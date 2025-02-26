@@ -1,0 +1,173 @@
+<script setup>
+import { ref, onMounted } from "vue";
+
+// Props con la información del evento
+defineProps({
+  event: Object,
+});
+
+// Leer API Key de Google Maps desde las variables de entorno
+const googleMapsApiKey = import.meta.env.GOOGLE_MAPS_API_KEY;
+
+// Estado para el toggle "Ver más" en la descripción
+const showFullDescription = ref(false);
+
+// Estado de cada pregunta en "Preguntas Frecuentes"
+const faqs = ref([
+  {
+    question: "¿Cuál es el horario del evento?",
+    answer: "El evento se realizará los días 17 y 18 de Mayo, desde las 10:00 a las 22:00 hrs.",
+    open: false
+  },
+  {
+    question: "¿Dónde se llevará a cabo?",
+    answer: "El evento se realizará en Mallplaza Norte, Huechuraba, Chile.",
+    open: false
+  },
+  {
+    question: "¿Es un evento gratuito?",
+    answer: "Sí, la entrada es totalmente gratis para todos los asistentes.",
+    open: false
+  },
+  {
+    question: "¿Necesito registrarme previamente?",
+    answer: "Te recomendamos reservar tu ticket en línea para asegurar tu cupo.",
+    open: false
+  },
+  {
+    question: "¿Habrá estacionamiento disponible?",
+    answer: "Sí, Mallplaza Norte cuenta con estacionamiento amplio para visitantes.",
+    open: false
+  },
+]);
+
+// Alternar la apertura de una pregunta con animación
+const toggleFAQ = (index) => {
+  faqs.value[index].open = !faqs.value[index].open;
+};
+
+// Detectar el scroll y resaltar la sección activa
+const activeSection = ref("descripcion");
+
+// Función para manejar el scroll
+const handleScroll = () => {
+  const sections = document.querySelectorAll(".event-section");
+  let currentSection = "descripcion";
+
+  sections.forEach((section) => {
+    const rect = section.getBoundingClientRect();
+    if (rect.top <= 150 && rect.bottom >= 150) {
+      currentSection = section.id;
+    }
+  });
+
+  activeSection.value = currentSection;
+};
+
+// Escuchar el scroll cuando se monta el componente
+onMounted(() => {
+  window.addEventListener("scroll", handleScroll);
+});
+
+const getTime = (date) => {
+  return new Date(date).toLocaleTimeString("es-ES", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+</script>
+
+<template>
+  <div class="lg:col-span-2 font-['Prompt']" v-if="event">
+    <!-- Tabs de navegación (solo en desktop) -->
+    <div class="hidden lg:flex border-b border-gray-300 space-x-4 sticky top-0 bg-white py-2 z-10">
+      <a href="#descripcion" class="py-2 px-4 text-sm font-semibold cursor-pointer font-['Unbounded']"
+        :class="activeSection === 'descripcion' ? 'border-b-2 border-black text-black' : 'text-gray-500'">
+        Descripción
+      </a>
+      <a href="#fecha" class="py-2 px-4 text-sm font-semibold cursor-pointer font-['Unbounded']"
+        :class="activeSection === 'fecha' ? 'border-b-2 border-black text-black' : 'text-gray-500'">
+        Fecha
+      </a>
+      <a href="#lugar" class="py-2 px-4 text-sm font-semibold cursor-pointer font-['Unbounded']"
+        :class="activeSection === 'lugar' ? 'border-b-2 border-black text-black' : 'text-gray-500'">
+        Ubicación
+      </a>
+      <a href="#preguntas" class="py-2 px-4 text-sm font-semibold cursor-pointer font-['Unbounded']"
+        :class="activeSection === 'preguntas' ? 'border-b-2 border-black text-black' : 'text-gray-500'">
+        Preguntas Frecuentes
+      </a>
+    </div>
+
+    <!-- Descripción con Soporte para HTML -->
+    <div id="descripcion" class="event-section mt-6">
+      <h2 class="text-2xl font-bold mb-4 font-['Unbounded']">Descripción</h2>
+      <transition name="fade-slide">
+        <div v-html="event.description" class="text-gray-600"></div>
+      </transition>
+      <button v-if="event.description.length > 200" @click="showFullDescription = !showFullDescription"
+        class="text-blue-500 mt-2 cursor-pointer">
+        {{ showFullDescription ? "Ver menos" : "Ver más" }}
+      </button>
+    </div>
+
+    <!-- Sección de Fecha -->
+    <div id="fecha" class="event-section mt-10">
+      <h2 class="text-2xl font-bold mb-4 font-['Unbounded']">Fecha y hora</h2>
+      <div class="flex space-x-4">
+        <div class="bg-gray-100 p-4 rounded-lg text-center w-1/2">
+          <span class="text-gray-900 font-semibold block">
+            {{ new Date(event.start_date).toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "long" }) }}
+          </span>
+          <span class="text-gray-600 text-sm">{{ getTime(event.start_date) }} hrs - {{ getTime(event.end_date) }} hrs</span>
+        </div>
+        <div class="bg-gray-100 p-4 rounded-lg text-center w-1/2">
+          <span class="text-gray-900 font-semibold block">
+            {{ new Date(event.end_date).toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "long" }) }}
+          </span>
+          <span class="text-gray-600 text-sm">{{ getTime(event.start_date) }} hrs - {{ getTime(event.end_date) }} hrs</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sección de Ubicación con Mapa -->
+    <div id="lugar" class="event-section mt-10">
+      <h2 class="text-2xl font-bold mb-4 font-['Unbounded']">Ubicación</h2>
+      <p class="text-gray-600">
+        {{ event.location }} 
+        <a :href="'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(event.location)" target="_blank"
+          class="text-blue-500 cursor-pointer">Ver ubicación</a>
+      </p>
+      <iframe class="w-full h-64 mt-4 rounded-lg shadow-md"
+        :src="'https://www.google.com/maps/embed/v1/place?key=' + googleMapsApiKey + '&q=' + encodeURIComponent(event.location)"
+        allowfullscreen>
+      </iframe>
+    </div>
+
+    <!-- Sección de Preguntas Frecuentes con animación -->
+    <div id="preguntas" class="event-section mt-10">
+      <h2 class="text-2xl font-bold mb-4 font-['Unbounded']">Preguntas Frecuentes</h2>
+      <div v-for="(faq, index) in faqs" :key="index" class="border-b border-gray-300 py-3">
+        <button @click="toggleFAQ(index)" class="flex justify-between items-center w-full text-left cursor-pointer">
+          <span class="text-gray-900 font-medium">{{ index + 1 }}. {{ faq.question }}</span>
+          <span class="text-gray-500">{{ faq.open ? "▲" : "▼" }}</span>
+        </button>
+        <transition name="fade-slide">
+          <p v-if="faq.open" class="mt-2 text-gray-600">{{ faq.answer }}</p>
+        </transition>
+      </div>
+    </div>
+
+    <!-- Categorías o temáticas del evento -->
+    <div class="mt-10">
+      <h2 class="text-2xl font-bold mb-4 font-['Unbounded']">Categorías y temáticas del evento</h2>
+      <div class="flex flex-wrap gap-2">
+        <span v-for="(cat, idx) in event.tags" :key="idx"
+          class="px-3 py-1 bg-gray-100 rounded-full text-gray-600 text-sm">
+          {{ cat }}
+        </span>
+      </div>
+    </div>
+  </div>
+</template>

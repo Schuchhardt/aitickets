@@ -1,0 +1,13 @@
+# Node
+node_modules
+dist
+.cache
+
+# Env files
+.env
+
+# mac os related
+.DS_Store
+**/*.DS_Store
+
+.qodo

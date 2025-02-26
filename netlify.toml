@@ -1,0 +1,9 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[functions]
+  # El directorio donde estarán las funciones construidas
+  # (Astro generará las funciones dentro de dist/functions por defecto)
+  directory = "dist/functions"
+  included_files = ["dist/**", "node_modules/**", ".env"]
