@@ -1,0 +1,109 @@
+---
+import AppHeader from "../components/AppHeader.vue";
+import AppFooter from "../components/AppFooter.vue";
+import Layout from '../layouts/Layout.astro';
+import "../styles/global.css";
+
+---
+
+<Layout>
+  <AppHeader/>
+  <main>
+        <div class="container mx-auto px-6 py-12 text-gray-700 font-['Prompt']">
+          <h1 class="text-3xl font-bold mb-6 font-['Unbounded'] text-gray-900">Aviso de Privacidad</h1>
+      
+          <p class="mb-4 font-['Prompt']">
+            En <strong>Chanium SpA</strong>, la privacidad de nuestros usuarios es una prioridad. 
+            Este aviso de privacidad describe cómo recopilamos, utilizamos, almacenamos y protegemos su información personal al utilizar nuestra plataforma.
+          </p>
+      
+          <section class="mb-8">
+            <h2 class="text-xl font-bold mb-2 font-['Unbounded'] text-gray-900">1. Información que recopilamos</h2>
+            <p class="font-['Prompt']">
+              Al utilizar nuestros servicios, podemos recopilar información personal como su nombre, correo electrónico, número de teléfono y detalles de pago. 
+              También podemos almacenar datos relacionados con sus preferencias de compra y el uso de nuestra plataforma.
+            </p>
+          </section>
+      
+          <section class="mb-8">
+            <h2 class="text-xl font-bold mb-2 font-['Unbounded'] text-gray-900">2. Uso de la información</h2>
+            <p class="font-['Prompt']">
+              La información recopilada se utiliza para:
+            </p>
+            <ul class="list-disc list-inside ml-4">
+              <li>Procesar y gestionar la compra de entradas.</li>
+              <li>Enviar confirmaciones y actualizaciones de eventos.</li>
+              <li>Mejorar la experiencia del usuario en nuestra plataforma.</li>
+              <li>Brindar soporte al cliente y responder consultas.</li>
+              <li>Cumplir con obligaciones legales y regulatorias.</li>
+            </ul>
+          </section>
+      
+          <section class="mb-8">
+            <h2 class="text-xl font-bold mb-2 font-['Unbounded'] text-gray-900">3. Protección de datos</h2>
+            <p class="font-['Prompt']">
+              Implementamos medidas de seguridad para proteger su información contra accesos no autorizados, pérdidas o alteraciones. 
+              Sin embargo, ningún sistema es completamente seguro, por lo que no podemos garantizar la seguridad absoluta de sus datos.
+            </p>
+          </section>
+      
+          <section class="mb-8">
+            <h2 class="text-xl font-bold mb-2 font-['Unbounded'] text-gray-900">4. Compartición de información</h2>
+            <p class="font-['Prompt']">
+              No compartimos su información personal con terceros, salvo en los siguientes casos:
+            </p>
+            <ul class="list-disc list-inside ml-4">
+              <li>Cuando sea necesario para procesar su compra (por ejemplo, con procesadores de pago).</li>
+              <li>Si lo exige la ley o una autoridad competente.</li>
+              <li>Con proveedores de servicio que nos ayudan a mejorar la plataforma (por ejemplo, servicios de análisis y marketing).</li>
+            </ul>
+          </section>
+      
+          <section class="mb-8">
+            <h2 class="text-xl font-bold mb-2 font-['Unbounded'] text-gray-900">5. Derechos del usuario</h2>
+            <p class="font-['Prompt']">
+              Usted tiene derecho a:
+            </p>
+            <ul class="list-disc list-inside ml-4">
+              <li>Acceder, modificar o eliminar su información personal.</li>
+              <li>Solicitar la restricción del procesamiento de sus datos.</li>
+              <li>Oponerse al uso de su información para fines específicos.</li>
+            </ul>
+            <p class="font-['Prompt']">
+              Para ejercer estos derechos, puede contactarnos a través de nuestros canales de atención al cliente.
+            </p>
+          </section>
+      
+          <section class="mb-8">
+            <h2 class="text-xl font-bold mb-2 font-['Unbounded'] text-gray-900">6. Uso de cookies</h2>
+            <p class="font-['Prompt']">
+              Nuestro sitio web utiliza cookies para mejorar su experiencia de navegación. Estas cookies nos permiten almacenar preferencias de usuario, 
+              analizar el tráfico en el sitio y ofrecer contenido personalizado. Puede gestionar sus preferencias de cookies desde la configuración de su navegador.
+            </p>
+          </section>
+      
+          <section class="mb-8">
+            <h2 class="text-xl font-bold mb-2 font-['Unbounded'] text-gray-900">7. Cambios en la política de privacidad</h2>
+            <p class="font-['Prompt']">
+              Nos reservamos el derecho de actualizar esta política en cualquier momento. Cualquier cambio será publicado en nuestro sitio web y entrará en vigor 
+              desde su publicación. Se recomienda revisar periódicamente esta sección para estar informado de cualquier actualización.
+            </p>
+          </section>
+      
+          <section class="mb-8">
+            <h2 class="text-xl font-bold mb-2 font-['Unbounded'] text-gray-900">8. Contacto</h2>
+            <p class="font-['Prompt']">
+              Si tiene preguntas o inquietudes sobre nuestra política de privacidad, puede contactarnos a través de nuestros canales de soporte.
+            </p>
+          </section>
+      
+          <!-- Botón de volver -->
+          <div class="text-center mt-8">
+            <a href="/" class="text-blue-500 hover:underline text-sm">Volver al inicio</a>
+          </div>
+      
+        </div>      
+      
+  </main>
+  <AppFooter/>
+</Layout>
