@@ -1,4 +1,4 @@
-<script setup>
+<script setup is:client>
 import logoLight from "../images/logo.png";
 import iconArrowGreen from "../images/icon-arrow-green.png";
 import iconFacebook from "../images/icon-facebook.png";
@@ -11,7 +11,7 @@ const isFocused = ref(false);
 const successMessage = ref("");
 const errorMessage = ref("");
 
-// ✅ Se obtiene el mensaje de éxito solo en el cliente
+// Se obtiene el mensaje de éxito solo en el cliente
 onMounted(() => {
   if (typeof window !== "undefined") {
     successMessage.value = localStorage.getItem("subscriptionSuccess") || "";
@@ -26,7 +26,7 @@ const submitForm = async (event) => {
   
   try {
     // Simulación de llamada a la API (reemplázalo con fetch real)
-    const response = await fetch("https://herokuapp.com/aitalks/api/subscribe", {
+    const response = await fetch("/api/newsletter", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: email.value }),
@@ -38,7 +38,7 @@ const submitForm = async (event) => {
       throw new Error(result.message || "Error desconocido");
     }
 
-    // ✅ Guardar mensaje de éxito en localStorage solo en el cliente
+    // Guardar mensaje de éxito en localStorage solo en el cliente
     successMessage.value = "¡Gracias por suscribirte!";
     if (typeof window !== "undefined") {
       localStorage.setItem("subscriptionSuccess", successMessage.value);
@@ -56,23 +56,24 @@ const submitForm = async (event) => {
   <footer class="bg-white py-6 border-t border-gray-200">
     <div class="container mx-auto flex flex-col lg:flex-row items-center justify-between space-y-6 lg:space-y-0 px-6">
       
-      <!-- 📌 Logo con enlace al root -->
+      <!-- Logo con enlace al root -->
       <div class="flex justify-center lg:justify-start w-full lg:w-auto">
         <a href="/" class="cursor-pointer">
           <img :src="logoLight.src" alt="AI Tickets" class="h-8" />
         </a>
       </div>
 
-      <!-- 📩 Formulario de suscripción o mensaje de éxito -->
+      <!-- Formulario de suscripción o mensaje de éxito -->
       <div class="flex flex-col items-center lg:items-end w-full lg:w-auto">
         <p class="text-gray-900 font-bold text-sm font-['Unbounded']">
           Únete a la comunidad AI 🔥
         </p>
         <div v-if="!successMessage" class="relative mt-2">
-          <form @submit="submitForm" class="flex">
+          <form @submit.prevent="submitForm" class="flex">
             <input 
               v-model="email" 
-              type="email" 
+              type="email"
+              name="email" 
               placeholder="Ingresa tu correo"
               @focus="isFocused = true"
               @blur="isFocused = false"
@@ -88,10 +89,10 @@ const submitForm = async (event) => {
           </form>
         </div>
 
-        <!-- ✅ Mensaje de confirmación -->
+        <!-- Mensaje de confirmación -->
         <p v-else class="text-green-600 font-bold mt-2">{{ successMessage }}</p>
 
-        <!-- ❌ Mensaje de error -->
+        <!-- Mensaje de error -->
         <p v-if="errorMessage" class="text-red-500 mt-2 text-sm">{{ errorMessage }}</p>
       </div>
 

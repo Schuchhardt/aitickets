@@ -9,7 +9,7 @@ const props = defineProps({
 </script>
 
 <template>
-  <section class="container mx-auto px-6 py-10">
+  <section id="events" class="container mx-auto px-6 py-10">
     <h2 class="text-3xl font-bold text-center font-['Unbounded'] mb-6">
       Eventos Destacados
     </h2>

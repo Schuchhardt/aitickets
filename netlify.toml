@@ -1,9 +1,9 @@
 [build]
   command = "npm run build"
   publish = "dist"
+  functions = "netlify/functions"
 
 [functions]
-  # El directorio donde estarán las funciones construidas
-  # (Astro generará las funciones dentro de dist/functions por defecto)
-  directory = "dist/functions"
-  included_files = ["dist/**", "node_modules/**", ".env"]
+  # Debe coincidir con el directorio de funciones declarado en build
+  directory = "netlify/functions"
+  included_files = ["netlify/functions/**", "node_modules/**", ".env"]

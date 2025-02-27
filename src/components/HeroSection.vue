@@ -18,10 +18,10 @@ import summitHero from "../images/summit.jpg";
 
       <!-- 🎟 Botones de acción -->
       <div class="mt-6 flex flex-col sm:flex-row justify-center gap-4">
-        <a href="/register" class="px-6 py-3 text-lg font-bold font-['Unbounded'] bg-lime-400 text-black border border-black rounded-lg transition hover:bg-black hover:text-white">
+        <!-- <a href="/register" class="px-6 py-3 text-lg font-bold font-['Unbounded'] bg-lime-400 text-black border border-black rounded-lg transition hover:bg-black hover:text-white">
           Crea tu Evento
-        </a>
-        <a href="/events" class="px-6 py-3 text-lg font-bold font-['Unbounded'] border border-white rounded-lg hover:bg-white hover:text-black transition">
+        </a> -->
+        <a href="#events" class="px-6 py-3 text-lg font-bold font-['Unbounded'] border border-white rounded-lg hover:bg-white hover:text-black transition">
           Descubrir Eventos
         </a>
       </div>
