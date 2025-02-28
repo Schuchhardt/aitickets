@@ -75,12 +75,12 @@ const getPaymentLink = () => {
       <div class="p-6">
         <!-- ✅ Paso 1: Selección de Entradas -->
         <div v-if="currentStep === 1">
-          <h3 class="text-lg font-semibold mb-4">Elige tus entradas</h3>
+          <h3 class="text-lg font-semibold mb-4">Selecciona tus tickets</h3>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <!-- 🎫 Entradas disponibles -->
             <div>
 
-              <!-- <div class="text-center border-b pb-4">
+              <div class="text-center border-b pb-4">
                 <p class="text-gray-500 text-sm">Fecha</p>
                 <p class="text-lg font-semibold">
                   {{ new Date(event.start_date).toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "long" }) }}
@@ -90,7 +90,7 @@ const getPaymentLink = () => {
                 <p class="text-gray-500 text-sm">
                   {{ event.start_time }} - {{ event.end_time }}
                 </p>
-              </div> -->
+              </div>
 
 
               <div

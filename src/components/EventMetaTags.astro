@@ -1,0 +1,23 @@
+---
+const { event } = Astro.props;
+const siteUrl = import.meta.env.SITE_URL || "https://aitickets.cl"; // Usa el dominio de entorno o uno por defecto
+---
+
+<head>
+  <title>{event?.name || "Evento no encontrado"}</title>
+  <meta name="description" content={event?.description || "Este evento no está disponible."} />
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content={`${siteUrl}/eventos/${event?.slug}`} />
+  <meta property="og:title" content={event?.name || "Evento no encontrado"} />
+  <meta property="og:description" content={event?.description || "Este evento no está disponible."} />
+  <meta property="og:image" content={`${siteUrl}${event?.image || "/images/default.jpg"}`} />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:url" content={`${siteUrl}/eventos/${event?.slug}`} />
+  <meta name="twitter:title" content={event?.name || "Evento no encontrado"} />
+  <meta name="twitter:description" content={event?.description || "Este evento no está disponible."} />
+  <meta name="twitter:image" content={`${siteUrl}${event?.image || "/images/default.jpg"}`} />
+</head>

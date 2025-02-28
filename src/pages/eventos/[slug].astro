@@ -1,11 +1,13 @@
 ---
 import _ from "lodash";
-import { supabase } from "../lib/supabaseClient";
-import AppHeader from "../components/AppHeader.vue";
-import AppFooter from "../components/AppFooter.vue";
-import EventDetail from "../components/EventDetail.vue";
-import Layout from '../layouts/Layout.astro';
-import "../styles/global.css";
+import { supabase } from "../../lib/supabaseClient";
+import AppHeader from "../../components/AppHeader.vue";
+import AppFooter from "../../components/AppFooter.vue";
+import EventDetail from "../../components/EventDetail.vue";
+import EventMetaTags from "../../components/EventMetaTags.astro";
+
+import Layout from '../../layouts/Layout.astro';
+import "../../styles/global.css";
 
 export const prerender = false;
 
@@ -57,8 +59,8 @@ if (!error || event) {
 
 
 ---
-
 <Layout>
+  <EventMetaTags event={event} />
     <AppHeader/>
     <EventDetail event={event} client:idle/>
     <AppFooter client:idle/>

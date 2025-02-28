@@ -1,0 +1,24 @@
+---
+import { supabase } from "../../lib/supabaseClient";
+import AppHeader from "../../components/AppHeader.vue";
+import AppFooter from "../../components/AppFooter.vue";
+import EventList from "../../components/EventList.vue";
+import Layout from '../../layouts/Layout.astro';
+import "../../styles/global.css";
+
+
+// Consulta los eventos en el servidor (SSR)
+const { data: events, error } = await supabase.from("events").select("*");
+
+// Si hay error o no hay eventos, definir un fallback vacío
+const eventData = error || !events ? [] : events;
+---
+
+<Layout>
+  <AppHeader/>
+  
+    <main>
+      <EventList events={eventData} client:idle />
+    </main>
+  <AppFooter client:idle/>
+</Layout>

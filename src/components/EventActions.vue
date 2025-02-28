@@ -4,7 +4,7 @@ import iconShare from "../images/icon-share.png"; // Icono de compartir
 import iconArrow from "../images/icon-arrow-black.png"; // Icono de flecha en botón de reserva
 import iconTicket from "../images/icon-tickets.png"; // Icono de ticket
 import ShareEventModal from "./ShareEventModal.vue";
-import ReserveModal from "./ReserveModal.vue";
+import ReserveModal from "./Reservation/ReservationModal.vue";
 
 defineProps({
   event: Object,

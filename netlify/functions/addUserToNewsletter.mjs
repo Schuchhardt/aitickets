@@ -16,7 +16,7 @@ export default async function handler(req, context) {
   }
 
   try {
-    const { email } = await req.json();
+    const { email, language, timezone, userAgent, referrer } = await req.json();
     if (!email) {
       return new Response(JSON.stringify({ message: 'Email requerido' }), { status: 400 });
     }
@@ -25,13 +25,45 @@ export default async function handler(req, context) {
     const userIp = context.ip || '0.0.0.0';
     const country = context.geo?.country?.name || 'Desconocido';
 
-    // Guardar en Supabase
-    const { error } = await supabase
+    // Verificar si el correo ya está registrado en Supabase
+    const { data: existingUser, error: fetchError } = await supabase
       .from('newsletter')
-      .insert([{ email, ip: userIp, country }]);
+      .select('email')
+      .eq('email', email)
+      .single();
 
-    if (error) {
-      return new Response(JSON.stringify({ message: 'Error guardando en Supabase', error }), { status: 500 });
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      return new Response(JSON.stringify({
+        message: 'Ha ocurrido un error, intenta más tarde',
+        error: fetchError.message
+      }), { status: 500 });
+    }
+
+    if (existingUser) {
+      return new Response(JSON.stringify({
+        message: 'Ya estás registrado',
+        error: 'Correo duplicado en Supabase'
+      }), { status: 400 });
+    }
+
+    // Insertar en Supabase
+    const { error: insertError } = await supabase
+      .from('newsletter')
+      .insert([{ 
+        email, 
+        ip: userIp, 
+        country, 
+        language, 
+        timezone, 
+        userAgent, 
+        referrer // Guardamos referrer o UTM en un solo campo
+      }]);
+
+    if (insertError) {
+      return new Response(JSON.stringify({
+        message: 'Ha ocurrido un error, intenta más tarde',
+        error: insertError.message
+      }), { status: 500 });
     }
 
     // Enviar a MailerLite
@@ -43,15 +75,25 @@ export default async function handler(req, context) {
       },
       body: JSON.stringify({
         email,
-        groups: mailerLiteGroupId ? [mailerLiteGroupId] : [], // Opcional
-        fields: { country, ip_address: userIp },
+        groups: mailerLiteGroupId ? [mailerLiteGroupId] : [],
+        fields: { 
+          country, 
+          ip_address: userIp, 
+          language, 
+          timezone, 
+          user_agent: userAgent, 
+          tracking_source: trackingSource
+        },
       }),
     });
 
     const mailerLiteData = await mailerLiteResponse.json();
 
     if (!mailerLiteResponse.ok) {
-      return new Response(JSON.stringify({ message: 'Error en MailerLite', error: mailerLiteData }), { status: 500 });
+      return new Response(JSON.stringify({
+        message: 'Ha ocurrido un error, intenta más tarde',
+        error: mailerLiteData
+      }), { status: 500 });
     }
 
     return new Response(
@@ -60,15 +102,22 @@ export default async function handler(req, context) {
         email,
         ip: userIp,
         country,
+        language,
+        timezone,
+        userAgent,
+        trackingSource
       }),
       { status: 200 }
     );
   } catch (error) {
-    return new Response(JSON.stringify({ message: 'Error en el servidor', error: error.message }), { status: 500 });
+    return new Response(JSON.stringify({
+      message: 'Ha ocurrido un error, intenta más tarde',
+      error: error.message
+    }), { status: 500 });
   }
 }
 
 // 📌 Definir rutas personalizadas
 export const config = {
-  path: ['/api/newsletter', '/subscribe'],
+  path: ['/api/newsletter', 'api/subscribe'],
 };

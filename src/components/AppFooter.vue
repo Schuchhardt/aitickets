@@ -18,6 +18,24 @@ onMounted(() => {
   }
 });
 
+const getTrackingSource = () => {
+  const referrer = document.referrer;
+  const params = new URLSearchParams(window.location.search);
+  
+  if (referrer) return referrer; // Si hay referrer, usarlo
+
+  // Construir string con UTM si no hay referrer
+  const utmParams = [
+    params.get("utm_source") ? `utm_source=${params.get("utm_source")}` : "",
+    params.get("utm_medium") ? `utm_medium=${params.get("utm_medium")}` : "",
+    params.get("utm_campaign") ? `utm_campaign=${params.get("utm_campaign")}` : "",
+    params.get("utm_term") ? `utm_term=${params.get("utm_term")}` : "",
+    params.get("utm_content") ? `utm_content=${params.get("utm_content")}` : ""
+  ].filter(Boolean).join("&");
+
+  return utmParams || "direct"; // Si no hay UTM ni referrer, marcar como tráfico directo
+}
+
 // Función para manejar el envío del formulario
 const submitForm = async (event) => {
   event.preventDefault(); // Evita recarga de la página
@@ -29,7 +47,13 @@ const submitForm = async (event) => {
     const response = await fetch("/api/newsletter", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: email.value }),
+      body: JSON.stringify({ 
+        email: email.value,
+        language: navigator.language,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        userAgent: navigator.userAgent,
+        referrer: getTrackingSource()
+      }),
     });
 
     const result = await response.json();
@@ -90,17 +114,17 @@ const submitForm = async (event) => {
         </div>
 
         <!-- Mensaje de confirmación -->
-        <p v-else class="text-green-600 font-bold mt-2">{{ successMessage }}</p>
+        <p v-else class="text-green-600 font-bold mt-2 font-['Prompt']">{{ successMessage }}</p>
 
         <!-- Mensaje de error -->
-        <p v-if="errorMessage" class="text-red-500 mt-2 text-sm">{{ errorMessage }}</p>
+        <p v-if="errorMessage" class="text-red-500 mt-2 text-sm font-['Prompt']">{{ errorMessage }}</p>
       </div>
 
     </div>
 
     <!-- 🌐 Redes sociales -->
     <div class="flex justify-center space-x-4 mt-4">
-      <a href="https://facebook.com" target="_blank" class="cursor-pointer">
+      <a href="https://www.facebook.com/profile.php?id=61573771138631" target="_blank" class="cursor-pointer">
         <img :src="iconFacebook.src" alt="Facebook" class="w-6 h-6" />
       </a>
       <a href="https://linkedin.com" target="_blank" class="cursor-pointer">
