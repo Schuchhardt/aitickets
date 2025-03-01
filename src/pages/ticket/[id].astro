@@ -1,0 +1,89 @@
+---
+import { supabase } from "../../lib/supabaseClient";
+import Layout from "../../layouts/Layout.astro";
+import AppHeader from "../../components/AppHeader.vue";
+import AppFooter from "../../components/AppFooter.vue";
+import TicketQR from "../../components/TicketQR.vue";
+
+import "../../styles/global.css";
+
+// Obtener el ID de la entrada desde la URL
+const { id } = Astro.params;
+
+let ticket = null;
+let errorMessage = null;
+
+if (id) {
+  // Obtener los datos del ticket
+  const { data: ticketData, error } = await supabase
+    .from("event_attendees")
+    .select("id, event_id, event_ticket_id, attendee_id, qr_code")
+    .eq("internal_id", id)
+    .single();
+
+  console.log("Datos obtenidos del ticket:", ticketData);
+
+  if (error || !ticketData) {
+    errorMessage = "Ticket no encontrado";
+  } else {
+    // Obtener datos del evento
+    const { data: event } = await supabase
+      .from("events")
+      .select("name, start_date")
+      .eq("id", ticketData.event_id)
+      .single();
+
+    // Obtener datos del asistente
+    const { data: attendee } = await supabase
+      .from("attendees")
+      .select("first_name, last_name, email")
+      .eq("id", ticketData.attendee_id)
+      .single();
+
+    ticket = {
+      event_name: event?.name || "Evento desconocido",
+      event_date: event?.start_date || "Fecha no disponible",
+      ticket_name: "Entrada General",
+      attendee_name: `${attendee?.first_name || ""} ${attendee?.last_name || ""}`.trim(),
+      attendee_email: attendee?.email || "Correo no disponible",
+      qr_code: ticketData.qr_code || null,
+    };
+  }
+}
+---
+
+<Layout>
+  <AppHeader />
+  <main class="flex flex-col items-center justify-center min-h-screen bg-gray-100 px-4">
+    <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-md text-center">
+      <h2 class="text-3xl font-bold mb-4 font-unbounded">Tu Entrada</h2>
+
+      {errorMessage ? (
+        <p class="text-red-600 font-semibold">{errorMessage}</p>
+      ) : (
+        <>
+          <p class="text-xl font-semibold font-unbounded">{ticket.event_name}</p>
+          <p class="text-gray-600 font-prompt">{ticket.ticket_name}</p>
+          <p class="text-gray-500 font-prompt">{ticket.event_date}</p>
+
+          <div class="mt-4 text-center font-prompt">
+            <p><strong>Nombre:</strong> {ticket.attendee_name}</p>
+            <p><strong>Email:</strong> {ticket.attendee_email}</p>
+          </div>
+
+          {ticket.qr_code && (
+            <div class="mt-6 flex flex-col items-center">
+              <TicketQR code={ticket.qr_code} client:idle />
+              <p class="text-gray-500 text-sm mt-2">Escanea este código al ingresar</p>
+            </div>
+          )}
+
+          <a href="/" class="mt-6 inline-block bg-black text-white px-6 py-2 rounded-md font-prompt">
+            Volver al inicio
+          </a>
+        </>
+      )}
+    </div>
+  </main>
+  <AppFooter client:idle />
+</Layout>

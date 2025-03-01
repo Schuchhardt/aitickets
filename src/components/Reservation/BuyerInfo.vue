@@ -30,7 +30,7 @@ const isChile = computed(() => buyerInfo.value.country === "Chile");
         @input="updateBuyerInfo('firstName', $event.target.value)"
         type="text"
         placeholder="Nombre*"
-        class="border p-2 rounded-md w-full"
+        class="border p-2 rounded-md w-full col-span-2"
         required
       />
       <input
@@ -38,7 +38,7 @@ const isChile = computed(() => buyerInfo.value.country === "Chile");
         @input="updateBuyerInfo('lastName', $event.target.value)"
         type="text"
         placeholder="Apellidos*"
-        class="border p-2 rounded-md w-full"
+        class="border p-2 rounded-md w-full col-span-2"
         required
       />
       <input
@@ -57,42 +57,24 @@ const isChile = computed(() => buyerInfo.value.country === "Chile");
         class="border p-2 rounded-md w-full col-span-2"
         required
       />
-      <div v-if="isChile" class="flex items-center border p-2 rounded-md w-full col-span-2">
-        <!-- <span class="mr-2">🇨🇱 +56</span> -->
+      <div class="flex items-center border p-2 rounded-md w-full col-span-2">
         <input
           v-model="buyerInfo.phone"
           @input="updateBuyerInfo('phone', $event.target.value)"
           type="tel"
-          placeholder="9 12 345 678"
+          name="phone"
+          placeholder="+56 9 12 345 678"
           class="w-full"
           required
         />
       </div>
-      <div v-else class="border p-2 rounded-md w-full col-span-2">
-        <input
-          v-model="buyerInfo.phone"
-          @input="updateBuyerInfo('phone', $event.target.value)"
-          type="tel"
-          placeholder="Teléfono"
-          class="w-full"
-          required
-        />
-      </div>
-      <select
-        v-model="buyerInfo.country"
-        @change="updateBuyerInfo('country', $event.target.value)"
-        class="border p-2 rounded-md w-full col-span-2"
-      >
-        <option>Chile</option>
-        <option>Otro</option>
-      </select>
     </div>
     <div class="flex items-center mt-4">
       <input
         v-model="buyerInfo.termsAccepted"
         @change="updateBuyerInfo('termsAccepted', $event.target.checked)"
         type="checkbox"
-        class="mr-2"
+        class="mr-2 cursor-pointer"
         required
       />
       <label class="text-gray-600 text-sm">

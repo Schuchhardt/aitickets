@@ -67,8 +67,8 @@ const applyDiscount = async () => {
 
 <template>
   <div class="border p-4 rounded-lg bg-gray-50">
-    <h4 class="font-semibold text-lg mb-4">Tu pedido</h4>
-    <div class="flex items-center mb-2">
+    <h4 class="font-semibold text-lg mb-4" v-if="selectedTicketList.length !== 0">Tu pedido</h4>
+    <div class="flex items-center mb-2" v-if="selectedTicketList.length !== 0 && hasPaidTickets">
       <input 
         v-model="discountCode" 
         type="text" 
@@ -92,15 +92,21 @@ const applyDiscount = async () => {
         <span>
           {{ ticket.quantity }} x {{ ticket.name }}
         </span>
-        <span class="font-medium">
+        <span class="font-medium" v-if="ticket.total !== 0">
           ${{ ticket.total.toLocaleString("es-ES") }} CLP
+        </span>
+        <span class="font-medium" v-if="ticket.total == 0">
+          Gratis
         </span>
       </li>
     </ul>
     <div v-if="selectedTicketList.length" class="text-sm text-gray-600 border-t pt-2">
       <div class="flex justify-between">
         <span>Subtotal</span>
-        <span>${{ totalAmount.toLocaleString("es-ES") }} CLP</span>
+        <span v-if="totalAmount !== 0">${{ totalAmount.toLocaleString("es-ES") }} CLP</span>
+        <span class="font-medium" v-if="totalAmount == 0">
+          Gratis
+        </span>
       </div>
       <div v-if="hasPaidTickets" class="flex justify-between">
         <span>Tasa del servicio</span>
@@ -113,7 +119,8 @@ const applyDiscount = async () => {
     </div>
     <div v-if="selectedTicketList.length" class="flex justify-between text-xl font-bold border-t pt-2 mt-2">
       <span>Total ({{ selectedTicketList.reduce((sum, t) => sum + t.quantity, 0) }} ticket<span v-if="selectedTicketList.reduce((sum, t) => sum + t.quantity, 0) > 1">s</span>)</span>
-      <span>${{ finalTotal.toLocaleString("es-ES") }} CLP</span>
+      <span v-if="finalTotal !== 0">${{ finalTotal.toLocaleString("es-ES") }} CLP</span>
+      <span v-if="finalTotal == 0">Gratis</span>
     </div>
   </div>
 </template>

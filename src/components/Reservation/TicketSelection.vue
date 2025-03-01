@@ -3,6 +3,7 @@ import { defineProps, defineEmits, ref } from "vue";
 
 const props = defineProps({
   event: Object,
+  selectedTickets: Object, // Se recibe desde el padre
 });
 
 const emit = defineEmits(["update:selectedTickets"]);
@@ -14,7 +15,7 @@ const updateSelection = (ticketId, quantity) => {
 };
 
 const isSuperFan = (ticket) => {
-  return ticket.price === Math.max(...props.event.tickets.map(t => t.price));
+  return ticket.price > 0 && ticket.price === Math.max(...props.event.tickets.map(t => t.price));
 };
 
 const increaseTicket = (ticket) => {
@@ -40,9 +41,9 @@ const formatPrice = (price) => {
 
 <template>
   <div v-if="event.tickets && event.tickets.length" class="w-full">
-    <h3 class="text-lg font-semibold mb-4">Selecciona tus tickets</h3>
+    <h3 class="text-lg font-semibold text-center mb-4">Selecciona tus tickets</h3>
     <div class="w-full">
-      <div class="text-center border-b pb-4">
+      <div class="text-center pb-4">
         <p class="text-gray-500 text-sm">Fecha</p>
         <p class="text-lg font-semibold">
           <template v-if="event.start_date || event.end_date">
@@ -66,16 +67,31 @@ const formatPrice = (price) => {
             <div v-if="isSuperFan(ticket)" class="bg-green-200 text-green-800 text-xs font-bold px-2 py-1 rounded-full inline-block mb-2">
               Super Fan
             </div>
+            <div v-if="!isSuperFan(ticket)" class="bg-gray-200 text-xs font-bold px-2 py-1 rounded-full inline-block mb-2">
+              Fan
+            </div>
             <p class="font-medium">{{ ticket.ticket_name }}</p>
             <p v-if="ticket.price !== null && ticket.price !== undefined" class="text-gray-500">
               {{ ticket.price > 0 ? `$${formatPrice(ticket.price)}` : "Gratis" }}
             </p>
           </div>
-          <div class="flex items-center space-x-2">
-            <button @click="decreaseTicket(ticket)" class="px-2 py-1 border rounded">-</button>
-            <span>{{ selectedTickets[ticket.id] || 0 }}</span>
-            <button @click="increaseTicket(ticket)" class="px-2 py-1 border rounded">+</button>
+
+        <!-- Botón Añadir / Controles de cantidad alineados al centro -->
+        <div class="flex justify-center items-center">
+          <button 
+            v-if="!selectedTickets[ticket.id]" 
+            @click="increaseTicket(ticket)" 
+            class="border px-4 py-1 rounded-lg text-black hover:bg-gray-100"
+          >
+            Añadir
+          </button>
+          <div v-else class="flex items-center justify-center space-x-2 border rounded-lg px-2 py-1">
+            <button @click="decreaseTicket(ticket)" class="px-2 py-1">-</button>
+            <span class="w-6 text-center">{{ selectedTickets[ticket.id] || 0 }}</span>
+            <button @click="increaseTicket(ticket)" class="px-2 py-1">+</button>
           </div>
+        </div>
+
         </div>
       </div>
     </div>
