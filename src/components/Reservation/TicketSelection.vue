@@ -40,8 +40,8 @@ const formatPrice = (price) => {
 </script>
 
 <template>
-  <div v-if="event.tickets && event.tickets.length" class="w-full">
-    <h3 class="text-lg font-semibold text-center mb-4">Selecciona tus tickets</h3>
+  <div v-if="event.tickets && event.tickets.length" class="w-full font-[Prompt]">
+    <h3 class="text-lg font-semibold text-center mb-4 font-[Prompt]">Selecciona tus tickets</h3>
     <div class="w-full">
       <div class="text-center pb-4">
         <p class="text-gray-500 text-sm">Fecha</p>

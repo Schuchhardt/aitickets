@@ -66,7 +66,7 @@ const applyDiscount = async () => {
 </script>
 
 <template>
-  <div class="border p-4 rounded-lg bg-gray-50">
+  <div class="border p-4 rounded-lg bg-gray-50 font-[Prompt]">
     <h4 class="font-semibold text-lg mb-4" v-if="selectedTicketList.length !== 0">Tu pedido</h4>
     <div class="flex items-center mb-2" v-if="selectedTicketList.length !== 0 && hasPaidTickets">
       <input 

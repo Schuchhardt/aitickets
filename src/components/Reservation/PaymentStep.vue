@@ -68,7 +68,8 @@ const handlePayment = async () => {
       window.location.href = `/ticket/${data.ticketId}`; // Redirigir al ticket
     }
   } catch (error) {
-    errorMessage.value = error.message;
+    console.error(error.message)
+    errorMessage.value = "Ha ocurrido un error. por favor intenta mas tarde" //error.message;
   } finally {
     isLoading.value = false;
   }
@@ -76,13 +77,13 @@ const handlePayment = async () => {
 </script>
 
 <template>
-  <div class="text-center">
+  <div class="text-center font-[Prompt]">
     <h3 class="text-lg font-semibold mb-4">Completa tu registro</h3>
     <p class="text-gray-600 mb-4">Revisa tu pedido antes de continuar.</p>
 
     <div class="border p-4 rounded-lg mb-4">
       <p class="text-lg font-bold">Total a pagar:</p>
-      <p class="text-xl" :class="{ 'text-green-600': totalAmount > 0, 'text-blue-600': totalAmount === 0 }">
+      <p class="text-xl" :class="{ 'text-green-600': totalAmount > 0, 'text-lime-600 font-[Unbounded]': totalAmount === 0 }">
         {{ totalAmount > 0 ? `$${finalTotal.toLocaleString("es-ES")}` : "Evento gratuito" }}
       </p>
     </div>

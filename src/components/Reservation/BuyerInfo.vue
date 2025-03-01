@@ -1,5 +1,5 @@
 <script setup>
-import { defineEmits, ref, computed } from "vue";
+import { defineEmits, ref } from "vue";
 
 const emit = defineEmits(["update:buyerInfo"]);
 const buyerInfo = ref({
@@ -8,7 +8,6 @@ const buyerInfo = ref({
   email: "",
   confirmEmail: "",
   phone: "",
-  country: "Chile",
   termsAccepted: false,
 });
 
@@ -16,12 +15,10 @@ const updateBuyerInfo = (field, value) => {
   buyerInfo.value[field] = value;
   emit("update:buyerInfo", buyerInfo.value);
 };
-
-const isChile = computed(() => buyerInfo.value.country === "Chile");
 </script>
 
 <template>
-  <div>
+  <div class="font-[Prompt]">
     <h3 class="text-lg font-semibold mb-4">Información de los tickets</h3>
     <p class="text-gray-600 mb-4">Información del comprador</p>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -74,15 +71,15 @@ const isChile = computed(() => buyerInfo.value.country === "Chile");
         v-model="buyerInfo.termsAccepted"
         @change="updateBuyerInfo('termsAccepted', $event.target.checked)"
         type="checkbox"
-        class="mr-2 cursor-pointer"
+        class="mr-3 cursor-pointer w-10 h-10 accent-black"
         required
       />
-      <label class="text-gray-600 text-sm">
+      <label class="text-gray-600 text-sm leading-5">
         Acepto los
-        <a href="/terms" class="text-blue-600 underline">Términos del Servicio</a>
+        <a href="/terms" class="text-black underline font-medium" target="_blank">Términos del Servicio</a>
         y
-        <a href="/privacy" class="text-blue-600 underline">Políticas de Privacidad</a>
-        <span class="text-red-500">(Requerido)</span>
+        <a href="/privacy" class="text-black underline font-medium" target="_blank">Políticas de Privacidad</a>
+            <span class="text-red-500"> (Requerido)</span>
       </label>
     </div>
   </div>

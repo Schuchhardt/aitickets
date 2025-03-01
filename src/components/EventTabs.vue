@@ -100,17 +100,19 @@ const getTime = (date) => {
       </a>
     </div>
 
-    <!-- Descripción con Soporte para HTML -->
+
+    <!-- Sección de Descripción con soporte para "Ver más" -->
     <div id="descripcion" class="event-section mt-6">
       <h2 class="text-2xl font-bold mb-4 font-['Unbounded']">Descripción</h2>
       <transition name="fade-slide">
-        <div v-html="event.description" class="text-gray-600"></div>
+        <div v-html="showFullDescription ? event.description : event.description.slice(0, 200) + '...'" class="text-gray-600"></div>
       </transition>
       <button v-if="event.description.length > 200" @click="showFullDescription = !showFullDescription"
         class="text-blue-500 mt-2 cursor-pointer">
         {{ showFullDescription ? "Ver menos" : "Ver más" }}
       </button>
     </div>
+
 
     <!-- Sección de Fecha -->
     <div id="fecha" class="event-section mt-10">
@@ -160,7 +162,7 @@ const getTime = (date) => {
     </div>
 
     <!-- Categorías o temáticas del evento -->
-    <div class="mt-10">
+    <div class="mt-10" v-if="event.tags">
       <h2 class="text-2xl font-bold mb-4 font-['Unbounded']">Categorías y temáticas del evento</h2>
       <div class="flex flex-wrap gap-2">
         <span v-for="(cat, idx) in event.tags" :key="idx"
