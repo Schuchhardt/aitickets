@@ -27,7 +27,7 @@ const closeReserveModal = () => {
   <div class="font-['Unbounded'] font-bold" v-if="event">
     <!-- Botón de compartir en Mobile (debajo del EventHeader) -->
     <div class="lg:hidden flex justify-center mt-4">
-      <button class="w-11/12 flex items-center justify-center py-2 border border-gray-300 rounded-full text-gray-600 bg-gray-100">
+      <button @click="showModal = true" class="w-11/12 flex items-center justify-center py-2 border border-gray-300 rounded-full text-gray-600 bg-gray-100 cursor-pointer">
         <img :src="iconShare.src" alt="Compartir" class="w-5 h-5 mr-2" />
         Compartir evento
       </button>

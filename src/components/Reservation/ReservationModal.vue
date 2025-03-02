@@ -74,7 +74,7 @@ const closeModal = (event) => {
 <template>
     <div
       id="modal-overlay"
-      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto md:p-4"
+      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[55] overflow-y-auto md:p-4"
       @click="closeModal"
     >
       <div
