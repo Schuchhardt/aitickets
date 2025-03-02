@@ -2,7 +2,7 @@
 import { ref, onMounted } from "vue";
 
 // Props con la información del evento
-defineProps({
+const props = defineProps({
   event: Object,
 });
 
@@ -13,33 +13,9 @@ const googleMapsApiKey = import.meta.env.GOOGLE_MAPS_API_KEY;
 const showFullDescription = ref(false);
 
 // Estado de cada pregunta en "Preguntas Frecuentes"
-const faqs = ref([
-  {
-    question: "¿Cuál es el horario del evento?",
-    answer: "El evento se realizará los días 17 y 18 de Mayo, desde las 10:00 a las 22:00 hrs.",
-    open: false
-  },
-  {
-    question: "¿Dónde se llevará a cabo?",
-    answer: "El evento se realizará en Mallplaza Norte, Huechuraba, Chile.",
-    open: false
-  },
-  {
-    question: "¿Es un evento gratuito?",
-    answer: "Sí, la entrada es totalmente gratis para todos los asistentes.",
-    open: false
-  },
-  {
-    question: "¿Necesito registrarme previamente?",
-    answer: "Te recomendamos reservar tu ticket en línea para asegurar tu cupo.",
-    open: false
-  },
-  {
-    question: "¿Habrá estacionamiento disponible?",
-    answer: "Sí, Mallplaza Norte cuenta con estacionamiento amplio para visitantes.",
-    open: false
-  },
-]);
+const faqs = ref(props.event.faqs.map( (faq) => {
+  return {...faq, open: false} }
+));
 
 // Alternar la apertura de una pregunta con animación
 const toggleFAQ = (index) => {

@@ -1,0 +1,236 @@
+<script setup>
+import { ref, onMounted, nextTick, defineProps} from "vue";
+import { marked } from "marked"; // Importar la librería para renderizar Markdown
+import DOMPurify from "dompurify"; // Para sanitizar el HTML
+import IconChat from "../images/icon-chat.png"; 
+import IconArrowGreen from "../images/icon-arrow-green.png"; 
+
+const props = defineProps({
+  event: Object,
+});
+
+const isOpen = ref(false);
+const messages = ref([
+  { role: "assistant", text: "¿Te ayudo a conseguir tu ticket en segundos? 😎", time: new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) }
+]);
+const userMessage = ref("");
+const showSuggestedReplies = ref(true);
+const chatContainer = ref(null);
+const isLoading = ref(false);
+
+// Función para hacer scroll automático
+const scrollToBottom = () => {
+  nextTick(() => {
+    if (chatContainer.value) {
+      chatContainer.value.scrollTop = chatContainer.value.scrollHeight;
+    }
+  });
+};
+
+// Función para convertir Markdown a HTML y sanitizarlo
+const renderMarkdown = (text) => {
+  return DOMPurify.sanitize(marked(text)); // Convierte a HTML y sanitiza
+};
+
+const sendMessage = async (message) => {
+  if (!message.trim()) return;
+
+  messages.value.push({ role: "user", text: message });
+  showSuggestedReplies.value = false;
+  scrollToBottom();
+  isLoading.value = true;
+
+  const assistantMessage = { role: "assistant", text: "" };
+  messages.value.push(assistantMessage);
+
+  // Mensaje oculto con los detalles del evento (NO se muestra en la UI)
+  const eventDetailsMessage = {
+    role: "system",
+    text: `Detalles del evento:
+    - ID Evento: ${props.event.id}
+    - Nombre: ${props.event.name}
+    - Descripción: ${props.event.description}
+    - Fecha: ${new Date(props.event.start_date).toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })} - ${new Date(props.event.end_date).toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })}
+    - Ubicación: ${props.event.location}
+    - Preguntas frecuentes: ${props.event.faqs}
+    - Precios de las entradas:
+      ${props.event.tickets.map(ticket => `•Tipo de entrada ${ticket.ticket_name}: Precio $${ticket.price}`).join("\n")}
+    `,
+  };
+
+  userMessage.value = "";
+  try {
+    const response = await fetch("/api/ai-assistant", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: [eventDetailsMessage, ...messages.value] }),
+    });
+
+    if (!response.ok) throw new Error("Error en la respuesta del servidor");
+
+    // Leer la respuesta completa de una vez
+    const responseData = await response.json();
+    
+    // Asignar el texto directamente sin procesamiento por partes
+    assistantMessage.text = responseData.message;
+
+  } catch (error) {
+    assistantMessage.text = "Lo siento, hubo un error. Inténtalo de nuevo más tarde.";
+  } finally {
+    isLoading.value = false;
+    scrollToBottom();
+  }
+
+};
+
+// Obtener la fecha actual
+const currentDate = new Date().toLocaleDateString("es-ES", {
+  weekday: "long",
+  day: "numeric",
+  month: "long"
+});
+
+onMounted(scrollToBottom);
+</script>
+
+<template>
+  <div>
+    <!-- Botón flotante -->
+    <div v-if="!isOpen" class="assistant-button group flex flex-col items-center">
+      <span class="bg-gray-800 text-white text-xs px-2 py-1 rounded-md mb-2 opacity-0 group-hover:opacity-100 transition font-[Prompt]">
+        Asistente AI
+      </span>
+      <button 
+        @click="isOpen = true" 
+        class="w-16 h-16 rounded-full cursor-pointer shadow-lg bg-cover bg-center bg-no-repeat transition hover:opacity-80"
+        :style="{ backgroundImage: `url(${IconChat.src})` }">
+      </button>
+    </div>
+
+    <!-- Panel del chat -->
+    <div v-if="isOpen" class="assistant-chat fixed bottom-20 bg-white shadow-xl rounded-lg max-h-[500px] flex flex-col overflow-hidden border border-gray-200 z-50 w-full md:w-96">
+      
+      <!-- Header -->
+      <div class="bg-white text-gray-900 p-4 font-semibold flex justify-between font-[Unbounded] border-b">
+        <span>AI Tickets</span>
+        <button @click="isOpen = false" class="cursor-pointer text-gray-400 hover:text-black text-xl">×</button>
+      </div>
+
+      <!-- Mensajes -->
+      <div ref="chatContainer" class="p-4 flex-1 overflow-y-auto space-y-3 text-sm font-[Prompt]">
+        <p class="text-gray-400 text-xs text-center">{{ currentDate }}</p>
+
+        <div v-for="(msg, index) in messages" :key="index" class="flex items-start space-x-2"
+          :class="msg.role === 'user' ? 'justify-end' : 'justify-start'">
+          <img v-if="msg.role === 'assistant'" :src="IconChat.src" alt="AI" class="w-8 h-8 rounded-full" />
+          
+          <div v-if="msg.role === 'assistant'" class="bg-gray-200 text-black p-3 rounded-lg max-w-[80%] markdown-content">
+            <span v-html="renderMarkdown(msg.text)"></span> 
+
+            <!-- "Escribiendo..." solo en el último mensaje del asistente cuando está cargando -->
+            <span v-if="isLoading && index === messages.length - 1" class="text-gray-500 ml-2 italic">Escribiendo...</span>
+          </div>
+
+          <div v-if="msg.role === 'user'" class="bg-black text-white p-3 rounded-lg max-w-fit ml-auto">
+            {{ msg.text }}
+          </div>
+        </div>
+
+        <!-- Respuestas sugeridas -->
+        <div v-if="showSuggestedReplies" class="mt-2 flex flex-wrap gap-2">
+          <button @click="sendMessage('Sí, por favor 🙏')" class="border border-gray-300 text-black px-4 py-2 rounded-lg text-sm font-[Prompt]">
+            Sí, por favor 🙏
+          </button>
+          <button @click="sendMessage('No, gracias 👌')" class="border border-gray-300 text-black px-4 py-2 rounded-lg text-sm font-[Prompt]">
+            No, gracias 👌
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Input -->
+      <div class="p-4 border-t flex items-center">
+        <input 
+          v-model="userMessage" 
+          @keyup.enter="sendMessage(userMessage)"
+          placeholder="Escribe aquí"
+          class="flex-1 p-3 border rounded-lg text-sm font-[Prompt] bg-gray-100 outline-none" />
+        <button @click="sendMessage(userMessage)" class="ml-2 w-10 h-10 bg-cover bg-center cursor-pointer"
+          :style="{ backgroundImage: `url(${IconArrowGreen.src})` }">
+        </button>
+      </div>
+    </div>
+  </div>
+</template>
+
+
+
+<style scoped>
+/* Posición del botón de asistencia */
+.assistant-button {
+  position: fixed;
+  top: 25%;
+  left: 1rem;
+  transform: translateY(-50%);
+  z-index: 50;
+}
+
+/* Estilos del chat */
+.assistant-chat {
+  width: 24rem; /* 384px */
+  min-height: 250px; /* Tamaño mínimo del chat */
+  right: 1rem;
+}
+
+/* En mobile, ocupar todo el ancho */
+@media (max-width: 768px) {
+  .assistant-chat {
+    width: 100%;
+    left: 0;
+    right: 0;
+    bottom: 0;
+  }
+  .assistant-button {
+    left: 0.5rem;
+  }
+}
+
+/* Asegurar que en desktop tenga más z-index que los tabs */
+@media (min-width: 1024px) {
+  .assistant-button {
+    left: 2rem;
+  }
+}
+
+.markdown-content {
+  font-family: "Prompt", sans-serif;
+}
+
+.markdown-content strong {
+  font-weight: bold;
+  color: black;
+}
+
+.markdown-content em {
+  font-style: italic;
+}
+
+.markdown-content ul {
+  list-style-type: disc;
+  padding-left: 20px;
+}
+
+.markdown-content ol {
+  list-style-type: decimal;
+  padding-left: 20px;
+}
+
+.markdown-content li {
+  margin-bottom: 4px;
+}
+
+.markdown-content p {
+  margin-bottom: 8px;
+}
+
+</style>

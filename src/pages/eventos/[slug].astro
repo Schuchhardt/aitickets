@@ -4,6 +4,7 @@ import { supabase } from "../../lib/supabaseClient";
 import AppHeader from "../../components/AppHeader.vue";
 import AppFooter from "../../components/AppFooter.vue";
 import EventDetail from "../../components/EventDetail.vue";
+import EventAssistant from "../../components/EventAssistant.vue";
 import EventMetaTags from "../../components/EventMetaTags.astro";
 
 import Layout from '../../layouts/Layout.astro';
@@ -47,9 +48,40 @@ if (!error || event) {
     console.error("Error al obtener las entradas:", errorTickets);
     event.tickets = []
   } else {
-    console.log(event_tickets)
     event.tickets = event_tickets
   }
+
+  // load event faqs
+
+  const faqs = [
+    {
+      question: "¿Cuál es el horario del evento?",
+      answer: "El evento se realizará los días 17 y 18 de Mayo, desde las 10:00 a las 22:00 hrs.",
+      id: 1
+    },
+    {
+      question: "¿Dónde se llevará a cabo?",
+      answer: "El evento se realizará en Mallplaza Norte, Huechuraba, Chile.",
+      id: 2
+    },
+    {
+      question: "¿Es un evento gratuito?",
+      answer: "Sí, la entrada es totalmente gratis para todos los asistentes.",
+      id: 3
+    },
+    {
+      question: "¿Necesito registrarme previamente?",
+      answer: "Te recomendamos reservar tu ticket en línea para asegurar tu cupo.",
+      id: 4
+    },
+    {
+      question: "¿Habrá estacionamiento disponible?",
+      answer: "Sí, Mallplaza Norte cuenta con estacionamiento amplio para visitantes.",
+      id: 5
+    },
+  ];
+
+  event.faqs = faqs;
   
 } else {
   console.error("Error al obtener el evento:", error);
@@ -63,5 +95,6 @@ if (!error || event) {
   <EventMetaTags event={event} />
     <AppHeader/>
     <EventDetail event={event} client:idle/>
+    <EventAssistant event={event} client:idle/>
     <AppFooter client:idle/>
 </Layout>
