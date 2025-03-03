@@ -1,8 +1,8 @@
 <script setup is:client>
 import logoLight from "../images/logo.png";
 import iconArrowGreen from "../images/icon-arrow-green.png";
-import iconFacebook from "../images/icon-facebook.png";
-import iconLinkedIn from "../images/icon-linkedin.png";
+import FacebookIcon from '../images/icons/facebook.svg';
+import LinkedInIcon from '../images/icons/linkedin.svg';
 import { ref, onMounted } from "vue";
 
 // Estado del formulario
@@ -125,10 +125,12 @@ const submitForm = async (event) => {
     <!-- 🌐 Redes sociales -->
     <div class="flex justify-center space-x-4 mt-4">
       <a href="https://www.facebook.com/profile.php?id=61573771138631" target="_blank" class="cursor-pointer">
-        <img :src="iconFacebook.src" alt="Facebook" class="w-6 h-6" />
+        <img :src="FacebookIcon.src" class="w-6 h-6 text-black-500"/>
+
       </a>
       <a href="https://linkedin.com" target="_blank" class="cursor-pointer">
-        <img :src="iconLinkedIn.src" alt="LinkedIn" class="w-6 h-6" />
+        <img :src="LinkedInIcon.src" class="w-6 h-6 text-black-500"/>
+
       </a>
     </div>
 

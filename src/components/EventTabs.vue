@@ -45,12 +45,10 @@ onMounted(() => {
   window.addEventListener("scroll", handleScroll);
 });
 
-const getTime = (date) => {
-  return new Date(date).toLocaleTimeString("es-ES", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
+const getTime = (time) => {
+  const optionsTime = { hour: "2-digit", minute: "2-digit", hour12: false };
+  
+  return new Date(`1970-01-01T${time}`).toLocaleTimeString("es-ES", optionsTime);
 }
 </script>
 
@@ -94,20 +92,17 @@ const getTime = (date) => {
     <div id="fecha" class="event-section mt-10">
       <h2 class="text-2xl font-bold mb-4 font-['Unbounded']">Fecha y hora</h2>
       <div class="flex space-x-4">
-        <div class="bg-gray-100 p-4 rounded-lg text-center w-1/2">
+        <div class="bg-gray-100 p-4 rounded-lg text-center w-1/2" v-for="(date, index) in event.dates" :key="index">
           <span class="text-gray-900 font-semibold block">
-            {{ new Date(event.start_date).toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "long" }) }}
+            {{ new Date(date.date).toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "long" }) }}
           </span>
-          <span class="text-gray-600 text-sm">{{ getTime(event.start_date) }} hrs - {{ getTime(event.end_date) }} hrs</span>
-        </div>
-        <div class="bg-gray-100 p-4 rounded-lg text-center w-1/2">
-          <span class="text-gray-900 font-semibold block">
-            {{ new Date(event.end_date).toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "long" }) }}
+          <span class="text-gray-600 text-sm">
+            {{ getTime(date.start_time) }} hrs - {{ getTime(date.end_time) }} hrs
           </span>
-          <span class="text-gray-600 text-sm">{{ getTime(event.start_date) }} hrs - {{ getTime(event.end_date) }} hrs</span>
         </div>
       </div>
     </div>
+
 
     <!-- Sección de Ubicación con Mapa -->
     <div id="lugar" class="event-section mt-10">

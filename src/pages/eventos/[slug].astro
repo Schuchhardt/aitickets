@@ -52,36 +52,29 @@ if (!error || event) {
   }
 
   // load event faqs
+  const { data: event_faqs, error: errorFaqs } = await supabase
+  .from("event_faqs")
+  .select("*")
+  .eq("event_id", event.id)
+  if (errorFaqs){
+    console.error("Error al obtener las faqs:", errorTickets);
+    event.faqs = []
+  } else {
+    event.faqs = event_faqs;
+  }
 
-  const faqs = [
-    {
-      question: "¿Cuál es el horario del evento?",
-      answer: "El evento se realizará los días 17 y 18 de Mayo, desde las 10:00 a las 22:00 hrs.",
-      id: 1
-    },
-    {
-      question: "¿Dónde se llevará a cabo?",
-      answer: "El evento se realizará en Mallplaza Norte, Huechuraba, Chile.",
-      id: 2
-    },
-    {
-      question: "¿Es un evento gratuito?",
-      answer: "Sí, la entrada es totalmente gratis para todos los asistentes.",
-      id: 3
-    },
-    {
-      question: "¿Necesito registrarme previamente?",
-      answer: "Te recomendamos reservar tu ticket en línea para asegurar tu cupo.",
-      id: 4
-    },
-    {
-      question: "¿Habrá estacionamiento disponible?",
-      answer: "Sí, Mallplaza Norte cuenta con estacionamiento amplio para visitantes.",
-      id: 5
-    },
-  ];
-
-  event.faqs = faqs;
+  // load event dates
+  const { data: event_dates, error: errorDates } = await supabase
+  .from("event_dates")
+  .select("*")
+  .eq("event_id", event.id)
+  if (errorDates){
+    console.error("Error al obtener las fechas:", errorDates);
+    event.dates = []
+  } else {
+    event.dates = event_dates;
+  }
+  
   
 } else {
   console.error("Error al obtener el evento:", error);

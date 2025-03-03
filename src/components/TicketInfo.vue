@@ -32,9 +32,13 @@ const formattedTime = computed(() => {
 
 <template>
   <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-md text-center mx-auto lg:col-span-1">
-    <h2 class="text-3xl font-bold mb-4 font-[Unbounded]">Tu Entrada</h2>
+    <div v-if="ticket.qr_code" class="mt-6 flex flex-col items-center">
+      <TicketQR :code="ticket.qr_code" client:idle />
+      <p class="text-gray-500 text-sm mt-2">Muestra este código al ingresar</p>
+    </div>
+    <p class="text-2xl font-bold font-[Prompt]">Evento</p>
+    <h2 class="text-3xl font-bold mb-4 font-[Unbounded]">{{ event.name }}</h2>
 
-    <p class="text-2xl font-bold font-[Prompt]">{{ event.name }}</p>
     <p class="text-gray-600 font-bold font-[Prompt]">{{ ticket.ticket_name }}</p>
     <p class="text-gray-500 font-[Prompt]">{{ formattedDate }} </p>
     <p class="text-gray-500 font-[Prompt]">{{ formattedTime }}</p>
@@ -44,10 +48,6 @@ const formattedTime = computed(() => {
       <p><strong>Email:</strong> {{ ticket.attendee_email }}</p>
     </div>
 
-    <div v-if="ticket.qr_code" class="mt-6 flex flex-col items-center">
-      <TicketQR :code="ticket.qr_code" client:idle />
-      <p class="text-gray-500 text-sm mt-2">Muestra este código al ingresar</p>
-    </div>
 
     <a href="/" class="mt-6 inline-block bg-black text-white px-6 py-2 rounded-md font-[Prompt]">
       Volver al inicio

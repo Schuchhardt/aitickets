@@ -36,6 +36,19 @@ if (id) {
       .eq("id", ticketData.event_id)
       .single();
 
+    event = eventData;
+
+    // load event dates
+    const { data: event_dates, error: errorDates } = await supabase
+    .from("event_dates")
+    .select("*")
+    .eq("event_id", event.id)
+    if (errorDates){
+      console.error("Error al obtener las fechas:", errorDates);
+      event.dates = []
+    } else {
+      event.dates = event_dates;
+    }
     // Obtener datos del asistente
     const { data: attendee } = await supabase
       .from("attendees")
@@ -43,11 +56,11 @@ if (id) {
       .eq("id", ticketData.attendee_id)
       .single();
 
-    event = eventData;
+    
 
     ticket = {
       event_name: event?.name || "Evento desconocido",
-      event_date: event?.start_date || "Fecha no disponible",
+      event_dates: event?.dates || "Fecha no disponible",
       ticket_name: "Entrada General",
       attendee_name: `${attendee?.first_name || ""} ${attendee?.last_name || ""}`.trim(),
       attendee_email: attendee?.email || "Correo no disponible",

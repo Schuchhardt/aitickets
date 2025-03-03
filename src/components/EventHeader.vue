@@ -9,32 +9,22 @@ defineProps({
 });
 
 // Función para formatear la fecha con hora
-const formatFullDate = (startDate, endDate) => {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+const formatFullDate = (dateArray) => {
+  if (!dateArray.length) return "No hay fechas disponibles";
 
-  const startDateStr = start.toLocaleDateString("es-ES", {
-    day: "numeric",
-    month: "long",
-  });
-  const endDateStr = end.toLocaleDateString("es-ES", {
-    day: "numeric",
-    month: "long",
-  });
+  const optionsDate = { day: "numeric", month: "long" };
+  const optionsTime = { hour: "2-digit", minute: "2-digit", hour12: false };
 
-  const startTime = start.toLocaleTimeString("es-ES", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
+  const start = dateArray[0];
+  const end = dateArray[dateArray.length - 1];
 
-  const endTime = end.toLocaleTimeString("es-ES", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
+  const startDate = new Date(start.date).toLocaleDateString("es-ES", optionsDate);
+  const endDate = new Date(end.date).toLocaleDateString("es-ES", optionsDate);
 
-  return `Del ${startDateStr} al ${endDateStr}, desde las ${startTime} a las ${endTime} hrs`;
+  const startTime = new Date(`1970-01-01T${start.start_time}`).toLocaleTimeString("es-ES", optionsTime);
+  const endTime = new Date(`1970-01-01T${end.end_time}`).toLocaleTimeString("es-ES", optionsTime);
+
+  return `Del ${startDate} al ${endDate}, desde las ${startTime} a las ${endTime} hrs`;
 };
 </script>
 
@@ -53,7 +43,7 @@ const formatFullDate = (startDate, endDate) => {
           <!-- Fecha -->
           <div class="flex items-start flex-wrap">
             <img :src="iconCalendarLight.src" alt="calendar icon" class="w-5 h-5 mr-1.5 flex-shrink-0" />
-            <span class="leading-tight">{{ formatFullDate(event.start_date, event.end_date) }}</span>
+            <span class="leading-tight">{{ formatFullDate(event.dates) }}</span>
           </div>
           <!-- Ubicación -->
           <div class="flex items-center">
@@ -64,7 +54,7 @@ const formatFullDate = (startDate, endDate) => {
       </div>
     </div>
 
-    <!-- 📌 Texto debajo de la imagen en mobile -->
+    <!-- Texto debajo de la imagen en mobile -->
     <div class="lg:hidden text-center mt-4 font-['Prompt']">
       <span class="uppercase text-xs font-medium tracking-wide text-gray-600">{{ event.title }}</span>
       <h2 class="text-2xl font-bold text-gray-900 font-['Unbounded']">{{ event.name }}</h2>
@@ -73,7 +63,7 @@ const formatFullDate = (startDate, endDate) => {
         <!-- Fecha -->
         <div class="flex items-start text-center">
           <img :src="iconCalendarDark.src" alt="calendar icon" class="w-5 h-5 mr-2 mt-1" />
-          <span class="block">{{ formatFullDate(event.start_date, event.end_date) }}</span>
+          <span class="block">{{ formatFullDate(event.dates) }}</span>
         </div>
         <!-- Ubicación -->
         <div class="flex items-start text-center">
