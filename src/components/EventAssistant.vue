@@ -95,9 +95,16 @@ onMounted(scrollToBottom);
 
 <template>
   <div>
+    <!-- Overlay en mobile -->
+    <div 
+      v-if="isOpen" 
+      class="fixed inset-0 bg-black opacity-50 z-40 md:hidden"
+      @click="isOpen = false">
+    </div>
+
     <!-- Botón flotante -->
-    <div v-if="!isOpen" class="assistant-button group flex flex-col items-center">
-      <span class="bg-gray-800 text-white text-xs px-2 py-1 rounded-md mb-2 opacity-0 group-hover:opacity-100 transition font-[Prompt]">
+    <div v-if="!isOpen" class="assistant-button flex flex-col items-center">
+      <span class="bg-gray-800 text-white text-xs px-2 py-1 rounded-md mb-2 opacity-100 transition font-[Prompt]">
         Asistente AI
       </span>
       <button 
@@ -108,7 +115,8 @@ onMounted(scrollToBottom);
     </div>
 
     <!-- Panel del chat -->
-    <div v-if="isOpen" class="assistant-chat fixed bottom-20 bg-white shadow-xl rounded-lg max-h-[500px] flex flex-col overflow-hidden border border-gray-200 z-50 w-full md:w-96">
+    <div v-if="isOpen" 
+      class="assistant-chat fixed bottom-0 md:bottom-20 bg-white shadow-xl rounded-t-lg md:rounded-lg max-h-[500px] md:max-h-[600px] flex flex-col overflow-hidden border border-gray-200 z-50 w-full md:w-96">
       
       <!-- Header -->
       <div class="bg-white text-gray-900 p-4 font-semibold flex justify-between font-[Unbounded] border-b">
@@ -117,7 +125,7 @@ onMounted(scrollToBottom);
       </div>
 
       <!-- Mensajes -->
-      <div ref="chatContainer" class="p-4 flex-1 overflow-y-auto space-y-3 text-sm font-[Prompt]">
+      <div ref="chatContainer" class="chat-container-list p-4 flex-1 overflow-y-auto space-y-3 text-sm font-[Prompt]">
         <p class="text-gray-400 text-xs text-center">{{ currentDate }}</p>
 
         <div v-for="(msg, index) in messages" :key="index" class="flex items-start space-x-2"
@@ -163,14 +171,12 @@ onMounted(scrollToBottom);
   </div>
 </template>
 
-
-
 <style scoped>
 /* Posición del botón de asistencia */
 .assistant-button {
   position: fixed;
   top: 25%;
-  left: 1rem;
+  right: 1rem;
   transform: translateY(-50%);
   z-index: 50;
 }
@@ -182,6 +188,10 @@ onMounted(scrollToBottom);
   right: 1rem;
 }
 
+.chat-container-list{
+  min-height: 300px;
+}
+
 /* En mobile, ocupar todo el ancho */
 @media (max-width: 768px) {
   .assistant-chat {
@@ -191,14 +201,14 @@ onMounted(scrollToBottom);
     bottom: 0;
   }
   .assistant-button {
-    left: 0.5rem;
+    right: 0.5rem;
   }
 }
 
 /* Asegurar que en desktop tenga más z-index que los tabs */
 @media (min-width: 1024px) {
   .assistant-button {
-    left: 2rem;
+    right: 2rem;
   }
 }
 
