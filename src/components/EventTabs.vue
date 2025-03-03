@@ -13,9 +13,9 @@ const googleMapsApiKey = import.meta.env.GOOGLE_MAPS_API_KEY;
 const showFullDescription = ref(false);
 
 // Estado de cada pregunta en "Preguntas Frecuentes"
-const faqs = ref(props.event.faqs.map( (faq) => {
+const faqs = props.event.faqs ? ref(props.event.faqs.map( (faq) => {
   return {...faq, open: false} }
-));
+)) : [] ;
 
 // Alternar la apertura de una pregunta con animación
 const toggleFAQ = (index) => {
@@ -124,7 +124,7 @@ const getTime = (date) => {
     </div>
 
     <!-- Sección de Preguntas Frecuentes con animación -->
-    <div id="preguntas" class="event-section mt-10">
+    <div id="preguntas" v-if="event.faqs" class="event-section mt-10">
       <h2 class="text-2xl font-bold mb-4 font-['Unbounded']">Preguntas Frecuentes</h2>
       <div v-for="(faq, index) in faqs" :key="index" class="border-b border-gray-300 py-3">
         <button @click="toggleFAQ(index)" class="flex justify-between items-center w-full text-left cursor-pointer">

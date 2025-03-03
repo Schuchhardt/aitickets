@@ -60,7 +60,7 @@ const updateBuyerInfo = (field, value) => {
           @input="updateBuyerInfo('phone', $event.target.value)"
           type="tel"
           name="phone"
-          placeholder="+56 9 12 345 678"
+          placeholder="+56 9 12 345 678*"
           class="w-full"
           required
         />
