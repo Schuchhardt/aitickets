@@ -75,6 +75,7 @@ const sendMessage = async (message) => {
     assistantMessage.text = responseData.message;
 
   } catch (error) {
+    console.log(error)
     assistantMessage.text = "Lo siento, hubo un error. Inténtalo de nuevo más tarde.";
   } finally {
     isLoading.value = false;

@@ -40,9 +40,15 @@ if (!error || event) {
   const { data: event_tickets, error: errorTickets } = await supabase
   .from("event_tickets")
   .select("*")
-  .eq("event_id", event.id) // Solo entradas del evento actual
-  .eq("is_gift", false) // Excluir las entradas de cortesía
+  .eq("event_id", event.id) 
+  .eq("is_gift", false) 
+  .eq("status", "available")
+  .lte("init_date", new Date().toISOString())
+  .gte("end_date", new Date().toISOString())
+  .gte("max_quantity", 1)
   .order("price", { ascending: true }); // Ordenar por precio
+
+  console.log("event_tickets", event_tickets);
 
   if (errorTickets){
     console.error("Error al obtener las entradas:", errorTickets);
