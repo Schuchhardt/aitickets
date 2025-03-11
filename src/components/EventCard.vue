@@ -6,22 +6,20 @@ defineProps({
   event: Object,
 });
 
-const formatFullDate = (dateArray) => {
-  if (!dateArray.length) return "No hay fechas disponibles";
-
+const formatFullDate = (event) => {
   const optionsDate = { day: "numeric", month: "long" };
   const optionsTime = { hour: "2-digit", minute: "2-digit", hour12: false };
 
-  const start = dateArray[0];
-  const end = dateArray[dateArray.length - 1];
+  const start = event.start_date;
+  const end = event.end_date;
 
-  const startDate = new Date(start.date).toLocaleDateString("es-ES", optionsDate);
-  const endDate = new Date(end.date).toLocaleDateString("es-ES", optionsDate);
+  const startDate = new Date(start).toLocaleDateString("es-ES", optionsDate);
+  const endDate = new Date(end).toLocaleDateString("es-ES", optionsDate);
 
-  const startTime = new Date(`1970-01-01T${start.start_time}`).toLocaleTimeString("es-ES", optionsTime);
-  const endTime = new Date(`1970-01-01T${end.end_time}`).toLocaleTimeString("es-ES", optionsTime);
+  const startTime = new Date(start).toLocaleTimeString("es-ES", optionsTime);
+  const endTime = new Date(end).toLocaleTimeString("es-ES", optionsTime);
 
-  return `Del ${startDate} al ${endDate}, desde las ${startTime} a las ${endTime} hrs`;
+  return startDate !== endDate ? `Del ${startDate} al ${endDate}, desde las ${startTime} a las ${endTime} hrs` : `${startDate}, desde las ${startTime} a las ${endTime} hrs`;
 };
 </script>
 
@@ -36,9 +34,9 @@ const formatFullDate = (dateArray) => {
       <h3 class="text-lg font-bold text-gray-900 font-['Unbounded']">{{ event.name }}</h3>
 
       <!-- Fecha -->
-      <div class="flex items-center space-x-2 text-gray-600 text-sm" v-if="event.dates">
+      <div class="flex items-center space-x-2 text-gray-600 text-sm" v-if="event.dates || (event.start_date && event.end_date)">
         <img :src="iconCalendar.src" alt="Calendario" class="w-4 h-4" />
-        <p>{{ formatFullDate(event.dates) }}</p>
+        <p>{{ formatFullDate(event) }}</p>
       </div>
 
       <!-- Ubicación -->

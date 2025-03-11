@@ -2,8 +2,8 @@ import fetch from 'node-fetch';
 import { createClient } from '@supabase/supabase-js';
 
 // Configurar Supabase
-const supabaseUrl = process.env.PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.PUBLIC_SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Configurar MailerLite

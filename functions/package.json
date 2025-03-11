@@ -1,0 +1,17 @@
+{
+    "name": "aitickets-functions",
+    "version": "1.0.0",
+    "type": "module",
+    "main": "index.js",
+    "scripts": {
+      "build": "echo 'Nothing to build here'"
+    },
+    "dependencies": {
+      "@supabase/supabase-js": "^2.39.3",
+      "openai": "^4.86.1"
+    },
+    "engines": {
+      "node": ">=18.0.0"
+    }
+  }
+  

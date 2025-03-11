@@ -8,6 +8,7 @@ const props = defineProps({
 
 const emit = defineEmits(["update:selectedTickets"]);
 const selectedTickets = ref({});
+const showTooltip = ref(false); // Controla la visibilidad del tooltip
 
 const updateSelection = (ticketId, quantity) => {
   selectedTickets.value[ticketId] = quantity;
@@ -19,7 +20,17 @@ const isSuperFan = (ticket) => {
 };
 
 const increaseTicket = (ticket) => {
-  updateSelection(ticket.id, Math.min((selectedTickets.value[ticket.id] || 0) + 1, ticket.max_quantity));
+  const currentQuantity = selectedTickets.value[ticket.id] || 0;
+  if (currentQuantity < ticket.max_quantity) {
+    updateSelection(ticket.id, currentQuantity + 1);
+    showTooltip.value = false; // Oculta el tooltip si la cantidad es válida
+  } else {
+    console.log("Máximo de tickets alcanzado");
+    showTooltip.value = true; // Muestra el tooltip si se supera el máximo
+    setTimeout(() => {
+      showTooltip.value = false; // Oculta el tooltip después de 2 segundos
+    }, 2000);
+  }
 };
 
 const decreaseTicket = (ticket) => {
@@ -86,14 +97,48 @@ const formatPrice = (price) => {
             Añadir
           </button>
           <div v-else class="flex items-center justify-center space-x-2 border rounded-lg px-2 py-1">
-            <button @click="decreaseTicket(ticket)" class="px-2 py-1">-</button>
+            <button @click="decreaseTicket(ticket)" class="px-2 py-1 cursor-pointer">-</button>
             <span class="w-6 text-center">{{ selectedTickets[ticket.id] || 0 }}</span>
-            <button @click="increaseTicket(ticket)" class="px-2 py-1">+</button>
+            <!-- Botón "+" con tooltip debajo -->
+            <button
+              @click="increaseTicket(ticket)"
+              class="px-2 py-1 relative cursor-pointer"
+            >
+              +
+              <!-- Tooltip debajo con animación -->
+              <transition name="fade">
+                <span
+                  v-if="showTooltip"
+                  class="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-gray-900 text-white text-xs rounded px-2 py-1 z-50 whitespace-nowrap"
+                >
+                  Solo se puede {{ ticket.max_quantity }} ticket(s) máximo
+                  <span
+                    class="absolute top-0 left-1/2 -translate-x-1/2 -mt-1 w-0 h-0 border-l-4 border-r-4 border-b-4 border-l-transparent border-r-transparent border-b-gray-900"
+                  ></span>
+                </span>
+              </transition>
+            </button>
+
           </div>
         </div>
-
-        </div>
+        
+      </div>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+.fade-enter-to,
+.fade-leave-from {
+  opacity: 1;
+}
+</style>

@@ -3,7 +3,6 @@
   publish = "dist"
   functions = "netlify/functions"
 
-[functions]
-  # Debe coincidir con el directorio de funciones declarado en build
-  directory = "netlify/functions"
-  included_files = ["netlify/functions/**", "node_modules/**", ".env"]
+# [functions]
+#   directory = "netlify/functions"
+#   included_files = ["netlify/functions/**", "node_modules/**", ".env"]

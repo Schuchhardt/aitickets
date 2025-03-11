@@ -87,7 +87,7 @@ if (id) {
           <summary class="text-lg font-semibold cursor-pointer font-[Unbounded]">Detalles del Evento</summary>
           <div class="mt-4">
             <EventHeader event={event} client:idle />
-            <EventTabs event={event} client:idle />
+            <EventTabs event={event} client:only />
           </div>
         </details>
       </div>

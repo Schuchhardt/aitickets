@@ -41,5 +41,5 @@ Visita http://localhost:3000 para ver la app.
 ## Despliegue en Netlify
 Conecta este repo a tu cuenta de Netlify.
 En "Build Settings", define npm run build y la carpeta de salida (dist por defecto en Astro).
-Configura las variables de entorno en Netlify (PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY, etc.).
+Configura las variables de entorno en Netlify (SUPABASE_URL, SUPABASE_ANON_KEY, etc.).
 ¡Listo para usar!

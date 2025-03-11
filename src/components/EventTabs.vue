@@ -7,13 +7,13 @@ const props = defineProps({
 });
 
 // Leer API Key de Google Maps desde las variables de entorno
-const googleMapsApiKey = import.meta.env.GOOGLE_MAPS_API_KEY;
+const googleMapsApiKey = import.meta.env.PUBLIC_GOOGLE_MAPS_API_KEY;
 
 // Estado para el toggle "Ver más" en la descripción
 const showFullDescription = ref(false);
 
 // Estado de cada pregunta en "Preguntas Frecuentes"
-const faqs = props.event.faqs ? ref(props.event.faqs.map( (faq) => {
+const faqs = props.event?.faqs ? ref(props.event.faqs.map( (faq) => {
   return {...faq, open: false} }
 )) : [] ;
 

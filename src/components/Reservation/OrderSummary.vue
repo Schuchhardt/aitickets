@@ -118,9 +118,9 @@ const applyDiscount = async () => {
       </div>
     </div>
     <div v-if="selectedTicketList.length" class="flex justify-between text-xl font-bold border-t pt-2 mt-2">
-      <span>Total ({{ selectedTicketList.reduce((sum, t) => sum + t.quantity, 0) }} ticket<span v-if="selectedTicketList.reduce((sum, t) => sum + t.quantity, 0) > 1">s</span>)</span>
+      <span>Total ({{ selectedTicketList.reduce((sum, t) => sum + t.quantity, 0) }} ticket<span v-if="selectedTicketList.reduce((sum, t) => sum + t.quantity, 0) > 1">s</span>) </span>
       <span v-if="finalTotal !== 0">${{ finalTotal.toLocaleString("es-ES") }} CLP</span>
-      <span v-if="finalTotal == 0">Gratis</span>
+      <span v-if="finalTotal == 0" class="ml-4"> Gratis</span>
     </div>
   </div>
 </template>

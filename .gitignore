@@ -13,3 +13,4 @@ dist
 .qodo
 .astro
 .netlify
+.serverless/

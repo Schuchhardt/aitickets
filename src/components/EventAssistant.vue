@@ -8,6 +8,8 @@ import IconArrowGreen from "../images/icon-arrow-green.png";
 const props = defineProps({
   event: Object,
 });
+const assistantURL = import.meta.env.PUBLIC_CLOUD_FUNCTION_ASISSTANT;
+const apiSecret = import.meta.env.PUBLIC_API_SECRET
 
 const isOpen = ref(false);
 const messages = ref([
@@ -60,9 +62,9 @@ const sendMessage = async (message) => {
 
   userMessage.value = "";
   try {
-    const response = await fetch("/api/ai-assistant", {
+    const response = await fetch(assistantURL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-api-secret": apiSecret },
       body: JSON.stringify({ messages: [eventDetailsMessage, ...messages.value] }),
     });
 
@@ -147,10 +149,10 @@ onMounted(scrollToBottom);
 
         <!-- Respuestas sugeridas -->
         <div v-if="showSuggestedReplies" class="mt-2 flex flex-wrap gap-2">
-          <button @click="sendMessage('Sí, por favor 🙏')" class="border border-gray-300 text-black px-4 py-2 rounded-lg text-sm font-[Prompt]">
+          <button @click="sendMessage('Sí, por favor 🙏')" class="border cursor-pointer border-gray-300 text-black px-4 py-2 rounded-lg text-sm font-[Prompt]">
             Sí, por favor 🙏
           </button>
-          <button @click="sendMessage('No, gracias 👌')" class="border border-gray-300 text-black px-4 py-2 rounded-lg text-sm font-[Prompt]">
+          <button @click="sendMessage('No, gracias 👌')" class="border cursor-pointer border-gray-300 text-black px-4 py-2 rounded-lg text-sm font-[Prompt]">
             No, gracias 👌
           </button>
         </div>
