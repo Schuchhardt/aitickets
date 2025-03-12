@@ -24,7 +24,7 @@
             "description": "Número de teléfono del comprador."
           },
           "ticket_type_id": {
-            "type": "string",
+            "type": "integer",
             "description": "El ID del tipo de entrada seleccionada."
           },
           "quantity": {

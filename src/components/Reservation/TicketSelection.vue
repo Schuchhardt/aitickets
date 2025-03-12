@@ -3,7 +3,7 @@ import { defineProps, defineEmits, ref } from "vue";
 
 const props = defineProps({
   event: Object,
-  selectedTickets: Object, // Se recibe desde el padre
+  selectedTickets: Object,
 });
 
 const emit = defineEmits(["update:selectedTickets"]);

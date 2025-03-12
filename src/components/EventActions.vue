@@ -1,17 +1,18 @@
 <script setup>
-import { ref } from "vue";
+import { ref, onMounted, onUnmounted } from "vue";
 import iconShare from "../images/icon-share.png"; // Icono de compartir
 import iconArrow from "../images/icon-arrow-black.png"; // Icono de flecha en botón de reserva
 import iconTicket from "../images/icon-tickets.png"; // Icono de ticket
 import ShareEventModal from "./ShareEventModal.vue";
 import ReserveModal from "./Reservation/ReservationModal.vue";
+import { eventBus } from '../utils/eventBus.js';
 
 defineProps({
   event: Object,
 });
 
 const showModal = ref(false);
-const showReserveModal = ref(false); // 🔹 El modal inicia cerrado
+const showReserveModal = ref(false);
 
 const openReserveModal = () => {
   showReserveModal.value = true;
@@ -21,6 +22,17 @@ const closeReserveModal = () => {
   showReserveModal.value = false;
 };
 
+onMounted(() => {
+  eventBus.on('open-modal', handleOpenModal);
+});
+
+onUnmounted(() => {
+  eventBus.off('open-modal', handleOpenModal);
+});
+
+function handleOpenModal() {
+  showReserveModal.value = true;
+}
 </script>
 
 <template>
@@ -63,7 +75,7 @@ const closeReserveModal = () => {
         Reservar ticket
       </button>
     </div>
-
+ 
     <ShareEventModal :show="showModal" :event="event" @close="showModal = false"/>
     <ReserveModal v-if="showReserveModal" :event="event" @close="closeReserveModal" />
 

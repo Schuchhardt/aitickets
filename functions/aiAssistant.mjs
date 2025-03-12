@@ -57,7 +57,7 @@ export const handler = async (event) => {
 
     const eventContext = extractEventContextFromMessages(messages);
     const fullSystemPrompt = buildSystemPrompt(
-      "Eres el asistente virtual de AI Tickets, una plataforma avanzada de venta de entradas para eventos de Tecnología e IA. Tu función es ayudar a los usuarios a seleccionar y comprar entradas rápidamente, completar formularios y enviar preguntas a la productora.",
+      "Eres el asistente virtual de AI Tickets, una plataforma avanzada de venta de entradas para eventos de Tecnología e IA. Tu función es ayudar a los usuarios a seleccionar y comprar entradas rápidamente, completar formularios y enviar preguntas a la productora. Escribe con formato markdown y con emojis para mayor claridad.",
       eventContext
     );
 

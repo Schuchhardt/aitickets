@@ -1,19 +1,14 @@
 <script setup>
-import { defineEmits, ref } from "vue";
+import { defineEmits, defineProps } from "vue";
 
-const emit = defineEmits(["update:buyerInfo"]);
-const buyerInfo = ref({
-  firstName: "",
-  lastName: "",
-  email: "",
-  confirmEmail: "",
-  phone: "",
-  termsAccepted: false,
+const props = defineProps({
+  buyerInfo: Object,
 });
+const emit = defineEmits(["update:buyerInfo"]);
 
 const updateBuyerInfo = (field, value) => {
-  buyerInfo.value[field] = value;
-  emit("update:buyerInfo", buyerInfo.value);
+  const updated = { ...props.buyerInfo, [field]: value };
+  emit("update:buyerInfo", updated);
 };
 </script>
 
@@ -23,7 +18,7 @@ const updateBuyerInfo = (field, value) => {
     <p class="text-gray-600 mb-4">Información del comprador</p>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <input
-        v-model="buyerInfo.firstName"
+        :value="props.buyerInfo.firstName"
         @input="updateBuyerInfo('firstName', $event.target.value)"
         type="text"
         placeholder="Nombre*"
@@ -31,7 +26,7 @@ const updateBuyerInfo = (field, value) => {
         required
       />
       <input
-        v-model="buyerInfo.lastName"
+        :value="props.buyerInfo.lastName"
         @input="updateBuyerInfo('lastName', $event.target.value)"
         type="text"
         placeholder="Apellidos*"
@@ -39,7 +34,7 @@ const updateBuyerInfo = (field, value) => {
         required
       />
       <input
-        v-model="buyerInfo.email"
+        :value="props.buyerInfo.email"
         @input="updateBuyerInfo('email', $event.target.value)"
         type="email"
         placeholder="Correo electrónico*"
@@ -47,7 +42,7 @@ const updateBuyerInfo = (field, value) => {
         required
       />
       <input
-        v-model="buyerInfo.confirmEmail"
+        :value="props.buyerInfo.confirmEmail"
         @input="updateBuyerInfo('confirmEmail', $event.target.value)"
         type="email"
         placeholder="Confirmar correo electrónico*"
@@ -56,7 +51,7 @@ const updateBuyerInfo = (field, value) => {
       />
       <div class="flex items-center border p-2 rounded-md w-full col-span-2">
         <input
-          v-model="buyerInfo.phone"
+          :value="props.buyerInfo.phone"
           @input="updateBuyerInfo('phone', $event.target.value)"
           type="tel"
           name="phone"
@@ -68,7 +63,7 @@ const updateBuyerInfo = (field, value) => {
     </div>
     <div class="flex items-center mt-4">
       <input
-        v-model="buyerInfo.termsAccepted"
+        :checked="props.buyerInfo.termsAccepted"
         @change="updateBuyerInfo('termsAccepted', $event.target.checked)"
         type="checkbox"
         class="mr-3 cursor-pointer w-10 h-10 accent-black"
@@ -79,7 +74,7 @@ const updateBuyerInfo = (field, value) => {
         <a href="/terms" class="text-black underline font-medium" target="_blank">Términos del Servicio</a>
         y
         <a href="/privacy" class="text-black underline font-medium" target="_blank">Políticas de Privacidad</a>
-            <span class="text-red-500"> (Requerido)</span>
+        <span class="text-red-500"> (Requerido)</span>
       </label>
     </div>
   </div>

@@ -1,7 +1,8 @@
 <script setup>
 import { ref, onMounted, nextTick, defineProps} from "vue";
-import { marked } from "marked"; // Importar la librería para renderizar Markdown
-import DOMPurify from "dompurify"; // Para sanitizar el HTML
+import { marked } from "marked"; 
+import DOMPurify from "dompurify";
+import { eventBus } from '../utils/eventBus.js';
 import IconChat from "../images/icon-chat.png"; 
 import IconArrowGreen from "../images/icon-arrow-green.png"; 
 
@@ -39,6 +40,20 @@ const fillForm = (properties) => {
   // Emitir un evento para abrir el modal de reserva
   // Llenar los datos del formulario con los properties
   console.log("Llenar formulario con los datos: ", properties);
+  
+  eventBus.emit('open-modal');
+  setTimeout(() => {
+    console.log("Llenar ticket: ", properties);
+    eventBus.emit('ticket-selection', properties);
+  }, 2000);
+  setTimeout(() => {
+    console.log("Presiona siguiente: ");
+    eventBus.emit('proceed-to-next-step');
+  }, 4000);
+  setTimeout(() => {
+    console.log("Llenar info: ", properties);
+    eventBus.emit('fill-buyer-info', properties);
+  }, 5000);
 };
 
 const sendMessage = async (message) => {
@@ -63,7 +78,7 @@ const sendMessage = async (message) => {
     - Ubicación: ${props.event.location}
     - Preguntas frecuentes: ${props.event.faqs.map(faq => `• ${faq.question}: ${faq.answer}`).join("\n")}
     - Precios de las entradas:
-      ${props.event.tickets.map(ticket => `•Tipo de entrada ${ticket.ticket_name}: Precio $${ticket.price} Cantidad maxima por usuario: ${ticket.max_quantity}`).join("\n")}
+      ${props.event.tickets.map(ticket => `•Ticket ID:${ticket.id} Tipo de entrada: ${ticket.ticket_name}: Precio $${ticket.price} Cantidad maxima por usuario: ${ticket.max_quantity}`).join("\n")}
     `,
   };
 
