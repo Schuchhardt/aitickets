@@ -6,3 +6,5 @@
 [functions]
   directory = "netlify/functions"
   included_files = ["netlify/functions/**", "node_modules/**", ".env"]
+  node_bundler = "esbuild"
+  
