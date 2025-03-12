@@ -5,7 +5,7 @@ import iconArrow from "../images/icon-arrow-black.png"; // Icono de flecha en bo
 import iconTicket from "../images/icon-tickets.png"; // Icono de ticket
 import ShareEventModal from "./ShareEventModal.vue";
 import ReserveModal from "./Reservation/ReservationModal.vue";
-import { eventBus } from '../utils/eventBus.js';
+import { eventBus } from '../utils/eventbus.js';
 
 defineProps({
   event: Object,
