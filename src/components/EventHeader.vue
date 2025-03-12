@@ -23,8 +23,7 @@ const formatFullDate = (dateArray) => {
 
   const startTime = new Date(`1970-01-01T${start.start_time}`).toLocaleTimeString("es-ES", optionsTime);
   const endTime = new Date(`1970-01-01T${end.end_time}`).toLocaleTimeString("es-ES", optionsTime);
-
-  return `Del ${startDate} al ${endDate}, desde las ${startTime} a las ${endTime} hrs`;
+  return startDate !== endDate ? `Del ${startDate} al ${endDate}, desde las ${startTime} a las ${endTime} hrs` : `${startDate}, desde las ${startTime} a las ${endTime} hrs`;
 };
 </script>
 

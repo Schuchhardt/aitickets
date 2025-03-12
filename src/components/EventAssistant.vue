@@ -71,8 +71,7 @@ const sendMessage = async (message) => {
   try {
     const response = await fetch(assistantURL, {
       method: "POST",
-      mode: 'cors',
-      headers: { "Content-Type": "application/json", "x-api-secret": apiSecret, 'Access-Control-Allow-Origin':'*'},
+      headers: { "Content-Type": "application/json", "x-api-secret": apiSecret},
       body: JSON.stringify({ messages: [eventDetailsMessage, ...messages.value] }),
     });
 
