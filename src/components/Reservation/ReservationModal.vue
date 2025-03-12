@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, defineProps, defineEmits, onMounted, onUnmounted, watch } from "vue";
-import { eventBus } from '../../utils/eventBus.js';
+import { eventBus } from '../../utils/eventbus.js';
 import HeaderSteps from "./HeaderSteps.vue";
 import TicketSelection from "./TicketSelection.vue";
 import OrderSummary from "./OrderSummary.vue";

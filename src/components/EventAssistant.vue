@@ -2,7 +2,7 @@
 import { ref, onMounted, nextTick, defineProps} from "vue";
 import { marked } from "marked"; 
 import DOMPurify from "dompurify";
-import { eventBus } from '../utils/eventBus.js';
+import { eventBus } from '../utils/eventbus.js';
 import IconChat from "../images/icon-chat.png"; 
 import IconArrowGreen from "../images/icon-arrow-green.png"; 
 
