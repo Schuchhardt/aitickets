@@ -70,15 +70,23 @@ if (!error || event) {
   }
 
   // load event dates
+  const getTimeFromTimestamp = (timestamp) => {
+    const date = new Date(timestamp);
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    const seconds = String(date.getSeconds()).padStart(2, "0");
+    return `${hours}:${minutes}:${seconds}`;
+  };
+  const defaultDate = {date: event.start_date, start_time: getTimeFromTimestamp(event.start_date), end_time: getTimeFromTimestamp(event.end_date)};
   const { data: event_dates, error: errorDates } = await supabase
   .from("event_dates")
   .select("*")
   .eq("event_id", event.id)
   if (errorDates){
     console.error("Error al obtener las fechas:", errorDates);
-    event.dates = []
+    event.dates = [defaultDate]
   } else {
-    event.dates = event_dates;
+    event.dates = event_dates.length > 0 ? event_dates : [defaultDate];
   }
   
   

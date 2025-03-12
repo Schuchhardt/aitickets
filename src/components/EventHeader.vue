@@ -43,7 +43,7 @@ const formatFullDate = (dateArray) => {
           <!-- Fecha -->
           <div class="flex items-start flex-wrap">
             <img :src="iconCalendarLight.src" alt="calendar icon" class="w-5 h-5 mr-1.5 flex-shrink-0" />
-            <span class="leading-tight">{{ formatFullDate(event.dates) }}</span>
+            <span class="leading-tight">{{ formatFullDate(event) }}</span>
           </div>
           <!-- Ubicación -->
           <div class="flex items-center">

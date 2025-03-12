@@ -8,7 +8,7 @@ import "../../styles/global.css";
 
 
 // Consulta los eventos en el servidor (SSR)
-const { data: events, error } = await supabase.from("events").select("*");
+const { data: events, error } = await supabase.from("events").select("*").eq("status", "published");
 
 // Si hay error o no hay eventos, definir un fallback vacío
 const eventData = error || !events ? [] : events;

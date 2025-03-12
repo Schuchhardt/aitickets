@@ -14,11 +14,28 @@ provider:
     SUPABASE_ANON_KEY: ${env:SUPABASE_ANON_KEY}
     API_SECRET: ${env:PUBLIC_API_SECRET}
   httpApi:
-    cors: true
+    disableDefaultEndpoint: true
+    cors:
+      allowedOrigins:
+        - http://localhost:4321
+        - http://localhost:8000
+        - https://aitickets.cl
+      allowedHeaders:
+        - Content-Type
+        - Authorization
+        - X-Amz-Date
+        - X-Api-Secret
+      allowedMethods:
+        - OPTIONS
+        - GET
+        - POST
+        - PUT
+        - DELETE
 
 functions:
   aiAssistant:
     handler: functions/aiAssistant.handler
+    timeout: 30
     events:
       - httpApi:
           path: /api/ai-assistant

@@ -1,5 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import OpenAI from 'openai';
+import { buildMessagesWithContext } from './utils/buildMessagesWithContext.js';
+import { extractEventContextFromMessages, buildSystemPrompt } from './utils/extractEventContext.js';
+import tools from './utils/tools.json' assert { type: 'json' };
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -8,7 +11,7 @@ const supabaseKey = process.env.SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function sendMessageToProducer(eventId, message, userName, userEmail) {
-  console.log("Enviando mensaje a la productora:", { eventId, message });
+  console.log("📨 Enviando mensaje a la productora:", { eventId, message, userName, userEmail });
 
   const { data, error } = await supabase
     .from("questions")
@@ -23,7 +26,7 @@ async function sendMessageToProducer(eventId, message, userName, userEmail) {
 
 export const handler = async (event) => {
   const headers = event.headers || {};
-  const secret = headers['x-api-secret'];
+  const secret = headers['x-api-secret'] || headers['X-API-SECRET'];
 
   if (secret !== process.env.API_SECRET) {
     return {
@@ -31,6 +34,7 @@ export const handler = async (event) => {
       body: JSON.stringify({ message: "Unauthorized" })
     };
   }
+
   if (event.requestContext.http.method !== "POST") {
     return {
       statusCode: 405,
@@ -40,100 +44,99 @@ export const handler = async (event) => {
   }
 
   try {
-    const body = JSON.parse(event.body);
+    const body = JSON.parse(event.body || '{}');
     const { messages } = body;
 
-    const formattedMessages = messages
-      .filter(msg => msg.text?.trim())
-      .map(msg => ({
-        role: msg.role,
-        content: msg.text
-      }));
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return {
+        statusCode: 400,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "No se enviaron mensajes válidos." })
+      };
+    }
 
-    const tools = [
-      {
-        type: "function",
-        function: {
-          name: "update_ticket_selection",
-          description: "Modifica la selección de entradas del usuario en la UI.",
-          parameters: {
-            type: "object",
-            properties: {
-              ticket_type_id: { type: "string", description: "El ID del tipo de entrada seleccionada." },
-              quantity: { type: "integer", description: "Cantidad de entradas seleccionadas." }
-            },
-            required: ["ticket_type_id", "quantity"]
-          }
-        }
-      },
-      {
-        type: "function",
-        function: {
-          name: "fill_buyer_information",
-          description: "Prellena el formulario de compra con la información del usuario.",
-          parameters: {
-            type: "object",
-            properties: {
-              first_name: { type: "string", description: "Nombre del comprador." },
-              last_name: { type: "string", description: "Apellido del comprador." },
-              email: { type: "string", description: "Correo electrónico del comprador." },
-              phone: { type: "string", description: "Número de teléfono del comprador." }
-            },
-            required: ["first_name", "last_name", "email", "phone"]
-          }
-        }
-      },
-      {
-        type: "function",
-        function: {
-          name: "send_message_to_producer",
-          description: "Envía un mensaje a la productora del evento para responder dudas de los usuarios.",
-          parameters: {
-            type: "object",
-            properties: {
-              event_id: { type: "integer", description: "ID del evento" },
-              message: { type: "string", description: "Mensaje del usuario" },
-              user_name: { type: "string", description: "Nombre del usuario" },
-              user_email: { type: "string", description: "Email del usuario" }
-            },
-            required: ["event_id", "message", "user_name", "user_email"]
-          }
-        }
-      }
-    ];
+    const eventContext = extractEventContextFromMessages(messages);
+    const fullSystemPrompt = buildSystemPrompt(
+      "Eres el asistente virtual de AI Tickets, una plataforma avanzada de venta de entradas para eventos de Tecnología e IA. Tu función es ayudar a los usuarios a seleccionar y comprar entradas rápidamente, completar formularios y enviar preguntas a la productora.",
+      eventContext
+    );
+
+    const messagesToSend = buildMessagesWithContext(messages, {
+      maxMessages: 8,
+      systemPrompt: fullSystemPrompt,
+      enableSummary: true
+    });
 
     const response = await openai.chat.completions.create({
       model: "gpt-4-turbo",
-      messages: [
-        {
-          role: "system",
-          content: `Eres el asistente virtual de AI Tickets...` // mismo mensaje original aquí
-        },
-        ...formattedMessages,
-      ],
+      messages: messagesToSend,
       temperature: 0.7,
       tools,
-      tool_choice: "auto",
+      tool_choice: "auto"
     });
 
-    if (response.choices[0]?.message?.tool_calls) {
-      for (const toolCall of response.choices[0].message.tool_calls) {
+    console.log("🧠 Respuesta de OpenAI:", JSON.stringify(response.choices[0], null, 2));
+
+    const choice = response.choices[0];
+
+    // --- Si el modelo llama a tools ---
+    if (choice?.message?.tool_calls?.length > 0) {
+      const toolCalls = choice.message.tool_calls;
+      const toolResponses = [];
+
+      for (const toolCall of toolCalls) {
         if (toolCall.function.name === "send_message_to_producer") {
-          const { event_id, message, user_name, user_email } = JSON.parse(toolCall.function.arguments);
-          await sendMessageToProducer(event_id, message, user_name, user_email);
-          return {
-            statusCode: 200,
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: "✅ Tu pregunta ha sido enviada a la productora." })
-          };
+          const args = JSON.parse(toolCall.function.arguments || '{}');
+
+          if (!args.event_id || !args.message || !args.user_name || !args.user_email) {
+            return {
+              statusCode: 200,
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ message: "No se pudieron interpretar los datos para la productora." })
+            };
+          }
+
+          await sendMessageToProducer(args.event_id, args.message, args.user_name, args.user_email);
+
+          toolResponses.push({
+            role: "tool",
+            tool_call_id: toolCall.id,
+            content: "✅ Tu pregunta fue enviada correctamente a la productora."
+          });
         }
       }
+
+      // Segunda llamada al modelo para continuar la conversación
+      const secondResponse = await openai.chat.completions.create({
+        model: "gpt-4-turbo",
+        messages: [...messagesToSend, choice.message, ...toolResponses],
+        temperature: 0.7
+      });
+
+      const finalContent = secondResponse.choices?.[0]?.message?.content?.trim();
+
+      return {
+        statusCode: 200,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: finalContent || "✅ Tu pregunta ha sido enviada a la productora."
+        })
+      };
+    }
+
+    // --- Si NO hubo tool call, responder directamente ---
+    if (choice?.message?.content?.trim()) {
+      return {
+        statusCode: 200,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: choice.message.content.trim() })
+      };
     }
 
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: response.choices[0]?.message?.content || "Sin respuesta" })
+      body: JSON.stringify({ message: "⚠️ La IA no respondió con contenido útil." })
     };
 
   } catch (error) {
@@ -141,7 +144,7 @@ export const handler = async (event) => {
     return {
       statusCode: 500,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: "Error en la IA", error: error.message })
+      body: JSON.stringify({ message: "Error en el procesamiento", error: error.message })
     };
   }
 };
