@@ -16,7 +16,7 @@ const formattedDate = computed(() => {
     month: "long",
     year: "numeric",
     timeZone: "America/Santiago",
-  }).format(new Date(props.ticket.event_date));
+  }).format(new Date(props.event.start_date));
 });
 
 // ✅ Formatear hora del evento
@@ -26,7 +26,7 @@ const formattedTime = computed(() => {
     hour: "2-digit",
     minute: "2-digit",
     timeZone: "America/Santiago",
-  }).format(new Date(props.ticket.event_date)) + " hrs";
+  }).format(new Date(props.event.start_date)) + " hrs";
 });
 </script>
 

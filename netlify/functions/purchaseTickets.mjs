@@ -1,6 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
-import { v4 as uuidv4 } from 'uuid';
 
 // Configurar Supabase
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -58,14 +57,11 @@ export default async function handler(req, context) {
         .update(`${attendeeId}-${eventId}-${ticket.id}-${Date.now()}`)
         .digest('hex');
 
-      const uniqueUUID = uuidv4(); // Generar un UUID único
-
       return {
         event_id: eventId,
         event_ticket_id: ticket.id,
         attendee_id: attendeeId,
         qr_code: uniqueHash,
-        internal_id: uniqueUUID,
         is_complimentary: ticket.price === 0,
         payment_status: ticket.price > 0 ? 'pending' : 'completed',
         status: 'active',
