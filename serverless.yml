@@ -35,7 +35,7 @@ provider:
 functions:
   aiAssistant:
     handler: functions/aiAssistant.handler
-    timeout: 30
+    timeout: 28
     events:
       - httpApi:
           path: /api/ai-assistant

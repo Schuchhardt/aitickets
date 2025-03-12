@@ -79,15 +79,14 @@ export const handler = async (event) => {
 
     const choice = response.choices[0];
 
-    // --- Si el modelo llama a tools ---
     if (choice?.message?.tool_calls?.length > 0) {
       const toolCalls = choice.message.tool_calls;
       const toolResponses = [];
 
       for (const toolCall of toolCalls) {
-        if (toolCall.function.name === "send_message_to_producer") {
-          const args = JSON.parse(toolCall.function.arguments || '{}');
+        const args = JSON.parse(toolCall.function.arguments || '{}');
 
+        if (toolCall.function.name === "send_message_to_producer") {
           if (!args.event_id || !args.message || !args.user_name || !args.user_email) {
             return {
               statusCode: 200,
@@ -103,10 +102,27 @@ export const handler = async (event) => {
             tool_call_id: toolCall.id,
             content: "✅ Tu pregunta fue enviada correctamente a la productora."
           });
+
+        } else if (
+          toolCall.function.name === "fill_buyer_information"
+        ) {
+          // 👉 Para el front: enviar instrucciones de UI
+          return {
+            statusCode: 200,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              message: null,
+              function_calling: {
+                called: true,
+                name: toolCall.function.name,
+                properties: args
+              }
+            })
+          };
         }
       }
 
-      // Segunda llamada al modelo para continuar la conversación
+      // Si solo se ejecutó send_message_to_producer, hacemos la segunda llamada
       const secondResponse = await openai.chat.completions.create({
         model: "gpt-4-turbo",
         messages: [...messagesToSend, choice.message, ...toolResponses],
@@ -124,7 +140,6 @@ export const handler = async (event) => {
       };
     }
 
-    // --- Si NO hubo tool call, responder directamente ---
     if (choice?.message?.content?.trim()) {
       return {
         statusCode: 200,

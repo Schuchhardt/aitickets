@@ -34,6 +34,13 @@ const renderMarkdown = (text) => {
   return DOMPurify.sanitize(marked(text)); // Convierte a HTML y sanitiza
 };
 
+// emitir un evento para abrir el modal de reserva y llenar los datos con los properties
+const fillForm = (properties) => {
+  // Emitir un evento para abrir el modal de reserva
+  // Llenar los datos del formulario con los properties
+  console.log("Llenar formulario con los datos: ", properties);
+};
+
 const sendMessage = async (message) => {
   if (!message.trim()) return;
 
@@ -54,9 +61,9 @@ const sendMessage = async (message) => {
     - Descripción: ${props.event.description}
     - Fecha: ${new Date(props.event.start_date).toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })} - ${new Date(props.event.end_date).toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })}
     - Ubicación: ${props.event.location}
-    - Preguntas frecuentes: ${props.event.faqs}
+    - Preguntas frecuentes: ${props.event.faqs.map(faq => `• ${faq.question}: ${faq.answer}`).join("\n")}
     - Precios de las entradas:
-      ${props.event.tickets.map(ticket => `•Tipo de entrada ${ticket.ticket_name}: Precio $${ticket.price}`).join("\n")}
+      ${props.event.tickets.map(ticket => `•Tipo de entrada ${ticket.ticket_name}: Precio $${ticket.price} Cantidad maxima por usuario: ${ticket.max_quantity}`).join("\n")}
     `,
   };
 
@@ -73,9 +80,30 @@ const sendMessage = async (message) => {
 
     // Leer la respuesta completa de una vez
     const responseData = await response.json();
-    
-    // Asignar el texto directamente sin procesamiento por partes
-    assistantMessage.text = responseData.message;
+
+    if (responseData.function_calling?.called) {
+      const { name, properties } = responseData.function_calling;
+
+      // Ejecutas en frontend la lógica asociada (ej: rellenar formulario o actualizar selección de entradas)
+      if (name === 'fill_buyer_information') {
+        fillForm(properties);
+      }
+
+      // ✅ Avisas al bot que ya se ejecutó como mensaje "system"
+      messages.value.push({
+        role: "system",
+        text: `La función ${name} fue ejecutada correctamente en el cliente con los siguientes datos: ${JSON.stringify(properties)}`
+      });
+
+      // (Opcional) También puedes mostrar al usuario algo tipo:
+      messages.value.push({
+        role: "assistant",
+        text: `✅ Ya prellené esa información por ti. ¿Quieres continuar?`
+      });
+    } else {
+      // Asignar el texto directamente sin procesamiento por partes
+      assistantMessage.text = responseData.message;
+    }
 
   } catch (error) {
     console.log(error)
