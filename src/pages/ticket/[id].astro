@@ -20,8 +20,8 @@ if (id) {
   // Obtener los datos del ticket
   const { data: ticketData, error } = await supabase
     .from("event_attendees")
-    .select("id, event_id, event_ticket_id, attendee_id, qr_code, internal_id")
-    .eq("internal_id", id)
+    .select("*")
+    .eq("id", id)
     .single();
 
   console.log("Datos obtenidos del ticket:", ticketData);
@@ -78,7 +78,7 @@ if (id) {
       
       <!-- Tarjeta del Ticket (Pegada arriba) -->
       <div class="mt-0 pt-8 lg:pt-12 px-4 lg:px-0">
-        <TicketInfo ticket={ticket} event={event} client:idle />
+        <TicketInfo ticket={ticket} event={event} client:only />
       </div>
 
       <!-- Contenedor colapsable del evento -->
