@@ -94,7 +94,7 @@ const getTime = (time) => {
       <div class="flex space-x-4">
         <div class="bg-gray-100 p-4 rounded-lg text-center w-1/2" v-for="(date, index) in event.dates" :key="index">
           <span class="text-gray-900 font-semibold block">
-            {{ new Date(date.date).toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "long" }) }}
+            {{ new Date(date.date).toLocaleDateString("es-CL", { weekday: "short", day: "numeric", month: "long" }) }}
           </span>
           <span class="text-gray-600 text-sm">
             {{ getTime(date.start_time) }} hrs - {{ getTime(date.end_time) }} hrs
@@ -119,7 +119,7 @@ const getTime = (time) => {
     </div>
 
     <!-- Sección de Preguntas Frecuentes con animación -->
-    <div id="preguntas" v-if="event.faqs" class="event-section mt-10">
+    <div id="preguntas" v-if="event.faqs && event.faqs.length > 0" class="event-section mt-10">
       <h2 class="text-2xl font-bold mb-4 font-['Unbounded']">Preguntas Frecuentes</h2>
       <div v-for="(faq, index) in faqs" :key="index" class="border-b border-gray-300 py-3">
         <button @click="toggleFAQ(index)" class="flex justify-between items-center w-full text-left cursor-pointer">
@@ -133,7 +133,7 @@ const getTime = (time) => {
     </div>
 
     <!-- Categorías o temáticas del evento -->
-    <div class="mt-10" v-if="event.tags">
+    <div class="mt-10" v-if="event.tags && event.tags.length > 0">
       <h2 class="text-2xl font-bold mb-4 font-['Unbounded']">Categorías y temáticas del evento</h2>
       <div class="flex flex-wrap gap-2">
         <span v-for="(cat, idx) in event.tags" :key="idx"

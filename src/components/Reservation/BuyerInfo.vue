@@ -13,7 +13,7 @@ const updateBuyerInfo = (field, value) => {
 </script>
 
 <template>
-  <div class="font-[Prompt]">
+  <div class="font-[Prompt] p-4">
     <h3 class="text-lg font-semibold mb-4">Información de los tickets</h3>
     <p class="text-gray-600 mb-4">Información del comprador</p>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">

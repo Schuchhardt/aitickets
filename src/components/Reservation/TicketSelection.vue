@@ -37,28 +37,37 @@ const decreaseTicket = (ticket) => {
   updateSelection(ticket.id, Math.max((selectedTickets.value[ticket.id] || 0) - 1, 0));
 };
 
-const formatDate = (datetime) => {
-  return datetime ? new Date(datetime).toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "long" }) : "";
-};
-
 const formatTime = (datetime) => {
-  return datetime ? new Date(datetime).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : "";
+  return datetime ? new Date(datetime).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" }) : "";
 };
 
 const formatPrice = (price) => {
-  return price !== null && price !== undefined ? price.toLocaleString("es-ES") : "";
+  return price !== null && price !== undefined ? price.toLocaleString("es-CL") : "";
+};
+
+const formatFullDate = (dateArray) => {
+  if (!dateArray.length) return "No hay fechas disponibles";
+
+  const optionsDate = { day: "numeric", month: "long" };
+
+  const start = dateArray[0];
+  const end = dateArray[dateArray.length - 1];
+
+  const startDate = new Date(start.date).toLocaleDateString("es-ES", optionsDate);
+  const endDate = new Date(end.date).toLocaleDateString("es-ES", optionsDate);
+  return startDate !== endDate ? `Del ${startDate} al ${endDate}` : `${startDate}`;
 };
 </script>
 
 <template>
   <div v-if="event.tickets && event.tickets.length" class="w-full font-[Prompt]">
-    <h3 class="text-lg font-semibold text-center mb-4 font-[Prompt]">Selecciona tus tickets</h3>
+    <!-- <h3 class="text-lg font-semibold text-center pt-0 mb-2 font-[Prompt]">Selecciona tus tickets</h3> -->
     <div class="w-full">
-      <div class="text-center pb-4">
+      <div class="text-center p-2 mb-4 bg-gray-50 rounded-[10px]">
         <p class="text-gray-500 text-sm">Fecha</p>
         <p class="text-lg font-semibold">
           <template v-if="event.start_date || event.end_date">
-            {{ formatDate(event.start_date) }}<span v-if="event.start_date && event.end_date"> - </span>{{ formatDate(event.end_date) }}
+            {{formatFullDate(event.dates)}}
           </template>
         </p>
         <p class="text-gray-500 text-sm">
@@ -92,7 +101,7 @@ const formatPrice = (price) => {
           <button 
             v-if="!selectedTickets[ticket.id]" 
             @click="increaseTicket(ticket)" 
-            class="border px-4 py-1 rounded-lg text-black hover:bg-gray-100"
+            class="border px-4 py-1 rounded-lg text-black hover:bg-gray-100 cursor-pointer"
           >
             Añadir
           </button>

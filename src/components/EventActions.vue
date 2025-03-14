@@ -33,6 +33,19 @@ onUnmounted(() => {
 function handleOpenModal() {
   showReserveModal.value = true;
 }
+// format price with thousands separator (dot)
+const formatPrice = (price) => {
+  return price !== null && price !== undefined ? price.toLocaleString("es-CL") : "";
+};
+// get lowest ticket price and maximum price
+// and return the price of the event
+const getEventPrice = (tickets) => {
+  if (!tickets || !tickets.length) return "Gratis";
+  const prices = tickets.map(t => t.price);
+  const minPrice = Math.min(...prices);
+  const maxPrice = Math.max(...prices);
+  return minPrice === maxPrice ? formatPrice(minPrice) : `$${formatPrice(minPrice)} - $${formatPrice(maxPrice)}`;º
+};
 </script>
 
 <template>
@@ -53,7 +66,7 @@ function handleOpenModal() {
           <img :src="iconTicket.src" alt="ticket icon" class="w-5 h-5 mr-2" />
           Precio
         </span>
-        <span class="text-xl">{{ event.price || "Gratis" }}</span>
+        <span class="text-xl">{{ getEventPrice(event.tickets) || "Gratis" }}</span>
       </div>
 
       <!-- Botones -->

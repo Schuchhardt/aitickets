@@ -15,7 +15,6 @@ const selectedTickets = ref({});
 const buyerInfo = ref({ firstName: "", lastName: "", email: "", phone: "", termsAccepted: false });
 const discount = ref(0);
 
-// ==== CARGAR LOCALSTORAGE AL MONTAR ====
 onMounted(() => {
   const storedTickets = localStorage.getItem(`selectedTickets_event_${props.event.id}`);
   if (storedTickets) selectedTickets.value = JSON.parse(storedTickets);
@@ -58,13 +57,9 @@ const calculateSubtotal = computed(() => {
   }, 0);
 });
 
-const calculateFee = computed(() => {
-  return calculateSubtotal.value > 0 ? calculateSubtotal.value * 0.1 : 0;
-});
-
 const calculateTotal = computed(() => {
   const discountAmount = discount.value ? (calculateSubtotal.value * discount.value) / 100 : 0;
-  return calculateSubtotal.value + calculateFee.value - discountAmount;
+  return calculateSubtotal.value - discountAmount;
 });
 
 // ==== NAVEGACIÓN ====
@@ -140,7 +135,7 @@ function handleRemoteGoToNextStep() {
     >
       <HeaderSteps :eventName="event.name" :currentStep="currentStep" @close="emit('close')" />
 
-      <div v-if="currentStep === 1 || currentStep === 2" class="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
+      <div v-if="currentStep === 1 || currentStep === 2" class="grid grid-cols-1 md:grid-cols-2 gap-6 p-2 w-full md:min-w-[732px] md:max-w-[800px] mx-auto">
         <div class="w-full">
           <TicketSelection
             v-if="currentStep === 1"
@@ -151,7 +146,7 @@ function handleRemoteGoToNextStep() {
           <BuyerInfo v-if="currentStep === 2" v-model:buyerInfo="buyerInfo" class="w-full" />
         </div>
 
-        <div class="bg-gray-50 p-6 w-full">
+        <div class="bg-gray-50 p-6 w-full rounded-[10px]">
           <OrderSummary
             :selectedTickets="selectedTickets"
             :event="event"
