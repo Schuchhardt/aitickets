@@ -12,4 +12,7 @@ export default defineConfig({
   vite: {
     plugins: [tailwindcss(), svgLoader()],
   },
+  security:{
+    checkOrigin: false
+  }
 });

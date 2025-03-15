@@ -19,15 +19,18 @@ export default async function handler(req) {
       return new Response(JSON.stringify({ message: 'Token no recibido' }), { status: 400 });
     }
 
+    // Construir la URL con el parámetro 'token'
+    const url = new URL(flowApiUrl);
+    url.searchParams.append('token', token);
+
     // Consultar el estado del pago en Flow
-    const flowResponse = await fetch(flowApiUrl, {
-      method: 'POST',
+    const flowResponse = await fetch(url, {
+      method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'ApiKey': flowApiKey
+        'ApiKey': flowApiKey,
       },
-      body: JSON.stringify({ token })
-    }); 
+    });
 
     const paymentStatus = await flowResponse.json();
 
@@ -41,7 +44,7 @@ export default async function handler(req) {
       status,
       amount,
       fee,
-      paymentData
+      paymentData,
     } = paymentStatus;
 
     // Solo procesar si el pago fue exitoso

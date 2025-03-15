@@ -139,7 +139,7 @@ export default async function handler(req, context) {
         currency: 'CLP',
         amount: total,
         email: buyer.email,
-        urlConfirmation: 'https://8568-45-181-123-118.ngrok-free.app/payment_confirmation', //`${process.env.SITE_URL}/api/payment-confirmation`, // URL para recibir confirmaciones de Flow
+        urlConfirmation: `${process.env.SITE_URL}/api/payment-confirmation`, // URL para recibir confirmaciones de Flow
         urlReturn: `${process.env.SITE_URL}/payment-confirmation`, // URL a la que se redirige al usuario después del pago
       };
       console.log('🔗 Orden de pago:', flowOrderData);
