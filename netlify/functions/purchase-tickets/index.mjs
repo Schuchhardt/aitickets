@@ -156,8 +156,8 @@ export default async function handler(req, context) {
           s: signature,
         }),
       });
-      console.log('🔗 Respuesta de Flow:', flowResponse);
       const flowData = await flowResponse.json();
+      console.log('🔗 Respuesta de Flow:', flowData);
 
       if (!flowResponse.ok) {
         return new Response(JSON.stringify({ message: 'Error al crear la orden de pago en Flow', error: flowData }), { status: 500 });
