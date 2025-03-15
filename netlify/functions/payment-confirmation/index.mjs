@@ -72,6 +72,7 @@ export default async function handler(req) {
     return new Response(JSON.stringify({ message: 'Pago confirmado y orden actualizada' }), { status: 200 });
 
   } catch (error) {
+    console.error('Error en payment-confirmation:', error);
     return new Response(JSON.stringify({ message: 'Error interno', error: error.message }), { status: 500 });
   }
 }
