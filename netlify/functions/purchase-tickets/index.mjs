@@ -149,9 +149,7 @@ export default async function handler(req, context) {
       const flowResponse = await fetch(`${flowApiUrl}/payment/create`, {
         method: 'POST',
         headers: {
-          // Request Body schema: application/x-www-form-urlencoded
           'Content-Type': 'application/x-www-form-urlencoded',
-          //'ApiKey': flowApiKey,
         },
         body: new URLSearchParams({
           ...flowOrderData,

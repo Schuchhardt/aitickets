@@ -1,4 +1,8 @@
 ---
+import AppHeader from "../components/AppHeader.vue";
+import AppFooter from "../components/AppFooter.vue";
+import Layout from '../layouts/Layout.astro';
+import "../styles/global.css";
 import { createClient } from '@supabase/supabase-js';
 
 // Inicializar el cliente de Supabase
@@ -87,27 +91,27 @@ if (request.method === 'POST') {
   }
 }
 ---
-
-<html lang="es">
-  <head>
-    <title>Estado de tu Pago</title>
-  </head>
-  <body>
-    {paymentDetails ? (
-      <div>
-        <h1>{paymentStatusMessage}</h1>
-        <p><strong>ID de la Orden:</strong> {paymentDetails.id}</p>
-        <p><strong>Estado en Flow:</strong> {paymentDetails.flowStatus === 1 ? 'Pagado' : 'No Pagado'}</p>
-        <p><strong>Monto Total:</strong> {paymentDetails.flowAmount}</p>
-        <p><strong>Comisión de Pago:</strong> {paymentDetails.flowFee}</p>
-        <p><strong>ID de Comercio en Flow:</strong> {paymentDetails.flowCommerceId}</p>
-        {/* Otros detalles de la orden desde tu base de datos */}
-        <p><strong>Nombre del Cliente:</strong> {paymentDetails.customer_name}</p>
-        <p><strong>Email del Cliente:</strong> {paymentDetails.customer_email}</p>
-        {/* Agrega más campos según sea necesario */}
-      </div>
-    ) : (
-      <p>{paymentStatusMessage}</p>
-    )}
-  </body>
-</html>
+<Layout>
+    <AppHeader/>
+    <main>
+        {paymentDetails ? (
+            <div>
+              <h1>{paymentStatusMessage}</h1>
+              <p><strong>ID de la Orden:</strong> {paymentDetails.id}</p>
+              <p><strong>Estado en Flow:</strong> {paymentDetails.flowStatus === 1 ? 'Pagado' : 'No Pagado'}</p>
+              <p><strong>Monto Total:</strong> {paymentDetails.flowAmount}</p>
+              <p><strong>Comisión de Pago:</strong> {paymentDetails.flowFee}</p>
+              <p><strong>ID de Comercio en Flow:</strong> {paymentDetails.flowCommerceId}</p>
+              {/* Otros detalles de la orden desde tu base de datos */}
+              <p><strong>Nombre del Cliente:</strong> {paymentDetails.customer_name}</p>
+              <p><strong>Email del Cliente:</strong> {paymentDetails.customer_email}</p>
+              {/* Agrega más campos según sea necesario */}
+            </div>
+          ) : (
+            <p>{paymentStatusMessage}</p>
+          )}
+        
+    </main>
+    <AppFooter/>
+</Layout>
+  
