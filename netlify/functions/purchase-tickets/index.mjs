@@ -133,14 +133,14 @@ export default async function handler(req, context) {
       // Generar una orden de pago en Flow
       const flowOrderData = {
         apiKey: flowApiKey,
-        paymentMethod: 1,
+        paymentMethod: 1, // 1: Webpay, 2: Multicaja, 3: Servipag, 4: Cryptocompra
         commerceOrder: newOrder.id, // ID único de la orden en tu sistema
         subject: `Pago de entradas para el evento ${eventId}`,
         currency: 'CLP',
         amount: total,
         email: buyer.email,
-        urlConfirmation: `${process.env.SITE_URL}/api/payment-confirmation`, // URL para recibir confirmaciones de Flow
-        urlReturn: `${process.env.SITE_URL}/payment-success`, // URL a la que se redirige al usuario después del pago
+        urlConfirmation: 'https://8568-45-181-123-118.ngrok-free.app/payment_confirmation', //`${process.env.SITE_URL}/api/payment-confirmation`, // URL para recibir confirmaciones de Flow
+        urlReturn: `${process.env.SITE_URL}/payment-confirmation`, // URL a la que se redirige al usuario después del pago
       };
       console.log('🔗 Orden de pago:', flowOrderData);
       // Firmar la solicitud según la documentación de Flow

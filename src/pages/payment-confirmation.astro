@@ -1,0 +1,29 @@
+---
+const request = Astro.request;
+let formDataJson = null;
+
+if (request.method === 'POST') {
+  const formData = await request.formData();
+  const formDataObj = {};
+  formData.forEach((value, key) => {
+    formDataObj[key] = value;
+  });
+  formDataJson = JSON.stringify(formDataObj, null, 2); // Convertir a JSON con formato
+}
+---
+
+<html lang="es">
+  <head>
+    <title>Confirmación de Pago</title>
+  </head>
+  <body>
+    {formDataJson ? (
+      <div>
+        <h1>Datos del Formulario Recibido</h1>
+        <pre>{formDataJson}</pre>
+      </div>
+    ) : (
+      <p>No se recibieron datos del formulario.</p>
+    )}
+  </body>
+</html>
