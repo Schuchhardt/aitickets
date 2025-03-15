@@ -28,6 +28,7 @@ function generateSignature(params, secretKey) {
 
   return signature;
 }
+
 export default async function handler(req) {
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ message: 'Método no permitido' }), { status: 405 });
@@ -57,7 +58,7 @@ export default async function handler(req) {
     const paymentStatus = await flowResponse.json();
 
     console.log("paymentStatus", paymentStatus);
-    
+
     if (!flowResponse.ok) {
       return new Response(JSON.stringify({ message: 'Error al consultar estado de pago en Flow', error: paymentStatus }), { status: 500 });
     }

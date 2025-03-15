@@ -4,6 +4,7 @@ import AppFooter from "../components/AppFooter.vue";
 import Layout from '../layouts/Layout.astro';
 import "../styles/global.css";
 import { createClient } from '@supabase/supabase-js';
+import crypto from 'crypto';
 
 // Inicializar el cliente de Supabase
 const supabaseUrl = import.meta.env.SUPABASE_URL;
@@ -18,6 +19,27 @@ if (!allowedOrigins.includes(origin)) {
   return new Response('Origen no permitido', { status: 403 });
 }
 
+/**
+ * Firma los parámetros usando HMAC-SHA256 con secretKey
+ * @param {Object} params - Objeto con los parámetros (sin incluir la firma "s")
+ * @param {string} secretKey - Clave secreta para firmar
+ * @returns {string} - Firma generada (hash HMAC-SHA256 en hexadecimal)
+ */
+function generateSignature(params, secretKey) {
+  // 1. Claves ordenadas alfabéticamente
+  const keys = Object.keys(params).filter(key => key !== 's').sort();
+
+  // 2. Concatenar en formato nombre + valor
+  const stringToSign = keys.map(key => key + params[key]).join('');
+
+  // 3. Firmar con HMAC-SHA256
+  const hmac = crypto.createHmac('sha256', secretKey);
+  hmac.update(stringToSign);
+  const signature = hmac.digest('hex');
+
+  return signature;
+}
+
 // Variables para almacenar datos
 let paymentDetails = null;
 let paymentStatusMessage = '';
@@ -30,13 +52,17 @@ if (request.method === 'POST') {
   if (token) {
     // Consultar el estado del pago en Flow
     const flowApiKey = import.meta.env.FLOW_API_KEY;
-    const flowApiUrl = `${import.meta.env.FLOW_BASE_URL}/payment/getStatus?token=${token}`;
+    const flowApiSecret = import.meta.env.FLOW_API_SECRET;
+    const flowApiUrl = `${import.meta.env.FLOW_BASE_URL}/payment/getStatus`;
+    const signature = generateSignature({ apiKey: flowApiKey, token }, flowApiSecret);
 
-    const flowResponse = await fetch(flowApiUrl, {
+    // Construir la URL con los parámetros necesarios
+    const url = `${flowApiUrl}?apiKey=${flowApiKey}&token=${token}&s=${signature}`;
+
+    const flowResponse = await fetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'ApiKey': flowApiKey,
       },
     });
 
@@ -47,7 +73,7 @@ if (request.method === 'POST') {
       // Obtener detalles de la orden desde Supabase
       const { data, error } = await supabase
         .from('event_orders')
-        .select('*')
+        .select('id, status')
         .eq('id', commerceOrder)
         .single();
 
@@ -63,22 +89,41 @@ if (request.method === 'POST') {
           flowCommerceId: paymentData?.commerceId || null,
         };
 
-        // Determinar el mensaje de estado del pago
-        switch (status) {
-          case 1:
+        // Verificar si el estado en la base de datos es diferente al estado en Flow
+        if (data.status !== 'paid' && status === 2) {
+          // Actualizar el estado de la orden en Supabase
+          const { error: updateError } = await supabase
+            .from('event_orders')
+            .update({
+              status: 'paid',
+              total_payment: amount,
+              payment_fee: fee,
+              payment_commerce_id: paymentData?.commerceId || null,
+            })
+            .eq('id', commerceOrder);
+
+          if (updateError) {
+            console.error('Error al actualizar la orden en Supabase:', updateError.message);
+            paymentStatusMessage = 'Hubo un problema al actualizar el estado de tu orden. Por favor, contacta a soporte.';
+          } else {
+            paymentDetails.status = 'paid';
             paymentStatusMessage = '¡Gracias por tu pago! Tu transacción ha sido completada exitosamente.';
-            break;
-          case 2:
-            paymentStatusMessage = 'Tu pago está pendiente de confirmación. Te notificaremos una vez que se confirme.';
-            break;
-          case 3:
-            paymentStatusMessage = 'Lamentablemente, tu pago ha sido rechazado. Por favor, intenta nuevamente o utiliza otro método de pago.';
-            break;
-          case 4:
-            paymentStatusMessage = 'Tu pago ha sido anulado. Si crees que esto es un error, por favor, contacta a soporte.';
-            break;
-          default:
-            paymentStatusMessage = 'Estado del pago desconocido. Por favor, contacta a soporte para más información.';
+          }
+        } else {
+          // Determinar el mensaje de estado del pago
+          switch (status) {
+            case 1:
+              paymentStatusMessage = 'Tu pago está pendiente de confirmación. Te notificaremos una vez que se confirme.';
+              break;
+            case 3:
+              paymentStatusMessage = 'Lamentablemente, tu pago ha sido rechazado. Por favor, intenta nuevamente o utiliza otro método de pago.';
+              break;
+            case 4:
+              paymentStatusMessage = 'Tu pago ha sido anulado. Si crees que esto es un error, por favor, contacta a soporte.';
+              break;
+            default:
+              paymentStatusMessage = 'Estado del pago desconocido. Por favor, contacta a soporte para más información.';
+          }
         }
       }
     } else {
@@ -92,26 +137,24 @@ if (request.method === 'POST') {
 }
 ---
 <Layout>
-    <AppHeader/>
-    <main>
-        {paymentDetails ? (
-            <div>
-              <h1>{paymentStatusMessage}</h1>
-              <p><strong>ID de la Orden:</strong> {paymentDetails.id}</p>
-              <p><strong>Estado en Flow:</strong> {paymentDetails.flowStatus === 1 ? 'Pagado' : 'No Pagado'}</p>
-              <p><strong>Monto Total:</strong> {paymentDetails.flowAmount}</p>
-              <p><strong>Comisión de Pago:</strong> {paymentDetails.flowFee}</p>
-              <p><strong>ID de Comercio en Flow:</strong> {paymentDetails.flowCommerceId}</p>
-              {/* Otros detalles de la orden desde tu base de datos */}
-              <p><strong>Nombre del Cliente:</strong> {paymentDetails.customer_name}</p>
-              <p><strong>Email del Cliente:</strong> {paymentDetails.customer_email}</p>
-              {/* Agrega más campos según sea necesario */}
-            </div>
-          ) : (
-            <p>{paymentStatusMessage}</p>
-          )}
-        
-    </main>
-    <AppFooter/>
+  <AppHeader/>
+  <main>
+    {paymentDetails ? (
+      <div>
+        <h1>{paymentStatusMessage}</h1>
+        <p><strong>ID de la Orden:</strong> {paymentDetails.id}</p>
+        <p><strong>Estado en Flow:</strong> {paymentDetails.flowStatus === 2 ? 'Pagado' : 'No Pagado'}</p>
+        <p><strong>Monto Total:</strong> {paymentDetails.flowAmount}</p>
+        <p><strong>Comisión de Pago:</strong> {paymentDetails.flowFee}</p>
+        <p><strong>ID de Comercio en Flow:</strong> {paymentDetails.flowCommerceId}</p>
+        {/* Otros detalles de la orden desde tu base de datos */}
+        <p><strong>Nombre del Cliente:</strong> {paymentDetails.customer_name}</p>
+        <p><strong>Email del Cliente:</strong> {paymentDetails.customer_email}</p>
+        {/* Agrega más campos según sea necesario */}
+      </div>
+    ) : (
+      <p>{paymentStatusMessage}</p>
+    )}
+  </main>
+  <AppFooter/>
 </Layout>
-  
