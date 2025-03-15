@@ -10,11 +10,11 @@ export default async function handler(req) {
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ message: 'Método no permitido' }), { status: 405 });
   }
-
+  console.log("payment-confirmation");
   try {
     const formData = await req.formData();
     const token = formData.get('token');
-
+    console.log("token", token);
     if (!token) {
       return new Response(JSON.stringify({ message: 'Token no recibido' }), { status: 400 });
     }
@@ -38,6 +38,7 @@ export default async function handler(req) {
       return new Response(JSON.stringify({ message: 'Error al consultar estado de pago en Flow', error: paymentStatus }), { status: 500 });
     }
 
+    console.log("paymentStatus", paymentStatus);
     // Extraer datos relevantes
     const {
       commerceOrder,
