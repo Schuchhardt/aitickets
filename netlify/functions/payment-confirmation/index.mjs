@@ -42,10 +42,10 @@ export default async function handler(req) {
       return new Response(JSON.stringify({ message: 'Token no recibido' }), { status: 400 });
     }
 
-    const signature = generateSignature({ apiKey, token }, flowApiSecret);
+    const signature = generateSignature({ apiKey: flowApiKey, token }, flowApiSecret);
 
     // Construir la URL con el parámetro 'token'
-    const url = flowApiUrl + `?apiKey=${apiKey}&token=${token}&s=${signature}`;
+    const url = flowApiUrl + `?apiKey=${flowApiKey}&token=${token}&s=${signature}`;
 
     // Consultar el estado del pago en Flow
     const flowResponse = await fetch(url, {

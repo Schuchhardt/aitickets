@@ -92,7 +92,7 @@ export default async function handler(req, context) {
         attendee_id: attendeeId,
         qr_code: uniqueHash,
         is_complimentary: ticket.price === 0,
-        status: 'active',
+        status: ticket.price === 0 ? 'active' : 'pending',
       };
     });
     console.log('🎟️ Registrando entradas:', eventAttendees);
@@ -166,7 +166,7 @@ export default async function handler(req, context) {
       // Actualizar la orden con el ID de la orden de Flow
       const { error: updateOrderError } = await supabase
         .from('event_orders')
-        .update({ payment_external_id: flowData.token })
+        .update({ payment_external_id: flowData.flowOrder })
         .eq('id', newOrder.id);
 
       if (updateOrderError) {
