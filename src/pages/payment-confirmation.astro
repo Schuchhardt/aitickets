@@ -4,7 +4,7 @@ import AppFooter from "../components/AppFooter.vue";
 import Layout from '../layouts/Layout.astro';
 import "../styles/global.css";
 import { createClient } from '@supabase/supabase-js';
-import crypto from 'crypto';
+import { createHmac } from 'node:crypto';
 
 // Inicializar el cliente de Supabase
 const supabaseUrl = import.meta.env.SUPABASE_URL;
@@ -35,7 +35,7 @@ function generateSignature(params, secretKey) {
   const stringToSign = keys.map(key => key + params[key]).join('');
 
   // 3. Firmar con HMAC-SHA256
-  const hmac = crypto.createHmac('sha256', secretKey);
+  const hmac = createHmac('sha256', secretKey);
   hmac.update(stringToSign);
   const signature = hmac.digest('hex');
 

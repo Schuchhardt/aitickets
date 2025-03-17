@@ -77,6 +77,15 @@ export default async function handler(req) {
       return new Response(JSON.stringify({ message: 'Pago no confirmado aún', status }), { status: 200 });
     }
 
+    // Buscar la orden en Supabase
+    const { data: orderData, error: orderError } = await supabase
+      .from('event_orders')
+      .select('event_id, attendee_id, ticket_details')
+      .eq('id', commerceOrder);
+
+    if (orderError) {
+      return new Response(JSON.stringify({ message: 'Error al buscar orden en Supabase', error: orderError.message }), { status: 500 });
+    }
     // Actualizar la orden en Supabase
     const { error: updateError } = await supabase
       .from('event_orders')
@@ -90,10 +99,37 @@ export default async function handler(req) {
 
     if (updateError) {
       return new Response(JSON.stringify({ message: 'Error al actualizar orden en Supabase', error: updateError.message }), { status: 500 });
+    } else{
+       // Insertar entradas en event_attendees con QR único y UUID
+            const eventAttendees = ticket_details.map(ticket => { // TODO: iterar sobre los tickets de la orden, pero ahora viene por ejemplo ticket.id, quantity: 2, tendrian que ser 2 registros y no uno
+              const uniqueHash = crypto.createHash('sha256')
+                .update(`${attendeeId}-${eventId}-${ticket.id}-${Date.now()}`)
+                .digest('hex');
+      
+              return {
+                event_id: orderData.event_id,
+                event_ticket_id: parseInt(ticket.id,10),
+                attendee_id: orderData.attendee_id,
+                qr_code: uniqueHash,
+                is_complimentary: false,
+                status: 'active',
+              };
+            });
+            console.log('Registrando entradas:', eventAttendees);
+            const { data: insertedTickets, error: insertTicketsError } = await supabase
+              .from('event_attendees')
+              .insert(eventAttendees)
+              .select();
+      
+            if (insertTicketsError) {
+              return new Response(JSON.stringify({ message: 'Error al registrar entradas', error: insertTicketsError.message }), { status: 500 });
+            }
+
+            console.log('Entradas registradas:', insertedTickets);
+            // Responder a Flow (aunque no lo requiere, es buena práctica)
+            return new Response(JSON.stringify({ message: 'Pago confirmado y orden actualizada' }), { status: 200 });
     }
 
-    // Responder a Flow (aunque no lo requiere, es buena práctica)
-    return new Response(JSON.stringify({ message: 'Pago confirmado y orden actualizada' }), { status: 200 });
 
   } catch (error) {
     console.error('Error en payment-confirmation:', error);

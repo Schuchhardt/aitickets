@@ -80,36 +80,36 @@ export default async function handler(req, context) {
     } else{
       console.log('👤 Asistente nuevo:', attendeeId);
     }
-    // Insertar entradas en event_attendees con QR único y UUID
-    const eventAttendees = tickets.map(ticket => {
-      const uniqueHash = crypto.createHash('sha256')
-        .update(`${attendeeId}-${eventId}-${ticket.id}-${Date.now()}`)
-        .digest('hex');
 
-      return {
-        event_id: eventId,
-        event_ticket_id: parseInt(ticket.id,10),
-        attendee_id: attendeeId,
-        qr_code: uniqueHash,
-        is_complimentary: ticket.price === 0,
-        status: ticket.price === 0 ? 'active' : 'pending',
-      };
-    });
-    console.log('🎟️ Registrando entradas:', eventAttendees);
-    const { data: insertedTickets, error: insertTicketsError } = await supabase
-      .from('event_attendees')
-      .insert(eventAttendees)
-      .select();
-
-    if (insertTicketsError) {
-      return new Response(JSON.stringify({ message: 'Error al registrar entradas', error: insertTicketsError.message }), { status: 500 });
-    }
-
-    // Si el evento es gratuito, devolver el `id` para redirigir a la página de entrada
+    // Si el evento es gratuito, registrar qr como asistentes y devolver el `id` para redirigir a la página de entrada
     if (total === 0) {
+      // Insertar entradas en event_attendees con QR único y UUID
+      const eventAttendees = tickets.map(ticket => {
+        const uniqueHash = crypto.createHash('sha256')
+          .update(`${attendeeId}-${eventId}-${ticket.id}-${Date.now()}`)
+          .digest('hex');
+
+        return {
+          event_id: eventId,
+          event_ticket_id: parseInt(ticket.id,10),
+          attendee_id: attendeeId,
+          qr_code: uniqueHash,
+          is_complimentary: true,
+          status: 'active',
+        };
+      });
+      console.log('Registrando entradas:', eventAttendees);
+      const { data: insertedTickets, error: insertTicketsError } = await supabase
+        .from('event_attendees')
+        .insert(eventAttendees)
+        .select();
+
+      if (insertTicketsError) {
+        return new Response(JSON.stringify({ message: 'Error al registrar entradas', error: insertTicketsError.message }), { status: 500 });
+      }
       return new Response(JSON.stringify({ ticketId: insertedTickets[0].id, message: 'Registro completado' }), { status: 200 });
     } else {
-      console.log('🎟️ Creando orden de pago');
+      console.log('Creando orden de pago');
       // Crear una orden en la base de datos para eventos pagados
       const { data: newOrder, error: orderError } = await supabase
         .from('event_orders')
@@ -119,14 +119,15 @@ export default async function handler(req, context) {
           attendee_id: attendeeId,
           amount: total,
           ticket_qty: tickets.length,
+          ticket_details: tickets,
         }])
         .select()
         .single();
       
-      console.log('🎟️ Orden creada:', newOrder);
+      console.log('Orden creada:', newOrder);
       
       if (orderError) {
-        console.log('🎟️ Error al crear la orden:', orderError.message);
+        console.log('Error al crear la orden:', orderError.message);
         return new Response(JSON.stringify({ message: 'Error al crear la orden', error: orderError.message }), { status: 500 });
       }
 
