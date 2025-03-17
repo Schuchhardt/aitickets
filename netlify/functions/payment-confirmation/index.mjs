@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import crypto from 'crypto';
 import fetch from 'node-fetch';
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
@@ -138,5 +139,5 @@ export default async function handler(req) {
 }
 
 export const config = {
-  path: ['/api/payment-confirmation'],
+  path: ['/api/payment-success', '/api/payment-failure', '/api/payment-confirmation'],
 };
