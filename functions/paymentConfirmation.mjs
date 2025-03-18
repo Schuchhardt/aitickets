@@ -25,16 +25,30 @@ export const handler = async (event) => {
     let token = event.queryStringParameters?.token;
 
     if (!token) {
-        const bodyString = event.isBase64Encoded ? Buffer.from(event.body, 'base64').toString('utf-8') : event.body;
+      const contentType = event.headers['content-type'] || event.headers['Content-Type'];
+    
+      const bodyString = event.isBase64Encoded
+        ? Buffer.from(event.body, 'base64').toString('utf-8')
+        : event.body;
+    
+      if (contentType && contentType.includes('application/x-www-form-urlencoded')) {
         const bodyParams = new URLSearchParams(bodyString);
         token = bodyParams.get('token');
-    } else {
-      return { statusCode: 400, body: JSON.stringify({ message: 'Tipo de contenido no soportado' }) };
+      } else {
+        return {
+          statusCode: 400,
+          body: JSON.stringify({ message: 'Tipo de contenido no soportado' }),
+        };
+      }
     }
-
+    
     if (!token) {
-      return { statusCode: 400, body: JSON.stringify({ message: 'Token no recibido' }) };
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ message: 'Token no recibido' }),
+      };
     }
+    
 
     const signature = generateSignature({ apiKey: flowApiKey, token }, flowApiSecret);
     const url = `${flowApiUrl}?apiKey=${flowApiKey}&token=${token}&s=${signature}`;

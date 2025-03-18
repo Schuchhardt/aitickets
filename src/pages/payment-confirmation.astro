@@ -94,24 +94,8 @@ if (request.method === 'POST') {
 
         // Verificar si el estado en la base de datos es diferente al estado en Flow
         if (data.status !== 'paid' && status === 2) {
-          // Actualizar el estado de la orden en Supabase
-          const { error: updateError } = await supabase
-            .from('event_orders')
-            .update({
-              status: 'paid',
-              total_payment: amount,
-              payment_fee: fee,
-              payment_commerce_id: paymentData?.commerceId || null,
-            })
-            .eq('id', commerceOrder);
-
-          if (updateError) {
-            console.error('Error al actualizar la orden en Supabase:', updateError.message);
-            paymentStatusMessage = 'Hubo un problema al actualizar el estado de tu orden. Por favor, contacta a soporte.';
-          } else {
-            paymentDetails.status = 'paid';
-            paymentStatusMessage = '¡Gracias por tu pago! Tu transacción ha sido completada exitosamente.';
-          }
+          paymentDetails.status = 'paid';
+          paymentStatusMessage = '¡Gracias por tu pago! Tu transacción ha sido completada exitosamente.';
         } else {
           // Determinar el mensaje de estado del pago
           switch (status) {

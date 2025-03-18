@@ -9,7 +9,7 @@ import IconArrowGreen from "../images/icon-arrow-green.png";
 const props = defineProps({
   event: Object,
 });
-const assistantURL = import.meta.env.PUBLIC_CLOUD_FUNCTION_ASISSTANT;
+const assistantURL = import.meta.env.PUBLIC_SERVERLESS_URL;
 const apiSecret = import.meta.env.PUBLIC_API_SECRET
 
 const isOpen = ref(false);
@@ -84,7 +84,7 @@ const sendMessage = async (message) => {
 
   userMessage.value = "";
   try {
-    const response = await fetch(assistantURL, {
+    const response = await fetch(assistantURL + '/ai-assistant', {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-api-secret": apiSecret},
       body: JSON.stringify({ messages: [eventDetailsMessage, ...messages.value] }),
