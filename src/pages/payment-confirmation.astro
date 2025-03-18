@@ -14,11 +14,11 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Configuración de seguridad
 const request = Astro.request;
-const allowedOrigins = ['https://aitickets.cl', 'https://www.aitickets.cl', 'https://www.flow.cl', 'https://sandbox.flow.cl'];
-const origin = request.headers.get('origin');
-if (!allowedOrigins.includes(origin)) {
-  return new Response('Origen no permitido', { status: 403 });
-}
+// const allowedOrigins = ['https://aitickets.cl', 'https://www.aitickets.cl', 'https://www.flow.cl', 'https://sandbox.flow.cl', 'http://localhost:4321'];
+// const origin = request.headers.get('origin');
+// if (!allowedOrigins.includes(origin)) {
+//   return new Response('Origen no permitido', { status: 403 });
+// }
 
 /**
  * Firma los parámetros usando HMAC-SHA256 con secretKey
@@ -27,8 +27,6 @@ if (!allowedOrigins.includes(origin)) {
  * @returns {string} - Firma generada (hash HMAC-SHA256 en hexadecimal)
  */
 function generateSignature(params, secretKey) {
-    console.log(params)
-    console.log(secretKey)
   // 1. Claves ordenadas alfabéticamente
   const keys = Object.keys(params).filter(key => key !== 's').sort();
 
@@ -40,13 +38,14 @@ function generateSignature(params, secretKey) {
   hmac.update(stringToSign);
   const signature = hmac.digest('hex');
 
-
   return signature;
 }
 
 // Variables para almacenar datos
 let paymentDetails = null;
 let paymentStatusMessage = '';
+let eventData = null;
+let ticketData = [];
 
 // Procesar la solicitud POST
 if (request.method === 'POST') {
@@ -75,11 +74,13 @@ if (request.method === 'POST') {
       const { commerceOrder, status, amount, fee, paymentData } = paymentStatus;
 
       // Obtener detalles de la orden desde Supabase
-      const { data, error } = await supabase
+      const { data: orderData, error } = await supabase
         .from('event_orders')
         .select('id, status')
         .eq('id', commerceOrder)
         .single();
+
+      console.log('Datos de la orden:', orderData);
 
       if (error) {
         console.error('Error al obtener la orden desde Supabase:', error.message);
@@ -87,30 +88,40 @@ if (request.method === 'POST') {
       } else {
 
            // Obtener tickets de la orden desde Supabase
-        const { data: ticketsData } = await supabase
-          .from('event_attendes')
+        const { data: ticketsInfo, error: ticketsError } = await supabase
+          .from('event_attendees')
           .select('*')
-          .eq('event_order_id', data.id);
+          .eq('event_order_id', commerceOrder);
 
-        // obtener evento
-        const { data: eventData } = await supabase
-          .from('events')
-          .select('*')
-          .eq('id', ticketsData.event_id)
-          .single();
+        console.log('Tickets obtenidos:', ticketsInfo);
+        
+        if (ticketsError) {
+          console.error('Error al obtener los tickets desde Supabase:', ticketsError.message);
+          paymentStatusMessage = 'Hubo un problema al recuperar los detalles de tus tickets. Por favor, contacta a soporte.';
+        } else{
+          // obtener evento
+          const { data: eventInfo } = await supabase
+            .from('events')
+            .select('*')
+            .eq('id', ticketsInfo?.event_id)
+            .single();
+
+            eventData = eventInfo;
+            ticketData = ticketsInfo;
+        }
 
         paymentDetails = {
-          ...data,
+          ...orderData,
           flowStatus: status,
           flowAmount: amount,
           flowFee: fee,
           flowCommerceId: paymentData?.commerceId || null,
-          ticketsData,
+          ticketsData: ticketData,
           event: eventData
         };
 
         // Verificar si el estado en la base de datos es diferente al estado en Flow
-        if (data.status !== 'paid' && status === 2) {
+        if (orderData.status !== 'paid' && status === 2) {
           paymentDetails.status = 'paid';
           paymentStatusMessage = '¡Gracias por tu pago! Tu transacción ha sido completada exitosamente.';
         } else {
@@ -148,9 +159,9 @@ if (request.method === 'POST') {
 
       {paymentDetails ? (
         <>
-          <h1 class="text-2xl font-semibold text-green-600 mb-4">{paymentStatusMessage}</h1>
+          <h1 class="text-2xl font-semibold text-green-600 mb-4 font-[Unbounded]">{paymentStatusMessage}</h1>
 
-          <div class="space-y-3 text-gray-700">
+          <div class="space-y-3 text-gray-700 font-[Prompt]" >
             <p><span class="font-semibold">ID de la Orden:</span> {paymentDetails.id}</p>
             <p><span class="font-semibold">Estado en Flow:</span> {paymentDetails.flowStatus === 2 ? 'Pagado' : 'No Pagado'}</p>
             <p><span class="font-semibold">Monto Total:</span> ${paymentDetails.flowAmount}</p>
@@ -160,7 +171,7 @@ if (request.method === 'POST') {
 
           {paymentDetails.status === 'paid' && (
             <div class="mt-8">
-              <h2 class="text-xl font-bold text-gray-800 mb-4">Tickets Adquiridos</h2>
+              <h2 class="text-xl font-bold text-gray-800 mb-4 font-[Unbounded]">Tickets Adquiridos</h2>
               <div class="space-y-6">
                 {paymentDetails.ticketsData.map(ticket => (
                   <div class="mt-0 pt-8 lg:pt-12 px-4 lg:px-0">
