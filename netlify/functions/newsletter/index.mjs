@@ -117,7 +117,7 @@ export default async function handler(req, context) {
   }
 }
 
-// 📌 Definir rutas personalizadas
+// Definir rutas personalizadas
 export const config = {
   path: ['/api/newsletter', '/api/subscribe'],
 };

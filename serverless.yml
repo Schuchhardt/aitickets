@@ -13,6 +13,10 @@ provider:
     SUPABASE_URL: ${env:SUPABASE_URL}
     SUPABASE_ANON_KEY: ${env:SUPABASE_ANON_KEY}
     API_SECRET: ${env:PUBLIC_API_SECRET}
+    FLOW_API_KEY: ${env:FLOW_API_KEY}
+    FLOW_SECRET_KEY: ${env:FLOW_SECRET_KEY}
+    FLOW_BASE_URL: ${env:FLOW_BASE_URL}
+
   httpApi:
     disableDefaultEndpoint: true
     cors:
@@ -39,6 +43,13 @@ functions:
     events:
       - httpApi:
           path: /api/ai-assistant
+          method: POST
+  paymentConfirmation:
+    handler: functions/paymentConfirmation.handler
+    timeout: 28
+    events:
+      - httpApi:
+          path: /api/payment-confirmation
           method: POST
 
   # addUserToNewsletter:
