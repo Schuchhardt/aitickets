@@ -83,6 +83,15 @@ if (request.method === 'POST') {
 
       console.log('Datos de la orden:', orderData);
 
+                // obtener evento
+      const { data: eventInfo } = await supabase
+        .from('events')
+        .select('*')
+        .eq('id', orderData.event_id)
+        .single();
+
+        eventData = eventInfo;
+
       if (error) {
         console.error('Error al obtener la orden desde Supabase:', error.message);
         paymentStatusMessage = 'Hubo un problema al recuperar los detalles de tu orden. Por favor, contacta a soporte.';
@@ -99,18 +108,9 @@ if (request.method === 'POST') {
         if (ticketsError) {
           console.error('Error al obtener los tickets desde Supabase:', ticketsError.message);
           paymentStatusMessage = 'Hubo un problema al recuperar los detalles de tus tickets. Por favor, contacta a soporte.';
-        } else {
-          // obtener evento
-          const { data: eventInfo } = await supabase
-            .from('events')
-            .select('*')
-            .eq('id', ticketsInfo[0]?.event_id)
-            .single();
-
-            eventData = eventInfo;
-            ticketData = ticketsInfo;
+        }  else {
+          ticketData = ticketsInfo;
         }
-
         paymentDetails = {
           ...orderData,
           flowStatus: status,
@@ -164,7 +164,7 @@ if (request.method === 'POST') {
 
           <div class="space-y-3 text-gray-700 font-[Prompt]" >
             <p><span class="font-semibold">ID de la Orden:</span> {paymentDetails.id}</p>
-            <p><span class="font-semibold">Estado en Flow:</span> {paymentDetails.flowStatus === 2 ? 'Pagado' : 'No Pagado'}</p>
+            <p><span class="font-semibold">Estado:</span> {paymentDetails.flowStatus === 2 ? 'Pagado' : 'No Pagado'}</p>
             <p><span class="font-semibold">Monto Total:</span> ${paymentDetails.flowAmount}</p>
             {/* <p><span class="font-semibold">Comisión de Pago:</span> ${paymentDetails.flowFee}</p> */}
             <p><span class="font-semibold">ID de Pago en Comercio:</span> {paymentDetails.flowCommerceId}</p>

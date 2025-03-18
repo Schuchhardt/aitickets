@@ -31,11 +31,10 @@ const formattedTime = (event) => {
 
 <template>
   <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-md text-center mx-auto lg:col-span-1">
-    <div v-if="ticket.qr_code" class="mt-6 flex flex-col items-center">
+    <div v-if="ticket.qr_code" class="mt-2 flex flex-col items-center">
       <TicketQR :code="ticket.qr_code" client:idle />
       <p class="text-gray-500 text-sm mt-2">Muestra este código al ingresar</p>
     </div>
-    <p class="text-2xl font-bold font-[Prompt]">Evento</p>
     <h2 class="text-3xl font-bold mb-4 font-[Unbounded]">{{ event.name }}</h2>
 
     <p class="text-gray-600 font-bold font-[Prompt]">{{ ticket.ticket_name || ticket.name }}</p>

@@ -39,12 +39,18 @@ const formatPrice = (price) => {
 };
 // get lowest ticket price and maximum price
 // and return the price of the event
+// if all tickets have the same price, return the price
+// if all tickets has price equals to zero, return "Gratis"
+// if tickets have different prices, return the range in string format
 const getEventPrice = (tickets) => {
-  if (!tickets || !tickets.length) return "Gratis";
-  const prices = tickets.map(t => t.price);
+  if (!tickets || tickets.length === 0) return "Gratis";
+  const prices = tickets.map((ticket) => ticket.price);
   const minPrice = Math.min(...prices);
   const maxPrice = Math.max(...prices);
-  return minPrice === maxPrice ? formatPrice(minPrice) : `$${formatPrice(minPrice)} - $${formatPrice(maxPrice)}`;º
+  if (minPrice === maxPrice) {
+    return minPrice === 0 ? "Gratis" : `$${formatPrice(minPrice)}`;
+  }
+  return `Desde $${formatPrice(minPrice)} hasta $${formatPrice(maxPrice)}`;
 };
 </script>
 
@@ -66,7 +72,7 @@ const getEventPrice = (tickets) => {
           <img :src="iconTicket.src" alt="ticket icon" class="w-5 h-5 mr-2" />
           Precio
         </span>
-        <span class="text-xl">{{ getEventPrice(event.tickets) || "Gratis" }}</span>
+        <span class="text-xl">{{ getEventPrice(event.tickets) }}</span>
       </div>
 
       <!-- Botones -->

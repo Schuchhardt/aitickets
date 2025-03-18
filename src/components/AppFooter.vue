@@ -128,9 +128,8 @@ const submitForm = async (event) => {
         <img :src="FacebookIcon.src" class="w-6 h-6 text-black-500"/>
 
       </a>
-      <a href="https://linkedin.com" target="_blank" class="cursor-pointer">
+      <a href="https://www.linkedin.com/company/ai-tickets" target="_blank" class="cursor-pointer">
         <img :src="LinkedInIcon.src" class="w-6 h-6 text-black-500"/>
-
       </a>
     </div>
 
