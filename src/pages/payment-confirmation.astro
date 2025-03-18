@@ -71,6 +71,7 @@ if (request.method === 'POST') {
 
     if (flowResponse.ok) {
       const paymentStatus = await flowResponse.json();
+      console.log(paymentStatus)
       const { commerceOrder, status, amount } = paymentStatus;
 
       // Obtener detalles de la orden desde Supabase
@@ -121,7 +122,7 @@ if (request.method === 'POST') {
         };
 
         // Verificar si el estado en la base de datos es diferente al estado en Flow
-        if (orderData.status !== 'paid' && status === 2) {
+        if (orderData.status == 'paid' && status === 2) {
           paymentDetails.status = 'paid';
           paymentStatusMessage = '¡Gracias por tu pago! Tu transacción ha sido completada exitosamente.';
         } else {
@@ -159,7 +160,7 @@ if (request.method === 'POST') {
 
       {paymentDetails ? (
         <>
-          <h1 class="text-2xl font-semibold text-green-600 mb-4 font-[Unbounded]">{paymentStatusMessage}</h1>
+          <h1 class="text-2xl font-semibold text-green-600 mb-4 font-[Unbounded] text-center">{paymentStatusMessage}</h1>
 
           <div class="space-y-3 text-gray-700 font-[Prompt]" >
             <p><span class="font-semibold">ID de la Orden:</span> {paymentDetails.id}</p>
@@ -171,7 +172,7 @@ if (request.method === 'POST') {
 
           {(paymentDetails.status === 'paid' && paymentDetails.ticketsData.length) && (
             <div class="mt-8">
-              <h2 class="text-xl font-bold text-gray-800 mb-4 font-[Unbounded]">Tickets Adquiridos</h2>
+              <h2 class="text-xl font-bold text-gray-800 mb-4 font-[Unbounded] text-center">Tickets Adquiridos</h2>
               <div class="space-y-6">
                 {paymentDetails.ticketsData.map(ticket => (
                   <div class="mt-0 pt-8 lg:pt-12 px-4 lg:px-0">

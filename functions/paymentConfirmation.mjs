@@ -59,8 +59,8 @@ export const handler = async (event) => {
       return { statusCode: 500, body: JSON.stringify({ message: 'Error al consultar Flow', error: paymentStatus }) };
     }
 
-    const { commerceOrder, status, amount, fee, paymentData } = paymentStatus;
-    if (status !== 1) {
+    const { commerceOrder, status, amount, paymentData } = paymentStatus;
+    if (status !== 2) {
       return { statusCode: 200, body: JSON.stringify({ message: 'Pago no confirmado aún', status }) };
     }
 
@@ -81,8 +81,9 @@ export const handler = async (event) => {
       .update({
         status: 'paid',
         total_payment: amount,
-        payment_fee: fee,
-        payment_commerce_id: paymentData?.commerceId || null,
+        payment_fee: parseInt(paymentData.fee, 10),
+        balance: paymentData.balance,
+        payment_commerce_id: paymentData.media,
       })
       .eq('id', commerceOrder);
 
