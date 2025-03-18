@@ -104,6 +104,7 @@ export const handler = async (event) => {
           qr_code: uniqueHash,
           is_complimentary: false,
           status: 'active',
+          event_order_id: commerceOrder,
         });
       }
     });

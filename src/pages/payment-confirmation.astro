@@ -1,6 +1,7 @@
 ---
 import AppHeader from "../components/AppHeader.vue";
 import AppFooter from "../components/AppFooter.vue";
+import TicketInfo from "../components/TicketInfo.vue";
 import Layout from '../layouts/Layout.astro';
 import "../styles/global.css";
 import { createClient } from '@supabase/supabase-js';
@@ -84,12 +85,28 @@ if (request.method === 'POST') {
         console.error('Error al obtener la orden desde Supabase:', error.message);
         paymentStatusMessage = 'Hubo un problema al recuperar los detalles de tu orden. Por favor, contacta a soporte.';
       } else {
+
+           // Obtener tickets de la orden desde Supabase
+        const { data: ticketsData } = await supabase
+          .from('event_attendes')
+          .select('*')
+          .eq('event_order_id', data.id);
+
+        // obtener evento
+        const { data: eventData } = await supabase
+          .from('events')
+          .select('*')
+          .eq('id', ticketsData.event_id)
+          .single();
+
         paymentDetails = {
           ...data,
           flowStatus: status,
           flowAmount: amount,
           flowFee: fee,
           flowCommerceId: paymentData?.commerceId || null,
+          ticketsData,
+          event: eventData
         };
 
         // Verificar si el estado en la base de datos es diferente al estado en Flow
@@ -124,24 +141,43 @@ if (request.method === 'POST') {
 }
 ---
 <Layout>
-  <AppHeader/>
-  <main>
-    {paymentDetails ? (
-      <div>
-        <h1>{paymentStatusMessage}</h1>
-        <p><strong>ID de la Orden:</strong> {paymentDetails.id}</p>
-        <p><strong>Estado en Flow:</strong> {paymentDetails.flowStatus === 2 ? 'Pagado' : 'No Pagado'}</p>
-        <p><strong>Monto Total:</strong> {paymentDetails.flowAmount}</p>
-        <p><strong>Comisión de Pago:</strong> {paymentDetails.flowFee}</p>
-        <p><strong>ID de Comercio en Flow:</strong> {paymentDetails.flowCommerceId}</p>
-        {/* Otros detalles de la orden desde tu base de datos */}
-        <p><strong>Nombre del Cliente:</strong> {paymentDetails.customer_name}</p>
-        <p><strong>Email del Cliente:</strong> {paymentDetails.customer_email}</p>
-        {/* Agrega más campos según sea necesario */}
-      </div>
-    ) : (
-      <p>{paymentStatusMessage}</p>
-    )}
+  <AppHeader />
+
+  <main class="flex flex-col items-center min-h-screen bg-gray-100 py-10">
+    <div class="max-w-3xl w-full bg-white shadow-lg rounded-2xl p-6 lg:p-10 mx-4">
+
+      {paymentDetails ? (
+        <>
+          <h1 class="text-2xl font-semibold text-green-600 mb-4">{paymentStatusMessage}</h1>
+
+          <div class="space-y-3 text-gray-700">
+            <p><span class="font-semibold">ID de la Orden:</span> {paymentDetails.id}</p>
+            <p><span class="font-semibold">Estado en Flow:</span> {paymentDetails.flowStatus === 2 ? 'Pagado' : 'No Pagado'}</p>
+            <p><span class="font-semibold">Monto Total:</span> ${paymentDetails.flowAmount}</p>
+            <p><span class="font-semibold">Comisión de Pago:</span> ${paymentDetails.flowFee}</p>
+            <p><span class="font-semibold">ID de Comercio en Flow:</span> {paymentDetails.flowCommerceId}</p>
+          </div>
+
+          {paymentDetails.status === 'paid' && (
+            <div class="mt-8">
+              <h2 class="text-xl font-bold text-gray-800 mb-4">Tickets Adquiridos</h2>
+              <div class="space-y-6">
+                {paymentDetails.ticketsData.map(ticket => (
+                  <div class="mt-0 pt-8 lg:pt-12 px-4 lg:px-0">
+                    <TicketInfo ticket={ticket} event={paymentDetails.event} client:only />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        <p class="text-gray-600">{paymentStatusMessage}</p>
+      )}
+
+    </div>
   </main>
-  <AppFooter/>
+
+  <AppFooter />
 </Layout>
+
