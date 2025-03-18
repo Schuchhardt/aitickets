@@ -41,14 +41,8 @@ const formattedTime = (event) => {
     <p class="text-gray-500 font-[Prompt]">{{ formattedDate(event) }} </p>
     <p class="text-gray-500 font-[Prompt]">{{ formattedTime(event) }}</p>
 
-    <!-- <div class="mt-4 text-center font-[Prompt]">
-      <p><strong>Nombre:</strong> {{ ticket.attendee_name }}</p>
-      <p><strong>Email:</strong> {{ ticket.attendee_email }}</p>
-    </div> -->
-
-<!-- 
-    <a href="/" class="mt-6 inline-block bg-black text-white px-6 py-2 rounded-md font-[Prompt]">
-      Volver al inicio
-    </a> -->
+    <a :href="ticket.pdf_url" download="ticket.pdf" class="block bg-lime-500 text-white text-center py-2 rounded-lg mt-4 hover:bg-lime-600 transition">
+      Descargar ticket
+    </a>
   </div>
 </template>

@@ -29,7 +29,7 @@
   </section>
 
   <section class="w-full bg-gray-950 text-white px-6 py-20 flex flex-col items-center text-center">
-    <h2 class="text-3xl sm:text-4xl font-bold font-['Unbounded'] mb-6">¿Eres productora? 🚀🎧</h2>
+    <h2 class="text-3xl sm:text-4xl font-bold font-['Unbounded'] mb-6">¿Quieres hacer un evento? 🚀</h2>
     <p class="max-w-3xl text-lg text-gray-300 font-['Prompt'] mb-10">
       Haz crecer tus eventos con inteligencia artificial. Conecta con tu audiencia, vende más entradas y dedícate a producir. Nosotros nos encargamos del marketing, la promoción y el crecimiento.
     </p>
@@ -53,7 +53,7 @@
     </ul>
     <div class="mt-10">
       <a href="/register" class="px-6 py-3 text-lg font-bold font-['Unbounded'] bg-lime-400 text-black border border-black rounded-lg transition hover:bg-black hover:text-white">
-        Quiero vender con AI Tickets
+        Contactanos
       </a>
     </div>
   </section>
