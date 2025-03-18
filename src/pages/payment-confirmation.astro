@@ -71,12 +71,12 @@ if (request.method === 'POST') {
 
     if (flowResponse.ok) {
       const paymentStatus = await flowResponse.json();
-      const { commerceOrder, status, amount, fee, paymentData } = paymentStatus;
+      const { commerceOrder, status, amount } = paymentStatus;
 
       // Obtener detalles de la orden desde Supabase
       const { data: orderData, error } = await supabase
         .from('event_orders')
-        .select('id, status')
+        .select('*')
         .eq('id', commerceOrder)
         .single();
 
@@ -114,8 +114,8 @@ if (request.method === 'POST') {
           ...orderData,
           flowStatus: status,
           flowAmount: amount,
-          flowFee: fee,
-          flowCommerceId: paymentData?.commerceId || null,
+          // flowFee: fee,
+          flowCommerceId: orderData.payment_external_id || null,
           ticketsData: ticketData,
           event: eventData
         };
@@ -165,11 +165,11 @@ if (request.method === 'POST') {
             <p><span class="font-semibold">ID de la Orden:</span> {paymentDetails.id}</p>
             <p><span class="font-semibold">Estado en Flow:</span> {paymentDetails.flowStatus === 2 ? 'Pagado' : 'No Pagado'}</p>
             <p><span class="font-semibold">Monto Total:</span> ${paymentDetails.flowAmount}</p>
-            <p><span class="font-semibold">Comisión de Pago:</span> ${paymentDetails.flowFee}</p>
-            <p><span class="font-semibold">ID de Comercio en Flow:</span> {paymentDetails.flowCommerceId}</p>
+            {/* <p><span class="font-semibold">Comisión de Pago:</span> ${paymentDetails.flowFee}</p> */}
+            <p><span class="font-semibold">ID de Pago en Comercio:</span> {paymentDetails.flowCommerceId}</p>
           </div>
 
-          {paymentDetails.status === 'paid' && (
+          {(paymentDetails.status === 'paid' && paymentDetails.ticketsData.length) && (
             <div class="mt-8">
               <h2 class="text-xl font-bold text-gray-800 mb-4 font-[Unbounded]">Tickets Adquiridos</h2>
               <div class="space-y-6">

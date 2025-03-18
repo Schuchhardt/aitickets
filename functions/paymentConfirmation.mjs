@@ -109,10 +109,12 @@ export const handler = async (event) => {
       }
     });
 
-    const { error: insertError } = await supabase.from('event_attendees').insert(eventAttendees);
+    const { data: eventTickets ,error: insertError } = await supabase.from('event_attendees').insert(eventAttendees);
     if (insertError) {
       return { statusCode: 500, body: JSON.stringify({ message: 'Error insertando entradas', error: insertError.message }) };
     }
+
+    console.log('Entradas registradas:', eventTickets);
 
     return { statusCode: 200, body: JSON.stringify({ message: 'Pago confirmado y entradas registradas' }) };
 
