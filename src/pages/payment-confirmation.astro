@@ -98,12 +98,12 @@ if (request.method === 'POST') {
         if (ticketsError) {
           console.error('Error al obtener los tickets desde Supabase:', ticketsError.message);
           paymentStatusMessage = 'Hubo un problema al recuperar los detalles de tus tickets. Por favor, contacta a soporte.';
-        } else{
+        } else {
           // obtener evento
           const { data: eventInfo } = await supabase
             .from('events')
             .select('*')
-            .eq('id', ticketsInfo?.event_id)
+            .eq('id', ticketsInfo[0]?.event_id)
             .single();
 
             eventData = eventInfo;
