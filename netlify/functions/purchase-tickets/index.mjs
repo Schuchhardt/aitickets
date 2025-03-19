@@ -1,6 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import fetch from 'node-fetch';
+import FormData from "form-data"; // form-data v4.0.1
+import Mailgun from "mailgun.js"; // mailgun.js v11.1.0
 
 // Configurar Supabase
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -34,13 +36,55 @@ function generateSignature(params, secretKey) {
   return signature;
 }
 
+async function sendTicketsEmail(customerInfo, eventInfo, orderInfo, ticketsInfo) {
+  const mailgun = new Mailgun(FormData);
+
+  const mg = mailgun.client({
+    username: "api",
+    key: process.env.MAILGUN_API_KEY,
+  });
+
+  try {
+    const data = await mg.messages.create("mg.aitickets.cl", {
+      from: "AI Tickets <postmaster@mg.aitickets.cl>",
+      to: [`${customerInfo.name} ${customerInfo.lastname} <${customerInfo.email}>`],
+      subject: `🎟️ ¡Aquí están tus entradas para ${eventInfo.name}!`,
+      template: "order complete",
+      "h:X-Mailgun-Variables": JSON.stringify(
+        {
+          "customer_name": customerInfo.name,
+          "event_name": eventInfo.name,
+          "event_date": eventInfo.date,
+          "venue": eventInfo.address,
+          "order_id": orderInfo.id,
+          "order_date": orderInfo.created_at,
+          "order_qr_url": "https://aitickets.cl/ticket/" + orderInfo.id,
+          "total_amount": orderInfo.amount,
+          "tickets": ticketsInfo,
+          // "tickets": [
+          //   {
+          //     "ticket_type": "Entrada General",
+          //     "quantity": 2,
+          //     "unit_price":  "$6.000",
+          //     "total": "$12.000"
+          //   }
+          // ]
+        }
+      ),
+    });
+    console.log(data); // logs response data
+  } catch (error) {
+    console.log(error); // logs any error
+  }
+}
+
 export default async function handler(req, context) {
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ message: 'Método no permitido' }), { status: 405 });
   }
 
   try {
-    const { buyer, tickets, total, eventId } = await req.json();
+    const { buyer, tickets, total, eventId, event } = await req.json();
 
     if (!buyer?.email || !tickets?.length) {
       return new Response(JSON.stringify({ message: 'Datos incompletos' }), { status: 400 });
@@ -106,6 +150,30 @@ export default async function handler(req, context) {
 
       if (insertTicketsError) {
         return new Response(JSON.stringify({ message: 'Error al registrar entradas', error: insertTicketsError.message }), { status: 500 });
+      } else {
+        // enviar correo con las entradas
+        const customerInfo = {
+          name: buyer.firstName,
+          lastname: buyer.lastName,
+          email: buyer.email,
+        };
+        const eventInfo = {
+          name: event.name,
+          date: event.start_date,
+          address: event.location,
+        };
+        const orderInfo = {
+          id: insertedTickets[0].id,
+          created_at: new Date().toISOString(),
+          amount: "Gratis",
+        };
+        const ticketsInfo = tickets.map(ticket => ({
+          ticket_type: ticket.name,
+          quantity: ticket.quantity,
+          unit_price: ticket.price,
+          total: ticket.total,
+        }));
+        sendTicketsEmail(customerInfo, eventInfo, orderInfo, ticketsInfo);
       }
       return new Response(JSON.stringify({ ticketId: insertedTickets[0].id, message: 'Registro completado' }), { status: 200 });
     } else {

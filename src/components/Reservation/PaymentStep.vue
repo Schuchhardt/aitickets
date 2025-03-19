@@ -52,7 +52,8 @@ const handlePayment = async () => {
         tickets: selectedTicketList.value,
         total: finalTotal.value,
         discount: props.discount,
-        eventId: props.event.id
+        eventId: props.event.id,
+        event: props.event,
       }),
     });
 

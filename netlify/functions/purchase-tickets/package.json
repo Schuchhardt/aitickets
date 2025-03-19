@@ -3,7 +3,9 @@
     "version": "1.0.0",
     "type": "module",
     "dependencies": {
-      "@supabase/supabase-js": "^2.43.2"
+      "@supabase/supabase-js": "^2.43.2",
+      "form-data": "4.0.1",
+      "mailgun.js": "11.1.0"
     }
 }
   
