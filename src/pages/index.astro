@@ -24,7 +24,7 @@ const eventData = error || !events ? [] : events;
   <AppHeader/>
   
     <main>
-      <HeroSection/>
+      <HeroSection client:idle/>
       <EventList events={eventData} client:idle />
       <FeaturesSection/>
       <BenefitsSection/>

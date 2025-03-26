@@ -3,8 +3,11 @@
     <div class="container mx-auto px-4 md:px-8">
       <div class="text-center mb-16">
         <FadeInSection>
-          <span class="text-lime-400 font-medium text-sm">CARACTERÍSTICAS</span>
+          <span class="inline-block text-lime-400 font-[Prompt] font-medium text-sm bg-black px-4 py-1 rounded-full">
+            Características
+          </span>
         </FadeInSection>
+
         <FadeInSection :delay="100">
           <h2 class="text-3xl md:text-4xl font-bold mt-2 mb-4 font-[Unbounded]">Una plataforma para todos</h2>
         </FadeInSection>
