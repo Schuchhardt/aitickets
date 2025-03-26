@@ -100,7 +100,7 @@ if (!error || event) {
 ---
 <Layout>
   <EventMetaTags event={event} />
-    <AppHeader/>
+    <AppHeader client:idle/>
     <EventDetail event={event} v-if={event} client:idle/>
     <EventAssistant event={event} v-if={event} client:idle/>
     <AppFooter client:idle/>

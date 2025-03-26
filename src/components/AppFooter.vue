@@ -1,8 +1,6 @@
 <script setup is:client>
 import logoLight from "../images/logo.png";
 import iconArrowGreen from "../images/icon-arrow-green.png";
-import FacebookIcon from '../images/icons/facebook.svg';
-import LinkedInIcon from '../images/icons/linkedin.svg';
 import { ref, onMounted } from "vue";
 
 // Estado del formulario
@@ -122,18 +120,18 @@ const submitForm = async (event) => {
 
     </div>
 
-    <!-- 🌐 Redes sociales -->
+    <!-- Redes sociales -->
     <div class="flex justify-center space-x-4 mt-4">
-      <a href="https://www.facebook.com/profile.php?id=61573771138631" target="_blank" class="cursor-pointer">
-        <img :src="FacebookIcon.src" class="w-6 h-6 text-black-500"/>
+  <a href="https://www.facebook.com/profile.php?id=61573771138631" target="_blank" class="cursor-pointer">
+    <img src="https://cdn.simpleicons.org/facebook/000000" alt="Facebook" class="w-6 h-6" />
+  </a>
+  <a href="https://www.linkedin.com/company/ai-tickets" target="_blank" class="cursor-pointer">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/8/81/LinkedIn_icon.svg" alt="LinkedIn" class="w-6 h-6" />
+  </a>
+</div>
 
-      </a>
-      <a href="https://www.linkedin.com/company/ai-tickets" target="_blank" class="cursor-pointer">
-        <img :src="LinkedInIcon.src" class="w-6 h-6 text-black-500"/>
-      </a>
-    </div>
 
-    <!-- 📜 Links de términos y condiciones -->
+    <!-- Links de términos y condiciones -->
     <div class="mt-6 text-center text-gray-500 text-sm font-['Prompt']">
       <div class="flex justify-center space-x-4">
         <a href="/terms" class="hover:underline">Términos y condiciones</a>

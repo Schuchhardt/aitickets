@@ -15,7 +15,7 @@ const eventData = error || !events ? [] : events;
 ---
 
 <Layout>
-  <AppHeader/>
+  <AppHeader client:idle/>
   
     <main>
       <EventList events={eventData} client:idle />
