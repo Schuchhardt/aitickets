@@ -6,7 +6,7 @@ import HeroSection from "../components/HeroSection.vue";
 import EventList from "../components/EventList.vue";
 import FeaturesSection from "../components/FeaturesSection.vue";
 import BenefitsSection from "../components/BenefitsSection.vue";
-import ContactSection from "../components/ContactSection.vue";
+import CallToAction from "../components/CallToAction.vue";
 import Layout from '../layouts/Layout.astro';
 import "../styles/global.css";
 import 'animate.css';
@@ -28,7 +28,7 @@ const eventData = error || !events ? [] : events;
       <EventList events={eventData} client:idle />
       <FeaturesSection/>
       <BenefitsSection/>
-      <ContactSection/>
+      <CallToAction/>
     </main>
   <AppFooter client:idle/>
 </Layout>
