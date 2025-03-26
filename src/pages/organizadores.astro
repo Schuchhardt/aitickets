@@ -2,9 +2,8 @@
 import { supabase } from "../lib/supabaseClient";
 import AppHeader from "../components/AppHeader.vue";
 import AppFooter from "../components/AppFooter.vue";
-import HeroSection from "../components/HeroSection.vue";
-import EventList from "../components/EventList.vue";
-import FeaturesSection from "../components/FeaturesSection.vue";
+import ProducersHeroSection from "../components/ProducersHeroSection.vue";
+import ProducersFeaturesSection from "../components/ProducersFeaturesSection.vue";
 import BenefitsSection from "../components/BenefitsSection.vue";
 import ContactSection from "../components/ContactSection.vue";
 import Layout from '../layouts/Layout.astro';
@@ -24,9 +23,8 @@ const eventData = error || !events ? [] : events;
   <AppHeader/>
   
     <main>
-      <HeroSection/>
-      <EventList events={eventData} client:idle />
-      <FeaturesSection/>
+      <ProducersHeroSection/>
+      <ProducersFeaturesSection/>
       <BenefitsSection/>
       <ContactSection/>
     </main>
