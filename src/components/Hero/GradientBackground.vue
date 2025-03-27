@@ -84,12 +84,23 @@
   z-index: 0;
 }
 
+/* add height on table */
+@media (max-width: 1024px) {
+  .gradient-bg {
+    height: 90vh;
+  }
+}
+
+
 /* add 145vh on mobile */
 @media (max-width: 640px) {
   .gradient-bg {
-    height: 145vh;
+    height: 200vh;
   }
 }
+
+
+
 
 .gradient-bg-alt {
   --color-bg1: rgb(15, 10, 40);

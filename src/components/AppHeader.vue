@@ -40,29 +40,23 @@ const toggleMenu = () => {
         <!-- Desktop Menu -->
         <div class="hidden md:flex items-center space-x-8">
           <a
+            v-if="currentPath !== '/'"
             href="/"
-            :class="[
-              'text-sm font-medium font-[Unbounded] hover:bg-black text-white transition-colors',
-              currentPath === '/' ? 'bg-black text-white' : ''
-            ]"
+            class="text-sm font-medium font-[Unbounded] hover:bg-black hover:text-white text-black transition-colors"
           >
             Inicio
           </a>
           <a
+            v-if="currentPath !== '/eventos'"
             href="/eventos"
-            :class="[
-              'text-sm font-medium font-[Unbounded] hover:bg-black text-white transition-colors',
-              currentPath === '/eventos' ? 'bg-black text-white' : ''
-            ]"
+            class="text-sm font-medium font-[Unbounded] hover:bg-black hover:text-white text-black transition-colors"
           >
             Eventos
           </a>
           <a
+            v-if="currentPath !== '/organizadores'"
             href="/organizadores"
-            :class="[
-              'text-sm font-medium font-[Unbounded] hover:bg-black text-white transition-colors',
-              currentPath === '/organizadores' ? 'bg-black text-white' : ''
-            ]"
+            class="text-sm font-medium font-[Unbounded] hover:bg-black hover:text-white text-black transition-colors"
           >
             Para Organizadores
           </a>

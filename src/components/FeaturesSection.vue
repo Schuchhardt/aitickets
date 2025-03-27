@@ -1,3 +1,76 @@
+<script setup>
+import {
+  Lightbulb,
+  BarChart3,
+  Ticket,
+  Users,
+  CreditCard,
+  Calendar,
+  QrCode,
+  Gift
+} from 'lucide-vue-next';
+import FadeInSection from './Hero/FadeInSection.vue';
+
+const producerFeatures = [
+  {
+    icon: Calendar,
+    title: 'Gestión de eventos',
+    description: 'Crea y gestiona eventos fácilmente desde tu panel de control con todos los detalles necesarios.'
+  },
+  {
+    icon: QrCode,
+    title: 'Venta de entradas',
+    description: 'Venta directa a través de WebPay y MercadoPago con validación de entradas mediante QR.'
+  },
+  {
+    icon: Users,
+    title: 'Equipo colaborativo',
+    description: 'Asigna permisos y roles para que tu equipo pueda gestionar el evento de forma compartida.'
+  },
+  {
+    icon: Lightbulb,
+    title: 'Marketing con IA',
+    description: 'Promoción automática en Meta, Google y TikTok optimizada con inteligencia artificial.'
+  },
+  {
+    icon: CreditCard,
+    title: 'Modelo de créditos',
+    description: 'Compra anticipada de créditos por evento que solo se descuentan si se vende una entrada.'
+  },
+  {
+    icon: BarChart3,
+    title: 'Analítica avanzada',
+    description: 'Métricas de ventas, tasa de conversión, fuente de tráfico y más en tiempo real.'
+  }
+];
+
+const attendeeFeatures = [
+  {
+    icon: Ticket,
+    title: 'Compra fácil',
+    description: 'Procesos de compra fluidos a través de Web, WhatsApp o Facebook.'
+  },
+  {
+    icon: Lightbulb,
+    title: 'Recomendaciones',
+    description: 'Sugerencias personalizadas según tus gustos y asistencias anteriores.'
+  },
+  {
+    icon: Gift,
+    title: 'Sistema de puntos',
+    description: 'Gana puntos por asistir, invitar amigos y participar en eventos.'
+  }
+];
+
+const tags = [
+  'Festivales',
+  'Fiestas electrónicas',
+  'Charlas tech',
+  'Ferias',
+  'Experiencias inmersivas'
+];
+</script>
+
 <template>
   <section class="py-24 font-[Prompt] bg-gradient-to-b from-slate-200 to-lime-200">
     <div class="container mx-auto px-4 md:px-8">
@@ -90,76 +163,3 @@
   </section>
 </template>
 
-
-<script setup>
-import {
-  Lightbulb,
-  BarChart3,
-  ShoppingCart,
-  Ticket,
-  Users,
-  CreditCard,
-  Calendar,
-  Gift
-} from 'lucide-vue-next';
-import FadeInSection from './Hero/FadeInSection.vue';
-
-const producerFeatures = [
-  {
-    icon: Calendar,
-    title: 'Gestión de eventos',
-    description: 'Crea y gestiona eventos fácilmente desde tu panel de control con todos los detalles necesarios.'
-  },
-  {
-    icon: ShoppingCart,
-    title: 'Venta de entradas',
-    description: 'Venta directa a través de WebPay y MercadoPago con validación de entradas mediante QR.'
-  },
-  {
-    icon: Users,
-    title: 'Equipo colaborativo',
-    description: 'Asigna permisos y roles para que tu equipo pueda gestionar el evento de forma compartida.'
-  },
-  {
-    icon: Lightbulb,
-    title: 'Marketing con IA',
-    description: 'Promoción automática en Meta, Google y TikTok optimizada con inteligencia artificial.'
-  },
-  {
-    icon: CreditCard,
-    title: 'Modelo de créditos',
-    description: 'Compra anticipada de créditos por evento que solo se descuentan si se vende una entrada.'
-  },
-  {
-    icon: BarChart3,
-    title: 'Analítica avanzada',
-    description: 'Métricas de ventas, tasa de conversión, fuente de tráfico y más en tiempo real.'
-  }
-];
-
-const attendeeFeatures = [
-  {
-    icon: Ticket,
-    title: 'Compra fácil',
-    description: 'Procesos de compra fluidos a través de Web, WhatsApp o Facebook.'
-  },
-  {
-    icon: Lightbulb,
-    title: 'Recomendaciones',
-    description: 'Sugerencias personalizadas según tus gustos y asistencias anteriores.'
-  },
-  {
-    icon: Gift,
-    title: 'Sistema de puntos',
-    description: 'Gana puntos por asistir, invitar amigos y participar en eventos.'
-  }
-];
-
-const tags = [
-  'Festivales',
-  'Fiestas electrónicas',
-  'Charlas tech',
-  'Ferias',
-  'Experiencias inmersivas'
-];
-</script>
