@@ -21,7 +21,7 @@ Netlify Functions para manejar compras de tickets.
 2. Instalar dependencias:
 
 ```bash
-npm install
+yarn install
 ```
 
 Copiar .env.example a .env y agregar tus valores de Supabase:
@@ -34,7 +34,7 @@ cp .env.example .env
 3. Ejecutar en modo desarrollo:
 
 ```bash
-npm run dev
+yarn run dev
 ```
 Visita http://localhost:3000 para ver la app.
 
