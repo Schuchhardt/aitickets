@@ -1,7 +1,7 @@
 ---
 import AppHeader from "../components/AppHeader.vue";
 import AppFooter from "../components/AppFooter.vue";
-// import HeroSection from "../components/HeroSection.vue";
+import RegisterForm from "../components/RegisterForm.vue";
 // import EventList from "../components/EventList.vue";
 // import WhatIsSection from "../components/WhatIsSection.vue";
 import ContactSection from "../components/ContactSection.vue";
@@ -14,17 +14,7 @@ import "../styles/global.css";
   <AppHeader client:idle/>
     <main>
         <section class="relative w-full p-10 mt-12 flex justify-center text-center px-6 overflow-hidden">
-            <div class="relative z-10 max-w-2xl">
-                <h1 class="text-4xl font-bold sm:text-5xl font-['Unbounded']">
-                    Registra tu evento
-                </h1>
-                <p class="my-4 text-lg text-gray-500 font-['Prompt']">
-                    Si quieres registrar tu evento en nuestra plataforma, contáctanos para más información.
-                </p>
-                <a href="https://wa.me/56982347140?text=Hola%2C%20quiero%20saber%20m%C3%A1s%20sobre%20AI%20Tickets" target="_blank" class="mt-4 px-6 py-3 text-lg font-bold font-['Unbounded'] bg-lime-400 text-black border border-black rounded-lg transition hover:bg-black hover:text-white">
-                    Contactar acá
-                </a>
-            </div>
+          <RegisterForm client:only="vue" />
         </section>
       <ContactSection/>
     </main>
