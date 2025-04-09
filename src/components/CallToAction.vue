@@ -27,7 +27,7 @@
         <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
           <!-- Botón principal -->
           <a
-            href="/registro"
+            href="/register"
             class="flex items-center justify-center gap-2 bg-white text-black font-bold py-3 px-6 rounded-full transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5 active:scale-[0.97] font-[Unbounded]"
           >
             Comenzar ahora

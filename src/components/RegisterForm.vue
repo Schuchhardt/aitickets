@@ -1,84 +1,71 @@
 <script setup>
+import { reactive, ref } from 'vue'
+import * as z from 'zod'
 
 const loading = ref(false)
+const globalError = ref('')
 
-import { ref, onMounted } from 'vue'
-
-const buyerInfo = ref({
+const buyerInfo = reactive({
   name: '',
   email: '',
-  confirmEmail: '',
   password: '',
   confirmPassword: '',
   phone: '',
-  organizationId: '',
+  organizationName: '',
   termsAccepted: false
 })
 
-const organizations = ref([])
+const errors = ref({})
 
-onMounted(async () => {
-  const res = await fetch('https://bgsmqjrdryafvlyxywud.supabase.co/rest/v1/organizations', {
-    headers: {
-      apikey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnc21xanJkcnlhZnZseXh5d3VkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk5MDk1MDIsImV4cCI6MjA1NTQ4NTUwMn0._WHWk0csFD5k0PsVtT0nGuvgrgKlx7INGMcWzF2zyZ0',
-      Authorization: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnc21xanJkcnlhZnZseXh5d3VkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk5MDk1MDIsImV4cCI6MjA1NTQ4NTUwMn0._WHWk0csFD5k0PsVtT0nGuvgrgKlx7INGMcWzF2zyZ0'
-    }
+// Esquema Zod 
+const registerSchema = z.object({
+  name: z.string().min(1, 'El nombre es obligatorio'),
+  email: z.string().email('Formato de email inválido'),
+  password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
+  confirmPassword: z.string().min(1, 'Debes confirmar tu contraseña'),
+  phone: z.string().regex(/^\+?[0-9\s-]+$/, 'El teléfono solo debe contener números y puede comenzar con +'),
+  organizationName: z.string().min(1, 'El nombre de la organización es obligatorio'),
+  termsAccepted: z.literal(true, {
+    errorMap: () => ({ message: 'Debes aceptar los términos' })
   })
-  organizations.value = await res.json()
+}).refine(data => data.password === data.confirmPassword, {
+  path: ['confirmPassword'],
+  message: 'Las contraseñas no coinciden'
 })
 
-const registerProducer = async (registerInfo) => {
-  // Validaciones
-  const requiredFields = [
-    registerInfo.name,
-    registerInfo.email,
-    registerInfo.confirmEmail,
-    registerInfo.password,
-    registerInfo.confirmPassword,
-    registerInfo.organizationId,
-    registerInfo.phone
-  ]
-  const hasEmptyField = requiredFields.some(field => String(field).trim() === '')
-  if (hasEmptyField) return alert('Por favor completa todos los campos obligatorios.')
+const submitForm = async () => {
+  const result = registerSchema.safeParse(buyerInfo)
 
-   //Validación de email con formato correcto
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  if (!emailRegex.test(registerInfo.email)) {
-    return alert('El correo no tiene un formato válido.')
+  if (!result.success) {
+    errors.value = result.error.flatten().fieldErrors
+    const allErrors = Object.values(errors.value).flat()
+    globalError.value = allErrors.length > 0 ? allErrors[0] : 'Error desconocido'
+    return
   }
 
-  //Validación de teléfono: solo números
-  const phoneRegex = /^\+?\d+$/
-  if (!phoneRegex.test(registerInfo.phone)) {
-    return alert('El teléfono solo debe contener números.')
-  }
-
-  if (registerInfo.email !== registerInfo.confirmEmail) return alert('Los correos electrónicos no coinciden.')
-  if (registerInfo.password !== registerInfo.confirmPassword) return alert('Las contraseñas no coinciden.')
-  if (!registerInfo.termsAccepted) return alert('Debes aceptar los Términos y Políticas para continuar.')
+  errors.value = {}
+  globalError.value = ''
 
   try {
     loading.value = true
 
-    // Encriptar password
     const hashRes = await fetch('https://api.aitickets.cl/hashpass', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: registerInfo.password })
+      body: JSON.stringify({ password: buyerInfo.password })
     })
     const hashData = await hashRes.json()
     if (!hashData.password_hashed) throw new Error('No se pudo encriptar la contraseña')
 
-    // Enviar a Netlify Function
-    const registerRes = await fetch('/.netlify/functions/registerProducer', {
+    const registerRes = await fetch('/api/register-producer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        name: registerInfo.name,
-        email: registerInfo.email,
+        name: buyerInfo.name,
+        email: buyerInfo.email,
         password: hashData.password_hashed,
-        organization_id: registerInfo.organizationId,
-        phone: registerInfo.phone
+        organization_name: buyerInfo.organizationName,
+        phone: buyerInfo.phone
       })
     })
 
@@ -86,68 +73,72 @@ const registerProducer = async (registerInfo) => {
 
     window.location.href = 'https://admin.aitickets.cl/login'
   } catch (err) {
-    alert('Error: ' + err.message)
+    globalError.value = 'Ocurrió un error al registrar. Intenta de nuevo.'
+    console.error('Error:', err.message)
   } finally {
     loading.value = false
   }
 }
 </script>
 
-
 <template>
   <div class="font-[Prompt] p-4">
-    <p class="text-2xl text-gray-600 mb-4">Regístrate como productor</p>
+    <p class="text-2xl text-gray-600 mb-4 font-[Unbounded]">Regístrate como productor</p>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <input
-        v-model="buyerInfo.name"
-        type="text"
-        placeholder="Nombre y Apellido*"
-        class="border p-2 rounded-md w-full col-span-2"
-      />
+      <div class="col-span-2">
+        <input
+          v-model="buyerInfo.name"
+          type="text"
+          placeholder="Nombre y Apellido*"
+          :class="['p-2 rounded-md w-full', errors.name ? 'border-red-500 border' : 'border']"
+        />
+      </div>
 
-      <input
-        v-model="buyerInfo.email"
-        type="email"
-        placeholder="Correo electrónico*"
-        class="border p-2 rounded-md w-full col-span-2"
-      />
-      <input
-        v-model="buyerInfo.confirmEmail"
-        type="email"
-        placeholder="Confirmar correo electrónico*"
-        class="border p-2 rounded-md w-full col-span-2"
-      />
-      <input
-        v-model="buyerInfo.password"
-        type="password"
-        placeholder="Contraseña*"
-        class="border p-2 rounded-md w-full col-span-2"
-      />
-      <input
-        v-model="buyerInfo.confirmPassword"
-        type="password"
-        placeholder="Confirmar contraseña*"
-        class="border p-2 rounded-md w-full col-span-2"
-      />
-      <input
-        v-model="buyerInfo.phone"
-        type="tel"
-        placeholder="Teléfono*"
-        class="border p-2 rounded-md w-full col-span-2"
-      />
+      <div class="col-span-2">
+        <input
+          v-model="buyerInfo.email"
+          type="email"
+          placeholder="Correo electrónico*"
+          :class="['p-2 rounded-md w-full', errors.email ? 'border-red-500 border' : 'border']"
+        />
+      </div>
 
-      <!-- Select de organización -->
-      <select
-  v-model="buyerInfo.organizationId"
-  class="border p-2 rounded-md w-full col-span-2 bg-white text-gray-700"
->
-  <option disabled value="">Selecciona una productora*</option>
-  <option v-for="org in organizations" :key="org.id" :value="org.id">
-    {{ org.public_name }}
-  </option>
-</select>
+      <div class="col-span-2">
+        <input
+          v-model="buyerInfo.password"
+          type="password"
+          placeholder="Contraseña*"
+          :class="['p-2 rounded-md w-full', errors.password ? 'border-red-500 border' : 'border']"
+        />
+      </div>
 
+      <div class="col-span-2">
+        <input
+          v-model="buyerInfo.confirmPassword"
+          type="password"
+          placeholder="Confirmar contraseña*"
+          :class="['p-2 rounded-md w-full', errors.confirmPassword ? 'border-red-500 border' : 'border']"
+        />
+      </div>
+
+      <div class="col-span-2">
+        <input
+          v-model="buyerInfo.phone"
+          type="tel"
+          placeholder="Teléfono*"
+          :class="['p-2 rounded-md w-full', errors.phone ? 'border-red-500 border' : 'border']"
+        />
+      </div>
+
+      <div class="col-span-2">
+        <input
+          v-model="buyerInfo.organizationName"
+          type="text"
+          placeholder="Nombre de la organización*"
+          :class="['p-2 rounded-md w-full', errors.organizationName ? 'border-red-500 border' : 'border']"
+        />
+      </div>
     </div>
 
     <div class="flex items-center mt-4">
@@ -165,8 +156,11 @@ const registerProducer = async (registerInfo) => {
       </label>
     </div>
 
+    <!-- ✅ Mensaje de error entre checkbox y botón -->
+    <p v-if="globalError" class="text-red-500 text-sm mt-3 font-[Unbounded]">{{ globalError }}</p>
+
     <button
-      @click="registerProducer(buyerInfo)"
+      @click="submitForm"
       type="button"
       class="bg-black text-white font-medium py-2 px-5 mt-6 rounded-md hover:bg-gray-800 transition duration-150 active:scale-95"
     >
@@ -174,6 +168,9 @@ const registerProducer = async (registerInfo) => {
     </button>
   </div>
 </template>
+
+
+
 
 
 
