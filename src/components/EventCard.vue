@@ -49,7 +49,7 @@ const formatFullDate = (event) => {
       <div class="flex justify-center mt-4">
         <a :href="`/eventos/${event.slug}`"
           class="px-5 py-2 text-lg font-bold text-black bg-lime-400 rounded-full transition hover:bg-lime-500 font-['Unbounded']">
-          Ver detalles
+          Ir al evento
         </a>
       </div>
     </div>
