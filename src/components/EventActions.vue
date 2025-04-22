@@ -58,7 +58,7 @@ const getEventPrice = (tickets) => {
   <div class="font-['Unbounded'] font-bold" v-if="event">
     <!-- Botón de compartir en Mobile (debajo del EventHeader) -->
     <div class="lg:hidden flex justify-center mt-4">
-      <button @click="showModal = true" class="w-11/12 flex items-center justify-center py-2 border border-gray-300 rounded-full text-gray-600 bg-gray-100 cursor-pointer">
+      <button @click="showModal = true" aria-label="Compartir evento" class="w-11/12 flex items-center justify-center py-2 border border-gray-300 rounded-full text-gray-600 bg-gray-100 cursor-pointer">
         <img :src="iconShare.src" alt="Compartir" class="w-5 h-5 mr-2" />
         Compartir evento
       </button>
@@ -76,12 +76,12 @@ const getEventPrice = (tickets) => {
       </div>
 
       <!-- Botones -->
-      <button @click="openReserveModal"  class="w-full bg-black text-white py-3 rounded-full flex items-center justify-center mt-4 cursor-pointer">
+      <button @click="openReserveModal" aria-label="Reservar ticket" class="w-full bg-black text-white py-3 rounded-full flex items-center justify-center mt-4 cursor-pointer">
         Reservar ticket
         <img :src="iconArrow.src" alt="Arrow" class="w-4 h-4 ml-2" />
       </button>
 
-      <button @click="showModal = true" class="w-full mt-3 border border-gray-400 py-2 rounded-full text-gray-700 flex items-center justify-center cursor-pointer">
+      <button @click="showModal = true" aria-label="Compartir evento" class="w-full mt-3 border border-gray-400 py-2 rounded-full text-gray-700 flex items-center justify-center cursor-pointer">
         <img :src="iconShare.src" alt="Compartir" class="w-5 h-5 mr-2" />
         Compartir evento
       </button>
@@ -90,7 +90,7 @@ const getEventPrice = (tickets) => {
     <!-- Precio Sticky en Mobile -->
     <div class="lg:hidden fixed bottom-0 left-0 w-full bg-lime-400 py-4 px-6 flex justify-between items-center shadow-md">
       <span class="text-lg text-gray-900">{{ event.price || "Gratis" }}</span>
-      <button @click="openReserveModal"  class="bg-black text-white py-2 px-6 rounded-full flex items-center cursor-pointer">
+      <button @click="openReserveModal" aria-label="Reservar ticket" class="bg-black text-white py-2 px-6 rounded-full flex items-center cursor-pointer">
         Reservar ticket
       </button>
     </div>

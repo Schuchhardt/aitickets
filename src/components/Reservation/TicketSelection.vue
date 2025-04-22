@@ -100,16 +100,18 @@ const formatFullDate = (dateArray) => {
         <div class="flex justify-center items-center">
           <button 
             v-if="!selectedTickets[ticket.id]" 
-            @click="increaseTicket(ticket)" 
+            @click="increaseTicket(ticket)"
+            aria-label="Añadir ticket"
             class="border px-4 py-1 rounded-lg text-black hover:bg-gray-100 cursor-pointer"
           >
             Añadir
           </button>
           <div v-else class="flex items-center justify-center space-x-2 border rounded-lg px-2 py-1">
-            <button @click="decreaseTicket(ticket)" class="px-2 py-1 cursor-pointer">-</button>
+            <button aria-label="Disminuir cantidad de tickets" @click="decreaseTicket(ticket)" class="px-2 py-1 cursor-pointer">-</button>
             <span class="w-6 text-center">{{ selectedTickets[ticket.id] || 0 }}</span>
             <!-- Botón "+" con tooltip debajo -->
             <button
+              aria-label="Aumentar cantidad de tickets"
               @click="increaseTicket(ticket)"
               class="px-2 py-1 relative cursor-pointer"
             >

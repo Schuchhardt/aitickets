@@ -1,0 +1,33 @@
+---
+import AppHeader from "../components/AppHeader.vue";
+import AppFooter from "../components/AppFooter.vue";
+import ContactSection from "../components/ContactSection.vue";
+import Layout from '../layouts/Layout.astro';
+import ValidateQR from "../components/ValidateQR.vue";
+import { supabase } from "../lib/supabaseClient";
+import "../styles/global.css";
+
+// 🔍 Obtener eventos publicados (SSR)
+const { data: events, error } = await supabase
+  .from("events")
+  .select("id, name, start_date, end_date")
+  .eq("status", "published");
+
+  const eventData = Array.isArray(events) ? events : [];
+---
+
+<Layout>
+  <AppHeader client:idle />
+
+  <main>
+    <section class="relative w-full p-10 mt-12 flex flex-col items-center text-center px-6 overflow-hidden">
+      
+
+      <ValidateQR events={eventData} client:idle  />
+    </section>
+
+    <ContactSection />
+  </main>
+
+  <AppFooter client:idle />
+</Layout>

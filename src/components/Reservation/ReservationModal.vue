@@ -168,7 +168,7 @@ function handleRemoteGoToNextStep() {
       </div>
 
       <div class="w-full flex justify-between p-6 border-t bg-white md:rounded-b-lg">
-        <button v-if="currentStep > 1" @click="prevStep" class="cursor-pointer text-gray-600 hover:text-black">Atrás</button>
+        <button v-if="currentStep > 1" @click="prevStep" aria-label="atras" class="cursor-pointer text-gray-600 hover:text-black">Atrás</button>
         <button
           v-if="currentStep < 3"
           @click="nextStep"
@@ -178,6 +178,7 @@ function handleRemoteGoToNextStep() {
             'bg-lime-500 text-white cursor-pointer': canProceed,
             'bg-gray-300 text-gray-500 cursor-not-allowed': !canProceed
           }"
+          aria-label="continuar"
         >
           Continuar
         </button>

@@ -81,7 +81,7 @@ const getTime = (time) => {
       <transition name="fade-slide">
         <div v-html="showFullDescription ? event.description : event.description.slice(0, 200) + '...'" class="text-gray-600"></div>
       </transition>
-      <button v-if="event.description.length > 200" @click="showFullDescription = !showFullDescription"
+      <button v-if="event.description.length > 200" @click="showFullDescription = !showFullDescription" aria-label="Mostrar/ocultar descripción completa"
         class="text-blue-500 mt-2 cursor-pointer">
         {{ showFullDescription ? "Ver menos" : "Ver más" }}
       </button>
@@ -122,7 +122,7 @@ const getTime = (time) => {
     <div id="preguntas" v-if="event.faqs && event.faqs.length > 0" class="event-section mt-10">
       <h2 class="text-2xl font-bold mb-4 font-['Unbounded']">Preguntas Frecuentes</h2>
       <div v-for="(faq, index) in faqs" :key="index" class="border-b border-gray-300 py-3">
-        <button @click="toggleFAQ(index)" class="flex justify-between items-center w-full text-left cursor-pointer">
+        <button @click="toggleFAQ(index)" class="flex justify-between items-center w-full text-left cursor-pointer" aria-label="Mostrar/ocultar respuesta">
           <span class="text-gray-900 font-medium">{{ index + 1 }}. {{ faq.question }}</span>
           <span class="text-gray-500">{{ faq.open ? "▲" : "▼" }}</span>
         </button>
