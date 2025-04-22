@@ -155,6 +155,7 @@ onMounted(scrollToBottom);
       </span>
       <button 
         @click="isOpen = true" 
+        aria-label="Abrir asistente"
         class="w-16 h-16 rounded-full cursor-pointer shadow-lg bg-cover bg-center bg-no-repeat transition hover:opacity-80"
         :style="{ backgroundImage: `url(${IconChat.src})` }">
       </button>
@@ -167,7 +168,7 @@ onMounted(scrollToBottom);
       <!-- Header -->
       <div class="bg-white text-gray-900 p-4 font-semibold flex justify-between font-[Unbounded] border-b">
         <span>AI Tickets</span>
-        <button @click="isOpen = false" class="cursor-pointer text-gray-400 hover:text-black text-xl">×</button>
+        <button @click="isOpen = false" aria-label="Cerrar asistente" class="cursor-pointer text-gray-400 hover:text-black text-xl">×</button>
       </div>
 
       <!-- Mensajes -->
@@ -209,7 +210,7 @@ onMounted(scrollToBottom);
           @keyup.enter="sendMessage(userMessage)"
           placeholder="Escribe aquí"
           class="flex-1 p-3 border rounded-lg text-sm font-[Prompt] bg-gray-100 outline-none" />
-        <button @click="sendMessage(userMessage)" class="ml-2 w-10 h-10 bg-cover bg-center cursor-pointer"
+        <button aria-label="Enviar mensaje" @click="sendMessage(userMessage)" class="ml-2 w-10 h-10 bg-cover bg-center cursor-pointer"
           :style="{ backgroundImage: `url(${IconArrowGreen.src})` }">
         </button>
       </div>

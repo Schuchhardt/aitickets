@@ -39,13 +39,13 @@ const copyToClipboard = async () => {
           class="block bg-blue-500 text-white text-center py-2 rounded-lg hover:bg-blue-600 transition">
           Compartir en Twitter
         </a>
-        <button @click="copyToClipboard" class="block w-full bg-gray-200 text-gray-800 text-center py-2 rounded-lg hover:bg-gray-300 transition">
+        <button aria-label="Copiar enlace" @click="copyToClipboard" class="block w-full bg-gray-200 text-gray-800 text-center py-2 rounded-lg hover:bg-gray-300 transition">
           Copiar enlace
         </button>
       </div>
 
       <!-- 🔹 Botón de cerrar -->
-      <button @click="emit('close')" class="mt-4 block w-full bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition cursor-pointer">
+      <button aria-label="Cerrar" @click="emit('close')" class="mt-4 block w-full bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition cursor-pointer">
         Cerrar
       </button>
     </div>

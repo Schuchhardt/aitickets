@@ -105,7 +105,9 @@ const submitForm = async (event) => {
             <button 
               type="submit"
               class="absolute right-2 top-1/2 transform -translate-y-1/2 w-10 h-10 rounded-full transition-transform duration-300 cursor-pointer flex items-center justify-center"
-              :class="{ 'rotate-45': isFocused || email.length > 0 }">
+              :class="{ 'rotate-45': isFocused || email.length > 0 }"
+              aria-label="Enviar" 
+              >
               <img :src="iconArrowGreen.src" alt="Enviar" class="w-6 h-6 transition-transform duration-300" />
             </button>
           </form>

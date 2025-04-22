@@ -162,6 +162,7 @@ const submitForm = async () => {
     <button
       @click="submitForm"
       type="button"
+      aria-label="Boton de registro"
       class="bg-black text-white font-medium py-2 px-5 mt-6 rounded-md hover:bg-gray-800 transition duration-150 active:scale-95"
     >
       {{ loading ? 'Registrando...' : 'Registrarse' }}

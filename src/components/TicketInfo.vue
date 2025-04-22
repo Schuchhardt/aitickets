@@ -63,6 +63,7 @@ const descargarComoImagen = async () => {
     </div>
 
     <button
+      aria-label="Descargar ticket como imagen"
       @click="descargarComoImagen"
       class="mt-4 w-full bg-gray-700 text-white text-center py-2 rounded-lg hover:bg-gray-800 transition"
     >
