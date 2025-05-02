@@ -42,6 +42,22 @@ export default async function handler(req, context) {
       throw new Error('Error al crear el usuario')
     }
 
+    // ⏩ Enviar correo de bienvenida (detecta local vs producción)
+    try {
+      const baseUrl =
+        process.env.CONTEXT === 'production'
+          ? process.env.SITE_URL
+          : 'http://localhost:8888'
+
+      await fetch(`${baseUrl}/api/send-welcome`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email })
+      })
+    } catch (emailError) {
+      console.error('📭 Error al enviar el correo de bienvenida:', emailError.message)
+    }
+
     return new Response(JSON.stringify({ message: 'Registro exitoso' }), {
       status: 200
     })
@@ -56,3 +72,5 @@ export default async function handler(req, context) {
 export const config = {
   path: ['/api/register-producer']
 }
+
+

@@ -10,7 +10,7 @@ import "../styles/global.css";
 // 🔍 Obtener eventos publicados (SSR)
 const { data: events, error } = await supabase
   .from("events")
-  .select("id, name, start_date, end_date")
+  .select("id, name, start_date, end_date, organization_id")
   .eq("status", "published");
 
   const eventData = Array.isArray(events) ? events : [];

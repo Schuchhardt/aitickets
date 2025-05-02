@@ -1,0 +1,13 @@
+{
+    "name": "send-welcome",
+    "version": "1.0.0",
+    "type": "module",
+    "dependencies": {
+      "resend": "^0.26.1",
+      "@react-email/render": "^0.5.4",
+      "@react-email/components": "^0.5.4",
+      "react": "^17.2.0",
+      "react-dom": "^17.2.0"
+    }
+  }
+  
