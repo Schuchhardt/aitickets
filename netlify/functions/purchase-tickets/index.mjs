@@ -178,6 +178,9 @@ export default async function handler(req, context) {
       return new Response(JSON.stringify({ ticketId: insertedTickets[0].id, message: 'Registro completado' }), { status: 200 });
     } else {
       console.log('Creando orden de pago');
+      // Calcular la cantidad total de tickets sumando todas las cantidades
+      const totalTicketQty = tickets.reduce((sum, ticket) => sum + ticket.quantity, 0);
+      
       // Crear una orden en la base de datos para eventos pagados
       const { data: newOrder, error: orderError } = await supabase
         .from('event_orders')
@@ -186,7 +189,7 @@ export default async function handler(req, context) {
           event_id: eventId,
           attendee_id: attendeeId,
           amount: total,
-          ticket_qty: tickets.length,
+          ticket_qty: totalTicketQty,
           ticket_details: tickets,
         }])
         .select()
@@ -204,7 +207,7 @@ export default async function handler(req, context) {
         apiKey: flowApiKey,
         paymentMethod: 1, // 1: Webpay, 2: Multicaja, 3: Servipag, 4: Cryptocompra
         commerceOrder: newOrder.id, // ID único de la orden en tu sistema
-        subject: `Pago de entradas para el evento ${eventId} - ${event.name} - ${buyer.email}`,
+        subject: `Pago de ${totalTicketQty === 1 ? '1 entrada' : `${totalTicketQty} entradas`} para el evento ${event.name} - ${buyer.email}`,
         currency: 'CLP',
         amount: total,
         email: buyer.email,
