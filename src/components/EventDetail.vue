@@ -1,10 +1,25 @@
 <script setup>
+import { onMounted } from "vue";
+import { useGoogleAnalytics } from "../composables/useGoogleAnalytics.js";
 import EventHeader from "./EventHeader.vue";
 import EventTabs from "./EventTabs.vue";
 import EventActions from "./EventActions.vue";
 
-defineProps({
+const props = defineProps({
   event: Object,
+});
+
+const { trackViewEvent } = useGoogleAnalytics();
+
+onMounted(() => {
+  if (props.event) {
+    // Rastrear cuando alguien ve un evento
+    const avgPrice = props.event.tickets?.length 
+      ? props.event.tickets.reduce((sum, ticket) => sum + (ticket.price || 0), 0) / props.event.tickets.length
+      : 0;
+      
+    trackViewEvent(props.event.id, props.event.title, avgPrice);
+  }
 });
 </script>
 

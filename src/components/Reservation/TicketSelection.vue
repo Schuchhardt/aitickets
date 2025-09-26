@@ -1,5 +1,6 @@
 <script setup>
 import { defineProps, defineEmits, ref } from "vue";
+import { useGoogleAnalytics } from "../../composables/useGoogleAnalytics.js";
 
 const props = defineProps({
   event: Object,
@@ -9,6 +10,7 @@ const props = defineProps({
 const emit = defineEmits(["update:selectedTickets"]);
 const selectedTickets = ref({});
 const showTooltip = ref(false); // Controla la visibilidad del tooltip
+const { trackAddToCart } = useGoogleAnalytics();
 
 const updateSelection = (ticketId, quantity) => {
   selectedTickets.value[ticketId] = quantity;
@@ -24,6 +26,14 @@ const increaseTicket = (ticket) => {
   if (currentQuantity < ticket.max_quantity) {
     updateSelection(ticket.id, currentQuantity + 1);
     showTooltip.value = false; // Oculta el tooltip si la cantidad es válida
+    
+    // Track cuando se agrega un ticket
+    trackAddToCart(
+      props.event.id, 
+      props.event.title, 
+      1, 
+      ticket.price || 0
+    );
   } else {
     console.log("Máximo de tickets alcanzado");
     showTooltip.value = true; // Muestra el tooltip si se supera el máximo

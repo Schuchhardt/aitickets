@@ -1,5 +1,6 @@
 <script setup>
 import { defineProps, defineEmits, computed } from "vue";
+import { useGoogleAnalytics } from "../composables/useGoogleAnalytics.js";
 
 const props = defineProps({
   show: Boolean,
@@ -7,6 +8,7 @@ const props = defineProps({
 });
 
 const emit = defineEmits(["close"]);
+const { trackShare } = useGoogleAnalytics();
 
 // 📌 URL del evento (Asegúrate de cambiarlo según la URL real de tu sitio)
 const eventUrl = computed(() => `${window.location.origin}/e-${props.event.slug}`);
@@ -15,10 +17,20 @@ const eventUrl = computed(() => `${window.location.origin}/e-${props.event.slug}
 const copyToClipboard = async () => {
   try {
     await navigator.clipboard.writeText(eventUrl.value);
+    trackShare(props.event.id, 'copy_link');
     alert("Enlace copiado al portapapeles");
   } catch (err) {
     console.error("Error al copiar el enlace:", err);
   }
+};
+
+// 📌 Funciones para tracking de compartir
+const trackWhatsAppShare = () => {
+  trackShare(props.event.id, 'whatsapp');
+};
+
+const trackTwitterShare = () => {
+  trackShare(props.event.id, 'twitter');
 };
 </script>
 
@@ -30,12 +42,12 @@ const copyToClipboard = async () => {
 
       <!-- 🔹 Botones de compartir -->
       <div class="space-y-3">
-        <a :href="`https://wa.me/?text=${encodeURIComponent(eventUrl)}`" target="_blank"
+        <a :href="`https://wa.me/?text=${encodeURIComponent(eventUrl)}`" target="_blank" @click="trackWhatsAppShare"
           class="block bg-green-500 text-white text-center py-2 rounded-lg hover:bg-green-600 transition">
           Compartir en WhatsApp
         </a>
         <a :href="`https://twitter.com/intent/tweet?text=${encodeURIComponent(event.name)}&url=${encodeURIComponent(eventUrl)}`"
-          target="_blank"
+          target="_blank" @click="trackTwitterShare"
           class="block bg-blue-500 text-white text-center py-2 rounded-lg hover:bg-blue-600 transition">
           Compartir en Twitter
         </a>

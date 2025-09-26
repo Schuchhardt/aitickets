@@ -16,6 +16,8 @@ provider:
     FLOW_API_KEY: ${env:FLOW_API_KEY}
     FLOW_SECRET_KEY: ${env:FLOW_SECRET_KEY}
     FLOW_BASE_URL: ${env:FLOW_BASE_URL}
+    SENTRY_DSN: ${env:SENTRY_DSN}
+    NODE_ENV: ${env:NODE_ENV, 'production'}
 
   httpApi:
     disableDefaultEndpoint: true

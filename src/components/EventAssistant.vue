@@ -3,6 +3,7 @@ import { ref, onMounted, nextTick, defineProps} from "vue";
 import { marked } from "marked"; 
 import DOMPurify from "dompurify";
 import { eventBus } from '../utils/eventbus.js';
+import { useGoogleAnalytics } from "../composables/useGoogleAnalytics.js";
 import IconChat from "../images/icon-chat.png"; 
 import IconArrowGreen from "../images/icon-arrow-green.png"; 
 
@@ -10,7 +11,8 @@ const props = defineProps({
   event: Object,
 });
 const assistantURL = import.meta.env.PUBLIC_SERVERLESS_URL;
-const apiSecret = import.meta.env.PUBLIC_API_SECRET
+const apiSecret = import.meta.env.PUBLIC_API_SECRET;
+const { trackAIAssistant } = useGoogleAnalytics();
 
 const isOpen = ref(false);
 const messages = ref([
@@ -58,6 +60,9 @@ const fillForm = (properties) => {
 
 const sendMessage = async (message) => {
   if (!message.trim()) return;
+
+  // Track AI assistant usage
+  trackAIAssistant(props.event.id, message);
 
   messages.value.push({ role: "user", text: message });
   showSuggestedReplies.value = false;

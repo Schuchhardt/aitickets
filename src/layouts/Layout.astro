@@ -9,6 +9,18 @@
 		<link rel="manifest" href="/site.webmanifest">
 		<meta name="generator" content={Astro.generator} />
 		<title>AI Tickets</title>
+		
+		<!-- Google Analytics (optimized with Partytown) -->
+		<script type="text/partytown" async src="https://www.googletagmanager.com/gtag/js?id=G-ZKTCNLYSQT"></script>
+		<script type="text/partytown">
+			window.dataLayer = window.dataLayer || [];
+			function gtag(){dataLayer.push(arguments);}
+			gtag('js', new Date());
+			gtag('config', 'G-ZKTCNLYSQT', {
+				page_title: document.title,
+				page_location: window.location.href
+			});
+		</script>
 		<meta name="description" content="Conecta con tu público ideal, vende entradas automáticamente y obtén métricas clave en tiempo real. Todo desde un solo lugar.">
 		<!-- Open Graph / Facebook -->
 		<meta property="og:type" content="website">

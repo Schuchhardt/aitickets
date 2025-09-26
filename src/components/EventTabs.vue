@@ -79,9 +79,9 @@ const getTime = (time) => {
     <div id="descripcion" class="event-section mt-6">
       <h2 class="text-2xl font-bold mb-4 font-['Unbounded']">Descripción</h2>
       <transition name="fade-slide">
-        <div v-html="showFullDescription ? event.description : event.description.slice(0, 200) + '...'" class="text-gray-600"></div>
+        <div v-html="showFullDescription ? event.description : event.description.slice(0, 2000) + '...'" class="text-gray-600"></div>
       </transition>
-      <button v-if="event.description.length > 200" @click="showFullDescription = !showFullDescription" aria-label="Mostrar/ocultar descripción completa"
+      <button v-if="event.description.length > 2000" @click="showFullDescription = !showFullDescription" aria-label="Mostrar/ocultar descripción completa"
         class="text-blue-500 mt-2 cursor-pointer">
         {{ showFullDescription ? "Ver menos" : "Ver más" }}
       </button>

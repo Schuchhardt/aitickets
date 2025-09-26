@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, defineProps, defineEmits, onMounted, onUnmounted, watch } from "vue";
 import { eventBus } from '../../utils/eventbus.js';
+import { useGoogleAnalytics } from "../../composables/useGoogleAnalytics.js";
 import HeaderSteps from "./HeaderSteps.vue";
 import TicketSelection from "./TicketSelection.vue";
 import OrderSummary from "./OrderSummary.vue";
@@ -14,6 +15,7 @@ const currentStep = ref(1);
 const selectedTickets = ref({});
 const buyerInfo = ref({ firstName: "", lastName: "", email: "", phone: "", termsAccepted: false });
 const discount = ref(0);
+const { trackBeginCheckout } = useGoogleAnalytics();
 
 onMounted(() => {
   const storedTickets = localStorage.getItem(`selectedTickets_event_${props.event.id}`);
@@ -84,6 +86,19 @@ const canProceed = computed(() => {
 
 const nextStep = () => {
   if (canProceed.value && currentStep.value < 3) {
+    // Track begin_checkout when moving from ticket selection to buyer info (step 1 to 2)
+    if (currentStep.value === 1) {
+      const totalQuantity = Object.values(selectedTickets.value).reduce((sum, qty) => sum + qty, 0);
+      const totalPrice = calculateTotal.value;
+      
+      trackBeginCheckout(
+        props.event.id,
+        props.event.title,
+        totalQuantity,
+        totalPrice
+      );
+    }
+    
     currentStep.value++;
   }
 };

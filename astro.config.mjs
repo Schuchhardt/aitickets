@@ -1,13 +1,21 @@
 import { defineConfig } from 'astro/config';
 import netlify from '@astrojs/netlify';
 import vue from '@astrojs/vue';
+import partytown from '@astrojs/partytown';
 import tailwindcss from "@tailwindcss/vite";
 import svgLoader from 'vite-svg-loader';
 
 export default defineConfig({
   output: 'server',
   adapter: netlify(),
-  integrations: [vue()],
+  integrations: [
+    vue(), 
+    partytown({
+      config: {
+        forward: ["dataLayer.push"]
+      }
+    })
+  ],
   vite: {
     plugins: [tailwindcss(), svgLoader()],
     server: {

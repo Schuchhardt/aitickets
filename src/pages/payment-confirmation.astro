@@ -202,5 +202,24 @@ if (request.method === 'POST') {
   </main>
 
   <AppFooter />
+
+  {/* Google Analytics Purchase Tracking */}
+  {paymentDetails?.status === 'paid' && (
+    <script type="text/partytown">
+      // Track successful purchase
+      gtag('event', 'purchase', {
+        transaction_id: paymentDetails.id,
+        currency: 'CLP',
+        value: paymentDetails.flowAmount,
+        items: paymentDetails.ticketsData.map(ticket => ({
+          item_id: paymentDetails.event.id,
+          item_name: paymentDetails.event.title,
+          item_category: 'event_ticket',
+          quantity: ticket.quantity || 1,
+          price: ticket.price || (paymentDetails.flowAmount / paymentDetails.ticketsData.length)
+        }))
+      });
+    </script>
+  )}
 </Layout>
 
