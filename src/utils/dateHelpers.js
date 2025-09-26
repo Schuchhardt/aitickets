@@ -51,6 +51,19 @@ export const formatLocalTime = (datetime, options = {}) => {
  * @returns {string} Hora formateada
  */
 export const formatLocalTimeFromString = (timeString, options = {}) => {
+  if (!timeString) return "";
+  
+  // Si el string de tiempo es solo formato HH:MM o HH:MM:SS, lo devolvemos tal como está
+  // ya que representa una hora local sin zona horaria
+  if (timeString.match(/^\d{1,2}:\d{2}(:\d{2})?$/)) {
+    // Asegurar formato HH:MM
+    const parts = timeString.split(':');
+    const hours = parts[0].padStart(2, '0');
+    const minutes = parts[1].padStart(2, '0');
+    return `${hours}:${minutes}`;
+  }
+  
+  // Para strings de tiempo más complejos (con zona horaria), usar el formateo estándar
   const defaultOptions = {
     hour: "2-digit",
     minute: "2-digit",
@@ -58,7 +71,12 @@ export const formatLocalTimeFromString = (timeString, options = {}) => {
     timeZone: getUserTimeZone()
   };
   
-  return new Date(`1970-01-01T${timeString}`).toLocaleTimeString("es-CL", { ...defaultOptions, ...options });
+  try {
+    return new Date(`1970-01-01T${timeString}`).toLocaleTimeString("es-CL", { ...defaultOptions, ...options });
+  } catch (error) {
+    console.warn(`Error formateando tiempo "${timeString}":`, error);
+    return timeString; // Devolver el string original si hay error
+  }
 };
 
 /**
