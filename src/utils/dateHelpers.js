@@ -5,17 +5,9 @@
 
 /**
  * Obtiene la zona horaria local del usuario
- * En el servidor siempre retorna la zona horaria por defecto para eventos (Chile)
- * En el cliente retorna la zona horaria real del navegador del usuario
  * @returns {string} La zona horaria del usuario (ej: "America/Santiago", "Europe/Madrid")
  */
 export const getUserTimeZone = () => {
-  // Si estamos en el servidor (SSR), usar la zona horaria por defecto de los eventos
-  // Esto asegura consistencia hasta que se hidrate en el cliente
-  if (typeof window === 'undefined') {
-    return 'America/Santiago'; // Zona horaria por defecto de los eventos
-  }
-  // En el cliente, usar la zona horaria real del navegador del usuario
   return Intl.DateTimeFormat().resolvedOptions().timeZone;
 };
 

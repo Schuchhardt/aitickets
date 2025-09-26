@@ -40,11 +40,16 @@ if (id) {
 
     // load event dates
     const getTimeFromTimestamp = (timestamp) => {
+      // IMPORTANTE: Extraer la hora usando una zona horaria específica
+      // para que sea consistente independientemente del servidor
       const date = new Date(timestamp);
-      const hours = String(date.getHours()).padStart(2, "0");
-      const minutes = String(date.getMinutes()).padStart(2, "0");
-      const seconds = String(date.getSeconds()).padStart(2, "0");
-      return `${hours}:${minutes}:${seconds}`;
+      return date.toLocaleTimeString("es-CL", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit", 
+        hour12: false,
+        timeZone: "America/Santiago" // Zona horaria donde están los eventos
+      });
     };
     const defaultDate = {date: event.start_date, start_time: getTimeFromTimestamp(event.start_date), end_time: getTimeFromTimestamp(event.end_date)};
     const { data: event_dates, error: errorDates } = await supabase
