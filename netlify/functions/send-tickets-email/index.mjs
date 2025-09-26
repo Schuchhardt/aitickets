@@ -112,7 +112,7 @@ export default async function handler(req, context) {
       .select(`
         *,
         event_tickets (
-          name,
+          ticket_name,
           price
         )
       `)
@@ -151,7 +151,7 @@ export default async function handler(req, context) {
     // Agrupar tickets por tipo para el email
     const ticketGroups = {};
     ticketsData.forEach(ticket => {
-      const ticketType = ticket.event_tickets.name;
+      const ticketType = ticket.event_tickets.ticket_name;
       const unitPrice = ticket.event_tickets.price;
       
       if (!ticketGroups[ticketType]) {
