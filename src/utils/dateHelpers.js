@@ -5,9 +5,17 @@
 
 /**
  * Obtiene la zona horaria local del usuario
+ * En el servidor siempre retorna la zona horaria por defecto para eventos (Chile)
+ * En el cliente retorna la zona horaria real del navegador del usuario
  * @returns {string} La zona horaria del usuario (ej: "America/Santiago", "Europe/Madrid")
  */
 export const getUserTimeZone = () => {
+  // Si estamos en el servidor (SSR), usar la zona horaria por defecto de los eventos
+  // Esto asegura consistencia hasta que se hidrate en el cliente
+  if (typeof window === 'undefined') {
+    return 'America/Santiago'; // Zona horaria por defecto de los eventos
+  }
+  // En el cliente, usar la zona horaria real del navegador del usuario
   return Intl.DateTimeFormat().resolvedOptions().timeZone;
 };
 
@@ -53,17 +61,17 @@ export const formatLocalTime = (datetime, options = {}) => {
 export const formatLocalTimeFromString = (timeString, options = {}) => {
   if (!timeString) return "";
   
-  // Si el string de tiempo es solo formato HH:MM o HH:MM:SS, lo devolvemos tal como está
-  // ya que representa una hora local sin zona horaria
+  // Para strings de tiempo simples (HH:MM o HH:MM:SS), devolverlos directamente
+  // ya que ya vienen formateados correctamente desde getTimeFromTimestamp
   if (timeString.match(/^\d{1,2}:\d{2}(:\d{2})?$/)) {
-    // Asegurar formato HH:MM
+    // Asegurar formato HH:MM (sin segundos para consistencia)
     const parts = timeString.split(':');
     const hours = parts[0].padStart(2, '0');
     const minutes = parts[1].padStart(2, '0');
     return `${hours}:${minutes}`;
   }
   
-  // Para strings de tiempo más complejos (con zona horaria), usar el formateo estándar
+  // Para otros formatos más complejos, usar formateo estándar
   const defaultOptions = {
     hour: "2-digit",
     minute: "2-digit",
