@@ -1,0 +1,201 @@
+---
+import { supabase } from "../../lib/supabaseClient";
+import Layout from "../../layouts/Layout.astro";
+import AppHeader from "../../components/AppHeader.vue";
+import AppFooter from "../../components/AppFooter.vue";
+import EventHeader from "../../components/EventHeader.vue";
+import EventTabs from "../../components/EventTabs.vue";
+import TicketInfo from "../../components/TicketInfo.vue";
+
+import "../../styles/global.css";
+
+// Obtener el ID de la orden desde la URL
+const { id } = Astro.params;
+
+let tickets: any[] = [];
+let event: any = null;
+let orderInfo: any = null;
+let attendeeInfo: any = null;
+let errorMessage: string | null = null;
+
+if (id) {
+  try {
+    // Obtener los datos de la orden
+    const { data: orderData, error: orderError } = await supabase
+      .from("event_orders")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (orderError || !orderData) {
+      errorMessage = "Orden no encontrada";
+    } else {
+      orderInfo = orderData;
+
+      // Obtener datos del evento
+      const { data: eventData, error: eventError } = await supabase
+        .from("events")
+        .select("*")
+        .eq("id", orderData.event_id)
+        .single();
+
+      if (eventError) {
+        errorMessage = "Evento no encontrado";
+      } else {
+        event = eventData;
+
+        // Cargar fechas del evento
+        const getTimeFromTimestamp = (timestamp) => {
+          const date = new Date(timestamp);
+          return date.toLocaleTimeString("es-CL", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit", 
+            hour12: false,
+            timeZone: "America/Santiago"
+          });
+        };
+
+        const defaultDate = {
+          date: event.start_date, 
+          start_time: getTimeFromTimestamp(event.start_date), 
+          end_time: getTimeFromTimestamp(event.end_date)
+        };
+
+        const { data: event_dates, error: errorDates } = await supabase
+          .from("event_dates")
+          .select("*")
+          .eq("event_id", event.id);
+
+        if (errorDates) {
+          console.error("Error al obtener las fechas:", errorDates);
+          event.dates = [defaultDate];
+        } else {
+          event.dates = event_dates.length > 0 ? event_dates : [defaultDate];
+        }
+
+        // Obtener datos del asistente
+        const { data: attendee, error: attendeeError } = await supabase
+          .from("attendees")
+          .select("first_name, last_name, email")
+          .eq("id", orderData.attendee_id)
+          .single();
+
+        if (!attendeeError && attendee) {
+          attendeeInfo = attendee;
+        }
+
+        // Obtener todos los tickets de la orden
+        const { data: ticketsData, error: ticketsError } = await supabase
+          .from("event_attendees")
+          .select(`
+            *,
+            event_tickets (
+              name,
+              price
+            )
+          `)
+          .eq("event_order_id", id);
+
+        if (ticketsError) {
+          console.error("Error al obtener tickets:", ticketsError);
+          errorMessage = "Error al cargar los tickets";
+        } else {
+          // Formatear tickets para mostrar
+          tickets = ticketsData.map(ticketData => ({
+            id: ticketData.id,
+            event_name: event?.name || "Evento desconocido",
+            event_dates: event?.dates || "Fecha no disponible",
+            ticket_name: ticketData.event_tickets?.name || "Entrada General",
+            attendee_name: `${attendeeInfo?.first_name || ""} ${attendeeInfo?.last_name || ""}`.trim(),
+            attendee_email: attendeeInfo?.email || "Correo no disponible",
+            qr_code: ticketData.qr_code || null,
+            internal_id: ticketData.internal_id,
+            status: ticketData.status,
+          }));
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Error general:", error);
+    errorMessage = "Error interno del servidor";
+  }
+}
+---
+
+<Layout>
+  <AppHeader client:idle />
+  <main class="flex flex-col items-center min-h-screen bg-gray-100">
+    <div class="max-w-6xl mx-auto w-full px-4 lg:px-0">
+      
+      {errorMessage ? (
+        <!-- Mensaje de Error -->
+        <div class="mt-12 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
+          <h2 class="text-xl font-semibold font-[Unbounded] mb-2">Error</h2>
+          <p>{errorMessage}</p>
+        </div>
+      ) : (
+        <>
+          <!-- Información de la Orden -->
+          <div class="mt-8 lg:mt-12 bg-white rounded-lg shadow-lg p-6">
+            <h1 class="text-2xl font-bold font-[Unbounded] text-gray-800 mb-4">
+              🎟️ Orden #{orderInfo?.id}
+            </h1>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600 font-[Prompt]">
+              <div>
+                <span class="font-semibold">Cliente:</span>
+                <p>{attendeeInfo?.first_name} {attendeeInfo?.last_name}</p>
+                <p>{attendeeInfo?.email}</p>
+              </div>
+              <div>
+                <span class="font-semibold">Fecha de compra:</span>
+                <p>{orderInfo?.created_at ? new Date(orderInfo.created_at).toLocaleDateString('es-CL') : 'N/A'}</p>
+              </div>
+              <div>
+                <span class="font-semibold">Total pagado:</span>
+                <p class="text-lg font-bold text-green-600">
+                  ${orderInfo?.amount ? orderInfo.amount.toLocaleString('es-CL') : '0'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tickets -->
+          <div class="mt-6">
+            <h2 class="text-xl font-semibold font-[Unbounded] text-gray-800 mb-4">
+              Tus Entradas ({tickets.length})
+            </h2>
+            
+            <div class="space-y-6">
+              {tickets.map((ticket, index) => (
+                <div class="relative">
+                  {tickets.length > 1 && (
+                    <div class="text-sm text-gray-500 font-[Prompt] mb-2">
+                      Entrada {index + 1} de {tickets.length}
+                    </div>
+                  )}
+                  <TicketInfo ticket={ticket} event={event} client:only />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <!-- Contenedor colapsable del evento -->
+          <div class="w-full mt-8 mb-8">
+            <details class="bg-white p-4 rounded-lg shadow-lg">
+              <summary class="text-lg font-semibold cursor-pointer font-[Unbounded]">
+                Detalles del Evento
+              </summary>
+              <div class="mt-4">
+                <EventHeader event={event} client:idle />
+                <EventTabs event={event} client:only />
+              </div>
+            </details>
+          </div>
+        </>
+      )}
+    </div>
+  </main>
+  <AppFooter client:idle />
+</Layout>

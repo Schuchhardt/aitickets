@@ -105,11 +105,16 @@ const getTime = (time) => {
 
     <!-- Sección de Ubicación con Mapa -->
     <div id="lugar" class="event-section mt-10">
-      <h2 class="text-2xl font-bold mb-4 font-['Unbounded']">Ubicación</h2>
+      <h2 class="text-2xl font-bold mb-4 font-['Unbounded']">
+        {{ event.secret_location ? 'Ubicación aproximada' : 'Ubicación' }}
+      </h2>
       <p class="text-gray-600">
         {{ event.location }} 
-        <a :href="'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(event.location)" target="_blank"
+        <a v-if="!event.secret_location" :href="'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(event.location)" target="_blank"
           class="text-blue-500 cursor-pointer">Ver ubicación</a>
+      </p>
+      <p v-if="event.secret_location" class="text-amber-600 text-sm mt-2 italic">
+        La ubicación exacta será mostrada en la entrada el día del evento.
       </p>
       <iframe class="w-full h-64 mt-4 rounded-lg shadow-md"
         :src="'https://www.google.com/maps/embed/v1/place?key=' + googleMapsApiKey + '&q=' + encodeURIComponent(event.location)"
@@ -128,6 +133,11 @@ const getTime = (time) => {
         <transition name="fade-slide">
           <p v-if="faq.open" class="mt-2 text-gray-600">{{ faq.answer }}</p>
         </transition>
+      </div>
+      
+      <!-- Imagen del evento al final de preguntas frecuentes -->
+      <div class="mt-6 flex justify-center">
+        <img :src="event.image_url" :alt="event.name" class="rounded-lg shadow-md max-w-full h-auto object-cover" style="height: 100%;" />
       </div>
     </div>
 

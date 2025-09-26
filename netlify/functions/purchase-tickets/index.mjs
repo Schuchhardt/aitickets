@@ -58,7 +58,7 @@ async function sendTicketsEmail(customerInfo, eventInfo, orderInfo, ticketsInfo)
           "venue": eventInfo.address,
           "order_id": orderInfo.id,
           "order_date": orderInfo.created_at,
-          "order_qr_url": "https://aitickets.cl/ticket/" + orderInfo.id,
+          "order_qr_url": "https://aitickets.cl/order/" + orderInfo.id,
           "total_amount": orderInfo.amount,
           "tickets": ticketsInfo,
           // "tickets": [

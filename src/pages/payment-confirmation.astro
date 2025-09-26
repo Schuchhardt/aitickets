@@ -125,6 +125,27 @@ if (request.method === 'POST') {
         if (orderData.status == 'paid' && status === 2) {
           paymentDetails.status = 'paid';
           paymentStatusMessage = '¡Gracias por tu pago! Tu transacción ha sido completada exitosamente.';
+          
+          // Enviar email de confirmación con tickets
+          try {
+            const emailResponse = await fetch(`${import.meta.env.SITE_URL}/api/send-tickets-email`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                orderId: commerceOrder
+              })
+            });
+
+            if (emailResponse.ok) {
+              console.log('✉️ Email de confirmación enviado exitosamente');
+            } else {
+              console.error('❌ Error enviando email de confirmación:', await emailResponse.text());
+            }
+          } catch (emailError) {
+            console.error('❌ Error al llamar función de email:', emailError);
+          }
         } else {
           // Determinar el mensaje de estado del pago
           switch (status) {
