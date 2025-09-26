@@ -55,7 +55,7 @@ const getTime = (time) => {
 <template>
   <div class="lg:col-span-2 font-['Prompt']" v-if="event">
     <!-- Tabs de navegación (solo en desktop) -->
-    <div class="hidden lg:flex border-b border-gray-300 space-x-4 sticky top-0 bg-white py-2 z-10">
+    <div id="event-tabs" class="hidden lg:flex border-b border-gray-300 space-x-4 bg-white py-2">
       <a href="#descripcion" class="py-2 px-4 text-sm font-semibold cursor-pointer font-['Unbounded']"
         :class="activeSection === 'descripcion' ? 'border-b-2 border-black text-black' : 'text-gray-500'">
         Descripción

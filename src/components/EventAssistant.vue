@@ -156,7 +156,7 @@ onMounted(scrollToBottom);
       <button 
         @click="isOpen = true" 
         aria-label="Abrir asistente"
-        class="w-16 h-16 rounded-full cursor-pointer shadow-lg bg-cover bg-center bg-no-repeat transition hover:opacity-80"
+        class="w-16 h-16 rounded-full cursor-pointer shadow-lg bg-cover bg-center bg-no-repeat transition hover:opacity-80 relative z-50 pointer-events-auto"
         :style="{ backgroundImage: `url(${IconChat.src})` }">
       </button>
     </div>
@@ -222,7 +222,7 @@ onMounted(scrollToBottom);
 /* Posición del botón de asistencia */
 .assistant-button {
   position: fixed;
-  top: 25%;
+  top: 70%;
   right: 1rem;
   transform: translateY(-50%);
   z-index: 50;

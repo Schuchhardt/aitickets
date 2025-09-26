@@ -4,7 +4,7 @@ import iconShare from "../images/icon-share.png"; // Icono de compartir
 import iconArrow from "../images/icon-arrow-black.png"; // Icono de flecha en botón de reserva
 import iconTicket from "../images/icon-tickets.png"; // Icono de ticket
 import ShareEventModal from "./ShareEventModal.vue";
-import ReserveModal from "./Reservation/ReservationModal.vue";
+import ReservationModal from "./Reservation/ReservationModal.vue";
 import { eventBus } from '../utils/eventbus.js';
 
 defineProps({
@@ -15,6 +15,7 @@ const showModal = ref(false);
 const showReserveModal = ref(false);
 
 const openReserveModal = () => {
+  console.log('Opening reserve modal');
   showReserveModal.value = true;
 };
 
@@ -58,7 +59,7 @@ const getEventPrice = (tickets) => {
   <div class="font-['Unbounded'] font-bold" v-if="event">
     <!-- Botón de compartir en Mobile (debajo del EventHeader) -->
     <div class="lg:hidden flex justify-center mt-4">
-      <button @click="showModal = true" aria-label="Compartir evento" class="w-11/12 flex items-center justify-center py-2 border border-gray-300 rounded-full text-gray-600 bg-gray-100 cursor-pointer">
+      <button @click="showModal = true" aria-label="Compartir evento" class="w-11/12 flex items-center justify-center py-2 border border-gray-300 rounded-full text-gray-600 bg-gray-100 cursor-pointer relative z-10 pointer-events-auto">
         <img :src="iconShare.src" alt="Compartir" class="w-5 h-5 mr-2" />
         Compartir evento
       </button>
@@ -76,12 +77,12 @@ const getEventPrice = (tickets) => {
       </div>
 
       <!-- Botones -->
-      <button @click="openReserveModal" aria-label="Reservar ticket" class="w-full bg-black text-white py-3 rounded-full flex items-center justify-center mt-4 cursor-pointer">
-        Reservar ticket
+      <button @click="openReserveModal" aria-label="Comprar entrada" class="w-full bg-black text-white py-3 rounded-full flex items-center justify-center mt-4 cursor-pointer relative z-10 pointer-events-auto">
+        Comprar entrada
         <img :src="iconArrow.src" alt="Arrow" class="w-4 h-4 ml-2" />
       </button>
 
-      <button @click="showModal = true" aria-label="Compartir evento" class="w-full mt-3 border border-gray-400 py-2 rounded-full text-gray-700 flex items-center justify-center cursor-pointer">
+      <button @click="showModal = true" aria-label="Compartir evento" class="w-full mt-3 border border-gray-400 py-2 rounded-full text-gray-700 flex items-center justify-center cursor-pointer relative z-10 pointer-events-auto">
         <img :src="iconShare.src" alt="Compartir" class="w-5 h-5 mr-2" />
         Compartir evento
       </button>
@@ -89,14 +90,14 @@ const getEventPrice = (tickets) => {
 
     <!-- Precio Sticky en Mobile -->
     <div class="lg:hidden fixed bottom-0 left-0 w-full bg-lime-400 py-4 px-6 flex justify-between items-center shadow-md">
-      <span class="text-lg text-gray-900">{{ event.price || "Gratis" }}</span>
-      <button @click="openReserveModal" aria-label="Reservar ticket" class="bg-black text-white py-2 px-6 rounded-full flex items-center cursor-pointer">
-        Reservar ticket
+            <span class="text-lg text-gray-900">{{ getEventPrice(event.tickets) }}</span>
+      <button @click="openReserveModal" aria-label="Comprar entrada" class="bg-black text-white py-2 px-6 rounded-full flex items-center cursor-pointer relative z-10 pointer-events-auto">
+        Comprar entrada
       </button>
     </div>
  
     <ShareEventModal :show="showModal" :event="event" @close="showModal = false"/>
-    <ReserveModal v-if="showReserveModal" :event="event" @close="closeReserveModal" />
+    <ReservationModal v-if="showReserveModal" :event="event" @close="closeReserveModal" />
 
   </div>
 </template>
