@@ -3,27 +3,15 @@ import iconCalendarLight from "../images/icon-calendar-light.png";
 import iconPinLight from "../images/icon-pin-light.png";
 import iconCalendarDark from "../images/icon-calendar-dark.png";
 import iconPinDark from "../images/icon-pin-dark.png";
+import { formatFullDateRange } from "../utils/dateHelpers.js";
 
 defineProps({
   event: Object,
 });
 
-// Función para formatear la fecha con hora
+// Función para formatear la fecha con hora usando zona horaria local del usuario
 const formatFullDate = (dateArray) => {
-  if (!dateArray.length) return "No hay fechas disponibles";
-
-  const optionsDate = { day: "numeric", month: "long" };
-  const optionsTime = { hour: "2-digit", minute: "2-digit", hour12: false };
-
-  const start = dateArray[0];
-  const end = dateArray[dateArray.length - 1];
-
-  const startDate = new Date(start.date).toLocaleDateString("es-ES", optionsDate);
-  const endDate = new Date(end.date).toLocaleDateString("es-ES", optionsDate);
-
-  const startTime = new Date(`1970-01-01T${start.start_time}`).toLocaleTimeString("es-ES", optionsTime);
-  const endTime = new Date(`1970-01-01T${end.end_time}`).toLocaleTimeString("es-ES", optionsTime);
-  return startDate !== endDate ? `Del ${startDate} al ${endDate}, desde las ${startTime} hasta las ${endTime} hrs` : `${startDate}, desde las ${startTime} hasta las ${endTime} hrs`;
+  return formatFullDateRange(dateArray);
 };
 </script>
 

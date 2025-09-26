@@ -85,7 +85,7 @@ const handlePayment = async () => {
     <div class="border p-4 rounded-lg mb-4">
       <p class="text-lg font-bold">Total a pagar:</p>
       <p class="text-xl" :class="{ 'text-green-600': totalAmount > 0, 'text-lime-600 font-[Unbounded]': totalAmount === 0 }">
-        {{ totalAmount > 0 ? `$${finalTotal.toLocaleString("es-ES")}` : "Evento gratuito" }}
+        {{ totalAmount > 0 ? `$${finalTotal.toLocaleString("es-CL")}` : "Evento gratuito" }}
       </p>
     </div>
 
@@ -102,7 +102,7 @@ const handlePayment = async () => {
         <li v-for="ticket in selectedTicketList" :key="ticket.id" class="flex justify-between">
           <span>{{ ticket.quantity }} x {{ ticket.name }}</span>
           <span class="font-medium" v-if="ticket.total !== 0">
-            ${{ ticket.total.toLocaleString("es-ES") }}
+            ${{ ticket.total.toLocaleString("es-CL") }}
           </span>
           <span class="font-medium" v-if="ticket.total == 0">
             Gratis

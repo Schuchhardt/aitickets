@@ -4,6 +4,7 @@ import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { eventBus } from '../utils/eventbus.js';
 import { useGoogleAnalytics } from "../composables/useGoogleAnalytics.js";
+import { formatLocalTime, formatLocalDate } from "../utils/dateHelpers.js";
 import IconChat from "../images/icon-chat.png"; 
 import IconArrowGreen from "../images/icon-arrow-green.png"; 
 
@@ -16,7 +17,7 @@ const { trackAIAssistant } = useGoogleAnalytics();
 
 const isOpen = ref(false);
 const messages = ref([
-  { role: "assistant", text: "¿Te ayudo a conseguir tu ticket en segundos? 😎", time: new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) }
+  { role: "assistant", text: "¿Te ayudo a conseguir tu ticket en segundos? 😎", time: formatLocalTime(new Date()) }
 ]);
 const userMessage = ref("");
 const showSuggestedReplies = ref(true);
@@ -79,7 +80,7 @@ const sendMessage = async (message) => {
     - ID Evento: ${props.event.id}
     - Nombre: ${props.event.name}
     - Descripción: ${props.event.description}
-    - Fecha: ${new Date(props.event.start_date).toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })} - ${new Date(props.event.end_date).toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })}
+    - Fecha: ${formatLocalDate(props.event.start_date, { weekday: "long", day: "numeric", month: "long" })} - ${formatLocalDate(props.event.end_date, { weekday: "long", day: "numeric", month: "long" })}
     - Ubicación: ${props.event.location}
     - Preguntas frecuentes: ${props.event.faqs.map(faq => `• ${faq.question}: ${faq.answer}`).join("\n")}
     - Precios de las entradas:
@@ -135,7 +136,7 @@ const sendMessage = async (message) => {
 };
 
 // Obtener la fecha actual
-const currentDate = new Date().toLocaleDateString("es-ES", {
+const currentDate = formatLocalDate(new Date(), {
   weekday: "long",
   day: "numeric",
   month: "long"

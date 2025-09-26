@@ -160,7 +160,7 @@ if (request.method === 'POST') {
 
       {paymentDetails ? (
         <>
-          <h1 class="text-2xl font-semibold text-green-600 mb-4 font-[Unbounded] text-center">{paymentStatusMessage}</h1>
+          <h1 class="text-2xl font-semibold text-green-600 pt-4 mb-4 font-[Unbounded] text-center">{paymentStatusMessage}</h1>
 
           <div class="space-y-3 text-gray-700 font-[Prompt]" >
             <p><span class="font-semibold">ID de la Orden:</span> {paymentDetails.id}</p>
@@ -206,7 +206,6 @@ if (request.method === 'POST') {
   {/* Google Analytics Purchase Tracking */}
   {paymentDetails?.status === 'paid' && (
     <script type="text/partytown">
-      // Track successful purchase
       gtag('event', 'purchase', {
         transaction_id: paymentDetails.id,
         currency: 'CLP',

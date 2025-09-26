@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted } from "vue";
+import { formatLocalTimeFromString, formatLocalDate } from "../utils/dateHelpers.js";
 
 // Props con la información del evento
 const props = defineProps({
@@ -46,9 +47,7 @@ onMounted(() => {
 });
 
 const getTime = (time) => {
-  const optionsTime = { hour: "2-digit", minute: "2-digit", hour12: false };
-  
-  return new Date(`1970-01-01T${time}`).toLocaleTimeString("es-ES", optionsTime);
+  return formatLocalTimeFromString(time);
 }
 </script>
 
@@ -94,7 +93,7 @@ const getTime = (time) => {
       <div class="flex space-x-4">
         <div class="bg-gray-100 p-4 rounded-lg text-center w-1/2" v-for="(date, index) in event.dates" :key="index">
           <span class="text-gray-900 font-semibold block">
-            {{ new Date(date.date).toLocaleDateString("es-CL", { weekday: "short", day: "numeric", month: "long" }) }}
+            {{ formatLocalDate(date.date, { weekday: "short", day: "numeric", month: "long" }) }}
           </span>
           <span class="text-gray-600 text-sm">
             {{ getTime(date.start_time) }} hrs - {{ getTime(date.end_time) }} hrs

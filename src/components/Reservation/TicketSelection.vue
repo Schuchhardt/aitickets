@@ -1,6 +1,7 @@
 <script setup>
 import { defineProps, defineEmits, ref } from "vue";
 import { useGoogleAnalytics } from "../../composables/useGoogleAnalytics.js";
+import { formatLocalTime, formatLocalDate } from "../../utils/dateHelpers.js";
 
 const props = defineProps({
   event: Object,
@@ -48,7 +49,7 @@ const decreaseTicket = (ticket) => {
 };
 
 const formatTime = (datetime) => {
-  return datetime ? new Date(datetime).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" }) : "";
+  return datetime ? formatLocalTime(datetime) : "";
 };
 
 const formatPrice = (price) => {
@@ -58,13 +59,11 @@ const formatPrice = (price) => {
 const formatFullDate = (dateArray) => {
   if (!dateArray.length) return "No hay fechas disponibles";
 
-  const optionsDate = { day: "numeric", month: "long" };
-
   const start = dateArray[0];
   const end = dateArray[dateArray.length - 1];
 
-  const startDate = new Date(start.date).toLocaleDateString("es-ES", optionsDate);
-  const endDate = new Date(end.date).toLocaleDateString("es-ES", optionsDate);
+  const startDate = formatLocalDate(start.date);
+  const endDate = formatLocalDate(end.date);
   return startDate !== endDate ? `Del ${startDate} al ${endDate}` : `${startDate}`;
 };
 </script>

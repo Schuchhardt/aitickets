@@ -204,7 +204,7 @@ export default async function handler(req, context) {
         apiKey: flowApiKey,
         paymentMethod: 1, // 1: Webpay, 2: Multicaja, 3: Servipag, 4: Cryptocompra
         commerceOrder: newOrder.id, // ID único de la orden en tu sistema
-        subject: `Pago de entradas para el evento ${eventId}`,
+        subject: `Pago de entradas para el evento ${eventId} - ${event.name} - ${buyer.email}`,
         currency: 'CLP',
         amount: total,
         email: buyer.email,
