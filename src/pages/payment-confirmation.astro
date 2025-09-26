@@ -183,11 +183,47 @@ if (request.method === 'POST') {
         <>
           <h1 class="text-2xl font-semibold text-green-600 pt-4 mb-4 font-[Unbounded] text-center">{paymentStatusMessage}</h1>
 
+          {/* Detalles del Evento */}
+          <div class="bg-gray-50 rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4 font-[Unbounded]">Detalles del Evento</h2>
+            <div class="space-y-3 text-gray-700 font-[Prompt]">
+              <p><span class="font-semibold">Evento:</span> {paymentDetails.event.name}</p>
+              <p><span class="font-semibold">Fecha:</span> {new Date(paymentDetails.event.start_date).toLocaleDateString('es-CL', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}</p>
+              <p><span class="font-semibold">Hora:</span> {new Date(paymentDetails.event.start_date).toLocaleTimeString('es-CL', { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+              })} hrs</p>
+              <div>
+                <span class="font-semibold">Dirección:</span>
+                {paymentDetails.event.secret_location ? (
+                  <div class="mt-1">
+                    <p class="text-gray-600">{paymentDetails.event.secret_location}</p>
+                    <p class="text-sm text-amber-600 mt-1">
+                      <span class="inline-flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                        </svg>
+                        La ubicación puede ser actualizada el día del evento
+                      </span>
+                    </p>
+                  </div>
+                ) : (
+                  <span class="text-gray-600">{paymentDetails.event.address || 'Dirección no disponible'}</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Detalles del Pago */}
           <div class="space-y-3 text-gray-700 font-[Prompt]" >
             <p><span class="font-semibold">ID de la Orden:</span> {paymentDetails.id}</p>
             <p><span class="font-semibold">Estado:</span> {paymentDetails.flowStatus === 2 ? 'Pagado' : 'No Pagado'}</p>
             <p><span class="font-semibold">Monto Total:</span> ${paymentDetails.flowAmount}</p>
-            {/* <p><span class="font-semibold">Comisión de Pago:</span> ${paymentDetails.flowFee}</p> */}
             <p><span class="font-semibold">ID de Pago en Comercio:</span> {paymentDetails.flowCommerceId}</p>
           </div>
 
