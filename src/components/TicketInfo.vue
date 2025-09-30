@@ -1,8 +1,9 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed } from 'vue';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import TicketQR from "./TicketQR.vue";
+import ShareEventModal from "./ShareEventModal.vue";
 import { formatLocalDate, formatLocalTime } from "../utils/dateHelpers.js";
 
 const props = defineProps({
@@ -11,7 +12,23 @@ const props = defineProps({
 });
 
 const isDownloading = ref(false);
-const isSharing = ref(false);
+const showShareModal = ref(false);
+
+// URL del ticket para compartir
+const ticketUrl = computed(() => {
+  if (typeof window === "undefined") return "";
+  return window.location.href;
+});
+
+// Título personalizado para compartir
+const shareTitle = computed(() => {
+  return `Mi entrada para ${props.event?.name || 'el evento'}`;
+});
+
+// Texto personalizado para compartir
+const shareText = computed(() => {
+  return `¡Mira mi entrada para ${props.event?.name}! ${formattedDate(props.event)} a las ${formattedTime(props.event)}`;
+});
 
 // Formatear fecha del evento usando zona horaria local del usuario
 const formattedDate = (event) => {
@@ -36,123 +53,14 @@ const supportsDownload = () => {
   return typeof a.download !== 'undefined';
 };
 
-// Función para imprimir como fallback
-const printTicket = () => {
-  const printWindow = window.open('', '_blank');
-  const ticketEl = document.getElementById('ticket-container');
-  
-  if (!ticketEl || !printWindow) {
-    // Fallback adicional - usar window.print() directamente
-    window.print();
-    return;
-  }
-  
-  const ticketHTML = ticketEl.outerHTML;
-  const eventName = props.event.name || 'Evento';
-  
-  const htmlContent = `<!DOCTYPE html>
-<html>
-<head>
-  <title>Ticket - ${eventName}</title>
-  <script src="https://cdn.tailwindcss.com"><\/script>
-  <style>
-    @media print {
-      body { margin: 0; padding: 20px; }
-      * { 
-        -webkit-print-color-adjust: exact !important; 
-        color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
-    }
-    @import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700&family=Prompt:wght@400;700&display=swap');
-    .font-unbounded { font-family: 'Unbounded', cursive; }
-    .font-prompt { font-family: 'Prompt', sans-serif; }
-  </style>
-</head>
-<body class="bg-gray-100 p-4">
-  <div class="max-w-md mx-auto">
-    ${ticketHTML}
-  </div>
-  <script>
-    window.onload = function() {
-      window.print();
-      setTimeout(function() { window.close(); }, 100);
-    }
-  <\/script>
-</body>
-</html>`;
-  
-  printWindow.document.write(htmlContent);
-  printWindow.document.close();
+// Abrir modal de compartir
+const openShareModal = () => {
+  showShareModal.value = true;
 };
 
-// Función para compartir la entrada con Web Share API
-const shareTicket = async () => {
-  if (isSharing.value) return;
-  
-  try {
-    isSharing.value = true;
-    
-    const ticketEl = document.getElementById('ticket-container');
-    if (!ticketEl) {
-      throw new Error('No se encontró el contenedor del ticket');
-    }
-
-    // Generar imagen del ticket
-    const canvas = await html2canvas(ticketEl, { 
-      scale: 2,
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: '#ffffff',
-      width: ticketEl.offsetWidth,
-      height: ticketEl.offsetHeight
-    });
-
-    // Convertir canvas a blob
-    const blob = await new Promise(resolve => {
-      canvas.toBlob(resolve, 'image/jpeg', 0.9);
-    });
-
-    const eventName = props.event.name || 'Evento';
-    const fileName = `ticket-${eventName.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}.jpg`;
-    const file = new File([blob], fileName, { type: 'image/jpeg' });
-
-    // Intentar compartir con Web Share API
-    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({
-        files: [file],
-        title: `Mi entrada para ${eventName}`,
-        text: `¡Mira mi entrada para ${eventName}! ${formattedDate(props.event)} a las ${formattedTime(props.event)}`
-      });
-      console.log('Entrada compartida exitosamente');
-    } else {
-      // Fallback: descargar la imagen
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      console.log('Web Share API no disponible, imagen descargada');
-    }
-    
-  } catch (error) {
-    console.error('Error al compartir entrada:', error);
-    // Fallback adicional - copiar información al portapapeles
-    try {
-      const eventName = props.event.name || 'Evento';
-      const shareText = `¡Mira mi entrada para ${eventName}! ${formattedDate(props.event)} a las ${formattedTime(props.event)}`;
-      await navigator.clipboard.writeText(shareText);
-      alert('Información de la entrada copiada al portapapeles');
-    } catch (clipboardError) {
-      console.error('Error al copiar al portapapeles:', clipboardError);
-      alert('No se pudo compartir la entrada');
-    }
-  } finally {
-    isSharing.value = false;
-  }
+// Cerrar modal de compartir
+const closeShareModal = () => {
+  showShareModal.value = false;
 };
 
 // 👉 Función mejorada para descargar el ticket como PDF
@@ -164,8 +72,8 @@ const downloadAsPDF = async () => {
     
     // Verificar soporte del navegador
     if (!supportsDownload()) {
-      console.warn('El navegador no soporta descargas, usando diálogo de impresión');
-      printTicket();
+      console.warn('El navegador no soporta descargas');
+      alert('Tu navegador no soporta la descarga de archivos. Por favor, usa otro navegador.');
       return;
     }
     
@@ -218,8 +126,7 @@ const downloadAsPDF = async () => {
     
   } catch (error) {
     console.error('Error al generar PDF:', error);
-    console.log('Usando diálogo de impresión como fallback');
-    printTicket();
+    alert('Ocurrió un error al generar el PDF. Por favor, intenta nuevamente.');
   } finally {
     isDownloading.value = false;
   }
@@ -256,25 +163,21 @@ const downloadAsPDF = async () => {
       <!-- Botón principal de compartir entrada -->
       <button
         aria-label="Compartir entrada"
-        @click="shareTicket"
-        :disabled="isSharing || isDownloading"
+        @click="openShareModal"
+        :disabled="isDownloading"
         class="flex-1 bg-lime-500 font-[Unbounded] text-white text-center py-2 rounded-lg hover:bg-lime-600 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
-        <svg v-if="isSharing" class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-        <svg v-else class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z"></path>
         </svg>
-        {{ isSharing ? 'Compartiendo...' : 'Compartir Entrada' }}
+        Compartir Entrada
       </button>
       
       <!-- Botón PDF (solo icono) -->
       <button
         aria-label="Descargar ticket como PDF"
         @click="downloadAsPDF"
-        :disabled="isDownloading || isSharing"
+        :disabled="isDownloading"
         class="bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
         title="Descargar PDF"
       >
@@ -286,20 +189,18 @@ const downloadAsPDF = async () => {
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
         </svg>
       </button>
-      
-      <!-- Botón Imprimir (solo icono) -->
-      <button
-        aria-label="Imprimir ticket"
-        @click="printTicket"
-        :disabled="isDownloading || isSharing"
-        class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-        title="Imprimir ticket"
-      >
-        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
-        </svg>
-      </button>
     </div>
+
+    <!-- Modal de compartir -->
+    <ShareEventModal 
+      :show="showShareModal" 
+      :event="event"
+      :customUrl="ticketUrl"
+      :customTitle="shareTitle"
+      :customText="shareText"
+      @close="closeShareModal"
+      client:only
+    />
   </div>
 </template>
 

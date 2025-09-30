@@ -106,28 +106,26 @@ const defaultDescription = "Este evento no está disponible.";
 const plainDescription = stripHtml(event?.description) || defaultDescription;
 ---
 
-<head>
-  <title>{event?.name || "Evento no encontrado"}</title>
-  <meta name="description" content={plainDescription} />
+<title>{event?.name || "Evento no encontrado"}</title>
+<meta name="description" content={plainDescription} />
 
-  <!-- Open Graph / Facebook -->
-  <meta property="og:type" content="website" />
-  <meta property="og:url" content={`${siteUrl}/eventos/${event?.slug}`} />
-  <meta property="og:title" content={event?.name || "Evento no encontrado"} />
-  <meta property="og:description" content={plainDescription} />
-  <meta property="og:image" content={buildAbsoluteUrl(event?.image_url || fallbackImagePath)} />
+<!-- Open Graph / Facebook -->
+<meta property="og:type" content="website" />
+<meta property="og:url" content={`${siteUrl}/eventos/${event?.slug}`} />
+<meta property="og:title" content={event?.name || "Evento no encontrado"} />
+<meta property="og:description" content={plainDescription} />
+<meta property="og:image" content={buildAbsoluteUrl(event?.image_url || fallbackImagePath)} />
 
-  <meta property="og:logo" content="https://bgsmqjrdryafvlyxywud.supabase.co/storage/v1/object/public/Events/AITickets.svg" />
+<meta property="og:logo" content="https://bgsmqjrdryafvlyxywud.supabase.co/storage/v1/object/public/Events/AITickets.svg" />
 
-  <!-- Twitter Card -->
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:url" content={`${siteUrl}/eventos/${event?.slug}`} />
-  <meta name="twitter:title" content={event?.name || "Evento no encontrado"} />
-  <meta name="twitter:description" content={plainDescription} />
-  <meta name="twitter:image" content={buildAbsoluteUrl(event?.image_url || fallbackImagePath)} />
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:url" content={`${siteUrl}/eventos/${event?.slug}`} />
+<meta name="twitter:title" content={event?.name || "Evento no encontrado"} />
+<meta name="twitter:description" content={plainDescription} />
+<meta name="twitter:image" content={buildAbsoluteUrl(event?.image_url || fallbackImagePath)} />
 
-  <!-- JSON-LD Structured Data -->
-  {eventJsonLd && (
-    <script type="application/ld+json" set:html={eventJsonLd}></script>
-  )}
-</head>
+<!-- JSON-LD Structured Data -->
+{eventJsonLd && (
+  <script type="application/ld+json" set:html={eventJsonLd}></script>
+)}

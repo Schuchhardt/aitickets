@@ -4,14 +4,33 @@ import { useGoogleAnalytics } from "../composables/useGoogleAnalytics.js";
 
 const props = defineProps({
   show: Boolean,
-  event: Object
+  event: Object,
+  customUrl: String, // URL personalizada para compartir (ej: URL del ticket)
+  customTitle: String, // Título personalizado para compartir
+  customText: String // Texto personalizado para compartir
 });
 
 const emit = defineEmits(["close"]);
 const { trackShare } = useGoogleAnalytics();
 
-// 📌 URL del evento (Asegúrate de cambiarlo según la URL real de tu sitio)
-const eventUrl = computed(() => `${window.location.origin}/eventos/${props.event.slug}`);
+// 📌 URL para compartir (usa customUrl si está disponible, sino la URL del evento)
+const eventUrl = computed(() => {
+  if (props.customUrl) return props.customUrl;
+  if (!props.event?.slug) return window.location.href;
+  return `${window.location.origin}/eventos/${props.event.slug}`;
+});
+
+// 📌 Título para compartir
+const shareTitle = computed(() => {
+  if (props.customTitle) return props.customTitle;
+  return props.event?.name || 'Evento';
+});
+
+// 📌 Texto para compartir
+const shareText = computed(() => {
+  if (props.customText) return props.customText;
+  return `¡Mira este evento! ${props.event?.name}`;
+});
 
 // 📌 Verificar si el navegador soporta Web Share API
 const canShare = computed(() => navigator.share);
@@ -21,11 +40,11 @@ const shareNative = async () => {
   if (navigator.share) {
     try {
       await navigator.share({
-        title: props.event.name,
-        text: `¡Mira este evento! ${props.event.name}`,
+        title: shareTitle.value,
+        text: shareText.value,
         url: eventUrl.value,
       });
-      trackShare(props.event.id, 'native');
+      trackShare(props.event?.id, 'native');
     } catch (err) {
       console.error('Error al compartir:', err);
     }
@@ -36,7 +55,7 @@ const shareNative = async () => {
 const copyToClipboard = async () => {
   try {
     await navigator.clipboard.writeText(eventUrl.value);
-    trackShare(props.event.id, 'copy_link');
+    trackShare(props.event?.id, 'copy_link');
     alert("Enlace copiado al portapapeles");
   } catch (err) {
     console.error("Error al copiar el enlace:", err);
@@ -45,7 +64,7 @@ const copyToClipboard = async () => {
 
 // 📌 Funciones para tracking de compartir
 const trackShare_ = (platform) => {
-  trackShare(props.event.id, platform);
+  trackShare(props.event?.id, platform);
 };
 </script>
 
@@ -53,7 +72,7 @@ const trackShare_ = (platform) => {
   <div v-if="show" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
     <div class="bg-white p-6 rounded-lg shadow-lg w-80">
       <!-- 🔹 Título -->
-      <h2 class="text-lg font-bold mb-4 font-['Unbounded']">Compartir evento</h2>
+      <h2 class="text-lg font-bold mb-4 font-['Unbounded']">Compartir {{ customTitle ? '' : 'evento' }}</h2>
 
       <!-- 🔹 Botones de compartir -->
       <div class="space-y-3">
@@ -76,7 +95,7 @@ const trackShare_ = (platform) => {
         </button>
 
         <!-- Email -->
-        <a :href="`mailto:?subject=Mira este evento: ${event.name}&body=¡Hola! Te comparto este evento que me parece interesante: ${eventUrl}`" 
+        <a :href="`mailto:?subject=Mira este evento: ${shareTitle}&body=${shareText}: ${eventUrl}`" 
           @click="trackShare_('email')"
           class="flex items-center gap-2 w-full border px-4 py-2 rounded-lg text-sm hover:bg-gray-50 justify-center">
           <img src="https://cdn.simpleicons.org/gmail" alt="email" class="w-5 h-5" />
@@ -84,7 +103,7 @@ const trackShare_ = (platform) => {
         </a>
 
         <!-- SMS -->
-        <a :href="`sms:&body=¡Hola! Te comparto este evento: ${eventUrl}`" 
+        <a :href="`sms:&body=${shareText}: ${eventUrl}`" 
           @click="trackShare_('sms')"
           class="flex items-center gap-2 w-full border px-4 py-2 rounded-lg text-sm hover:bg-gray-50 justify-center">
           <img src="https://cdn.simpleicons.org/googlemessages" alt="sms" class="w-5 h-5" />
@@ -92,7 +111,7 @@ const trackShare_ = (platform) => {
         </a>
 
         <!-- WhatsApp -->
-        <a :href="`https://wa.me/?text=${encodeURIComponent(`¡Hola! Te comparto este evento: ${event.name} ${eventUrl}`)}`" 
+        <a :href="`https://wa.me/?text=${encodeURIComponent(`${shareText} ${eventUrl}`)}`" 
           target="_blank" rel="noopener noreferrer" 
           @click="trackShare_('whatsapp')"
           class="flex items-center gap-2 w-full border px-4 py-2 rounded-lg text-sm hover:bg-gray-50 justify-center">
@@ -110,7 +129,7 @@ const trackShare_ = (platform) => {
         </a>
 
         <!-- X (Twitter) -->
-        <a :href="`https://twitter.com/intent/tweet?text=${encodeURIComponent(`¡Mira este evento! ${event.name}`)}&url=${encodeURIComponent(eventUrl)}`" 
+        <a :href="`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(eventUrl)}`" 
           target="_blank" rel="noopener noreferrer" 
           @click="trackShare_('twitter')"
           class="flex items-center gap-2 w-full border px-4 py-2 rounded-lg text-sm hover:bg-gray-50 justify-center">

@@ -8,7 +8,6 @@
 		<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
 		<link rel="manifest" href="/site.webmanifest">
 		<meta name="generator" content={Astro.generator} />
-		<title>AI Tickets</title>
 		
 		<!-- Google Analytics (optimized with Partytown) -->
 		<script type="text/partytown" async src="https://www.googletagmanager.com/gtag/js?id=G-ZKTCNLYSQT"></script>
@@ -21,24 +20,30 @@
 				page_location: window.location.href
 			});
 		</script>
-		<meta name="description" content="Conecta con tu público ideal, vende entradas automáticamente y obtén métricas clave en tiempo real. Todo desde un solo lugar.">
-		<!-- Open Graph / Facebook -->
-		<meta property="og:type" content="website">
-		<meta property="og:title" content="AI Tickets">
-		<meta property="og:url" content="https://aitickets.cl/">
-		<meta property="og:site_name" content="AI Tickets">
-		<meta property="og:locale" content="es_CL">
-		<meta property="og:locale:alternate" content="en_US">
-		<meta property="og:description" content="Conecta con tu público ideal, vende entradas automáticamente y obtén métricas clave en tiempo real. Todo desde un solo lugar.">
-		<meta property="og:image" content="https://aitickets.cl/aitickets_preview.png">
-		<!-- Twitter -->
-		<meta name="twitter:card" content="summary_large_image">
-		<meta name="twitter:title" content="AI Tickets">
-		<meta name="twitter:url" content="https://aitickets.cl/">
-		<meta name="twitter:site" content="@aitickets">
-		<meta name="twitter:creator" content="@aitickets">
-		<meta name="twitter:description" content="Conecta con tu público ideal, vende entradas automáticamente y obtén métricas clave en tiempo real. Todo desde un solo lugar.">
-		<meta name="twitter:image" content="https://aitickets.cl/aitickets_preview.png">
+		
+		<!-- Named slot for page-specific meta tags (if provided, default meta tags won't be used) -->
+		<slot name="head">
+			<!-- Default meta tags (only used if no page-specific head slot is provided) -->
+			<title>AI Tickets</title>
+			<meta name="description" content="Conecta con tu público ideal, vende entradas automáticamente y obtén métricas clave en tiempo real. Todo desde un solo lugar.">
+			<!-- Open Graph / Facebook -->
+			<meta property="og:type" content="website">
+			<meta property="og:title" content="AI Tickets">
+			<meta property="og:url" content="https://aitickets.cl/">
+			<meta property="og:site_name" content="AI Tickets">
+			<meta property="og:locale" content="es_CL">
+			<meta property="og:locale:alternate" content="en_US">
+			<meta property="og:description" content="Conecta con tu público ideal, vende entradas automáticamente y obtén métricas clave en tiempo real. Todo desde un solo lugar.">
+			<meta property="og:image" content="https://aitickets.cl/aitickets_preview.png">
+			<!-- Twitter -->
+			<meta name="twitter:card" content="summary_large_image">
+			<meta name="twitter:title" content="AI Tickets">
+			<meta name="twitter:url" content="https://aitickets.cl/">
+			<meta name="twitter:site" content="@aitickets">
+			<meta name="twitter:creator" content="@aitickets">
+			<meta name="twitter:description" content="Conecta con tu público ideal, vende entradas automáticamente y obtén métricas clave en tiempo real. Todo desde un solo lugar.">
+			<meta name="twitter:image" content="https://aitickets.cl/aitickets_preview.png">
+		</slot>
 	</head>
 	<body>
 		<slot />
