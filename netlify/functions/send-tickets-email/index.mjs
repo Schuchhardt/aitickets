@@ -94,7 +94,7 @@ async function sendTicketsEmail(customerInfo, eventInfo, orderInfo, ticketsInfo)
       attachment: [
         {
           filename: "evento.ics",
-          content: icsContent,
+          data: Buffer.from(icsContent, "utf-8"),
           contentType: "text/calendar"
         }
       ]
