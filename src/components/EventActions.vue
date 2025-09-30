@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted, computed } from "vue";
 import iconShare from "../images/icon-share.png"; // Icono de compartir
 import iconArrow from "../images/icon-arrow-black.png"; // Icono de flecha en botón de reserva
 import iconTicket from "../images/icon-tickets.png"; // Icono de ticket
+import iconCalendar from "../images/icon-calendar-dark.png"; // Icono de calendario
 import ShareEventModal from "./ShareEventModal.vue";
 import ReservationModal from "./Reservation/ReservationModal.vue";
 import PurchasedTicketsModal from "./PurchasedTicketsModal.vue";
@@ -38,11 +39,14 @@ const checkPurchasedTickets = () => {
 };
 
 const openReserveModal = () => {
-  console.log('Opening reserve modal');
+  eventBus.emit('open-modal'); // Emitir evento al abrir el modal (para el asistente de IA)
+  eventBus.emit('assistant-hide'); // Evento específico para ocultar el asistente
   showReserveModal.value = true;
 };
 
 const closeReserveModal = () => {
+  eventBus.emit('close-modal'); // Notificar que el modal se está cerrando
+  eventBus.emit('assistant-show'); // Evento específico para mostrar el asistente
   showReserveModal.value = false;
 };
 
@@ -94,15 +98,42 @@ const getEventPrice = (tickets) => {
   }
   return `Desde $${formatPrice(minPrice)} hasta $${formatPrice(maxPrice)}`;
 };
+
+// Función para agregar evento al calendario
+const addToCalendar = () => {
+  if (!props.event) return;
+  
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  };
+  
+  const title = encodeURIComponent(props.event.name || props.event.title || 'Evento');
+  const description = encodeURIComponent(props.event.description || '');
+  const location = encodeURIComponent(props.event.location || '');
+  const startDate = formatDate(props.event.start_date);
+  const endDate = formatDate(props.event.end_date);
+  
+  // URL para Google Calendar
+  const googleUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startDate}/${endDate}&details=${description}&location=${location}`;
+  
+  // Abrir Google Calendar
+  window.open(googleUrl, '_blank');
+};
 </script>
 
 <template>
   <div class="font-['Unbounded'] font-bold" v-if="event">
-    <!-- Botón de compartir en Mobile (debajo del EventHeader) -->
-    <div class="lg:hidden flex justify-center mt-4">
-      <button @click="showModal = true" aria-label="Compartir evento" class="w-11/12 flex items-center justify-center py-2 border border-gray-300 rounded-full text-gray-600 bg-gray-100 cursor-pointer relative z-10 pointer-events-auto">
+    <!-- Botones de acción en Mobile (debajo del EventHeader) -->
+    <div class="lg:hidden flex flex-col items-center mt-4 space-y-3">
+      <button @click="showModal = true" aria-label="Compartir evento" class="w-11/12 flex items-center justify-center py-2 border border-gray-300 rounded-full text-gray-600 bg-gray-100 cursor-pointer relative z-5 pointer-events-auto">
         <img :src="iconShare.src" alt="Compartir" class="w-5 h-5 mr-2" />
         Compartir evento
+      </button>
+      
+      <button @click="addToCalendar" aria-label="Añadir al calendario" class="w-11/12 flex items-center justify-center py-2 border border-gray-300 rounded-full text-gray-600 bg-gray-100 cursor-pointer relative z-5 pointer-events-auto">
+        <img :src="iconCalendar.src" alt="Calendario" class="w-5 h-5 mr-2" />
+        Añadir al calendario
       </button>
     </div>
 
@@ -152,10 +183,15 @@ const getEventPrice = (tickets) => {
         <img :src="iconShare.src" alt="Compartir" class="w-5 h-5 mr-2" />
         Compartir evento
       </button>
+
+      <button @click="addToCalendar" aria-label="Añadir al calendario" class="w-full mt-3 border border-gray-400 py-2 rounded-full text-gray-700 flex items-center justify-center cursor-pointer relative z-10 pointer-events-auto">
+        <img :src="iconCalendar.src" alt="Calendario" class="w-5 h-5 mr-2" />
+        Añadir al calendario
+      </button>
     </div>
 
     <!-- Precio Sticky en Mobile -->
-    <div v-if="!hasPurchasedTickets" class="lg:hidden fixed bottom-0 left-0 w-full bg-lime-400 py-4 px-6 flex justify-between items-center shadow-md">
+    <div v-if="!hasPurchasedTickets" class="lg:hidden fixed bottom-0 left-0 w-full bg-lime-400 py-4 px-6 flex justify-between items-center shadow-md z-50">
       <span class="text-lg text-gray-900">{{ getEventPrice(event.tickets) }}</span>
       <button 
         @click="openReserveModal" 
@@ -167,7 +203,7 @@ const getEventPrice = (tickets) => {
     </div>
 
     <!-- Sticky con múltiples botones cuando ya compró -->
-    <div v-else class="lg:hidden fixed bottom-0 left-0 w-full bg-lime-400 py-3 px-4 shadow-md">
+    <div v-else class="lg:hidden fixed bottom-0 left-0 w-full bg-lime-400 py-3 px-4 shadow-md z-50">
       <div class="flex flex-col gap-2">
         <div class="flex justify-between items-center">
           <span class="text-sm text-gray-900 font-medium">{{ getEventPrice(event.tickets) }}</span>

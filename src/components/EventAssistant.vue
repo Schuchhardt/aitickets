@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, nextTick, defineProps} from "vue";
+import { ref, onMounted, onUnmounted, nextTick, defineProps} from "vue";
 import { marked } from "marked"; 
 import DOMPurify from "dompurify";
 import { eventBus } from '../utils/eventbus.js';
@@ -16,6 +16,7 @@ const apiSecret = import.meta.env.PUBLIC_API_SECRET;
 const { trackAIAssistant } = useGoogleAnalytics();
 
 const isOpen = ref(false);
+const isModalOpen = ref(false); // Estado para controlar si el modal de reserva está abierto
 const messages = ref([
   { role: "assistant", text: "¿Te ayudo a conseguir tu ticket en segundos? 😎", time: formatLocalTime(new Date()) }
 ]);
@@ -142,15 +143,36 @@ const currentDate = formatLocalDate(new Date(), {
   month: "long"
 });
 
-onMounted(scrollToBottom);
+// Funciones para manejar la visibilidad del asistente
+const handleAssistantHide = () => {
+  isModalOpen.value = true;
+  isOpen.value = false; // También cerrar el chat si está abierto
+};
+
+const handleAssistantShow = () => {
+  isModalOpen.value = false;
+};
+
+onMounted(() => {
+  scrollToBottom();
+  // Escuchar eventos específicos para ocultar/mostrar el asistente
+  eventBus.on('assistant-hide', handleAssistantHide);
+  eventBus.on('assistant-show', handleAssistantShow);
+});
+
+onUnmounted(() => {
+  // Limpiar los listeners
+  eventBus.off('assistant-hide', handleAssistantHide);
+  eventBus.off('assistant-show', handleAssistantShow);
+});
 </script>
 
 <template>
-  <div>
+  <div v-if="!isModalOpen">
     <!-- Overlay en mobile -->
     <div 
       v-if="isOpen" 
-      class="fixed inset-0 bg-black opacity-50 z-40 md:hidden"
+      class="fixed inset-0 bg-black opacity-50 z-30 md:hidden"
       @click="isOpen = false">
     </div>
 
@@ -162,14 +184,14 @@ onMounted(scrollToBottom);
       <button 
         @click="isOpen = true" 
         aria-label="Abrir asistente"
-        class="w-16 h-16 rounded-full cursor-pointer shadow-lg bg-cover bg-center bg-no-repeat transition hover:opacity-80 relative z-50 pointer-events-auto"
+        class="w-16 h-16 rounded-full cursor-pointer shadow-lg bg-cover bg-center bg-no-repeat transition hover:opacity-80 relative z-40 pointer-events-auto"
         :style="{ backgroundImage: `url(${IconChat.src})` }">
       </button>
     </div>
 
     <!-- Panel del chat -->
     <div v-if="isOpen" 
-      class="assistant-chat fixed bottom-0 md:bottom-20 bg-white shadow-xl rounded-t-lg md:rounded-lg max-h-[500px] md:max-h-[600px] flex flex-col overflow-hidden border border-gray-200 z-50 w-full md:w-96">
+      class="assistant-chat fixed bottom-0 md:bottom-20 bg-white shadow-xl rounded-t-lg md:rounded-lg max-h-[500px] md:max-h-[600px] flex flex-col overflow-hidden border border-gray-200 z-40 w-full md:w-96">
       
       <!-- Header -->
       <div class="bg-white text-gray-900 p-4 font-semibold flex justify-between font-[Unbounded] border-b">
@@ -231,7 +253,7 @@ onMounted(scrollToBottom);
   top: 70%;
   right: 1rem;
   transform: translateY(-50%);
-  z-index: 50;
+  z-index: 40;
 }
 
 /* Estilos del chat */

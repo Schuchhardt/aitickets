@@ -111,8 +111,15 @@ const prevStep = () => {
 
 const closeModal = (event) => {
   if (event.target.id === "modal-overlay") {
-    emit("close");
+    handleClose();
   }
+};
+
+const handleClose = () => {
+  console.log('ReservationModal: Cerrando modal');
+  eventBus.emit('close-modal'); // Notificar que el modal se está cerrando
+  eventBus.emit('assistant-show'); // Mostrar el asistente al cerrar el modal
+  emit("close");
 };
 
 function handleRemoteTicketSelection(data) {
@@ -148,7 +155,7 @@ function handleRemoteGoToNextStep() {
       class="bg-white rounded-lg shadow-xl max-w-3xl w-full md:w-auto md:max-w-5xl md:flex md:flex-col md:items-start max-h-[90vh] overflow-y-auto"
       @click.stop
     >
-      <HeaderSteps :eventName="event.name" :currentStep="currentStep" @close="emit('close')" />
+      <HeaderSteps :eventName="event.name" :currentStep="currentStep" @close="handleClose" />
 
       <div v-if="currentStep === 1 || currentStep === 2" class="grid grid-cols-1 md:grid-cols-2 gap-6 p-2 w-full md:min-w-[732px] md:max-w-[800px] mx-auto">
         <div class="w-full">
