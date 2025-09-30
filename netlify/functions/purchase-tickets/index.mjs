@@ -185,8 +185,9 @@ export default async function handler(req, context) {
       const totalTicketQty = tickets.reduce((sum, ticket) => sum + ticket.quantity, 0);
       
       // Calcular el monto base y la comisión
-      const ticketFee = Math.round(total * SYSTEM_FEE_PERCENTAGE);
-      const baseAmount = total - ticketFee;
+      // El total ya incluye la comisión, por lo que extraemos el monto base
+      const baseAmount = Math.round(total / (1 + SYSTEM_FEE_PERCENTAGE));
+      const ticketFee = total - baseAmount;
       
       // Crear una orden en la base de datos para eventos pagados
       const { data: newOrder, error: orderError } = await supabase

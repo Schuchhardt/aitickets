@@ -142,7 +142,7 @@ export const handler = async (event) => {
     const updateData = {
       status: 'paid',
       total_payment: amount,
-      payment_fee: parseInt(paymentData.fee, 10),
+      payment_fee: parseInt(paymentData.fee, 10) + parseInt(paymentData.taxes, 10),
       balance: paymentData.balance,
       payment_commerce_id: paymentData.media,
     };
