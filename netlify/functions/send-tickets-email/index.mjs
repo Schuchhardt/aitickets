@@ -8,6 +8,44 @@ const supabaseKey = process.env.SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 /**
+ * Formatea una fecha para la zona horaria de Santiago, Chile
+ * @param {Date|string} date - La fecha a formatear
+ * @param {boolean} includeTime - Si incluir la hora
+ * @returns {string} Fecha formateada
+ */
+function formatChileDate(date, includeTime = false) {
+  const options = {
+    timeZone: 'America/Santiago',
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  };
+  
+  if (includeTime) {
+    options.hour = '2-digit';
+    options.minute = '2-digit';
+    options.hour12 = false;
+  }
+  
+  return new Date(date).toLocaleDateString('es-CL', options);
+}
+
+/**
+ * Formatea solo la hora para la zona horaria de Santiago, Chile
+ * @param {Date|string} date - La fecha con hora a formatear
+ * @returns {string} Hora formateada
+ */
+function formatChileTime(date) {
+  return new Date(date).toLocaleTimeString('es-CL', {
+    timeZone: 'America/Santiago',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+}
+
+/**
  * Envía email con los tickets al cliente después de un pago exitoso
  * @param {Object} customerInfo - Información del cliente
  * @param {Object} eventInfo - Información del evento
@@ -106,22 +144,11 @@ export default async function handler(req, context) {
       );
     }
 
-    // Obtener tickets de la orden
-    const { data: ticketsData, error: ticketsError } = await supabase
-      .from('event_attendees')
-      .select(`
-        *,
-        event_tickets (
-          ticket_name,
-          price
-        )
-      `)
-      .eq('event_order_id', orderId);
-
-    if (ticketsError) {
-      console.error('Error obteniendo tickets:', ticketsError);
+    // Los datos de tickets ya están en orderData.ticket_details
+    if (!orderData.ticket_details || !Array.isArray(orderData.ticket_details)) {
+      console.error('Error: ticket_details no encontrado o no es un array');
       return new Response(
-        JSON.stringify({ message: 'Error obteniendo tickets' }), 
+        JSON.stringify({ message: 'Detalles de tickets no encontrados' }), 
         { 
           status: 500,
           headers: { 'Content-Type': 'application/json' }
@@ -138,40 +165,29 @@ export default async function handler(req, context) {
 
     const eventInfo = {
       name: orderData.events.name,
-      date: orderData.events.start_date,
+      date: `${formatChileDate(orderData.events.start_date)} a las ${formatChileTime(orderData.events.start_date)} hrs`,
       address: orderData.events.location,
     };
 
     const orderInfo = {
       id: orderData.id,
-      created_at: orderData.created_at,
+      created_at: `${formatChileDate(orderData.created_at, true)}`,
       total_payment: `$${orderData.total_payment.toLocaleString('es-CL')}`,
     };
 
-    // Agrupar tickets por tipo para el email
-    const ticketGroups = {};
-    ticketsData.forEach(ticket => {
-      const ticketType = ticket.event_tickets.ticket_name;
-      const unitPrice = ticket.event_tickets.price;
+    // Usar directamente los datos de ticket_details para el email
+    const ticketsInfo = orderData.ticket_details.map(ticket => {
+      const subtotal = ticket.price * ticket.quantity;
+      const commission = subtotal * 0.10;
+      const totalWithCommission = subtotal + commission;
       
-      if (!ticketGroups[ticketType]) {
-        ticketGroups[ticketType] = {
-          ticket_type: ticketType,
-          quantity: 0,
-          unit_price: `$${unitPrice.toLocaleString('es-CL')}`,
-          total: 0
-        };
-      }
-      
-      ticketGroups[ticketType].quantity += 1;
-      ticketGroups[ticketType].total += unitPrice;
+      return {
+        ticket_type: ticket.name,
+        quantity: ticket.quantity,
+        unit_price: `$${ticket.price.toLocaleString('es-CL')}`,
+        total: `$${totalWithCommission.toLocaleString('es-CL')}`
+      };
     });
-
-    // Formatear totales
-    const ticketsInfo = Object.values(ticketGroups).map(group => ({
-      ...group,
-      total: `$${group.total.toLocaleString('es-CL')}`
-    }));
 
     // Enviar email
     const emailResult = await sendTicketsEmail(customerInfo, eventInfo, orderInfo, ticketsInfo);
