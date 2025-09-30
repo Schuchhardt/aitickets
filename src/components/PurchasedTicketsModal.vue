@@ -147,6 +147,7 @@
 
 <script setup>
 import { defineProps, defineEmits, computed } from 'vue'
+import { showInfo } from '../lib/toastBus.js'
 
 const props = defineProps({
   show: {
@@ -193,6 +194,6 @@ const formatDate = (dateString) => {
 
 // Download tickets for a specific order (placeholder)
 const downloadOrderTickets = (order) => {
-  alert(`Descargando entradas de la orden #${order.orderId}`)
+  showInfo(`Descargando entradas de la orden #${order.orderId}`)
 }
 </script>

@@ -1,6 +1,7 @@
 <script setup>
 import { defineProps, defineEmits, computed, ref } from "vue";
 import { useGoogleAnalytics } from "../composables/useGoogleAnalytics.js";
+import { showSuccess, showError } from "../lib/toastBus.js";
 
 const props = defineProps({
   show: Boolean,
@@ -56,9 +57,10 @@ const copyToClipboard = async () => {
   try {
     await navigator.clipboard.writeText(eventUrl.value);
     trackShare(props.event?.id, 'copy_link');
-    alert("Enlace copiado al portapapeles");
+    showSuccess("Enlace copiado al portapapeles");
   } catch (err) {
     console.error("Error al copiar el enlace:", err);
+    showError("No se pudo copiar el enlace");
   }
 };
 
