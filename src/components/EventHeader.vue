@@ -3,16 +3,11 @@ import iconCalendarLight from "../images/icon-calendar-light.png";
 import iconPinLight from "../images/icon-pin-light.png";
 import iconCalendarDark from "../images/icon-calendar-dark.png";
 import iconPinDark from "../images/icon-pin-dark.png";
-import { formatFullDateRange } from "../utils/dateHelpers.js";
+import { formatEventDateRange } from "../utils/dateHelpers.js";
 
 defineProps({
   event: Object,
 });
-
-// Función para formatear la fecha con hora usando zona horaria local del usuario
-const formatFullDate = (dateArray) => {
-  return formatFullDateRange(dateArray);
-};
 </script>
 
 <template>
@@ -30,7 +25,7 @@ const formatFullDate = (dateArray) => {
           <!-- Fecha -->
           <div class="flex items-start flex-wrap">
             <img :src="iconCalendarLight.src" alt="calendar icon" class="w-5 h-5 mr-1.5 flex-shrink-0" />
-            <span class="leading-tight">{{ formatFullDate(event.dates) }}</span>
+            <span class="leading-tight">{{ formatEventDateRange(event) }}</span>
           </div>
           <!-- Ubicación -->
           <div class="flex items-center">
@@ -50,7 +45,7 @@ const formatFullDate = (dateArray) => {
         <!-- Fecha -->
         <div class="flex items-start text-center">
           <img :src="iconCalendarDark.src" alt="calendar icon" class="w-5 h-5 mr-2 mt-1" />
-          <span class="block">{{ formatFullDate(event.dates) }}</span>
+          <span class="block">{{ formatEventDateRange(event) }}</span>
         </div>
         <!-- Ubicación -->
         <div class="flex items-start text-center">
