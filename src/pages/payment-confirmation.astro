@@ -269,5 +269,45 @@ if (request.method === 'POST') {
       });
     </script>
   )}
+
+  {/* Guardar información de la orden en localStorage */}
+  {paymentDetails?.status === 'paid' && (
+    <script define:vars={{ paymentDetails }}>
+      // Guardar información de la compra en localStorage para mostrar después
+      const purchaseData = {
+        orderId: paymentDetails.id,
+        eventId: paymentDetails.event.id,
+        eventSlug: paymentDetails.event.slug,
+        eventName: paymentDetails.event.name,
+        eventAddress: paymentDetails.event.address,
+        eventSecretLocation: paymentDetails.event.secret_location,
+        eventStartDate: paymentDetails.event.start_date,
+        purchaseDate: new Date().toISOString(),
+        amount: paymentDetails.flowAmount,
+        ticketsCount: paymentDetails.ticketsData.length,
+        tickets: paymentDetails.ticketsData
+      };
+      
+      // Obtener órdenes existentes para este evento específico
+      const eventOrdersKey = `purchase_event_${paymentDetails.event.id}`;
+      const existingEventOrders = JSON.parse(localStorage.getItem(eventOrdersKey) || '[]');
+      
+      // Verificar si esta orden ya existe (evitar duplicados)
+      const orderExists = existingEventOrders.some(order => order.orderId === paymentDetails.id);
+      
+      if (!orderExists) {
+        // Agregar la nueva orden al array de órdenes del evento
+        existingEventOrders.push(purchaseData);
+        
+        // Guardar todas las órdenes de este evento
+        localStorage.setItem(eventOrdersKey, JSON.stringify(existingEventOrders));
+      }
+      
+      // También limpiar datos temporales del modal de reserva
+      localStorage.removeItem(`selectedTickets_event_${paymentDetails.event.id}`);
+      localStorage.removeItem(`buyerInfo_event_${paymentDetails.event.id}`);
+      localStorage.removeItem(`currentStep_event_${paymentDetails.event.id}`);
+    </script>
+  )}
 </Layout>
 

@@ -1,18 +1,33 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, onMounted, onUnmounted, computed } from "vue";
 import iconShare from "../images/icon-share.png"; // Icono de compartir
 import iconArrow from "../images/icon-arrow-black.png"; // Icono de flecha en botón de reserva
 import iconTicket from "../images/icon-tickets.png"; // Icono de ticket
 import ShareEventModal from "./ShareEventModal.vue";
 import ReservationModal from "./Reservation/ReservationModal.vue";
+import PurchasedTicketsModal from "./PurchasedTicketsModal.vue";
 import { eventBus } from '../utils/eventbus.js';
 
-defineProps({
+const props = defineProps({
   event: Object,
 });
 
 const showModal = ref(false);
 const showReserveModal = ref(false);
+const showPurchasedTickets = ref(false);
+const eventOrders = ref([]);
+
+// Verificar si hay entradas compradas para este evento
+const hasPurchasedTickets = computed(() => {
+  if (!props.event?.id) return false;
+  const stored = localStorage.getItem(`purchase_event_${props.event.id}`);
+  if (stored) {
+    const orders = JSON.parse(stored);
+    eventOrders.value = Array.isArray(orders) ? orders : [orders];
+    return eventOrders.value.length > 0;
+  }
+  return false;
+});
 
 const openReserveModal = () => {
   console.log('Opening reserve modal');
@@ -21,6 +36,14 @@ const openReserveModal = () => {
 
 const closeReserveModal = () => {
   showReserveModal.value = false;
+};
+
+const openPurchasedTickets = () => {
+  showPurchasedTickets.value = true;
+};
+
+const closePurchasedTickets = () => {
+  showPurchasedTickets.value = false;
 };
 
 onMounted(() => {
@@ -77,10 +100,35 @@ const getEventPrice = (tickets) => {
       </div>
 
       <!-- Botones -->
-      <button @click="openReserveModal" aria-label="Comprar entrada" class="w-full bg-black text-white py-3 rounded-full flex items-center justify-center mt-4 cursor-pointer relative z-10 pointer-events-auto">
+      <button 
+        v-if="!hasPurchasedTickets"
+        @click="openReserveModal" 
+        aria-label="Comprar entrada" 
+        class="w-full bg-black text-white py-3 rounded-full flex items-center justify-center mt-4 cursor-pointer relative z-10 pointer-events-auto"
+      >
         Comprar entrada
         <img :src="iconArrow.src" alt="Arrow" class="w-4 h-4 ml-2" />
       </button>
+
+      <template v-else>
+        <button 
+          @click="openPurchasedTickets" 
+          aria-label="Ver entradas compradas" 
+          class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-full flex items-center justify-center mt-4 cursor-pointer relative z-10 pointer-events-auto"
+        >
+          Ver entradas compradas
+          <img :src="iconTicket.src" alt="Ticket" class="w-4 h-4 ml-2" />
+        </button>
+
+        <button 
+          @click="openReserveModal" 
+          aria-label="Comprar más entradas" 
+          class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-full flex items-center justify-center mt-3 cursor-pointer relative z-10 pointer-events-auto"
+        >
+          Comprar más entradas
+          <img :src="iconArrow.src" alt="Arrow" class="w-4 h-4 ml-2" />
+        </button>
+      </template>
 
       <button @click="showModal = true" aria-label="Compartir evento" class="w-full mt-3 border border-gray-400 py-2 rounded-full text-gray-700 flex items-center justify-center cursor-pointer relative z-10 pointer-events-auto">
         <img :src="iconShare.src" alt="Compartir" class="w-5 h-5 mr-2" />
@@ -89,15 +137,51 @@ const getEventPrice = (tickets) => {
     </div>
 
     <!-- Precio Sticky en Mobile -->
-    <div class="lg:hidden fixed bottom-0 left-0 w-full bg-lime-400 py-4 px-6 flex justify-between items-center shadow-md">
-            <span class="text-lg text-gray-900">{{ getEventPrice(event.tickets) }}</span>
-      <button @click="openReserveModal" aria-label="Comprar entrada" class="bg-black text-white py-2 px-6 rounded-full flex items-center cursor-pointer relative z-10 pointer-events-auto">
+    <div v-if="!hasPurchasedTickets" class="lg:hidden fixed bottom-0 left-0 w-full bg-lime-400 py-4 px-6 flex justify-between items-center shadow-md">
+      <span class="text-lg text-gray-900">{{ getEventPrice(event.tickets) }}</span>
+      <button 
+        @click="openReserveModal" 
+        aria-label="Comprar entrada" 
+        class="bg-black text-white py-2 px-6 rounded-full flex items-center cursor-pointer relative z-10 pointer-events-auto"
+      >
         Comprar entrada
       </button>
+    </div>
+
+    <!-- Sticky con múltiples botones cuando ya compró -->
+    <div v-else class="lg:hidden fixed bottom-0 left-0 w-full bg-lime-400 py-3 px-4 shadow-md">
+      <div class="flex flex-col gap-2">
+        <div class="flex justify-between items-center">
+          <span class="text-sm text-gray-900 font-medium">{{ getEventPrice(event.tickets) }}</span>
+          <span class="text-xs text-gray-700">Ya tienes {{ eventOrders.length }} orden(es)</span>
+        </div>
+        <div class="flex gap-2">
+          <button 
+            @click="openPurchasedTickets" 
+            aria-label="Ver entradas compradas" 
+            class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-3 rounded-full text-sm font-medium cursor-pointer relative z-10 pointer-events-auto"
+          >
+            Ver entradas
+          </button>
+          <button 
+            @click="openReserveModal" 
+            aria-label="Comprar más entradas" 
+            class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded-full text-sm font-medium cursor-pointer relative z-10 pointer-events-auto"
+          >
+            Comprar más
+          </button>
+        </div>
+      </div>
     </div>
  
     <ShareEventModal :show="showModal" :event="event" @close="showModal = false"/>
     <ReservationModal v-if="showReserveModal" :event="event" @close="closeReserveModal" />
+    <PurchasedTicketsModal 
+      :show="showPurchasedTickets" 
+      :eventOrders="eventOrders" 
+      :event="event"
+      @close="closePurchasedTickets" 
+    />
 
   </div>
 </template>

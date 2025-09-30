@@ -117,3 +117,29 @@ export const formatEventDateRange = (event) => {
     ? `Del ${startDate} al ${endDate}, desde las ${startTime} a las ${endTime} hrs` 
     : `${startDate}, desde las ${startTime} a las ${endTime} hrs`;
 };
+
+
+/**
+ * Formatear fecha del evento usando zona horaria local del usuario
+ * @param {Object} event - Objeto evento con start_date y end_date
+ * @returns {string} Fecha formateada
+ */
+export const formattedDate = (event) => {
+  if (!event.start_date) return "Fecha no disponible";
+  return formatLocalDate(event.start_date, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  });
+};
+
+/**
+ * Formatear hora del evento usando zona horaria local del usuario
+ * @param {Object} event - Objeto evento con start_date y end_date
+ * @returns {string} Hora formateada
+ */
+export const formattedTime = (event) => {
+  if (!event.start_date) return "Hora no disponible";
+  return formatLocalTime(event.start_date) + " hrs";
+};
