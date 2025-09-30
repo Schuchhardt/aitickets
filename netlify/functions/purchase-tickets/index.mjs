@@ -14,6 +14,9 @@ const flowApiKey = process.env.FLOW_API_KEY;
 const flowApiSecret = process.env.FLOW_SECRET_KEY;
 const flowApiUrl = process.env.FLOW_BASE_URL;
 
+// Configuración del sistema
+const SYSTEM_FEE_PERCENTAGE = 0.10; // 10% de comisión
+
 /**
  * Firma los parámetros usando HMAC-SHA256 con secretKey
  * @param {Object} params - Objeto con los parámetros (sin incluir la firma "s")
@@ -181,6 +184,10 @@ export default async function handler(req, context) {
       // Calcular la cantidad total de tickets sumando todas las cantidades
       const totalTicketQty = tickets.reduce((sum, ticket) => sum + ticket.quantity, 0);
       
+      // Calcular el monto base y la comisión
+      const ticketFee = Math.round(total * SYSTEM_FEE_PERCENTAGE);
+      const baseAmount = total - ticketFee;
+      
       // Crear una orden en la base de datos para eventos pagados
       const { data: newOrder, error: orderError } = await supabase
         .from('event_orders')
@@ -188,7 +195,8 @@ export default async function handler(req, context) {
           status: 'pending',
           event_id: eventId,
           attendee_id: attendeeId,
-          amount: total,
+          amount: baseAmount,
+          ticket_fee: ticketFee,
           ticket_qty: totalTicketQty,
           ticket_details: tickets,
         }])

@@ -36,7 +36,7 @@ async function sendTicketsEmail(customerInfo, eventInfo, orderInfo, ticketsInfo)
         "order_id": orderInfo.id,
         "order_date": orderInfo.created_at,
         "order_qr_url": "https://aitickets.cl/order/" + orderInfo.id,
-        "total_amount": orderInfo.amount,
+        "total_amount": orderInfo.total_payment,
         "tickets": ticketsInfo,
       }),
     });
@@ -145,7 +145,7 @@ export default async function handler(req, context) {
     const orderInfo = {
       id: orderData.id,
       created_at: orderData.created_at,
-      amount: `$${orderData.amount.toLocaleString('es-CL')}`,
+      total_payment: `$${orderData.total_payment.toLocaleString('es-CL')}`,
     };
 
     // Agrupar tickets por tipo para el email
