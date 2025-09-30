@@ -71,7 +71,21 @@ async function sendTicketsEmail(customerInfo, eventInfo, orderInfo, ticketsInfo)
   const eventStart = eventInfo.rawStartDate || new Date();
   const eventEnd = eventInfo.rawEndDate ? new Date(eventInfo.rawEndDate) : new Date(eventStart.getTime() + 2 * 60 * 60 * 1000);
   const formatICSDate = d => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-  const icsContent = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//aitickets.cl//EN\nCALSCALE:GREGORIAN\nBEGIN:VEVENT\nSUMMARY:${eventInfo.name}\nDESCRIPTION:${eventInfo.description}\nDTSTART:${formatICSDate(new Date(eventStart))}\nDTEND:${formatICSDate(eventEnd)}\nLOCATION:${eventInfo.address}\nURL:https://aitickets.cl/order/${orderInfo.id}\nEND:VEVENT\nEND:VCALENDAR`;
+  const icsContent = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//aitickets.cl//EN',
+    'CALSCALE:GREGORIAN',
+    'BEGIN:VEVENT',
+    `SUMMARY:${eventInfo.name}`,
+    `DESCRIPTION:Tus entradas están en este link: https://aitickets.cl/order/${orderInfo.id}\\n${eventInfo.description}`,
+    `DTSTART:${formatICSDate(new Date(eventStart))}`,
+    `DTEND:${formatICSDate(eventEnd)}`,
+    `LOCATION:${eventInfo.address}`,
+    `URL:https://aitickets.cl/order/${orderInfo.id}`,
+    'END:VEVENT',
+    'END:VCALENDAR'
+  ].join('\n');
 
     // Adjuntar el ICS
     const data = await mg.messages.create("mg.aitickets.cl", {
@@ -204,6 +218,7 @@ export default async function handler(req, context) {
 
     const eventInfo = {
       name: orderData.events.name,
+      description: orderData.events.description || '',
       date: `${formatChileDate(orderData.events.start_date)} a las ${formatChileTime(orderData.events.start_date)} hrs`,
       address: orderData.events.secret_location ? orderData.events.secret_location : orderData.events.location,
       adminEmail: adminEmail,
