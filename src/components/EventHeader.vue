@@ -14,7 +14,7 @@ defineProps({
   <div v-if="event">
     <!-- Imagen con degradado en desktop y sin degradado en mobile -->
     <div class="relative w-full rounded-xl overflow-hidden">
-      <img :src="event.image_url" :alt="event.name" class="w-full h-80 object-cover lg:h-[400px]" />
+      <img :src="event.image_url" :alt="event.name" class="w-full h-80 object-cover lg:h-[400px]" fetchpriority="high" />
       <div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent hidden lg:block"></div>
 
       <!-- Texto sobre la imagen en desktop -->
