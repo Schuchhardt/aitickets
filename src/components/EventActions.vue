@@ -16,18 +16,26 @@ const showModal = ref(false);
 const showReserveModal = ref(false);
 const showPurchasedTickets = ref(false);
 const eventOrders = ref([]);
+const hasPurchasedTickets = ref(false);
 
-// Verificar si hay entradas compradas para este evento
-const hasPurchasedTickets = computed(() => {
-  if (!props.event?.id) return false;
-  const stored = localStorage.getItem(`purchase_event_${props.event.id}`);
-  if (stored) {
-    const orders = JSON.parse(stored);
-    eventOrders.value = Array.isArray(orders) ? orders : [orders];
-    return eventOrders.value.length > 0;
+// Función para verificar entradas compradas (solo en el cliente)
+const checkPurchasedTickets = () => {
+  if (!props.event?.id) return;
+  
+  try {
+    const stored = localStorage.getItem(`purchase_event_${props.event.id}`);
+    if (stored) {
+      const orders = JSON.parse(stored);
+      eventOrders.value = Array.isArray(orders) ? orders : [orders];
+      hasPurchasedTickets.value = eventOrders.value.length > 0;
+    } else {
+      hasPurchasedTickets.value = false;
+    }
+  } catch (error) {
+    console.error('Error checking purchased tickets:', error);
+    hasPurchasedTickets.value = false;
   }
-  return false;
-});
+};
 
 const openReserveModal = () => {
   console.log('Opening reserve modal');
@@ -47,15 +55,25 @@ const closePurchasedTickets = () => {
 };
 
 onMounted(() => {
+  // Verificar entradas compradas solo en el cliente
+  checkPurchasedTickets();
+  
   eventBus.on('open-modal', handleOpenModal);
+  eventBus.on('purchase-completed', handlePurchaseCompleted);
 });
 
 onUnmounted(() => {
   eventBus.off('open-modal', handleOpenModal);
+  eventBus.off('purchase-completed', handlePurchaseCompleted);
 });
 
 function handleOpenModal() {
   showReserveModal.value = true;
+}
+
+function handlePurchaseCompleted() {
+  // Re-verificar las entradas compradas cuando se complete una compra
+  checkPurchasedTickets();
 }
 // format price with thousands separator (dot)
 const formatPrice = (price) => {
