@@ -5,16 +5,16 @@ import partytown from '@astrojs/partytown';
 import tailwindcss from "@tailwindcss/vite";
 import svgLoader from 'vite-svg-loader';
 
+import sentry from '@sentry/astro';
+
 export default defineConfig({
   output: 'server',
   adapter: netlify(),
-  integrations: [
-    vue(), 
-    partytown({
-      config: {
-        forward: ["dataLayer.push"]
-      }
-    })
+  integrations: [vue(), partytown({
+    config: {
+      forward: ["dataLayer.push"]
+    }
+  }), sentry()
   ],
   vite: {
     plugins: [tailwindcss(), svgLoader()],

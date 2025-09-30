@@ -63,7 +63,7 @@ const closeShareModal = () => {
   showShareModal.value = false;
 };
 
-// 👉 Función mejorada para descargar el ticket como PDF
+// 👉 Función mejorada para descargar el ticket como PDF (optimizada para móvil)
 const downloadAsPDF = async () => {
   if (isDownloading.value) return;
   
@@ -82,22 +82,59 @@ const downloadAsPDF = async () => {
       throw new Error('No se encontró el contenedor del ticket');
     }
 
-    // Generar canvas con html2canvas
+    // Esperar a que todas las fuentes e imágenes estén cargadas
+    await document.fonts.ready;
+    
+    // Pausa más larga en móviles para asegurar el renderizado
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    await new Promise(resolve => setTimeout(resolve, isMobile ? 300 : 100));
+
+    // Configuración optimizada según el dispositivo
+    const scale = isMobile ? 1.5 : 2; // Menor escala en móviles para reducir memoria
+    
+    // Generar canvas con html2canvas (configuración optimizada para móviles y desktop)
     const canvas = await html2canvas(ticketEl, { 
-      scale: 2,
-      useCORS: true,
-      allowTaint: true,
+      scale: scale,
+      useCORS: false, // Cambiar a false para evitar problemas de CORS
+      allowTaint: true, // Permitir taint para capturar todo el contenido
       backgroundColor: '#ffffff',
-      width: ticketEl.offsetWidth,
-      height: ticketEl.offsetHeight
+      logging: false, // Desactivar logs en producción
+      imageTimeout: 0, // Sin timeout para imágenes
+      removeContainer: true, // Limpiar después de capturar
+      async: true,
+      foreignObjectRendering: false, // Evitar problemas con SVG en Safari
+      windowWidth: ticketEl.scrollWidth,
+      windowHeight: ticketEl.scrollHeight,
+      onclone: (clonedDoc) => {
+        // Asegurar que el contenido clonado esté visible
+        const clonedEl = clonedDoc.getElementById('ticket-container');
+        if (clonedEl) {
+          clonedEl.style.display = 'block';
+          clonedEl.style.visibility = 'visible';
+        }
+      }
     });
 
+    // Verificar que el canvas se generó correctamente
+    if (!canvas || canvas.width === 0 || canvas.height === 0) {
+      throw new Error('No se pudo generar el canvas correctamente');
+    }
+
     // Crear PDF con jsPDF
-    const imgData = canvas.toDataURL('image/png');
+    // Reducir calidad en móviles para archivos más pequeños
+    const imageQuality = isMobile ? 0.8 : 1.0;
+    const imgData = canvas.toDataURL('image/jpeg', imageQuality);
+    
+    // Verificar que la imagen se generó correctamente
+    if (!imgData || imgData === 'data:,') {
+      throw new Error('No se pudo convertir el canvas a imagen');
+    }
+    
     const pdf = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
-      format: 'a4'
+      format: 'a4',
+      compress: true
     });
 
     // Calcular dimensiones para centrar en A4
@@ -116,17 +153,37 @@ const downloadAsPDF = async () => {
     const x = (pdfWidth - finalWidth) / 2;
     const y = 20; // Margen superior
 
-    pdf.addImage(imgData, 'PNG', x, y, finalWidth, finalHeight);
+    pdf.addImage(imgData, 'JPEG', x, y, finalWidth, finalHeight, undefined, 'FAST');
     
     // Generar nombre del archivo
-    const fileName = `ticket-${(props.event.name || 'evento').replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}.pdf`;
+    const eventName = props.event?.name || 'evento';
+    const fileName = `ticket-${eventName.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}.pdf`;
     
-    // Descargar PDF
+    // Descargar PDF (funciona tanto en desktop como en móvil)
     pdf.save(fileName);
     
+    // En móviles, mostrar mensaje de éxito
+    if (isMobile) {
+      // Pequeño delay para que la descarga se inicie
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    
   } catch (error) {
-    console.error('Error al generar PDF:', error);
-    alert('Ocurrió un error al generar el PDF. Por favor, intenta nuevamente.');
+    console.error('Error detallado al generar PDF:', error);
+    console.error('Error stack:', error.stack);
+    
+    // Mensaje de error más específico
+    let errorMessage = 'Ocurrió un error al generar el PDF.';
+    
+    if (error.message.includes('canvas')) {
+      errorMessage = 'No se pudo capturar el ticket. Por favor, intenta de nuevo.';
+    } else if (error.message.includes('imagen')) {
+      errorMessage = 'Error al procesar las imágenes del ticket. Por favor, intenta de nuevo.';
+    } else if (error.message.includes('memory') || error.message.includes('quota')) {
+      errorMessage = 'No hay suficiente memoria disponible. Intenta cerrar otras pestañas.';
+    }
+    
+    alert(errorMessage + ' Si el problema persiste, intenta recargar la página.');
   } finally {
     isDownloading.value = false;
   }
