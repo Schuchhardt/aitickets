@@ -1,6 +1,82 @@
 ---
 const { event } = Astro.props;
 const siteUrl = import.meta.env.SITE_URL || "https://aitickets.cl"; // Usa el dominio de entorno o uno por defecto
+
+// Función para generar el JSON-LD del evento
+const generateEventJsonLd = (event, siteUrl) => {
+  if (!event) return null;
+
+  // Obtener fechas del evento
+  const startDate = event.start_date || (event.dates?.[0]?.date);
+  const endDate = event.end_date || (event.dates?.[event.dates.length - 1]?.date);
+  
+  // Obtener precios de los tickets
+  const offers = event.tickets?.map(ticket => ({
+    "@type": "Offer",
+    "name": ticket.ticket_name || "Entrada General",
+    "price": ticket.price || 0,
+    "priceCurrency": "CLP",
+    "availability": "https://schema.org/InStock",
+    "url": `${siteUrl}/eventos/${event.slug}`,
+    "validFrom": ticket.init_date || startDate,
+    "validThrough": ticket.end_date || endDate
+  })) || [];
+
+  // Determinar el tipo de evento basado en las categorías/tags
+  const eventType = event.tags?.includes('Festival') ? 'Festival' : 
+                   event.tags?.includes('Concierto') ? 'MusicEvent' :
+                   event.tags?.includes('Conferencia') ? 'BusinessEvent' :
+                   'Event';
+
+  const jsonLd: any = {
+    "@context": "https://schema.org",
+    "@type": eventType,
+    "name": event.name,
+    "description": event.description,
+    "url": `${siteUrl}/eventos/${event.slug}`,
+    "image": event.image_url ? `${siteUrl}${event.image_url}` : `${siteUrl}/logo.png`,
+    "startDate": startDate,
+    "endDate": endDate,
+    "eventStatus": "https://schema.org/EventScheduled",
+    "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+    "location": {
+      "@type": "Place",
+      "name": event.location,
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": event.location,
+        "addressCountry": "CL"
+      }
+    },
+    "organizer": {
+      "@type": "Organization",
+      "name": "AI Tickets",
+      "url": siteUrl
+    },
+    "offers": offers.length > 0 ? offers : {
+      "@type": "Offer",
+      "price": 0,
+      "priceCurrency": "CLP",
+      "availability": "https://schema.org/InStock",
+      "url": `${siteUrl}/eventos/${event.slug}`
+    }
+  };
+
+  // Agregar fechas específicas si están disponibles
+  if (event.dates && event.dates.length > 0) {
+    jsonLd.subEvents = event.dates.map(date => ({
+      "@type": "Event",
+      "name": event.name,
+      "startDate": `${date.date}T${date.start_time || '00:00:00'}`,
+      "endDate": `${date.date}T${date.end_time || '23:59:59'}`,
+      "location": jsonLd.location
+    }));
+  }
+
+  return JSON.stringify(jsonLd);
+};
+
+const eventJsonLd = generateEventJsonLd(event, siteUrl);
 ---
 
 <head>
@@ -20,4 +96,9 @@ const siteUrl = import.meta.env.SITE_URL || "https://aitickets.cl"; // Usa el do
   <meta name="twitter:title" content={event?.name || "Evento no encontrado"} />
   <meta name="twitter:description" content={event?.description || "Este evento no está disponible."} />
   <meta name="twitter:image" content={`${siteUrl}${event?.image_url || "/images/default.jpg"}`} />
+
+  <!-- JSON-LD Structured Data -->
+  {eventJsonLd && (
+    <script type="application/ld+json" set:html={eventJsonLd}></script>
+  )}
 </head>

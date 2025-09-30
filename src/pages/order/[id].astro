@@ -6,7 +6,8 @@ import AppFooter from "../../components/AppFooter.vue";
 import EventHeader from "../../components/EventHeader.vue";
 import EventTabs from "../../components/EventTabs.vue";
 import TicketInfo from "../../components/TicketInfo.vue";
-import { formattedDate, formattedTime, formatLocalDate, formatLocalTime, getUserTimeZone } from "../../utils/dateHelpers.js";
+import EventDetails from "../../components/EventDetails.vue";
+import { formatLocalDate, formatLocalTime } from "../../utils/dateHelpers.js";
 
 import "../../styles/global.css";
 
@@ -45,15 +46,16 @@ if (id) {
       } else {
         event = eventData;
 
-        // Cargar fechas del evento
+        // Cargar fechas del evento (para procesamiento interno solamente)
         const getTimeFromTimestamp = (timestamp) => {
           const date = new Date(timestamp);
           return date.toLocaleTimeString("es-CL", {
             hour: "2-digit",
             minute: "2-digit",
             second: "2-digit", 
-            hour12: false,
-            timeZone: getUserTimeZone() // Usar zona horaria del usuario
+            hour12: false
+            // Nota: No se especifica timeZone para que use la del servidor
+            // Esto solo se usa para procesamiento interno, no para mostrar al usuario
           });
         };
 
@@ -162,24 +164,7 @@ if (id) {
             </div>
           </div>
 
-          <div class="mt-6 bg-gray-50 rounded-lg shadow-lg p-6">
-            <h3 class="text-lg font-bold font-[Unbounded] text-gray-800 mb-4">Detalles del Evento</h3>
-            <div class="space-y-3 text-gray-700 font-[Prompt]">
-              <p><span class="font-semibold">Evento:</span> {event?.name}</p>
-              <p><span class="font-semibold">Fecha:</span> {event ? formattedDate(event) : 'Fecha no disponible'}</p>
-              <p><span class="font-semibold">Hora:</span> {event ? formattedTime(event) : 'Hora no disponible'}</p>
-              <div>
-                <span class="font-semibold">Dirección exacta:</span>
-                {event?.secret_location ? (
-                  <div class="mt-1">
-                    <p class="text-gray-600">{event.secret_location}</p>
-                  </div>
-                ) : (
-                  <span class="text-gray-600">{event?.address || 'Dirección no disponible'}</span>
-                )}
-              </div>
-            </div>
-          </div>
+          <EventDetails event={event} client:load />
 
           <!-- Tickets -->
           <div class="mt-6">
