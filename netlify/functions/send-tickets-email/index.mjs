@@ -61,9 +61,15 @@ async function sendTicketsEmail(customerInfo, eventInfo, orderInfo, ticketsInfo)
   });
 
   try {
+    // Obtener emails para bcc
+    let bccEmails = ["contacto@aitickets.cl"];
+    if (eventInfo.adminEmail) {
+      bccEmails.push(eventInfo.adminEmail);
+    }
     const data = await mg.messages.create("mg.aitickets.cl", {
       from: "AI Tickets <postmaster@mg.aitickets.cl>",
       to: [`${customerInfo.name} ${customerInfo.lastname} <${customerInfo.email}>`],
+      bcc: bccEmails,
       subject: `🎟️ ¡Aquí están tus entradas para ${eventInfo.name}!`,
       template: "order complete",
       "h:X-Mailgun-Variables": JSON.stringify({
@@ -78,7 +84,6 @@ async function sendTicketsEmail(customerInfo, eventInfo, orderInfo, ticketsInfo)
         "tickets": ticketsInfo,
       }),
     });
-    
     console.log('✉️ Email enviado exitosamente:', data);
     return { success: true, data };
   } catch (error) {
@@ -126,7 +131,8 @@ export default async function handler(req, context) {
         events (
           name,
           start_date,
-          location
+          location,
+          organization_id
         )
       `)
       .eq('id', orderId)
@@ -163,10 +169,26 @@ export default async function handler(req, context) {
       email: orderData.attendees.email,
     };
 
+    // Obtener el email del admin de la organización asociada al evento
+    let adminEmail = null;
+    if (orderData.events && orderData.events.organization_id) {
+      const { data: adminData, error: adminError } = await supabase
+        .from('users')
+        .select('email')
+        .eq('organization_id', orderData.events.organization_id)
+        .eq('role', 'admin')
+        .limit(1)
+        .single();
+      if (adminData && adminData.email) {
+        adminEmail = adminData.email;
+      }
+    }
+
     const eventInfo = {
       name: orderData.events.name,
       date: `${formatChileDate(orderData.events.start_date)} a las ${formatChileTime(orderData.events.start_date)} hrs`,
       address: orderData.events.location,
+      adminEmail: adminEmail,
     };
 
     const orderInfo = {
@@ -180,7 +202,6 @@ export default async function handler(req, context) {
       const subtotal = ticket.price * ticket.quantity;
       const commission = subtotal * 0.10;
       const totalWithCommission = subtotal + commission;
-      
       return {
         ticket_type: ticket.name,
         quantity: ticket.quantity,
