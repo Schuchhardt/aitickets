@@ -70,15 +70,15 @@ if (!error || event) {
 
   // load event dates
   const getTimeFromTimestamp = (timestamp) => {
-    // IMPORTANTE: Extraer la hora usando una zona horaria específica
-    // para que sea consistente independientemente del servidor
+    // IMPORTANTE: Extraer la hora usando la zona horaria del usuario
+    // para que sea consistente con el resto de la aplicación
     const date = new Date(timestamp);
     return date.toLocaleTimeString("es-CL", {
       hour: "2-digit",
       minute: "2-digit",
       second: "2-digit",
       hour12: false,
-      timeZone: "America/Santiago" // Zona horaria donde están los eventos
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone // Zona horaria del usuario
     });
   };
   const defaultDate = {date: event.start_date, start_time: getTimeFromTimestamp(event.start_date), end_time: getTimeFromTimestamp(event.end_date)};
