@@ -66,6 +66,14 @@ async function sendTicketsEmail(customerInfo, eventInfo, orderInfo, ticketsInfo)
     if (eventInfo.adminEmail) {
       bccEmails.push(eventInfo.adminEmail);
     }
+
+    // Crear archivo ICS
+  const eventStart = eventInfo.rawStartDate || new Date();
+  const eventEnd = eventInfo.rawEndDate ? new Date(eventInfo.rawEndDate) : new Date(eventStart.getTime() + 2 * 60 * 60 * 1000);
+  const formatICSDate = d => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  const icsContent = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//aitickets.cl//EN\nCALSCALE:GREGORIAN\nBEGIN:VEVENT\nSUMMARY:${eventInfo.name}\nDESCRIPTION:${eventInfo.description}\nDTSTART:${formatICSDate(new Date(eventStart))}\nDTEND:${formatICSDate(eventEnd)}\nLOCATION:${eventInfo.address}\nURL:https://aitickets.cl/order/${orderInfo.id}\nEND:VEVENT\nEND:VCALENDAR`;
+
+    // Adjuntar el ICS
     const data = await mg.messages.create("mg.aitickets.cl", {
       from: "AI Tickets <postmaster@mg.aitickets.cl>",
       to: [`${customerInfo.name} ${customerInfo.lastname} <${customerInfo.email}>`],
@@ -83,6 +91,13 @@ async function sendTicketsEmail(customerInfo, eventInfo, orderInfo, ticketsInfo)
         "total_amount": orderInfo.total_payment,
         "tickets": ticketsInfo,
       }),
+      attachment: [
+        {
+          filename: "evento.ics",
+          content: icsContent,
+          contentType: "text/calendar"
+        }
+      ]
     });
     console.log('✉️ Email enviado exitosamente:', data);
     return { success: true, data };
@@ -131,8 +146,11 @@ export default async function handler(req, context) {
         events (
           name,
           start_date,
+          end_date,
           location,
-          organization_id
+          organization_id,
+          description,
+          secret_location
         )
       `)
       .eq('id', orderId)
@@ -187,8 +205,10 @@ export default async function handler(req, context) {
     const eventInfo = {
       name: orderData.events.name,
       date: `${formatChileDate(orderData.events.start_date)} a las ${formatChileTime(orderData.events.start_date)} hrs`,
-      address: orderData.events.location,
+      address: orderData.events.secret_location ? orderData.events.secret_location : orderData.events.location,
       adminEmail: adminEmail,
+      rawStartDate: orderData.events.start_date,
+      rawEndDate: orderData.events.end_date,
     };
 
     const orderInfo = {
