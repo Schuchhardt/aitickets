@@ -67,32 +67,35 @@ async function sendTicketsEmail(customerInfo, eventInfo, orderInfo, ticketsInfo)
       bccEmails.push(eventInfo.adminEmail);
     }
 
-    // Función para escapar texto en formato ICS según RFC 5545
+    // Función para escapar texto en formato ICS según RFC 5545 con normalización
     const escapeICSText = (text) => {
       if (!text) return '';
-      return text
-        .replace(/\\/g, '\\\\')  // Escapar backslashes
-        .replace(/;/g, '\\;')    // Escapar punto y coma
-        .replace(/,/g, '\\,')    // Escapar comas
-        .replace(/\n/g, '\\n')   // Escapar saltos de línea
-        .replace(/\r/g, '')      // Remover retornos de carro
-        .replace(/<br\s*\/?>/gi, '\\n')  // Convertir <br> a salto de línea
-        .replace(/<[^>]+>/g, ''); // Remover todas las etiquetas HTML
+      return text.normalize('NFC')
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<[^>]+>/g, '')
+        .replace(/\\/g, '\\\\')
+        .replace(/;/g, '\\;')
+        .replace(/,/g, '\\,')
+        .replace(/\r\n|\r|\n/g, '\\n');
     };
 
-    // Función para dividir líneas largas según RFC 5545 (máximo 75 caracteres)
-    const foldLine = (line) => {
-      if (line.length <= 75) return line;
-      const lines = [];
-      let currentLine = line.substring(0, 75);
-      let remaining = line.substring(75);
-      lines.push(currentLine);
-      while (remaining.length > 0) {
-        currentLine = ' ' + remaining.substring(0, 74); // Espacio inicial para continuación
-        remaining = remaining.substring(74);
-        lines.push(currentLine);
+    // Función para dividir líneas largas por octetos (UTF-8 safe) según RFC 5545
+    const foldIcsLineOctets = (line) => {
+      const MAX = 75; // octetos (bytes)
+      const enc = new TextEncoder();
+      const bytes = enc.encode(line);
+      let out = '';
+      let i = 0;
+
+      while (i < bytes.length) {
+        let end = Math.min(i + MAX, bytes.length);
+        // no cortar un carácter UTF-8 por la mitad
+        while (end > i && (bytes[end] & 0b11000000) === 0b10000000) end--;
+        out += new TextDecoder().decode(bytes.slice(i, end));
+        i = end;
+        if (i < bytes.length) out += '\r\n '; // continuación con espacio
       }
-      return lines.join('\r\n');
+      return out;
     };
 
     // Crear archivo ICS
@@ -100,9 +103,22 @@ async function sendTicketsEmail(customerInfo, eventInfo, orderInfo, ticketsInfo)
     const eventEnd = eventInfo.rawEndDate ? new Date(eventInfo.rawEndDate) : new Date(eventStart.getTime() + 2 * 60 * 60 * 1000);
     const formatICSDate = d => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
     
+    // URL del pedido
+    const urlPedido = `https://aitickets.cl/order/${orderInfo.id}`;
+    
     // Limpiar y formatear la descripción
     const cleanDescription = escapeICSText(eventInfo.description);
-    const descriptionText = `Tus entradas están en este link: https://aitickets.cl/order/${orderInfo.id}\\n\\n${cleanDescription}`;
+    const descriptionText = `Tus entradas están en este link: ${urlPedido}\\n\\n${cleanDescription}`;
+    
+    // HTML alternativo (opcional pero recomendado)
+    const buildAltHtml = () => {
+      const html = `
+<!DOCTYPE html><html><body>
+<p>Tus entradas están en este link: <a href="${urlPedido}">${urlPedido}</a></p>
+${(eventInfo.description || '').trim()}
+</body></html>`.trim();
+      return html.replace(/\r?\n/g, ''); // una sola línea
+    };
     
     const icsLines = [
       'BEGIN:VCALENDAR',
@@ -113,20 +129,32 @@ async function sendTicketsEmail(customerInfo, eventInfo, orderInfo, ticketsInfo)
       'BEGIN:VEVENT',
       `UID:${orderInfo.id}@aitickets.cl`,
       `DTSTAMP:${formatICSDate(new Date())}`,
-      `SUMMARY:${escapeICSText(eventInfo.name)}`,
-      `DESCRIPTION:${descriptionText}`,
+      `SUMMARY;LANGUAGE=es:${escapeICSText(eventInfo.name)}`,
+      `DESCRIPTION;LANGUAGE=es:${descriptionText}`,
+      // HTML alternativo
+      `X-ALT-DESC;FMTTYPE=text/html:${buildAltHtml()}`,
       `DTSTART:${formatICSDate(new Date(eventStart))}`,
       `DTEND:${formatICSDate(eventEnd)}`,
       `LOCATION:${escapeICSText(eventInfo.address)}`,
-      `URL:https://aitickets.cl/order/${orderInfo.id}`,
+      `URL:${urlPedido}`,
       'STATUS:CONFIRMED',
       'SEQUENCE:0',
+      // Contacto visible (no direcciona respuestas a la productora)
+      `CONTACT;LANGUAGE=es:${escapeICSText('Soporte AI Tickets, soporte@aitickets.cl')}`,
+      // El asistente (comprador) sin solicitar RSVP ni enviar respuesta
+      `ATTENDEE;CN=${escapeICSText(`${customerInfo.name} ${customerInfo.lastname}`)};ROLE=REQ-PARTICIPANT;PARTSTAT=ACCEPTED;RSVP=FALSE:mailto:${customerInfo.email}`,
+      // Recordatorio opcional
+      'BEGIN:VALARM',
+      'ACTION:DISPLAY',
+      'DESCRIPTION:Recordatorio',
+      'TRIGGER:-PT30M',
+      'END:VALARM',
       'END:VEVENT',
       'END:VCALENDAR'
     ];
     
     // Aplicar folding a líneas largas y unir con CRLF
-    const icsContent = icsLines.map(line => foldLine(line)).join('\r\n');
+    const icsContent = icsLines.map(line => foldIcsLineOctets(line)).join('\r\n') + '\r\n';
 
     // Adjuntar el ICS
     const data = await mg.messages.create("mg.aitickets.cl", {
