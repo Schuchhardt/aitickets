@@ -67,25 +67,66 @@ async function sendTicketsEmail(customerInfo, eventInfo, orderInfo, ticketsInfo)
       bccEmails.push(eventInfo.adminEmail);
     }
 
+    // Función para escapar texto en formato ICS según RFC 5545
+    const escapeICSText = (text) => {
+      if (!text) return '';
+      return text
+        .replace(/\\/g, '\\\\')  // Escapar backslashes
+        .replace(/;/g, '\\;')    // Escapar punto y coma
+        .replace(/,/g, '\\,')    // Escapar comas
+        .replace(/\n/g, '\\n')   // Escapar saltos de línea
+        .replace(/\r/g, '')      // Remover retornos de carro
+        .replace(/<br\s*\/?>/gi, '\\n')  // Convertir <br> a salto de línea
+        .replace(/<[^>]+>/g, ''); // Remover todas las etiquetas HTML
+    };
+
+    // Función para dividir líneas largas según RFC 5545 (máximo 75 caracteres)
+    const foldLine = (line) => {
+      if (line.length <= 75) return line;
+      const lines = [];
+      let currentLine = line.substring(0, 75);
+      let remaining = line.substring(75);
+      lines.push(currentLine);
+      while (remaining.length > 0) {
+        currentLine = ' ' + remaining.substring(0, 74); // Espacio inicial para continuación
+        remaining = remaining.substring(74);
+        lines.push(currentLine);
+      }
+      return lines.join('\r\n');
+    };
+
     // Crear archivo ICS
-  const eventStart = eventInfo.rawStartDate || new Date();
-  const eventEnd = eventInfo.rawEndDate ? new Date(eventInfo.rawEndDate) : new Date(eventStart.getTime() + 2 * 60 * 60 * 1000);
-  const formatICSDate = d => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-  const icsContent = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//aitickets.cl//EN',
-    'CALSCALE:GREGORIAN',
-    'BEGIN:VEVENT',
-    `SUMMARY:${eventInfo.name}`,
-    `DESCRIPTION:Tus entradas están en este link: https://aitickets.cl/order/${orderInfo.id}\\n${eventInfo.description}`,
-    `DTSTART:${formatICSDate(new Date(eventStart))}`,
-    `DTEND:${formatICSDate(eventEnd)}`,
-    `LOCATION:${eventInfo.address}`,
-    `URL:https://aitickets.cl/order/${orderInfo.id}`,
-    'END:VEVENT',
-    'END:VCALENDAR'
-  ].join('\n');
+    const eventStart = eventInfo.rawStartDate || new Date();
+    const eventEnd = eventInfo.rawEndDate ? new Date(eventInfo.rawEndDate) : new Date(eventStart.getTime() + 2 * 60 * 60 * 1000);
+    const formatICSDate = d => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    
+    // Limpiar y formatear la descripción
+    const cleanDescription = escapeICSText(eventInfo.description);
+    const descriptionText = `Tus entradas están en este link: https://aitickets.cl/order/${orderInfo.id}\\n\\n${cleanDescription}`;
+    
+    const icsLines = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//aitickets.cl//EN',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+      'BEGIN:VEVENT',
+      `UID:${orderInfo.id}@aitickets.cl`,
+      `DTSTAMP:${formatICSDate(new Date())}`,
+      `SUMMARY:${escapeICSText(eventInfo.name)}`,
+      `DESCRIPTION:${descriptionText}`,
+      `DTSTART:${formatICSDate(new Date(eventStart))}`,
+      `DTEND:${formatICSDate(eventEnd)}`,
+      `LOCATION:${escapeICSText(eventInfo.address)}`,
+      `URL:https://aitickets.cl/order/${orderInfo.id}`,
+      'STATUS:CONFIRMED',
+      'SEQUENCE:0',
+      'END:VEVENT',
+      'END:VCALENDAR'
+    ];
+    
+    // Aplicar folding a líneas largas y unir con CRLF
+    const icsContent = icsLines.map(line => foldLine(line)).join('\r\n');
 
     // Adjuntar el ICS
     const data = await mg.messages.create("mg.aitickets.cl", {
