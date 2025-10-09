@@ -113,9 +113,19 @@ export const formatEventDateRange = (event) => {
   const startTime = formatLocalTime(event.start_date);
   const endTime = formatLocalTime(event.end_date);
 
+  // Si el evento no tiene event_dates en la BD (es decir, usa solo start_date y end_date)
+  // o si solo tiene una fecha en el array, mostrar como evento de un solo día
+  const isSingleDayEvent = !event.dates || event.dates.length <= 1;
+
+  if (isSingleDayEvent) {
+    // Para eventos de un solo día, mostrar solo la fecha de inicio
+    return `${startDate}, desde las ${startTime} hasta las ${endTime} hrs`;
+  }
+
+  // Para eventos de múltiples días
   return startDate !== endDate 
-    ? `Del ${startDate} al ${endDate}, desde las ${startTime} a las ${endTime} hrs` 
-    : `${startDate}, desde las ${startTime} a las ${endTime} hrs`;
+    ? `Del ${startDate} al ${endDate}, desde las ${startTime} hasta las ${endTime} hrs`
+    : `${startDate}, desde las ${startTime} hasta las ${endTime} hrs`;
 };
 
 

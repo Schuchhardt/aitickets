@@ -93,7 +93,7 @@ const getTime = (time) => {
       <div class="flex space-x-4">
         <div class="bg-gray-100 p-4 rounded-lg text-center w-1/2" v-for="(date, index) in event.dates" :key="index">
           <span class="text-gray-900 font-semibold block">
-            {{ formatLocalDate(date.date, { weekday: "short", day: "numeric", month: "long" }) }}
+            {{ formatLocalDate(new Date(date.date), { weekday: "short", day: "numeric", month: "long" }) }}
           </span>
           <span class="text-gray-600 text-sm">
             {{ getTime(date.start_time) }} hrs - {{ getTime(date.end_time) }} hrs
