@@ -15,6 +15,68 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Configuración de seguridad
 const request = Astro.request;
+
+// Si no es POST, redirigir usando localStorage del cliente
+if (request.method !== 'POST') {
+  // En lugar de mostrar error, renderizamos una página que redirige desde el cliente
+  const redirectPage = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>Redirigiendo...</title>
+    </head>
+    <body>
+      <script>
+        // Buscar la compra más reciente en localStorage
+        let mostRecentPurchase = null;
+        let mostRecentDate = null;
+        
+        // Recorrer todas las claves del localStorage buscando compras de eventos
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('purchase_event_')) {
+            try {
+              const orders = JSON.parse(localStorage.getItem(key) || '[]');
+              if (orders.length > 0) {
+                // Obtener la orden más reciente de este evento
+                const latestOrder = orders[orders.length - 1];
+                const purchaseDate = new Date(latestOrder.purchaseDate);
+                
+                if (!mostRecentDate || purchaseDate > mostRecentDate) {
+                  mostRecentDate = purchaseDate;
+                  mostRecentPurchase = latestOrder;
+                }
+              }
+            } catch (e) {
+              console.error('Error al leer localStorage:', e);
+            }
+          }
+        }
+        
+        // Redirigir al evento más reciente o a la página principal
+        if (mostRecentPurchase && mostRecentPurchase.eventSlug) {
+          window.location.href = '/eventos/' + mostRecentPurchase.eventSlug;
+        } else {
+          window.location.href = '/';
+        }
+      </script>
+      <div style="font-family: sans-serif; text-align: center; padding: 50px;">
+        <h2>Redirigiendo...</h2>
+        <p>Si no eres redirigido automáticamente, <a href="/">haz clic aquí</a>.</p>
+      </div>
+    </body>
+    </html>
+  `;
+  
+  return new Response(redirectPage, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+    },
+  });
+}
+
 const allowedOrigins = ['https://aitickets.cl', 'https://www.aitickets.cl', 'https://www.flow.cl', 'https://sandbox.flow.cl'];
 const origin = request.headers.get('origin');
 if (!allowedOrigins.includes(origin)) {
