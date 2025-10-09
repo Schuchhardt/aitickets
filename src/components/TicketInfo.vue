@@ -5,7 +5,7 @@ import jsPDF from 'jspdf';
 import TicketQR from "./TicketQR.vue";
 import ShareEventModal from "./ShareEventModal.vue";
 import { formatLocalDate, formatLocalTime } from "../utils/dateHelpers.js";
-import { showSuccess, showError, showInfo } from "../lib/toastBus.js";
+import { showSuccess, showError } from "../lib/toastBus.js";
 
 const props = defineProps({
   ticket: Object,
@@ -17,18 +17,29 @@ const showShareModal = ref(false);
 
 // URL del ticket para compartir
 const ticketUrl = computed(() => {
+  
+  // Obtener el ID del ticket - puede venir como 'id' o como parte del objeto ticket
+  const ticketId = props.ticket?.id || props.ticket?.internal_id;
+  
+  if (!ticketId) {
+    console.warn('No se encontró ID del ticket');
+    return window.location.href;
+  }
+  
   if (typeof window === "undefined") return "";
-  return window.location.href;
+  // Construir la URL del ticket usando el origin actual y el ID del ticket
+  const origin = window.location.origin;
+  return `${origin}/ticket/${ticketId}`;
 });
 
 // Título personalizado para compartir
 const shareTitle = computed(() => {
-  return `Mi entrada para ${props.event?.name || 'el evento'}`;
+  return `La entrada para ${props.event?.name || 'el evento'}`;
 });
 
 // Texto personalizado para compartir
 const shareText = computed(() => {
-  return `¡Mira mi entrada para ${props.event?.name}! ${formattedDate(props.event)} a las ${formattedTime(props.event)}`;
+  return `¡Mira la entrada para ${props.event?.name}! ${formattedDate(props.event)} a las ${formattedTime(props.event)}`;
 });
 
 // Formatear fecha del evento usando zona horaria local del usuario
@@ -101,24 +112,6 @@ const downloadAsPDF = async () => {
     clonedTicket.style.top = '0';
     clonedTicket.style.visibility = 'visible';
     document.body.appendChild(clonedTicket);
-    
-    // Mapa de colores Tailwind a RGB (para reemplazar oklch directamente)
-    const tailwindColorMap = {
-      // Grays
-      'text-gray-500': 'rgb(107, 114, 128)',
-      'text-gray-600': 'rgb(75, 85, 99)',
-      'text-gray-700': 'rgb(55, 65, 81)',
-      'text-gray-400': 'rgb(156, 163, 175)',
-      'bg-white': 'rgb(255, 255, 255)',
-      'bg-gray-50': 'rgb(249, 250, 251)',
-      'bg-gray-100': 'rgb(243, 244, 246)',
-      // Lime (verde)
-      'bg-lime-500': 'rgb(132, 204, 22)',
-      'text-lime-500': 'rgb(132, 204, 22)',
-      // Otros comunes
-      'text-black': 'rgb(0, 0, 0)',
-      'text-white': 'rgb(255, 255, 255)',
-    };
     
     // Función para reemplazar estilos problemáticos
     const sanitizeElement = (el) => {
