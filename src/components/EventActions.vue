@@ -79,6 +79,15 @@ function handlePurchaseCompleted() {
   // Re-verificar las entradas compradas cuando se complete una compra
   checkPurchasedTickets();
 }
+
+// Verificar si el evento ya ha terminado
+const isEventFinished = computed(() => {
+  if (!props.event?.end_date) return false;
+  const endDate = new Date(props.event.end_date);
+  const now = new Date();
+  return endDate < now;
+});
+
 // format price with thousands separator (dot)
 const formatPrice = (price) => {
   return price !== null && price !== undefined ? price.toLocaleString("es-CL") : "";
@@ -126,72 +135,105 @@ const addToCalendar = () => {
   <div class="font-['Unbounded'] font-bold" v-if="event">
     <!-- Botones de acción en Mobile (debajo del EventHeader) -->
     <div class="lg:hidden flex flex-col items-center mt-4 space-y-3">
-      <button @click="showModal = true" aria-label="Compartir evento" class="w-11/12 flex items-center justify-center py-2 border border-gray-300 rounded-full text-gray-600 bg-gray-100 cursor-pointer relative z-5 pointer-events-auto">
-        <img :src="iconShare.src" alt="Compartir" class="w-5 h-5 mr-2" />
-        Compartir evento
-      </button>
+      <!-- Mostrar solo para eventos finalizados -->
+      <template v-if="isEventFinished">
+        <div class="w-11/12 flex flex-col items-center py-4 border-2 border-gray-400 rounded-xl text-center bg-gray-50">
+          <button disabled class="w-full py-3 rounded-full text-gray-600 bg-gray-200 cursor-not-allowed font-bold text-lg">
+            Evento finalizado
+          </button>
+          <p class="mt-3 text-gray-600 text-sm">Te vemos en el próximo</p>
+        </div>
+      </template>
       
-      <button @click="addToCalendar" aria-label="Añadir al calendario" class="w-11/12 flex items-center justify-center py-2 border border-gray-300 rounded-full text-gray-600 bg-gray-100 cursor-pointer relative z-5 pointer-events-auto">
-        <img :src="iconCalendar.src" alt="Calendario" class="w-5 h-5 mr-2" />
-        Añadir al calendario
-      </button>
+      <!-- Mostrar botones normales para eventos activos -->
+      <template v-else>
+        <button @click="showModal = true" aria-label="Compartir evento" class="w-11/12 flex items-center justify-center py-2 border border-gray-300 rounded-full text-gray-600 bg-gray-100 cursor-pointer relative z-5 pointer-events-auto">
+          <img :src="iconShare.src" alt="Compartir" class="w-5 h-5 mr-2" />
+          Compartir evento
+        </button>
+        
+        <button @click="addToCalendar" aria-label="Añadir al calendario" class="w-11/12 flex items-center justify-center py-2 border border-gray-300 rounded-full text-gray-600 bg-gray-100 cursor-pointer relative z-5 pointer-events-auto">
+          <img :src="iconCalendar.src" alt="Calendario" class="w-5 h-5 mr-2" />
+          Añadir al calendario
+        </button>
+      </template>
     </div>
 
     <!-- Tarjeta de Acciones en Desktop -->
     <div class="hidden lg:block bg-gray-100 p-6 rounded-xl shadow-md text-center">
-      <!-- Precio -->
-      <div class="flex items-center justify-between text-lg text-gray-900">
-        <span class="flex items-center">
-          <img :src="iconTicket.src" alt="ticket icon" class="w-5 h-5 mr-2" />
-          Precio
-        </span>
-        <span class="text-xl">{{ getEventPrice(event.tickets) }}</span>
-      </div>
-
-      <!-- Botones -->
-      <button 
-        v-if="!hasPurchasedTickets"
-        @click="openReserveModal" 
-        aria-label="Comprar entrada" 
-        class="w-full bg-black text-white py-3 rounded-full flex items-center justify-center mt-4 cursor-pointer relative z-10 pointer-events-auto"
-      >
-        Comprar entrada
-        <img :src="iconArrow.src" alt="Arrow" class="w-4 h-4 ml-2" />
-      </button>
-
-      <template v-else>
-        <button 
-          @click="openPurchasedTickets" 
-          aria-label="Ver entradas compradas" 
-          class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-full flex items-center justify-center mt-4 cursor-pointer relative z-10 pointer-events-auto"
-        >
-          Ver entradas compradas
-          <img :src="iconTicket.src" alt="Ticket" class="w-4 h-4 ml-2" />
-        </button>
-
-        <button 
-          @click="openReserveModal" 
-          aria-label="Comprar más entradas" 
-          class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-full flex items-center justify-center mt-3 cursor-pointer relative z-10 pointer-events-auto"
-        >
-          Comprar más entradas
-          <img :src="iconArrow.src" alt="Arrow" class="w-4 h-4 ml-2" />
-        </button>
+      <!-- Para eventos finalizados -->
+      <template v-if="isEventFinished">
+        <div class="flex flex-col items-center py-4">
+          <button disabled class="w-full py-4 rounded-full text-gray-600 bg-gray-200 cursor-not-allowed font-bold text-xl">
+            Evento finalizado
+          </button>
+          <p class="mt-4 text-gray-600 text-base">Te vemos en el próximo</p>
+        </div>
       </template>
 
-      <button @click="showModal = true" aria-label="Compartir evento" class="w-full mt-3 border border-gray-400 py-2 rounded-full text-gray-700 flex items-center justify-center cursor-pointer relative z-10 pointer-events-auto">
-        <img :src="iconShare.src" alt="Compartir" class="w-5 h-5 mr-2" />
-        Compartir evento
-      </button>
+      <!-- Para eventos activos -->
+      <template v-else>
+        <!-- Precio -->
+        <div class="flex items-center justify-between text-lg text-gray-900">
+          <span class="flex items-center">
+            <img :src="iconTicket.src" alt="ticket icon" class="w-5 h-5 mr-2" />
+            Precio
+          </span>
+          <span class="text-xl">{{ getEventPrice(event.tickets) }}</span>
+        </div>
 
-      <button @click="addToCalendar" aria-label="Añadir al calendario" class="w-full mt-3 border border-gray-400 py-2 rounded-full text-gray-700 flex items-center justify-center cursor-pointer relative z-10 pointer-events-auto">
-        <img :src="iconCalendar.src" alt="Calendario" class="w-5 h-5 mr-2" />
-        Añadir al calendario
-      </button>
+        <!-- Botones -->
+        <button 
+          v-if="!hasPurchasedTickets"
+          @click="openReserveModal" 
+          aria-label="Comprar entrada" 
+          class="w-full bg-black text-white py-3 rounded-full flex items-center justify-center mt-4 cursor-pointer relative z-10 pointer-events-auto"
+        >
+          Comprar entrada
+          <img :src="iconArrow.src" alt="Arrow" class="w-4 h-4 ml-2" />
+        </button>
+
+        <template v-else>
+          <button 
+            @click="openPurchasedTickets" 
+            aria-label="Ver entradas compradas" 
+            class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-full flex items-center justify-center mt-4 cursor-pointer relative z-10 pointer-events-auto"
+          >
+            Ver entradas compradas
+            <img :src="iconTicket.src" alt="Ticket" class="w-4 h-4 ml-2" />
+          </button>
+
+          <button 
+            @click="openReserveModal" 
+            aria-label="Comprar más entradas" 
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-full flex items-center justify-center mt-3 cursor-pointer relative z-10 pointer-events-auto"
+          >
+            Comprar más entradas
+            <img :src="iconArrow.src" alt="Arrow" class="w-4 h-4 ml-2" />
+          </button>
+        </template>
+
+        <button @click="showModal = true" aria-label="Compartir evento" class="w-full mt-3 border border-gray-400 py-2 rounded-full text-gray-700 flex items-center justify-center cursor-pointer relative z-10 pointer-events-auto">
+          <img :src="iconShare.src" alt="Compartir" class="w-5 h-5 mr-2" />
+          Compartir evento
+        </button>
+
+        <button @click="addToCalendar" aria-label="Añadir al calendario" class="w-full mt-3 border border-gray-400 py-2 rounded-full text-gray-700 flex items-center justify-center cursor-pointer relative z-10 pointer-events-auto">
+          <img :src="iconCalendar.src" alt="Calendario" class="w-5 h-5 mr-2" />
+          Añadir al calendario
+        </button>
+      </template>
     </div>
 
     <!-- Precio Sticky en Mobile -->
-    <div v-if="!hasPurchasedTickets" class="lg:hidden fixed bottom-0 left-0 w-full bg-lime-400 py-4 px-6 flex justify-between items-center shadow-md z-50">
+    <div v-if="isEventFinished" class="lg:hidden fixed bottom-0 left-0 w-full bg-gray-300 py-4 px-6 flex flex-col items-center shadow-md z-50">
+      <button disabled class="w-full py-3 rounded-full text-gray-600 bg-gray-200 cursor-not-allowed font-bold text-base">
+        Evento finalizado
+      </button>
+      <p class="mt-2 text-gray-600 text-sm">Te vemos en el próximo</p>
+    </div>
+
+    <div v-else-if="!hasPurchasedTickets" class="lg:hidden fixed bottom-0 left-0 w-full bg-lime-400 py-4 px-6 flex justify-between items-center shadow-md z-50">
       <span class="text-lg text-gray-900">{{ getEventPrice(event.tickets) }}</span>
       <button 
         @click="openReserveModal" 
@@ -203,7 +245,7 @@ const addToCalendar = () => {
     </div>
 
     <!-- Sticky con múltiples botones cuando ya compró -->
-    <div v-else class="lg:hidden fixed bottom-0 left-0 w-full bg-lime-400 py-3 px-4 shadow-md z-50">
+    <div v-else-if="!isEventFinished" class="lg:hidden fixed bottom-0 left-0 w-full bg-lime-400 py-3 px-4 shadow-md z-50">
       <div class="flex flex-col gap-2">
         <div class="flex justify-between items-center">
           <span class="text-sm text-gray-900 font-medium">{{ getEventPrice(event.tickets) }}</span>
