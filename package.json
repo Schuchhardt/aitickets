@@ -9,7 +9,13 @@
     "preview": "astro preview",
     "local": "serverless offline --aws-profile serverless-deploy-user",
     "deploy": "serverless deploy --aws-profile serverless-deploy-user",
-    "remove": "serverless remove --aws-profile serverless-deploy-user"
+    "remove": "serverless remove --aws-profile serverless-deploy-user",
+    "test:e2e": "playwright test -c e2e/playwright.config.ts",
+    "test:e2e:ui": "playwright test --ui -c e2e/playwright.config.ts",
+    "test:e2e:headed": "playwright test --headed -c e2e/playwright.config.ts",
+    "test:e2e:smoke": "playwright test -g @smoke -c e2e/playwright.config.ts",
+    "test:e2e:noserver": "NO_SERVER=1 playwright test -c e2e/playwright.config.ts",
+    "e2e": "start-server-and-test dev http://localhost:4321 test:e2e"
   },
   "dependencies": {
     "@astrojs/netlify": "^6.2.2",
@@ -45,12 +51,15 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.0",
     "astro-eslint-parser": "^1.2.0",
     "autoprefixer": "^10.4.21",
     "eslint": "^9.21.0",
+    "msw": "^2.11.5",
     "postcss": "^8.5.3",
     "prettier": "^3.2.5",
-    "serverless-esbuild": "^1.55.0"
+    "serverless-esbuild": "^1.55.0",
+    "start-server-and-test": "^2.1.2"
   },
   "engines": {
     "node": ">=18.0.0"

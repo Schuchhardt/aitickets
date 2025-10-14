@@ -30,18 +30,19 @@ const toggleMenu = () => {
 </script>
 
 <template>
-  <nav class="fixed top-0 left-0 right-0 z-50 transition-all duration-300 bg-white py-4 shadow-sm text-gray-900">
+  <nav data-testid="navbar" class="fixed top-0 left-0 right-0 z-50 transition-all duration-300 bg-white py-4 shadow-sm text-gray-900">
     <div class="w-full max-w-screen-xl mx-auto px-4 md:px-8 overflow-hidden">
       <div class="flex items-center justify-between">
-        <a href="/" class="flex items-center space-x-2">
+        <a href="/" data-testid="nav-logo" class="flex items-center space-x-2">
           <img :src="logoLight.src" alt="AI Tickets" class="h-8" />
         </a>
 
         <!-- Desktop Menu -->
-        <div class="hidden md:flex items-center space-x-8">
+        <div data-testid="nav-menu-desktop" class="hidden md:flex items-center space-x-8">
           <a
             v-if="currentPath !== '/'"
             href="/"
+            data-testid="nav-link-home"
             class="text-sm font-medium font-[Unbounded] hover:bg-black hover:text-white text-black transition-colors"
           >
             Inicio
@@ -49,6 +50,7 @@ const toggleMenu = () => {
           <a
             v-if="currentPath !== '/eventos'"
             href="/eventos"
+            data-testid="nav-link-events"
             class="text-sm font-medium font-[Unbounded] hover:bg-black hover:text-white text-black transition-colors"
           >
             Eventos
@@ -56,6 +58,7 @@ const toggleMenu = () => {
           <a
             v-if="currentPath !== '/organizadores'"
             href="/organizadores"
+            data-testid="nav-link-producers"
             class="text-sm font-medium font-[Unbounded] hover:bg-black hover:text-white text-black transition-colors"
           >
             Para Organizadores
@@ -63,7 +66,7 @@ const toggleMenu = () => {
         </div>
 
         <!-- Mobile Menu Button -->
-        <button type="button" class="md:hidden" @click="toggleMenu" aria-label="Toggle menu">
+        <button type="button" data-testid="nav-menu-mobile" class="md:hidden" @click="toggleMenu" aria-label="Toggle menu">
           <template v-if="!mobileMenuOpen">
             <Menu size="24" />
           </template>

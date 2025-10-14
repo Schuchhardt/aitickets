@@ -75,12 +75,12 @@ const submitForm = async (event) => {
 </script>
 
 <template>
-  <footer class="bg-white py-6 border-t border-gray-200">
+  <footer data-testid="footer" class="bg-white py-6 border-t border-gray-200">
     <div class="container mx-auto flex flex-col lg:flex-row items-center justify-between space-y-6 lg:space-y-0 px-6">
       
       <!-- Logo con enlace al root -->
       <div class="flex justify-center lg:justify-start w-full lg:w-auto">
-        <a href="/" class="cursor-pointer">
+        <a href="/" data-testid="footer-logo" class="cursor-pointer">
           <img :src="logoLight.src" alt="AI Tickets" class="h-8" />
         </a>
       </div>
@@ -91,12 +91,13 @@ const submitForm = async (event) => {
           Únete a la comunidad AI 🔥
         </p>
         <div v-if="!successMessage" class="relative mt-2">
-          <form @submit.prevent="submitForm" class="flex">
+          <form @submit.prevent="submitForm" data-testid="footer-newsletter" class="flex">
             <input 
               v-model="email" 
               type="email"
               name="email" 
               placeholder="Ingresa tu correo"
+              data-testid="newsletter-email"
               @focus="isFocused = true"
               @blur="isFocused = false"
               class="w-64 lg:w-80 border border-gray-300 py-2 pl-4 pr-16 rounded-full text-gray-600 font-['Prompt'] focus:outline-none focus:ring-2 focus:ring-gray-300 cursor-pointer"
@@ -104,6 +105,7 @@ const submitForm = async (event) => {
             />
             <button 
               type="submit"
+              data-testid="newsletter-submit"
               class="absolute right-2 top-1/2 transform -translate-y-1/2 w-10 h-10 rounded-full transition-transform duration-300 cursor-pointer flex items-center justify-center"
               :class="{ 'rotate-45': isFocused || email.length > 0 }"
               aria-label="Enviar" 
@@ -114,31 +116,31 @@ const submitForm = async (event) => {
         </div>
 
         <!-- Mensaje de confirmación -->
-        <p v-else class="text-green-600 font-bold mt-2 font-['Prompt']">{{ successMessage }}</p>
+        <p v-else data-testid="newsletter-success" class="text-green-600 font-bold mt-2 font-['Prompt']">{{ successMessage }}</p>
 
         <!-- Mensaje de error -->
-        <p v-if="errorMessage" class="text-red-500 mt-2 text-sm font-['Prompt']">{{ errorMessage }}</p>
+        <p v-if="errorMessage" data-testid="newsletter-error" class="text-red-500 mt-2 text-sm font-['Prompt']">{{ errorMessage }}</p>
       </div>
 
     </div>
 
     <!-- Redes sociales -->
-    <div class="flex justify-center space-x-4 mt-4">
-  <a href="https://www.facebook.com/profile.php?id=61573771138631" target="_blank" class="cursor-pointer">
+    <div data-testid="footer-social" class="flex justify-center space-x-4 mt-4">
+  <a href="https://www.facebook.com/profile.php?id=61573771138631" target="_blank" data-testid="social-facebook" class="cursor-pointer">
     <img src="https://cdn.simpleicons.org/facebook/000000" alt="Facebook" class="w-6 h-6" />
   </a>
-  <a href="https://www.linkedin.com/company/ai-tickets" target="_blank" class="cursor-pointer">
+  <a href="https://www.linkedin.com/company/ai-tickets" target="_blank" data-testid="social-linkedin" class="cursor-pointer">
     <img src="https://upload.wikimedia.org/wikipedia/commons/8/81/LinkedIn_icon.svg" alt="LinkedIn" class="w-6 h-6" />
   </a>
 </div>
 
 
     <!-- Links de términos y condiciones -->
-    <div class="mt-6 text-center text-gray-500 text-sm font-['Prompt']">
+    <div data-testid="footer-links" class="mt-6 text-center text-gray-500 text-sm font-['Prompt']">
       <div class="flex justify-center space-x-4">
-        <a href="/terms" class="hover:underline">Términos y condiciones</a>
+        <a href="/terms" data-testid="footer-link-terms" class="hover:underline">Términos y condiciones</a>
         <span>|</span>
-        <a href="/privacy" class="hover:underline">Aviso de privacidad</a>
+        <a href="/privacy" data-testid="footer-link-privacy" class="hover:underline">Aviso de privacidad</a>
       </div>
     </div>
 

@@ -5,6 +5,7 @@ dist
 
 # Env files
 .env
+.env.test
 
 # mac os related
 .DS_Store
@@ -17,3 +18,29 @@ dist
 .cache/
 dist/
 node_modules/
+
+# Playwright E2E
+/test-results/
+/playwright-report/
+/e2e/report/
+/playwright/.cache/
+/e2e/screenshots/
+*.webm
+/e2e/test-results/
+/e2e/.auth/
+.playwright/
+
+# Playwright
+/test-results/
+/playwright-report/
+/e2e/report/
+/playwright/.cache/
+/e2e/screenshots/
+
+# Videos y traces
+*.webm
+/e2e/test-results/
+/e2e/.auth/
+
+# Cache
+.playwright/

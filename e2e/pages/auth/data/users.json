@@ -1,0 +1,17 @@
+{
+  "validUser": {
+    "name": "Test User",
+    "email": "test@example.com",
+    "password": "TestPass123!"
+  },
+  "invalidUser": {
+    "email": "invalid@example.com",
+    "password": "wrongpassword"
+  },
+  "producerUser": {
+    "name": "Productor Demo",
+    "email": "producer@example.com",
+    "password": "ProducerPass123!",
+    "company": "Eventos Demo SL"
+  }
+}

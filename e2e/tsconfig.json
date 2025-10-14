@@ -1,0 +1,22 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "..",
+    "paths": {
+      "@e2e/*": ["e2e/*"],
+      "@e2e/support/*": ["e2e/support/*"],
+      "@e2e/pages/*": ["e2e/pages/*"]
+    },
+    "types": ["node", "@playwright/test"],
+    "module": "ESNext",
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": true
+  },
+  "include": ["./**/*.ts"],
+  "exclude": ["../node_modules", "../dist", "./report"]
+}
