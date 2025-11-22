@@ -1,0 +1,84 @@
+---
+import _ from "lodash";
+import { supabase } from "../../lib/supabaseClient";
+import AppFooter from "../../components/AppFooter.vue";
+import Layout from '../../layouts/Layout.astro';
+import ValidateQR from "../../components/ValidateQR.vue";
+import "../../styles/global.css";
+import logoImg from '../../images/logo.png';
+
+export const prerender = false;
+
+const { slug } = Astro.params;
+
+// Validar token de acceso
+const token = Astro.url.searchParams.get('token');
+if (token !== 'qrvalidator') {
+  return Astro.redirect('/404');
+}
+
+// Obtener el evento
+const { data: event, error } = await supabase
+  .from("events")
+  .select("*")
+  .eq("slug", slug)
+  .single();
+
+if (!error && event) {
+  // Cargar asistentes con información completa
+  const { data: event_attendees, error: errorTickets } = await supabase
+    .from("event_attendees")
+    .select(`
+      id,
+      event_id,
+      qr_code,
+      status,
+      validated_at,
+      attendees (
+        first_name,
+        last_name,
+        email
+      ),
+      event_tickets (
+        ticket_name,
+        price
+      )
+    `)
+    .eq("event_id", event.id);
+
+  console.log("event_attendees", event_attendees);
+
+  if (errorTickets) {
+    console.error("Error al obtener las entradas:", errorTickets);
+    event.attendees = [];
+  } else {
+    event.attendees = event_attendees || [];
+  }
+} else {
+  console.error("Error al obtener el evento:", error);
+  return Astro.redirect('/404');
+}
+
+---
+
+<Layout>
+  <head>
+    <!-- Evitar indexación en motores de búsqueda -->
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="googlebot" content="noindex, nofollow" />
+  </head>
+  <main>
+    <section class="relative w-full flex flex-col items-center text-center px-6 overflow-hidden">
+      
+      <div class="flex items-center justify-between m-6">
+        <a href="/" class="flex items-center space-x-2">
+          <img src={logoImg.src} alt="AI Tickets" class="h-8" />
+        </a>
+      </div>
+      <ValidateQR event={event} client:idle  />
+    </section>
+
+  </main>
+
+  <AppFooter client:idle />
+</Layout>
