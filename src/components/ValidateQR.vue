@@ -26,6 +26,9 @@ const lastSyncDate = ref(null)
 const selectedCamera = ref('auto')
 const availableCameras = ref([])
 const showCameraSelector = ref(false)
+const cameraError = ref('')
+const noRearCamera = ref(false)
+const noFrontCamera = ref(false)
 
 // Almacenamiento local
 const { value: localEvent, setValue: setLocalEvent } = useClientStorage(`event_${props.event.slug}`, null)
@@ -75,10 +78,24 @@ onMounted(() => {
 // Obtener cámaras disponibles
 const getCameras = async () => {
   try {
+    // Primero solicitar permisos para obtener labels
+    await navigator.mediaDevices.getUserMedia({ video: true })
+    
     const devices = await navigator.mediaDevices.enumerateDevices()
     const videoDevices = devices.filter(device => device.kind === 'videoinput')
-    availableCameras.value = videoDevices
-    console.log('📷 Cámaras disponibles:', videoDevices.length)
+    
+    // Filtrar y mostrar solo cámaras principales (evitar duplicados de ultra-wide, etc)
+    const mainCameras = videoDevices.filter(device => {
+      const label = device.label.toLowerCase()
+      // Excluir cámaras especiales que no son útiles para QR
+      return !label.includes('ultra') && 
+             !label.includes('wide') && 
+             !label.includes('telephoto') &&
+             !label.includes('macro')
+    })
+    
+    availableCameras.value = mainCameras.length > 0 ? mainCameras : videoDevices
+    console.log('📷 Cámaras disponibles:', availableCameras.value)
   } catch (error) {
     console.error('Error al obtener cámaras:', error)
   }
@@ -97,10 +114,59 @@ const selectCamera = (deviceId) => {
 // Configuración de constraints para la cámara
 const cameraConstraints = computed(() => {
   if (selectedCamera.value === 'auto') {
-    return { facingMode: { exact: 'environment' } } // Forzar cámara trasera siempre
+    // Usar ideal en lugar de exact para mejor compatibilidad
+    return { 
+      facingMode: { ideal: 'environment' },
+      width: { ideal: 1920 },
+      height: { ideal: 1080 }
+    }
   }
-  return { deviceId: { exact: selectedCamera.value } }
+  return { 
+    deviceId: { exact: selectedCamera.value },
+    width: { ideal: 1920 },
+    height: { ideal: 1080 }
+  }
 })
+
+// Manejar errores de cámara
+const onCameraError = (error) => {
+  console.error('Error de cámara:', error)
+  
+  const cameraMissingError = error.name === 'OverconstrainedError'
+  const isUsingRearCamera = selectedCamera.value === 'auto' || 
+                           (selectedCamera.value !== 'auto' && cameraConstraints.value.facingMode?.ideal === 'environment')
+  const isUsingFrontCamera = cameraConstraints.value.facingMode?.ideal === 'user'
+
+  if (isUsingRearCamera && cameraMissingError) {
+    noRearCamera.value = true
+    cameraError.value = '⚠️ No se detectó cámara trasera. Intenta seleccionar otra cámara manualmente.'
+    // Intentar con cámara frontal
+    selectedCamera.value = 'auto-front'
+  } else if (isUsingFrontCamera && cameraMissingError) {
+    noFrontCamera.value = true
+    cameraError.value = '⚠️ No se detectó cámara frontal.'
+  } else if (error.name === 'NotAllowedError') {
+    cameraError.value = '❌ Permisos de cámara denegados. Por favor, permite el acceso a la cámara.'
+  } else if (error.name === 'NotFoundError') {
+    cameraError.value = '❌ No se encontró ninguna cámara en el dispositivo.'
+  } else if (error.name === 'NotReadableError') {
+    cameraError.value = '❌ La cámara está siendo usada por otra aplicación.'
+  } else {
+    cameraError.value = `❌ Error al acceder a la cámara: ${error.message}`
+  }
+}
+
+// Cambiar entre cámara frontal y trasera manualmente
+const switchCameraMode = () => {
+  if (selectedCamera.value === 'auto') {
+    selectedCamera.value = 'auto-front'
+  } else {
+    selectedCamera.value = 'auto'
+  }
+  cameraError.value = ''
+  noRearCamera.value = false
+  noFrontCamera.value = false
+}
 
 // Validar QR offline
 const onDetect = async ([result]) => {
@@ -359,9 +425,18 @@ const manualValidation = (attendee) => {
       Última sincronización: {{ new Date(lastSyncDate).toLocaleString('es-ES') }}
     </p>
 
+    <!-- Error de cámara -->
+    <div v-if="cameraError" class="mb-4 p-3 bg-red-100 border border-red-400 rounded text-sm text-red-700">
+      {{ cameraError }}
+    </div>
+
     <!-- Cámara QR -->
     <div v-if="cameraVisible" class="max-w-xl mx-auto pb-4 relative">
-      <QrcodeStream @detect="onDetect" :constraints="{ video: cameraConstraints }" />
+      <QrcodeStream 
+        @detect="onDetect" 
+        @error="onCameraError"
+        :constraints="{ video: cameraConstraints }" 
+      />
       
       <!-- Botón para cambiar cámara -->
       <button
