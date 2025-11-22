@@ -37,8 +37,7 @@ export default async function handler(req) {
           email
         ),
         event_tickets (
-          ticket_name,
-          price
+          ticket_name
         )
       `)
       .eq('event_id', eventId)

@@ -97,9 +97,9 @@ const selectCamera = (deviceId) => {
 // Configuración de constraints para la cámara
 const cameraConstraints = computed(() => {
   if (selectedCamera.value === 'auto') {
-    return { facingMode: 'environment' } // Cámara trasera por defecto
+    return { facingMode: { exact: 'environment' } } // Forzar cámara trasera siempre
   }
-  return { deviceId: selectedCamera.value }
+  return { deviceId: { exact: selectedCamera.value } }
 })
 
 // Validar QR offline
@@ -367,16 +367,16 @@ const manualValidation = (attendee) => {
       <button
         v-if="availableCameras.length > 1"
         @click="switchCamera"
-        class="absolute top-2 right-2 bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-70 transition-opacity z-10"
+        class="absolute top-2 right-2 bg-black bg-opacity-60 text-white p-3 rounded-full hover:bg-opacity-80 transition-all shadow-lg z-10"
         title="Cambiar cámara"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
         </svg>
       </button>
 
       <!-- Selector de cámaras -->
-      <div v-if="showCameraSelector" class="absolute top-12 right-2 bg-white rounded-lg shadow-lg p-3 z-20 min-w-[200px]">
+      <div v-if="showCameraSelector" class="absolute top-14 right-2 bg-white rounded-lg shadow-xl p-3 z-20 min-w-[200px] border border-gray-200">
         <p class="text-xs font-semibold mb-2 text-gray-700">Seleccionar cámara:</p>
         <button
           @click="selectCamera('auto')"
@@ -404,7 +404,6 @@ const manualValidation = (attendee) => {
         <p class="break-words"><strong>Nombre:</strong> {{ ticketData.full_name }}</p>
         <p class="break-all"><strong>Email:</strong> {{ ticketData.email }}</p>
         <p><strong>Ticket:</strong> {{ ticketData.ticket_name }}</p>
-        <p><strong>Precio:</strong> ${{ ticketData.price }}</p>
       </div>
 
       <div class="flex flex-col sm:flex-row gap-2 mt-4">
@@ -505,7 +504,7 @@ const manualValidation = (attendee) => {
               </div>
               <p class="text-xs sm:text-sm text-gray-600 break-all">{{ attendee.attendees.email }}</p>
               <p class="text-xs sm:text-sm text-gray-700 mt-1">
-                <strong>Ticket:</strong> {{ attendee.event_tickets.ticket_name }} - ${{ attendee.event_tickets.price }}
+                <strong>Ticket:</strong> {{ attendee.event_tickets.ticket_name }}
               </p>
               <p v-if="attendee.validated_at" class="text-xs text-gray-500 mt-1">
                 Validado: {{ new Date(attendee.validated_at).toLocaleString('es-ES') }}
