@@ -84,17 +84,7 @@ const getCameras = async () => {
     const devices = await navigator.mediaDevices.enumerateDevices()
     const videoDevices = devices.filter(device => device.kind === 'videoinput')
     
-    // Filtrar y mostrar solo cámaras principales (evitar duplicados de ultra-wide, etc)
-    const mainCameras = videoDevices.filter(device => {
-      const label = device.label.toLowerCase()
-      // Excluir cámaras especiales que no son útiles para QR
-      return !label.includes('ultra') && 
-             !label.includes('wide') && 
-             !label.includes('telephoto') &&
-             !label.includes('macro')
-    })
-    
-    availableCameras.value = mainCameras.length > 0 ? mainCameras : videoDevices
+    availableCameras.value = videoDevices
     console.log('📷 Cámaras disponibles:', availableCameras.value)
   } catch (error) {
     console.error('Error al obtener cámaras:', error)
@@ -114,18 +104,11 @@ const selectCamera = (deviceId) => {
 // Configuración de constraints para la cámara
 const cameraConstraints = computed(() => {
   if (selectedCamera.value === 'auto') {
-    // Usar ideal en lugar de exact para mejor compatibilidad
-    return { 
-      facingMode: { ideal: 'environment' },
-      width: { ideal: 1920 },
-      height: { ideal: 1080 }
-    }
+    return { facingMode: 'environment' }
+  } else if (selectedCamera.value === 'auto-front') {
+    return { facingMode: 'user' }
   }
-  return { 
-    deviceId: { exact: selectedCamera.value },
-    width: { ideal: 1920 },
-    height: { ideal: 1080 }
-  }
+  return { deviceId: { exact: selectedCamera.value } }
 })
 
 // Manejar errores de cámara
@@ -133,9 +116,8 @@ const onCameraError = (error) => {
   console.error('Error de cámara:', error)
   
   const cameraMissingError = error.name === 'OverconstrainedError'
-  const isUsingRearCamera = selectedCamera.value === 'auto' || 
-                           (selectedCamera.value !== 'auto' && cameraConstraints.value.facingMode?.ideal === 'environment')
-  const isUsingFrontCamera = cameraConstraints.value.facingMode?.ideal === 'user'
+  const isUsingRearCamera = selectedCamera.value === 'auto'
+  const isUsingFrontCamera = selectedCamera.value === 'auto-front'
 
   if (isUsingRearCamera && cameraMissingError) {
     noRearCamera.value = true
@@ -156,17 +138,6 @@ const onCameraError = (error) => {
   }
 }
 
-// Cambiar entre cámara frontal y trasera manualmente
-const switchCameraMode = () => {
-  if (selectedCamera.value === 'auto') {
-    selectedCamera.value = 'auto-front'
-  } else {
-    selectedCamera.value = 'auto'
-  }
-  cameraError.value = ''
-  noRearCamera.value = false
-  noFrontCamera.value = false
-}
 
 // Validar QR offline
 const onDetect = async ([result]) => {
