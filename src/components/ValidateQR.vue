@@ -23,12 +23,13 @@ const isOnline = ref(false) // Se inicializa en onMounted para evitar mismatch d
 const lastSyncDate = ref(null)
 
 // Configuración de cámara
-const selectedCamera = ref('auto')
-const availableCameras = ref([])
-const showCameraSelector = ref(false)
+const selectedConstraints = ref({ facingMode: 'environment' })
+const defaultConstraintOptions = [
+  { label: 'Cámara trasera', constraints: { facingMode: 'environment' } },
+  { label: 'Cámara frontal', constraints: { facingMode: 'user' } }
+]
+const constraintOptions = ref(defaultConstraintOptions)
 const cameraError = ref('')
-const noRearCamera = ref(false)
-const noFrontCamera = ref(false)
 
 // Almacenamiento local
 const { value: localEvent, setValue: setLocalEvent } = useClientStorage(`event_${props.event.slug}`, null)
@@ -70,71 +71,68 @@ onMounted(() => {
   // Escuchar cambios de conexión
   window.addEventListener('online', () => { isOnline.value = true })
   window.addEventListener('offline', () => { isOnline.value = false })
-
-  // Obtener lista de cámaras disponibles
-  getCameras()
 })
 
-// Obtener cámaras disponibles
-const getCameras = async () => {
+// Callback cuando la cámara está lista
+const onCameraReady = async () => {
   try {
-    // Primero solicitar permisos para obtener labels
-    await navigator.mediaDevices.getUserMedia({ video: true })
-    
     const devices = await navigator.mediaDevices.enumerateDevices()
-    const videoDevices = devices.filter(device => device.kind === 'videoinput')
-    
-    availableCameras.value = videoDevices
-    console.log('📷 Cámaras disponibles:', availableCameras.value)
+    const videoDevices = devices.filter(({ kind }) => kind === 'videoinput')
+
+    constraintOptions.value = [
+      ...defaultConstraintOptions,
+      ...videoDevices.map(({ deviceId, label }) => ({
+        label: `${label || 'Cámara'} (ID: ${deviceId.substring(0, 8)}...)`,
+        constraints: { deviceId }
+      }))
+    ]
+
+    cameraError.value = ''
+    console.log('📷 Cámaras disponibles:', videoDevices)
   } catch (error) {
     console.error('Error al obtener cámaras:', error)
   }
 }
 
-// Cambiar cámara
-const switchCamera = () => {
-  showCameraSelector.value = !showCameraSelector.value
-}
+// Función para dibujar el bounding box rojo
+const paintOutline = (detectedCodes, ctx) => {
+  for (const detectedCode of detectedCodes) {
+    const [firstPoint, ...otherPoints] = detectedCode.cornerPoints
 
-const selectCamera = (deviceId) => {
-  selectedCamera.value = deviceId
-  showCameraSelector.value = false
-}
+    ctx.strokeStyle = 'red'
+    ctx.lineWidth = 3
 
-// Configuración de constraints para la cámara
-const cameraConstraints = computed(() => {
-  if (selectedCamera.value === 'auto') {
-    return { facingMode: 'environment' }
-  } else if (selectedCamera.value === 'auto-front') {
-    return { facingMode: 'user' }
+    ctx.beginPath()
+    ctx.moveTo(firstPoint.x, firstPoint.y)
+    for (const { x, y } of otherPoints) {
+      ctx.lineTo(x, y)
+    }
+    ctx.lineTo(firstPoint.x, firstPoint.y)
+    ctx.closePath()
+    ctx.stroke()
   }
-  return { deviceId: { exact: selectedCamera.value } }
-})
+}
 
 // Manejar errores de cámara
 const onCameraError = (error) => {
   console.error('Error de cámara:', error)
   
-  const cameraMissingError = error.name === 'OverconstrainedError'
-  const isUsingRearCamera = selectedCamera.value === 'auto'
-  const isUsingFrontCamera = selectedCamera.value === 'auto-front'
-
-  if (isUsingRearCamera && cameraMissingError) {
-    noRearCamera.value = true
-    cameraError.value = '⚠️ No se detectó cámara trasera. Intenta seleccionar otra cámara manualmente.'
-    // Intentar con cámara frontal
-    selectedCamera.value = 'auto-front'
-  } else if (isUsingFrontCamera && cameraMissingError) {
-    noFrontCamera.value = true
-    cameraError.value = '⚠️ No se detectó cámara frontal.'
-  } else if (error.name === 'NotAllowedError') {
+  if (error.name === 'NotAllowedError') {
     cameraError.value = '❌ Permisos de cámara denegados. Por favor, permite el acceso a la cámara.'
   } else if (error.name === 'NotFoundError') {
     cameraError.value = '❌ No se encontró ninguna cámara en el dispositivo.'
   } else if (error.name === 'NotReadableError') {
     cameraError.value = '❌ La cámara está siendo usada por otra aplicación.'
+  } else if (error.name === 'OverconstrainedError') {
+    cameraError.value = '⚠️ Las cámaras instaladas no son adecuadas. Intenta seleccionar otra.'
+  } else if (error.name === 'NotSupportedError') {
+    cameraError.value = '❌ Se requiere contexto seguro (HTTPS, localhost)'
+  } else if (error.name === 'StreamApiNotSupportedError') {
+    cameraError.value = '❌ Stream API no es compatible con este navegador'
+  } else if (error.name === 'InsecureContextError') {
+    cameraError.value = '❌ El acceso a la cámara solo se permite en contexto seguro (HTTPS)'
   } else {
-    cameraError.value = `❌ Error al acceder a la cámara: ${error.message}`
+    cameraError.value = `❌ Error: ${error.message}`
   }
 }
 
@@ -401,46 +399,34 @@ const manualValidation = (attendee) => {
       {{ cameraError }}
     </div>
 
+    <!-- Selector de cámara -->
+    <div v-if="cameraVisible" class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 mb-2">
+        Seleccionar cámara:
+      </label>
+      <select 
+        v-model="selectedConstraints"
+        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+      >
+        <option
+          v-for="option in constraintOptions"
+          :key="option.label"
+          :value="option.constraints"
+        >
+          {{ option.label }}
+        </option>
+      </select>
+    </div>
+
     <!-- Cámara QR -->
-    <div v-if="cameraVisible" class="max-w-xl mx-auto pb-4 relative">
+    <div v-if="cameraVisible" class="max-w-xl mx-auto pb-4">
       <QrcodeStream 
+        :constraints="selectedConstraints"
+        :track="paintOutline"
         @detect="onDetect" 
         @error="onCameraError"
-        :constraints="{ video: cameraConstraints }" 
+        @camera-on="onCameraReady"
       />
-      
-      <!-- Botón para cambiar cámara -->
-      <button
-        v-if="availableCameras.length > 1"
-        @click="switchCamera"
-        class="absolute top-2 right-2 bg-black bg-opacity-60 text-white p-3 rounded-full hover:bg-opacity-80 transition-all shadow-lg z-10"
-        title="Cambiar cámara"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-        </svg>
-      </button>
-
-      <!-- Selector de cámaras -->
-      <div v-if="showCameraSelector" class="absolute top-14 right-2 bg-white rounded-lg shadow-xl p-3 z-20 min-w-[200px] border border-gray-200">
-        <p class="text-xs font-semibold mb-2 text-gray-700">Seleccionar cámara:</p>
-        <button
-          @click="selectCamera('auto')"
-          class="w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 transition-colors"
-          :class="{ 'bg-blue-100 font-semibold': selectedCamera === 'auto' }"
-        >
-          🎯 Automática (Trasera)
-        </button>
-        <button
-          v-for="(camera, index) in availableCameras"
-          :key="camera.deviceId"
-          @click="selectCamera(camera.deviceId)"
-          class="w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 transition-colors break-words"
-          :class="{ 'bg-blue-100 font-semibold': selectedCamera === camera.deviceId }"
-        >
-          📷 {{ camera.label || `Cámara ${index + 1}` }}
-        </button>
-      </div>
     </div>
 
     <!-- Datos de la entrada -->
