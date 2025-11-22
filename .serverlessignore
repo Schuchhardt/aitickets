@@ -1,0 +1,26 @@
+# Exclude everything from main project
+node_modules/**
+!functions/node_modules/**
+
+# Exclude Astro/Frontend files
+src/**
+public/**
+netlify/**
+.astro/**
+dist/**
+db/**
+
+# Exclude config files not needed for Lambda
+*.config.*
+tsconfig.json
+tailwind.config.js
+astro.config.mjs
+netlify.toml
+
+# Exclude development files
+.env*
+README.md
+package-lock.json
+
+# Include only functions
+!functions/**

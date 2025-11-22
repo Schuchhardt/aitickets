@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted } from "vue";
+import { formatLocalTimeFromString, formatLocalDate } from "../utils/dateHelpers.js";
 
 // Props con la información del evento
 const props = defineProps({
@@ -46,16 +47,14 @@ onMounted(() => {
 });
 
 const getTime = (time) => {
-  const optionsTime = { hour: "2-digit", minute: "2-digit", hour12: false };
-  
-  return new Date(`1970-01-01T${time}`).toLocaleTimeString("es-ES", optionsTime);
+  return formatLocalTimeFromString(time);
 }
 </script>
 
 <template>
   <div class="lg:col-span-2 font-['Prompt']" v-if="event">
     <!-- Tabs de navegación (solo en desktop) -->
-    <div class="hidden lg:flex border-b border-gray-300 space-x-4 sticky top-0 bg-white py-2 z-10">
+    <div id="event-tabs" class="hidden lg:flex border-b border-gray-300 space-x-4 bg-white py-2">
       <a href="#descripcion" class="py-2 px-4 text-sm font-semibold cursor-pointer font-['Unbounded']"
         :class="activeSection === 'descripcion' ? 'border-b-2 border-black text-black' : 'text-gray-500'">
         Descripción
@@ -79,9 +78,9 @@ const getTime = (time) => {
     <div id="descripcion" class="event-section mt-6">
       <h2 class="text-2xl font-bold mb-4 font-['Unbounded']">Descripción</h2>
       <transition name="fade-slide">
-        <div v-html="showFullDescription ? event.description : event.description.slice(0, 200) + '...'" class="text-gray-600"></div>
+        <div v-html="showFullDescription ? event.description : event.description.slice(0, 2000) + '...'" class="text-gray-600"></div>
       </transition>
-      <button v-if="event.description.length > 200" @click="showFullDescription = !showFullDescription" aria-label="Mostrar/ocultar descripción completa"
+      <button v-if="event.description.length > 2000" @click="showFullDescription = !showFullDescription" aria-label="Mostrar/ocultar descripción completa"
         class="text-blue-500 mt-2 cursor-pointer">
         {{ showFullDescription ? "Ver menos" : "Ver más" }}
       </button>
@@ -94,7 +93,7 @@ const getTime = (time) => {
       <div class="flex space-x-4">
         <div class="bg-gray-100 p-4 rounded-lg text-center w-1/2" v-for="(date, index) in event.dates" :key="index">
           <span class="text-gray-900 font-semibold block">
-            {{ new Date(date.date).toLocaleDateString("es-CL", { weekday: "short", day: "numeric", month: "long" }) }}
+            {{ formatLocalDate(new Date(date.date), { weekday: "short", day: "numeric", month: "long" }) }}
           </span>
           <span class="text-gray-600 text-sm">
             {{ getTime(date.start_time) }} hrs - {{ getTime(date.end_time) }} hrs
@@ -106,11 +105,16 @@ const getTime = (time) => {
 
     <!-- Sección de Ubicación con Mapa -->
     <div id="lugar" class="event-section mt-10">
-      <h2 class="text-2xl font-bold mb-4 font-['Unbounded']">Ubicación</h2>
+      <h2 class="text-2xl font-bold mb-4 font-['Unbounded']">
+        {{ event.secret_location ? 'Ubicación aproximada' : 'Ubicación' }}
+      </h2>
       <p class="text-gray-600">
         {{ event.location }} 
-        <a :href="'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(event.location)" target="_blank"
+        <a v-if="!event.secret_location" :href="'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(event.location)" target="_blank"
           class="text-blue-500 cursor-pointer">Ver ubicación</a>
+      </p>
+      <p v-if="event.secret_location" class="text-amber-600 text-sm mt-2 italic">
+        La ubicación exacta será mostrada en la entrada el día del evento.
       </p>
       <iframe class="w-full h-64 mt-4 rounded-lg shadow-md"
         :src="'https://www.google.com/maps/embed/v1/place?key=' + googleMapsApiKey + '&q=' + encodeURIComponent(event.location)"
@@ -129,6 +133,11 @@ const getTime = (time) => {
         <transition name="fade-slide">
           <p v-if="faq.open" class="mt-2 text-gray-600">{{ faq.answer }}</p>
         </transition>
+      </div>
+      
+      <!-- Imagen del evento al final de preguntas frecuentes -->
+      <div class="mt-6 flex justify-center">
+        <img :src="event.image_url" :alt="event.name" class="rounded-lg shadow-md max-w-full h-auto object-cover" style="height: 100%;" />
       </div>
     </div>
 

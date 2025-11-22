@@ -1,5 +1,4 @@
 ---
-import { supabase } from "../lib/supabaseClient";
 import AppHeader from "../components/AppHeader.vue";
 import AppFooter from "../components/AppFooter.vue";
 import ProducersHeroSection from "../components/ProducersHeroSection.vue";
@@ -10,13 +9,6 @@ import Layout from '../layouts/Layout.astro';
 import "../styles/global.css";
 import 'animate.css';
 
-
-// Consulta los eventos en el servidor (SSR)
-// filtrar solo eventos que tengan status published
-const { data: events, error } = await supabase.from("events").select("*").eq("status", "published");
-
-// Si hay error o no hay eventos, definir un fallback vacío
-const eventData = error || !events ? [] : events;
 ---
 
 <Layout>

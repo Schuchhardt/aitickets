@@ -1,0 +1,12 @@
+{
+  "name": "send-tickets-email",
+  "version": "1.0.0",
+  "description": "Función de Netlify para enviar emails con tickets después de un pago exitoso",
+  "main": "index.mjs",
+  "type": "module",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "form-data": "^4.0.1",
+    "mailgun.js": "^11.1.0"
+  }
+}

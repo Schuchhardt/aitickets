@@ -14,7 +14,7 @@ import 'animate.css';
 
 // Consulta los eventos en el servidor (SSR)
 // filtrar solo eventos que tengan status published
-const { data: events, error } = await supabase.from("events").select("*").eq("status", "published");
+const { data: events, error } = await supabase.from("events").select("*").eq("status", "published").eq("accessibility", "public");
 console.log("Eventos desde la base de datos:", events);
 // Si hay error o no hay eventos, definir un fallback vacío
 const eventData = error || !events ? [] : events;

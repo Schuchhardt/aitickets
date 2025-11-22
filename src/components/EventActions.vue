@@ -1,38 +1,93 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, onMounted, onUnmounted, computed } from "vue";
 import iconShare from "../images/icon-share.png"; // Icono de compartir
 import iconArrow from "../images/icon-arrow-black.png"; // Icono de flecha en botón de reserva
 import iconTicket from "../images/icon-tickets.png"; // Icono de ticket
+import iconCalendar from "../images/icon-calendar-dark.png"; // Icono de calendario
 import ShareEventModal from "./ShareEventModal.vue";
-import ReserveModal from "./Reservation/ReservationModal.vue";
+import ReservationModal from "./Reservation/ReservationModal.vue";
+import PurchasedTicketsModal from "./PurchasedTicketsModal.vue";
 import { eventBus } from '../utils/eventbus.js';
 
-defineProps({
+const props = defineProps({
   event: Object,
 });
 
 const showModal = ref(false);
 const showReserveModal = ref(false);
+const showPurchasedTickets = ref(false);
+const eventOrders = ref([]);
+const hasPurchasedTickets = ref(false);
+
+// Función para verificar entradas compradas (solo en el cliente)
+const checkPurchasedTickets = () => {
+  if (!props.event?.id) return;
+  
+  try {
+    const stored = localStorage.getItem(`purchase_event_${props.event.id}`);
+    if (stored) {
+      const orders = JSON.parse(stored);
+      eventOrders.value = Array.isArray(orders) ? orders : [orders];
+      hasPurchasedTickets.value = eventOrders.value.length > 0;
+    } else {
+      hasPurchasedTickets.value = false;
+    }
+  } catch (error) {
+    console.error('Error checking purchased tickets:', error);
+    hasPurchasedTickets.value = false;
+  }
+};
 
 const openReserveModal = () => {
+  eventBus.emit('open-modal'); // Emitir evento al abrir el modal (para el asistente de IA)
+  eventBus.emit('assistant-hide'); // Evento específico para ocultar el asistente
   showReserveModal.value = true;
 };
 
 const closeReserveModal = () => {
+  eventBus.emit('close-modal'); // Notificar que el modal se está cerrando
+  eventBus.emit('assistant-show'); // Evento específico para mostrar el asistente
   showReserveModal.value = false;
 };
 
+const openPurchasedTickets = () => {
+  showPurchasedTickets.value = true;
+};
+
+const closePurchasedTickets = () => {
+  showPurchasedTickets.value = false;
+};
+
 onMounted(() => {
+  // Verificar entradas compradas solo en el cliente
+  checkPurchasedTickets();
+  
   eventBus.on('open-modal', handleOpenModal);
+  eventBus.on('purchase-completed', handlePurchaseCompleted);
 });
 
 onUnmounted(() => {
   eventBus.off('open-modal', handleOpenModal);
+  eventBus.off('purchase-completed', handlePurchaseCompleted);
 });
 
 function handleOpenModal() {
   showReserveModal.value = true;
 }
+
+function handlePurchaseCompleted() {
+  // Re-verificar las entradas compradas cuando se complete una compra
+  checkPurchasedTickets();
+}
+
+// Verificar si el evento ya ha terminado
+const isEventFinished = computed(() => {
+  if (!props.event?.end_date) return false;
+  const endDate = new Date(props.event.end_date);
+  const now = new Date();
+  return endDate < now;
+});
+
 // format price with thousands separator (dot)
 const formatPrice = (price) => {
   return price !== null && price !== undefined ? price.toLocaleString("es-CL") : "";
@@ -52,51 +107,177 @@ const getEventPrice = (tickets) => {
   }
   return `Desde $${formatPrice(minPrice)} hasta $${formatPrice(maxPrice)}`;
 };
+
+// Función para agregar evento al calendario
+const addToCalendar = () => {
+  if (!props.event) return;
+  
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  };
+  
+  const title = encodeURIComponent(props.event.name || props.event.title || 'Evento');
+  const description = encodeURIComponent(props.event.description || '');
+  const location = encodeURIComponent(props.event.location || '');
+  const startDate = formatDate(props.event.start_date);
+  const endDate = formatDate(props.event.end_date);
+  
+  // URL para Google Calendar
+  const googleUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startDate}/${endDate}&details=${description}&location=${location}`;
+  
+  // Abrir Google Calendar
+  window.open(googleUrl, '_blank');
+};
 </script>
 
 <template>
   <div class="font-['Unbounded'] font-bold" v-if="event">
-    <!-- Botón de compartir en Mobile (debajo del EventHeader) -->
-    <div class="lg:hidden flex justify-center mt-4">
-      <button @click="showModal = true" aria-label="Compartir evento" class="w-11/12 flex items-center justify-center py-2 border border-gray-300 rounded-full text-gray-600 bg-gray-100 cursor-pointer">
-        <img :src="iconShare.src" alt="Compartir" class="w-5 h-5 mr-2" />
-        Compartir evento
-      </button>
+    <!-- Botones de acción en Mobile (debajo del EventHeader) -->
+    <div class="lg:hidden flex flex-col items-center mt-4 space-y-3">
+      <!-- Mostrar solo para eventos finalizados -->
+      <template v-if="isEventFinished">
+        <div class="w-11/12 flex flex-col items-center py-4 border-2 border-gray-400 rounded-xl text-center bg-gray-50">
+          <button disabled class="w-full py-3 rounded-full text-gray-600 bg-gray-200 cursor-not-allowed font-bold text-lg">
+            Evento finalizado
+          </button>
+          <p class="mt-3 text-gray-600 text-sm">Te vemos en el próximo</p>
+        </div>
+      </template>
+      
+      <!-- Mostrar botones normales para eventos activos -->
+      <template v-else>
+        <button @click="showModal = true" aria-label="Compartir evento" class="w-11/12 flex items-center justify-center py-2 border border-gray-300 rounded-full text-gray-600 bg-gray-100 cursor-pointer relative z-5 pointer-events-auto">
+          <img :src="iconShare.src" alt="Compartir" class="w-5 h-5 mr-2" />
+          Compartir evento
+        </button>
+        
+        <button @click="addToCalendar" aria-label="Añadir al calendario" class="w-11/12 flex items-center justify-center py-2 border border-gray-300 rounded-full text-gray-600 bg-gray-100 cursor-pointer relative z-5 pointer-events-auto">
+          <img :src="iconCalendar.src" alt="Calendario" class="w-5 h-5 mr-2" />
+          Añadir al calendario
+        </button>
+      </template>
     </div>
 
     <!-- Tarjeta de Acciones en Desktop -->
     <div class="hidden lg:block bg-gray-100 p-6 rounded-xl shadow-md text-center">
-      <!-- Precio -->
-      <div class="flex items-center justify-between text-lg text-gray-900">
-        <span class="flex items-center">
-          <img :src="iconTicket.src" alt="ticket icon" class="w-5 h-5 mr-2" />
-          Precio
-        </span>
-        <span class="text-xl">{{ getEventPrice(event.tickets) }}</span>
-      </div>
+      <!-- Para eventos finalizados -->
+      <template v-if="isEventFinished">
+        <div class="flex flex-col items-center py-4">
+          <button disabled class="w-full py-4 rounded-full text-gray-600 bg-gray-200 cursor-not-allowed font-bold text-xl">
+            Evento finalizado
+          </button>
+          <p class="mt-4 text-gray-600 text-base">Te vemos en el próximo</p>
+        </div>
+      </template>
 
-      <!-- Botones -->
-      <button @click="openReserveModal" aria-label="Reservar ticket" class="w-full bg-black text-white py-3 rounded-full flex items-center justify-center mt-4 cursor-pointer">
-        Reservar ticket
-        <img :src="iconArrow.src" alt="Arrow" class="w-4 h-4 ml-2" />
-      </button>
+      <!-- Para eventos activos -->
+      <template v-else>
+        <!-- Precio -->
+        <div class="flex items-center justify-between text-lg text-gray-900">
+          <span class="flex items-center">
+            <img :src="iconTicket.src" alt="ticket icon" class="w-5 h-5 mr-2" />
+            Precio
+          </span>
+          <span class="text-xl">{{ getEventPrice(event.tickets) }}</span>
+        </div>
 
-      <button @click="showModal = true" aria-label="Compartir evento" class="w-full mt-3 border border-gray-400 py-2 rounded-full text-gray-700 flex items-center justify-center cursor-pointer">
-        <img :src="iconShare.src" alt="Compartir" class="w-5 h-5 mr-2" />
-        Compartir evento
-      </button>
+        <!-- Botones -->
+        <button 
+          v-if="!hasPurchasedTickets"
+          @click="openReserveModal" 
+          aria-label="Comprar entrada" 
+          class="w-full bg-black text-white py-3 rounded-full flex items-center justify-center mt-4 cursor-pointer relative z-10 pointer-events-auto"
+        >
+          Comprar entrada
+          <img :src="iconArrow.src" alt="Arrow" class="w-4 h-4 ml-2" />
+        </button>
+
+        <template v-else>
+          <button 
+            @click="openPurchasedTickets" 
+            aria-label="Ver entradas compradas" 
+            class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-full flex items-center justify-center mt-4 cursor-pointer relative z-10 pointer-events-auto"
+          >
+            Ver entradas compradas
+            <img :src="iconTicket.src" alt="Ticket" class="w-4 h-4 ml-2" />
+          </button>
+
+          <button 
+            @click="openReserveModal" 
+            aria-label="Comprar más entradas" 
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-full flex items-center justify-center mt-3 cursor-pointer relative z-10 pointer-events-auto"
+          >
+            Comprar más entradas
+            <img :src="iconArrow.src" alt="Arrow" class="w-4 h-4 ml-2" />
+          </button>
+        </template>
+
+        <button @click="showModal = true" aria-label="Compartir evento" class="w-full mt-3 border border-gray-400 py-2 rounded-full text-gray-700 flex items-center justify-center cursor-pointer relative z-10 pointer-events-auto">
+          <img :src="iconShare.src" alt="Compartir" class="w-5 h-5 mr-2" />
+          Compartir evento
+        </button>
+
+        <button @click="addToCalendar" aria-label="Añadir al calendario" class="w-full mt-3 border border-gray-400 py-2 rounded-full text-gray-700 flex items-center justify-center cursor-pointer relative z-10 pointer-events-auto">
+          <img :src="iconCalendar.src" alt="Calendario" class="w-5 h-5 mr-2" />
+          Añadir al calendario
+        </button>
+      </template>
     </div>
 
     <!-- Precio Sticky en Mobile -->
-    <div class="lg:hidden fixed bottom-0 left-0 w-full bg-lime-400 py-4 px-6 flex justify-between items-center shadow-md">
-      <span class="text-lg text-gray-900">{{ event.price || "Gratis" }}</span>
-      <button @click="openReserveModal" aria-label="Reservar ticket" class="bg-black text-white py-2 px-6 rounded-full flex items-center cursor-pointer">
-        Reservar ticket
+    <div v-if="isEventFinished" class="lg:hidden fixed bottom-0 left-0 w-full bg-gray-300 py-4 px-6 flex flex-col items-center shadow-md z-50">
+      <button disabled class="w-full py-3 rounded-full text-gray-600 bg-gray-200 cursor-not-allowed font-bold text-base">
+        Evento finalizado
       </button>
+      <p class="mt-2 text-gray-600 text-sm">Te vemos en el próximo</p>
+    </div>
+
+    <div v-else-if="!hasPurchasedTickets" class="lg:hidden fixed bottom-0 left-0 w-full bg-lime-400 py-4 px-6 flex justify-between items-center shadow-md z-50">
+      <span class="text-lg text-gray-900">{{ getEventPrice(event.tickets) }}</span>
+      <button 
+        @click="openReserveModal" 
+        aria-label="Comprar entrada" 
+        class="bg-black text-white py-2 px-6 rounded-full flex items-center cursor-pointer relative z-10 pointer-events-auto"
+      >
+        Comprar entrada
+      </button>
+    </div>
+
+    <!-- Sticky con múltiples botones cuando ya compró -->
+    <div v-else-if="!isEventFinished" class="lg:hidden fixed bottom-0 left-0 w-full bg-lime-400 py-3 px-4 shadow-md z-50">
+      <div class="flex flex-col gap-2">
+        <div class="flex justify-between items-center">
+          <span class="text-sm text-gray-900 font-medium">{{ getEventPrice(event.tickets) }}</span>
+          <span class="text-xs text-gray-700">Ya tienes {{ eventOrders.length }} orden(es)</span>
+        </div>
+        <div class="flex gap-2">
+          <button 
+            @click="openPurchasedTickets" 
+            aria-label="Ver entradas compradas" 
+            class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-3 rounded-full text-sm font-medium cursor-pointer relative z-10 pointer-events-auto"
+          >
+            Ver entradas
+          </button>
+          <button 
+            @click="openReserveModal" 
+            aria-label="Comprar más entradas" 
+            class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded-full text-sm font-medium cursor-pointer relative z-10 pointer-events-auto"
+          >
+            Comprar más
+          </button>
+        </div>
+      </div>
     </div>
  
     <ShareEventModal :show="showModal" :event="event" @close="showModal = false"/>
-    <ReserveModal v-if="showReserveModal" :event="event" @close="closeReserveModal" />
+    <ReservationModal v-if="showReserveModal" :event="event" @close="closeReserveModal" />
+    <PurchasedTicketsModal 
+      :show="showPurchasedTickets" 
+      :eventOrders="eventOrders" 
+      :event="event"
+      @close="closePurchasedTickets" 
+    />
 
   </div>
 </template>

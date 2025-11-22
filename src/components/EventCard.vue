@@ -1,25 +1,14 @@
 <script setup>
 import iconCalendar from "../images/icon-calendar-dark.png";
 import iconLocation from "../images/icon-pin-dark.png";
+import { formatEventDateRange } from "../utils/dateHelpers.js";
 
 defineProps({
   event: Object,
 });
 
 const formatFullDate = (event) => {
-  const optionsDate = { day: "numeric", month: "long" };
-  const optionsTime = { hour: "2-digit", minute: "2-digit", hour12: false };
-
-  const start = event.start_date;
-  const end = event.end_date;
-
-  const startDate = new Date(start).toLocaleDateString("es-ES", optionsDate);
-  const endDate = new Date(end).toLocaleDateString("es-ES", optionsDate);
-
-  const startTime = new Date(start).toLocaleTimeString("es-ES", optionsTime);
-  const endTime = new Date(end).toLocaleTimeString("es-ES", optionsTime);
-
-  return startDate !== endDate ? `Del ${startDate} al ${endDate}, desde las ${startTime} a las ${endTime} hrs` : `${startDate}, desde las ${startTime} a las ${endTime} hrs`;
+  return formatEventDateRange(event);
 };
 </script>
 

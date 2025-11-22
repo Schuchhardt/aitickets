@@ -1,8 +1,10 @@
 <script setup>
-import { ref, onMounted, nextTick, defineProps} from "vue";
+import { ref, onMounted, onUnmounted, nextTick, defineProps} from "vue";
 import { marked } from "marked"; 
 import DOMPurify from "dompurify";
 import { eventBus } from '../utils/eventbus.js';
+import { useGoogleAnalytics } from "../composables/useGoogleAnalytics.js";
+import { formatLocalTime, formatLocalDate } from "../utils/dateHelpers.js";
 import IconChat from "../images/icon-chat.png"; 
 import IconArrowGreen from "../images/icon-arrow-green.png"; 
 
@@ -10,11 +12,13 @@ const props = defineProps({
   event: Object,
 });
 const assistantURL = import.meta.env.PUBLIC_SERVERLESS_URL;
-const apiSecret = import.meta.env.PUBLIC_API_SECRET
+const apiSecret = import.meta.env.PUBLIC_API_SECRET;
+const { trackAIAssistant } = useGoogleAnalytics();
 
 const isOpen = ref(false);
+const isModalOpen = ref(false); // Estado para controlar si el modal de reserva está abierto
 const messages = ref([
-  { role: "assistant", text: "¿Te ayudo a conseguir tu ticket en segundos? 😎", time: new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) }
+  { role: "assistant", text: "¿Te ayudo a conseguir tu ticket en segundos? 😎", time: formatLocalTime(new Date()) }
 ]);
 const userMessage = ref("");
 const showSuggestedReplies = ref(true);
@@ -59,6 +63,9 @@ const fillForm = (properties) => {
 const sendMessage = async (message) => {
   if (!message.trim()) return;
 
+  // Track AI assistant usage
+  trackAIAssistant(props.event.id, message);
+
   messages.value.push({ role: "user", text: message });
   showSuggestedReplies.value = false;
   scrollToBottom();
@@ -74,7 +81,7 @@ const sendMessage = async (message) => {
     - ID Evento: ${props.event.id}
     - Nombre: ${props.event.name}
     - Descripción: ${props.event.description}
-    - Fecha: ${new Date(props.event.start_date).toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })} - ${new Date(props.event.end_date).toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })}
+    - Fecha: ${formatLocalDate(props.event.start_date, { weekday: "long", day: "numeric", month: "long" })} - ${formatLocalDate(props.event.end_date, { weekday: "long", day: "numeric", month: "long" })}
     - Ubicación: ${props.event.location}
     - Preguntas frecuentes: ${props.event.faqs.map(faq => `• ${faq.question}: ${faq.answer}`).join("\n")}
     - Precios de las entradas:
@@ -130,21 +137,42 @@ const sendMessage = async (message) => {
 };
 
 // Obtener la fecha actual
-const currentDate = new Date().toLocaleDateString("es-ES", {
+const currentDate = formatLocalDate(new Date(), {
   weekday: "long",
   day: "numeric",
   month: "long"
 });
 
-onMounted(scrollToBottom);
+// Funciones para manejar la visibilidad del asistente
+const handleAssistantHide = () => {
+  isModalOpen.value = true;
+  isOpen.value = false; // También cerrar el chat si está abierto
+};
+
+const handleAssistantShow = () => {
+  isModalOpen.value = false;
+};
+
+onMounted(() => {
+  scrollToBottom();
+  // Escuchar eventos específicos para ocultar/mostrar el asistente
+  eventBus.on('assistant-hide', handleAssistantHide);
+  eventBus.on('assistant-show', handleAssistantShow);
+});
+
+onUnmounted(() => {
+  // Limpiar los listeners
+  eventBus.off('assistant-hide', handleAssistantHide);
+  eventBus.off('assistant-show', handleAssistantShow);
+});
 </script>
 
 <template>
-  <div>
+  <div v-if="!isModalOpen">
     <!-- Overlay en mobile -->
     <div 
       v-if="isOpen" 
-      class="fixed inset-0 bg-black opacity-50 z-40 md:hidden"
+      class="fixed inset-0 bg-black opacity-50 z-30 md:hidden"
       @click="isOpen = false">
     </div>
 
@@ -156,14 +184,14 @@ onMounted(scrollToBottom);
       <button 
         @click="isOpen = true" 
         aria-label="Abrir asistente"
-        class="w-16 h-16 rounded-full cursor-pointer shadow-lg bg-cover bg-center bg-no-repeat transition hover:opacity-80"
+        class="w-16 h-16 rounded-full cursor-pointer shadow-lg bg-cover bg-center bg-no-repeat transition hover:opacity-80 relative z-40 pointer-events-auto"
         :style="{ backgroundImage: `url(${IconChat.src})` }">
       </button>
     </div>
 
     <!-- Panel del chat -->
     <div v-if="isOpen" 
-      class="assistant-chat fixed bottom-0 md:bottom-20 bg-white shadow-xl rounded-t-lg md:rounded-lg max-h-[500px] md:max-h-[600px] flex flex-col overflow-hidden border border-gray-200 z-50 w-full md:w-96">
+      class="assistant-chat fixed bottom-0 md:bottom-20 bg-white shadow-xl rounded-t-lg md:rounded-lg max-h-[500px] md:max-h-[600px] flex flex-col overflow-hidden border border-gray-200 z-40 w-full md:w-96">
       
       <!-- Header -->
       <div class="bg-white text-gray-900 p-4 font-semibold flex justify-between font-[Unbounded] border-b">
@@ -222,10 +250,10 @@ onMounted(scrollToBottom);
 /* Posición del botón de asistencia */
 .assistant-button {
   position: fixed;
-  top: 25%;
+  top: 70%;
   right: 1rem;
   transform: translateY(-50%);
-  z-index: 50;
+  z-index: 40;
 }
 
 /* Estilos del chat */

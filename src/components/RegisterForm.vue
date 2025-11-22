@@ -1,9 +1,11 @@
 <script setup>
 import { reactive, ref } from 'vue'
 import * as z from 'zod'
+import { useGoogleAnalytics } from "../composables/useGoogleAnalytics.js";
 
 const loading = ref(false)
 const globalError = ref('')
+const { trackSignUp } = useGoogleAnalytics();
 
 const buyerInfo = reactive({
   name: '',
@@ -71,6 +73,9 @@ const submitForm = async () => {
 
     if (!registerRes.ok) throw new Error('Error al registrar')
 
+    // Track successful producer registration
+    trackSignUp('email');
+    
     window.location.href = 'https://admin.aitickets.cl/login'
   } catch (err) {
     globalError.value = 'Ocurrió un error al registrar. Intenta de nuevo.'
