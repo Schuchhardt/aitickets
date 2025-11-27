@@ -3,24 +3,42 @@
     <div class="container mx-auto px-4 md:px-8 text-center">
       <FadeInSection>
         <div class="inline-flex items-center justify-center mb-6">
-          <span class="bg-white/10 backdrop-blur-sm rounded-full px-4 py-1 flex items-center">
-            <Sparkles class="h-4 w-4 text-lime-400 mr-2" />
-            <span class="text-white/90 text-sm font-medium">Tecnología de vanguardia</span>
+          <span class="bg-lime-400/10 backdrop-blur-sm rounded-full px-4 py-1 flex items-center border border-lime-400/30">
+            <Shield class="h-4 w-4 text-lime-400 mr-2" />
+            <span class="text-lime-400 text-sm font-medium">Sin riesgo • Sin contratos • Sin costos fijos</span>
           </span>
         </div>
       </FadeInSection>
 
       <FadeInSection :delay="100">
         <h2 class="text-3xl md:text-4xl lg:text-5xl font-bold mb-6 max-w-3xl mx-auto leading-tight font-[Unbounded]">
-          Impulsa tus eventos con el poder de la inteligencia artificial
+          ¿Listo para llenar más funciones?
         </h2>
       </FadeInSection>
 
       <FadeInSection :delay="200">
-        <p class="text-white/80 max-w-2xl mx-auto mb-10 text-lg">
-          Únete a AI Tickets hoy y comienza a vender más entradas con menos esfuerzo. 
-          Nuestra tecnología revolucionaria está cambiando la forma en que se gestionan los eventos.
+        <p class="text-white/80 max-w-2xl mx-auto mb-6 text-lg">
+          Prueba AI Tickets sin compromiso. Tu primera función es gratis (hasta 100 entradas), 
+          nosotros configuramos todo por ti y te vas cuando quieras.
         </p>
+      </FadeInSection>
+
+      <!-- Garantías -->
+      <FadeInSection :delay="250">
+        <div class="flex flex-wrap justify-center gap-6 mb-10 text-sm text-white/70">
+          <div class="flex items-center gap-2">
+            <Gift class="h-4 w-4 text-lime-400" />
+            <span>Primera función gratis</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <Wrench class="h-4 w-4 text-lime-400" />
+            <span>Setup gratuito</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <Clock class="h-4 w-4 text-lime-400" />
+            <span>Soporte en menos de 2 hrs</span>
+          </div>
+        </div>
       </FadeInSection>
 
       <FadeInSection :delay="300">
@@ -28,9 +46,9 @@
           <!-- Botón principal -->
           <a
             href="/register"
-            class="flex items-center justify-center gap-2 bg-white text-black font-bold py-3 px-6 rounded-full transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5 active:scale-[0.97] font-[Unbounded]"
+            class="flex items-center justify-center gap-2 bg-lime-400 text-black font-bold py-4 px-8 rounded-full transition-all duration-300 hover:shadow-xl hover:shadow-lime-400/20 hover:-translate-y-0.5 active:scale-[0.97] font-[Unbounded]"
           >
-            Comenzar ahora
+            Solicitar Demo de 15 min
             <ArrowRight class="h-4 w-4 transition-transform group-hover:translate-x-1" />
           </a>
 
@@ -38,20 +56,26 @@
           <a
             :href="whatsappLink"
             target="_blank"
-            class="flex items-center justify-center gap-2 bg-transparent text-white border border-white/30 py-3 px-6 rounded-full font-medium transition-all duration-300 hover:bg-white/10 hover:shadow-md active:scale-[0.97]"
+            class="flex items-center justify-center gap-2 bg-transparent text-white border border-white/30 py-4 px-8 rounded-full font-medium transition-all duration-300 hover:bg-white/10 hover:shadow-md active:scale-[0.97]"
           >
             <MessageCircle class="h-4 w-4" />
-            Contactar a ventas
+            Hablar por WhatsApp
           </a>
         </div>
+      </FadeInSection>
+
+      <FadeInSection :delay="400">
+        <p class="mt-8 text-white/50 text-sm">
+          Solo pagas cuando vendes. Comisión desde 10% según el plan.
+        </p>
       </FadeInSection>
     </div>
   </section>
 </template>
 
 <script setup>
-import { Sparkles, ArrowRight, MessageCircle } from 'lucide-vue-next';
+import { Shield, ArrowRight, MessageCircle, Gift, Wrench, Clock } from 'lucide-vue-next';
 import FadeInSection from './Hero/FadeInSection.vue';
 
-const whatsappLink = "https://wa.me/56982347140?text=Hola%2C%20quiero%20saber%20m%C3%A1s%20sobre%20AI%20Tickets";
+const whatsappLink = "https://wa.me/56982347140?text=Hola%2C%20quiero%20agendar%20una%20demo%20de%20AI%20Tickets";
 </script>

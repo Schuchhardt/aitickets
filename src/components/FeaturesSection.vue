@@ -1,72 +1,74 @@
 <script setup>
 import {
-  Lightbulb,
+  CalendarDays,
+  MessageSquare,
+  Globe,
+  TrendingUp,
+  QrCode,
   BarChart3,
   Ticket,
-  Users,
-  CreditCard,
-  Calendar,
-  QrCode,
+  Bell,
   Gift
 } from 'lucide-vue-next';
 import FadeInSection from './Hero/FadeInSection.vue';
 
 const producerFeatures = [
   {
-    icon: Calendar,
-    title: 'Gestión de eventos',
-    description: 'Crea y gestiona eventos fácilmente desde tu panel de control con todos los detalles necesarios.'
+    icon: CalendarDays,
+    title: 'Funciones múltiples',
+    description: 'Gestiona temporadas completas con múltiples horarios, sedes y aforos desde un solo lugar.'
+  },
+  {
+    icon: MessageSquare,
+    title: 'Comunicación automática',
+    description: 'Notifica cambios, envía recordatorios y responde preguntas frecuentes por WhatsApp y email.'
+  },
+  {
+    icon: Globe,
+    title: 'Tu dominio propio',
+    description: 'Vende bajo tucirco.cl o entradas.tuteatro.com. Más confianza, mejor conversión.'
+  },
+  {
+    icon: TrendingUp,
+    title: 'Marketing que funciona',
+    description: 'Promoción en Meta y Google Ads optimizada para llenar las funciones con menos demanda.'
   },
   {
     icon: QrCode,
-    title: 'Venta de entradas',
-    description: 'Venta directa a través de WebPay y MercadoPago con validación de entradas mediante QR.'
-  },
-  {
-    icon: Users,
-    title: 'Equipo colaborativo',
-    description: 'Asigna permisos y roles para que tu equipo pueda gestionar el evento de forma compartida.'
-  },
-  {
-    icon: Lightbulb,
-    title: 'Marketing con IA',
-    description: 'Promoción automática en Meta, Google y TikTok optimizada con inteligencia artificial.'
-  },
-  {
-    icon: CreditCard,
-    title: 'Modelo de créditos',
-    description: 'Compra anticipada de créditos por evento que solo se descuentan si se vende una entrada.'
+    title: 'Check-in profesional',
+    description: 'QR que funciona sin internet, escaneo en 2 segundos y control de aforo en tiempo real.'
   },
   {
     icon: BarChart3,
-    title: 'Analítica avanzada',
-    description: 'Métricas de ventas, tasa de conversión, fuente de tráfico y más en tiempo real.'
+    title: 'Métricas claras',
+    description: 'Ventas por función, conversión por canal, horas pico y todo lo que necesitas para decidir.'
   }
 ];
 
 const attendeeFeatures = [
   {
     icon: Ticket,
-    title: 'Compra fácil',
-    description: 'Procesos de compra fluidos a través de Web, WhatsApp o Facebook.'
+    title: 'Compra simple',
+    description: 'WebPay, MercadoPago o transferencia. Recibe tu entrada al instante por email y WhatsApp.'
   },
   {
-    icon: Lightbulb,
-    title: 'Recomendaciones',
-    description: 'Sugerencias personalizadas según tus gustos y asistencias anteriores.'
+    icon: Bell,
+    title: 'Siempre informado',
+    description: 'Recordatorios antes de la función y avisos inmediatos si hay cambios o reprogramaciones.'
   },
   {
     icon: Gift,
-    title: 'Sistema de puntos',
-    description: 'Gana puntos por asistir, invitar amigos y participar en eventos.'
+    title: 'Extras y upgrades',
+    description: 'Accede a VIP, packs familiares, fotos con el elenco y más beneficios exclusivos.'
   }
 ];
 
 const tags = [
+  'Circos',
+  'Teatros',
+  'Ferias culturales',
+  'Museos',
   'Festivales',
-  'Fiestas electrónicas',
-  'Charlas tech',
-  'Ferias',
   'Experiencias inmersivas'
 ];
 </script>
@@ -77,17 +79,17 @@ const tags = [
       <div class="text-center mb-16">
         <FadeInSection>
           <span class="inline-block text-lime-400 font-[Prompt] font-medium text-sm bg-black px-4 py-1 rounded-full">
-            Características
+            Todo lo que necesitas
           </span>
         </FadeInSection>
 
         <FadeInSection :delay="100">
-          <h2 class="text-3xl md:text-4xl font-bold mt-2 mb-4 font-[Unbounded]">Una plataforma para todos</h2>
+          <h2 class="text-3xl md:text-4xl font-bold mt-2 mb-4 font-[Unbounded]">Deja de hacer malabares</h2>
         </FadeInSection>
         <FadeInSection :delay="200">
           <p class="text-gray-500 max-w-2xl mx-auto">
-            AI Tickets ofrece herramientas específicas tanto para productores de eventos como para asistentes, 
-            creando un ecosistema completo para la gestión y disfrute de eventos.
+            Venta de entradas, comunicación con asistentes, marketing y check-in. 
+            Todo desde un solo lugar, sin necesidad de ser experto en tecnología.
           </p>
         </FadeInSection>
       </div>
@@ -148,9 +150,9 @@ const tags = [
 
           <FadeInSection :delay="400" direction="up">
             <div class="mt-8 p-6 rounded-xl bg-gradient-to-br from-lime-400/10 to-lime-400/5 border border-lime-400/20">
-              <h4 class="text-lg font-semibold mb-2 font-[Unbounded]">Enfoque en Comunidad</h4>
+              <h4 class="text-lg font-semibold mb-2 font-[Unbounded]">Ideal para eventos con funciones múltiples</h4>
               <p class="text-gray-600 mb-4">
-                Preguntamos a los asistentes qué eventos quieren ver y conectamos a los organizadores con su comunidad ideal.
+                Diseñado especialmente para productores que manejan temporadas, múltiples horarios y sedes diferentes.
               </p>
               <div class="flex flex-wrap gap-2">
                 <span v-for="tag in tags" :key="tag" class="text-xs bg-white px-3 py-1 rounded-full">{{ tag }}</span>
