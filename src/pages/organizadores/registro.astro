@@ -1,0 +1,23 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import AppHeader from "../../components/AppHeader.vue";
+import AppFooter from "../../components/AppFooter.vue";
+import ProducerRegisterForm from "../../components/auth/ProducerRegisterForm.vue";
+import "../../styles/global.css";
+---
+
+<Layout title="Registro de Productores | AI Tickets">
+  <script
+    src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+    async
+    defer></script>
+  <AppHeader client:idle />
+
+  <main
+    class="min-h-screen bg-gray-50 flex items-center justify-center py-20 px-4"
+  >
+    <ProducerRegisterForm client:load />
+  </main>
+
+  <AppFooter client:idle />
+</Layout>

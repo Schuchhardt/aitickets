@@ -1,0 +1,19 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import AppHeader from "../../components/AppHeader.vue";
+import AppFooter from "../../components/AppFooter.vue";
+import ProducerLoginForm from "../../components/auth/ProducerLoginForm.vue";
+import "../../styles/global.css";
+---
+
+<Layout title="Iniciar Sesión | AI Tickets">
+  <AppHeader client:idle />
+
+  <main
+    class="min-h-screen bg-gray-50 flex items-center justify-center py-20 px-4"
+  >
+    <ProducerLoginForm client:load />
+  </main>
+
+  <AppFooter client:idle />
+</Layout>

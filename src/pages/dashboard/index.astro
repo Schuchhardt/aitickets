@@ -1,0 +1,83 @@
+---
+import DashboardLayout from "../../layouts/DashboardLayout.astro";
+import {
+  getSessionUser,
+  createSupabaseServerClient,
+} from "../../lib/supabaseServer";
+import {
+  LayoutDashboard,
+  CalendarDays,
+  Users,
+  TrendingUp,
+} from "lucide-vue-next";
+
+const user = await getSessionUser(Astro);
+
+if (!user) {
+  return Astro.redirect("/organizadores/login");
+}
+
+// Fetch additional profile data from `public.users` table
+const supabase = createSupabaseServerClient(Astro);
+const { data: dbUser } = await supabase
+  .from("users")
+  .select("name")
+  .eq("auth_user_id", user.id)
+  .single();
+
+// Si no hay sesión, se manejaría con un middleware, pero por ahora redirect en cliente o aquí si fuera SSR puro.
+// Como es híbrido/static, confiamos en la protección de rutas o redirect.
+
+// Fetch quick stats (Mocked or Real if possible)
+// En una app real, haríamos queries counts aquí.
+// Por ahora, estructura visual.
+---
+
+<DashboardLayout title="Resumen">
+  <div class="mb-8">
+    <h1 class="text-3xl font-bold font-[Unbounded] mb-2">
+      Hola, {
+        dbUser?.name ||
+          user?.user_metadata?.full_name ||
+          user?.email ||
+          "Productor"
+      } 👋
+    </h1>
+    <p class="text-gray-600">Bienvenido a tu panel de control de eventos.</p>
+  </div>
+
+  <!-- Stats Grid -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+      <div class="text-sm text-gray-500 font-medium mb-1">Eventos Activos</div>
+      <div class="text-3xl font-bold font-[Unbounded]">0</div>
+    </div>
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+      <div class="text-sm text-gray-500 font-medium mb-1">
+        Entradas Vendidas
+      </div>
+      <div class="text-3xl font-bold font-[Unbounded]">0</div>
+    </div>
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+      <div class="text-sm text-gray-500 font-medium mb-1">Ingresos Totales</div>
+      <div class="text-3xl font-bold font-[Unbounded] text-green-600">$0</div>
+    </div>
+  </div>
+
+  <div
+    class="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center py-20"
+  >
+    <div class="max-w-md mx-auto">
+      <h3 class="text-xl font-bold mb-2">Comienza tu primer evento</h3>
+      <p class="text-gray-500 mb-6">
+        Aún no has creado eventos. ¡Es hora de lanzar el próximo gran éxito!
+      </p>
+      <a
+        href="/dashboard/events/create"
+        class="inline-flex bg-black text-white px-6 py-3 rounded-lg hover:bg-gray-800 transition font-medium transform active:scale-95"
+      >
+        Crear Evento
+      </a>
+    </div>
+  </div>
+</DashboardLayout>

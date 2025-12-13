@@ -1,0 +1,283 @@
+---
+import DashboardLayout from "../../../layouts/DashboardLayout.astro";
+import { getSupabaseAdmin } from "../../../lib/auth-helpers";
+import { createSupabaseServerClient } from "../../../lib/supabaseServer";
+import {
+    Calendar,
+    MapPin,
+    Ticket,
+    CheckCircle,
+    AlertCircle,
+    Eye,
+    Edit,
+    Share2,
+    BarChart3,
+    Users,
+} from "lucide-vue-next";
+
+const { id } = Astro.params;
+const supabase = createSupabaseServerClient(Astro);
+const supabaseAdmin = getSupabaseAdmin();
+
+const {
+    data: { user },
+} = await supabase.auth.getUser();
+
+if (!user) {
+    return Astro.redirect("/organizadores/login");
+}
+
+// Get public user ID
+const { data: dbUser } = await supabase
+    .from("users")
+    .select("id")
+    .eq("auth_user_id", user.id)
+    .single();
+
+if (!dbUser) {
+    return Astro.redirect("/dashboard/events");
+}
+
+// Fetch event details
+const { data: event, error } = await supabaseAdmin
+    .from("events")
+    .select(
+        `
+    *,
+    event_tickets (
+      id,
+      ticket_name,
+      price,
+      total_quantity
+    ),
+    event_locations (
+      *,
+      venues (
+        name,
+        city
+      )
+    )
+  `,
+    )
+    .eq("id", id)
+    .eq("created_by", dbUser.id) // Correctly use integer ID
+    .single();
+
+if (error || !event) {
+    return Astro.redirect("/dashboard/events");
+}
+
+// Calculate Stats
+const totalTickets =
+    event.event_tickets?.reduce(
+        (acc, t) => acc + (t.total_quantity || t.quantity || 0),
+        0,
+    ) || 0;
+// Mock sales for now (or implement real count if orders existed)
+const ticketsSold = 0;
+const totalRevenue = 0;
+const visits = Math.floor(Math.random() * 50); // Placeholder for analytics
+
+const publicLink = `/eventos/${event.slug}`;
+---
+
+<DashboardLayout title={event.name}>
+    <!-- Header -->
+    <div
+        class="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8"
+    >
+        <div>
+            <div class="flex items-center gap-3 mb-2">
+                <a
+                    href="/dashboard/events"
+                    class="text-gray-500 hover:text-black transition">Eventos</a
+                >
+                <span class="text-gray-300">/</span>
+                <span class="text-gray-900 font-medium truncate max-w-[200px]"
+                    >{event.name}</span
+                >
+            </div>
+            <h1 class="text-3xl font-bold font-[Unbounded] mb-2">
+                {event.name}
+            </h1>
+            <div class="flex items-center gap-4 text-sm text-gray-600">
+                <span
+                    class={`px-3 py-1 rounded-full text-xs font-bold ${event.status === "published" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}
+                >
+                    {event.status === "published" ? "Publicado" : "Borrador"}
+                </span>
+                <span class="flex items-center gap-1">
+                    <Calendar size="16" />
+                    {
+                        event.start_date
+                            ? new Date(event.start_date).toLocaleDateString()
+                            : "Fecha por definir"
+                    }
+                </span>
+            </div>
+        </div>
+
+        <div class="flex gap-3">
+            <a
+                href={publicLink}
+                target="_blank"
+                class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
+            >
+                <Eye size="18" /> Ver Página
+            </a>
+            <button
+                class="flex items-center gap-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-900 transition font-medium"
+            >
+                <Edit size="18" /> Editar
+            </button>
+        </div>
+    </div>
+
+    <!-- Stats Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+            <div class="flex justify-between items-start mb-4">
+                <div class="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                    <Eye size="20" />
+                </div>
+                <span
+                    class="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded-full"
+                    >+12%</span
+                >
+            </div>
+            <p class="text-gray-500 text-sm mb-1">Visitas Totales</p>
+            <h3 class="text-2xl font-bold">{visits}</h3>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+            <div class="flex justify-between items-start mb-4">
+                <div class="p-2 bg-purple-50 text-purple-600 rounded-lg">
+                    <Ticket size="20" />
+                </div>
+            </div>
+            <p class="text-gray-500 text-sm mb-1">Entradas Vendidas</p>
+            <h3 class="text-2xl font-bold">{ticketsSold} / {totalTickets}</h3>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+            <div class="flex justify-between items-start mb-4">
+                <div class="p-2 bg-green-50 text-green-600 rounded-lg">
+                    <BarChart3 size="20" />
+                </div>
+            </div>
+            <p class="text-gray-500 text-sm mb-1">Ingresos Totales</p>
+            <h3 class="text-2xl font-bold">${totalRevenue.toLocaleString()}</h3>
+        </div>
+        <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+            <div class="flex justify-between items-start mb-4">
+                <div class="p-2 bg-orange-50 text-orange-600 rounded-lg">
+                    <Share2 size="20" />
+                </div>
+            </div>
+            <p class="text-gray-500 text-sm mb-1">Conversión</p>
+            <h3 class="text-2xl font-bold">0%</h3>
+        </div>
+    </div>
+
+    <!-- Main Content Layout -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Left Column: Details -->
+        <div class="lg:col-span-2 space-y-8">
+            <!-- Tickets Section -->
+            <section
+                class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
+            >
+                <div
+                    class="p-6 border-b border-gray-100 flex justify-between items-center"
+                >
+                    <h3 class="font-bold text-lg">Tipos de Entrada</h3>
+                    <button
+                        class="text-sm text-black font-medium hover:underline"
+                        >Gestionar</button
+                    >
+                </div>
+                <div class="divide-y divide-gray-100">
+                    {
+                        event.event_tickets?.map((ticket) => (
+                            <div class="p-4 flex justify-between items-center hover:bg-gray-50 transition">
+                                <div>
+                                    <p class="font-bold text-gray-900">
+                                        {ticket.name}
+                                    </p>
+                                    <p class="text-sm text-gray-500">
+                                        ${Number(ticket.price).toLocaleString()}{" "}
+                                        • {ticket.quantity} disponibles
+                                    </p>
+                                </div>
+                                <div>
+                                    <span class="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs font-medium">
+                                        Activo
+                                    </span>
+                                </div>
+                            </div>
+                        ))
+                    }
+                    {
+                        (!event.event_tickets ||
+                            event.event_tickets.length === 0) && (
+                            <div class="p-8 text-center text-gray-500">
+                                No hay entradas configuradas.
+                            </div>
+                        )
+                    }
+                </div>
+            </section>
+        </div>
+
+        <!-- Right Column: Quick Actions & Public Link -->
+        <div class="space-y-6">
+            <div
+                class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm"
+            >
+                <h3 class="font-bold text-lg mb-4">Link Público</h3>
+                <p class="text-sm text-gray-500 mb-2">
+                    Comparte este enlace para vender entradas.
+                </p>
+
+                <div class="flex gap-2">
+                    <input
+                        type="text"
+                        readonly
+                        value={`https://aitickets.cl${publicLink}`}
+                        class="bg-gray-50 border border-gray-200 text-gray-600 text-sm rounded-lg px-3 py-2 w-full outline-none"
+                    />
+                    <button
+                        class="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition text-gray-700"
+                    >
+                        <Share2 size="18" />
+                    </button>
+                </div>
+            </div>
+
+            <div
+                class="bg-gradient-to-br from-gray-900 to-black p-6 rounded-xl text-white shadow-lg"
+            >
+                <h3 class="font-bold text-lg mb-2">Estado del Evento</h3>
+                <p class="text-gray-400 text-sm mb-6">
+                    Tu evento está actualmente en modo <strong
+                        >{
+                            event.status === "published"
+                                ? "Público"
+                                : "Borrador"
+                        }</strong
+                    >.
+                </p>
+
+                <button
+                    class="w-full py-2 bg-white text-black font-bold rounded-lg hover:bg-gray-100 transition"
+                >
+                    {
+                        event.status === "published"
+                            ? "Pausar Ventas"
+                            : "Publicar Evento"
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+</DashboardLayout>

@@ -60,6 +60,12 @@ const toggleMenu = () => {
           >
             Para Organizadores
           </a>
+          <a
+            href="/organizadores/login"
+            class="text-sm font-medium font-[Unbounded] bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors"
+          >
+            Ingresar
+          </a>
         </div>
 
         <!-- Mobile Menu Button -->
@@ -107,6 +113,15 @@ const toggleMenu = () => {
             ]"
           >
             Para Organizadores
+          </a>
+          <a
+            href="/organizadores/login"
+            :class="[
+              'text-sm font-medium font-[Unbounded] px-4 py-2 hover:bg-secondary rounded-md transition-colors block',
+               currentPath === '/organizadores/login' ? 'bg-secondary bg-black text-white' : ''
+            ]"
+          >
+            Ingresar
           </a>
         </div>
       </div>

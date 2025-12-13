@@ -1,0 +1,1092 @@
+---
+import DashboardLayout from "../../../layouts/DashboardLayout.astro";
+import { createSupabaseServerClient } from "../../../lib/supabaseServer";
+import { getSupabaseAdmin } from "../../../lib/auth-helpers";
+import {
+    Ticket,
+    Calendar,
+    ChevronDown,
+    Users,
+    DollarSign,
+    Gift,
+    Clock,
+    CheckCircle,
+    XCircle,
+    Search,
+} from "lucide-vue-next";
+
+const supabase = createSupabaseServerClient(Astro);
+const supabaseAdmin = getSupabaseAdmin();
+
+const {
+    data: { user },
+} = await supabase.auth.getUser();
+
+if (!user) {
+    return Astro.redirect("/organizadores/login");
+}
+
+// Get public user info (organization_id)
+const { data: dbUser } = await supabase
+    .from("users")
+    .select("organization_id")
+    .eq("auth_user_id", user.id)
+    .single();
+
+if (!dbUser || !dbUser.organization_id) {
+    console.error("User request without organization_id");
+}
+
+const now = new Date().toISOString();
+
+// Fetch current events (end_date >= now or start_date >= now)
+const { data: currentEvents } = await supabaseAdmin
+    .from("events")
+    .select(
+        `
+    id,
+    name,
+    title,
+    slug,
+    start_date,
+    end_date,
+    status,
+    image_url,
+    event_tickets (
+      id,
+      ticket_name,
+      price,
+      total_quantity,
+      status
+    )
+  `,
+    )
+    .eq("organization_id", dbUser?.organization_id)
+    .gte("end_date", now)
+    .order("start_date", { ascending: true });
+
+// Fetch past events (end_date < now)
+const { data: pastEvents } = await supabaseAdmin
+    .from("events")
+    .select(
+        `
+    id,
+    name,
+    title,
+    slug,
+    start_date,
+    end_date,
+    status,
+    image_url,
+    event_tickets (
+      id,
+      ticket_name,
+      price,
+      total_quantity,
+      status
+    )
+  `,
+    )
+    .eq("organization_id", dbUser?.organization_id)
+    .lt("end_date", now)
+    .order("end_date", { ascending: false });
+
+// Function to get ticket stats for an event
+async function getTicketStats(eventId: number) {
+    // Get attendees count per ticket type
+    const { data: attendees } = await supabaseAdmin
+        .from("event_attendees")
+        .select("id, event_ticket_id, event_order_id")
+        .eq("event_id", eventId);
+
+    // Get paid orders for this event
+    const { data: paidOrders } = await supabaseAdmin
+        .from("event_orders")
+        .select("id")
+        .eq("event_id", eventId)
+        .eq("status", "paid");
+
+    const paidOrderIds = new Set(paidOrders?.map((o) => o.id) || []);
+
+    // Count sold tickets: attendees with paid order OR attendees without order (free tickets)
+    const soldAttendees =
+        attendees?.filter((a) => {
+            if (a.event_order_id === null) return true; // Free ticket
+            return paidOrderIds.has(a.event_order_id); // Paid order
+        }) || [];
+
+    return {
+        totalSold: soldAttendees.length,
+        byTicketType: soldAttendees.reduce(
+            (acc, a) => {
+                const ticketId = a.event_ticket_id;
+                acc[ticketId] = (acc[ticketId] || 0) + 1;
+                return acc;
+            },
+            {} as Record<number, number>,
+        ),
+    };
+}
+
+// Function to get attendee list for an event
+async function getAttendeeList(eventId: number) {
+    // Get all attendees with their ticket and attendee info
+    const { data: eventAttendees } = await supabaseAdmin
+        .from("event_attendees")
+        .select(
+            `
+      id,
+      created_at,
+      event_order_id,
+      status,
+      validated_at,
+      is_complimentary,
+      event_tickets (
+        id,
+        ticket_name,
+        price
+      ),
+      attendees (
+        id,
+        first_name,
+        last_name,
+        email
+      )
+    `,
+        )
+        .eq("event_id", eventId)
+        .order("created_at", { ascending: false });
+
+    // Get paid orders for filtering
+    const { data: paidOrders } = await supabaseAdmin
+        .from("event_orders")
+        .select("id, created_at, amount")
+        .eq("event_id", eventId)
+        .eq("status", "paid");
+
+    const paidOrderMap = new Map(paidOrders?.map((o) => [o.id, o]) || []);
+
+    // Filter attendees: those with paid orders OR those without orders (free)
+    const validAttendees =
+        eventAttendees?.filter((a) => {
+            if (a.event_order_id === null) return true;
+            return paidOrderMap.has(a.event_order_id);
+        }) || [];
+
+    return validAttendees.map((a) => ({
+        id: a.id,
+        name:
+            `${a.attendees?.first_name || ""} ${a.attendees?.last_name || ""}`.trim() ||
+            "Sin nombre",
+        email: a.attendees?.email || "Sin email",
+        ticketType: a.event_tickets?.ticket_name || "N/A",
+        price: a.event_tickets?.price || 0,
+        isFree: a.event_order_id === null,
+        isComplimentary: a.is_complimentary,
+        purchaseDate: a.created_at,
+        status: a.status,
+        validated: !!a.validated_at,
+    }));
+}
+
+// Pre-compute stats for all events
+const eventStats: Record<
+    number,
+    { totalSold: number; byTicketType: Record<number, number> }
+> = {};
+const eventAttendees: Record<
+    number,
+    ReturnType<typeof getAttendeeList> extends Promise<infer T> ? T : never
+> = {};
+
+const allEvents = [...(currentEvents || []), ...(pastEvents || [])];
+for (const event of allEvents) {
+    eventStats[event.id] = await getTicketStats(event.id);
+    eventAttendees[event.id] = await getAttendeeList(event.id);
+}
+
+// Format price
+function formatPrice(price: number): string {
+    return new Intl.NumberFormat("es-CL", {
+        style: "currency",
+        currency: "CLP",
+        minimumFractionDigits: 0,
+    }).format(price);
+}
+
+// Format date
+function formatDate(dateString: string): string {
+    return new Date(dateString).toLocaleDateString("es-CL", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+    });
+}
+---
+
+<DashboardLayout title="Entradas">
+    <div class="space-y-6">
+        <!-- Header -->
+        <div
+            class="flex flex-col md:flex-row md:items-center justify-between gap-4"
+        >
+            <div>
+                <h1 class="text-3xl font-bold font-[Unbounded] mb-2">
+                    Entradas
+                </h1>
+                <p class="text-gray-600">
+                    Gestiona las entradas vendidas de todos tus eventos.
+                </p>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div
+            class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden"
+        >
+            <div class="border-b border-gray-100">
+                <nav class="flex" id="tabs-nav">
+                    <button
+                        type="button"
+                        class="tab-btn active px-6 py-4 text-sm font-medium border-b-2 border-black text-black transition-colors"
+                        data-tab="current"
+                    >
+                        <span class="flex items-center gap-2">
+                            <Calendar class="w-4 h-4" />
+                            Eventos Actuales
+                            <span
+                                class="bg-black text-white text-xs px-2 py-0.5 rounded-full"
+                            >
+                                {currentEvents?.length || 0}
+                            </span>
+                        </span>
+                    </button>
+                    <button
+                        type="button"
+                        class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 transition-colors"
+                        data-tab="past"
+                    >
+                        <span class="flex items-center gap-2">
+                            <Clock class="w-4 h-4" />
+                            Eventos Pasados
+                            <span
+                                class="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full"
+                            >
+                                {pastEvents?.length || 0}
+                            </span>
+                        </span>
+                    </button>
+                </nav>
+            </div>
+
+            <!-- Current Events Tab -->
+            <div id="tab-current" class="tab-content">
+                {
+                    !currentEvents || currentEvents.length === 0 ? (
+                        <div class="p-12 text-center">
+                            <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-400">
+                                <Ticket size={32} />
+                            </div>
+                            <h3 class="text-xl font-bold mb-2">
+                                No hay eventos actuales
+                            </h3>
+                            <p class="text-gray-500 mb-6">
+                                Crea un evento para comenzar a vender entradas.
+                            </p>
+                            <a
+                                href="/dashboard/events/create"
+                                class="inline-flex bg-black text-white px-6 py-3 rounded-lg hover:bg-gray-800 transition font-medium"
+                            >
+                                Crear Evento
+                            </a>
+                        </div>
+                    ) : (
+                        <div class="divide-y divide-gray-100">
+                            {currentEvents.map((event) => {
+                                const stats = eventStats[event.id];
+                                const attendees = eventAttendees[event.id];
+                                const totalTickets =
+                                    event.event_tickets?.reduce(
+                                        (sum, t) =>
+                                            sum + (t.total_quantity || 0),
+                                        0,
+                                    ) || 0;
+                                const soldPercentage =
+                                    totalTickets > 0
+                                        ? Math.round(
+                                              (stats.totalSold / totalTickets) *
+                                                  100,
+                                          )
+                                        : 0;
+
+                                return (
+                                    <div
+                                        class="event-accordion"
+                                        data-event-id={event.id}
+                                    >
+                                        {/* Event Header - Clickable */}
+                                        <button
+                                            type="button"
+                                            class="accordion-trigger w-full p-6 flex items-center gap-4 hover:bg-gray-50 transition text-left"
+                                        >
+                                            <div class="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                                                {event.image_url ? (
+                                                    <img
+                                                        src={event.image_url}
+                                                        alt={event.name}
+                                                        class="w-full h-full object-cover"
+                                                    />
+                                                ) : (
+                                                    <div class="w-full h-full flex items-center justify-center text-gray-400">
+                                                        <Calendar size={24} />
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div class="flex-1 min-w-0">
+                                                <div class="flex items-center gap-2 mb-1">
+                                                    <h3 class="font-bold text-lg truncate">
+                                                        {event.title ||
+                                                            event.name}
+                                                    </h3>
+                                                    <span
+                                                        class={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                                                            event.status ===
+                                                            "published"
+                                                                ? "bg-green-100 text-green-700"
+                                                                : "bg-yellow-100 text-yellow-700"
+                                                        }`}
+                                                    >
+                                                        {event.status ===
+                                                        "published"
+                                                            ? "Publicado"
+                                                            : "Borrador"}
+                                                    </span>
+                                                </div>
+                                                <p class="text-sm text-gray-500">
+                                                    {event.start_date
+                                                        ? formatDate(
+                                                              event.start_date,
+                                                          )
+                                                        : "Fecha por definir"}
+                                                </p>
+                                            </div>
+                                            <div class="flex items-center gap-6">
+                                                <div class="text-right">
+                                                    <p class="text-2xl font-bold">
+                                                        {stats.totalSold}
+                                                    </p>
+                                                    <p class="text-xs text-gray-500">
+                                                        vendidas
+                                                    </p>
+                                                </div>
+                                                <div class="w-24">
+                                                    <div class="flex justify-between text-xs mb-1">
+                                                        <span class="text-gray-500">
+                                                            Ocupación
+                                                        </span>
+                                                        <span class="font-medium">
+                                                            {soldPercentage}%
+                                                        </span>
+                                                    </div>
+                                                    <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
+                                                        <div
+                                                            class="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all duration-500"
+                                                            style={`width: ${soldPercentage}%`}
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <ChevronDown class="w-5 h-5 text-gray-400 accordion-icon transition-transform duration-200" />
+                                            </div>
+                                        </button>
+
+                                        {/* Accordion Content */}
+                                        <div class="accordion-content hidden border-t border-gray-100 bg-gray-50/50">
+                                            {/* Ticket Types Summary */}
+                                            <div class="p-6 border-b border-gray-100">
+                                                <h4 class="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                                                    <Ticket class="w-4 h-4" />
+                                                    Resumen por Tipo de Entrada
+                                                </h4>
+                                                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                                    {event.event_tickets?.map(
+                                                        (ticket) => {
+                                                            const sold =
+                                                                stats
+                                                                    .byTicketType[
+                                                                    ticket.id
+                                                                ] || 0;
+                                                            const available =
+                                                                (ticket.total_quantity ||
+                                                                    0) - sold;
+                                                            const ticketPercentage =
+                                                                ticket.total_quantity
+                                                                    ? Math.round(
+                                                                          (sold /
+                                                                              ticket.total_quantity) *
+                                                                              100,
+                                                                      )
+                                                                    : 0;
+                                                            const isFree =
+                                                                ticket.price ===
+                                                                0;
+
+                                                            return (
+                                                                <div class="bg-white rounded-lg border border-gray-200 p-4">
+                                                                    <div class="flex items-start justify-between mb-3">
+                                                                        <div class="flex items-center gap-2">
+                                                                            {isFree ? (
+                                                                                <Gift class="w-4 h-4 text-green-500" />
+                                                                            ) : (
+                                                                                <Ticket class="w-4 h-4 text-purple-500" />
+                                                                            )}
+                                                                            <span class="font-medium text-gray-900">
+                                                                                {
+                                                                                    ticket.ticket_name
+                                                                                }
+                                                                            </span>
+                                                                        </div>
+                                                                        <span
+                                                                            class={`text-xs px-2 py-0.5 rounded-full ${
+                                                                                isFree
+                                                                                    ? "bg-green-100 text-green-700"
+                                                                                    : "bg-purple-100 text-purple-700"
+                                                                            }`}
+                                                                        >
+                                                                            {isFree
+                                                                                ? "Gratis"
+                                                                                : formatPrice(
+                                                                                      ticket.price,
+                                                                                  )}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div class="space-y-2">
+                                                                        <div class="flex justify-between text-sm">
+                                                                            <span class="text-gray-500">
+                                                                                Vendidas
+                                                                            </span>
+                                                                            <span class="font-semibold text-green-600">
+                                                                                {
+                                                                                    sold
+                                                                                }
+                                                                            </span>
+                                                                        </div>
+                                                                        <div class="flex justify-between text-sm">
+                                                                            <span class="text-gray-500">
+                                                                                Disponibles
+                                                                            </span>
+                                                                            <span class="font-semibold text-blue-600">
+                                                                                {
+                                                                                    available
+                                                                                }
+                                                                            </span>
+                                                                        </div>
+                                                                        <div class="h-1.5 bg-gray-200 rounded-full overflow-hidden mt-2">
+                                                                            <div
+                                                                                class="h-full bg-gradient-to-r from-green-400 to-emerald-500 rounded-full"
+                                                                                style={`width: ${ticketPercentage}%`}
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        },
+                                                    )}
+                                                    {(!event.event_tickets ||
+                                                        event.event_tickets
+                                                            .length === 0) && (
+                                                        <div class="col-span-full text-center py-4 text-gray-500">
+                                                            No hay tipos de
+                                                            entrada configurados
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Attendees Table */}
+                                            <div class="p-6">
+                                                <div class="flex items-center justify-between mb-4">
+                                                    <h4 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                                                        <Users class="w-4 h-4" />
+                                                        Listado de Entradas (
+                                                        {attendees.length})
+                                                    </h4>
+                                                    <div class="relative">
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Buscar..."
+                                                            class="search-input pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-gray-300"
+                                                            data-event-id={
+                                                                event.id
+                                                            }
+                                                        />
+                                                        <Search class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                                                    </div>
+                                                </div>
+
+                                                {attendees.length > 0 ? (
+                                                    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                                                        <div class="overflow-x-auto">
+                                                            <table class="w-full text-sm">
+                                                                <thead class="bg-gray-50 text-gray-600">
+                                                                    <tr>
+                                                                        <th class="px-4 py-3 text-left font-medium">
+                                                                            Asistente
+                                                                        </th>
+                                                                        <th class="px-4 py-3 text-left font-medium">
+                                                                            Tipo
+                                                                        </th>
+                                                                        <th class="px-4 py-3 text-left font-medium">
+                                                                            Precio
+                                                                        </th>
+                                                                        <th class="px-4 py-3 text-left font-medium">
+                                                                            Fecha
+                                                                        </th>
+                                                                        <th class="px-4 py-3 text-left font-medium">
+                                                                            Estado
+                                                                        </th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody
+                                                                    class="divide-y divide-gray-100 attendees-tbody"
+                                                                    data-event-id={
+                                                                        event.id
+                                                                    }
+                                                                >
+                                                                    {attendees.map(
+                                                                        (
+                                                                            attendee,
+                                                                        ) => (
+                                                                            <tr class="hover:bg-gray-50 transition attendee-row">
+                                                                                <td class="px-4 py-3">
+                                                                                    <div>
+                                                                                        <p class="font-medium text-gray-900 attendee-name">
+                                                                                            {
+                                                                                                attendee.name
+                                                                                            }
+                                                                                        </p>
+                                                                                        <p class="text-xs text-gray-500 attendee-email">
+                                                                                            {
+                                                                                                attendee.email
+                                                                                            }
+                                                                                        </p>
+                                                                                    </div>
+                                                                                </td>
+                                                                                <td class="px-4 py-3">
+                                                                                    <span class="flex items-center gap-1.5">
+                                                                                        {attendee.isFree ||
+                                                                                        attendee.isComplimentary ? (
+                                                                                            <Gift class="w-3.5 h-3.5 text-green-500" />
+                                                                                        ) : (
+                                                                                            <Ticket class="w-3.5 h-3.5 text-purple-500" />
+                                                                                        )}
+                                                                                        <span class="attendee-ticket">
+                                                                                            {
+                                                                                                attendee.ticketType
+                                                                                            }
+                                                                                        </span>
+                                                                                    </span>
+                                                                                </td>
+                                                                                <td class="px-4 py-3">
+                                                                                    <span
+                                                                                        class={`${
+                                                                                            attendee.isFree ||
+                                                                                            attendee.isComplimentary
+                                                                                                ? "text-green-600"
+                                                                                                : "text-gray-900"
+                                                                                        }`}
+                                                                                    >
+                                                                                        {attendee.isFree ||
+                                                                                        attendee.isComplimentary
+                                                                                            ? "Gratis"
+                                                                                            : formatPrice(
+                                                                                                  attendee.price,
+                                                                                              )}
+                                                                                    </span>
+                                                                                </td>
+                                                                                <td class="px-4 py-3 text-gray-500">
+                                                                                    {formatDate(
+                                                                                        attendee.purchaseDate,
+                                                                                    )}
+                                                                                </td>
+                                                                                <td class="px-4 py-3">
+                                                                                    {attendee.validated ? (
+                                                                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                                                                                            <CheckCircle class="w-3 h-3" />
+                                                                                            Validado
+                                                                                        </span>
+                                                                                    ) : (
+                                                                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">
+                                                                                            <Clock class="w-3 h-3" />
+                                                                                            Pendiente
+                                                                                        </span>
+                                                                                    )}
+                                                                                </td>
+                                                                            </tr>
+                                                                        ),
+                                                                    )}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div class="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-500">
+                                                        <Ticket class="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                                                        <p>
+                                                            No hay entradas
+                                                            vendidas para este
+                                                            evento
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )
+                }
+            </div>
+
+            <!-- Past Events Tab -->
+            <div id="tab-past" class="tab-content hidden">
+                {
+                    !pastEvents || pastEvents.length === 0 ? (
+                        <div class="p-12 text-center">
+                            <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-400">
+                                <Clock size={32} />
+                            </div>
+                            <h3 class="text-xl font-bold mb-2">
+                                No hay eventos pasados
+                            </h3>
+                            <p class="text-gray-500">
+                                Los eventos finalizados aparecerán aquí.
+                            </p>
+                        </div>
+                    ) : (
+                        <div class="divide-y divide-gray-100">
+                            {pastEvents.map((event) => {
+                                const stats = eventStats[event.id];
+                                const attendees = eventAttendees[event.id];
+                                const totalTickets =
+                                    event.event_tickets?.reduce(
+                                        (sum, t) =>
+                                            sum + (t.total_quantity || 0),
+                                        0,
+                                    ) || 0;
+                                const soldPercentage =
+                                    totalTickets > 0
+                                        ? Math.round(
+                                              (stats.totalSold / totalTickets) *
+                                                  100,
+                                          )
+                                        : 0;
+
+                                return (
+                                    <div
+                                        class="event-accordion"
+                                        data-event-id={event.id}
+                                    >
+                                        {/* Event Header - Clickable */}
+                                        <button
+                                            type="button"
+                                            class="accordion-trigger w-full p-6 flex items-center gap-4 hover:bg-gray-50 transition text-left opacity-80"
+                                        >
+                                            <div class="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 grayscale">
+                                                {event.image_url ? (
+                                                    <img
+                                                        src={event.image_url}
+                                                        alt={event.name}
+                                                        class="w-full h-full object-cover"
+                                                    />
+                                                ) : (
+                                                    <div class="w-full h-full flex items-center justify-center text-gray-400">
+                                                        <Calendar size={24} />
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div class="flex-1 min-w-0">
+                                                <div class="flex items-center gap-2 mb-1">
+                                                    <h3 class="font-bold text-lg truncate">
+                                                        {event.title ||
+                                                            event.name}
+                                                    </h3>
+                                                    <span class="px-2 py-0.5 text-xs font-medium rounded-full bg-gray-200 text-gray-600">
+                                                        Finalizado
+                                                    </span>
+                                                </div>
+                                                <p class="text-sm text-gray-500">
+                                                    {event.end_date
+                                                        ? formatDate(
+                                                              event.end_date,
+                                                          )
+                                                        : "Sin fecha"}
+                                                </p>
+                                            </div>
+                                            <div class="flex items-center gap-6">
+                                                <div class="text-right">
+                                                    <p class="text-2xl font-bold">
+                                                        {stats.totalSold}
+                                                    </p>
+                                                    <p class="text-xs text-gray-500">
+                                                        vendidas
+                                                    </p>
+                                                </div>
+                                                <div class="w-24">
+                                                    <div class="flex justify-between text-xs mb-1">
+                                                        <span class="text-gray-500">
+                                                            Ocupación
+                                                        </span>
+                                                        <span class="font-medium">
+                                                            {soldPercentage}%
+                                                        </span>
+                                                    </div>
+                                                    <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
+                                                        <div
+                                                            class="h-full bg-gray-400 rounded-full"
+                                                            style={`width: ${soldPercentage}%`}
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <ChevronDown class="w-5 h-5 text-gray-400 accordion-icon transition-transform duration-200" />
+                                            </div>
+                                        </button>
+
+                                        {/* Accordion Content - Same structure as current events */}
+                                        <div class="accordion-content hidden border-t border-gray-100 bg-gray-50/50">
+                                            {/* Ticket Types Summary */}
+                                            <div class="p-6 border-b border-gray-100">
+                                                <h4 class="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                                                    <Ticket class="w-4 h-4" />
+                                                    Resumen por Tipo de Entrada
+                                                </h4>
+                                                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                                    {event.event_tickets?.map(
+                                                        (ticket) => {
+                                                            const sold =
+                                                                stats
+                                                                    .byTicketType[
+                                                                    ticket.id
+                                                                ] || 0;
+                                                            const available =
+                                                                (ticket.total_quantity ||
+                                                                    0) - sold;
+                                                            const ticketPercentage =
+                                                                ticket.total_quantity
+                                                                    ? Math.round(
+                                                                          (sold /
+                                                                              ticket.total_quantity) *
+                                                                              100,
+                                                                      )
+                                                                    : 0;
+                                                            const isFree =
+                                                                ticket.price ===
+                                                                0;
+
+                                                            return (
+                                                                <div class="bg-white rounded-lg border border-gray-200 p-4">
+                                                                    <div class="flex items-start justify-between mb-3">
+                                                                        <div class="flex items-center gap-2">
+                                                                            {isFree ? (
+                                                                                <Gift class="w-4 h-4 text-green-500" />
+                                                                            ) : (
+                                                                                <Ticket class="w-4 h-4 text-gray-400" />
+                                                                            )}
+                                                                            <span class="font-medium text-gray-900">
+                                                                                {
+                                                                                    ticket.ticket_name
+                                                                                }
+                                                                            </span>
+                                                                        </div>
+                                                                        <span
+                                                                            class={`text-xs px-2 py-0.5 rounded-full ${
+                                                                                isFree
+                                                                                    ? "bg-green-100 text-green-700"
+                                                                                    : "bg-gray-100 text-gray-600"
+                                                                            }`}
+                                                                        >
+                                                                            {isFree
+                                                                                ? "Gratis"
+                                                                                : formatPrice(
+                                                                                      ticket.price,
+                                                                                  )}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div class="space-y-2">
+                                                                        <div class="flex justify-between text-sm">
+                                                                            <span class="text-gray-500">
+                                                                                Vendidas
+                                                                            </span>
+                                                                            <span class="font-semibold text-gray-700">
+                                                                                {
+                                                                                    sold
+                                                                                }
+                                                                            </span>
+                                                                        </div>
+                                                                        <div class="flex justify-between text-sm">
+                                                                            <span class="text-gray-500">
+                                                                                Total
+                                                                            </span>
+                                                                            <span class="font-semibold text-gray-600">
+                                                                                {ticket.total_quantity ||
+                                                                                    0}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div class="h-1.5 bg-gray-200 rounded-full overflow-hidden mt-2">
+                                                                            <div
+                                                                                class="h-full bg-gray-400 rounded-full"
+                                                                                style={`width: ${ticketPercentage}%`}
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        },
+                                                    )}
+                                                    {(!event.event_tickets ||
+                                                        event.event_tickets
+                                                            .length === 0) && (
+                                                        <div class="col-span-full text-center py-4 text-gray-500">
+                                                            No hay tipos de
+                                                            entrada configurados
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Attendees Table */}
+                                            <div class="p-6">
+                                                <div class="flex items-center justify-between mb-4">
+                                                    <h4 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                                                        <Users class="w-4 h-4" />
+                                                        Listado de Entradas (
+                                                        {attendees.length})
+                                                    </h4>
+                                                    <div class="relative">
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Buscar..."
+                                                            class="search-input pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-gray-300"
+                                                            data-event-id={
+                                                                event.id
+                                                            }
+                                                        />
+                                                        <Search class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                                                    </div>
+                                                </div>
+
+                                                {attendees.length > 0 ? (
+                                                    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                                                        <div class="overflow-x-auto">
+                                                            <table class="w-full text-sm">
+                                                                <thead class="bg-gray-50 text-gray-600">
+                                                                    <tr>
+                                                                        <th class="px-4 py-3 text-left font-medium">
+                                                                            Asistente
+                                                                        </th>
+                                                                        <th class="px-4 py-3 text-left font-medium">
+                                                                            Tipo
+                                                                        </th>
+                                                                        <th class="px-4 py-3 text-left font-medium">
+                                                                            Precio
+                                                                        </th>
+                                                                        <th class="px-4 py-3 text-left font-medium">
+                                                                            Fecha
+                                                                        </th>
+                                                                        <th class="px-4 py-3 text-left font-medium">
+                                                                            Estado
+                                                                        </th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody
+                                                                    class="divide-y divide-gray-100 attendees-tbody"
+                                                                    data-event-id={
+                                                                        event.id
+                                                                    }
+                                                                >
+                                                                    {attendees.map(
+                                                                        (
+                                                                            attendee,
+                                                                        ) => (
+                                                                            <tr class="hover:bg-gray-50 transition attendee-row">
+                                                                                <td class="px-4 py-3">
+                                                                                    <div>
+                                                                                        <p class="font-medium text-gray-900 attendee-name">
+                                                                                            {
+                                                                                                attendee.name
+                                                                                            }
+                                                                                        </p>
+                                                                                        <p class="text-xs text-gray-500 attendee-email">
+                                                                                            {
+                                                                                                attendee.email
+                                                                                            }
+                                                                                        </p>
+                                                                                    </div>
+                                                                                </td>
+                                                                                <td class="px-4 py-3">
+                                                                                    <span class="flex items-center gap-1.5">
+                                                                                        {attendee.isFree ||
+                                                                                        attendee.isComplimentary ? (
+                                                                                            <Gift class="w-3.5 h-3.5 text-green-500" />
+                                                                                        ) : (
+                                                                                            <Ticket class="w-3.5 h-3.5 text-gray-400" />
+                                                                                        )}
+                                                                                        <span class="attendee-ticket">
+                                                                                            {
+                                                                                                attendee.ticketType
+                                                                                            }
+                                                                                        </span>
+                                                                                    </span>
+                                                                                </td>
+                                                                                <td class="px-4 py-3">
+                                                                                    <span
+                                                                                        class={`${
+                                                                                            attendee.isFree ||
+                                                                                            attendee.isComplimentary
+                                                                                                ? "text-green-600"
+                                                                                                : "text-gray-900"
+                                                                                        }`}
+                                                                                    >
+                                                                                        {attendee.isFree ||
+                                                                                        attendee.isComplimentary
+                                                                                            ? "Gratis"
+                                                                                            : formatPrice(
+                                                                                                  attendee.price,
+                                                                                              )}
+                                                                                    </span>
+                                                                                </td>
+                                                                                <td class="px-4 py-3 text-gray-500">
+                                                                                    {formatDate(
+                                                                                        attendee.purchaseDate,
+                                                                                    )}
+                                                                                </td>
+                                                                                <td class="px-4 py-3">
+                                                                                    {attendee.validated ? (
+                                                                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                                                                                            <CheckCircle class="w-3 h-3" />
+                                                                                            Validado
+                                                                                        </span>
+                                                                                    ) : (
+                                                                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">
+                                                                                            <Clock class="w-3 h-3" />
+                                                                                            Pendiente
+                                                                                        </span>
+                                                                                    )}
+                                                                                </td>
+                                                                            </tr>
+                                                                        ),
+                                                                    )}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div class="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-500">
+                                                        <Ticket class="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                                                        <p>
+                                                            No hay entradas
+                                                            vendidas para este
+                                                            evento
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )
+                }
+            </div>
+        </div>
+    </div>
+</DashboardLayout>
+
+<script>
+    // Tab switching
+    document.querySelectorAll(".tab-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            const tabId = btn.getAttribute("data-tab");
+
+            // Update tab buttons
+            document.querySelectorAll(".tab-btn").forEach((b) => {
+                b.classList.remove("active", "border-black", "text-black");
+                b.classList.add("border-transparent", "text-gray-500");
+            });
+            btn.classList.add("active", "border-black", "text-black");
+            btn.classList.remove("border-transparent", "text-gray-500");
+
+            // Update tab content
+            document.querySelectorAll(".tab-content").forEach((content) => {
+                content.classList.add("hidden");
+            });
+            document.getElementById(`tab-${tabId}`)?.classList.remove("hidden");
+        });
+    });
+
+    // Accordion functionality
+    document.querySelectorAll(".accordion-trigger").forEach((trigger) => {
+        trigger.addEventListener("click", () => {
+            const accordion = trigger.closest(".event-accordion");
+            const content = accordion?.querySelector(".accordion-content");
+            const icon = trigger.querySelector(".accordion-icon");
+
+            if (content?.classList.contains("hidden")) {
+                content.classList.remove("hidden");
+                icon?.classList.add("rotate-180");
+            } else {
+                content?.classList.add("hidden");
+                icon?.classList.remove("rotate-180");
+            }
+        });
+    });
+
+    // Search functionality
+    document.querySelectorAll(".search-input").forEach((input) => {
+        input.addEventListener("input", (e) => {
+            const target = e.target as HTMLInputElement;
+            const searchTerm = target.value.toLowerCase();
+            const eventId = target.getAttribute("data-event-id");
+            const tbody = document.querySelector(
+                `.attendees-tbody[data-event-id="${eventId}"]`,
+            );
+
+            if (tbody) {
+                tbody.querySelectorAll(".attendee-row").forEach((row) => {
+                    const name =
+                        row
+                            .querySelector(".attendee-name")
+                            ?.textContent?.toLowerCase() || "";
+                    const email =
+                        row
+                            .querySelector(".attendee-email")
+                            ?.textContent?.toLowerCase() || "";
+                    const ticket =
+                        row
+                            .querySelector(".attendee-ticket")
+                            ?.textContent?.toLowerCase() || "";
+
+                    if (
+                        name.includes(searchTerm) ||
+                        email.includes(searchTerm) ||
+                        ticket.includes(searchTerm)
+                    ) {
+                        (row as HTMLElement).style.display = "";
+                    } else {
+                        (row as HTMLElement).style.display = "none";
+                    }
+                });
+            }
+        });
+    });
+</script>
+
+<style>
+    .tab-btn.active {
+        border-color: #000;
+        color: #000;
+    }
+</style>

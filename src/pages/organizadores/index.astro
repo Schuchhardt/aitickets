@@ -1,0 +1,23 @@
+---
+import AppHeader from "../../components/AppHeader.vue";
+import AppFooter from "../../components/AppFooter.vue";
+import ProducersHeroSection from "../../components/ProducersHeroSection.vue";
+import ProducersFeaturesSection from "../../components/ProducersFeaturesSection.vue";
+import BenefitsSection from "../../components/BenefitsSection.vue";
+import ContactSection from "../../components/ContactSection.vue";
+import Layout from "../../layouts/Layout.astro";
+import "../../styles/global.css";
+import "animate.css";
+---
+
+<Layout>
+  <AppHeader client:idle />
+
+  <main>
+    <ProducersHeroSection client:idle />
+    <ProducersFeaturesSection />
+    <BenefitsSection />
+    <ContactSection />
+  </main>
+  <AppFooter client:idle />
+</Layout>

@@ -9,8 +9,8 @@ import { createClient } from '@supabase/supabase-js';
 import { createHmac } from 'node:crypto';
 
 // Inicializar el cliente de Supabase
-const supabaseUrl = import.meta.env.SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.SUPABASE_ANON_KEY;
+const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Configuración de seguridad
