@@ -1,5 +1,4 @@
 <script setup>
-import { supabase } from '../../lib/supabaseClient'
 import { ref, computed, onMounted } from 'vue'
 import { Calendar, MapPin, Ticket, CheckCircle, Image as ImageIcon, Plus, Trash2, ChevronRight, ChevronLeft, UploadCloud } from 'lucide-vue-next'
 
@@ -142,23 +141,25 @@ const uploadFile = async (file) => {
   uploadError.value = ''
 
   try {
-    const fileName = `event-covers/${Date.now()}-${file.name}`
-    const { data, error } = await supabase.storage
-      .from('events')
-      .upload(fileName, file)
+    const formData = new FormData()
+    formData.append('file', file)
 
-    if (error) throw error
+    const response = await fetch('/api/events/upload-image', {
+      method: 'POST',
+      body: formData
+    })
 
-    // Get Public URL
-    const { data: { publicUrl } } = supabase.storage
-      .from('events')
-      .getPublicUrl(fileName)
+    const result = await response.json()
 
-    form.value.general.imageUrl = publicUrl
+    if (!response.ok) {
+      throw new Error(result.message || 'Error al subir imagen')
+    }
+
+    form.value.general.imageUrl = result.url
 
   } catch (e) {
     console.error(e)
-    uploadError.value = 'Error al subir la imagen. Intenta nuevamente.'
+    uploadError.value = e.message || 'Error al subir la imagen. Intenta nuevamente.'
   } finally {
     uploadingImage.value = false
   }

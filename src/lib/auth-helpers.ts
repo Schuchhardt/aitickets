@@ -12,7 +12,7 @@ export function getSupabaseAnon() {
 }
 
 export function getSupabaseAdmin() {
-    const supabaseUrl = import.meta.env.SUPABASE_URL || import.meta.env.PUBLIC_SUPABASE_URL;
+    const supabaseUrl = import.meta.env.SUPABASE_URL;
     const serviceKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !serviceKey) {

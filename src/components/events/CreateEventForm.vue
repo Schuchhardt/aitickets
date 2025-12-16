@@ -1,5 +1,4 @@
 <script setup>
-import { supabase } from '../../lib/supabaseClient'
 import { ref, computed } from 'vue'
 import { Calendar, MapPin, Ticket, CheckCircle, Image as ImageIcon, Plus, Trash2, ChevronRight, ChevronLeft, UploadCloud } from 'lucide-vue-next'
 

@@ -5,13 +5,11 @@ import TicketInfo from "../components/TicketInfo.vue";
 import EventDetails from "../components/EventDetails.vue";
 import Layout from '../layouts/Layout.astro';
 import "../styles/global.css";
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAnon } from "../lib/auth-helpers";
 import { createHmac } from 'node:crypto';
 
-// Inicializar el cliente de Supabase
-const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Inicializar el cliente de Supabase (server-side)
+const supabase = getSupabaseAnon();
 
 // Configuración de seguridad
 const request = Astro.request;
@@ -79,17 +77,14 @@ if (request.method !== 'POST') {
 
 const allowedOrigins = ['https://aitickets.cl', 'https://www.aitickets.cl', 'https://www.flow.cl', 'https://sandbox.flow.cl'];
 const origin = request.headers.get('origin');
-if (!allowedOrigins.includes(origin)) {
+if (origin && !allowedOrigins.includes(origin)) {
   return new Response('Origen no permitido', { status: 403 });
 }
 
 /**
  * Firma los parámetros usando HMAC-SHA256 con secretKey
- * @param {Object} params - Objeto con los parámetros (sin incluir la firma "s")
- * @param {string} secretKey - Clave secreta para firmar
- * @returns {string} - Firma generada (hash HMAC-SHA256 en hexadecimal)
  */
-function generateSignature(params, secretKey) {
+function generateSignature(params: Record<string, any>, secretKey: string): string {
   // 1. Claves ordenadas alfabéticamente
   const keys = Object.keys(params).filter(key => key !== 's').sort();
 
@@ -260,9 +255,9 @@ if (request.method === 'POST') {
             <div class="mt-8">
               <h2 class="text-xl font-bold text-gray-800 mb-4 font-[Unbounded] text-center">Tickets Adquiridos</h2>
               <div class="space-y-6">
-                {paymentDetails.ticketsData.map(ticket => (
+                {paymentDetails.ticketsData.map((ticketItem: any) => (
                   <div class="mt-0 pt-8 lg:pt-12 px-4 lg:px-0">
-                    <TicketInfo ticket={ticket} event={paymentDetails.event} client:only />
+                    <TicketInfo ticket={ticketItem} event={paymentDetails.event} client:only />
                   </div>
                 ))}
               </div>

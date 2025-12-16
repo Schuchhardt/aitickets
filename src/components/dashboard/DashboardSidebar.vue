@@ -11,8 +11,7 @@ import {
   ChevronLeft,
   ChevronRight
 } from 'lucide-vue-next'
-import { ref, toRefs } from 'vue'
-import { supabase } from '../../lib/supabaseClient'
+import { ref } from 'vue'
 import logoLight from '../../images/logo.png'
 import logoSquared from '../../images/logo_squared.png'
 
@@ -26,7 +25,7 @@ const toggleCollapse = () => {
 }
 
 const handleLogout = async () => {
-  await supabase.auth.signOut()
+  await fetch('/api/auth/logout', { method: 'POST' })
   window.location.href = '/organizadores/login'
 }
 

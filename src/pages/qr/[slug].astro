@@ -1,6 +1,6 @@
 ---
 import _ from "lodash";
-import { supabase } from "../../lib/supabaseClient";
+import { getSupabaseAnon } from "../../lib/auth-helpers";
 import AppFooter from "../../components/AppFooter.vue";
 import Layout from '../../layouts/Layout.astro';
 import ValidateQR from "../../components/ValidateQR.vue";
@@ -10,6 +10,7 @@ import logoImg from '../../images/logo.png';
 export const prerender = false;
 
 const { slug } = Astro.params;
+const supabase = getSupabaseAnon();
 
 // Validar token de acceso
 const token = Astro.url.searchParams.get('token');

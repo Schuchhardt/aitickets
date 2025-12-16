@@ -1,5 +1,5 @@
 ---
-import { supabase } from "../../lib/supabaseClient";
+import { getSupabaseAnon } from "../../lib/auth-helpers";
 import AppHeader from "../../components/AppHeader.vue";
 import AppFooter from "../../components/AppFooter.vue";
 import EventList from "../../components/EventList.vue";
@@ -8,6 +8,7 @@ import "../../styles/global.css";
 
 
 // Consulta los eventos en el servidor (SSR)
+const supabase = getSupabaseAnon();
 const { data: events, error } = await supabase.from("events").select("*").eq("status", "published").eq("accessibility", "public") ;
 
 // Si hay error o no hay eventos, definir un fallback vacío

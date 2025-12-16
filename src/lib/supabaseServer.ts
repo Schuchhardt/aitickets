@@ -6,8 +6,8 @@ export const createSupabaseServerClient = (context: Pick<AstroGlobal, 'cookies'>
     const accessToken = context.cookies.get("sb-access-token")?.value;
     const refreshToken = context.cookies.get("sb-refresh-token")?.value;
 
-    const supabaseUrl = import.meta.env.SUPABASE_URL || import.meta.env.PUBLIC_SUPABASE_URL;
-    const supabaseKey = import.meta.env.SUPABASE_ANON_KEY || import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
+    const supabaseUrl = import.meta.env.SUPABASE_URL;
+    const supabaseKey = import.meta.env.SUPABASE_ANON_KEY;
 
     const options: any = {};
 
