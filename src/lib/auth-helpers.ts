@@ -1,8 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 
 export function getSupabaseAnon() {
-    const supabaseUrl = import.meta.env.SUPABASE_URL || import.meta.env.PUBLIC_SUPABASE_URL;
-    const anonKey = import.meta.env.SUPABASE_ANON_KEY || import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
+    const supabaseUrl = import.meta.env.SUPABASE_URL;
+    const anonKey = import.meta.env.SUPABASE_ANON_KEY;
 
     if (!supabaseUrl || !anonKey) {
         throw new Error("Missing Supabase credentials (URL or Anon Key)");
