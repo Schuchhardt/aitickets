@@ -3,6 +3,11 @@
   publish = "dist"
   functions = "netlify/functions"
 
+[build.environment]
+  # La SUPABASE_ANON_KEY es intencionalmente pública (diseñada por Supabase para el cliente)
+  # Solo permite operaciones que RLS policies permitan - no es un secreto real
+  SECRETS_SCAN_OMIT_KEYS = "SUPABASE_ANON_KEY"
+
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
