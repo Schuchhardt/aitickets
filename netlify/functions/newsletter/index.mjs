@@ -82,7 +82,7 @@ export default async function handler(req, context) {
           language, 
           timezone, 
           user_agent: userAgent, 
-          tracking_source: trackingSource
+          tracking_source: referrer || ''
         },
       }),
     });

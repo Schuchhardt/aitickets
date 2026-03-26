@@ -16,14 +16,14 @@ if (!user) {
     return Astro.redirect("/organizadores/login");
 }
 
-// Check ownership first
+// Check ownership via organization
 const { data: dbUser } = await supabase
     .from("users")
-    .select("id")
+    .select("id, organization_id")
     .eq("auth_user_id", user.id)
     .single();
 
-if (!dbUser) return Astro.redirect("/dashboard/events");
+if (!dbUser || !dbUser.organization_id) return Astro.redirect("/dashboard/events");
 
 // Fetch Full Event Data
 const { data: event, error } = await supabaseAdmin
@@ -56,7 +56,7 @@ const { data: event, error } = await supabaseAdmin
     `,
     )
     .eq("id", id)
-    .eq("created_by", dbUser.id)
+    .eq("organization_id", dbUser.organization_id)
     .single();
 
 if (error || !event) {

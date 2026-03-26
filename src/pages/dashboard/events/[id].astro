@@ -27,14 +27,14 @@ if (!user) {
     return Astro.redirect("/organizadores/login");
 }
 
-// Get public user ID
+// Get public user info
 const { data: dbUser } = await supabase
     .from("users")
-    .select("id")
+    .select("id, organization_id")
     .eq("auth_user_id", user.id)
     .single();
 
-if (!dbUser) {
+if (!dbUser || !dbUser.organization_id) {
     return Astro.redirect("/dashboard/events");
 }
 
@@ -60,7 +60,7 @@ const { data: event, error } = await supabaseAdmin
   `,
     )
     .eq("id", id)
-    .eq("created_by", dbUser.id) // Correctly use integer ID
+    .eq("organization_id", dbUser.organization_id)
     .single();
 
 if (error || !event) {
@@ -73,10 +73,45 @@ const totalTickets =
         (acc, t) => acc + (t.total_quantity || t.quantity || 0),
         0,
     ) || 0;
-// Mock sales for now (or implement real count if orders existed)
-const ticketsSold = 0;
-const totalRevenue = 0;
-const visits = Math.floor(Math.random() * 50); // Placeholder for analytics
+
+// Real ticket sales from event_attendees
+const { count: ticketsSold } = await supabaseAdmin
+    .from("event_attendees")
+    .select("id", { count: "exact", head: true })
+    .eq("event_id", id);
+
+// Real revenue from paid orders
+const { data: ordersData } = await supabaseAdmin
+    .from("event_orders")
+    .select("amount")
+    .eq("event_id", id)
+    .eq("status", "paid");
+const totalRevenue = ordersData?.reduce((sum, o) => sum + (o.amount || 0), 0) || 0;
+
+// Per-ticket sales counts
+const { data: ticketSalesData } = await supabaseAdmin
+    .from("event_attendees")
+    .select("event_ticket_id")
+    .eq("event_id", id);
+const ticketSalesMap: Record<string, number> = {};
+ticketSalesData?.forEach((ea: any) => {
+    ticketSalesMap[ea.event_ticket_id] = (ticketSalesMap[ea.event_ticket_id] || 0) + 1;
+});
+
+// Total event page visits
+const { count: totalVisits } = await supabaseAdmin
+    .from("event_visits")
+    .select("id", { count: "exact", head: true })
+    .eq("event_id", id);
+
+// Unique visitors (by ip_hash) — fetch distinct hashes
+const { data: uniqueVisitorsData } = await supabaseAdmin
+    .from("event_visits")
+    .select("ip_hash")
+    .eq("event_id", id);
+const uniqueVisitors = new Set(uniqueVisitorsData?.map((v: any) => v.ip_hash)).size;
+
+const conversion = totalTickets > 0 ? Math.round(((ticketsSold || 0) / totalTickets) * 100) : 0;
 
 const publicLink = `/eventos/${event.slug}`;
 ---
@@ -125,11 +160,12 @@ const publicLink = `/eventos/${event.slug}`;
             >
                 <Eye size="18" /> Ver Página
             </a>
-            <button
+            <a
+                href={`/dashboard/events/${event.id}/edit`}
                 class="flex items-center gap-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-900 transition font-medium"
             >
                 <Edit size="18" /> Editar
-            </button>
+            </a>
         </div>
     </div>
 
@@ -140,13 +176,10 @@ const publicLink = `/eventos/${event.slug}`;
                 <div class="p-2 bg-blue-50 text-blue-600 rounded-lg">
                     <Eye size="20" />
                 </div>
-                <span
-                    class="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded-full"
-                    >+12%</span
-                >
             </div>
             <p class="text-gray-500 text-sm mb-1">Visitas Totales</p>
-            <h3 class="text-2xl font-bold">{visits}</h3>
+            <h3 class="text-2xl font-bold">{totalVisits || 0}</h3>
+            <p class="text-xs text-gray-400 mt-1">{uniqueVisitors} visitantes únicos</p>
         </div>
 
         <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
@@ -156,7 +189,7 @@ const publicLink = `/eventos/${event.slug}`;
                 </div>
             </div>
             <p class="text-gray-500 text-sm mb-1">Entradas Vendidas</p>
-            <h3 class="text-2xl font-bold">{ticketsSold} / {totalTickets}</h3>
+            <h3 class="text-2xl font-bold">{ticketsSold || 0} / {totalTickets}</h3>
         </div>
 
         <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
@@ -175,7 +208,7 @@ const publicLink = `/eventos/${event.slug}`;
                 </div>
             </div>
             <p class="text-gray-500 text-sm mb-1">Conversión</p>
-            <h3 class="text-2xl font-bold">0%</h3>
+            <h3 class="text-2xl font-bold">{conversion}%</h3>
         </div>
     </div>
 
@@ -202,11 +235,11 @@ const publicLink = `/eventos/${event.slug}`;
                             <div class="p-4 flex justify-between items-center hover:bg-gray-50 transition">
                                 <div>
                                     <p class="font-bold text-gray-900">
-                                        {ticket.name}
+                                        {ticket.ticket_name}
                                     </p>
                                     <p class="text-sm text-gray-500">
                                         ${Number(ticket.price).toLocaleString()}{" "}
-                                        • {ticket.quantity} disponibles
+                                        • {ticketSalesMap[ticket.id] || 0} vendidas / {ticket.total_quantity || 0} disponibles
                                     </p>
                                 </div>
                                 <div>
@@ -269,6 +302,9 @@ const publicLink = `/eventos/${event.slug}`;
                 </p>
 
                 <button
+                    id="toggleStatusBtn"
+                    data-event-id={event.id}
+                    data-current-status={event.status}
                     class="w-full py-2 bg-white text-black font-bold rounded-lg hover:bg-gray-100 transition"
                 >
                     {
@@ -281,3 +317,45 @@ const publicLink = `/eventos/${event.slug}`;
         </div>
     </div>
 </DashboardLayout>
+
+<script>
+  const btn = document.getElementById('toggleStatusBtn');
+  if (btn) {
+    btn.addEventListener('click', async () => {
+      const eventId = btn.dataset.eventId;
+      const currentStatus = btn.dataset.currentStatus;
+      const newStatus = currentStatus === 'published' ? 'draft' : 'published';
+      
+      btn.disabled = true;
+      btn.textContent = 'Actualizando...';
+
+      try {
+        const res = await fetch('/api/events/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            eventId: Number(eventId),
+            general: null,
+            locations: [],
+            tickets: [],
+            statusOnly: true,
+            status: newStatus
+          })
+        });
+
+        if (res.ok) {
+          window.location.reload();
+        } else {
+          const data = await res.json();
+          alert(data.message || 'Error al actualizar estado');
+          btn.disabled = false;
+          btn.textContent = currentStatus === 'published' ? 'Pausar Ventas' : 'Publicar Evento';
+        }
+      } catch (e) {
+        alert('Error de conexión');
+        btn.disabled = false;
+        btn.textContent = currentStatus === 'published' ? 'Pausar Ventas' : 'Publicar Evento';
+      }
+    });
+  }
+</script>

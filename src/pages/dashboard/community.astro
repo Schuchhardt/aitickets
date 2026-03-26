@@ -2,14 +2,59 @@
 import DashboardLayout from "../../layouts/DashboardLayout.astro";
 import { Download, Users } from "lucide-vue-next";
 import { createSupabaseServerClient } from "../../lib/supabaseServer";
+import { getSupabaseAdmin } from "../../lib/auth-helpers";
 
 const supabase = createSupabaseServerClient(Astro);
+const supabaseAdmin = getSupabaseAdmin();
 const {
   data: { user },
 } = await supabase.auth.getUser();
 
 if (!user) {
   return Astro.redirect("/organizadores/login");
+}
+
+// Get organization_id for the current user
+const { data: dbUser } = await supabase
+  .from("users")
+  .select("organization_id")
+  .eq("auth_user_id", user.id)
+  .single();
+
+let attendees = [];
+
+if (dbUser?.organization_id) {
+  // Get all events for this organization
+  const { data: orgEvents } = await supabaseAdmin
+    .from("events")
+    .select("id, name")
+    .eq("organization_id", dbUser.organization_id);
+
+  if (orgEvents && orgEvents.length > 0) {
+    const eventIds = orgEvents.map((e) => e.id);
+    const eventNameMap = Object.fromEntries(orgEvents.map((e) => [e.id, e.name]));
+
+    // Get all attendees for these events
+    const { data: eventAttendees } = await supabaseAdmin
+      .from("event_attendees")
+      .select(`
+        event_id,
+        created_at,
+        event_ticket_id,
+        attendees (first_name, last_name, email),
+        event_tickets (ticket_name)
+      `)
+      .in("event_id", eventIds)
+      .order("created_at", { ascending: false });
+
+    attendees = (eventAttendees || []).map((ea) => ({
+      name: [ea.attendees?.first_name, ea.attendees?.last_name].filter(Boolean).join(" ") || "—",
+      email: ea.attendees?.email || "—",
+      event: eventNameMap[ea.event_id] || "—",
+      ticket: ea.event_tickets?.ticket_name || "—",
+      date: new Date(ea.created_at).toLocaleDateString("es-CL"),
+    }));
+  }
 }
 ---
 
@@ -24,19 +69,22 @@ if (!user) {
       </p>
     </div>
 
-    <button
-      class="inline-flex items-center gap-2 bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition font-medium"
-    >
-      <Download size="18" />
-      Exportar CSV
-    </button>
+    {attendees.length > 0 && (
+      <button
+        id="exportCsvBtn"
+        class="inline-flex items-center gap-2 bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition font-medium"
+      >
+        <Download size="18" />
+        Exportar CSV
+      </button>
+    )}
   </div>
 
   <div
     class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"
   >
     <div class="overflow-x-auto">
-      <table class="w-full text-left text-sm text-gray-600">
+      <table id="attendeesTable" class="w-full text-left text-sm text-gray-600">
         <thead
           class="bg-gray-50 text-gray-900 font-semibold border-b border-gray-100"
         >
@@ -49,16 +97,56 @@ if (!user) {
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td colspan="5" class="px-6 py-12 text-center text-gray-400">
-              <div class="flex flex-col items-center gap-2">
-                <Users size="24" />
-                <span>No se encontraron asistentes aún.</span>
-              </div>
-            </td>
-          </tr>
+          {attendees.length > 0 ? (
+            attendees.map((a) => (
+              <tr class="border-b border-gray-50 hover:bg-gray-50 transition">
+                <td class="px-6 py-4 font-medium text-gray-900">{a.name}</td>
+                <td class="px-6 py-4">{a.email}</td>
+                <td class="px-6 py-4">{a.event}</td>
+                <td class="px-6 py-4">{a.ticket}</td>
+                <td class="px-6 py-4">{a.date}</td>
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td colspan="5" class="px-6 py-12 text-center text-gray-400">
+                <div class="flex flex-col items-center gap-2">
+                  <Users size="24" />
+                  <span>No se encontraron asistentes aún.</span>
+                </div>
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
     </div>
   </div>
 </DashboardLayout>
+
+<script>
+  const exportBtn = document.getElementById('exportCsvBtn');
+  if (exportBtn) {
+    exportBtn.addEventListener('click', () => {
+      const table = document.getElementById('attendeesTable');
+      if (!table) return;
+      const rows = table.querySelectorAll('tr');
+      const csvLines = [];
+      rows.forEach((row) => {
+        const cells = row.querySelectorAll('th, td');
+        const line = Array.from(cells).map((cell) => {
+          const text = cell.textContent?.trim().replace(/"/g, '""') || '';
+          return `"${text}"`;
+        }).join(',');
+        csvLines.push(line);
+      });
+      const csv = csvLines.join('\n');
+      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `asistentes_${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  }
+</script>

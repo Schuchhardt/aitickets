@@ -4,6 +4,7 @@ import {
   getSessionUser,
   createSupabaseServerClient,
 } from "../../lib/supabaseServer";
+import { getSupabaseAdmin } from "../../lib/auth-helpers";
 import {
   LayoutDashboard,
   CalendarDays,
@@ -17,20 +18,82 @@ if (!user) {
   return Astro.redirect("/organizadores/login");
 }
 
-// Fetch additional profile data from `public.users` table
 const supabase = createSupabaseServerClient(Astro);
+const supabaseAdmin = getSupabaseAdmin();
+
 const { data: dbUser } = await supabase
   .from("users")
-  .select("name")
+  .select("name, organization_id")
   .eq("auth_user_id", user.id)
   .single();
 
-// Si no hay sesión, se manejaría con un middleware, pero por ahora redirect en cliente o aquí si fuera SSR puro.
-// Como es híbrido/static, confiamos en la protección de rutas o redirect.
+// Fetch real stats
+let activeEvents = 0;
+let ticketsSold = 0;
+let totalRevenue = 0;
 
-// Fetch quick stats (Mocked or Real if possible)
-// En una app real, haríamos queries counts aquí.
-// Por ahora, estructura visual.
+if (dbUser?.organization_id) {
+  // Count active (published) events
+  const { count: eventsCount } = await supabaseAdmin
+    .from("events")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", dbUser.organization_id)
+    .eq("status", "published");
+  activeEvents = eventsCount || 0;
+
+  // Get all event IDs for this organization
+  const { data: orgEvents } = await supabaseAdmin
+    .from("events")
+    .select("id")
+    .eq("organization_id", dbUser.organization_id);
+
+  if (orgEvents && orgEvents.length > 0) {
+    const eventIds = orgEvents.map((e) => e.id);
+
+    // Count tickets sold (attendees)
+    const { count: attendeesCount } = await supabaseAdmin
+      .from("event_attendees")
+      .select("id", { count: "exact", head: true })
+      .in("event_id", eventIds);
+    ticketsSold = attendeesCount || 0;
+
+    // Sum revenue from paid orders
+    const { data: ordersData } = await supabaseAdmin
+      .from("event_orders")
+      .select("amount")
+      .in("event_id", eventIds)
+      .eq("status", "paid");
+    totalRevenue = ordersData?.reduce((sum, o) => sum + (o.amount || 0), 0) || 0;
+  }
+}
+
+// Fetch last 3 published events and last 3 draft events
+let publishedEvents: any[] = [];
+let draftEvents: any[] = [];
+const eventSelect = `
+  id, name, slug, status, image_url, start_date,
+  event_locations ( venues ( name, city ) )
+`;
+if (dbUser?.organization_id) {
+  const [pubResult, draftResult] = await Promise.all([
+    supabaseAdmin
+      .from("events")
+      .select(eventSelect)
+      .eq("organization_id", dbUser.organization_id)
+      .eq("status", "published")
+      .order("created_at", { ascending: false })
+      .limit(3),
+    supabaseAdmin
+      .from("events")
+      .select(eventSelect)
+      .eq("organization_id", dbUser.organization_id)
+      .eq("status", "draft")
+      .order("created_at", { ascending: false })
+      .limit(3),
+  ]);
+  publishedEvents = pubResult.data || [];
+  draftEvents = draftResult.data || [];
+}
 ---
 
 <DashboardLayout title="Resumen">
@@ -50,34 +113,118 @@ const { data: dbUser } = await supabase
   <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
     <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
       <div class="text-sm text-gray-500 font-medium mb-1">Eventos Activos</div>
-      <div class="text-3xl font-bold font-[Unbounded]">0</div>
+      <div class="text-3xl font-bold font-[Unbounded]">{activeEvents}</div>
     </div>
     <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
       <div class="text-sm text-gray-500 font-medium mb-1">
         Entradas Vendidas
       </div>
-      <div class="text-3xl font-bold font-[Unbounded]">0</div>
+      <div class="text-3xl font-bold font-[Unbounded]">{ticketsSold}</div>
     </div>
     <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
       <div class="text-sm text-gray-500 font-medium mb-1">Ingresos Totales</div>
-      <div class="text-3xl font-bold font-[Unbounded] text-green-600">$0</div>
+      <div class="text-3xl font-bold font-[Unbounded] text-green-600">${totalRevenue.toLocaleString()}</div>
     </div>
   </div>
 
-  <div
-    class="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center py-20"
-  >
-    <div class="max-w-md mx-auto">
-      <h3 class="text-xl font-bold mb-2">Comienza tu primer evento</h3>
-      <p class="text-gray-500 mb-6">
-        Aún no has creado eventos. ¡Es hora de lanzar el próximo gran éxito!
-      </p>
-      <a
-        href="/dashboard/events/create"
-        class="inline-flex bg-black text-white px-6 py-3 rounded-lg hover:bg-gray-800 transition font-medium transform active:scale-95"
-      >
-        Crear Evento
-      </a>
+  {publishedEvents.length > 0 || draftEvents.length > 0 ? (
+    <div class="space-y-10">
+      {/* Published / Active Events */}
+      {publishedEvents.length > 0 && (
+        <div>
+          <div class="flex items-center justify-between mb-6">
+            <h2 class="text-xl font-bold">Eventos Publicados</h2>
+            <a href="/dashboard/events" class="text-sm font-medium text-gray-600 hover:text-black transition">Ver todos &rarr;</a>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {publishedEvents.map((event) => {
+              const venue = event.event_locations?.[0]?.venues;
+              const locationText = venue ? `${venue.name}, ${venue.city}` : '';
+              const dateText = event.start_date
+                ? new Date(event.start_date).toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' })
+                : 'Fecha por definir';
+              return (
+                <a href={`/dashboard/events/${event.id}`} class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition group">
+                  <div class="aspect-[16/9] bg-gray-100 overflow-hidden">
+                    {event.image_url ? (
+                      <img src={event.image_url} alt={event.name} class="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
+                    ) : (
+                      <div class="w-full h-full flex items-center justify-center text-gray-300">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                      </div>
+                    )}
+                  </div>
+                  <div class="p-4">
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-green-100 text-green-700 mb-2 inline-block">Publicado</span>
+                    <h3 class="font-bold text-gray-900 mb-1 truncate">{event.name}</h3>
+                    <div class="text-sm text-gray-500 space-y-0.5">
+                      <p>{dateText}</p>
+                      {locationText && <p class="truncate">{locationText}</p>}
+                    </div>
+                  </div>
+                </a>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Draft Events */}
+      {draftEvents.length > 0 && (
+        <div>
+          <div class="flex items-center justify-between mb-6">
+            <h2 class="text-xl font-bold">Borradores</h2>
+            <a href="/dashboard/events" class="text-sm font-medium text-gray-600 hover:text-black transition">Ver todos &rarr;</a>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {draftEvents.map((event) => {
+              const venue = event.event_locations?.[0]?.venues;
+              const locationText = venue ? `${venue.name}, ${venue.city}` : '';
+              const dateText = event.start_date
+                ? new Date(event.start_date).toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' })
+                : 'Fecha por definir';
+              return (
+                <a href={`/dashboard/events/${event.id}`} class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition group">
+                  <div class="aspect-[16/9] bg-gray-100 overflow-hidden">
+                    {event.image_url ? (
+                      <img src={event.image_url} alt={event.name} class="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
+                    ) : (
+                      <div class="w-full h-full flex items-center justify-center text-gray-300">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                      </div>
+                    )}
+                  </div>
+                  <div class="p-4">
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-yellow-100 text-yellow-700 mb-2 inline-block">Borrador</span>
+                    <h3 class="font-bold text-gray-900 mb-1 truncate">{event.name}</h3>
+                    <div class="text-sm text-gray-500 space-y-0.5">
+                      <p>{dateText}</p>
+                      {locationText && <p class="truncate">{locationText}</p>}
+                    </div>
+                  </div>
+                </a>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
-  </div>
+  ) : (
+    <div
+      class="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center py-20"
+    >
+      <div class="max-w-md mx-auto">
+        <h3 class="text-xl font-bold mb-2">Comienza tu primer evento</h3>
+        <p class="text-gray-500 mb-6">
+          Aún no has creado eventos. ¡Es hora de lanzar el próximo gran éxito!
+        </p>
+        <a
+          href="/dashboard/events/create"
+          class="inline-flex bg-black text-white px-6 py-3 rounded-lg hover:bg-gray-800 transition font-medium transform active:scale-95"
+        >
+          Crear Evento
+        </a>
+      </div>
+    </div>
+  )}
 </DashboardLayout>

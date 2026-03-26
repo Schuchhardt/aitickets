@@ -1,8 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
+const supabaseAdmin = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+  { auth: { autoRefreshToken: false, persistSession: false } }
 )
 
 export default async function handler(req) {
@@ -13,6 +14,28 @@ export default async function handler(req) {
   }
 
   try {
+    // Authenticate the request via cookie tokens
+    const cookieHeader = req.headers.get('cookie') || ''
+    const cookies = Object.fromEntries(
+      cookieHeader.split(';').map(c => {
+        const [key, ...val] = c.trim().split('=')
+        return [key, val.join('=')]
+      })
+    )
+    const accessToken = cookies['sb-access-token']
+    if (!accessToken) {
+      return new Response(JSON.stringify({ message: 'No autorizado' }), { status: 401 })
+    }
+
+    // Verify the token and get user
+    const anonClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: `Bearer ${accessToken}` } }
+    })
+    const { data: { user }, error: authError } = await anonClient.auth.getUser()
+    if (authError || !user) {
+      return new Response(JSON.stringify({ message: 'No autorizado' }), { status: 401 })
+    }
+
     const url = new URL(req.url)
     const eventId = url.searchParams.get('event_id')
 
@@ -22,8 +45,30 @@ export default async function handler(req) {
       })
     }
 
+    // Verify the user owns this event (via organization)
+    const { data: dbUser } = await supabaseAdmin
+      .from('users')
+      .select('organization_id')
+      .eq('auth_user_id', user.id)
+      .single()
+
+    if (!dbUser?.organization_id) {
+      return new Response(JSON.stringify({ message: 'No autorizado' }), { status: 403 })
+    }
+
+    const { data: eventData } = await supabaseAdmin
+      .from('events')
+      .select('id')
+      .eq('id', eventId)
+      .eq('organization_id', dbUser.organization_id)
+      .single()
+
+    if (!eventData) {
+      return new Response(JSON.stringify({ message: 'Evento no encontrado o sin permisos' }), { status: 403 })
+    }
+
     // Obtener todos los asistentes del evento con información completa
-    const { data: attendees, error } = await supabase
+    const { data: attendees, error } = await supabaseAdmin
       .from('event_attendees')
       .select(`
         id,

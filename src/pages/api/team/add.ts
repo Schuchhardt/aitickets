@@ -123,11 +123,12 @@ export const POST: APIRoute = async (context) => {
         }
 
         // TODO: Send invitation email with temporary password
-        // For now, we just return success
+        // For now, we return it so the admin can share it manually.
+        // In production, send this via email only and remove from response.
 
         return new Response(JSON.stringify({
             message: "Miembro agregado exitosamente",
-            tempPassword: tempPassword // In production, send this via email instead
+            tempPassword: tempPassword
         }), {
             status: 200,
             headers: { "Content-Type": "application/json" },

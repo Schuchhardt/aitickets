@@ -1,6 +1,6 @@
 ---
 import DashboardLayout from "../../../layouts/DashboardLayout.astro";
-import { Plus, Calendar, MapPin, Eye, Edit } from "lucide-vue-next";
+import { Plus, Calendar, MapPin, Eye, Edit, ListFilter, Globe, FileText } from "lucide-vue-next";
 import { createSupabaseServerClient } from "../../../lib/supabaseServer";
 
 const supabase = createSupabaseServerClient(Astro);
@@ -77,12 +77,41 @@ const { data: events } = await query;
         </a>
       </div>
     ) : (
-      <div
-        id="events-grid"
-        class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-      >
-        {events.map((event) => (
-          <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition group">
+      <>
+        <!-- Status Filter Buttons -->
+        <div class="flex flex-wrap gap-3 mb-6">
+          <button
+            type="button"
+            data-status-filter="all"
+            class="status-filter-btn flex items-center gap-2 px-3 py-1.5 bg-gray-900 text-white rounded-full border border-gray-900 cursor-pointer transition-all hover:opacity-90"
+          >
+            <ListFilter size="14" />
+            <span class="text-xs font-medium">Todos</span>
+          </button>
+          <button
+            type="button"
+            data-status-filter="published"
+            class="status-filter-btn flex items-center gap-2 px-3 py-1.5 bg-green-50 rounded-full border border-green-100 cursor-pointer transition-all hover:bg-green-100"
+          >
+            <Globe size="14" class="text-green-600" />
+            <span class="text-xs font-medium text-green-700">Publicados</span>
+          </button>
+          <button
+            type="button"
+            data-status-filter="draft"
+            class="status-filter-btn flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-full border border-gray-200 cursor-pointer transition-all hover:bg-gray-100"
+          >
+            <FileText size="14" class="text-gray-500" />
+            <span class="text-xs font-medium text-gray-600">Borradores</span>
+          </button>
+        </div>
+
+        <div
+          id="events-grid"
+          class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+        >
+          {events.map((event) => (
+            <div class="event-card bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition group" data-status={event.status === "published" ? "published" : "draft"}>
             <div class="aspect-video bg-gray-200 relative overflow-hidden">
               {event.image_url ? (
                 <img src={event.image_url} class="w-full h-full object-cover" />
@@ -134,6 +163,54 @@ const { data: events } = await query;
           </div>
         ))}
       </div>
+    </>
     )
   }
 </DashboardLayout>
+
+<script>
+  const statusFilterBtns = document.querySelectorAll('.status-filter-btn');
+  const eventCards = document.querySelectorAll('.event-card');
+
+  function setActiveFilter(activeBtn: HTMLElement) {
+    statusFilterBtns.forEach(btn => {
+      const status = (btn as HTMLElement).dataset.statusFilter;
+      btn.classList.remove('bg-gray-900', 'text-white', 'border-gray-900');
+
+      if (status === 'all') {
+        btn.classList.add('bg-gray-100', 'text-gray-700', 'border-gray-200');
+      } else if (status === 'published') {
+        btn.classList.add('bg-green-50', 'text-green-700', 'border-green-100');
+      } else if (status === 'draft') {
+        btn.classList.add('bg-gray-50', 'text-gray-600', 'border-gray-200');
+      }
+    });
+
+    activeBtn.classList.remove(
+      'bg-gray-100', 'text-gray-700', 'border-gray-200',
+      'bg-green-50', 'text-green-700', 'border-green-100',
+      'bg-gray-50', 'text-gray-600'
+    );
+    activeBtn.classList.add('bg-gray-900', 'text-white', 'border-gray-900');
+  }
+
+  function filterByStatus(status: string) {
+    eventCards.forEach(card => {
+      const cardStatus = (card as HTMLElement).dataset.status;
+      if (status === 'all' || cardStatus === status) {
+        (card as HTMLElement).style.display = '';
+      } else {
+        (card as HTMLElement).style.display = 'none';
+      }
+    });
+  }
+
+  statusFilterBtns.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const target = e.currentTarget as HTMLElement;
+      const status = target.dataset.statusFilter || 'all';
+      setActiveFilter(target);
+      filterByStatus(status);
+    });
+  });
+</script>

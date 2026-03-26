@@ -50,3 +50,24 @@ CREATE POLICY "Enable update for own profile" ON "public"."users"
 AS PERMISSIVE FOR UPDATE
 TO authenticated
 USING (auth_user_id = auth.uid());
+
+-- EVENT_VISITS POLICIES
+ALTER TABLE public.event_visits ENABLE ROW LEVEL SECURITY;
+
+-- Allow anonymous inserts for visit tracking (public event pages)
+CREATE POLICY "Enable insert for anonymous visit tracking" ON "public"."event_visits"
+AS PERMISSIVE FOR INSERT
+TO anon
+WITH CHECK (true);
+
+-- Allow authenticated org members to read visit data for their events
+CREATE POLICY "Enable read for org event owners" ON "public"."event_visits"
+AS PERMISSIVE FOR SELECT
+TO authenticated
+USING (
+  event_id IN (
+    SELECT e.id FROM public.events e
+    JOIN public.users u ON u.organization_id = e.organization_id
+    WHERE u.auth_user_id = auth.uid()
+  )
+);

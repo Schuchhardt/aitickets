@@ -1,9 +1,31 @@
 ---
 import DashboardLayout from "../../../layouts/DashboardLayout.astro";
-import { getSupabaseAnon } from "../../../lib/auth-helpers";
+import { createSupabaseServerClient, getSessionUser } from "../../../lib/supabaseServer";
+import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 
-// Example of potentially fetching strict user settings here
-const user = null; // Would fetch from DB
+const user = await getSessionUser(Astro);
+if (!user) {
+    return Astro.redirect("/organizadores/login");
+}
+
+const supabase = createSupabaseServerClient(Astro);
+const supabaseAdmin = getSupabaseAdmin();
+
+const { data: dbUser } = await supabase
+    .from("users")
+    .select("organization_id")
+    .eq("auth_user_id", user.id)
+    .single();
+
+let org = null;
+if (dbUser?.organization_id) {
+    const { data } = await supabaseAdmin
+        .from("organizations")
+        .select("public_name, email, phone")
+        .eq("id", dbUser.organization_id)
+        .single();
+    org = data;
+}
 ---
 
 <DashboardLayout title="Configuración">
@@ -22,11 +44,14 @@ const user = null; // Would fetch from DB
                     </p>
                 </div>
                 <button
+                    id="saveOrgBtn"
                     class="px-4 py-2 text-sm bg-black text-white rounded-lg hover:bg-gray-800"
                 >
                     Guardar Cambios
                 </button>
             </div>
+
+            <div id="orgMsg" class="hidden rounded-lg px-4 py-3 text-sm font-medium"></div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div class="space-y-2">
@@ -34,9 +59,11 @@ const user = null; // Would fetch from DB
                         >Nombre de la Organización</label
                     >
                     <input
+                        id="orgName"
                         type="text"
                         class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-black/5"
                         placeholder="Tu organización"
+                        value={org?.public_name || ""}
                     />
                 </div>
                 <div class="space-y-2">
@@ -44,9 +71,11 @@ const user = null; // Would fetch from DB
                         >Email de Contacto</label
                     >
                     <input
+                        id="orgEmail"
                         type="email"
                         class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-black/5"
                         placeholder="contacto@ejemplo.com"
+                        value={org?.email || ""}
                     />
                 </div>
                 <div class="space-y-2">
@@ -54,9 +83,11 @@ const user = null; // Would fetch from DB
                         >Teléfono</label
                     >
                     <input
+                        id="orgPhone"
                         type="tel"
                         class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-black/5"
                         placeholder="+56 9 ..."
+                        value={org?.phone || ""}
                     />
                 </div>
             </div>
@@ -71,19 +102,153 @@ const user = null; // Would fetch from DB
                 </p>
             </div>
 
-            <div
-                class="bg-gray-50 rounded-lg p-6 flex items-center justify-between"
-            >
-                <div>
-                    <h3 class="font-medium text-gray-900">Contraseña</h3>
-                    <p class="text-gray-500 text-sm">***********</p>
+            <div id="pwMsg" class="hidden rounded-lg px-4 py-3 text-sm font-medium"></div>
+
+            <div id="pwSection" class="bg-gray-50 rounded-lg p-6">
+                <div id="pwDisplay" class="flex items-center justify-between">
+                    <div>
+                        <h3 class="font-medium text-gray-900">Contraseña</h3>
+                        <p class="text-gray-500 text-sm">***********</p>
+                    </div>
+                    <button
+                        id="showPwFormBtn"
+                        class="text-sm text-gray-600 hover:text-black font-medium border border-gray-200 bg-white px-4 py-2 rounded-lg"
+                    >
+                        Cambiar Contraseña
+                    </button>
                 </div>
-                <button
-                    class="text-sm text-gray-600 hover:text-black font-medium border border-gray-200 bg-white px-4 py-2 rounded-lg"
-                >
-                    Cambiar Contraseña
-                </button>
+                <div id="pwForm" class="hidden space-y-4">
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-gray-700">Nueva Contraseña</label>
+                        <input
+                            id="newPassword"
+                            type="password"
+                            class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-black/5"
+                            placeholder="Mínimo 6 caracteres"
+                        />
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-gray-700">Confirmar Contraseña</label>
+                        <input
+                            id="confirmPassword"
+                            type="password"
+                            class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-black/5"
+                            placeholder="Repite la nueva contraseña"
+                        />
+                    </div>
+                    <div class="flex gap-3">
+                        <button
+                            id="savePwBtn"
+                            class="px-4 py-2 text-sm bg-black text-white rounded-lg hover:bg-gray-800"
+                        >
+                            Guardar Contraseña
+                        </button>
+                        <button
+                            id="cancelPwBtn"
+                            class="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-100"
+                        >
+                            Cancelar
+                        </button>
+                    </div>
+                </div>
             </div>
         </section>
     </div>
 </DashboardLayout>
+
+<script>
+  // Organization save
+  const saveOrgBtn = document.getElementById('saveOrgBtn');
+  const orgMsg = document.getElementById('orgMsg');
+
+  function showMsg(el, text, isError) {
+    el.textContent = text;
+    el.className = `rounded-lg px-4 py-3 text-sm font-medium ${isError ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`;
+    el.classList.remove('hidden');
+    setTimeout(() => el.classList.add('hidden'), 4000);
+  }
+
+  saveOrgBtn?.addEventListener('click', async () => {
+    saveOrgBtn.disabled = true;
+    saveOrgBtn.textContent = 'Guardando...';
+    try {
+      const res = await fetch('/api/organizations/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          public_name: document.getElementById('orgName').value,
+          email: document.getElementById('orgEmail').value,
+          phone: document.getElementById('orgPhone').value,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showMsg(orgMsg, 'Organización actualizada correctamente', false);
+      } else {
+        showMsg(orgMsg, data.message || 'Error al guardar', true);
+      }
+    } catch {
+      showMsg(orgMsg, 'Error de conexión', true);
+    } finally {
+      saveOrgBtn.disabled = false;
+      saveOrgBtn.textContent = 'Guardar Cambios';
+    }
+  });
+
+  // Password change
+  const showPwFormBtn = document.getElementById('showPwFormBtn');
+  const pwDisplay = document.getElementById('pwDisplay');
+  const pwForm = document.getElementById('pwForm');
+  const cancelPwBtn = document.getElementById('cancelPwBtn');
+  const savePwBtn = document.getElementById('savePwBtn');
+  const pwMsg = document.getElementById('pwMsg');
+
+  showPwFormBtn?.addEventListener('click', () => {
+    pwDisplay.classList.add('hidden');
+    pwForm.classList.remove('hidden');
+  });
+
+  cancelPwBtn?.addEventListener('click', () => {
+    pwForm.classList.add('hidden');
+    pwDisplay.classList.remove('hidden');
+  });
+
+  savePwBtn?.addEventListener('click', async () => {
+    const newPw = document.getElementById('newPassword').value;
+    const confirmPw = document.getElementById('confirmPassword').value;
+
+    if (newPw.length < 6) {
+      showMsg(pwMsg, 'La contraseña debe tener al menos 6 caracteres', true);
+      return;
+    }
+    if (newPw !== confirmPw) {
+      showMsg(pwMsg, 'Las contraseñas no coinciden', true);
+      return;
+    }
+
+    savePwBtn.disabled = true;
+    savePwBtn.textContent = 'Guardando...';
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newPassword: newPw }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showMsg(pwMsg, 'Contraseña actualizada correctamente', false);
+        pwForm.classList.add('hidden');
+        pwDisplay.classList.remove('hidden');
+        document.getElementById('newPassword').value = '';
+        document.getElementById('confirmPassword').value = '';
+      } else {
+        showMsg(pwMsg, data.message || 'Error al cambiar contraseña', true);
+      }
+    } catch {
+      showMsg(pwMsg, 'Error de conexión', true);
+    } finally {
+      savePwBtn.disabled = false;
+      savePwBtn.textContent = 'Guardar Contraseña';
+    }
+  });
+</script>

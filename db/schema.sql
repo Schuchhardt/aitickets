@@ -242,6 +242,24 @@ CREATE TABLE public.event_dates (
   CONSTRAINT event_dates_event_location_id_fkey FOREIGN KEY (event_location_id) REFERENCES public.event_locations(id)
 );
 
+-- Visit tracking for event pages
+
+CREATE TABLE public.event_visits (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  event_id bigint NOT NULL,
+  ip_hash text NOT NULL,
+  ip_raw text,
+  user_agent text,
+  referrer text,
+  country text,
+  city text,
+  CONSTRAINT event_visits_pkey PRIMARY KEY (id),
+  CONSTRAINT event_visits_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.events(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_event_visits_event_id ON public.event_visits(event_id);
+
 -- Tables with multiple dependencies (created last)
 
 CREATE TABLE public.event_attendees (

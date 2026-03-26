@@ -103,6 +103,78 @@ const removeTicket = (index) => {
   form.value.tickets.splice(index, 1)
 }
 
+// Image Upload Handling
+const isDragging = ref(false)
+const uploadingImage = ref(false)
+const uploadError = ref('')
+
+const triggerFileInput = () => {
+  document.getElementById('eventImageInput').click()
+}
+
+const handleImageUpload = async (e) => {
+  const file = e.target.files[0]
+  if (file) await uploadFile(file)
+}
+
+const onDragOver = (e) => {
+  e.preventDefault()
+  isDragging.value = true
+}
+
+const onDragLeave = (e) => {
+  e.preventDefault()
+  isDragging.value = false
+}
+
+const onDrop = async (e) => {
+  e.preventDefault()
+  isDragging.value = false
+  const file = e.dataTransfer.files[0]
+  if (file) await uploadFile(file)
+}
+
+const uploadFile = async (file) => {
+  if (!file.type.startsWith('image/')) {
+    uploadError.value = 'Solo se permiten imágenes.'
+    return
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    uploadError.value = 'La imagen no debe superar los 5MB.'
+    return
+  }
+
+  uploadingImage.value = true
+  uploadError.value = ''
+
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await fetch('/api/events/upload-image', {
+      method: 'POST',
+      body: formData
+    })
+
+    const result = await response.json()
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Error al subir imagen')
+    }
+
+    form.value.general.imageUrl = result.url
+
+  } catch (e) {
+    uploadError.value = e.message || 'Error al subir la imagen. Intenta nuevamente.'
+  } finally {
+    uploadingImage.value = false
+  }
+}
+
+const removeImage = () => {
+  form.value.general.imageUrl = ''
+}
+
 // Submit
 const isSubmitting = ref(false)
 const submitError = ref('')

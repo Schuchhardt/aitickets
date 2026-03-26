@@ -11,7 +11,7 @@ export const POST: APIRoute = async (context) => {
 
     try {
         const body = await context.request.json();
-        const { eventId, general, locations, tickets } = body;
+        const { eventId, general, locations, tickets, statusOnly, status } = body;
 
         if (!eventId) {
             return new Response(JSON.stringify({ message: "Event ID is required" }), { status: 400 });
@@ -37,6 +37,20 @@ export const POST: APIRoute = async (context) => {
 
         if (fetchError || !event) {
             return new Response(JSON.stringify({ message: "Evento no encontrado o no autorizado" }), { status: 403 });
+        }
+
+        // Status-only update (publish/pause)
+        if (statusOnly && status) {
+            const validStatuses = ['published', 'draft'];
+            if (!validStatuses.includes(status)) {
+                return new Response(JSON.stringify({ message: "Estado inválido" }), { status: 400 });
+            }
+            const { error: statusError } = await supabaseAdmin
+                .from('events')
+                .update({ status })
+                .eq('id', eventId);
+            if (statusError) throw statusError;
+            return new Response(JSON.stringify({ message: "Estado actualizado", id: eventId }), { status: 200 });
         }
 
         // 2. Update Event Details
