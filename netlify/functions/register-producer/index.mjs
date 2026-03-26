@@ -45,7 +45,7 @@ export default async function handler(req, context) {
     // ⏩ Enviar correo de bienvenida (detecta local vs producción)
     try {
       const baseUrl =
-        process.env.CONTEXT === 'production'
+        process.env.NODE_ENV === 'production'
           ? process.env.SITE_URL
           : 'http://localhost:8888'
 

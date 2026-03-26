@@ -18,6 +18,7 @@ export default defineConfig({
   ],
   vite: {
     plugins: [tailwindcss(), svgLoader()],
+    envPrefix: ['PUBLIC_', 'SUPABASE_URL', 'SUPABASE_ANON_KEY'],
     server: {
       host: true,
       port: 4321,

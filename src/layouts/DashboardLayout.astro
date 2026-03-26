@@ -1,0 +1,63 @@
+---
+import DashboardSidebar from "../components/dashboard/DashboardSidebar.vue";
+import "../styles/global.css";
+import {
+  getSessionUser,
+  createSupabaseServerClient,
+} from "../lib/supabaseServer";
+
+const { title = "Dashboard" } = Astro.props;
+const userRaw = await getSessionUser(Astro);
+
+// Fetch user name from public.users table
+let dbUserName = null;
+if (userRaw) {
+  const supabase = createSupabaseServerClient(Astro);
+  const { data: dbUser } = await supabase
+    .from("users")
+    .select("name")
+    .eq("auth_user_id", userRaw.id)
+    .single();
+  dbUserName = dbUser?.name || null;
+}
+
+const userData = userRaw
+  ? {
+      email: userRaw.email,
+      user_metadata: userRaw.user_metadata,
+      id: userRaw.id,
+      dbName: dbUserName, // Name from public.users table
+    }
+  : null;
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title} | Producer Dashboard</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;700&family=Prompt:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="bg-gray-50 min-h-screen font-[Prompt]">
+    <div class="flex h-screen overflow-hidden">
+      <!-- Sidebar -->
+      <DashboardSidebar client:only="vue" userJson={JSON.stringify(userData)} />
+
+      <!-- Main Content -->
+      <main class="flex-1 overflow-y-auto p-8 relative">
+        <div class="max-w-7xl mx-auto">
+          <slot />
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

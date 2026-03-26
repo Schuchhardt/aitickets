@@ -1,5 +1,5 @@
 ---
-import { supabase } from "../../lib/supabaseClient";
+import { getSupabaseAnon } from "../../lib/auth-helpers";
 import Layout from "../../layouts/Layout.astro";
 import AppHeader from "../../components/AppHeader.vue";
 import AppFooter from "../../components/AppFooter.vue";
@@ -11,10 +11,11 @@ import "../../styles/global.css";
 
 // Obtener el ID de la entrada desde la URL
 const { id } = Astro.params;
+const supabase = getSupabaseAnon();
 
-let ticket = null;
-let event = null;
-let errorMessage = null;
+let ticket: Record<string, any> | undefined = undefined;
+let event: Record<string, any> | undefined = undefined;
+let errorMessage: string | null = null;
 
 if (id) {
   // Obtener los datos del ticket
@@ -39,7 +40,7 @@ if (id) {
     event = eventData;
 
     // load event dates
-    const getTimeFromTimestamp = (timestamp) => {
+    const getTimeFromTimestamp = (timestamp: string | number | Date) => {
       // IMPORTANTE: Extraer la hora usando una zona horaria específica
       // para que sea consistente independientemente del servidor
       const date = new Date(timestamp);
@@ -51,16 +52,19 @@ if (id) {
         timeZone: "America/Santiago" // Zona horaria donde están los eventos
       });
     };
-    const defaultDate = {date: event.start_date, start_time: getTimeFromTimestamp(event.start_date), end_time: getTimeFromTimestamp(event.end_date)};
-    const { data: event_dates, error: errorDates } = await supabase
-    .from("event_dates")
-    .select("*")
-    .eq("event_id", event.id)
-    if (errorDates){
-      console.error("Error al obtener las fechas:", errorDates);
-      event.dates = [defaultDate]
-    } else {
-      event.dates = event_dates.length > 0 ? event_dates : [defaultDate];
+
+    if (event) {
+      const defaultDate = {date: event.start_date, start_time: getTimeFromTimestamp(event.start_date), end_time: getTimeFromTimestamp(event.end_date)};
+      const { data: event_dates, error: errorDates } = await supabase
+        .from("event_dates")
+        .select("*")
+        .eq("event_id", event.id)
+      if (errorDates){
+        console.error("Error al obtener las fechas:", errorDates);
+        event.dates = [defaultDate]
+      } else {
+        event.dates = event_dates && event_dates.length > 0 ? event_dates : [defaultDate];
+      }
     }
   
     // Obtener datos del asistente

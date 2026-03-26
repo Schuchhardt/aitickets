@@ -40,7 +40,7 @@ function generateSignature(params, secretKey) {
 
 async function sendTicketsEmail(customerInfo, eventInfo, orderInfo, ticketsInfo) {
   const siteUrl =
-    process.env.CONTEXT === 'production'
+    process.env.NODE_ENV === 'production'
       ? process.env.SITE_URL
       : 'https://aitickets.cl';
 

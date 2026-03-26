@@ -1,0 +1,64 @@
+---
+import DashboardLayout from "../../layouts/DashboardLayout.astro";
+import { Download, Users } from "lucide-vue-next";
+import { createSupabaseServerClient } from "../../lib/supabaseServer";
+
+const supabase = createSupabaseServerClient(Astro);
+const {
+  data: { user },
+} = await supabase.auth.getUser();
+
+if (!user) {
+  return Astro.redirect("/organizadores/login");
+}
+---
+
+<DashboardLayout title="Comunidad">
+  <div
+    class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8"
+  >
+    <div>
+      <h1 class="text-3xl font-bold font-[Unbounded] mb-2">Comunidad</h1>
+      <p class="text-gray-600">
+        Visualiza a los asistentes de todos tus eventos.
+      </p>
+    </div>
+
+    <button
+      class="inline-flex items-center gap-2 bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition font-medium"
+    >
+      <Download size="18" />
+      Exportar CSV
+    </button>
+  </div>
+
+  <div
+    class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"
+  >
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-sm text-gray-600">
+        <thead
+          class="bg-gray-50 text-gray-900 font-semibold border-b border-gray-100"
+        >
+          <tr>
+            <th class="px-6 py-4">Nombre</th>
+            <th class="px-6 py-4">Email</th>
+            <th class="px-6 py-4">Evento</th>
+            <th class="px-6 py-4">Ticket</th>
+            <th class="px-6 py-4">Fecha Compra</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td colspan="5" class="px-6 py-12 text-center text-gray-400">
+              <div class="flex flex-col items-center gap-2">
+                <Users size="24" />
+                <span>No se encontraron asistentes aún.</span>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</DashboardLayout>

@@ -1,7 +1,7 @@
 
 
 <script setup>
-import { ArrowRight, Users, Sparkles, Calendar, BarChart3 } from 'lucide-vue-next';
+import { ArrowRight, Clock, Sparkles, TrendingUp, MessageSquare } from 'lucide-vue-next';
 import FadeInSection from './Hero/FadeInSection.vue';
 import FeatureCard from './Hero/FeatureCard.vue';
 import GradientBackground from './Hero/GradientBackground.vue';
@@ -18,47 +18,47 @@ import GradientBackground from './Hero/GradientBackground.vue';
           <FadeInSection direction="up">
             <span data-testid="hero-badge" class="inline-flex border items-center gap-2 text-lime-400 font-semibold sm:text-xs text-sm md:text-base mb-4 bg-lime-400/10 px-4 py-1.5 rounded-full font-[Prompt]">
               <Sparkles class="h-4 w-4" />
-              Revolucionando el mundo de los eventos
+              Para circos, teatros y eventos con funciones múltiples
             </span>
           </FadeInSection>
 
           <FadeInSection direction="up" :delay="100">
-            <h1 data-testid="hero-title" class="text-3xl md:text-2xl lg:text-4xl font-bold text-white leading-tight mb-6 font-[Unbounded]">
-              Donde la comunidad encuentra su
+            <h1 class="text-3xl md:text-2xl lg:text-4xl font-bold text-white leading-tight mb-6 font-[Unbounded]">
+              ¿Y si cada función
               <span class="relative inline-block">
-                evento ideal
+                estuviera llena?
                 <span class="absolute bottom-2 left-0 w-full h-3 bg-lime-400/30 -z-10 rounded"></span>
               </span>
             </h1>
           </FadeInSection>
 
           <FadeInSection direction="up" :delay="200">
-            <p data-testid="hero-subtitle" class="text-lg text-white/80 mb-8 max-w-2xl mx-auto lg:mx-0 font-[Prompt]">
-              AI Tickets conecta a las personas con sus eventos ideales y ayuda a los productores a vender más, de forma automática.
+            <p class="text-lg text-white/80 mb-8 max-w-2xl mx-auto lg:mx-0 font-[Prompt]">
+              Más asientos vendidos, menos dolores de cabeza. AI Tickets es como tener un equipo completo de ventas, marketing y operaciones trabajando 24/7 para tu evento.
             </p>
           </FadeInSection>
 
           <FadeInSection direction="up" :delay="300">
-            <div data-testid="hero-cta" class="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 mb-12">
-              <a href="/register" data-testid="cta-primary" class="px-6 py-3 text-lg font-bold font-[Unbounded] border border-white rounded-lg hover:bg-white hover:text-black transition w-full sm:w-auto group">
-                Comienza Ahora
+            <div class="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 mb-12">
+              <a href="/register" class="px-6 py-3 text-lg font-bold font-[Unbounded] bg-lime-400 text-black border border-lime-400 rounded-lg transition hover:bg-black hover:text-lime-400 hover:border-lime-400 w-full sm:w-auto group">
+                Solicitar Demo Gratis
                 <ArrowRight class="ml-2 inline-block h-4 w-4 transition-transform group-hover:translate-x-1" />
               </a>
-              <a href="/eventos" data-testid="cta-secondary" class="px-6 py-3 text-lg font-bold font-[Unbounded] bg-lime-400 text-black border border-black rounded-lg transition hover:bg-black hover:text-white w-full sm:w-auto">
-                Explorar Eventos
+              <a href="/eventos" class="px-6 py-3 text-lg font-bold font-[Unbounded] border border-white rounded-lg hover:bg-white hover:text-black transition w-full sm:w-auto">
+                Ver Eventos
               </a>
             </div>
           </FadeInSection>
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 pb-8">
             <FadeInSection direction="up" :delay="400">
-              <FeatureCard :icon="Calendar" title="Gestión Inteligente" text="Crea y administra eventos desde un solo lugar con herramientas intuitivas" />
+              <FeatureCard :icon="TrendingUp" title="+25% más ventas" text="Llena las funciones difíciles con promociones automáticas y publicidad inteligente" />
             </FadeInSection>
             <FadeInSection direction="up" :delay="500">
-              <FeatureCard :icon="Users" title="Marketing IA" text="Promociona tus eventos al público perfecto con nuestros algoritmos inteligentes" />
+              <FeatureCard :icon="Clock" title="15 hrs menos/semana" text="Deja de perder tiempo en Excel, WhatsApp y tareas manuales repetitivas" />
             </FadeInSection>
             <FadeInSection direction="up" :delay="600">
-              <FeatureCard :icon="BarChart3" title="Analítica Avanzada" text="Métricas en tiempo real para maximizar ventas y optimizar tu estrategia" />
+              <FeatureCard :icon="MessageSquare" title="1 click = todos avisados" text="Si algo cambia, notifica a todos tus asistentes por email y WhatsApp al instante" />
             </FadeInSection>
           </div>
         </div>

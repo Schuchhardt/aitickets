@@ -1,0 +1,966 @@
+---
+import "../styles/global.css";
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Tickets - Presentación</title>
+    <meta name="description" content="AI Tickets - Más asientos vendidos, menos dolores de cabeza">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      
+      html, body {
+        height: 100%;
+        overflow: hidden;
+        background: #000;
+        color: #FEFEFE;
+        font-family: 'Prompt', sans-serif;
+      }
+      
+      .presentation {
+        height: 100vh;
+        width: 100vw;
+        position: relative;
+      }
+      
+      .slide {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 4rem;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.5s ease, transform 0.5s ease;
+        transform: translateX(50px);
+      }
+      
+      .slide.active {
+        opacity: 1;
+        visibility: visible;
+        transform: translateX(0);
+      }
+      
+      .slide.prev {
+        transform: translateX(-50px);
+      }
+      
+      h1, h2 {
+        font-family: 'Unbounded', sans-serif;
+        font-weight: 500;
+        text-align: center;
+        line-height: 1.2;
+      }
+      
+      h1 {
+        font-size: clamp(2rem, 5vw, 4rem);
+        margin-bottom: 1.5rem;
+      }
+      
+      h2 {
+        font-size: clamp(1.5rem, 3.5vw, 2.5rem);
+        margin-bottom: 2rem;
+      }
+      
+      p, li {
+        font-size: clamp(1rem, 2vw, 1.4rem);
+        line-height: 1.8;
+        max-width: 900px;
+      }
+      
+      ul {
+        list-style: none;
+        text-align: left;
+        max-width: 800px;
+      }
+      
+      li {
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+      }
+      
+      li::before {
+        content: attr(data-icon);
+        font-size: 1.5rem;
+        flex-shrink: 0;
+      }
+      
+      .highlight-green {
+        color: #9AE600;
+      }
+      
+      .highlight-pink {
+        color: #D84ABF;
+      }
+      
+      .highlight-cyan {
+        color: #709EFF;
+      }
+      
+      .subtitle {
+        color: #9AE600;
+        font-size: clamp(1rem, 2vw, 1.5rem);
+        margin-top: 1rem;
+      }
+      
+      /* Backgrounds */
+      .bg-gradient-cyan {
+        background: linear-gradient(135deg, #000 0%, #1a3a5c 100%);
+      }
+      
+      .bg-gradient-green {
+        background: linear-gradient(135deg, #000 0%, #1a3d00 100%);
+      }
+      
+      .bg-gradient-pink {
+        background: linear-gradient(135deg, #000 0%, #3d1a35 100%);
+      }
+      
+      /* Navigation */
+      .nav-controls {
+        position: fixed;
+        bottom: 2rem;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+        z-index: 100;
+        background: rgba(0,0,0,0.8);
+        padding: 1rem 2rem;
+        border-radius: 50px;
+        border: 1px solid rgba(154, 230, 0, 0.3);
+      }
+      
+      .nav-btn {
+        background: transparent;
+        border: 2px solid #9AE600;
+        color: #9AE600;
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+        font-size: 1.2rem;
+      }
+      
+      .nav-btn:hover {
+        background: #9AE600;
+        color: #000;
+      }
+      
+      .nav-btn:disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+      }
+      
+      .slide-counter {
+        color: #9AE600;
+        font-family: 'Unbounded', sans-serif;
+        font-size: 1rem;
+        min-width: 80px;
+        text-align: center;
+      }
+      
+      /* Progress bar */
+      .progress-bar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 4px;
+        background: #9AE600;
+        transition: width 0.3s ease;
+        z-index: 100;
+      }
+      
+      /* Cards grid */
+      .cards-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        max-width: 1000px;
+        margin-top: 2rem;
+      }
+      
+      .card {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(154, 230, 0, 0.3);
+        border-radius: 16px;
+        padding: 1.5rem;
+        text-align: left;
+      }
+      
+      .card h3 {
+        font-family: 'Unbounded', sans-serif;
+        font-size: 1.2rem;
+        margin-bottom: 0.5rem;
+      }
+      
+      .card p {
+        font-size: 0.95rem;
+        opacity: 0.8;
+      }
+      
+      .card.green { border-color: #9AE600; }
+      .card.green h3 { color: #9AE600; }
+      
+      .card.cyan { border-color: #709EFF; }
+      .card.cyan h3 { color: #709EFF; }
+      
+      .card.pink { border-color: #D84ABF; }
+      .card.pink h3 { color: #D84ABF; }
+      
+      /* Steps */
+      .steps {
+        display: flex;
+        gap: 2rem;
+        margin-top: 2rem;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+      
+      .step {
+        text-align: center;
+        max-width: 280px;
+      }
+      
+      .step-number {
+        font-family: 'Unbounded', sans-serif;
+        font-size: 3rem;
+        color: #9AE600;
+        margin-bottom: 0.5rem;
+      }
+      
+      .step h3 {
+        font-family: 'Unbounded', sans-serif;
+        font-size: 1.2rem;
+        margin-bottom: 0.5rem;
+      }
+      
+      .step p {
+        font-size: 1rem;
+        opacity: 0.8;
+      }
+      
+      /* Quote */
+      .quote {
+        font-size: clamp(1.5rem, 3vw, 2.5rem);
+        font-style: italic;
+        max-width: 800px;
+        text-align: center;
+        line-height: 1.6;
+        position: relative;
+        padding: 2rem;
+      }
+      
+      .quote::before {
+        content: '"';
+        font-size: 6rem;
+        color: #9AE600;
+        position: absolute;
+        top: -1rem;
+        left: -1rem;
+        opacity: 0.5;
+        font-family: Georgia, serif;
+      }
+      
+      .quote-author {
+        margin-top: 1.5rem;
+        font-style: normal;
+        color: #9AE600;
+        font-size: 1.2rem;
+      }
+      
+      /* Pricing table */
+      .pricing {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1.5rem;
+        max-width: 1000px;
+        margin-top: 2rem;
+      }
+      
+      @media (max-width: 768px) {
+        .pricing {
+          grid-template-columns: 1fr;
+        }
+      }
+      
+      .price-card {
+        background: rgba(255,255,255,0.03);
+        border-radius: 20px;
+        padding: 2rem;
+        text-align: center;
+        border: 2px solid rgba(255,255,255,0.1);
+        transition: transform 0.3s ease, border-color 0.3s ease;
+      }
+      
+      .price-card:hover {
+        transform: translateY(-5px);
+      }
+      
+      .price-card.featured {
+        border-color: #709EFF;
+        background: rgba(112, 158, 255, 0.1);
+      }
+      
+      .price-card h3 {
+        font-family: 'Unbounded', sans-serif;
+        font-size: 1.3rem;
+        margin-bottom: 0.5rem;
+      }
+      
+      .price-card .percentage {
+        font-family: 'Unbounded', sans-serif;
+        font-size: 3rem;
+        margin: 1rem 0;
+      }
+      
+      .price-card ul {
+        text-align: left;
+        font-size: 0.9rem;
+      }
+      
+      .price-card li {
+        margin-bottom: 0.5rem;
+        font-size: 0.95rem;
+      }
+      
+      .price-card li::before {
+        content: '✓';
+        color: #9AE600;
+      }
+      
+      /* CTA Button */
+      .cta-button {
+        display: inline-block;
+        background: #9AE600;
+        color: #000;
+        padding: 1rem 3rem;
+        border-radius: 50px;
+        font-family: 'Unbounded', sans-serif;
+        font-size: 1.2rem;
+        text-decoration: none;
+        margin-top: 2rem;
+        transition: all 0.3s ease;
+        border: none;
+        cursor: pointer;
+      }
+      
+      .cta-button:hover {
+        transform: scale(1.05);
+        box-shadow: 0 0 30px rgba(154, 230, 0, 0.5);
+      }
+      
+      /* Metrics */
+      .metrics {
+        display: flex;
+        gap: 3rem;
+        margin-top: 2rem;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+      
+      .metric {
+        text-align: center;
+      }
+      
+      .metric-value {
+        font-family: 'Unbounded', sans-serif;
+        font-size: 3rem;
+        color: #9AE600;
+      }
+      
+      .metric-label {
+        font-size: 1rem;
+        opacity: 0.8;
+      }
+      
+      /* Logo */
+      .logo {
+        position: fixed;
+        top: 2rem;
+        left: 2rem;
+        font-family: 'Unbounded', sans-serif;
+        font-size: 1.2rem;
+        color: #9AE600;
+        z-index: 100;
+        text-decoration: none;
+      }
+      
+      /* Keyboard hints */
+      .keyboard-hint {
+        position: fixed;
+        bottom: 6rem;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 0.8rem;
+        opacity: 0.5;
+        z-index: 100;
+      }
+      
+      kbd {
+        background: rgba(255,255,255,0.1);
+        padding: 0.3rem 0.6rem;
+        border-radius: 4px;
+        margin: 0 0.2rem;
+      }
+      
+      /* Comparison table */
+      .comparison {
+        max-width: 900px;
+        margin-top: 2rem;
+        width: 100%;
+      }
+      
+      .comparison table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      
+      .comparison th, .comparison td {
+        padding: 1rem;
+        text-align: left;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+      }
+      
+      .comparison th {
+        font-family: 'Unbounded', sans-serif;
+        font-size: 0.9rem;
+      }
+      
+      .comparison td:first-child {
+        font-weight: 500;
+      }
+      
+      .check { color: #9AE600; }
+      .cross { color: #D84ABF; }
+      .warn { color: #FFB800; }
+
+      /* Fullscreen button */
+      .fullscreen-btn {
+        position: fixed;
+        top: 2rem;
+        right: 2rem;
+        background: transparent;
+        border: 1px solid rgba(154, 230, 0, 0.5);
+        color: #9AE600;
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        z-index: 100;
+        transition: all 0.3s ease;
+      }
+      
+      .fullscreen-btn:hover {
+        background: rgba(154, 230, 0, 0.1);
+      }
+      
+      /* Responsive */
+      @media (max-width: 768px) {
+        .slide {
+          padding: 2rem 1.5rem 6rem;
+        }
+        
+        .nav-controls {
+          padding: 0.8rem 1.5rem;
+        }
+        
+        .nav-btn {
+          width: 40px;
+          height: 40px;
+        }
+        
+        .steps {
+          flex-direction: column;
+          align-items: center;
+        }
+        
+        .cards-grid {
+          grid-template-columns: 1fr;
+        }
+        
+        .keyboard-hint {
+          display: none;
+        }
+        
+        .logo {
+          font-size: 1rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <a href="/" class="logo">AI Tickets</a>
+    <button class="fullscreen-btn" id="fullscreenBtn">⛶ Pantalla completa</button>
+    
+    <div class="progress-bar" id="progressBar"></div>
+    
+    <div class="presentation" id="presentation">
+      
+      <!-- SLIDE 1: Portada -->
+      <div class="slide active" data-slide="1">
+        <h1>¿Y si cada función <span class="highlight-green">estuviera llena</span>?</h1>
+        <p class="subtitle">AI Tickets - Más asientos vendidos, menos dolores de cabeza.</p>
+      </div>
+      
+      <!-- SLIDE 2: El Dolor -->
+      <div class="slide" data-slide="2">
+        <h2 class="highlight-pink">¿Te suena familiar?</h2>
+        <ul>
+          <li data-icon="😫">"Cancelaron la función y no pudimos avisar a todos a tiempo"</li>
+          <li data-icon="📉">"Lunes y martes siempre están vacíos"</li>
+          <li data-icon="🤯">"Paso más tiempo en el Excel que produciendo"</li>
+          <li data-icon="📱">"La gente pregunta lo mismo mil veces por WhatsApp"</li>
+          <li data-icon="💸">"Invertimos en publicidad pero no sabemos si funcionó"</li>
+        </ul>
+      </div>
+      
+      <!-- SLIDE 3: El Costo -->
+      <div class="slide bg-gradient-pink" data-slide="3">
+        <h2>El costo real de <span class="highlight-pink">seguir igual</span></h2>
+        <ul>
+          <li data-icon="📊">30-40% de asientos vacíos en funciones "flojas"</li>
+          <li data-icon="⏰">+15 horas semanales en tareas manuales</li>
+          <li data-icon="😤">Clientes frustrados = malas reseñas</li>
+          <li data-icon="💰">Dinero en publicidad sin saber qué funciona</li>
+          <li data-icon="🔥">Estrés operativo que mata la creatividad</li>
+        </ul>
+        <p class="subtitle" style="margin-top: 2rem;">"Cada función con asientos vacíos es dinero que ya no vuelve."</p>
+      </div>
+      
+      <!-- SLIDE 4: La Solución -->
+      <div class="slide bg-gradient-green" data-slide="4">
+        <h2>Imagina tener un equipo que:</h2>
+        <ul>
+          <li data-icon="✅">Vende entradas mientras duermes</li>
+          <li data-icon="✅">Avisa a todos si algo cambia (en segundos)</li>
+          <li data-icon="✅">Llena las funciones difíciles automáticamente</li>
+          <li data-icon="✅">Te dice exactamente qué está funcionando</li>
+          <li data-icon="✅">Hace todo esto sin que contrates a nadie</li>
+        </ul>
+        <p class="subtitle" style="margin-top: 2rem; font-size: 2rem;">Eso es <span class="highlight-green">AI Tickets</span>.</p>
+      </div>
+      
+      <!-- SLIDE 5: Cómo Funciona -->
+      <div class="slide" data-slide="5">
+        <h2 class="highlight-cyan">Así de fácil es empezar</h2>
+        <div class="steps">
+          <div class="step">
+            <div class="step-number">1</div>
+            <h3>Crea tu evento</h3>
+            <p>Sube la info de tus funciones en minutos. Nosotros te ayudamos la primera vez.</p>
+          </div>
+          <div class="step">
+            <div class="step-number">2</div>
+            <h3>Comparte el link</h3>
+            <p>Tu página de ventas está lista. Acepta WebPay, MercadoPago, transferencia.</p>
+          </div>
+          <div class="step">
+            <div class="step-number">3</div>
+            <h3>Nosotros hacemos el resto</h3>
+            <p>Promoción, comunicación, check-in. Tú solo recibe a tu público.</p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- SLIDE 6: Beneficio 1 -->
+      <div class="slide" data-slide="6">
+        <h2><span class="highlight-green">"Los lunes ya no son un problema"</span></h2>
+        <ul>
+          <li data-icon="📧">Emails automáticos a quienes buscaron pero no compraron</li>
+          <li data-icon="📱">WhatsApp con promociones de último minuto</li>
+          <li data-icon="📢">Publicidad dirigida solo a tu zona</li>
+          <li data-icon="🎯">Descuentos inteligentes para funciones con baja venta</li>
+        </ul>
+        <div class="metrics" style="margin-top: 3rem;">
+          <div class="metric">
+            <div class="metric-value">+25%</div>
+            <div class="metric-label">más asistentes en funciones "flojas"</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- SLIDE 7: Beneficio 2 -->
+      <div class="slide" data-slide="7">
+        <h2 class="highlight-pink">"Cambió la función. ¿Cómo aviso a 500 personas?"</h2>
+        <ul>
+          <li data-icon="✅">1 click → Todos notificados por email Y WhatsApp</li>
+          <li data-icon="✅">Recordatorios automáticos antes de cada función</li>
+          <li data-icon="✅">Respuestas automáticas a preguntas frecuentes</li>
+          <li data-icon="✅">Los asistentes siempre saben qué hacer</li>
+        </ul>
+        <p class="subtitle" style="margin-top: 2rem;">"Nunca más perder clientes por mala comunicación"</p>
+      </div>
+      
+      <!-- SLIDE 8: Beneficio 3 -->
+      <div class="slide" data-slide="8">
+        <h2 class="highlight-cyan">Tu marca, tu control</h2>
+        <div class="cards-grid" style="grid-template-columns: repeat(2, 1fr);">
+          <div class="card cyan">
+            <h3>🌐 tucirco.cl</h3>
+            <p>Vende bajo tu propio dominio</p>
+          </div>
+          <div class="card cyan">
+            <h3>🌐 entradas.tuteatro.com</h3>
+            <p>Sin logos de terceros que confundan</p>
+          </div>
+        </div>
+        <ul style="margin-top: 2rem;">
+          <li data-icon="✅">Más confianza del público</li>
+          <li data-icon="✅">Mejor posicionamiento en Google</li>
+          <li data-icon="✅">Imagen profesional</li>
+        </ul>
+      </div>
+      
+      <!-- SLIDE 9: Beneficio 4 - Upselling -->
+      <div class="slide bg-gradient-pink" data-slide="9">
+        <h2>Cada entrada puede <span class="highlight-pink">valer más</span></h2>
+        <div class="cards-grid">
+          <div class="card pink">
+            <h3>🎟️ Upgrade a VIP</h3>
+            <p>Antes del pago</p>
+          </div>
+          <div class="card pink">
+            <h3>👨‍👩‍👧‍👦 Packs familiares</h3>
+            <p>Con descuento</p>
+          </div>
+          <div class="card pink">
+            <h3>📸 Fotos con elenco</h3>
+            <p>Experiencia premium</p>
+          </div>
+          <div class="card pink">
+            <h3>🛍️ Merchandising</h3>
+            <p>En el checkout</p>
+          </div>
+        </div>
+        <div class="metrics" style="margin-top: 2rem;">
+          <div class="metric">
+            <div class="metric-value">+$2.500</div>
+            <div class="metric-label">extra por entrada vendida</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- SLIDE 10: Check-in -->
+      <div class="slide" data-slide="10">
+        <h2 class="highlight-green">Entrada sin filas, sin estrés</h2>
+        <ul>
+          <li data-icon="📱">QR que funciona SIN internet</li>
+          <li data-icon="⚡">Escaneo en menos de 2 segundos</li>
+          <li data-icon="🖥️">Totems de autoservicio (opcional)</li>
+          <li data-icon="👥">Control de aforo en tiempo real</li>
+        </ul>
+        <p class="subtitle" style="margin-top: 2rem;">"Tu equipo en puerta solo saluda. El sistema hace el resto."</p>
+      </div>
+      
+      <!-- SLIDE 11: Social Proof -->
+      <div class="slide" data-slide="11">
+        <h2 class="highlight-green">Resultados reales</h2>
+        <div class="metrics">
+          <div class="metric">
+            <div class="metric-value">+50K</div>
+            <div class="metric-label">entradas vendidas</div>
+          </div>
+          <div class="metric">
+            <div class="metric-value">+200</div>
+            <div class="metric-label">funciones gestionadas</div>
+          </div>
+          <div class="metric">
+            <div class="metric-value">98%</div>
+            <div class="metric-label">notificados a tiempo</div>
+          </div>
+        </div>
+        <div class="cards-grid" style="margin-top: 3rem;">
+          <div class="card green">
+            <h3>🎪 Circos</h3>
+            <p>"Llenamos 3 funciones extra por semana"</p>
+          </div>
+          <div class="card cyan">
+            <h3>🎭 Teatros</h3>
+            <p>"Dejé de contestar WhatsApp todo el día"</p>
+          </div>
+          <div class="card pink">
+            <h3>🎨 Ferias</h3>
+            <p>"Las preventas se agotan en horas"</p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- SLIDE 12: Testimonial -->
+      <div class="slide" data-slide="12">
+        <div class="quote">
+          Antes pasaba 20 horas a la semana en Excel, WhatsApp y correos. Ahora paso ese tiempo creando mejor contenido para mi show.
+          <br><br>
+          AI Tickets me devolvió las ganas de producir.
+          <div class="quote-author">— Productor de evento</div>
+        </div>
+      </div>
+      
+      <!-- SLIDE 13: Pricing -->
+      <div class="slide" data-slide="13">
+        <h2>Solo pagas cuando vendes</h2>
+        <p style="text-align: center; margin-bottom: 1rem; opacity: 0.8;">Sin setup. Sin mensualidad. Sin permanencia.</p>
+        <div class="pricing">
+          <div class="price-card">
+            <h3 class="highlight-green">ESENCIAL</h3>
+            <div class="percentage highlight-green">10%</div>
+            <ul>
+              <li>Venta online</li>
+              <li>Funciones múltiples</li>
+              <li>Check-in QR</li>
+              <li>Soporte básico</li>
+            </ul>
+            <p style="margin-top: 1rem; opacity: 0.7;">Para empezar sin riesgo</p>
+          </div>
+          <div class="price-card featured">
+            <h3 class="highlight-cyan">PRO ⭐</h3>
+            <div class="percentage highlight-cyan">15%</div>
+            <ul>
+              <li>Todo Esencial +</li>
+              <li>Emails automáticos</li>
+              <li>Cupones y descuentos</li>
+              <li>WhatsApp básico</li>
+              <li>Reportes avanzados</li>
+            </ul>
+            <p style="margin-top: 1rem;">Más popular</p>
+          </div>
+          <div class="price-card">
+            <h3 class="highlight-pink">FULL</h3>
+            <div class="percentage highlight-pink">20%</div>
+            <ul>
+              <li>Todo Pro +</li>
+              <li>Meta Ads</li>
+              <li>Google Ads</li>
+              <li>WhatsApp full</li>
+              <li>Manager dedicado</li>
+            </ul>
+            <p style="margin-top: 1rem; opacity: 0.7;">Para llenar TODO</p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- SLIDE 14: Comparativa -->
+      <div class="slide" data-slide="14">
+        <h2 class="highlight-cyan">¿Por qué AI Tickets?</h2>
+        <div class="comparison">
+          <table>
+            <thead>
+              <tr>
+                <th></th>
+                <th class="highlight-green">AI Tickets</th>
+                <th>Ticketeras</th>
+                <th>Manual</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Funciones múltiples</td>
+                <td class="check">✓ Sí</td>
+                <td class="warn">⚠ Limitado</td>
+                <td class="cross">✗ Caos</td>
+              </tr>
+              <tr>
+                <td>WhatsApp integrado</td>
+                <td class="check">✓ Sí</td>
+                <td class="cross">✗ No</td>
+                <td class="warn">⚠ Manual</td>
+              </tr>
+              <tr>
+                <td>Marketing incluido</td>
+                <td class="check">✓ Sí</td>
+                <td class="cross">✗ Extra</td>
+                <td class="cross">✗ No</td>
+              </tr>
+              <tr>
+                <td>Dominio propio</td>
+                <td class="check">✓ Sí</td>
+                <td class="cross">✗ No</td>
+                <td class="warn">⚠ Caro</td>
+              </tr>
+              <tr>
+                <td>Soporte en español</td>
+                <td class="check">✓ Directo</td>
+                <td class="warn">⚠ Bot</td>
+                <td class="cross">—</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="subtitle" style="margin-top: 2rem;">"Hacemos más, cobramos igual o menos."</p>
+      </div>
+      
+      <!-- SLIDE 15: Garantía -->
+      <div class="slide bg-gradient-green" data-slide="15">
+        <h2 class="highlight-green">🛡️ Prueba sin riesgo</h2>
+        <div class="cards-grid">
+          <div class="card green">
+            <h3>🎁 Primera función GRATIS</h3>
+            <p>Hasta 100 entradas, sin comisión</p>
+          </div>
+          <div class="card green">
+            <h3>🤝 Setup gratuito</h3>
+            <p>Nosotros configuramos todo por ti</p>
+          </div>
+          <div class="card green">
+            <h3>🚪 Sin contratos</h3>
+            <p>Te vas cuando quieras</p>
+          </div>
+          <div class="card green">
+            <h3>📞 Soporte humano</h3>
+            <p>Respuesta en menos de 2 horas</p>
+          </div>
+        </div>
+        <p class="subtitle" style="margin-top: 2rem;">"Si no vendes más, no pagas. Así de simple."</p>
+      </div>
+      
+      <!-- SLIDE 16: CTA Final -->
+      <div class="slide" data-slide="16">
+        <h1 class="highlight-green">¿Listo para llenar más funciones?</h1>
+        <p style="text-align: center; font-size: 1.3rem; margin: 1rem 0;">
+          📅 Agenda tu demo de 15 minutos
+        </p>
+        <ul style="margin: 1.5rem 0;">
+          <li data-icon="→">Te mostramos la plataforma con TU evento</li>
+          <li data-icon="→">Respondemos todas tus dudas</li>
+          <li data-icon="→">Sin compromiso</li>
+        </ul>
+        <a href="mailto:contacto@aitickets.cl" class="cta-button">Solicitar Demo</a>
+        <p style="margin-top: 2rem; opacity: 0.7; text-align: center;">
+          📧 contacto@aitickets.cl
+        </p>
+      </div>
+      
+      <!-- SLIDE 17: Cierre -->
+      <div class="slide" data-slide="17">
+        <h1 style="font-size: clamp(1.8rem, 4vw, 3rem); max-width: 800px;">
+          "¿Cuántas funciones más podrías llenar si tuvieras el <span class="highlight-green">sistema correcto</span>?"
+        </h1>
+        <p class="subtitle" style="margin-top: 3rem; font-size: 1.5rem;">Hagamos que pase.</p>
+      </div>
+      
+    </div>
+    
+    <p class="keyboard-hint">Usa <kbd>←</kbd> <kbd>→</kbd> o <kbd>espacio</kbd> para navegar</p>
+    
+    <div class="nav-controls">
+      <button class="nav-btn" id="prevBtn" disabled>←</button>
+      <span class="slide-counter" id="slideCounter">1 / 17</span>
+      <button class="nav-btn" id="nextBtn">→</button>
+    </div>
+    
+    <script>
+      const slides = document.querySelectorAll('.slide');
+      const prevBtn = document.getElementById('prevBtn');
+      const nextBtn = document.getElementById('nextBtn');
+      const slideCounter = document.getElementById('slideCounter');
+      const progressBar = document.getElementById('progressBar');
+      const fullscreenBtn = document.getElementById('fullscreenBtn');
+      const totalSlides = slides.length;
+      let currentSlide = 0;
+      
+      function updateSlide(newIndex) {
+        if (newIndex < 0 || newIndex >= totalSlides) return;
+        
+        slides[currentSlide].classList.remove('active');
+        slides[currentSlide].classList.add('prev');
+        
+        currentSlide = newIndex;
+        
+        slides.forEach(slide => slide.classList.remove('prev'));
+        slides[currentSlide].classList.add('active');
+        
+        // Update counter
+        slideCounter.textContent = `${currentSlide + 1} / ${totalSlides}`;
+        
+        // Update buttons
+        prevBtn.disabled = currentSlide === 0;
+        nextBtn.disabled = currentSlide === totalSlides - 1;
+        
+        // Update progress bar
+        const progress = ((currentSlide + 1) / totalSlides) * 100;
+        progressBar.style.width = `${progress}%`;
+      }
+      
+      prevBtn.addEventListener('click', () => updateSlide(currentSlide - 1));
+      nextBtn.addEventListener('click', () => updateSlide(currentSlide + 1));
+      
+      // Keyboard navigation
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight' || e.key === ' ') {
+          e.preventDefault();
+          updateSlide(currentSlide + 1);
+        } else if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          updateSlide(currentSlide - 1);
+        } else if (e.key === 'Home') {
+          e.preventDefault();
+          updateSlide(0);
+        } else if (e.key === 'End') {
+          e.preventDefault();
+          updateSlide(totalSlides - 1);
+        }
+      });
+      
+      // Touch/swipe support
+      let touchStartX = 0;
+      let touchEndX = 0;
+      
+      document.addEventListener('touchstart', (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+      });
+      
+      document.addEventListener('touchend', (e) => {
+        touchEndX = e.changedTouches[0].screenX;
+        const diff = touchStartX - touchEndX;
+        if (Math.abs(diff) > 50) {
+          if (diff > 0) {
+            updateSlide(currentSlide + 1);
+          } else {
+            updateSlide(currentSlide - 1);
+          }
+        }
+      });
+      
+      // Fullscreen toggle
+      fullscreenBtn.addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen();
+          fullscreenBtn.textContent = '✕ Salir';
+        } else {
+          document.exitFullscreen();
+          fullscreenBtn.textContent = '⛶ Pantalla completa';
+        }
+      });
+      
+      document.addEventListener('fullscreenchange', () => {
+        if (!document.fullscreenElement) {
+          fullscreenBtn.textContent = '⛶ Pantalla completa';
+        }
+      });
+      
+      // Initialize
+      updateSlide(0);
+    </script>
+  </body>
+</html>

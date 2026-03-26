@@ -1,6 +1,6 @@
 ---
 import _ from "lodash";
-import { supabase } from "../../lib/supabaseClient";
+import { getSupabaseAnon } from "../../lib/auth-helpers";
 import AppFooter from "../../components/AppFooter.vue";
 import EventDetail from "../../components/EventDetail.vue";
 import EventAssistant from "../../components/EventAssistant.vue";
@@ -12,6 +12,7 @@ import "../../styles/global.css";
 export const prerender = false;
 
 const { slug } = Astro.params;
+const supabase = getSupabaseAnon();
 
 // Obtener el evento
 const { data: event, error } = await supabase
@@ -69,7 +70,7 @@ if (!error || event) {
   }
 
   // load event dates
-  const getTimeFromTimestamp = (timestamp) => {
+  const getTimeFromTimestamp = (timestamp: string | number | Date) => {
     // IMPORTANTE: Extraer la hora usando la zona horaria del usuario
     // para que sea consistente con el resto de la aplicación
     const date = new Date(timestamp);

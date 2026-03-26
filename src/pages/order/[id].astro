@@ -1,5 +1,5 @@
 ---
-import { supabase } from "../../lib/supabaseClient";
+import { getSupabaseAnon } from "../../lib/auth-helpers";
 import Layout from "../../layouts/Layout.astro";
 import AppHeader from "../../components/AppHeader.vue";
 import AppFooter from "../../components/AppFooter.vue";
@@ -13,6 +13,7 @@ import "../../styles/global.css";
 
 // Obtener el ID de la orden desde la URL
 const { id } = Astro.params;
+const supabase = getSupabaseAnon();
 
 let tickets: any[] = [];
 let event: any = null;
@@ -47,7 +48,7 @@ if (id) {
         event = eventData;
 
         // Cargar fechas del evento (para procesamiento interno solamente)
-        const getTimeFromTimestamp = (timestamp) => {
+        const getTimeFromTimestamp = (timestamp: string | number | Date) => {
           const date = new Date(timestamp);
           return date.toLocaleTimeString("es-CL", {
             hour: "2-digit",

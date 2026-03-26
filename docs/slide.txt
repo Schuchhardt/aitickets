@@ -1,0 +1,596 @@
+═══════════════════════════════════════════════════════════════════════════════
+                    PRESENTACIÓN DE VENTAS - AI TICKETS
+              Para productores de eventos medianos (no técnicos)
+═══════════════════════════════════════════════════════════════════════════════
+
+🎯 OBJETIVO DE LA PRESENTACIÓN:
+Conseguir una reunión de demostración o prueba piloto gratuita.
+Tiempo estimado: 8-10 minutos de presentación + preguntas.
+
+⸻
+
+1) ELEVATOR PITCH (30 segundos)
+
+"¿Sabías que el 40% de los asientos en eventos con múltiples funciones quedan vacíos 
+por mala comunicación o falta de promoción?
+
+AI Tickets es como tener un equipo completo de ventas, marketing y operaciones 
+trabajando 24/7 para tu evento... pero sin contratar a nadie.
+
+Circos, teatros y ferias ya están llenando más funciones con menos esfuerzo. 
+¿Quieres ver cómo?"
+
+⸻
+
+🎨 ESTILO VISUAL DE LA PRESENTACIÓN
+
+	•	Tipografía título: Unbounded (peso 600 o 700)
+	•	Tipografía textos: Inter (peso 400 y 500)
+	•	Fondo base: Negro (#000000)
+	•	Color principal: Verde (#9AE600) - representa crecimiento y dinero
+	•	Colores acento:
+		•	Rosado (#D84ABF) - urgencia y emoción
+		•	Cian (#709EFF) - confianza y tecnología
+	•	Color texto: Blanco (#FEFEFE)
+	•	Estética: Minimal, bold, bordes redondeados, iconografía simple
+
+💡 TIP: Usar imágenes reales de eventos (circos, teatros) con gente disfrutando.
+    Evitar stock genérico. Mostrar la EMOCIÓN del evento exitoso.
+
+═══════════════════════════════════════════════════════════════════════════════
+                              ESTRUCTURA DE SLIDES
+═══════════════════════════════════════════════════════════════════════════════
+
+📊 SLIDE 1 — PORTADA (GANCHO EMOCIONAL)
+
+Fondo: Negro con imagen de teatro/circo lleno de gente
+Título: Unbounded blanco grande
+Subtítulo: Inter verde
+Acento: línea inferior verde (#9AE600)
+
+Texto:
+
+	"¿Y si cada función estuviera llena?"
+	
+	AI Tickets - Más asientos vendidos, menos dolores de cabeza.
+
+[Logo pequeño en esquina inferior]
+
+💡 NOTA: No decir qué es todavía. Generar curiosidad con una pregunta 
+   que toca el deseo principal del productor.
+
+⸻
+
+📊 SLIDE 2 — EL DOLOR (AGITAR EL PROBLEMA)
+
+Fondo: Negro
+Título: Unbounded rosado (#D84ABF) - color de alerta/dolor
+Iconos: Emojis o iconos simples de frustración
+
+Texto:
+
+	¿Te suena familiar?
+	
+	😫  "Cancelaron la función y no pudimos avisar a todos a tiempo"
+	
+	📉  "Lunes y martes siempre están vacíos"
+	
+	🤯  "Paso más tiempo en el Excel que produciendo"
+	
+	📱  "La gente pregunta lo mismo mil veces por WhatsApp"
+	
+	💸  "Invertimos en publicidad pero no sabemos si funcionó"
+
+TRANSICIÓN VERBAL: "Estos problemas le cuestan miles de pesos a productores 
+cada temporada. Y lo peor... tienen solución."
+
+⸻
+
+📊 SLIDE 3 — EL COSTO DE NO HACER NADA
+
+Fondo: Negro con números grandes en rojo/rosado
+Título: Unbounded blanco
+
+Texto:
+
+	El costo real de seguir igual:
+	
+	📊  30-40% de asientos vacíos en funciones "flojas"
+	
+	⏰  +15 horas semanales en tareas manuales
+	
+	😤  Clientes frustrados = malas reseñas
+	
+	💰  Dinero en publicidad sin saber qué funciona
+	
+	🔥  Estrés operativo que mata la creatividad
+
+	"Cada función con asientos vacíos es dinero que ya no vuelve."
+
+💡 NOTA: Este slide crea urgencia. El prospecto debe sentir el COSTO de no actuar.
+
+⸻
+
+📊 SLIDE 4 — LA SOLUCIÓN SIMPLE
+
+Fondo: Negro → transición a verde suave
+Título: Unbounded verde brillante
+Texto: Inter blanco
+
+Texto:
+
+	Imagina tener un equipo que:
+	
+	✅  Vende entradas mientras duermes
+	
+	✅  Avisa a todos si algo cambia (en segundos)
+	
+	✅  Llena las funciones difíciles automáticamente
+	
+	✅  Te dice exactamente qué está funcionando
+	
+	✅  Hace todo esto sin que contrates a nadie
+
+	Eso es AI Tickets.
+
+TRANSICIÓN VERBAL: "No es magia. Es simplemente usar la tecnología correcta."
+
+⸻
+
+📊 SLIDE 5 — CÓMO FUNCIONA (3 PASOS SIMPLES)
+
+Fondo: Negro
+Título: Unbounded cian
+Tarjetas: 3 bloques con números grandes en verde
+
+Texto:
+
+	Así de fácil es empezar:
+	
+	[1] CREA TU EVENTO
+	    Sube la info de tus funciones en minutos.
+	    (Nosotros te ayudamos la primera vez)
+	
+	[2] COMPARTE EL LINK  
+	    Tu página de ventas está lista.
+	    Acepta WebPay, MercadoPago, transferencia.
+	
+	[3] NOSOTROS HACEMOS EL RESTO
+	    Promoción, comunicación, check-in.
+	    Tú solo recibe a tu público.
+
+💡 NOTA: Mostrar que NO requiere conocimiento técnico.
+   La frase clave es "Nosotros te ayudamos".
+
+⸻
+
+📊 SLIDE 6 — BENEFICIO #1: LLENA LAS FUNCIONES DIFÍCILES
+
+Fondo: Negro con acento verde lateral
+Título: Unbounded verde
+Texto: Inter blanco
+Imagen: Calendario con funciones marcadas
+
+Texto:
+
+	"Los lunes ya no son un problema"
+	
+	📧  Emails automáticos a quienes buscaron pero no compraron
+	
+	📱  WhatsApp con promociones de último minuto
+	
+	📢  Publicidad dirigida solo a tu zona
+	
+	🎯  Descuentos inteligentes para funciones con baja venta
+
+	Resultado: +25% más asistentes en funciones "flojas"
+
+TRANSICIÓN VERBAL: "¿Cuánto vale para ti llenar esos lunes y martes?"
+
+⸻
+
+📊 SLIDE 7 — BENEFICIO #2: COMUNICACIÓN SIN ESFUERZO
+
+Fondo: Negro
+Título: Unbounded rosado
+Imagen: Mockup de WhatsApp/Email con mensaje de cambio
+
+Texto:
+
+	"Cambió la función. ¿Cómo aviso a 500 personas?"
+	
+	Con AI Tickets:
+	
+	✅  1 click → Todos notificados por email Y WhatsApp
+	
+	✅  Recordatorios automáticos antes de cada función
+	
+	✅  Respuestas automáticas a preguntas frecuentes
+	
+	✅  Los asistentes siempre saben qué hacer
+
+	"Nunca más perder clientes por mala comunicación"
+
+⸻
+
+📊 SLIDE 8 — BENEFICIO #3: TU MARCA, TU CONTROL
+
+Fondo: Negro
+Título: Unbounded cian
+Mockups: Sitio con URL personalizada (tucirco.cl)
+
+Texto:
+
+	Vende bajo tu propia marca
+	
+	🌐  tucirco.cl
+	🌐  entradas.tuteatro.com
+	
+	Sin logos de terceros que confundan.
+	
+	✅  Más confianza del público
+	✅  Mejor posicionamiento en Google  
+	✅  Imagen profesional
+	
+	"Parece que tienes un equipo de marketing propio"
+
+⸻
+
+📊 SLIDE 9 — BENEFICIO #4: GANA MÁS POR ENTRADA
+
+Fondo: Negro con acento rosado radiado
+Título: Unbounded blanco
+Tarjetas: Ejemplos de upselling
+
+Texto:
+
+	Cada entrada puede valer más
+	
+	🎟️  Upgrade a VIP antes del pago
+	
+	👨‍👩‍👧‍👦  Packs familiares con descuento
+	
+	📸  Fotos con el elenco/personajes
+	
+	🛍️  Merchandising en el checkout
+	
+	⚡  Acceso prioritario
+	
+	Promedio: +$2.500 extra por entrada vendida
+
+💡 NOTA: Dar un número concreto de ganancia extra. Esto es muy persuasivo.
+
+⸻
+
+📊 SLIDE 10 — BENEFICIO #5: CHECK-IN PROFESIONAL
+
+Fondo: Negro con acento verde
+Título: Unbounded verde
+Imagen: Persona escaneando QR / Totem
+
+Texto:
+
+	Entrada sin filas, sin estrés
+	
+	📱  QR que funciona SIN internet
+	
+	⚡  Escaneo en menos de 2 segundos
+	
+	🖥️  Totems de autoservicio (opcional)
+	
+	👥  Control de aforo en tiempo real
+	
+	"Tu equipo en puerta solo saluda. El sistema hace el resto."
+
+⸻
+
+📊 SLIDE 11 — SOCIAL PROOF: ¿QUIÉN YA LO USA?
+
+Fondo: Negro
+Título: Unbounded verde
+Logos/fotos de eventos + números
+
+Texto:
+
+	Productores que ya confían en AI Tickets:
+	
+	🎪  [Nombre de circo] - "Llenamos 3 funciones extra por semana"
+	
+	🎭  [Nombre de teatro] - "Dejé de contestar WhatsApp todo el día"
+	
+	🎨  [Nombre de feria] - "Las preventas se agotan en horas"
+	
+	📈  +50,000 entradas vendidas
+	📈  +200 funciones gestionadas  
+	📈  98% de asistentes notificados a tiempo
+
+💡 NOTA: Si aún no tienes testimoniales, usa "Eventos piloto" o 
+   "Primeros usuarios reportan..." con métricas internas.
+
+⸻
+
+📊 SLIDE 12 — TESTIMONIAL DESTACADO
+
+Fondo: Negro con comillas grandes en verde
+Título: Ninguno (dejar que hable el testimonio)
+Foto: Del productor o evento
+
+Texto:
+
+	"Antes pasaba 20 horas a la semana en Excel, 
+	WhatsApp y correos. Ahora paso ese tiempo 
+	creando mejor contenido para mi show.
+	
+	AI Tickets me devolvió las ganas de producir."
+	
+	— [Nombre], Productor de [Evento]
+
+💡 NOTA: Un buen testimonio vale más que 10 slides de features.
+   Si no tienes uno, usa tu propia experiencia como productor.
+
+⸻
+
+📊 SLIDE 13 — PRICING TRANSPARENTE (SIN SUSTOS)
+
+Fondo: Negro
+Título: Unbounded blanco
+3 Cards comparativas: Verde / Cian / Rosado (destacar el medio)
+
+Texto:
+
+	Solo pagas cuando vendes. Sin costos fijos.
+	
+	┌─────────────────────────────────────────────────────────────┐
+	│  ESENCIAL (10%)      PRO (15%)           FULL (20%)        │
+	│  ─────────────      ─────────            ──────────        │
+	│                                                             │
+	│  ✓ Venta online     Todo Esencial +      Todo Pro +        │
+	│  ✓ Funciones        ✓ Emails auto        ✓ Meta Ads        │
+	│    múltiples        ✓ Cupones            ✓ Google Ads      │
+	│  ✓ Check-in QR      ✓ WhatsApp básico    ✓ WhatsApp full   │
+	│  ✓ Soporte          ✓ Reportes           ✓ Manager         │
+	│                       avanzados            dedicado        │
+	│                                                             │
+	│  Para empezar       ⭐ MÁS POPULAR        Para llenar      │
+	│  sin riesgo           Para crecer          TODO             │
+	└─────────────────────────────────────────────────────────────┘
+	
+	💡 Sin setup. Sin mensualidad. Sin permanencia.
+
+TRANSICIÓN VERBAL: "El plan más popular es Pro porque incluye la 
+automatización que realmente ahorra tiempo."
+
+⸻
+
+📊 SLIDE 14 — COMPARATIVA CON ALTERNATIVAS
+
+Fondo: Negro
+Título: Unbounded cian
+Tabla comparativa simple
+
+Texto:
+
+	¿Por qué AI Tickets y no otro sistema?
+	
+	                        AI Tickets    Ticketeras     Hacerlo
+	                                      Tradicionales  Manual
+	────────────────────────────────────────────────────────────
+	Funciones múltiples     ✅ Sí         ❌ Limitado    ⚠️ Caos
+	WhatsApp integrado      ✅ Sí         ❌ No          ⚠️ Manual
+	Marketing incluido      ✅ Sí         ❌ Extra       ❌ No
+	Dominio propio          ✅ Sí         ❌ No          ⚠️ Caro
+	Soporte en español      ✅ Directo    ⚠️ Bot         ❌ —
+	Comisión                10-20%        15-25%         Tu tiempo
+	
+	"Hacemos más, cobramos igual o menos."
+
+⸻
+
+📊 SLIDE 15 — MANEJO DE OBJECIONES
+
+(Este slide NO se presenta, es tu cheat sheet para responder)
+
+OBJECIÓN: "Es muy caro / la comisión es alta"
+RESPUESTA: "¿Cuánto vale tu tiempo? Si ahorras 15 horas a la semana y 
+vendes 20% más, ¿la comisión se paga sola?"
+
+OBJECIÓN: "Ya tenemos un sistema"
+RESPUESTA: "Entiendo. ¿Tu sistema actual llena las funciones difíciles? 
+¿Avisa automáticamente si hay cambios? Hacemos una migración sin costo."
+
+OBJECIÓN: "No somos muy tecnológicos"
+RESPUESTA: "Por eso existimos. Nosotros configuramos todo. Tú solo 
+apruebas. En 1 hora estás vendiendo."
+
+OBJECIÓN: "Necesito consultarlo con mi socio/equipo"
+RESPUESTA: "Perfecto. ¿Hacemos una demo de 15 min con todos presentes? 
+Así respondo todas las dudas de una vez."
+
+OBJECIÓN: "Ahora no es buen momento"
+RESPUESTA: "¿Cuándo es tu próxima temporada? Podemos dejar todo listo 
+antes para que empieces sin estrés."
+
+⸻
+
+📊 SLIDE 16 — GARANTÍA / REDUCIR RIESGO
+
+Fondo: Negro con borde verde brillante
+Título: Unbounded verde grande
+Icono: Escudo / Checkmark grande
+
+Texto:
+
+	Prueba sin riesgo
+	
+	🛡️  Primera función GRATIS
+	    (Hasta 100 entradas, sin comisión)
+	
+	🤝  Setup gratuito
+	    Nosotros configuramos todo por ti
+	
+	🚪  Sin contratos
+	    Te vas cuando quieras
+	
+	📞  Soporte humano
+	    Respuesta en menos de 2 horas
+
+	"Si no vendes más, no pagas. Así de simple."
+
+💡 NOTA: Este es el slide que elimina el miedo a probar.
+   La garantía debe ser CLARA y GENEROSA.
+
+⸻
+
+📊 SLIDE 17 — PARA QUIÉN ES (CALIFICACIÓN)
+
+Fondo: Negro
+Título: Unbounded verde
+Dos columnas: ✅ y ❌
+
+Texto:
+
+	AI Tickets es perfecto si:
+	
+	✅  Tienes eventos con múltiples funciones
+	✅  Quieres llenar más asientos
+	✅  Estás cansado de Excel y WhatsApp manual
+	✅  Valoras tu tiempo
+	✅  Quieres crecer profesionalmente
+	
+	Probablemente NO es para ti si:
+	
+	❌  Haces 1 evento al año
+	❌  Vendes menos de 50 entradas por evento
+	❌  Prefieres seguir haciéndolo todo manual
+
+💡 NOTA: Descalificar algunos prospectos genera más confianza y 
+   hace que los buenos prospectos se sientan "elegidos".
+
+⸻
+
+📊 SLIDE 18 — CTA: SIGUIENTE PASO CLARO
+
+Fondo: Negro
+Texto principal: Verde (#9AE600) muy grande
+Subtexto: Blanco
+Botón: Rosado o cian brillante
+
+Texto:
+
+	¿Listo para llenar más funciones?
+	
+	📅  AGENDA TU DEMO DE 15 MINUTOS
+	
+	    → Te mostramos la plataforma con TU evento
+	    → Respondemos todas tus dudas
+	    → Sin compromiso
+	
+	🔗  aitickets.cl/demo
+	📧  contacto@aitickets.cl
+	📱  +56 9 XXXX XXXX (WhatsApp)
+
+	🎁 BONUS: Menciona esta presentación y obtén 
+	   setup prioritario + primera función gratis.
+
+💡 NOTA: Un solo CTA claro. No dar muchas opciones.
+   Incluir "sin compromiso" reduce fricción.
+
+⸻
+
+📊 SLIDE 19 — CIERRE / PREGUNTA FINAL
+
+Fondo: Negro
+Texto: Unbounded blanco grande
+Sin distracciones
+
+Texto:
+
+	"¿Cuántas funciones más podrías llenar 
+	 si tuvieras el sistema correcto?"
+	
+	Hagamos que pase.
+
+[Silencio - esperar respuesta]
+
+💡 NOTA: Terminar con pregunta abierta que invite al diálogo.
+   No terminar con "¿alguna pregunta?" (muy débil).
+
+═══════════════════════════════════════════════════════════════════════════════
+                           GUÍA DE EJECUCIÓN
+═══════════════════════════════════════════════════════════════════════════════
+
+🎯 ANTES DE LA PRESENTACIÓN:
+
+1. Investiga el evento del prospecto (redes, web, reseñas)
+2. Identifica sus dolores específicos
+3. Prepara 2-3 preguntas personalizadas
+4. Ten lista una demo con datos similares a su evento
+
+🎤 DURANTE LA PRESENTACIÓN:
+
+1. ESCUCHA más de lo que hablas (regla 70/30)
+2. Haz preguntas: "¿Te ha pasado esto?" "¿Cómo lo manejas hoy?"
+3. Conecta cada feature con SU problema específico
+4. Si ves que asiente, pregunta: "¿Esto resolvería [su problema]?"
+5. No tengas miedo al silencio - déjalos pensar
+
+📞 DESPUÉS DE LA PRESENTACIÓN:
+
+1. Resumen por email dentro de 2 horas
+2. Incluir: Video corto de demo + Link a agendar
+3. Follow-up a las 48 horas si no responde
+4. Segundo follow-up a la semana con caso de éxito
+
+⸻
+
+📝 SCRIPT DE APERTURA (Para romper el hielo):
+
+"Hola [Nombre], gracias por tu tiempo. Antes de empezar, 
+cuéntame: ¿Cuál es el mayor dolor de cabeza que tienes 
+hoy con la venta de entradas?"
+
+[Escuchar - tomar notas - esto guía toda la presentación]
+
+⸻
+
+📝 SCRIPT DE CIERRE:
+
+"Basado en lo que me contaste sobre [problema específico], 
+creo que AI Tickets puede ayudarte a [beneficio específico].
+
+El siguiente paso sería hacer una demo de 15 minutos donde 
+configuro tu evento real y ves exactamente cómo funcionaría.
+
+¿Qué día te funciona mejor, martes o jueves?"
+
+[Dar 2 opciones, no preguntar "¿cuándo puedes?"]
+
+═══════════════════════════════════════════════════════════════════════════════
+                         MÉTRICAS CLAVE A MENCIONAR
+═══════════════════════════════════════════════════════════════════════════════
+
+(Ajustar según datos reales cuando los tengas)
+
+📈  +25% más asistentes en funciones de baja demanda
+⏱️  15+ horas ahorradas por semana
+📧  98% tasa de entrega en comunicaciones
+⚡  2 segundos promedio de check-in
+💰  +$2,500 adicionales por entrada (con upselling)
+🎯  3x mejor ROI en publicidad vs hacerlo manual
+
+═══════════════════════════════════════════════════════════════════════════════
+                              NOTAS FINALES
+═══════════════════════════════════════════════════════════════════════════════
+
+RECUERDA:
+• Los productores no técnicos compran RESULTADOS, no features
+• Siempre traducir tecnología a beneficio tangible
+• Usar historias y ejemplos, no especificaciones técnicas
+• El miedo a perder (FOMO) motiva más que la ganancia potencial
+• La confianza se gana siendo honesto sobre limitaciones
+• Un "no" rápido es mejor que un "tal vez" eterno
+
+FRASE PARA RECORDAR:
+"No vendemos software. Vendemos funciones llenas y noches tranquilas."
+
+═══════════════════════════════════════════════════════════════════════════════
