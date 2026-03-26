@@ -76,7 +76,7 @@ const submitForm = async () => {
     // Track successful producer registration
     trackSignUp('email');
     
-    window.location.href = 'https://admin.aitickets.cl/login'
+    window.location.href = '/organizadores/login'
   } catch (err) {
     globalError.value = 'Ocurrió un error al registrar. Intenta de nuevo.'
     console.error('Error:', err.message)
