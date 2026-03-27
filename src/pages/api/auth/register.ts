@@ -81,6 +81,11 @@ export const POST = async ({ request }) => {
             return new Response(JSON.stringify({ message: "Error al crear perfil de usuario: " + getFriendlyErrorMessage(userError) }), { status: 500 });
         }
 
+        // Notificar en Slack sobre nuevo productor
+        notifySlack({ name, email, phone, organizationName }).catch(err =>
+            console.error("Error al notificar a Slack:", err.message)
+        );
+
         return new Response(JSON.stringify({ message: "Registro exitoso", userId: authData.user.id }), { status: 200 });
 
     } catch (error) {
@@ -88,3 +93,23 @@ export const POST = async ({ request }) => {
         return new Response(JSON.stringify({ message: "Error interno del servidor" }), { status: 500 });
     }
 };
+
+async function notifySlack({ name, email, phone, organizationName }: { name: string; email: string; phone?: string; organizationName: string }) {
+    const webhookUrl = import.meta.env.SLACK_WEBHOOK_URL;
+    if (!webhookUrl) {
+        console.warn("SLACK_WEBHOOK_URL no configurado, omitiendo notificación");
+        return;
+    }
+
+    const res = await fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            text: `🎉 *Nuevo productor registrado*\n• *Nombre:* ${name}\n• *Email:* ${email}\n• *Teléfono:* ${phone || "No proporcionado"}\n• *Organización:* ${organizationName || "No proporcionada"}`
+        })
+    });
+
+    if (!res.ok) {
+        throw new Error(`Slack respondió con status ${res.status}`);
+    }
+}
