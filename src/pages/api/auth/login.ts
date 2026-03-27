@@ -33,7 +33,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
             httpOnly: true,
             secure: import.meta.env.PROD, // Secure in production
             sameSite: "lax",
-            maxAge: 60 * 60 * 24 * 7, // 1 week
+            maxAge: 60 * 60 * 24 * 30, // 1 month
         });
 
         cookies.set("sb-refresh-token", refresh_token, {
@@ -41,7 +41,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
             httpOnly: true,
             secure: import.meta.env.PROD,
             sameSite: "lax",
-            maxAge: 60 * 60 * 24 * 7,
+            maxAge: 60 * 60 * 24 * 30, // 1 month
         });
 
         return new Response(JSON.stringify({ message: "Login exitoso" }), { status: 200 });

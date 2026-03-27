@@ -1,0 +1,87 @@
+---
+import DashboardLayout from "../../../layouts/DashboardLayout.astro";
+import { createSupabaseServerClient } from "../../../lib/supabaseServer";
+import { getSupabaseAdmin } from "../../../lib/auth-helpers";
+import PromoteOverview from "../../../components/dashboard/promote/PromoteOverview.vue";
+
+const supabase = createSupabaseServerClient(Astro);
+const supabaseAdmin = getSupabaseAdmin();
+
+const {
+  data: { user },
+} = await supabase.auth.getUser();
+
+if (!user) {
+  return Astro.redirect("/organizadores/login");
+}
+
+const { data: dbUser } = await supabase
+  .from("users")
+  .select("organization_id")
+  .eq("auth_user_id", user.id)
+  .single();
+
+if (!dbUser?.organization_id) {
+  return Astro.redirect("/dashboard");
+}
+
+// Fetch connected social accounts
+const { data: socialAccounts } = await supabaseAdmin
+  .from("social_accounts")
+  .select("*")
+  .eq("organization_id", dbUser.organization_id)
+  .order("created_at", { ascending: false });
+
+// Fetch recent social posts with event info
+const { data: socialPosts } = await supabaseAdmin
+  .from("social_posts")
+  .select("*, events(id, name, title, image_url)")
+  .eq("organization_id", dbUser.organization_id)
+  .order("created_at", { ascending: false })
+  .limit(20);
+
+// Fetch published events for the CTA
+const { data: events } = await supabaseAdmin
+  .from("events")
+  .select("id, name, title, image_url, status")
+  .eq("organization_id", dbUser.organization_id)
+  .eq("status", "published")
+  .order("created_at", { ascending: false });
+
+// Fetch ad account connections
+const { data: adConnections } = await supabaseAdmin
+  .from("ad_account_connections")
+  .select("id, platform, account_name, status")
+  .eq("organization_id", dbUser.organization_id);
+
+// Fetch ad campaigns
+const { data: adCampaigns } = await supabaseAdmin
+  .from("ad_campaigns")
+  .select("id, status, spend, impressions")
+  .eq("organization_id", dbUser.organization_id);
+
+// Stats
+const totalPosts = socialPosts?.length || 0;
+const publishedPosts = socialPosts?.filter((p) => p.status === "published").length || 0;
+const scheduledPosts = socialPosts?.filter((p) => p.status === "scheduled").length || 0;
+const activeCampaigns = adCampaigns?.filter((c) => c.status === "active").length || 0;
+const totalAdSpend = adCampaigns?.reduce((sum, c) => sum + (c.spend || 0), 0) || 0;
+const hasMetaAds = (adConnections?.length || 0) > 0;
+
+const connected = Astro.url.searchParams.get("connected");
+const error = Astro.url.searchParams.get("error");
+const tab = Astro.url.searchParams.get("tab");
+---
+
+<DashboardLayout title="Promocionar">
+  <PromoteOverview
+    client:only="vue"
+    accountsJson={JSON.stringify(socialAccounts || [])}
+    postsJson={JSON.stringify(socialPosts || [])}
+    eventsJson={JSON.stringify(events || [])}
+    statsJson={JSON.stringify({ totalPosts, publishedPosts, scheduledPosts, activeCampaigns, totalAdSpend, hasMetaAds })}
+    connectedPlatform={connected || ""}
+    errorType={error || ""}
+    initialTab={tab || ""}
+  />
+</DashboardLayout>

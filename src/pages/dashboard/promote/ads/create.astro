@@ -1,0 +1,59 @@
+---
+import DashboardLayout from "../../../../layouts/DashboardLayout.astro";
+import { createSupabaseServerClient } from "../../../../lib/supabaseServer";
+import { getSupabaseAdmin } from "../../../../lib/auth-helpers";
+import CreateAdCampaign from "../../../../components/dashboard/promote/CreateAdCampaign.vue";
+
+const supabase = createSupabaseServerClient(Astro);
+const supabaseAdmin = getSupabaseAdmin();
+
+const {
+  data: { user },
+} = await supabase.auth.getUser();
+
+if (!user) {
+  return Astro.redirect("/organizadores/login");
+}
+
+const { data: dbUser } = await supabase
+  .from("users")
+  .select("organization_id")
+  .eq("auth_user_id", user.id)
+  .single();
+
+if (!dbUser?.organization_id) {
+  return Astro.redirect("/dashboard");
+}
+
+// Fetch published events with details
+const { data: events } = await supabaseAdmin
+  .from("events")
+  .select(`
+    id, name, title, description, image_url, slug, status, start_date,
+    event_tickets(ticket_name, price),
+    event_dates(date, start_time, end_time),
+    event_locations(*, venues(name, city, address_line1))
+  `)
+  .eq("organization_id", dbUser.organization_id)
+  .eq("status", "published")
+  .order("created_at", { ascending: false });
+
+// Fetch ALL active ad account connections (producer may have multiple)
+const { data: adConnections } = await supabaseAdmin
+  .from("ad_account_connections")
+  .select("id, platform, account_name, meta_ad_account_id, status, token_expires_at")
+  .eq("organization_id", dbUser.organization_id)
+  .eq("status", "active")
+  .order("created_at", { ascending: false });
+
+const preSelectedEventId = Astro.url.searchParams.get("event") || "";
+---
+
+<DashboardLayout title="Crear Campaña">
+  <CreateAdCampaign
+    client:only="vue"
+    eventsJson={JSON.stringify(events || [])}
+    adConnectionsJson={JSON.stringify(adConnections || [])}
+    preSelectedEventId={preSelectedEventId}
+  />
+</DashboardLayout>

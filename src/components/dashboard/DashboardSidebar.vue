@@ -5,6 +5,7 @@ import {
   Users, 
   Ticket,
   DollarSign,
+  Megaphone,
   UserCog,
   Settings,
   LogOut,
@@ -35,6 +36,7 @@ const menuItems = [
   { name: 'Entradas', path: '/dashboard/tickets', icon: Ticket },
   { name: 'Comunidad', path: '/dashboard/community', icon: Users },
   { name: 'Ingresos', path: '/dashboard/finance', icon: DollarSign },
+  { name: 'Promocionar', path: '/dashboard/promote', icon: Megaphone },
   { name: 'Equipo', path: '/dashboard/team', icon: UserCog },
   { name: 'Configuración', path: '/dashboard/settings', icon: Settings },
 ]

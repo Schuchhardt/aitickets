@@ -71,3 +71,183 @@ USING (
     WHERE u.auth_user_id = auth.uid()
   )
 );
+
+-- SOCIAL_ACCOUNTS POLICIES
+ALTER TABLE public.social_accounts ENABLE ROW LEVEL SECURITY;
+
+-- Allow org members to read their own social accounts
+CREATE POLICY "Enable read for org members" ON "public"."social_accounts"
+AS PERMISSIVE FOR SELECT
+TO authenticated
+USING (
+  organization_id IN (
+    SELECT organization_id FROM public.users
+    WHERE auth_user_id = auth.uid()
+  )
+);
+
+-- Allow org members to insert social accounts for their org
+CREATE POLICY "Enable insert for org members" ON "public"."social_accounts"
+AS PERMISSIVE FOR INSERT
+TO authenticated
+WITH CHECK (
+  organization_id IN (
+    SELECT organization_id FROM public.users
+    WHERE auth_user_id = auth.uid()
+  )
+);
+
+-- Allow org members to update their social accounts
+CREATE POLICY "Enable update for org members" ON "public"."social_accounts"
+AS PERMISSIVE FOR UPDATE
+TO authenticated
+USING (
+  organization_id IN (
+    SELECT organization_id FROM public.users
+    WHERE auth_user_id = auth.uid()
+  )
+);
+
+-- Allow org members to delete their social accounts
+CREATE POLICY "Enable delete for org members" ON "public"."social_accounts"
+AS PERMISSIVE FOR DELETE
+TO authenticated
+USING (
+  organization_id IN (
+    SELECT organization_id FROM public.users
+    WHERE auth_user_id = auth.uid()
+  )
+);
+
+-- SOCIAL_POSTS POLICIES
+ALTER TABLE public.social_posts ENABLE ROW LEVEL SECURITY;
+
+-- Allow org members to read their own social posts
+CREATE POLICY "Enable read for org members" ON "public"."social_posts"
+AS PERMISSIVE FOR SELECT
+TO authenticated
+USING (
+  organization_id IN (
+    SELECT organization_id FROM public.users
+    WHERE auth_user_id = auth.uid()
+  )
+);
+
+-- Allow org members to insert social posts for their org
+CREATE POLICY "Enable insert for org members" ON "public"."social_posts"
+AS PERMISSIVE FOR INSERT
+TO authenticated
+WITH CHECK (
+  organization_id IN (
+    SELECT organization_id FROM public.users
+    WHERE auth_user_id = auth.uid()
+  )
+);
+
+-- Allow org members to update their social posts
+CREATE POLICY "Enable update for org members" ON "public"."social_posts"
+AS PERMISSIVE FOR UPDATE
+TO authenticated
+USING (
+  organization_id IN (
+    SELECT organization_id FROM public.users
+    WHERE auth_user_id = auth.uid()
+  )
+);
+
+-- Allow org members to delete their social posts
+CREATE POLICY "Enable delete for org members" ON "public"."social_posts"
+AS PERMISSIVE FOR DELETE
+TO authenticated
+USING (
+  organization_id IN (
+    SELECT organization_id FROM public.users
+    WHERE auth_user_id = auth.uid()
+  )
+);
+
+-- AD_ACCOUNT_CONNECTIONS POLICIES
+ALTER TABLE public.ad_account_connections ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Enable read for org members" ON "public"."ad_account_connections"
+AS PERMISSIVE FOR SELECT
+TO authenticated
+USING (
+  organization_id IN (
+    SELECT organization_id FROM public.users
+    WHERE auth_user_id = auth.uid()
+  )
+);
+
+CREATE POLICY "Enable insert for org members" ON "public"."ad_account_connections"
+AS PERMISSIVE FOR INSERT
+TO authenticated
+WITH CHECK (
+  organization_id IN (
+    SELECT organization_id FROM public.users
+    WHERE auth_user_id = auth.uid()
+  )
+);
+
+CREATE POLICY "Enable update for org members" ON "public"."ad_account_connections"
+AS PERMISSIVE FOR UPDATE
+TO authenticated
+USING (
+  organization_id IN (
+    SELECT organization_id FROM public.users
+    WHERE auth_user_id = auth.uid()
+  )
+);
+
+CREATE POLICY "Enable delete for org members" ON "public"."ad_account_connections"
+AS PERMISSIVE FOR DELETE
+TO authenticated
+USING (
+  organization_id IN (
+    SELECT organization_id FROM public.users
+    WHERE auth_user_id = auth.uid()
+  )
+);
+
+-- AD_CAMPAIGNS POLICIES
+ALTER TABLE public.ad_campaigns ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Enable read for org members" ON "public"."ad_campaigns"
+AS PERMISSIVE FOR SELECT
+TO authenticated
+USING (
+  organization_id IN (
+    SELECT organization_id FROM public.users
+    WHERE auth_user_id = auth.uid()
+  )
+);
+
+CREATE POLICY "Enable insert for org members" ON "public"."ad_campaigns"
+AS PERMISSIVE FOR INSERT
+TO authenticated
+WITH CHECK (
+  organization_id IN (
+    SELECT organization_id FROM public.users
+    WHERE auth_user_id = auth.uid()
+  )
+);
+
+CREATE POLICY "Enable update for org members" ON "public"."ad_campaigns"
+AS PERMISSIVE FOR UPDATE
+TO authenticated
+USING (
+  organization_id IN (
+    SELECT organization_id FROM public.users
+    WHERE auth_user_id = auth.uid()
+  )
+);
+
+CREATE POLICY "Enable delete for org members" ON "public"."ad_campaigns"
+AS PERMISSIVE FOR DELETE
+TO authenticated
+USING (
+  organization_id IN (
+    SELECT organization_id FROM public.users
+    WHERE auth_user_id = auth.uid()
+  )
+);

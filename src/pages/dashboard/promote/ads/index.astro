@@ -1,0 +1,61 @@
+---
+import DashboardLayout from "../../../../layouts/DashboardLayout.astro";
+import { createSupabaseServerClient } from "../../../../lib/supabaseServer";
+import { getSupabaseAdmin } from "../../../../lib/auth-helpers";
+import AdCampaignList from "../../../../components/dashboard/promote/AdCampaignList.vue";
+
+const supabase = createSupabaseServerClient(Astro);
+const supabaseAdmin = getSupabaseAdmin();
+
+const {
+  data: { user },
+} = await supabase.auth.getUser();
+
+if (!user) {
+  return Astro.redirect("/organizadores/login");
+}
+
+const { data: dbUser } = await supabase
+  .from("users")
+  .select("organization_id")
+  .eq("auth_user_id", user.id)
+  .single();
+
+if (!dbUser?.organization_id) {
+  return Astro.redirect("/dashboard");
+}
+
+// Fetch ad account connections
+const { data: adConnections } = await supabaseAdmin
+  .from("ad_account_connections")
+  .select("id, platform, account_name, meta_ad_account_id, status, token_expires_at, created_at")
+  .eq("organization_id", dbUser.organization_id)
+  .order("created_at", { ascending: false });
+
+// Fetch campaigns with event info
+const { data: campaigns } = await supabaseAdmin
+  .from("ad_campaigns")
+  .select("*, events(id, name, title, image_url)")
+  .eq("organization_id", dbUser.organization_id)
+  .order("created_at", { ascending: false })
+  .limit(50);
+
+// Stats
+const activeCampaigns = campaigns?.filter((c) => c.status === "active").length || 0;
+const totalSpend = campaigns?.reduce((sum, c) => sum + (c.spend || 0), 0) || 0;
+const totalImpressions = campaigns?.reduce((sum, c) => sum + (c.impressions || 0), 0) || 0;
+
+const connected = Astro.url.searchParams.get("connected");
+const error = Astro.url.searchParams.get("error");
+---
+
+<DashboardLayout title="Meta Ads">
+  <AdCampaignList
+    client:only="vue"
+    connectionsJson={JSON.stringify(adConnections || [])}
+    campaignsJson={JSON.stringify(campaigns || [])}
+    statsJson={JSON.stringify({ activeCampaigns, totalSpend, totalImpressions })}
+    connectedPlatform={connected || ""}
+    errorType={error || ""}
+  />
+</DashboardLayout>
