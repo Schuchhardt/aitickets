@@ -67,6 +67,9 @@ export default async function handler(req, context) {
       throw new Error('Error al crear el usuario')
     }
 
+    // Notificar en Slack sobre nuevo productor
+    await notifySlack({ name, email, phone, organization_name })
+
     return new Response(JSON.stringify({ message: 'Registro exitoso' }), {
       status: 200
     })
@@ -75,6 +78,30 @@ export default async function handler(req, context) {
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500
     })
+  }
+}
+
+async function notifySlack({ name, email, phone, organization_name }) {
+  const webhookUrl = process.env.SLACK_WEBHOOK_URL
+  if (!webhookUrl) {
+    console.warn('⚠️ SLACK_WEBHOOK_URL no configurado, omitiendo notificación')
+    return
+  }
+
+  try {
+    const res = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: `🎉 *Nuevo productor registrado*\n• *Nombre:* ${name}\n• *Email:* ${email}\n• *Teléfono:* ${phone || 'No proporcionado'}\n• *Organización:* ${organization_name || 'No proporcionada'}`
+      })
+    })
+
+    if (!res.ok) {
+      console.error('❌ Error al enviar notificación a Slack:', res.statusText)
+    }
+  } catch (err) {
+    console.error('❌ Error al notificar a Slack:', err.message)
   }
 }
 
