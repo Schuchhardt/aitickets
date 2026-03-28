@@ -255,11 +255,15 @@ CREATE TABLE public.event_visits (
   referrer text,
   country text,
   city text,
+  utm_source text,
+  utm_medium text,
+  utm_campaign text,
   CONSTRAINT event_visits_pkey PRIMARY KEY (id),
   CONSTRAINT event_visits_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.events(id) ON DELETE CASCADE
 );
 
 CREATE INDEX idx_event_visits_event_id ON public.event_visits(event_id);
+CREATE INDEX idx_event_visits_utm ON public.event_visits(event_id, utm_source);
 
 -- Tables with multiple dependencies (created last)
 

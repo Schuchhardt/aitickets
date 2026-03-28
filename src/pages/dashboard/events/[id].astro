@@ -168,6 +168,12 @@ const publicLink = `/eventos/${event.slug}`;
                 <CheckCircle size="18" /> Check-in
             </a>
             <a
+                href={`/dashboard/events/${event.id}/analytics`}
+                class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
+            >
+                <BarChart3 size="18" /> Analytics
+            </a>
+            <a
                 href={`/dashboard/events/${event.id}/edit`}
                 class="flex items-center gap-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-900 transition font-medium"
             >

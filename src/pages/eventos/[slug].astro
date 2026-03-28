@@ -39,6 +39,10 @@ if (!error || event) {
       ? (() => { try { return JSON.parse(Astro.request.headers.get("x-nf-geo")!).city || null; } catch { return null; } })()
       : null;
 
+    const utmSource = Astro.url.searchParams.get("utm_source") || null;
+    const utmMedium = Astro.url.searchParams.get("utm_medium") || null;
+    const utmCampaign = Astro.url.searchParams.get("utm_campaign") || null;
+
     const supabaseAdmin = getSupabaseAdmin();
     supabaseAdmin.from("event_visits").insert({
       event_id: event.id,
@@ -48,6 +52,9 @@ if (!error || event) {
       referrer: referrer?.substring(0, 1024) || null,
       country,
       city,
+      utm_source: utmSource?.substring(0, 256) || null,
+      utm_medium: utmMedium?.substring(0, 256) || null,
+      utm_campaign: utmCampaign?.substring(0, 256) || null,
     }).then(({ error: visitError }) => {
       if (visitError) console.error("Error tracking visit:", visitError);
     });

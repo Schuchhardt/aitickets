@@ -1,0 +1,300 @@
+---
+import DashboardLayout from "../../../../layouts/DashboardLayout.astro";
+import { getSupabaseAdmin } from "../../../../lib/auth-helpers";
+import { createSupabaseServerClient } from "../../../../lib/supabaseServer";
+import LineChart from "../../../../components/dashboard/analytics/LineChart.vue";
+import BarChart from "../../../../components/dashboard/analytics/BarChart.vue";
+import GeoTable from "../../../../components/dashboard/analytics/GeoTable.vue";
+import { Eye, Users, Ticket, BarChart3, TrendingUp } from "lucide-vue-next";
+
+const { id } = Astro.params;
+const supabase = createSupabaseServerClient(Astro);
+const supabaseAdmin = getSupabaseAdmin();
+
+const {
+    data: { user },
+} = await supabase.auth.getUser();
+
+if (!user) {
+    return Astro.redirect("/organizadores/login");
+}
+
+const { data: dbUser } = await supabase
+    .from("users")
+    .select("id, organization_id")
+    .eq("auth_user_id", user.id)
+    .single();
+
+if (!dbUser || !dbUser.organization_id) {
+    return Astro.redirect("/dashboard/events");
+}
+
+const { data: event, error } = await supabaseAdmin
+    .from("events")
+    .select("id, name, slug, status")
+    .eq("id", id)
+    .eq("organization_id", dbUser.organization_id)
+    .single();
+
+if (error || !event) {
+    return Astro.redirect("/dashboard/events");
+}
+
+// --- Data Queries ---
+
+// 1. All visits (for visits/day, peak hours, unique visitors)
+const { data: visitsRaw } = await supabaseAdmin
+    .from("event_visits")
+    .select("created_at, ip_hash, referrer, utm_source, country, city")
+    .eq("event_id", id)
+    .order("created_at", { ascending: true });
+
+const totalVisits = visitsRaw?.length || 0;
+const uniqueVisitors = new Set(visitsRaw?.map((v: any) => v.ip_hash)).size;
+
+// Group visits by day
+const visitsByDay: Record<string, number> = {};
+visitsRaw?.forEach((v: any) => {
+    const day = new Date(v.created_at).toISOString().split("T")[0];
+    visitsByDay[day] = (visitsByDay[day] || 0) + 1;
+});
+const visitDates = Object.keys(visitsByDay);
+const visitCounts = Object.values(visitsByDay);
+
+// Peak hours
+const hourCounts = new Array(24).fill(0);
+visitsRaw?.forEach((v: any) => {
+    const hour = new Date(v.created_at).getHours();
+    hourCounts[hour]++;
+});
+const hourLabels = hourCounts.map((_: number, i: number) => `${i.toString().padStart(2, "0")}:00`);
+
+// 2. Orders (for sales/day, revenue)
+const { data: ordersRaw } = await supabaseAdmin
+    .from("event_orders")
+    .select("created_at, amount, ticket_qty")
+    .eq("event_id", id)
+    .eq("status", "paid")
+    .order("created_at", { ascending: true });
+
+const totalRevenue = ordersRaw?.reduce((sum: number, o: any) => sum + (o.amount || 0), 0) || 0;
+const totalTicketsSold = ordersRaw?.reduce((sum: number, o: any) => sum + (o.ticket_qty || 1), 0) || 0;
+
+const salesByDay: Record<string, { count: number; revenue: number }> = {};
+ordersRaw?.forEach((o: any) => {
+    const day = new Date(o.created_at).toISOString().split("T")[0];
+    if (!salesByDay[day]) salesByDay[day] = { count: 0, revenue: 0 };
+    salesByDay[day].count += o.ticket_qty || 1;
+    salesByDay[day].revenue += o.amount || 0;
+});
+const salesDates = Object.keys(salesByDay);
+const salesCounts = salesDates.map((d) => salesByDay[d].count);
+const salesRevenue = salesDates.map((d) => salesByDay[d].revenue);
+
+// 3. Traffic sources
+function categorizeReferrer(referrer: string | null, utmSource: string | null): string {
+    if (utmSource) return utmSource;
+    if (!referrer) return "Directo";
+    const url = referrer.toLowerCase();
+    if (url.includes("google")) return "Google";
+    if (url.includes("facebook") || url.includes("fb.")) return "Facebook";
+    if (url.includes("instagram")) return "Instagram";
+    if (url.includes("twitter") || url.includes("x.com")) return "X/Twitter";
+    if (url.includes("tiktok")) return "TikTok";
+    if (url.includes("linkedin")) return "LinkedIn";
+    if (url.includes("whatsapp")) return "WhatsApp";
+    return "Otro";
+}
+
+const sourceCounts: Record<string, number> = {};
+visitsRaw?.forEach((v: any) => {
+    const source = categorizeReferrer(v.referrer, v.utm_source);
+    sourceCounts[source] = (sourceCounts[source] || 0) + 1;
+});
+const sortedSources = Object.entries(sourceCounts).sort((a, b) => b[1] - a[1]);
+const sourceLabels = sortedSources.map((s) => s[0]);
+const sourceValues = sortedSources.map((s) => s[1]);
+
+// 4. Sales by ticket type
+const { data: ticketSalesRaw } = await supabaseAdmin
+    .from("event_attendees")
+    .select("event_ticket_id, event_tickets(ticket_name)")
+    .eq("event_id", id);
+
+const ticketTypeCounts: Record<string, number> = {};
+ticketSalesRaw?.forEach((ea: any) => {
+    const name = ea.event_tickets?.ticket_name || "Desconocido";
+    ticketTypeCounts[name] = (ticketTypeCounts[name] || 0) + 1;
+});
+const ticketLabels = Object.keys(ticketTypeCounts);
+const ticketValues = Object.values(ticketTypeCounts);
+
+// 5. Geographic breakdown
+const geoCounts: Record<string, number> = {};
+visitsRaw?.forEach((v: any) => {
+    const location = [v.city, v.country].filter(Boolean).join(", ") || "Desconocido";
+    geoCounts[location] = (geoCounts[location] || 0) + 1;
+});
+const geoData = Object.entries(geoCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([location, visits]) => ({
+        location,
+        visits,
+        percentage: Math.round((visits / (totalVisits || 1)) * 100),
+    }));
+
+// Conversion
+const { data: eventTickets } = await supabaseAdmin
+    .from("event_tickets")
+    .select("total_quantity")
+    .eq("event_id", id);
+const totalCapacity = eventTickets?.reduce((acc: number, t: any) => acc + (t.total_quantity || 0), 0) || 0;
+const conversion = totalCapacity > 0 ? Math.round((totalTicketsSold / totalCapacity) * 100) : 0;
+
+// --- Chart Data Serialization ---
+const visitsDatasets = JSON.stringify([
+    {
+        label: "Visitas",
+        data: visitCounts,
+        borderColor: "#2563eb",
+        backgroundColor: "rgba(37, 99, 235, 0.1)",
+        fill: true,
+        tension: 0.3,
+        pointRadius: 2,
+    },
+]);
+
+const salesDatasets = JSON.stringify([
+    {
+        label: "Entradas vendidas",
+        data: salesCounts,
+        borderColor: "#16a34a",
+        backgroundColor: "rgba(22, 163, 74, 0.1)",
+        fill: true,
+        tension: 0.3,
+        pointRadius: 2,
+    },
+]);
+
+const sourceDatasets = JSON.stringify([
+    {
+        data: sourceValues,
+        backgroundColor: ["#111827", "#2563eb", "#7c3aed", "#db2777", "#ea580c", "#ca8a04", "#059669", "#6b7280"],
+        borderRadius: 4,
+    },
+]);
+
+const ticketDatasets = JSON.stringify([
+    {
+        data: ticketValues,
+        backgroundColor: ["#2563eb", "#7c3aed", "#db2777", "#ea580c", "#ca8a04", "#059669"],
+        borderRadius: 4,
+    },
+]);
+
+const peakDatasets = JSON.stringify([
+    {
+        data: hourCounts,
+        backgroundColor: "#e5e7eb",
+        hoverBackgroundColor: "#111827",
+        borderRadius: 4,
+    },
+]);
+---
+
+<DashboardLayout title={`Analytics · ${event.name}`}>
+    <div class="mb-6">
+        <div class="flex items-center gap-3 mb-2">
+            <a href="/dashboard/events" class="text-gray-500 hover:text-black transition">Eventos</a>
+            <span class="text-gray-300">/</span>
+            <a
+                href={`/dashboard/events/${event.id}`}
+                class="text-gray-500 hover:text-black transition truncate max-w-[200px]"
+            >{event.name}</a>
+            <span class="text-gray-300">/</span>
+            <span class="text-gray-900 font-medium">Analytics</span>
+        </div>
+        <h1 class="text-3xl font-bold font-[Unbounded]">Analytics</h1>
+        <p class="text-gray-500 mt-1">Resumen de rendimiento de tu evento.</p>
+    </div>
+
+    <!-- Summary Stats -->
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+        <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+            <div class="p-2 bg-blue-50 text-blue-600 rounded-lg w-fit mb-3">
+                <Eye size="18" />
+            </div>
+            <p class="text-gray-500 text-xs mb-1">Visitas</p>
+            <h3 class="text-xl font-bold">{totalVisits.toLocaleString()}</h3>
+        </div>
+        <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+            <div class="p-2 bg-purple-50 text-purple-600 rounded-lg w-fit mb-3">
+                <Users size="18" />
+            </div>
+            <p class="text-gray-500 text-xs mb-1">Visitantes unicos</p>
+            <h3 class="text-xl font-bold">{uniqueVisitors.toLocaleString()}</h3>
+        </div>
+        <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+            <div class="p-2 bg-green-50 text-green-600 rounded-lg w-fit mb-3">
+                <Ticket size="18" />
+            </div>
+            <p class="text-gray-500 text-xs mb-1">Entradas vendidas</p>
+            <h3 class="text-xl font-bold">{totalTicketsSold}</h3>
+        </div>
+        <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+            <div class="p-2 bg-orange-50 text-orange-600 rounded-lg w-fit mb-3">
+                <BarChart3 size="18" />
+            </div>
+            <p class="text-gray-500 text-xs mb-1">Ingresos</p>
+            <h3 class="text-xl font-bold">${totalRevenue.toLocaleString()}</h3>
+        </div>
+        <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+            <div class="p-2 bg-pink-50 text-pink-600 rounded-lg w-fit mb-3">
+                <TrendingUp size="18" />
+            </div>
+            <p class="text-gray-500 text-xs mb-1">Conversion</p>
+            <h3 class="text-xl font-bold">{conversion}%</h3>
+        </div>
+    </div>
+
+    <!-- Charts Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <LineChart
+            client:visible
+            title="Visitas por dia"
+            labelsJson={JSON.stringify(visitDates)}
+            datasetsJson={visitsDatasets}
+        />
+        <LineChart
+            client:visible
+            title="Ventas por dia"
+            labelsJson={JSON.stringify(salesDates)}
+            datasetsJson={salesDatasets}
+        />
+        <BarChart
+            client:visible
+            title="Fuentes de trafico"
+            horizontal
+            labelsJson={JSON.stringify(sourceLabels)}
+            datasetsJson={sourceDatasets}
+        />
+        <BarChart
+            client:visible
+            title="Ventas por tipo de entrada"
+            labelsJson={JSON.stringify(ticketLabels)}
+            datasetsJson={ticketDatasets}
+        />
+        <BarChart
+            client:visible
+            title="Horas pico de visitas"
+            labelsJson={JSON.stringify(hourLabels)}
+            datasetsJson={peakDatasets}
+        />
+        <GeoTable
+            client:visible
+            title="Ubicacion de visitantes"
+            dataJson={JSON.stringify(geoData)}
+        />
+    </div>
+</DashboardLayout>
