@@ -383,3 +383,20 @@ CREATE TABLE public.ad_campaigns (
 
 CREATE INDEX idx_ad_campaigns_org ON public.ad_campaigns(organization_id);
 CREATE INDEX idx_ad_campaigns_event ON public.ad_campaigns(event_id);
+
+-- Notification log for tracking emails sent (reminders, event changes, etc.)
+
+CREATE TABLE public.notification_log (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  event_id bigint NOT NULL,
+  attendee_id bigint,
+  type text NOT NULL, -- 'reminder_24h', 'general_update', 'date_change', 'venue_change', 'cancellation'
+  channel text NOT NULL DEFAULT 'email'::text, -- 'email', 'whatsapp'
+  status text NOT NULL DEFAULT 'sent'::text,
+  CONSTRAINT notification_log_pkey PRIMARY KEY (id),
+  CONSTRAINT notification_log_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.events(id) ON DELETE CASCADE,
+  CONSTRAINT notification_log_attendee_id_fkey FOREIGN KEY (attendee_id) REFERENCES public.attendees(id) ON DELETE SET NULL
+);
+
+CREATE INDEX idx_notification_log_event ON public.notification_log(event_id, type);

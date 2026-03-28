@@ -1,0 +1,12 @@
+{
+  "name": "send-event-reminders",
+  "version": "1.0.0",
+  "description": "Envía recordatorios automáticos 24hrs antes de cada función de un evento",
+  "main": "index.mjs",
+  "type": "module",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "form-data": "^4.0.1",
+    "mailgun.js": "^11.1.0"
+  }
+}

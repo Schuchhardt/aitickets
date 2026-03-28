@@ -1,5 +1,6 @@
 ---
 import DashboardLayout from "../../../layouts/DashboardLayout.astro";
+import EventFAQManager from "../../../components/dashboard/EventFAQManager.vue";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { createSupabaseServerClient } from "../../../lib/supabaseServer";
 import {
@@ -161,6 +162,12 @@ const publicLink = `/eventos/${event.slug}`;
                 <Eye size="18" /> Ver Página
             </a>
             <a
+                href={`/dashboard/events/${event.id}/checkin`}
+                class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
+            >
+                <CheckCircle size="18" /> Check-in
+            </a>
+            <a
                 href={`/dashboard/events/${event.id}/edit`}
                 class="flex items-center gap-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-900 transition font-medium"
             >
@@ -260,6 +267,9 @@ const publicLink = `/eventos/${event.slug}`;
                     }
                 </div>
             </section>
+
+            <!-- FAQ Section -->
+            <EventFAQManager client:load eventId={Number(event.id)} />
         </div>
 
         <!-- Right Column: Quick Actions & Public Link -->

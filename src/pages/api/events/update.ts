@@ -176,6 +176,26 @@ export const POST: APIRoute = async (context) => {
         }
 
 
+        // Notify attendees if the event is published and this is a real content update
+        const { data: currentEvent } = await supabaseAdmin
+            .from('events')
+            .select('status')
+            .eq('id', eventId)
+            .single();
+
+        if (currentEvent?.status === 'published') {
+            const origin = new URL(context.request.url).origin;
+            fetch(`${origin}/api/send-event-notification`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    eventId,
+                    changeType: 'general_update',
+                    changeDescription: 'El organizador ha actualizado la información del evento. Revisa los detalles actualizados.'
+                })
+            }).catch(err => console.error('Notification error:', err));
+        }
+
         return new Response(JSON.stringify({ message: "Evento actualizado", id: eventId }), { status: 200 });
 
     } catch (error) {

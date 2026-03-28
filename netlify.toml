@@ -16,3 +16,6 @@
     "netlify/functions/**/node_modules/**",
     ".env"
   ]
+
+[functions."send-event-reminders"]
+  schedule = "0 13 * * *"

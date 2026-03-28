@@ -251,3 +251,24 @@ USING (
     WHERE auth_user_id = auth.uid()
   )
 );
+
+-- NOTIFICATION_LOG POLICIES
+ALTER TABLE public.notification_log ENABLE ROW LEVEL SECURITY;
+
+-- Allow org members to read notification logs for their events
+CREATE POLICY "Enable read for org event owners" ON "public"."notification_log"
+AS PERMISSIVE FOR SELECT
+TO authenticated
+USING (
+  event_id IN (
+    SELECT e.id FROM public.events e
+    JOIN public.users u ON u.organization_id = e.organization_id
+    WHERE u.auth_user_id = auth.uid()
+  )
+);
+
+-- Allow anon inserts (Netlify functions use SUPABASE_ANON_KEY)
+CREATE POLICY "Enable insert for service functions" ON "public"."notification_log"
+AS PERMISSIVE FOR INSERT
+TO anon
+WITH CHECK (true);

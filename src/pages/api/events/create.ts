@@ -116,6 +116,10 @@ export const POST: APIRoute = async (context) => {
         const { error: ticketsError } = await supabaseAdmin.from('event_tickets').insert(ticketsPayload);
         if (ticketsError) throw ticketsError;
 
+        // Notificar en Slack sobre nuevo evento
+        notifySlackNewEvent({ eventName: general.name, slug, locations, tickets }).catch(err =>
+            console.error("Error al notificar a Slack:", err.message)
+        );
 
         return new Response(JSON.stringify({ message: "Evento creado exitosamente", id: eventId }), {
             status: 200,
@@ -130,3 +134,26 @@ export const POST: APIRoute = async (context) => {
         });
     }
 };
+
+async function notifySlackNewEvent({ eventName, slug, locations, tickets }: { eventName: string; slug: string; locations: any[]; tickets: any[] }) {
+    const webhookUrl = import.meta.env.SLACK_WEBHOOK_URL;
+    if (!webhookUrl) {
+        console.warn("SLACK_WEBHOOK_URL no configurado, omitiendo notificación");
+        return;
+    }
+
+    const totalDates = locations.reduce((sum: number, loc: any) => sum + (loc.dates?.length || 0), 0);
+    const ticketLines = tickets.map((t: any) => `  - ${t.name}: $${t.price} (${t.quantity} disponibles)`).join("\n");
+
+    const res = await fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            text: `🎫 *Nuevo evento creado*\n• *Nombre:* ${eventName}\n• *Ubicaciones:* ${locations.length}\n• *Fechas:* ${totalDates}\n• *Tickets:*\n${ticketLines}\n• *Link:* /eventos/${slug}`
+        })
+    });
+
+    if (!res.ok) {
+        throw new Error(`Slack respondió con status ${res.status}`);
+    }
+}

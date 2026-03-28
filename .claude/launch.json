@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "localhost",
+      "runtimeExecutable": "npm run dev",
+      "runtimeArgs": ["--", "--port", "4321"],
+      "port": 4321,
+    }
+  ]
+}

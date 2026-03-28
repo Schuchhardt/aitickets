@@ -105,7 +105,7 @@ export default async function handler(req, context) {
         language,
         timezone,
         userAgent,
-        trackingSource
+        referrer
       }),
       { status: 200 }
     );
