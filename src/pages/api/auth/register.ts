@@ -1,9 +1,10 @@
 import { getSupabaseAdmin, getSupabaseAnon, getFriendlyErrorMessage } from "../../../lib/auth-helpers";
 import { verifyTurnstileToken } from "../../../lib/turnstile";
+import type { APIRoute } from "astro";
 
 export const prerender = false; // Ensure this endpoint is server-rendered
 
-export const POST = async ({ request }) => {
+export const POST: APIRoute = async ({ request, cookies }) => {
     try {
         const data = await request.json();
         const { email, password, name, organizationName, phone, cfToken } = data;
@@ -118,7 +119,7 @@ export const POST = async ({ request }) => {
         // 3. Create Public User Linked using Admin Client (skip if already exists)
         const { data: existingProfile } = await supabaseAdmin
             .from('users')
-            .select('id')
+            .select('id, organization_id')
             .eq('auth_user_id', userId)
             .maybeSingle();
 
@@ -139,14 +140,55 @@ export const POST = async ({ request }) => {
                 console.error("Error creating public user:", userError);
                 return new Response(JSON.stringify({ message: "Error al crear perfil de usuario: " + getFriendlyErrorMessage(userError) }), { status: 500 });
             }
+        } else if (!existingProfile.organization_id) {
+            // Perfil existe pero sin organización (registro parcial previo), actualizar
+            const { error: updateError } = await supabaseAdmin
+                .from('users')
+                .update({ organization_id: orgId, name, phone })
+                .eq('id', existingProfile.id);
+
+            if (updateError) {
+                console.error("Error updating user profile:", updateError);
+                return new Response(JSON.stringify({ message: "Error al actualizar perfil de usuario: " + getFriendlyErrorMessage(updateError) }), { status: 500 });
+            }
         }
+
+        // Auto-login: obtener sesión para el nuevo usuario
+        const supabaseLogin = getSupabaseAnon();
+        const { data: loginData, error: loginError } = await supabaseLogin.auth.signInWithPassword({
+            email,
+            password,
+        });
+
+        if (loginError || !loginData.session) {
+            // Registro exitoso pero auto-login falló, redirigir al login manual
+            return new Response(JSON.stringify({ message: "Registro exitoso", redirect: "/organizadores/login" }), { status: 200 });
+        }
+
+        const { access_token, refresh_token } = loginData.session;
+
+        cookies.set("sb-access-token", access_token, {
+            path: "/",
+            httpOnly: true,
+            secure: import.meta.env.PROD,
+            sameSite: "lax",
+            maxAge: 60 * 60 * 24 * 30,
+        });
+
+        cookies.set("sb-refresh-token", refresh_token, {
+            path: "/",
+            httpOnly: true,
+            secure: import.meta.env.PROD,
+            sameSite: "lax",
+            maxAge: 60 * 60 * 24 * 30,
+        });
 
         // Notificar en Slack sobre nuevo productor
         notifySlack({ name, email, phone, organizationName }).catch(err =>
             console.error("Error al notificar a Slack:", err.message)
         );
 
-        return new Response(JSON.stringify({ message: "Registro exitoso", userId: authData.user.id }), { status: 200 });
+        return new Response(JSON.stringify({ message: "Registro exitoso", redirect: "/dashboard", userId }), { status: 200 });
 
     } catch (error) {
         console.error("Server error:", error);

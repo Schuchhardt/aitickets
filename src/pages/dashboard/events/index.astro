@@ -20,22 +20,19 @@ const { data: dbUser } = await supabase
   .single();
 
 if (!dbUser || !dbUser.organization_id) {
-  // Handle case where user implies no organization (shouldn't happen for producers)
-  // For now, return empty or redirect
   console.error("User request without organization_id");
 }
 
-// Fetch events
-const query = supabase
-  .from("events")
-  .select("*")
-  .order("created_at", { ascending: false });
-
+// Fetch events (only if user has an organization)
+const events = [];
 if (dbUser?.organization_id) {
-  query.eq("organization_id", dbUser.organization_id);
+  const { data } = await supabase
+    .from("events")
+    .select("*")
+    .eq("organization_id", dbUser.organization_id)
+    .order("created_at", { ascending: false });
+  if (data) events.push(...data);
 }
-
-const { data: events } = await query;
 ---
 
 <DashboardLayout title="Mis Eventos">

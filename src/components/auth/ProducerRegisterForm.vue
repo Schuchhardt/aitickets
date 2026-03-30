@@ -127,8 +127,8 @@ const handleRegister = async () => {
       throw new Error(dataRes.message || 'Error al registrarse')
     }
 
-    // Registro exitoso, redirigir al login
-    window.location.href = '/organizadores/login'
+    // Registro exitoso, redirigir al dashboard (auto-login) o login
+    window.location.href = dataRes.redirect || '/dashboard'
 
   } catch (error) {
     errorMsg.value = error.message
