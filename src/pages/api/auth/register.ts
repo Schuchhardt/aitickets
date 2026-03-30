@@ -31,6 +31,7 @@ export const POST = async ({ request }) => {
         const supabaseAdmin = getSupabaseAdmin();
 
         // 1. SignUp in Auth using Anon Client
+        let userId: string;
         const { data: authData, error: authError } = await supabaseAnon.auth.signUp({
             email,
             password,
@@ -43,49 +44,101 @@ export const POST = async ({ request }) => {
         });
 
         if (authError) {
-            return new Response(JSON.stringify({ message: getFriendlyErrorMessage(authError) }), { status: 400 });
-        }
+            // Si el usuario ya existe en auth, intentar recuperar el registro parcial
+            if (authError.message?.includes("already") || authError.message?.includes("registered")) {
+                // Verificar si ya tiene perfil completo
+                const { data: existingUser } = await supabaseAdmin
+                    .from('users')
+                    .select('id')
+                    .eq('email', email)
+                    .maybeSingle();
 
-        if (!authData.user) {
+                if (existingUser) {
+                    return new Response(JSON.stringify({ message: "Este correo electrónico ya está registrado. Intenta iniciar sesión." }), { status: 400 });
+                }
+
+                // Usuario en auth pero sin perfil: buscar su auth_user_id para completar el registro
+                const { data: { users: authUsers } } = await supabaseAdmin.auth.admin.listUsers();
+                const existingAuthUser = authUsers?.find(u => u.email === email);
+                if (!existingAuthUser) {
+                    return new Response(JSON.stringify({ message: "Error al recuperar usuario. Contacta soporte." }), { status: 500 });
+                }
+                userId = existingAuthUser.id;
+            } else {
+                return new Response(JSON.stringify({ message: getFriendlyErrorMessage(authError) }), { status: 400 });
+            }
+        } else if (!authData.user) {
             return new Response(JSON.stringify({ message: "No se pudo crear el usuario" }), { status: 500 });
+        } else {
+            // Supabase puede retornar un user sin identities si ya existe (email no confirmado)
+            if (authData.user.identities?.length === 0) {
+                const { data: existingUser } = await supabaseAdmin
+                    .from('users')
+                    .select('id')
+                    .eq('email', email)
+                    .maybeSingle();
+
+                if (existingUser) {
+                    return new Response(JSON.stringify({ message: "Este correo electrónico ya está registrado. Intenta iniciar sesión." }), { status: 400 });
+                }
+                userId = authData.user.id;
+            } else {
+                userId = authData.user.id;
+            }
         }
 
-        // 2. Create Organization using Admin Client
-        const { data: orgData, error: orgError } = await supabaseAdmin
+        // 2. Create Organization using Admin Client (skip if already exists for this email)
+        let orgId: number;
+        const { data: existingOrg } = await supabaseAdmin
             .from('organizations')
-            .insert({
-                public_name: organizationName,
-                email: email,
-                phone: phone
-            })
-            .select()
-            .single();
+            .select('id')
+            .eq('email', email)
+            .maybeSingle();
 
-        if (orgError) {
-            // Security note: User created in Auth but Org failed. 
-            // Ideally we would delete the Auth user here to rollback, but requires Service Role key (admin).
-            // For now, we return error.
-            console.error("Error creating org:", orgError);
-            // Cleanup: Try to delete auth user if org creation fails (optional/advanced)
-            return new Response(JSON.stringify({ message: "Error al crear la organización: " + getFriendlyErrorMessage(orgError) }), { status: 500 });
+        if (existingOrg) {
+            orgId = existingOrg.id;
+        } else {
+            const { data: orgData, error: orgError } = await supabaseAdmin
+                .from('organizations')
+                .insert({
+                    public_name: organizationName,
+                    email: email,
+                    phone: phone
+                })
+                .select()
+                .single();
+
+            if (orgError) {
+                console.error("Error creating org:", orgError);
+                return new Response(JSON.stringify({ message: "Error al crear la organización: " + getFriendlyErrorMessage(orgError) }), { status: 500 });
+            }
+            orgId = orgData.id;
         }
 
-        // 3. Create Public User Linked using Admin Client
-        const { error: userError } = await supabaseAdmin
+        // 3. Create Public User Linked using Admin Client (skip if already exists)
+        const { data: existingProfile } = await supabaseAdmin
             .from('users')
-            .insert({
-                auth_user_id: authData.user.id,
-                organization_id: orgData.id,
-                name: name,
-                email: email,
-                phone: phone,
-                role: 'producer',
-                active: true
-            });
+            .select('id')
+            .eq('auth_user_id', userId)
+            .maybeSingle();
 
-        if (userError) {
-            console.error("Error creating public user:", userError);
-            return new Response(JSON.stringify({ message: "Error al crear perfil de usuario: " + getFriendlyErrorMessage(userError) }), { status: 500 });
+        if (!existingProfile) {
+            const { error: userError } = await supabaseAdmin
+                .from('users')
+                .insert({
+                    auth_user_id: userId,
+                    organization_id: orgId,
+                    name: name,
+                    email: email,
+                    phone: phone,
+                    role: 'producer',
+                    active: true
+                });
+
+            if (userError) {
+                console.error("Error creating public user:", userError);
+                return new Response(JSON.stringify({ message: "Error al crear perfil de usuario: " + getFriendlyErrorMessage(userError) }), { status: 500 });
+            }
         }
 
         // Notificar en Slack sobre nuevo productor

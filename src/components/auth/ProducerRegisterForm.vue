@@ -30,12 +30,13 @@ import { onMounted } from 'vue'
 // ... existing refs ...
 
 const turnstileToken = ref('')
+const turnstileWidgetId = ref(null)
 
 onMounted(() => {
   // Function to render the widget
   const renderTurnstile = () => {
     if (window.turnstile) {
-      window.turnstile.render('#cf-turnstile-widget', {
+      turnstileWidgetId.value = window.turnstile.render('#cf-turnstile-widget', {
         sitekey: props.turnstileSiteKey,
         callback: (token) => {
           turnstileToken.value = token
@@ -133,6 +134,11 @@ const handleRegister = async () => {
     errorMsg.value = error.message
   } finally {
     loading.value = false
+    // Reset Turnstile para obtener un token fresco en caso de reintento
+    if (window.turnstile && turnstileWidgetId.value !== null) {
+      window.turnstile.reset(turnstileWidgetId.value)
+      turnstileToken.value = ''
+    }
   }
 }
 </script>
