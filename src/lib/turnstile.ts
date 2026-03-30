@@ -1,4 +1,10 @@
-export async function verifyTurnstileToken(token: string): Promise<{ success: boolean; message?: string }> {
+interface TurnstileOptions {
+    token: string;
+    remoteip?: string;
+    idempotencyKey?: string;
+}
+
+export async function verifyTurnstileToken({ token, remoteip, idempotencyKey }: TurnstileOptions): Promise<{ success: boolean; message?: string }> {
     const TURNSTILE_SECRET_KEY = import.meta.env.TURNSTILE_SECRET_KEY;
 
     if (!TURNSTILE_SECRET_KEY) {
@@ -11,21 +17,32 @@ export async function verifyTurnstileToken(token: string): Promise<{ success: bo
     }
 
     const verificationUrl = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
-    const formData = new FormData();
-    formData.append('secret', TURNSTILE_SECRET_KEY);
-    formData.append('response', token);
+
+    const body: Record<string, string> = {
+        secret: TURNSTILE_SECRET_KEY,
+        response: token,
+    };
+
+    if (remoteip) {
+        body.remoteip = remoteip;
+    }
+    if (idempotencyKey) {
+        body.idempotency_key = idempotencyKey;
+    }
 
     try {
         const turnstileRes = await fetch(verificationUrl, {
             method: 'POST',
-            body: formData,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
         });
 
         const turnstileData = await turnstileRes.json();
 
         if (!turnstileData.success) {
-            console.error('Turnstile verification failed:', turnstileData);
-            return { success: false, message: "CAPTCHA inválido" };
+            console.error('Turnstile verification failed:', JSON.stringify(turnstileData));
+            const codes = turnstileData['error-codes']?.join(', ') || 'unknown';
+            return { success: false, message: `CAPTCHA inválido (${codes})` };
         }
 
         return { success: true };

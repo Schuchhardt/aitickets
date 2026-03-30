@@ -14,7 +14,14 @@ export const POST = async ({ request }) => {
         }
 
         // Verify Turnstile Token
-        const { success: cfSuccess, message: cfMessage } = await verifyTurnstileToken(cfToken);
+        const remoteip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+            || request.headers.get('cf-connecting-ip')
+            || undefined;
+        const { success: cfSuccess, message: cfMessage } = await verifyTurnstileToken({
+            token: cfToken,
+            remoteip,
+            idempotencyKey: crypto.randomUUID(),
+        });
         if (!cfSuccess) {
             return new Response(JSON.stringify({ message: cfMessage }), { status: 400 });
         }
