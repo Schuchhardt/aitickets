@@ -71,7 +71,7 @@ if (error || !event) {
 // Calculate Stats
 const totalTickets =
     event.event_tickets?.reduce(
-        (acc, t) => acc + (t.total_quantity || t.quantity || 0),
+        (acc: number, t: any) => acc + (t.total_quantity || t.quantity || 0),
         0,
     ) || 0;
 
@@ -143,7 +143,7 @@ const publicLink = `/eventos/${event.slug}`;
                     {event.status === "published" ? "Publicado" : "Borrador"}
                 </span>
                 <span class="flex items-center gap-1">
-                    <Calendar size="16" />
+                    <Calendar size={16} />
                     {
                         event.start_date
                             ? new Date(event.start_date).toLocaleDateString()
@@ -159,25 +159,25 @@ const publicLink = `/eventos/${event.slug}`;
                 target="_blank"
                 class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
             >
-                <Eye size="18" /> Ver Página
+                <Eye size={18} /> Ver Página
             </a>
             <a
                 href={`/dashboard/events/${event.id}/checkin`}
                 class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
             >
-                <CheckCircle size="18" /> Check-in
+                <CheckCircle size={18} /> Check-in
             </a>
             <a
                 href={`/dashboard/events/${event.id}/analytics`}
                 class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
             >
-                <BarChart3 size="18" /> Analytics
+                <BarChart3 size={18} /> Analytics
             </a>
             <a
                 href={`/dashboard/events/${event.id}/edit`}
                 class="flex items-center gap-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-900 transition font-medium"
             >
-                <Edit size="18" /> Editar
+                <Edit size={18} /> Editar
             </a>
         </div>
     </div>
@@ -187,7 +187,7 @@ const publicLink = `/eventos/${event.slug}`;
         <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
             <div class="flex justify-between items-start mb-4">
                 <div class="p-2 bg-blue-50 text-blue-600 rounded-lg">
-                    <Eye size="20" />
+                    <Eye size={20} />
                 </div>
             </div>
             <p class="text-gray-500 text-sm mb-1">Visitas Totales</p>
@@ -198,7 +198,7 @@ const publicLink = `/eventos/${event.slug}`;
         <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
             <div class="flex justify-between items-start mb-4">
                 <div class="p-2 bg-purple-50 text-purple-600 rounded-lg">
-                    <Ticket size="20" />
+                    <Ticket size={20} />
                 </div>
             </div>
             <p class="text-gray-500 text-sm mb-1">Entradas Vendidas</p>
@@ -208,7 +208,7 @@ const publicLink = `/eventos/${event.slug}`;
         <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
             <div class="flex justify-between items-start mb-4">
                 <div class="p-2 bg-green-50 text-green-600 rounded-lg">
-                    <BarChart3 size="20" />
+                    <BarChart3 size={20} />
                 </div>
             </div>
             <p class="text-gray-500 text-sm mb-1">Ingresos Totales</p>
@@ -217,7 +217,7 @@ const publicLink = `/eventos/${event.slug}`;
         <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
             <div class="flex justify-between items-start mb-4">
                 <div class="p-2 bg-orange-50 text-orange-600 rounded-lg">
-                    <Share2 size="20" />
+                    <Share2 size={20} />
                 </div>
             </div>
             <p class="text-gray-500 text-sm mb-1">Conversión</p>
@@ -244,7 +244,7 @@ const publicLink = `/eventos/${event.slug}`;
                 </div>
                 <div class="divide-y divide-gray-100">
                     {
-                        event.event_tickets?.map((ticket) => (
+                        event.event_tickets?.map((ticket: any) => (
                             <div class="p-4 flex justify-between items-center hover:bg-gray-50 transition">
                                 <div>
                                     <p class="font-bold text-gray-900">
@@ -298,7 +298,7 @@ const publicLink = `/eventos/${event.slug}`;
                     <button
                         class="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition text-gray-700"
                     >
-                        <Share2 size="18" />
+                        <Share2 size={18} />
                     </button>
                 </div>
             </div>
@@ -342,7 +342,7 @@ const publicLink = `/eventos/${event.slug}`;
       const currentStatus = btn.dataset.currentStatus;
       const newStatus = currentStatus === 'published' ? 'draft' : 'published';
       
-      btn.disabled = true;
+      (btn as HTMLButtonElement).disabled = true;
       btn.textContent = 'Actualizando...';
 
       try {
@@ -364,12 +364,12 @@ const publicLink = `/eventos/${event.slug}`;
         } else {
           const data = await res.json();
           alert(data.message || 'Error al actualizar estado');
-          btn.disabled = false;
+          (btn as HTMLButtonElement).disabled = false;
           btn.textContent = currentStatus === 'published' ? 'Pausar Ventas' : 'Publicar Evento';
         }
       } catch (e) {
         alert('Error de conexión');
-        btn.disabled = false;
+        (btn as HTMLButtonElement).disabled = false;
         btn.textContent = currentStatus === 'published' ? 'Pausar Ventas' : 'Publicar Evento';
       }
     });

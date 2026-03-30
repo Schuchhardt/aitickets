@@ -73,7 +73,7 @@ const initialFormState = {
         category: "",
     },
     locations:
-        event.event_locations?.map((loc) => ({
+        event.event_locations?.map((loc: any) => ({
             id: loc.id,
             venueId: loc.venue_id,
             isNewVenue: false,
@@ -81,7 +81,7 @@ const initialFormState = {
             newVenueAddress: "",
             newVenueCity: "",
             dates:
-                loc.dates?.map((d) => ({
+                loc.dates?.map((d: any) => ({
                     id: d.id,
                     date: d.date,
                     startTime: d.start_time?.slice(0, 5) || "21:00",
@@ -89,7 +89,7 @@ const initialFormState = {
                 })) || [],
         })) || [],
     tickets:
-        event.event_tickets?.map((t) => ({
+        event.event_tickets?.map((t: any) => ({
             id: t.id,
             name: t.ticket_name,
             price: Number(t.price),

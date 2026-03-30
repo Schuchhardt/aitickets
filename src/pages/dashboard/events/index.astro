@@ -51,7 +51,7 @@ const { data: events } = await query;
       href="/dashboard/events/create"
       class="inline-flex items-center gap-2 bg-black text-white px-5 py-2.5 rounded-lg hover:bg-gray-800 transition font-medium"
     >
-      <Plus size="20" />
+      <Plus size={20} />
       Crear Evento
     </a>
   </div>
@@ -63,7 +63,7 @@ const { data: events } = await query;
         class="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center"
       >
         <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-400">
-          <Calendar size="32" />
+          <Calendar size={32} />
         </div>
         <h3 class="text-xl font-bold mb-2">No tienes eventos activos</h3>
         <p class="text-gray-500 mb-6">
@@ -85,7 +85,7 @@ const { data: events } = await query;
             data-status-filter="all"
             class="status-filter-btn flex items-center gap-2 px-3 py-1.5 bg-gray-900 text-white rounded-full border border-gray-900 cursor-pointer transition-all hover:opacity-90"
           >
-            <ListFilter size="14" />
+            <ListFilter size={14} />
             <span class="text-xs font-medium">Todos</span>
           </button>
           <button
@@ -93,7 +93,7 @@ const { data: events } = await query;
             data-status-filter="published"
             class="status-filter-btn flex items-center gap-2 px-3 py-1.5 bg-green-50 rounded-full border border-green-100 cursor-pointer transition-all hover:bg-green-100"
           >
-            <Globe size="14" class="text-green-600" />
+            <Globe size={14} class="text-green-600" />
             <span class="text-xs font-medium text-green-700">Publicados</span>
           </button>
           <button
@@ -101,7 +101,7 @@ const { data: events } = await query;
             data-status-filter="draft"
             class="status-filter-btn flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-full border border-gray-200 cursor-pointer transition-all hover:bg-gray-100"
           >
-            <FileText size="14" class="text-gray-500" />
+            <FileText size={14} class="text-gray-500" />
             <span class="text-xs font-medium text-gray-600">Borradores</span>
           </button>
         </div>
@@ -117,7 +117,7 @@ const { data: events } = await query;
                 <img src={event.image_url} class="w-full h-full object-cover" />
               ) : (
                 <div class="w-full h-full flex items-center justify-center text-gray-400">
-                  <Calendar size="32" />
+                  <Calendar size={32} />
                 </div>
               )}
             </div>
@@ -139,7 +139,7 @@ const { data: events } = await query;
               </h3>
 
               <div class="flex items-center gap-2 text-sm text-gray-600 mb-4">
-                <MapPin size="16" />
+                <MapPin size={16} />
                 <span class="truncate">
                   {event.address || "Ubicación por definir"}
                 </span>
@@ -150,13 +150,13 @@ const { data: events } = await query;
                   href={`/dashboard/events/${event.id}`}
                   class="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-50 rounded-lg hover:bg-gray-100 transition"
                 >
-                  <Eye size="16" /> Gestionar
+                  <Eye size={16} /> Gestionar
                 </a>
                 <a
                   href={`/dashboard/events/${event.id}/edit`}
                   class="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-white bg-black rounded-lg hover:bg-gray-800 transition"
                 >
-                  <Edit size="16" /> Editar
+                  <Edit size={16} /> Editar
                 </a>
               </div>
             </div>

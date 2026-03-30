@@ -21,7 +21,7 @@ const { data: dbUser } = await supabase
   .eq("auth_user_id", user.id)
   .single();
 
-let attendees = [];
+let attendees: Array<{name: string; email: string; event: string; ticket: string; date: string}> = [];
 
 if (dbUser?.organization_id) {
   // Get all events for this organization
@@ -47,7 +47,7 @@ if (dbUser?.organization_id) {
       .in("event_id", eventIds)
       .order("created_at", { ascending: false });
 
-    attendees = (eventAttendees || []).map((ea) => ({
+    attendees = (eventAttendees || []).map((ea: any) => ({
       name: [ea.attendees?.first_name, ea.attendees?.last_name].filter(Boolean).join(" ") || "—",
       email: ea.attendees?.email || "—",
       event: eventNameMap[ea.event_id] || "—",
@@ -74,7 +74,7 @@ if (dbUser?.organization_id) {
         id="exportCsvBtn"
         class="inline-flex items-center gap-2 bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition font-medium"
       >
-        <Download size="18" />
+        <Download size={18} />
         Exportar CSV
       </button>
     )}
@@ -111,7 +111,7 @@ if (dbUser?.organization_id) {
             <tr>
               <td colspan="5" class="px-6 py-12 text-center text-gray-400">
                 <div class="flex flex-col items-center gap-2">
-                  <Users size="24" />
+                  <Users size={24} />
                   <span>No se encontraron asistentes aún.</span>
                 </div>
               </td>
@@ -130,7 +130,7 @@ if (dbUser?.organization_id) {
       const table = document.getElementById('attendeesTable');
       if (!table) return;
       const rows = table.querySelectorAll('tr');
-      const csvLines = [];
+      const csvLines: string[] = [];
       rows.forEach((row) => {
         const cells = row.querySelectorAll('th, td');
         const line = Array.from(cells).map((cell) => {

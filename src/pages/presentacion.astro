@@ -871,15 +871,15 @@ import "../styles/global.css";
     
     <script>
       const slides = document.querySelectorAll('.slide');
-      const prevBtn = document.getElementById('prevBtn');
-      const nextBtn = document.getElementById('nextBtn');
+      const prevBtn = document.getElementById('prevBtn') as HTMLButtonElement;
+      const nextBtn = document.getElementById('nextBtn') as HTMLButtonElement;
       const slideCounter = document.getElementById('slideCounter');
-      const progressBar = document.getElementById('progressBar');
+      const progressBar = document.getElementById('progressBar') as HTMLElement;
       const fullscreenBtn = document.getElementById('fullscreenBtn');
       const totalSlides = slides.length;
       let currentSlide = 0;
       
-      function updateSlide(newIndex) {
+      function updateSlide(newIndex: number) {
         if (newIndex < 0 || newIndex >= totalSlides) return;
         
         slides[currentSlide].classList.remove('active');
@@ -891,7 +891,7 @@ import "../styles/global.css";
         slides[currentSlide].classList.add('active');
         
         // Update counter
-        slideCounter.textContent = `${currentSlide + 1} / ${totalSlides}`;
+        if (slideCounter) slideCounter.textContent = `${currentSlide + 1} / ${totalSlides}`;
         
         // Update buttons
         prevBtn.disabled = currentSlide === 0;
@@ -899,11 +899,11 @@ import "../styles/global.css";
         
         // Update progress bar
         const progress = ((currentSlide + 1) / totalSlides) * 100;
-        progressBar.style.width = `${progress}%`;
+        if (progressBar) progressBar.style.width = `${progress}%`;
       }
       
-      prevBtn.addEventListener('click', () => updateSlide(currentSlide - 1));
-      nextBtn.addEventListener('click', () => updateSlide(currentSlide + 1));
+      prevBtn?.addEventListener('click', () => updateSlide(currentSlide - 1));
+      nextBtn?.addEventListener('click', () => updateSlide(currentSlide + 1));
       
       // Keyboard navigation
       document.addEventListener('keydown', (e) => {
@@ -943,19 +943,19 @@ import "../styles/global.css";
       });
       
       // Fullscreen toggle
-      fullscreenBtn.addEventListener('click', () => {
+      fullscreenBtn?.addEventListener('click', () => {
         if (!document.fullscreenElement) {
           document.documentElement.requestFullscreen();
-          fullscreenBtn.textContent = '✕ Salir';
+          if (fullscreenBtn) fullscreenBtn.textContent = '✕ Salir';
         } else {
           document.exitFullscreen();
-          fullscreenBtn.textContent = '⛶ Pantalla completa';
+          if (fullscreenBtn) fullscreenBtn.textContent = '⛶ Pantalla completa';
         }
       });
       
       document.addEventListener('fullscreenchange', () => {
         if (!document.fullscreenElement) {
-          fullscreenBtn.textContent = '⛶ Pantalla completa';
+          if (fullscreenBtn) fullscreenBtn.textContent = '⛶ Pantalla completa';
         }
       });
       

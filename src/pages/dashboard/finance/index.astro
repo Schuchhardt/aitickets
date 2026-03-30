@@ -21,7 +21,7 @@ const { data: dbUser } = await supabase
 
 let totalRevenue = 0;
 let pendingPayout = 0;
-let transactions = [];
+let transactions: Array<{event: string; amount: number; fee: number; qty: number; date: string; status: string}> = [];
 
 if (dbUser?.organization_id) {
     const { data: orgEvents } = await supabaseAdmin
@@ -68,7 +68,7 @@ if (dbUser?.organization_id) {
     }
 }
 
-const formatCLP = (amount) => `$${Number(amount).toLocaleString("es-CL")}`;
+const formatCLP = (amount: number) => `$${Number(amount).toLocaleString("es-CL")}`;
 ---
 
 <DashboardLayout title="Ingresos">
