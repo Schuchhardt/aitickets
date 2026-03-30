@@ -40,12 +40,12 @@ import GradientBackground from './Hero/GradientBackground.vue';
 
           <FadeInSection direction="up" :delay="300">
             <div class="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 mb-12">
-              <a href="/register" class="px-6 py-3 text-lg font-bold font-[Unbounded] bg-lime-400 text-black border border-lime-400 rounded-lg transition hover:bg-black hover:text-lime-400 hover:border-lime-400 w-full sm:w-auto group">
+              <a href="https://calendar.app.google/CMt97vedNjzBaoEX7" target="_blank" rel="noopener noreferrer" class="px-6 py-3 text-lg font-bold font-[Unbounded] bg-lime-400 text-black border border-lime-400 rounded-lg transition hover:bg-black hover:text-lime-400 hover:border-lime-400 w-full sm:w-auto group">
                 Solicitar Demo Gratis
                 <ArrowRight class="ml-2 inline-block h-4 w-4 transition-transform group-hover:translate-x-1" />
               </a>
-              <a href="/eventos" class="px-6 py-3 text-lg font-bold font-[Unbounded] border border-white rounded-lg hover:bg-white hover:text-black transition w-full sm:w-auto">
-                Ver Eventos
+              <a href="/organizadores/registro" class="px-6 py-3 text-lg font-bold font-[Unbounded] border border-white rounded-lg hover:bg-white hover:text-black transition w-full sm:w-auto">
+                Crear un Evento
               </a>
             </div>
           </FadeInSection>

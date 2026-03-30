@@ -1,5 +1,5 @@
 <template>
-    <div :class="['gradient-bg', isAlt ? 'gradient-bg-alt' : '']">
+    <div :class="['gradient-bg', variantClass]">
       <svg xmlns="http://www.w3.org/2000/svg">
         <defs>
           <filter id="goo">
@@ -31,7 +31,7 @@
     }
   });
   
-  const isAlt = props.variant === 'alt';
+  const variantClass = props.variant === 'alt' ? 'gradient-bg-alt' : props.variant === 'soft' ? 'gradient-bg-soft' : '';
   
   const interactiveBlob = ref(null);
   
@@ -111,6 +111,19 @@
   --color4: 140, 100, 255;
   --color5: 180, 80, 80;
   --color-interactive: 255, 255, 255;
+}
+
+.gradient-bg-soft {
+  --color-bg1: rgb(30, 25, 55);
+  --color-bg2: rgb(20, 15, 45);
+  --color1: 140, 130, 220;
+  --color2: 120, 180, 230;
+  --color3: 200, 150, 210;
+  --color4: 100, 170, 200;
+  --color5: 170, 140, 200;
+  --color-interactive: 200, 190, 255;
+  --blending: soft-light;
+  height: 100% !important;
 }
 
 

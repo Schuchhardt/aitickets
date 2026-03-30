@@ -45,7 +45,9 @@
         <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
           <!-- Botón principal -->
           <a
-            href="/register"
+            href="https://calendar.app.google/CMt97vedNjzBaoEX7"
+            target="_blank"
+            rel="noopener noreferrer"
             class="flex items-center justify-center gap-2 bg-lime-400 text-black font-bold py-4 px-8 rounded-full transition-all duration-300 hover:shadow-xl hover:shadow-lime-400/20 hover:-translate-y-0.5 active:scale-[0.97] font-[Unbounded]"
           >
             Solicitar Demo de 15 min

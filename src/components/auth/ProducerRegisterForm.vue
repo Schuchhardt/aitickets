@@ -131,90 +131,90 @@ const handleRegister = async () => {
 </script>
 
 <template>
-  <div class="w-full max-w-2xl mx-auto bg-white p-8 rounded-xl shadow-lg border border-gray-100 font-[Prompt]">
-    <h2 class="text-2xl font-bold mb-6 text-center font-[Unbounded]">Registro de Productor</h2>
+  <div class="w-full max-w-2xl mx-auto bg-white/10 backdrop-blur-xl p-8 rounded-xl shadow-2xl border border-white/20 font-[Prompt]">
+    <h2 class="text-2xl font-bold mb-6 text-center font-[Unbounded] text-white">Registro de Productor</h2>
     
     <form @submit.prevent="handleRegister" class="space-y-6">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div class="col-span-2 md:col-span-1">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Nombre Completo</label>
+          <label class="block text-sm font-medium text-white/80 mb-1">Nombre Completo</label>
           <input 
             v-model="name" 
             type="text" 
-            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-black outline-none transition"
-            :class="errors.name ? 'border-red-500' : 'border-gray-300'"
+            class="w-full px-4 py-2 border bg-white/10 text-white placeholder-white/40 rounded-lg focus:ring-2 focus:ring-white/50 outline-none transition"
+            :class="errors.name ? 'border-red-400/60' : 'border-white/20'"
             placeholder="Juan Pérez"
           />
-          <p v-if="errors.name" class="text-red-500 text-xs mt-1">{{ errors.name[0] }}</p>
+          <p v-if="errors.name" class="text-red-300 text-xs mt-1">{{ errors.name[0] }}</p>
         </div>
 
         <div class="col-span-2 md:col-span-1">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Nombre Organización</label>
+          <label class="block text-sm font-medium text-white/80 mb-1">Nombre Organización</label>
           <input 
             v-model="organizationName" 
             type="text" 
-            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-black outline-none transition"
-            :class="errors.organizationName ? 'border-red-500' : 'border-gray-300'"
+            class="w-full px-4 py-2 border bg-white/10 text-white placeholder-white/40 rounded-lg focus:ring-2 focus:ring-white/50 outline-none transition"
+            :class="errors.organizationName ? 'border-red-400/60' : 'border-white/20'"
             placeholder="Mi Productora"
           />
-          <p v-if="errors.organizationName" class="text-red-500 text-xs mt-1">{{ errors.organizationName[0] }}</p>
+          <p v-if="errors.organizationName" class="text-red-300 text-xs mt-1">{{ errors.organizationName[0] }}</p>
         </div>
 
         <div class="col-span-2">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+          <label class="block text-sm font-medium text-white/80 mb-1">Email</label>
           <input 
             v-model="email" 
             type="email" 
-            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-black outline-none transition"
-            :class="errors.email ? 'border-red-500' : 'border-gray-300'"
+            class="w-full px-4 py-2 border bg-white/10 text-white placeholder-white/40 rounded-lg focus:ring-2 focus:ring-white/50 outline-none transition"
+            :class="errors.email ? 'border-red-400/60' : 'border-white/20'"
             placeholder="contacto@productora.com"
           />
-          <p v-if="errors.email" class="text-red-500 text-xs mt-1">{{ errors.email[0] }}</p>
+          <p v-if="errors.email" class="text-red-300 text-xs mt-1">{{ errors.email[0] }}</p>
         </div>
 
         <div class="col-span-2 md:col-span-1">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+          <label class="block text-sm font-medium text-white/80 mb-1">Contraseña</label>
           <div class="relative">
             <input 
               v-model="password" 
               :type="showPassword ? 'text' : 'password'" 
-              class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-black outline-none transition"
-              :class="errors.password ? 'border-red-500' : 'border-gray-300'"
+              class="w-full px-4 py-2 border bg-white/10 text-white placeholder-white/40 rounded-lg focus:ring-2 focus:ring-white/50 outline-none transition"
+              :class="errors.password ? 'border-red-400/60' : 'border-white/20'"
               placeholder="Min. 6 caracteres"
             />
             <button 
               type="button" 
               @click="togglePassword"
-              class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70"
             >
               <component :is="showPassword ? EyeOff : Eye" size="20" />
             </button>
           </div>
-          <p v-if="errors.password" class="text-red-500 text-xs mt-1">{{ errors.password[0] }}</p>
+          <p v-if="errors.password" class="text-red-300 text-xs mt-1">{{ errors.password[0] }}</p>
         </div>
 
         <div class="col-span-2 md:col-span-1">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Confirmar Contraseña</label>
+          <label class="block text-sm font-medium text-white/80 mb-1">Confirmar Contraseña</label>
           <input 
             v-model="confirmPassword" 
             type="password" 
-            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-black outline-none transition"
-            :class="errors.confirmPassword ? 'border-red-500' : 'border-gray-300'"
+            class="w-full px-4 py-2 border bg-white/10 text-white placeholder-white/40 rounded-lg focus:ring-2 focus:ring-white/50 outline-none transition"
+            :class="errors.confirmPassword ? 'border-red-400/60' : 'border-white/20'"
             placeholder="Repite la contraseña"
           />
-          <p v-if="errors.confirmPassword" class="text-red-500 text-xs mt-1">{{ errors.confirmPassword[0] }}</p>
+          <p v-if="errors.confirmPassword" class="text-red-300 text-xs mt-1">{{ errors.confirmPassword[0] }}</p>
         </div>
 
         <div class="col-span-2">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+          <label class="block text-sm font-medium text-white/80 mb-1">Teléfono</label>
           <input 
             v-model="phone" 
             type="tel" 
-            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-black outline-none transition"
-            :class="errors.phone ? 'border-red-500' : 'border-gray-300'"
+            class="w-full px-4 py-2 border bg-white/10 text-white placeholder-white/40 rounded-lg focus:ring-2 focus:ring-white/50 outline-none transition"
+            :class="errors.phone ? 'border-red-400/60' : 'border-white/20'"
             placeholder="+56 9 1234 5678"
           />
-          <p v-if="errors.phone" class="text-red-500 text-xs mt-1">{{ errors.phone[0] }}</p>
+          <p v-if="errors.phone" class="text-red-300 text-xs mt-1">{{ errors.phone[0] }}</p>
         </div>
       </div>
 
@@ -223,27 +223,27 @@ const handleRegister = async () => {
           <input 
             v-model="termsAccepted" 
             type="checkbox" 
-            class="w-4 h-4 rounded border-gray-300 text-black focus:ring-black"
+            class="w-4 h-4 rounded border-white/30 bg-white/10 text-white focus:ring-white/50"
           />
         </div>
         <div class="text-sm">
-          <label class="font-medium text-gray-700">Acepto los términos y condiciones</label>
-          <p class="text-gray-500">Al registrarte aceptas nuestros <a href="/terms" class="underline text-black">Términos del Servicio</a> y <a href="/privacy" class="underline text-black">Política de Privacidad</a>.</p>
-          <p v-if="errors.termsAccepted" class="text-red-500 text-xs mt-1">{{ errors.termsAccepted[0] }}</p>
+          <label class="font-medium text-white/80">Acepto los términos y condiciones</label>
+          <p class="text-white/50">Al registrarte aceptas nuestros <a href="/terms" class="underline text-white/80 hover:text-white">Términos del Servicio</a> y <a href="/privacy" class="underline text-white/80 hover:text-white">Política de Privacidad</a>.</p>
+          <p v-if="errors.termsAccepted" class="text-red-300 text-xs mt-1">{{ errors.termsAccepted[0] }}</p>
         </div>
       </div>
 
-      <div v-if="errorMsg" class="p-4 bg-red-50 text-red-600 rounded-lg border border-red-100 text-center text-sm font-medium">
+      <div v-if="errorMsg" class="p-4 bg-red-500/20 text-red-200 rounded-lg border border-red-400/30 text-center text-sm font-medium">
         {{ errorMsg }}
       </div>
 
       <button
         type="submit"
         :disabled="loading"
-        class="w-full bg-black text-white rounded-lg py-3 px-4 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
+        class="w-full bg-white text-gray-900 rounded-lg py-3 px-4 hover:bg-white/90 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
       >
         <div v-if="loading" class="flex items-center justify-center">
-          <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+          <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600 mr-2"></div>
           Registrando...
         </div>
         <span v-else>Crear cuenta</span>
@@ -254,9 +254,9 @@ const handleRegister = async () => {
 
     </form>
 
-    <div class="mt-6 text-center text-sm text-gray-600">
+    <div class="mt-6 text-center text-sm text-white/60">
       ¿Ya tienes cuenta? 
-      <a href="/organizadores/login" class="font-medium text-black hover:underline">Inicia sesión</a>
+      <a href="/organizadores/login" class="font-medium text-white hover:underline">Inicia sesión</a>
     </div>
   </div>
 </template>

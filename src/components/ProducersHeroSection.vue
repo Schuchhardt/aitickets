@@ -38,7 +38,7 @@ import GradientBackground from './Hero/GradientBackground.vue';
   
             <FadeInSection direction="up" :delay="300">
               <div class="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 mb-12">
-                <a href="/register" class="px-6 py-3 text-lg font-bold font-[Unbounded] border border-white rounded-lg hover:bg-white hover:text-black transition w-full sm:w-auto group">
+                <a href="/organizadores/registro" class="px-6 py-3 text-lg font-bold font-[Unbounded] border border-white rounded-lg hover:bg-white hover:text-black transition w-full sm:w-auto group">
                   Comienza ahora
                   <ArrowRight class="ml-2 inline-block h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </a>

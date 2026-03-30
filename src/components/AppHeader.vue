@@ -30,7 +30,7 @@ const toggleMenu = () => {
 </script>
 
 <template>
-  <nav class="fixed top-0 left-0 right-0 z-50 transition-all duration-300 bg-white py-4 shadow-sm text-gray-900">
+  <nav class="fixed top-0 left-0 right-0 z-50 transition-all duration-300 py-4 bg-white shadow-sm text-gray-900">
     <div class="w-full max-w-screen-xl mx-auto px-4 md:px-8 overflow-hidden">
       <div class="flex items-center justify-between">
         <a href="/" class="flex items-center space-x-2">
@@ -40,23 +40,13 @@ const toggleMenu = () => {
         <!-- Desktop Menu -->
         <div class="hidden md:flex items-center space-x-8">
           <a
-            v-if="currentPath !== '/'"
-            href="/"
-            class="text-sm font-medium font-[Unbounded] hover:bg-black hover:text-white text-black transition-colors"
-          >
-            Inicio
-          </a>
-          <a
-            v-if="currentPath !== '/eventos'"
-            href="/eventos"
-            class="text-sm font-medium font-[Unbounded] hover:bg-black hover:text-white text-black transition-colors"
-          >
-            Eventos
-          </a>
-          <a
-            v-if="currentPath !== '/organizadores'"
             href="/organizadores"
-            class="text-sm font-medium font-[Unbounded] hover:bg-black hover:text-white text-black transition-colors"
+            :class="[
+              'text-sm font-medium font-[Unbounded] px-3 py-1.5 rounded-lg transition-colors text-black hover:text-gray-600',
+              currentPath === '/organizadores' 
+                ? 'border-b-2 border-lime-400'
+                : ''
+            ]"
           >
             Para Organizadores
           </a>
@@ -88,28 +78,10 @@ const toggleMenu = () => {
       >
         <div class="flex flex-col space-y-4">
           <a
-            href="/"
-            :class="[
-              'text-sm font-medium font-[Unbounded] px-4 py-2 hover:bg-secondary rounded-md transition-colors',
-              currentPath === '/' ? 'bg-secondary bg-black text-white' : ''
-            ]"
-          >
-            Inicio
-          </a>
-          <a
-            href="/eventos"
-            :class="[
-              'text-sm font-medium font-[Unbounded] px-4 py-2 hover:bg-secondary rounded-md transition-colors',
-              currentPath === '/eventos' ? 'bg-secondary bg-black text-white' : ''
-            ]"
-          >
-            Eventos
-          </a>
-          <a
             href="/organizadores"
             :class="[
-              'text-sm font-medium font-[Unbounded] px-4 py-2 hover:bg-secondary rounded-md transition-colors',
-              currentPath === '/organizadores' ? 'bg-secondary bg-black text-white' : ''
+              'text-sm font-medium font-[Unbounded] px-4 py-2 rounded-md transition-colors',
+              currentPath === '/organizadores' ? 'border-b-2 border-lime-400' : 'hover:bg-gray-100'
             ]"
           >
             Para Organizadores
@@ -117,8 +89,8 @@ const toggleMenu = () => {
           <a
             href="/organizadores/login"
             :class="[
-              'text-sm font-medium font-[Unbounded] px-4 py-2 hover:bg-secondary rounded-md transition-colors block',
-               currentPath === '/organizadores/login' ? 'bg-secondary bg-black text-white' : ''
+              'text-sm font-medium font-[Unbounded] px-4 py-2 rounded-md transition-colors block',
+              currentPath === '/organizadores/login' ? 'border-b-2 border-lime-400' : 'hover:bg-gray-100'
             ]"
           >
             Ingresar
