@@ -224,5 +224,4 @@ export default async function handler(req) {
 
 export const config = {
   schedule: "0 13 * * *", // 13:00 UTC = 10:00 AM Chile
-  path: ['/api/send-event-reminders'],
 };
