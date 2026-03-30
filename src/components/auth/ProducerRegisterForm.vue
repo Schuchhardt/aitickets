@@ -4,6 +4,13 @@ import { reactive, ref } from 'vue'
 import * as z from 'zod'
 import { Eye, EyeOff } from 'lucide-vue-next'
 
+const props = defineProps({
+  turnstileSiteKey: {
+    type: String,
+    required: true
+  }
+})
+
 const showPassword = ref(false)
 
 const loading = ref(false)
@@ -29,7 +36,7 @@ onMounted(() => {
   const renderTurnstile = () => {
     if (window.turnstile) {
       window.turnstile.render('#cf-turnstile-widget', {
-        sitekey: '1x00000000000000000000AA', // Always Pass Test Key
+        sitekey: props.turnstileSiteKey,
         callback: (token) => {
           turnstileToken.value = token
         },

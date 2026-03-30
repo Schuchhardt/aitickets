@@ -1,5 +1,10 @@
 export async function verifyTurnstileToken(token: string): Promise<{ success: boolean; message?: string }> {
-    const TURNSTILE_SECRET_KEY = import.meta.env.TURNSTILE_SECRET_KEY || '1x0000000000000000000000000000000AA'; // Test key fallback
+    const TURNSTILE_SECRET_KEY = import.meta.env.TURNSTILE_SECRET_KEY;
+
+    if (!TURNSTILE_SECRET_KEY) {
+        console.error('TURNSTILE_SECRET_KEY is not configured');
+        return { success: false, message: "Error de configuración del servidor" };
+    }
 
     if (!token) {
         return { success: false, message: "Falta validación de CAPTCHA" };

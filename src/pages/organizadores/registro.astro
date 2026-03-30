@@ -5,6 +5,8 @@ import AppFooter from "../../components/AppFooter.vue";
 import ProducerRegisterForm from "../../components/auth/ProducerRegisterForm.vue";
 import GradientBackground from "../../components/Hero/GradientBackground.vue";
 import "../../styles/global.css";
+
+const turnstileSiteKey = import.meta.env.TURNSTILE_SITE_KEY;
 ---
 
 <Layout title="Registro de Productores | AI Tickets">
@@ -19,7 +21,7 @@ import "../../styles/global.css";
   >
     <GradientBackground variant="soft" client:idle />
     <div class="relative z-10 w-full">
-      <ProducerRegisterForm client:load />
+      <ProducerRegisterForm client:load turnstileSiteKey={turnstileSiteKey} />
     </div>
   </main>
 
