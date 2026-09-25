@@ -3,6 +3,7 @@ import AppHeader from "../components/AppHeader.vue";
 import AppFooter from "../components/AppFooter.vue";
 import HeroSection from "../components/HeroSection.vue";
 import FeaturesSection from "../components/FeaturesSection.vue";
+import VideoSection from "../components/VideoSection.vue";
 import BenefitsSection from "../components/BenefitsSection.vue";
 import CallToAction from "../components/CallToAction.vue";
 import Layout from '../layouts/Layout.astro';
@@ -15,6 +16,7 @@ import 'animate.css';
   
     <main>
       <HeroSection client:idle/>
+      <VideoSection/>
       <FeaturesSection/>
       <BenefitsSection/>
       <CallToAction/>
