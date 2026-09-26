@@ -1,31 +1,55 @@
 ---
 import DashboardLayout from "../../../layouts/DashboardLayout.astro";
-import { createSupabaseServerClient, getSessionUser } from "../../../lib/supabaseServer";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
+import { ORG_ADMIN_ROLES } from "../../../lib/supabaseServer";
+import { requireDashboardSession } from "../_lib/guard";
 
-const user = await getSessionUser(Astro);
-if (!user) {
-    return Astro.redirect("/organizadores/login");
-}
-
-const supabase = createSupabaseServerClient(Astro);
+const guard = await requireDashboardSession(Astro, ORG_ADMIN_ROLES);
+if (!guard.ok) return guard.response;
+const { dbUser } = guard.session;
 const supabaseAdmin = getSupabaseAdmin();
 
-const { data: dbUser } = await supabase
-    .from("users")
-    .select("organization_id")
-    .eq("auth_user_id", user.id)
-    .single();
+type OrgSettings = {
+    public_name: string | null;
+    email: string | null;
+    phone: string | null;
+};
 
-let org = null;
-if (dbUser?.organization_id) {
-    const { data } = await supabaseAdmin
-        .from("organizations")
-        .select("public_name, email, phone")
-        .eq("id", dbUser.organization_id)
-        .single();
-    org = data;
+type PayoutAccount = {
+    legal_name: string | null;
+    legal_rut: string | null;
+    bank_name: string | null;
+    bank_account_type: string | null;
+    bank_account_number: string | null;
+    bank_account_holder: string | null;
+    bank_account_rut: string | null;
+};
+
+const { data: orgData } = await supabaseAdmin
+    .from("organizations")
+    .select("public_name, email, phone")
+    .eq("id", dbUser.organization_id)
+    .single();
+const org = orgData as OrgSettings | null;
+
+// Datos bancarios: tabla aparte (organization_payout_accounts, migración 20260926_C_dashboard)
+let payout: PayoutAccount | null = null;
+{
+    const { data, error } = await supabaseAdmin
+        .from("organization_payout_accounts")
+        .select("legal_name, legal_rut, bank_name, bank_account_type, bank_account_number, bank_account_holder, bank_account_rut")
+        .eq("organization_id", dbUser.organization_id)
+        .maybeSingle();
+    if (error) console.error("Error cargando datos de pago:", error.message);
+    payout = (data as PayoutAccount | null) || null;
 }
+
+const BANKS = [
+    "BancoEstado", "Banco de Chile / Edwards", "Santander", "BCI / MACH", "Scotiabank", "Itaú", "Banco Security",
+    "Banco BICE", "Banco Falabella", "Banco Ripley", "Banco Consorcio", "Banco Internacional", "Coopeuch",
+    "Tenpo", "Mercado Pago", "Otro",
+];
+const ACCOUNT_TYPES = ["Cuenta Corriente", "Cuenta Vista / CuentaRUT", "Cuenta de Ahorro"];
 ---
 
 <DashboardLayout title="Configuración">
@@ -93,65 +117,66 @@ if (dbUser?.organization_id) {
             </div>
         </section>
 
-        <!-- Security Section -->
+        <!-- Bank / Payout Section -->
         <section class="space-y-6 pt-6">
-            <div class="border-b border-gray-100 pb-4">
-                <h2 class="text-xl font-bold text-gray-900">Seguridad</h2>
-                <p class="text-gray-500 text-sm">
-                    Gestiona tu contraseña y sesiones.
-                </p>
+            <div class="flex items-center justify-between border-b border-gray-100 pb-4">
+                <div>
+                    <h2 class="text-xl font-bold text-gray-900">Datos para pagos</h2>
+                    <p class="text-gray-500 text-sm">
+                        Transferimos el valor de tus entradas a esta cuenta 48–72 horas después de cada función.
+                    </p>
+                </div>
+                <button id="saveBankBtn" class="px-4 py-2 text-sm bg-black text-white rounded-lg hover:bg-gray-800">
+                    Guardar Datos
+                </button>
             </div>
 
-            <div id="pwMsg" class="hidden rounded-lg px-4 py-3 text-sm font-medium"></div>
+            <div id="bankMsg" class="hidden rounded-lg px-4 py-3 text-sm font-medium"></div>
 
-            <div id="pwSection" class="bg-gray-50 rounded-lg p-6">
-                <div id="pwDisplay" class="flex items-center justify-between">
-                    <div>
-                        <h3 class="font-medium text-gray-900">Contraseña</h3>
-                        <p class="text-gray-500 text-sm">***********</p>
-                    </div>
-                    <button
-                        id="showPwFormBtn"
-                        class="text-sm text-gray-600 hover:text-black font-medium border border-gray-200 bg-white px-4 py-2 rounded-lg"
-                    >
-                        Cambiar Contraseña
-                    </button>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-gray-700">Razón social (opcional)</label>
+                    <input id="legalName" type="text" class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-black/5" placeholder="Mi Productora SpA" value={payout?.legal_name || ""} />
                 </div>
-                <div id="pwForm" class="hidden space-y-4">
-                    <div class="space-y-2">
-                        <label class="text-sm font-medium text-gray-700">Nueva Contraseña</label>
-                        <input
-                            id="newPassword"
-                            type="password"
-                            class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-black/5"
-                            placeholder="Mínimo 6 caracteres"
-                        />
-                    </div>
-                    <div class="space-y-2">
-                        <label class="text-sm font-medium text-gray-700">Confirmar Contraseña</label>
-                        <input
-                            id="confirmPassword"
-                            type="password"
-                            class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-black/5"
-                            placeholder="Repite la nueva contraseña"
-                        />
-                    </div>
-                    <div class="flex gap-3">
-                        <button
-                            id="savePwBtn"
-                            class="px-4 py-2 text-sm bg-black text-white rounded-lg hover:bg-gray-800"
-                        >
-                            Guardar Contraseña
-                        </button>
-                        <button
-                            id="cancelPwBtn"
-                            class="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-100"
-                        >
-                            Cancelar
-                        </button>
-                    </div>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-gray-700">RUT empresa (opcional)</label>
+                    <input id="legalRut" type="text" class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-black/5" placeholder="76.123.456-7" value={payout?.legal_rut || ""} />
+                </div>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-gray-700">Banco</label>
+                    <select id="bankName" class="w-full px-4 py-2 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-black/5">
+                        <option value="">Selecciona tu banco...</option>
+                        {BANKS.map((b) => <option value={b} selected={payout?.bank_name === b}>{b}</option>)}
+                        {payout?.bank_name && !BANKS.includes(payout.bank_name) && <option value={payout.bank_name} selected>{payout.bank_name}</option>}
+                    </select>
+                </div>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-gray-700">Tipo de cuenta</label>
+                    <select id="bankAccountType" class="w-full px-4 py-2 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-black/5">
+                        <option value="">Selecciona...</option>
+                        {ACCOUNT_TYPES.map((t) => <option value={t} selected={payout?.bank_account_type === t}>{t}</option>)}
+                    </select>
+                </div>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-gray-700">Número de cuenta</label>
+                    <input id="bankAccountNumber" type="text" inputmode="numeric" class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-black/5" value={payout?.bank_account_number || ""} />
+                </div>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-gray-700">Titular de la cuenta</label>
+                    <input id="bankAccountHolder" type="text" class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-black/5" value={payout?.bank_account_holder || ""} />
+                </div>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-gray-700">RUT del titular</label>
+                    <input id="bankAccountRut" type="text" class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-black/5" placeholder="12.345.678-9" value={payout?.bank_account_rut || ""} />
                 </div>
             </div>
+        </section>
+
+        <!-- La contraseña se cambia desde Mi Perfil (disponible para todos los roles) -->
+        <section class="pt-6">
+            <p class="text-sm text-gray-500">
+                ¿Quieres cambiar tu contraseña? Hazlo desde <a href="/dashboard/profile" class="font-medium text-gray-900 underline">Mi Perfil</a>.
+            </p>
         </section>
     </div>
 </DashboardLayout>
@@ -196,60 +221,35 @@ if (dbUser?.organization_id) {
     }
   });
 
-  // Password change
-  const showPwFormBtn = document.getElementById('showPwFormBtn');
-  const pwDisplay = document.getElementById('pwDisplay');
-  const pwForm = document.getElementById('pwForm');
-  const cancelPwBtn = document.getElementById('cancelPwBtn');
-  const savePwBtn = document.getElementById('savePwBtn');
-  const pwMsg = document.getElementById('pwMsg');
+  // Bank data save
+  const saveBankBtn = document.getElementById('saveBankBtn');
+  const bankMsg = document.getElementById('bankMsg');
+  const val = (id: string) => (document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null)?.value ?? '';
 
-  showPwFormBtn?.addEventListener('click', () => {
-    pwDisplay?.classList.add('hidden');
-    pwForm?.classList.remove('hidden');
-  });
-
-  cancelPwBtn?.addEventListener('click', () => {
-    pwForm?.classList.add('hidden');
-    pwDisplay?.classList.remove('hidden');
-  });
-
-  savePwBtn?.addEventListener('click', async () => {
-    const newPw = (document.getElementById('newPassword') as HTMLInputElement)?.value;
-    const confirmPw = (document.getElementById('confirmPassword') as HTMLInputElement)?.value;
-
-    if (newPw.length < 6) {
-      showMsg(pwMsg, 'La contraseña debe tener al menos 6 caracteres', true);
-      return;
-    }
-    if (newPw !== confirmPw) {
-      showMsg(pwMsg, 'Las contraseñas no coinciden', true);
-      return;
-    }
-
-    (savePwBtn as HTMLButtonElement).disabled = true;
-    savePwBtn.textContent = 'Guardando...';
+  saveBankBtn?.addEventListener('click', async () => {
+    (saveBankBtn as HTMLButtonElement).disabled = true;
+    saveBankBtn.textContent = 'Guardando...';
     try {
-      const res = await fetch('/api/auth/change-password', {
+      const res = await fetch('/api/organizations/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ newPassword: newPw }),
+        body: JSON.stringify({
+          legal_name: val('legalName'),
+          legal_rut: val('legalRut'),
+          bank_name: val('bankName'),
+          bank_account_type: val('bankAccountType'),
+          bank_account_number: val('bankAccountNumber'),
+          bank_account_holder: val('bankAccountHolder'),
+          bank_account_rut: val('bankAccountRut'),
+        }),
       });
       const data = await res.json();
-      if (res.ok) {
-        showMsg(pwMsg, 'Contraseña actualizada correctamente', false);
-        pwForm?.classList.add('hidden');
-        pwDisplay?.classList.remove('hidden');
-        (document.getElementById('newPassword') as HTMLInputElement).value = '';
-        (document.getElementById('confirmPassword') as HTMLInputElement).value = '';
-      } else {
-        showMsg(pwMsg, data.message || 'Error al cambiar contraseña', true);
-      }
+      showMsg(bankMsg, res.ok ? 'Datos bancarios guardados' : (data.message || 'Error al guardar'), !res.ok);
     } catch {
-      showMsg(pwMsg, 'Error de conexión', true);
+      showMsg(bankMsg, 'Error de conexión', true);
     } finally {
-      (savePwBtn as HTMLButtonElement).disabled = false;
-      savePwBtn.textContent = 'Guardar Contraseña';
+      (saveBankBtn as HTMLButtonElement).disabled = false;
+      saveBankBtn.textContent = 'Guardar Datos';
     }
   });
 </script>

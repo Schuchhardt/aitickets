@@ -1,80 +1,104 @@
 /**
  * Composable para Google Analytics
- * Proporciona funciones para rastrear eventos personalizados
+ * Proporciona funciones para rastrear eventos personalizados.
+ *
+ * Layout.astro define `window.gtag` y `window.dataLayer` en el hilo principal
+ * (Partytown los reenvía al worker donde corre gtag.js), así que estas
+ * funciones se pueden llamar desde cualquier componente del cliente.
+ *
+ * Uso:
+ *   import { trackPurchase } from '../composables/useGoogleAnalytics.js';
+ *   // o
+ *   const { trackPurchase } = useGoogleAnalytics();
  */
 
-export const useGoogleAnalytics = () => {
-  
-  /**
-   * Función genérica para enviar eventos a Google Analytics
-   * @param {string} eventName - Nombre del evento
-   * @param {Object} parameters - Parámetros adicionales del evento
-   */
-  const trackEvent = (eventName, parameters = {}) => {
-    if (typeof window !== 'undefined' && window.gtag) {
-      window.gtag('event', eventName, parameters);
+/**
+ * Función genérica para enviar eventos a Google Analytics.
+ * Nunca lanza errores (la analítica no debe romper la app).
+ * @param {string} eventName - Nombre del evento
+ * @param {Object} parameters - Parámetros adicionales del evento
+ */
+export const trackEvent = (eventName, parameters = {}) => {
+  if (typeof window === 'undefined') return;
+  try {
+    if (typeof window.gtag !== 'function') {
+      // Mismo stub que Layout.astro (por si la página no usa el Layout)
+      window.dataLayer = window.dataLayer || [];
+      window.gtag = function () { window.dataLayer.push(arguments); };
     }
-  };
+    window.gtag('event', eventName, parameters);
+  } catch (err) {
+    console.warn('[analytics] No se pudo enviar el evento', eventName, err);
+  }
+};
 
-  /**
-   * Rastrea cuando un usuario ve un evento
-   * @param {string} eventId - ID del evento
-   * @param {string} eventName - Nombre del evento
-   * @param {number} price - Precio de la entrada
-   */
-  const trackViewEvent = (eventId, eventName, price) => {
-    trackEvent('view_item', {
-      currency: 'CLP',
-      value: price,
-      item_id: eventId,
-      item_name: eventName,
-      item_category: 'event_ticket'
-    });
-  };
+const safeUnitPrice = (total, quantity) => {
+  const q = Number(quantity) || 0;
+  return q > 0 ? Number(total || 0) / q : Number(total || 0);
+};
 
-  /**
-   * Rastrea cuando un usuario inicia el proceso de compra
-   * @param {string} eventId - ID del evento
-   * @param {string} eventName - Nombre del evento
-   * @param {number} quantity - Cantidad de entradas
-   * @param {number} totalPrice - Precio total
-   */
-  const trackBeginCheckout = (eventId, eventName, quantity, totalPrice) => {
-    trackEvent('begin_checkout', {
-      currency: 'CLP',
-      value: totalPrice,
-      items: [{
-        item_id: eventId,
-        item_name: eventName,
-        item_category: 'event_ticket',
-        quantity: quantity,
-        price: totalPrice / quantity
-      }]
-    });
-  };
+/**
+ * view_item: alguien ve la página de un evento.
+ */
+export const trackViewItem = (eventId, eventName, price = 0) => {
+  trackEvent('view_item', {
+    currency: 'CLP',
+    value: Number(price) || 0,
+    items: [{
+      item_id: String(eventId ?? ''),
+      item_name: eventName || '',
+      item_category: 'event_ticket',
+      price: Number(price) || 0,
+    }],
+  });
+};
 
-  /**
-   * Rastrea cuando se completa una compra (conversión principal)
-   * @param {string} transactionId - ID de la transacción
-   * @param {string} eventId - ID del evento
-   * @param {string} eventName - Nombre del evento
-   * @param {number} quantity - Cantidad de entradas
-   * @param {number} totalPrice - Precio total
-   */
-  const trackPurchase = (transactionId, eventId, eventName, quantity, totalPrice) => {
-    trackEvent('purchase', {
-      transaction_id: transactionId,
-      currency: 'CLP',
-      value: totalPrice,
-      items: [{
-        item_id: eventId,
-        item_name: eventName,
-        item_category: 'event_ticket',
-        quantity: quantity,
-        price: totalPrice / quantity
-      }]
-    });
-  };
+/**
+ * begin_checkout: el comprador inicia el pago.
+ */
+export const trackBeginCheckout = (eventId, eventName, quantity, totalPrice) => {
+  trackEvent('begin_checkout', {
+    currency: 'CLP',
+    value: Number(totalPrice) || 0,
+    items: [{
+      item_id: String(eventId ?? ''),
+      item_name: eventName || '',
+      item_category: 'event_ticket',
+      quantity: Number(quantity) || 0,
+      price: safeUnitPrice(totalPrice, quantity),
+    }],
+  });
+};
+
+/**
+ * purchase: compra completada (conversión principal).
+ */
+export const trackPurchase = (transactionId, eventId, eventName, quantity, totalPrice) => {
+  trackEvent('purchase', {
+    transaction_id: String(transactionId ?? ''),
+    currency: 'CLP',
+    value: Number(totalPrice) || 0,
+    items: [{
+      item_id: String(eventId ?? ''),
+      item_name: eventName || '',
+      item_category: 'event_ticket',
+      quantity: Number(quantity) || 0,
+      price: safeUnitPrice(totalPrice, quantity),
+    }],
+  });
+};
+
+/**
+ * sign_up: registro de un productor.
+ */
+export const trackSignUp = (method = 'email', params = {}) => {
+  trackEvent('sign_up', { method, ...params });
+};
+
+export const useGoogleAnalytics = () => {
+
+
+
 
   /**
    * Rastrea cuando un usuario agrega una entrada al carrito/selección
@@ -110,15 +134,6 @@ export const useGoogleAnalytics = () => {
     });
   };
 
-  /**
-   * Rastrea cuando un usuario se registra como productor
-   * @param {string} method - Método de registro
-   */
-  const trackSignUp = (method = 'email') => {
-    trackEvent('sign_up', {
-      method: method
-    });
-  };
 
   /**
    * Rastrea cuando se usa el asistente de IA
@@ -144,8 +159,14 @@ export const useGoogleAnalytics = () => {
     });
   };
 
+  /**
+   * Alias histórico de trackViewItem
+   */
+  const trackViewEvent = (eventId, eventName, price) => trackViewItem(eventId, eventName, price);
+
   return {
     trackEvent,
+    trackViewItem,
     trackViewEvent,
     trackBeginCheckout,
     trackPurchase,

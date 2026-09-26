@@ -4,21 +4,24 @@
 ═══════════════════════════════════════════════════════════════════════════════
 
 🎯 OBJETIVO DE LA PRESENTACIÓN:
-Conseguir una reunión de demostración o prueba piloto gratuita.
+Conseguir que el productor cree su cuenta (aitickets.cl/organizadores/registro)
+o agende una demo de 15 minutos.
+
+⚠️ REGLA DE ORO: solo prometer lo que el producto hace HOY. Nada de métricas
+inventadas, testimonios ficticios ni features "próximamente" presentadas como
+disponibles (riesgo SERNAC y de credibilidad con productores).
 Tiempo estimado: 8-10 minutos de presentación + preguntas.
 
 ⸻
 
 1) ELEVATOR PITCH (30 segundos)
 
-"¿Sabías que el 40% de los asientos en eventos con múltiples funciones quedan vacíos 
-por mala comunicación o falta de promoción?
+"AI Tickets es la ticketera que llena tus funciones: 0% de comisión para ti,
+el comprador paga un cargo por servicio de 10%, te transferimos lo recaudado
+48–72 h después de cada función, y te ayudamos a armar el evento y los posts con IA.
 
-AI Tickets es como tener un equipo completo de ventas, marketing y operaciones 
-trabajando 24/7 para tu evento... pero sin contratar a nadie.
-
-Circos, teatros y ferias ya están llenando más funciones con menos esfuerzo. 
-¿Quieres ver cómo?"
+Estamos en piloto con productores de stand-up y teatro independiente.
+¿Quieres ver cómo funcionaría con tu próxima función?"
 
 ⸻
 
@@ -34,7 +37,7 @@ Circos, teatros y ferias ya están llenando más funciones con menos esfuerzo.
 	•	Color texto: Blanco (#FEFEFE)
 	•	Estética: Minimal, bold, bordes redondeados, iconografía simple
 
-💡 TIP: Usar imágenes reales de eventos (circos, teatros) con gente disfrutando.
+💡 TIP: Usar imágenes reales de eventos (stand-up, teatro) con gente disfrutando.
     Evitar stock genérico. Mostrar la EMOCIÓN del evento exitoso.
 
 ═══════════════════════════════════════════════════════════════════════════════
@@ -43,7 +46,7 @@ Circos, teatros y ferias ya están llenando más funciones con menos esfuerzo.
 
 📊 SLIDE 1 — PORTADA (GANCHO EMOCIONAL)
 
-Fondo: Negro con imagen de teatro/circo lleno de gente
+Fondo: Negro con imagen de teatro/stand-up lleno de gente
 Título: Unbounded blanco grande
 Subtítulo: Inter verde
 Acento: línea inferior verde (#9AE600)
@@ -52,7 +55,7 @@ Texto:
 
 	"¿Y si cada función estuviera llena?"
 	
-	AI Tickets - Más asientos vendidos, menos dolores de cabeza.
+	AI Tickets - La ticketera que llena tus funciones.
 
 [Logo pequeño en esquina inferior]
 
@@ -81,8 +84,8 @@ Texto:
 	
 	💸  "Invertimos en publicidad pero no sabemos si funcionó"
 
-TRANSICIÓN VERBAL: "Estos problemas le cuestan miles de pesos a productores 
-cada temporada. Y lo peor... tienen solución."
+TRANSICIÓN VERBAL: "Son los problemas que más escuchamos de productores
+de stand-up y teatro. Y tienen solución."
 
 ⸻
 
@@ -95,17 +98,20 @@ Texto:
 
 	El costo real de seguir igual:
 	
-	📊  30-40% de asientos vacíos en funciones "flojas"
+	📊  Funciones "flojas" con asientos vacíos
 	
-	⏰  +15 horas semanales en tareas manuales
+	⏰  Horas en tareas manuales: planillas, mensajes, listas en la puerta
 	
 	😤  Clientes frustrados = malas reseñas
 	
 	💰  Dinero en publicidad sin saber qué funciona
 	
-	🔥  Estrés operativo que mata la creatividad
+	⌛  Esperar semanas para recibir lo recaudado
 
-	"Cada función con asientos vacíos es dinero que ya no vuelve."
+	"Cada función con asientos vacíos es plata que no vuelve."
+
+💡 NOTA: No citar porcentajes de asientos vacíos ni horas ahorradas sin fuente.
+   Mejor preguntar: "¿Cuántas entradas te quedan sin vender un martes?"
 
 💡 NOTA: Este slide crea urgencia. El prospecto debe sentir el COSTO de no actuar.
 
@@ -119,17 +125,17 @@ Texto: Inter blanco
 
 Texto:
 
-	Imagina tener un equipo que:
+	Imagina una herramienta que:
 	
-	✅  Vende entradas mientras duermes
+	✅  Vende tus entradas online las 24 horas, con Webpay (vía Flow)
 	
-	✅  Avisa a todos si algo cambia (en segundos)
+	✅  Avisa por email a tus asistentes si cambia algo del evento
 	
-	✅  Llena las funciones difíciles automáticamente
+	✅  Te ayuda a promocionar cada función con posts hechos con IA
 	
-	✅  Te dice exactamente qué está funcionando
+	✅  Te muestra qué canal (UTM) te trae visitas y ventas
 	
-	✅  Hace todo esto sin que contrates a nadie
+	✅  Te transfiere lo recaudado 48–72 h después de cada función
 
 	Eso es AI Tickets.
 
@@ -153,11 +159,11 @@ Texto:
 	
 	[2] COMPARTE EL LINK  
 	    Tu página de ventas está lista.
-	    Acepta WebPay, MercadoPago, transferencia.
+	    Tus compradores pagan con Webpay (vía Flow).
 	
-	[3] NOSOTROS HACEMOS EL RESTO
-	    Promoción, comunicación, check-in.
-	    Tú solo recibe a tu público.
+	[3] RECIBE A TU PÚBLICO
+	    Entradas QR por email, recordatorio 24 h antes
+	    y check-in desde el celular.
 
 💡 NOTA: Mostrar que NO requiere conocimiento técnico.
    La frase clave es "Nosotros te ayudamos".
@@ -175,15 +181,15 @@ Texto:
 
 	"Los lunes ya no son un problema"
 	
-	📧  Emails automáticos a quienes buscaron pero no compraron
+	✨  Posts para Instagram y Facebook generados con IA desde tu evento
 	
-	📱  WhatsApp con promociones de último minuto
+	🔗  Links con UTM para saber qué canal vende más
 	
-	📢  Publicidad dirigida solo a tu zona
+	📊  Visitas, ventas, ciudad y hora peak de cada evento
 	
-	🎯  Descuentos inteligentes para funciones con baja venta
+	🤖  Asistente con IA en tu página que responde dudas de compradores
 
-	Resultado: +25% más asistentes en funciones "flojas"
+	Próximamente (decirlo así): WhatsApp y cupones de descuento.
 
 TRANSICIÓN VERBAL: "¿Cuánto vale para ti llenar esos lunes y martes?"
 
@@ -193,72 +199,66 @@ TRANSICIÓN VERBAL: "¿Cuánto vale para ti llenar esos lunes y martes?"
 
 Fondo: Negro
 Título: Unbounded rosado
-Imagen: Mockup de WhatsApp/Email con mensaje de cambio
+Imagen: Mockup del email de cambio de evento
 
 Texto:
 
-	"Cambió la función. ¿Cómo aviso a 500 personas?"
+	"Cambió la función. ¿Cómo aviso a todos?"
 	
 	Con AI Tickets:
 	
-	✅  1 click → Todos notificados por email Y WhatsApp
+	✅  Si editas un evento publicado, tus asistentes reciben un email automático
 	
-	✅  Recordatorios automáticos antes de cada función
+	✅  Recordatorio automático por email 24 h antes de la función
 	
-	✅  Respuestas automáticas a preguntas frecuentes
+	✅  El asistente con IA responde con la info y FAQs de tu evento
 	
-	✅  Los asistentes siempre saben qué hacer
+	✅  Cada comprador recibe su entrada QR por email al instante
 
-	"Nunca más perder clientes por mala comunicación"
+	"Menos mensajes repetidos, asistentes mejor informados."
 
 ⸻
 
-📊 SLIDE 8 — BENEFICIO #3: TU MARCA, TU CONTROL
+📊 SLIDE 8 — BENEFICIO #3: TU EQUIPO, TU CONTROL
 
 Fondo: Negro
 Título: Unbounded cian
-Mockups: Sitio con URL personalizada (tucirco.cl)
+Mockups: Panel de equipo y cortesías
 
 Texto:
 
-	Vende bajo tu propia marca
+	Tu equipo, tu control
 	
-	🌐  tucirco.cl
-	🌐  entradas.tuteatro.com
+	👥  Equipo con roles: admin, editor y validador (puerta)
+	🎟️  Entradas de cortesía desde el panel
+	📅  Varias fechas y horarios en un mismo evento
+	🔁  "Duplicar evento" para tus shows recurrentes
+	📄  Exporta tus órdenes a CSV
 	
-	Sin logos de terceros que confundan.
-	
-	✅  Más confianza del público
-	✅  Mejor posicionamiento en Google  
-	✅  Imagen profesional
-	
-	"Parece que tienes un equipo de marketing propio"
+	(Dominio propio: PRÓXIMAMENTE, no ofrecerlo como disponible.)
 
 ⸻
 
-📊 SLIDE 9 — BENEFICIO #4: GANA MÁS POR ENTRADA
+📊 SLIDE 9 — LO QUE VIENE (PRÓXIMAMENTE)
 
 Fondo: Negro con acento rosado radiado
 Título: Unbounded blanco
-Tarjetas: Ejemplos de upselling
+Tarjetas: features en desarrollo, marcadas "Próximamente"
 
 Texto:
 
-	Cada entrada puede valer más
+	Lo que viene (aún no disponible):
 	
-	🎟️  Upgrade a VIP antes del pago
-	
-	👨‍👩‍👧‍👦  Packs familiares con descuento
-	
-	📸  Fotos con el elenco/personajes
-	
-	🛍️  Merchandising en el checkout
-	
-	⚡  Acceso prioritario
-	
-	Promedio: +$2.500 extra por entrada vendida
+	💬  WhatsApp
+	🏷️  Cupones de descuento
+	💳  MercadoPago
+	🌐  Dominio propio
+	🪑  Mapa de asientos
+	🧾  Venta en puerta (POS)
+	📢  Campañas de Meta Ads gestionadas
 
-💡 NOTA: Dar un número concreto de ganancia extra. Esto es muy persuasivo.
+💡 NOTA: Nunca prometer fecha ni presentarlos como disponibles.
+   Sirve para preguntar: "¿Cuál de estos te importa más?"
 
 ⸻
 
@@ -266,67 +266,57 @@ Texto:
 
 Fondo: Negro con acento verde
 Título: Unbounded verde
-Imagen: Persona escaneando QR / Totem
+Imagen: Persona escaneando QR con el celular
 
 Texto:
 
 	Entrada sin filas, sin estrés
 	
-	📱  QR que funciona SIN internet
+	📱  Escanea el QR desde tu celular, sin instalar nada
 	
-	⚡  Escaneo en menos de 2 segundos
+	📶  Si se cae la señal, sigue validando con la lista descargada
+	    y sincroniza después
 	
-	🖥️  Totems de autoservicio (opcional)
+	🚫  Detecta entradas ya usadas o de otro evento
 	
-	👥  Control de aforo en tiempo real
+	👥  Suma validadores a tu equipo para la puerta
 	
 	"Tu equipo en puerta solo saluda. El sistema hace el resto."
 
 ⸻
 
-📊 SLIDE 11 — SOCIAL PROOF: ¿QUIÉN YA LO USA?
+📊 SLIDE 11 — ESTAMOS EN PILOTO
 
 Fondo: Negro
 Título: Unbounded verde
-Logos/fotos de eventos + números
 
 Texto:
 
-	Productores que ya confían en AI Tickets:
+	Estamos en piloto
 	
-	🎪  [Nombre de circo] - "Llenamos 3 funciones extra por semana"
-	
-	🎭  [Nombre de teatro] - "Dejé de contestar WhatsApp todo el día"
-	
-	🎨  [Nombre de feria] - "Las preventas se agotan en horas"
-	
-	📈  +50,000 entradas vendidas
-	📈  +200 funciones gestionadas  
-	📈  98% de asistentes notificados a tiempo
+	Trabajamos codo a codo con los primeros productores de stand-up
+	y teatro independiente. Si te sumas ahora, te ayudamos personalmente
+	a armar tus eventos y tu opinión define lo que construimos.
 
-💡 NOTA: Si aún no tienes testimoniales, usa "Eventos piloto" o 
-   "Primeros usuarios reportan..." con métricas internas.
+💡 NOTA: NO mostrar cifras de entradas vendidas, funciones gestionadas ni
+   testimonios hasta tenerlos reales, con nombre y permiso escrito del productor.
 
 ⸻
 
-📊 SLIDE 12 — TESTIMONIAL DESTACADO
+📊 SLIDE 12 — PARA QUIÉN ES (FRASE)
 
 Fondo: Negro con comillas grandes en verde
-Título: Ninguno (dejar que hable el testimonio)
-Foto: Del productor o evento
 
 Texto:
 
-	"Antes pasaba 20 horas a la semana en Excel, 
-	WhatsApp y correos. Ahora paso ese tiempo 
-	creando mejor contenido para mi show.
+	"Hecho para productores que hacen funciones todas las semanas
+	y no quieren pelearse con la tecnología.
 	
-	AI Tickets me devolvió las ganas de producir."
+	Tú haces el show. Nosotros te ayudamos a venderlo."
 	
-	— [Nombre], Productor de [Evento]
+	— Equipo AI Tickets
 
-💡 NOTA: Un buen testimonio vale más que 10 slides de features.
-   Si no tienes uno, usa tu propia experiencia como productor.
+💡 NOTA: Reemplazar por un testimonio REAL (con nombre y permiso) cuando exista.
 
 ⸻
 
@@ -334,31 +324,29 @@ Texto:
 
 Fondo: Negro
 Título: Unbounded blanco
-3 Cards comparativas: Verde / Cian / Rosado (destacar el medio)
+1 sola card destacada (no hay planes)
 
 Texto:
 
-	Solo pagas cuando vendes. Sin costos fijos.
+	Un solo precio, claro. Sin costos fijos.
 	
 	┌─────────────────────────────────────────────────────────────┐
-	│  ESENCIAL (10%)      PRO (15%)           FULL (20%)        │
-	│  ─────────────      ─────────            ──────────        │
+	│  0% DE COMISIÓN PARA EL PRODUCTOR                           │
+	│  El comprador paga un cargo por servicio de 10%.            │
 	│                                                             │
-	│  ✓ Venta online     Todo Esencial +      Todo Pro +        │
-	│  ✓ Funciones        ✓ Emails auto        ✓ Meta Ads        │
-	│    múltiples        ✓ Cupones            ✓ Google Ads      │
-	│  ✓ Check-in QR      ✓ WhatsApp básico    ✓ WhatsApp full   │
-	│  ✓ Soporte          ✓ Reportes           ✓ Manager         │
-	│                       avanzados            dedicado        │
+	│  ✓ Venta online con Webpay (vía Flow)                       │
+	│  ✓ Funciones múltiples y entradas QR por email              │
+	│  ✓ Check-in desde el celular                                │
+	│  ✓ Posts con IA y asistente IA en tu página                 │
+	│  ✓ Analítica por evento y canal (UTM)                       │
 	│                                                             │
-	│  Para empezar       ⭐ MÁS POPULAR        Para llenar      │
-	│  sin riesgo           Para crecer          TODO             │
+	│  Te transferimos lo recaudado 48–72 h después de cada       │
+	│  función.                                                   │
 	└─────────────────────────────────────────────────────────────┘
 	
-	💡 Sin setup. Sin mensualidad. Sin permanencia.
+	💡 Sin mensualidad. Sin permanencia.
 
-TRANSICIÓN VERBAL: "El plan más popular es Pro porque incluye la 
-automatización que realmente ahorra tiempo."
+TRANSICIÓN VERBAL: "Tú no pagas comisión. Si no vendes, no pagas nada."
 
 ⸻
 
@@ -370,19 +358,22 @@ Tabla comparativa simple
 
 Texto:
 
-	¿Por qué AI Tickets y no otro sistema?
+	¿Por qué AI Tickets y no hacerlo a mano?
 	
-	                        AI Tickets    Ticketeras     Hacerlo
-	                                      Tradicionales  Manual
+	                        AI Tickets          Planilla +
+	                                            transferencias
 	────────────────────────────────────────────────────────────
-	Funciones múltiples     ✅ Sí         ❌ Limitado    ⚠️ Caos
-	WhatsApp integrado      ✅ Sí         ❌ No          ⚠️ Manual
-	Marketing incluido      ✅ Sí         ❌ Extra       ❌ No
-	Dominio propio          ✅ Sí         ❌ No          ⚠️ Caro
-	Soporte en español      ✅ Directo    ⚠️ Bot         ❌ —
-	Comisión                10-20%        15-25%         Tu tiempo
-	
-	"Hacemos más, cobramos igual o menos."
+	Funciones múltiples     ✅ Sí               ⚠️ Caos
+	Entradas QR y check-in  ✅ Sí               ⚠️ Lista en papel
+	Posts con IA            ✅ Sí               ❌ No
+	Saber qué canal vende   ✅ UTM por evento   ❌ No
+	Soporte en español      ✅ Directo          —
+	Costo para el productor 0% (10% comprador)  Tu tiempo
+
+💡 NOTA: No comparar con ticketeras por nombre ni citar sus comisiones sin
+   fuente pública y fecha (riesgo de publicidad comparativa). Si preguntan,
+   Tickean publica 0% productor / 15% comprador (tickean.cl/comisiones-ticketera);
+   verificar antes de citarlo.
 
 ⸻
 
@@ -391,16 +382,18 @@ Texto:
 (Este slide NO se presenta, es tu cheat sheet para responder)
 
 OBJECIÓN: "Es muy caro / la comisión es alta"
-RESPUESTA: "¿Cuánto vale tu tiempo? Si ahorras 15 horas a la semana y 
-vendes 20% más, ¿la comisión se paga sola?"
+RESPUESTA: "Tú no pagas comisión: 0% para el productor. El comprador paga
+un cargo por servicio de 10%, y te transferimos lo recaudado 48–72 h
+después de cada función."
 
 OBJECIÓN: "Ya tenemos un sistema"
-RESPUESTA: "Entiendo. ¿Tu sistema actual llena las funciones difíciles? 
-¿Avisa automáticamente si hay cambios? Hacemos una migración sin costo."
+RESPUESTA: "Entiendo. ¿Tu sistema actual te dice qué canal vende? ¿Avisa
+automáticamente a tus asistentes si cambias algo? Te ayudamos a pasar tu
+próxima función sin costo para ti."
 
 OBJECIÓN: "No somos muy tecnológicos"
-RESPUESTA: "Por eso existimos. Nosotros configuramos todo. Tú solo 
-apruebas. En 1 hora estás vendiendo."
+RESPUESTA: "Por eso existimos. Te ayudamos a armar el evento y los posts
+con IA. Tú revisas y publicas."
 
 OBJECIÓN: "Necesito consultarlo con mi socio/equipo"
 RESPUESTA: "Perfecto. ¿Hacemos una demo de 15 min con todos presentes? 
@@ -420,24 +413,24 @@ Icono: Escudo / Checkmark grande
 
 Texto:
 
-	Prueba sin riesgo
+	Empieza sin riesgo
 	
-	🛡️  Primera función GRATIS
-	    (Hasta 100 entradas, sin comisión)
+	💸  0% de comisión para ti
+	    El comprador paga un cargo por servicio de 10%
 	
-	🤝  Setup gratuito
-	    Nosotros configuramos todo por ti
+	🤝  Te acompañamos
+	    Te ayudamos a armar tu primer evento
 	
-	🚪  Sin contratos
-	    Te vas cuando quieras
+	🚪  Sin permanencia
+	    Sin mensualidad ni costos fijos
 	
 	📞  Soporte humano
-	    Respuesta en menos de 2 horas
+	    Por WhatsApp y email, en español
 
-	"Si no vendes más, no pagas. Así de simple."
+	"Si no vendes, no pagas nada."
 
-💡 NOTA: Este es el slide que elimina el miedo a probar.
-   La garantía debe ser CLARA y GENEROSA.
+💡 NOTA: No prometer "primera función gratis" ni tiempos de respuesta
+   hasta que el dueño lo decida y esté aplicado en el código.
 
 ⸻
 
@@ -451,7 +444,7 @@ Texto:
 
 	AI Tickets es perfecto si:
 	
-	✅  Tienes eventos con múltiples funciones
+	✅  Haces stand-up, comedia o teatro con funciones recurrentes
 	✅  Quieres llenar más asientos
 	✅  Estás cansado de Excel y WhatsApp manual
 	✅  Valoras tu tiempo
@@ -479,18 +472,16 @@ Texto:
 
 	¿Listo para llenar más funciones?
 	
-	📅  AGENDA TU DEMO DE 15 MINUTOS
+	🚀  CREA TU CUENTA GRATIS
 	
-	    → Te mostramos la plataforma con TU evento
+	    → Te ayudamos a armar tu evento
 	    → Respondemos todas tus dudas
 	    → Sin compromiso
 	
-	🔗  aitickets.cl/demo
+	🔗  aitickets.cl/organizadores/registro
+	📅  Demo de 15 min: https://calendar.app.google/CMt97vedNjzBaoEX7
 	📧  contacto@aitickets.cl
-	📱  +56 9 XXXX XXXX (WhatsApp)
-
-	🎁 BONUS: Menciona esta presentación y obtén 
-	   setup prioritario + primera función gratis.
+	📱  WhatsApp: +56 9 8234 7140
 
 💡 NOTA: Un solo CTA claro. No dar muchas opciones.
    Incluir "sin compromiso" reduce fricción.
@@ -569,14 +560,15 @@ configuro tu evento real y ves exactamente cómo funcionaría.
                          MÉTRICAS CLAVE A MENCIONAR
 ═══════════════════════════════════════════════════════════════════════════════
 
-(Ajustar según datos reales cuando los tengas)
+Solo datos verificables del producto (no hay métricas de resultados aún):
 
-📈  +25% más asistentes en funciones de baja demanda
-⏱️  15+ horas ahorradas por semana
-📧  98% tasa de entrega en comunicaciones
-⚡  2 segundos promedio de check-in
-💰  +$2,500 adicionales por entrada (con upselling)
-🎯  3x mejor ROI en publicidad vs hacerlo manual
+💸  0% de comisión para el productor
+🧾  10% de cargo por servicio al comprador
+🏦  Transferencia 48–72 h después de cada función
+⏰  Recordatorio automático por email 24 h antes de la función
+
+Cuando haya datos reales del piloto (con permiso del productor), agregarlos
+aquí con fuente y fecha. Nunca inventar porcentajes ni cifras.
 
 ═══════════════════════════════════════════════════════════════════════════════
                               NOTAS FINALES

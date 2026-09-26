@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted, nextTick, defineProps} from "vue";
+import { ref, reactive, onMounted, onUnmounted, nextTick } from "vue";
 import { marked } from "marked"; 
 import DOMPurify from "dompurify";
 import { eventBus } from '../utils/eventbus.js';
@@ -11,8 +11,8 @@ import IconArrowGreen from "../images/icon-arrow-green.png";
 const props = defineProps({
   event: Object,
 });
-const assistantURL = import.meta.env.PUBLIC_SERVERLESS_URL;
-const apiSecret = import.meta.env.PUBLIC_API_SECRET;
+const MAX_MESSAGE_LENGTH = 1000;
+const MAX_HISTORY = 10;
 const { trackAIAssistant } = useGoogleAnalytics();
 
 const isOpen = ref(false);
@@ -43,97 +43,75 @@ const renderMarkdown = (text) => {
 const fillForm = (properties) => {
   // Emitir un evento para abrir el modal de reserva
   // Llenar los datos del formulario con los properties
-  console.log("Llenar formulario con los datos: ", properties);
-  
   eventBus.emit('open-modal');
   setTimeout(() => {
-    console.log("Llenar ticket: ", properties);
     eventBus.emit('ticket-selection', properties);
   }, 2000);
   setTimeout(() => {
-    console.log("Presiona siguiente: ");
     eventBus.emit('proceed-to-next-step');
   }, 4000);
   setTimeout(() => {
-    console.log("Llenar info: ", properties);
     eventBus.emit('fill-buyer-info', properties);
   }, 5000);
 };
 
 const sendMessage = async (message) => {
-  if (!message.trim()) return;
+  const text = (message || "").trim();
+  if (!text || isLoading.value) return;
+  if (text.length > MAX_MESSAGE_LENGTH) {
+    messages.value.push({ role: "assistant", text: `Tu mensaje es muy largo (máximo ${MAX_MESSAGE_LENGTH} caracteres).` });
+    scrollToBottom();
+    return;
+  }
 
   // Track AI assistant usage
-  trackAIAssistant(props.event.id, message);
+  trackAIAssistant(props.event.id, text);
 
-  messages.value.push({ role: "user", text: message });
+  messages.value.push({ role: "user", text });
   showSuggestedReplies.value = false;
+  userMessage.value = "";
   scrollToBottom();
   isLoading.value = true;
 
-  const assistantMessage = { role: "assistant", text: "" };
+  // El contexto del evento lo arma el servidor desde la BD; solo enviamos la conversación visible
+  const history = messages.value
+    .filter((m) => (m.role === "user" || m.role === "assistant") && m.text)
+    .slice(-MAX_HISTORY)
+    .map(({ role, text }) => ({ role, text }));
+
+  const assistantMessage = reactive({ role: "assistant", text: "" });
   messages.value.push(assistantMessage);
 
-  // Mensaje oculto con los detalles del evento (NO se muestra en la UI)
-  const eventDetailsMessage = {
-    role: "system",
-    text: `Detalles del evento:
-    - ID Evento: ${props.event.id}
-    - Nombre: ${props.event.name}
-    - Descripción: ${props.event.description}
-    - Fecha: ${formatLocalDate(props.event.start_date, { weekday: "long", day: "numeric", month: "long" })} - ${formatLocalDate(props.event.end_date, { weekday: "long", day: "numeric", month: "long" })}
-    - Ubicación: ${props.event.location}
-    - Preguntas frecuentes: ${props.event.faqs.map(faq => `• ${faq.question}: ${faq.answer}`).join("\n")}
-    - Precios de las entradas:
-      ${props.event.tickets.map(ticket => `•Ticket ID:${ticket.id} Tipo de entrada: ${ticket.ticket_name}: Precio $${ticket.price} Cantidad maxima por usuario: ${ticket.max_quantity}`).join("\n")}
-    `,
-  };
-
-  userMessage.value = "";
   try {
-    const response = await fetch(assistantURL + '/ai-assistant', {
+    const response = await fetch("/api/ai-assistant", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-api-secret": apiSecret},
-      body: JSON.stringify({ messages: [eventDetailsMessage, ...messages.value] }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ eventId: props.event.id, messages: history }),
     });
 
-    if (!response.ok) throw new Error("Error en la respuesta del servidor");
+    let responseData = {};
+    try { responseData = await response.json(); } catch { /* sin cuerpo */ }
 
-    // Leer la respuesta completa de una vez
-    const responseData = await response.json();
+    if (!response.ok) {
+      assistantMessage.text = responseData.message || "Lo siento, hubo un error. Inténtalo de nuevo más tarde.";
+      return;
+    }
 
     if (responseData.function_calling?.called) {
       const { name, properties } = responseData.function_calling;
-
-      // Ejecutas en frontend la lógica asociada (ej: rellenar formulario o actualizar selección de entradas)
-      if (name === 'fill_buyer_information') {
+      if (name === "fill_buyer_information") {
         fillForm(properties);
       }
-
-      // ✅ Avisas al bot que ya se ejecutó como mensaje "system"
-      messages.value.push({
-        role: "system",
-        text: `La función ${name} fue ejecutada correctamente en el cliente con los siguientes datos: ${JSON.stringify(properties)}`
-      });
-
-      // (Opcional) También puedes mostrar al usuario algo tipo:
-      messages.value.push({
-        role: "assistant",
-        text: `✅ Ya prellené esa información por ti. ¿Quieres continuar?`
-      });
+      assistantMessage.text = "✅ Ya prellené esa información por ti. Revisa los datos y continúa con tu compra.";
     } else {
-      // Asignar el texto directamente sin procesamiento por partes
-      assistantMessage.text = responseData.message;
+      assistantMessage.text = responseData.message || "No pude generar una respuesta. ¿Puedes reformular tu pregunta?";
     }
-
   } catch (error) {
-    console.log(error)
     assistantMessage.text = "Lo siento, hubo un error. Inténtalo de nuevo más tarde.";
   } finally {
     isLoading.value = false;
     scrollToBottom();
   }
-
 };
 
 // Obtener la fecha actual
@@ -236,6 +214,7 @@ onUnmounted(() => {
         <input 
           v-model="userMessage" 
           @keyup.enter="sendMessage(userMessage)"
+          :maxlength="MAX_MESSAGE_LENGTH"
           placeholder="Escribe aquí"
           class="flex-1 p-3 border rounded-lg text-sm font-[Prompt] bg-gray-100 outline-none" />
         <button aria-label="Enviar mensaje" @click="sendMessage(userMessage)" class="ml-2 w-10 h-10 bg-cover bg-center cursor-pointer"

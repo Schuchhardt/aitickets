@@ -1,17 +1,15 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-export function getSupabaseAnon() {
-    const supabaseUrl = import.meta.env.SUPABASE_URL;
-    const anonKey = import.meta.env.SUPABASE_ANON_KEY;
+// Todo el acceso a Supabase es server-side con la service role key.
+// La service role se salta RLS, así que TODA ruta debe autorizar explícitamente
+// (sesión + organización) antes de leer o escribir datos de un productor.
+// El proyecto de Supabase es compartido con otras apps: filtrar siempre por
+// organization_id / event_id y nunca hacer consultas sin filtro sobre tablas de aitickets.
+let adminClient: SupabaseClient | null = null;
 
-    if (!supabaseUrl || !anonKey) {
-        throw new Error("Missing Supabase credentials (URL or Anon Key)");
-    }
+export function getSupabaseAdmin(): SupabaseClient {
+    if (adminClient) return adminClient;
 
-    return createClient(supabaseUrl, anonKey);
-}
-
-export function getSupabaseAdmin() {
     const supabaseUrl = import.meta.env.SUPABASE_URL;
     const serviceKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -19,11 +17,29 @@ export function getSupabaseAdmin() {
         throw new Error("Missing Supabase credentials (URL or Service Role Key)");
     }
 
-    return createClient(supabaseUrl, serviceKey, {
+    adminClient = createClient(supabaseUrl, serviceKey, {
         auth: {
             autoRefreshToken: false,
             persistSession: false
         }
+    });
+    return adminClient;
+}
+
+/**
+ * Cliente service role NUEVO (no singleton) para operaciones de auth que crean o refrescan una
+ * sesión de usuario (signInWithPassword, refreshSession). supabase-js guarda esa sesión en memoria
+ * y, si se hiciera sobre el singleton, las consultas siguientes saldrían con el JWT del usuario
+ * (sujeto a RLS) en vez de la service role, mezclando sesiones entre requests.
+ */
+export function createEphemeralAuthClient(): SupabaseClient {
+    const supabaseUrl = import.meta.env.SUPABASE_URL;
+    const serviceKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !serviceKey) {
+        throw new Error("Missing Supabase credentials (URL or Service Role Key)");
+    }
+    return createClient(supabaseUrl, serviceKey, {
+        auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
     });
 }
 

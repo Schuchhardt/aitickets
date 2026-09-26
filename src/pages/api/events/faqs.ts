@@ -1,44 +1,27 @@
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin, getFriendlyErrorMessage } from "../../../lib/auth-helpers";
-import { getSessionUser } from "../../../lib/supabaseServer";
+import { getSessionContext, getOwnedEvent, hasRole, EVENT_MANAGER_ROLES, type SessionContext } from "../../../lib/supabaseServer";
 
-async function verifyEventOwnership(supabaseAdmin: any, authUserId: string, eventId: number) {
-    const { data: dbUser } = await supabaseAdmin
-        .from('users')
-        .select('id, organization_id')
-        .eq('auth_user_id', authUserId)
-        .single();
-
-    if (!dbUser) return null;
-
-    const { data: event } = await supabaseAdmin
-        .from('events')
-        .select('id')
-        .eq('id', eventId)
-        .eq('organization_id', dbUser.organization_id)
-        .single();
-
-    return event ? dbUser : null;
+/** Devuelve la sesión si el usuario (con rol de gestión) es dueño del evento vía su organización. */
+async function authorize(context: Parameters<typeof getSessionContext>[0], eventId: number): Promise<{ session: SessionContext } | Response> {
+    const session = await getSessionContext(context);
+    if (!session) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+    if (!hasRole(session.dbUser, EVENT_MANAGER_ROLES)) {
+        return new Response(JSON.stringify({ error: "No autorizado" }), { status: 403 });
+    }
+    if (!eventId) return new Response(JSON.stringify({ error: "eventId is required" }), { status: 400 });
+    const event = await getOwnedEvent(eventId, session.dbUser.organization_id, "id");
+    if (!event) return new Response(JSON.stringify({ error: "No autorizado" }), { status: 403 });
+    return { session };
 }
 
 export const GET: APIRoute = async (context) => {
-    const user = await getSessionUser(context);
-    if (!user) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
-    }
-
     const url = new URL(context.request.url);
     const eventId = Number(url.searchParams.get("eventId"));
 
-    if (!eventId) {
-        return new Response(JSON.stringify({ error: "eventId is required" }), { status: 400 });
-    }
-
+    const auth = await authorize(context, eventId);
+    if (auth instanceof Response) return auth;
     const supabaseAdmin = getSupabaseAdmin();
-    const dbUser = await verifyEventOwnership(supabaseAdmin, user.id, eventId);
-    if (!dbUser) {
-        return new Response(JSON.stringify({ error: "No autorizado" }), { status: 403 });
-    }
 
     const { data: faqs, error } = await supabaseAdmin
         .from('event_faqs')
@@ -54,24 +37,15 @@ export const GET: APIRoute = async (context) => {
 };
 
 export const POST: APIRoute = async (context) => {
-    const user = await getSessionUser(context);
-    if (!user) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
-    }
-
     try {
         const body = await context.request.json();
-        const { eventId, question, answer, action, id } = body;
+        const { eventId, action, id } = body;
+        const question = typeof body.question === "string" ? body.question.trim().slice(0, 500) : "";
+        const answer = typeof body.answer === "string" ? body.answer.trim().slice(0, 3000) : "";
 
-        if (!eventId) {
-            return new Response(JSON.stringify({ error: "eventId is required" }), { status: 400 });
-        }
-
+        const auth = await authorize(context, Number(eventId));
+        if (auth instanceof Response) return auth;
         const supabaseAdmin = getSupabaseAdmin();
-        const dbUser = await verifyEventOwnership(supabaseAdmin, user.id, eventId);
-        if (!dbUser) {
-            return new Response(JSON.stringify({ error: "No autorizado" }), { status: 403 });
-        }
 
         if (action === 'delete') {
             if (!id) {

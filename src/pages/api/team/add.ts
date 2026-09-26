@@ -1,144 +1,82 @@
 import type { APIRoute } from "astro";
+import { randomBytes } from "node:crypto";
 import { getSupabaseAdmin, getFriendlyErrorMessage } from "../../../lib/auth-helpers";
-import { getSessionUser, createSupabaseServerClient } from "../../../lib/supabaseServer";
+import { getSessionContext, hasRole, ORG_ADMIN_ROLES } from "../../../lib/supabaseServer";
+import { AITICKETS_APP_METADATA, ASSIGNABLE_ROLES, EMAIL_RE, json } from "./_team";
 
 export const POST: APIRoute = async (context) => {
-    const user = await getSessionUser(context);
+    const session = await getSessionContext(context);
+    if (!session) return json({ error: "Unauthorized" }, 401);
+    const { dbUser: currentUser } = session;
 
-    if (!user) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), {
-            status: 401,
-            headers: { "Content-Type": "application/json" },
-        });
+    // Productores (dueños) y administradores pueden sumar miembros
+    if (!hasRole(currentUser, ORG_ADMIN_ROLES)) {
+        return json({ error: "Solo los administradores pueden agregar miembros" }, 403);
     }
 
     try {
         const body = await context.request.json();
-        const { name, email, role } = body;
+        const name = String(body?.name || "").trim().slice(0, 150);
+        const email = String(body?.email || "").trim().toLowerCase().slice(0, 200);
+        const role = String(body?.role || "");
 
-        // Validate required fields
         if (!name || !email || !role) {
-            return new Response(JSON.stringify({ error: "Todos los campos son requeridos" }), {
-                status: 400,
-                headers: { "Content-Type": "application/json" },
-            });
+            return json({ error: "Todos los campos son requeridos" }, 400);
+        }
+        if (!EMAIL_RE.test(email)) {
+            return json({ error: "Email inválido" }, 400);
+        }
+        if (!ASSIGNABLE_ROLES.includes(role)) {
+            return json({ error: "Rol no válido" }, 400);
         }
 
-        // Validate role
-        const validRoles = ["admin", "editor", "validator"];
-        if (!validRoles.includes(role)) {
-            return new Response(JSON.stringify({ error: "Rol no válido" }), {
-                status: 400,
-                headers: { "Content-Type": "application/json" },
-            });
-        }
-
-        const supabase = createSupabaseServerClient(context);
         const supabaseAdmin = getSupabaseAdmin();
 
-        // Get current user's organization_id and verify admin role
-        const { data: currentUser, error: userError } = await supabase
-            .from("users")
-            .select("organization_id, role")
-            .eq("auth_user_id", user.id)
-            .single();
-
-        if (userError || !currentUser) {
-            return new Response(JSON.stringify({ error: "Usuario no encontrado" }), {
-                status: 404,
-                headers: { "Content-Type": "application/json" },
-            });
-        }
-
-        // Check if current user is admin
-        if (currentUser.role !== "admin") {
-            return new Response(JSON.stringify({ error: "Solo los administradores pueden agregar miembros" }), {
-                status: 403,
-                headers: { "Content-Type": "application/json" },
-            });
-        }
-
-        if (!currentUser.organization_id) {
-            return new Response(JSON.stringify({ error: "Usuario sin organización" }), {
-                status: 400,
-                headers: { "Content-Type": "application/json" },
-            });
-        }
-
-        // Check if email already exists
         const { data: existingUser } = await supabaseAdmin
             .from("users")
             .select("id")
-            .eq("email", email)
-            .single();
-
+            .ilike("email", email.replace(/[\\%_]/g, "\\$&"))
+            .maybeSingle();
         if (existingUser) {
-            return new Response(JSON.stringify({ error: "Este correo electrónico ya está registrado" }), {
-                status: 400,
-                headers: { "Content-Type": "application/json" },
-            });
+            return json({ error: "Este correo electrónico ya está registrado" }, 400);
         }
 
-        // Generate a temporary password
-        const tempPassword = Math.random().toString(36).slice(-12) + "Aa1!";
+        // Contraseña temporal aleatoria
+        const tempPassword = randomBytes(9).toString("base64url") + "Aa1!";
 
-        // Create auth user
         const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-            email: email,
+            email,
             password: tempPassword,
-            email_confirm: true, // Auto-confirm email
-            user_metadata: {
-                full_name: name,
-            }
+            email_confirm: true,
+            user_metadata: { full_name: name },
+            // Cuenta creada por AI Tickets: solo estas se pueden bloquear o cambiar de email desde el dashboard
+            app_metadata: { ...AITICKETS_APP_METADATA },
         });
 
         if (authError) {
             console.error("Auth user creation error:", authError);
-            return new Response(JSON.stringify({ error: getFriendlyErrorMessage(authError) }), {
-                status: 500,
-                headers: { "Content-Type": "application/json" },
-            });
+            return json({ error: getFriendlyErrorMessage(authError) }, 400);
         }
 
-        // Create user in public.users table
-        const { error: dbError } = await supabaseAdmin
-            .from("users")
-            .insert({
-                name: name,
-                email: email,
-                role: role,
-                organization_id: currentUser.organization_id,
-                auth_user_id: authData.user.id,
-                active: true
-            });
+        const { error: dbError } = await supabaseAdmin.from("users").insert({
+            name,
+            email,
+            role,
+            organization_id: currentUser.organization_id,
+            auth_user_id: authData.user.id,
+            active: true,
+        });
 
         if (dbError) {
             console.error("Database insert error:", dbError);
-            // Rollback: delete the auth user if DB insert fails
             await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-            return new Response(JSON.stringify({ error: getFriendlyErrorMessage(dbError) }), {
-                status: 500,
-                headers: { "Content-Type": "application/json" },
-            });
+            return json({ error: getFriendlyErrorMessage(dbError) }, 500);
         }
 
-        // TODO: Send invitation email with temporary password
-        // For now, we return it so the admin can share it manually.
-        // In production, send this via email only and remove from response.
-
-        return new Response(JSON.stringify({
-            message: "Miembro agregado exitosamente",
-            tempPassword: tempPassword
-        }), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-        });
-
+        // TODO: enviar invitación por email. Por ahora se devuelve para que el administrador la comparta.
+        return json({ message: "Miembro agregado exitosamente", tempPassword });
     } catch (error) {
         console.error("Add team member error:", error);
-        return new Response(JSON.stringify({ error: "Internal Server Error" }), {
-            status: 500,
-            headers: { "Content-Type": "application/json" },
-        });
+        return json({ error: "Internal Server Error" }, 500);
     }
 };

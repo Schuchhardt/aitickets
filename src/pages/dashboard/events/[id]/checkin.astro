@@ -1,69 +1,77 @@
 ---
 import DashboardLayout from "../../../../layouts/DashboardLayout.astro";
 import { getSupabaseAdmin } from "../../../../lib/auth-helpers";
-import { createSupabaseServerClient } from "../../../../lib/supabaseServer";
 import ValidateQR from "../../../../components/ValidateQR.vue";
+import { requireDashboardSession } from "../../_lib/guard";
+
+// Check-in: todos los roles del equipo (incluidos validadores)
+const CHECKIN_ROLES = ["admin", "producer", "editor", "validator"];
 
 const { id } = Astro.params;
-const supabase = createSupabaseServerClient(Astro);
+const guard = await requireDashboardSession(Astro, CHECKIN_ROLES);
+if (!guard.ok) return guard.response;
+const { dbUser } = guard.session;
 const supabaseAdmin = getSupabaseAdmin();
 
-const {
-    data: { user },
-} = await supabase.auth.getUser();
-
-if (!user) {
-    return Astro.redirect("/organizadores/login");
-}
-
-const { data: dbUser } = await supabase
-    .from("users")
-    .select("id, organization_id")
-    .eq("auth_user_id", user.id)
-    .single();
-
-if (!dbUser || !dbUser.organization_id) {
-    return Astro.redirect("/dashboard/events");
-}
-
-// Fetch event
-const { data: event, error } = await supabaseAdmin
+const { data: eventRow, error } = await supabaseAdmin
     .from("events")
-    .select("*")
+    .select("id, name, slug, start_date")
     .eq("id", id)
     .eq("organization_id", dbUser.organization_id)
     .single();
 
-if (error || !event) {
+if (error || !eventRow) {
     return Astro.redirect("/dashboard/events");
 }
 
-// Load attendees with full info
-const { data: event_attendees, error: attendeesError } = await supabaseAdmin
-    .from("event_attendees")
-    .select(`
-        id,
-        event_id,
-        qr_code,
-        status,
-        validated_at,
-        attendees (
-            first_name,
-            last_name,
-            email
-        ),
-        event_tickets (
-            ticket_name
-        )
-    `)
-    .eq("event_id", event.id);
-
-if (attendeesError) {
-    console.error("Error loading attendees:", attendeesError);
-    event.attendees = [];
-} else {
-    event.attendees = event_attendees || [];
+// Asistentes con la información necesaria para validar / buscar / reenviar.
+// Paginado con .range(): PostgREST devuelve como máximo 1000 filas por consulta.
+const PAGE_SIZE = 1000;
+const event_attendees: any[] = [];
+let attendeesError: string | null = null;
+for (let from = 0; ; from += PAGE_SIZE) {
+    const { data: page, error: pageError } = await supabaseAdmin
+        .from("event_attendees")
+        .select(`
+            id,
+            event_id,
+            event_order_id,
+            qr_code,
+            status,
+            is_complimentary,
+            validated_at,
+            attendees (
+                first_name,
+                last_name,
+                email
+            ),
+            event_tickets (
+                ticket_name,
+                event_date_id
+            )
+        `)
+        .eq("event_id", eventRow.id)
+        .order("id", { ascending: true })
+        .range(from, from + PAGE_SIZE - 1);
+    if (pageError) {
+        attendeesError = pageError.message;
+        break;
+    }
+    event_attendees.push(...(page || []));
+    if (!page || page.length < PAGE_SIZE) break;
 }
+
+// Funciones del evento (aviso de "otra función" en el check-in, contrato R1)
+const { data: eventDates } = await supabaseAdmin
+    .from("event_dates")
+    .select("id, date, start_time")
+    .eq("event_id", eventRow.id)
+    .order("date", { ascending: true })
+    .order("start_time", { ascending: true });
+
+if (attendeesError) console.error("Error loading attendees:", attendeesError);
+const event = { ...eventRow, dates: eventDates || [], attendees: event_attendees };
+const backHref = dbUser.role === "validator" ? "/dashboard/events" : `/dashboard/events/${event.id}`;
 ---
 
 <DashboardLayout title={`Check-in · ${event.name}`}>
@@ -75,7 +83,7 @@ if (attendeesError) {
             >
             <span class="text-gray-300">/</span>
             <a
-                href={`/dashboard/events/${event.id}`}
+                href={backHref}
                 class="text-gray-500 hover:text-black transition truncate max-w-[200px]"
                 >{event.name}</a
             >
@@ -83,7 +91,7 @@ if (attendeesError) {
             <span class="text-gray-900 font-medium">Check-in</span>
         </div>
         <h1 class="text-3xl font-bold font-[Unbounded]">Check-in</h1>
-        <p class="text-gray-500 mt-1">Escanea los códigos QR de los asistentes para validar su entrada.</p>
+        <p class="text-gray-500 mt-1">Escanea los códigos QR, busca asistentes por nombre o email para validarlos manualmente, o reenvía sus entradas.</p>
     </div>
 
     <ValidateQR event={event} client:load />

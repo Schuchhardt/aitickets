@@ -1,131 +1,163 @@
 ---
-const { event } = Astro.props;
-const siteUrl = import.meta.env.SITE_URL || "https://aitickets.cl"; // Usa el dominio de entorno o uno por defecto
-const fallbackImagePath = "/android-chrome-512x512.png";
+/**
+ * Meta tags + JSON-LD (schema.org/Event) de la página pública de un evento.
+ * Recibe el evento ya preparado por src/pages/eventos/[slug].astro
+ * (dates con start_iso/end_iso y venue, tickets a la venta, organization).
+ * No debe recibir ni mostrar secret_location.
+ */
+interface Props {
+  event: any;
+  title: string;
+  description: string;
+  canonicalPath: string;
+  noindex?: boolean;
+}
 
-// Normaliza rutas relativas para que siempre sean URLs absolutas
-const buildAbsoluteUrl = (path) => {
+const { event, title, description, canonicalPath, noindex = false } = Astro.props;
+const siteUrl = (import.meta.env.SITE_URL || "https://aitickets.cl").replace(/\/$/, "");
+const fallbackImagePath = "/aitickets_preview.png";
+
+const buildAbsoluteUrl = (path?: string | null) => {
   if (!path) return `${siteUrl}${fallbackImagePath}`;
-  if (path.startsWith('http')) return path;
-  if (path.startsWith('/')) return `${siteUrl}${path}`;
-  return `${siteUrl}/${path}`;
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${siteUrl}${path.startsWith("/") ? "" : "/"}${path}`;
 };
 
-// Convierte HTML en texto plano legible
-const stripHtml = (html) => {
-  if (!html) return "";
-  return html
-    .replace(/<br\s*\/?>/gi, ' ')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
+const stripHtml = (html?: string | null) =>
+  (html || "")
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
     .replace(/&quot;/gi, '"')
     .replace(/&#39;/gi, "'")
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/\s+/g, ' ')
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/\s+/g, " ")
     .trim();
+
+const canonicalUrl = `${siteUrl}${canonicalPath}`;
+const imageUrl = buildAbsoluteUrl(event?.image_url);
+
+const buildPlace = (venue: any) => {
+  if (!venue) {
+    return {
+      "@type": "Place",
+      name: event.location || "Por confirmar",
+      address: {
+        "@type": "PostalAddress",
+        streetAddress: event.location || undefined,
+        addressCountry: "CL",
+      },
+    };
+  }
+  const place: any = {
+    "@type": "Place",
+    name: venue.name || event.location,
+    address: {
+      "@type": "PostalAddress",
+      streetAddress: venue.address || undefined,
+      addressLocality: venue.city || undefined,
+      addressRegion: venue.region || undefined,
+      postalCode: venue.postal_code || undefined,
+      addressCountry: venue.country || "CL",
+    },
+  };
+  if (Number.isFinite(venue.latitude) && Number.isFinite(venue.longitude)) {
+    place.geo = { "@type": "GeoCoordinates", latitude: venue.latitude, longitude: venue.longitude };
+  }
+  return place;
 };
 
-// Función para generar el JSON-LD del evento
-const generateEventJsonLd = (event, siteUrl) => {
-  if (!event) return null;
-
-  // Obtener fechas del evento
-  const startDate = event.start_date || (event.dates?.[0]?.date);
-  const endDate = event.end_date || (event.dates?.[event.dates.length - 1]?.date);
-  
-  // Obtener precios de los tickets
-  const offers = event.tickets?.map(ticket => ({
-    "@type": "Offer",
-    "name": ticket.ticket_name || "Entrada General",
-    "price": ticket.price || 0,
-    "priceCurrency": "CLP",
-    "availability": "https://schema.org/InStock",
-    "url": `${siteUrl}/eventos/${event.slug}`,
-    "validFrom": ticket.init_date || startDate,
-    "validThrough": ticket.end_date || endDate
-  })) || [];
-
-  // Determinar el tipo de evento basado en las categorías/tags
-  const eventType = event.tags?.includes('Festival') ? 'Festival' : 
-                   event.tags?.includes('Concierto') ? 'MusicEvent' :
-                   event.tags?.includes('Conferencia') ? 'BusinessEvent' :
-                   'Event';
-
-  const jsonLd: any = {
-    "@context": "https://schema.org",
-    "@type": eventType,
-    "name": event.name,
-  "description": stripHtml(event.description) || "Este evento no está disponible.",
-    "url": `${siteUrl}/eventos/${event.slug}`,
-  "image": buildAbsoluteUrl(event.image_url || fallbackImagePath),
-    "startDate": startDate,
-    "endDate": endDate,
-    "eventStatus": "https://schema.org/EventScheduled",
-    "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
-    "location": {
-      "@type": "Place",
-      "name": event.location,
-      "address": {
-        "@type": "PostalAddress",
-        "addressLocality": event.location,
-        "addressCountry": "CL"
-      }
-    },
-    "organizer": {
-      "@type": "Organization",
-      "name": "AI Tickets",
-      "url": siteUrl
-    },
-    "offers": offers.length > 0 ? offers : {
+const buildOffers = () => {
+  // Solo publicar offers si hay entradas a la venta o agotadas (nunca inventar un precio)
+  const tickets = Array.isArray(event.tickets) ? event.tickets : [];
+  if (tickets.length > 0) {
+    return tickets.map((t: any) => ({
       "@type": "Offer",
-      "price": 0,
-      "priceCurrency": "CLP",
-      "availability": "https://schema.org/InStock",
-      "url": `${siteUrl}/eventos/${event.slug}`
-    }
-  };
-
-  // Agregar fechas específicas si están disponibles
-  if (event.dates && event.dates.length > 0) {
-    jsonLd.subEvents = event.dates.map(date => ({
-      "@type": "Event",
-      "name": event.name,
-      "startDate": `${date.date}T${date.start_time || '00:00:00'}`,
-      "endDate": `${date.date}T${date.end_time || '23:59:59'}`,
-      "location": jsonLd.location
+      name: t.ticket_name || "Entrada general",
+      price: Number(t.price) || 0,
+      priceCurrency: "CLP",
+      availability: t.remaining === 0 ? "https://schema.org/SoldOut" : "https://schema.org/InStock",
+      url: canonicalUrl,
+      ...(t.init_date ? { validFrom: new Date(t.init_date).toISOString() } : {}),
     }));
   }
-
-  return JSON.stringify(jsonLd);
+  if (event.sale_state === "sold_out") {
+    return [{ "@type": "Offer", url: canonicalUrl, priceCurrency: "CLP", availability: "https://schema.org/SoldOut" }];
+  }
+  return null;
 };
 
-const eventJsonLd = generateEventJsonLd(event, siteUrl);
-const defaultDescription = "Este evento no está disponible.";
-const plainDescription = stripHtml(event?.description) || defaultDescription;
+const generateEventJsonLd = () => {
+  if (!event) return null;
+  const organizer = event.organization?.name
+    ? {
+        "@type": "Organization",
+        name: event.organization.name,
+        ...(event.organization.website ? { url: event.organization.website } : {}),
+      }
+    : { "@type": "Organization", name: "AI Tickets", url: siteUrl };
+  const offers = buildOffers();
+  const baseDescription = stripHtml(event.description) || description;
+
+  const functions = (Array.isArray(event.dates) ? event.dates : []).filter((d: any) => d.start_iso);
+  const entries = (functions.length ? functions : [{ start_iso: null, end_iso: null, venue: event.venue }]).map(
+    (fn: any) => {
+      const item: any = {
+        "@context": "https://schema.org",
+        "@type": "Event",
+        name: event.name,
+        description: baseDescription.slice(0, 5000),
+        url: canonicalUrl,
+        image: [imageUrl],
+        eventStatus: "https://schema.org/EventScheduled",
+        eventAttendanceMode: fn.venue?.is_virtual
+          ? "https://schema.org/OnlineEventAttendanceMode"
+          : "https://schema.org/OfflineEventAttendanceMode",
+        location: buildPlace(fn.venue || event.venue),
+        organizer,
+      };
+      if (fn.start_iso) item.startDate = fn.start_iso;
+      else if (event.start_date) item.startDate = event.start_date;
+      if (fn.end_iso) item.endDate = fn.end_iso;
+      else if (event.end_date) item.endDate = event.end_date;
+      if (offers) item.offers = offers;
+      return item;
+    }
+  );
+  return JSON.stringify(entries.length === 1 ? entries[0] : entries).replace(/</g, "\\u003c");
+};
+
+const eventJsonLd = generateEventJsonLd();
 ---
 
-<title>{event?.name || "Evento no encontrado"}</title>
-<meta name="description" content={plainDescription} />
+<title>{title}</title>
+<meta name="description" content={description} />
+<link rel="canonical" href={canonicalUrl} />
+{noindex && <meta name="robots" content="noindex, nofollow" />}
 
 <!-- Open Graph / Facebook -->
 <meta property="og:type" content="website" />
-<meta property="og:url" content={`${siteUrl}/eventos/${event?.slug}`} />
-<meta property="og:title" content={event?.name || "Evento no encontrado"} />
-<meta property="og:description" content={plainDescription} />
-<meta property="og:image" content={buildAbsoluteUrl(event?.image_url || fallbackImagePath)} />
-
-<meta property="og:logo" content="https://bgsmqjrdryafvlyxywud.supabase.co/storage/v1/object/public/Events/AITickets.svg" />
+<meta property="og:site_name" content="AI Tickets" />
+<meta property="og:locale" content="es_CL" />
+<meta property="og:url" content={canonicalUrl} />
+<meta property="og:title" content={event?.name || title} />
+<meta property="og:description" content={description} />
+<meta property="og:image" content={imageUrl} />
 
 <!-- Twitter Card -->
 <meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:url" content={`${siteUrl}/eventos/${event?.slug}`} />
-<meta name="twitter:title" content={event?.name || "Evento no encontrado"} />
-<meta name="twitter:description" content={plainDescription} />
-<meta name="twitter:image" content={buildAbsoluteUrl(event?.image_url || fallbackImagePath)} />
+<meta name="twitter:site" content="@aitickets" />
+<meta name="twitter:url" content={canonicalUrl} />
+<meta name="twitter:title" content={event?.name || title} />
+<meta name="twitter:description" content={description} />
+<meta name="twitter:image" content={imageUrl} />
+
+<!-- Precarga de la imagen principal (LCP) -->
+{event?.image_url && <link rel="preload" as="image" href={event.image_url} fetchpriority="high" />}
 
 <!-- JSON-LD Structured Data -->
-{eventJsonLd && (
-  <script type="application/ld+json" set:html={eventJsonLd}></script>
+{eventJsonLd && !noindex && (
+  <script is:inline type="application/ld+json" set:html={eventJsonLd}></script>
 )}

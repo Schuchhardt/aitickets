@@ -1,25 +1,14 @@
 ---
 import DashboardLayout from "../../layouts/DashboardLayout.astro";
 import { Download, Users } from "lucide-vue-next";
-import { createSupabaseServerClient } from "../../lib/supabaseServer";
 import { getSupabaseAdmin } from "../../lib/auth-helpers";
+import { EVENT_MANAGER_ROLES } from "../../lib/supabaseServer";
+import { requireDashboardSession } from "./_lib/guard";
 
-const supabase = createSupabaseServerClient(Astro);
+const guard = await requireDashboardSession(Astro, EVENT_MANAGER_ROLES);
+if (!guard.ok) return guard.response;
+const { dbUser } = guard.session;
 const supabaseAdmin = getSupabaseAdmin();
-const {
-  data: { user },
-} = await supabase.auth.getUser();
-
-if (!user) {
-  return Astro.redirect("/organizadores/login");
-}
-
-// Get organization_id for the current user
-const { data: dbUser } = await supabase
-  .from("users")
-  .select("organization_id")
-  .eq("auth_user_id", user.id)
-  .single();
 
 let attendees: Array<{name: string; email: string; event: string; ticket: string; date: string}> = [];
 

@@ -4,7 +4,7 @@
         <div class="text-center mb-16">
           <FadeInSection>
           <span class="inline-block text-lime-400 font-[Prompt] font-medium text-sm bg-black px-4 py-1 rounded-full">
-            Resultados reales
+            Por qué AI Tickets
           </span>
         </FadeInSection>
           <FadeInSection :delay="100">
@@ -14,8 +14,8 @@
           </FadeInSection>
           <FadeInSection :delay="200">
             <p class="text-gray-500 max-w-2xl mx-auto">
-              Cada función con asientos vacíos es dinero que ya no vuelve. 
-              Cada hora en tareas manuales es tiempo que podrías dedicar a crear mejor contenido.
+              Cada función con asientos vacíos es plata que no vuelve.
+              Cada hora en tareas manuales es tiempo que podrías dedicarle a tu show.
             </p>
           </FadeInSection>
         </div>
@@ -31,8 +31,8 @@
                 ¿Te suena familiar?
               </h3>
               <p class="text-gray-600 mb-6">
-                Estos problemas le cuestan miles de pesos a productores cada temporada. 
-                Y lo peor... tienen solución.
+                Son los problemas que más escuchamos de productores de stand-up y teatro.
+                Y tienen solución.
               </p>
               <ul class="space-y-3">
                 <li v-for="(item, i) in problems" :key="i" class="flex items-start">
@@ -57,8 +57,8 @@
                 Con AI Tickets logras
               </h3>
               <p class="text-gray-600 mb-6">
-                Imagina tener un equipo que vende, comunica y gestiona mientras tú 
-                te enfocas en lo que realmente importa: crear experiencias increíbles.
+                Una herramienta que vende, avisa y ordena la puerta mientras tú
+                te enfocas en lo que importa: tu show.
               </p>
               <ul class="space-y-3">
                 <li v-for="(item, i) in solutions" :key="i" class="flex items-start">
@@ -78,20 +78,20 @@
         <FadeInSection :delay="300">
           <div class="mt-16 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             <div class="p-6">
-              <div class="text-4xl font-bold text-lime-500 font-[Unbounded]">+25%</div>
-              <div class="text-gray-600 text-sm mt-2">más asistentes en funciones flojas</div>
+              <div class="text-4xl font-bold text-lime-500 font-[Unbounded]">0%</div>
+              <div class="text-gray-600 text-sm mt-2">de comisión para el productor</div>
             </div>
             <div class="p-6">
-              <div class="text-4xl font-bold text-lime-500 font-[Unbounded]">15 hrs</div>
-              <div class="text-gray-600 text-sm mt-2">ahorradas por semana</div>
+              <div class="text-4xl font-bold text-lime-500 font-[Unbounded]">10%</div>
+              <div class="text-gray-600 text-sm mt-2">cargo por servicio que paga el comprador</div>
             </div>
             <div class="p-6">
-              <div class="text-4xl font-bold text-lime-500 font-[Unbounded]">98%</div>
-              <div class="text-gray-600 text-sm mt-2">asistentes notificados a tiempo</div>
+              <div class="text-4xl font-bold text-lime-500 font-[Unbounded]">48–72 h</div>
+              <div class="text-gray-600 text-sm mt-2">después de cada función te transferimos lo recaudado</div>
             </div>
             <div class="p-6">
-              <div class="text-4xl font-bold text-lime-500 font-[Unbounded]">2 seg</div>
-              <div class="text-gray-600 text-sm mt-2">tiempo de check-in promedio</div>
+              <div class="text-4xl font-bold text-lime-500 font-[Unbounded]">24 h</div>
+              <div class="text-gray-600 text-sm mt-2">antes, tus asistentes reciben un recordatorio por email</div>
             </div>
           </div>
         </FadeInSection>
@@ -104,19 +104,19 @@
   import FadeInSection from './Hero/FadeInSection.vue';
   
   const problems = [
-    '30-40% de asientos vacíos en funciones "flojas"',
-    '+15 horas semanales en tareas manuales',
-    'Clientes frustrados por mala comunicación',
-    'Dinero en publicidad sin saber qué funciona',
-    'Estrés operativo que mata la creatividad'
+    'Funciones "flojas" con asientos vacíos',
+    'Horas respondiendo lo mismo por mensaje y cuadrando planillas',
+    'Asistentes que no se enteran de un cambio de horario',
+    'Plata en publicidad sin saber qué canal vendió',
+    'Esperar semanas para recibir lo recaudado'
   ];
   
   const solutions = [
-    'Vende entradas mientras duermes',
-    'Avisa a todos si algo cambia (en segundos)',
-    'Llena las funciones difíciles automáticamente',
-    'Sabe exactamente qué está funcionando',
-    'Todo esto sin contratar a nadie'
+    'Vende entradas online las 24 horas, con Webpay',
+    'Avisa por email a tus asistentes si cambia algo del evento',
+    'Promociona cada función con posts generados con IA',
+    'Mira qué canal (UTM) te trae visitas y ventas',
+    'Recibe lo recaudado 48–72 h después de cada función'
   ];
   </script>
   

@@ -1,41 +1,31 @@
 ---
 import DashboardLayout from "../../../../layouts/DashboardLayout.astro";
 import EditEventForm from "../../../../components/events/EditEventForm.vue";
-import { createSupabaseServerClient } from "../../../../lib/supabaseServer";
 import { getSupabaseAdmin } from "../../../../lib/auth-helpers";
+import { EVENT_MANAGER_ROLES } from "../../../../lib/supabaseServer";
+import { requireDashboardSession } from "../../_lib/guard";
+import { decodeBasicEntities } from "../../../../lib/sanitize";
 
 const { id } = Astro.params;
-const supabase = createSupabaseServerClient(Astro);
+const guard = await requireDashboardSession(Astro, EVENT_MANAGER_ROLES);
+if (!guard.ok) return guard.response;
+const { dbUser } = guard.session;
 const supabaseAdmin = getSupabaseAdmin();
-
-const {
-    data: { user },
-} = await supabase.auth.getUser();
-
-if (!user) {
-    return Astro.redirect("/organizadores/login");
-}
-
-// Check ownership via organization
-const { data: dbUser } = await supabase
-    .from("users")
-    .select("id, organization_id")
-    .eq("auth_user_id", user.id)
-    .single();
-
-if (!dbUser || !dbUser.organization_id) return Astro.redirect("/dashboard/events");
 
 // Fetch Full Event Data
 const { data: event, error } = await supabaseAdmin
     .from("events")
     .select(
         `
-        *,
+        id, name, description, image_url, accessibility, status,
+        event_tags ( category_tags ( name ) ),
         event_tickets (
           id,
           ticket_name,
           price,
-          total_quantity
+          total_quantity,
+          status,
+          event_date_id
         ),
         event_locations (
            id,
@@ -68,9 +58,11 @@ if (error || !event) {
 const initialFormState = {
     general: {
         name: event.name,
-        description: event.description || "",
+        // Descripción guardada como texto plano sanitizado: mostrar sin entidades HTML en el textarea
+        description: /<\/?[a-z][^>]*>/i.test(event.description || "") ? event.description : decodeBasicEntities(event.description || ""),
         imageUrl: event.image_url || "",
-        category: "",
+        category: (event as any).event_tags?.[0]?.category_tags?.name || "",
+        isPrivate: event.accessibility === "private",
     },
     locations:
         event.event_locations?.map((loc: any) => ({
@@ -80,26 +72,34 @@ const initialFormState = {
             newVenueName: "",
             newVenueAddress: "",
             newVenueCity: "",
-            dates:
-                loc.dates?.map((d: any) => ({
-                    id: d.id,
-                    date: d.date,
-                    startTime: d.start_time?.slice(0, 5) || "21:00",
-                    endTime: d.end_time?.slice(0, 5) || "04:00",
-                })) || [],
+            // Ubicación sin funciones (p. ej. evento duplicado): se ofrece una fecha vacía para completar
+            dates: loc.dates?.length
+                ? loc.dates.map((d: any) => ({
+                      id: d.id,
+                      date: d.date,
+                      startTime: d.start_time?.slice(0, 5) || "21:00",
+                      endTime: d.end_time?.slice(0, 5) || "",
+                  }))
+                : [{ id: Date.now(), date: "", startTime: "21:00", endTime: "" }],
         })) || [],
     tickets:
-        event.event_tickets?.map((t: any) => ({
+        event.event_tickets?.filter((t: any) => t.status !== "unavailable").map((t: any) => ({
             id: t.id,
             name: t.ticket_name,
             price: Number(t.price),
             quantity: t.total_quantity,
             description: "",
+            // R1: "" = todas las funciones
+            eventDateId: t.event_date_id ?? "",
         })) || [],
 };
 
 // Fetch venues for the dropdown
-const { data: venues } = await supabase.from("venues").select("id, name, city");
+const { data: venues } = await supabaseAdmin
+    .from("venues")
+    .select("id, name, city")
+    .order("name", { ascending: true })
+    .limit(1000);
 ---
 
 <DashboardLayout title={`Editar ${event.name}`}>
@@ -115,9 +115,10 @@ const { data: venues } = await supabase.from("venues").select("id, name, city");
 
         <EditEventForm
             client:load
-            eventId={id}
+            eventId={id!}
             initialFormState={initialFormState}
             initialVenues={venues || []}
+            eventStatus={(event as any).status || "draft"}
         />
     </div>
 </DashboardLayout>

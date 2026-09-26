@@ -6,7 +6,7 @@ import { showSuccess, showError } from "../lib/toastBus.js";
 const props = defineProps({
   show: Boolean,
   event: Object,
-  customUrl: String, // URL personalizada para compartir (ej: URL del ticket)
+  customUrl: String, // URL personalizada para compartir (nunca la del ticket/QR)
   customTitle: String, // Título personalizado para compartir
   customText: String // Texto personalizado para compartir
 });
@@ -14,11 +14,13 @@ const props = defineProps({
 const emit = defineEmits(["close"]);
 const { trackShare } = useGoogleAnalytics();
 
-// 📌 URL para compartir (usa customUrl si está disponible, sino la URL del evento)
+// 📌 URL para compartir: SIEMPRE la página pública del evento con ?ref=share.
+// Nunca compartir /ticket/ ni /qr/ (cualquiera con el link podría usar la entrada).
 const eventUrl = computed(() => {
-  if (props.customUrl) return props.customUrl;
-  if (!props.event?.slug) return window.location.href;
-  return `${window.location.origin}/eventos/${props.event.slug}`;
+  if (props.customUrl && !/\/(ticket|qr|order)\//.test(props.customUrl)) return props.customUrl;
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://aitickets.cl";
+  if (!props.event?.slug) return `${origin}/eventos`;
+  return `${origin}/eventos/${encodeURIComponent(props.event.slug)}?ref=share`;
 });
 
 // 📌 Título para compartir
@@ -34,7 +36,7 @@ const shareText = computed(() => {
 });
 
 // 📌 Verificar si el navegador soporta Web Share API
-const canShare = computed(() => navigator.share);
+const canShare = computed(() => typeof navigator !== "undefined" && !!navigator.share);
 
 // 📌 Función para compartir nativo
 const shareNative = async () => {
@@ -71,13 +73,22 @@ const trackShare_ = (platform) => {
 </script>
 
 <template>
-  <div v-if="show" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+  <div v-if="show" class="fixed inset-0 bg-black/50 flex justify-center items-center z-50" @click.self="emit('close')">
     <div class="bg-white p-6 rounded-lg shadow-lg w-80">
       <!-- 🔹 Título -->
       <h2 class="text-lg font-bold mb-4 font-['Unbounded']">Compartir {{ customTitle ? '' : 'evento' }}</h2>
 
       <!-- 🔹 Botones de compartir -->
       <div class="space-y-3">
+        <!-- WhatsApp -->
+        <a :href="`https://wa.me/?text=${encodeURIComponent(`${shareText} ${eventUrl}`)}`" 
+          target="_blank" rel="noopener noreferrer" 
+          @click="trackShare_('whatsapp')"
+          class="flex items-center gap-2 w-full px-4 py-2 rounded-lg text-sm justify-center bg-green-500 text-white hover:bg-green-600 font-semibold">
+          <img src="https://cdn.simpleicons.org/whatsapp/ffffff" alt="" loading="lazy" class="w-5 h-5" />
+          WhatsApp
+        </a>
+
         <!-- Native Share (si está disponible) -->
         <button v-if="canShare" @click="shareNative" 
           class="flex items-center gap-2 w-full border px-4 py-2 rounded-lg text-sm hover:bg-gray-50 justify-center">
@@ -97,7 +108,7 @@ const trackShare_ = (platform) => {
         </button>
 
         <!-- Email -->
-        <a :href="`mailto:?subject=Mira este evento: ${shareTitle}&body=${shareText}: ${eventUrl}`" 
+        <a :href="`mailto:?subject=${encodeURIComponent(`Mira este evento: ${shareTitle}`)}&body=${encodeURIComponent(`${shareText}: ${eventUrl}`)}`" 
           @click="trackShare_('email')"
           class="flex items-center gap-2 w-full border px-4 py-2 rounded-lg text-sm hover:bg-gray-50 justify-center">
           <img src="https://cdn.simpleicons.org/gmail" alt="email" class="w-5 h-5" />
@@ -105,20 +116,11 @@ const trackShare_ = (platform) => {
         </a>
 
         <!-- SMS -->
-        <a :href="`sms:&body=${shareText}: ${eventUrl}`" 
+        <a :href="`sms:?&body=${encodeURIComponent(`${shareText}: ${eventUrl}`)}`" 
           @click="trackShare_('sms')"
           class="flex items-center gap-2 w-full border px-4 py-2 rounded-lg text-sm hover:bg-gray-50 justify-center">
           <img src="https://cdn.simpleicons.org/googlemessages" alt="sms" class="w-5 h-5" />
           Mensajes
-        </a>
-
-        <!-- WhatsApp -->
-        <a :href="`https://wa.me/?text=${encodeURIComponent(`${shareText} ${eventUrl}`)}`" 
-          target="_blank" rel="noopener noreferrer" 
-          @click="trackShare_('whatsapp')"
-          class="flex items-center gap-2 w-full border px-4 py-2 rounded-lg text-sm hover:bg-gray-50 justify-center">
-          <img src="https://cdn.simpleicons.org/whatsapp" alt="whatsapp" class="w-5 h-5" />
-          WhatsApp
         </a>
 
         <!-- Facebook -->

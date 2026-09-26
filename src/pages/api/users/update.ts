@@ -1,11 +1,11 @@
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin, getFriendlyErrorMessage } from "../../../lib/auth-helpers";
-import { getSessionUser } from "../../../lib/supabaseServer";
+import { getSessionContext } from "../../../lib/supabaseServer";
 
 export const POST: APIRoute = async (context) => {
-    const user = await getSessionUser(context);
+    const session = await getSessionContext(context);
 
-    if (!user) {
+    if (!session) {
         return new Response(JSON.stringify({ error: "Unauthorized" }), {
             status: 401,
             headers: { "Content-Type": "application/json" },
@@ -14,7 +14,9 @@ export const POST: APIRoute = async (context) => {
 
     try {
         const body = await context.request.json();
-        const { full_name, phone } = body;
+        const full_name = typeof body?.full_name === "string" ? body.full_name.trim().slice(0, 150) : undefined;
+        const phone = typeof body?.phone === "string" ? body.phone.trim().slice(0, 50) : undefined;
+        const user = session.authUser;
 
         const supabaseAdmin = getSupabaseAdmin();
 
@@ -26,7 +28,7 @@ export const POST: APIRoute = async (context) => {
                 phone: phone,
                 updated_at: new Date().toISOString()
             })
-            .eq("auth_user_id", user.id);
+            .eq("id", session.dbUser.id);
 
         if (dbError) {
             console.error("Database update error:", dbError);
@@ -37,10 +39,10 @@ export const POST: APIRoute = async (context) => {
         }
 
         // 2. Update Supabase Auth metadata (so sidebar update reflects immediately without DB fetch if used)
-        const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(
-            user.id,
-            { user_metadata: { full_name: full_name, phone: phone } }
-        );
+        // Solo si la cuenta de Auth la creó AI Tickets (Auth es compartido con otras apps)
+        const { error: authError } = user.app_metadata?.app === "aitickets"
+            ? await supabaseAdmin.auth.admin.updateUserById(user.id, { user_metadata: { ...user.user_metadata, full_name, phone } })
+            : { error: null };
 
         if (authError) {
             console.error("Auth update error:", authError);

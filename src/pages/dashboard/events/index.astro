@@ -1,34 +1,21 @@
 ---
 import DashboardLayout from "../../../layouts/DashboardLayout.astro";
-import { Plus, Calendar, MapPin, Eye, Edit, ListFilter, Globe, FileText } from "lucide-vue-next";
-import { createSupabaseServerClient } from "../../../lib/supabaseServer";
+import { Plus, Calendar, MapPin, Eye, Edit, ListFilter, Globe, FileText, QrCode } from "lucide-vue-next";
+import { getSupabaseAdmin } from "../../../lib/auth-helpers";
+import { hasRole, EVENT_MANAGER_ROLES } from "../../../lib/supabaseServer";
+import { requireDashboardSession } from "../_lib/guard";
 
-const supabase = createSupabaseServerClient(Astro);
-const {
-  data: { user },
-} = await supabase.auth.getUser();
+// Todos los roles pueden ver la lista (los validadores solo acceden al check-in)
+const guard = await requireDashboardSession(Astro);
+if (!guard.ok) return guard.response;
+const { dbUser } = guard.session;
+const canManage = hasRole(dbUser, EVENT_MANAGER_ROLES);
 
-if (!user) {
-  return Astro.redirect("/organizadores/login");
-}
-
-// Get public user info (organization_id)
-const { data: dbUser } = await supabase
-  .from("users")
-  .select("organization_id")
-  .eq("auth_user_id", user.id)
-  .single();
-
-if (!dbUser || !dbUser.organization_id) {
-  console.error("User request without organization_id");
-}
-
-// Fetch events (only if user has an organization)
-const events = [];
-if (dbUser?.organization_id) {
-  const { data } = await supabase
+const events: any[] = [];
+{
+  const { data } = await getSupabaseAdmin()
     .from("events")
-    .select("*")
+    .select("id, name, slug, status, image_url, start_date, location, created_at")
     .eq("organization_id", dbUser.organization_id)
     .order("created_at", { ascending: false });
   if (data) events.push(...data);
@@ -44,13 +31,15 @@ if (dbUser?.organization_id) {
       <p class="text-gray-600">Gestiona y monitorea todos tus eventos.</p>
     </div>
 
-    <a
-      href="/dashboard/events/create"
-      class="inline-flex items-center gap-2 bg-black text-white px-5 py-2.5 rounded-lg hover:bg-gray-800 transition font-medium"
-    >
-      <Plus size={20} />
-      Crear Evento
-    </a>
+    {canManage && (
+      <a
+        href="/dashboard/events/create"
+        class="inline-flex items-center gap-2 bg-black text-white px-5 py-2.5 rounded-lg hover:bg-gray-800 transition font-medium"
+      >
+        <Plus size={20} />
+        Crear Evento
+      </a>
+    )}
   </div>
 
   {
@@ -66,12 +55,14 @@ if (dbUser?.organization_id) {
         <p class="text-gray-500 mb-6">
           Crea tu primer evento para comenzar a vender entradas.
         </p>
-        <a
-          href="/dashboard/events/create"
-          class="inline-flex bg-black text-white px-6 py-3 rounded-lg hover:bg-gray-800 transition font-medium"
-        >
-          Crear Evento
-        </a>
+        {canManage && (
+          <a
+            href="/dashboard/events/create"
+            class="inline-flex bg-black text-white px-6 py-3 rounded-lg hover:bg-gray-800 transition font-medium"
+          >
+            Crear Evento
+          </a>
+        )}
       </div>
     ) : (
       <>
@@ -127,34 +118,47 @@ if (dbUser?.organization_id) {
                   {event.status === "published" ? "Publicado" : "Borrador"}
                 </span>
                 <span class="text-xs text-gray-500">
-                  {new Date(event.start_date).toLocaleDateString()}
+                  {event.start_date
+                    ? new Date(event.start_date).toLocaleDateString("es-CL", { timeZone: "America/Santiago" })
+                    : "Sin fecha"}
                 </span>
               </div>
 
               <h3 class="font-bold text-lg mb-2 font-[Unbounded] line-clamp-1">
-                {event.title || event.name}
+                {event.name}
               </h3>
 
               <div class="flex items-center gap-2 text-sm text-gray-600 mb-4">
                 <MapPin size={16} />
                 <span class="truncate">
-                  {event.address || "Ubicación por definir"}
+                  {event.location || "Ubicación por definir"}
                 </span>
               </div>
 
               <div class="flex gap-2 mt-4 pt-4 border-t border-gray-50">
-                <a
-                  href={`/dashboard/events/${event.id}`}
-                  class="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-50 rounded-lg hover:bg-gray-100 transition"
-                >
-                  <Eye size={16} /> Gestionar
-                </a>
-                <a
-                  href={`/dashboard/events/${event.id}/edit`}
-                  class="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-white bg-black rounded-lg hover:bg-gray-800 transition"
-                >
-                  <Edit size={16} /> Editar
-                </a>
+                {canManage ? (
+                  <>
+                    <a
+                      href={`/dashboard/events/${event.id}`}
+                      class="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-50 rounded-lg hover:bg-gray-100 transition"
+                    >
+                      <Eye size={16} /> Gestionar
+                    </a>
+                    <a
+                      href={`/dashboard/events/${event.id}/edit`}
+                      class="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-white bg-black rounded-lg hover:bg-gray-800 transition"
+                    >
+                      <Edit size={16} /> Editar
+                    </a>
+                  </>
+                ) : (
+                  <a
+                    href={`/dashboard/events/${event.id}/checkin`}
+                    class="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-white bg-black rounded-lg hover:bg-gray-800 transition"
+                  >
+                    <QrCode size={16} /> Check-in
+                  </a>
+                )}
               </div>
             </div>
           </div>

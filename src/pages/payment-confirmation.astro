@@ -5,11 +5,17 @@ import TicketInfo from "../components/TicketInfo.vue";
 import EventDetails from "../components/EventDetails.vue";
 import Layout from '../layouts/Layout.astro';
 import "../styles/global.css";
-import { getSupabaseAnon } from "../lib/auth-helpers";
+import { getSupabaseAdmin } from "../lib/auth-helpers";
+import { sendTicketsEmail } from "./api/_lib/server-utils";
 import { createHmac } from 'node:crypto';
 
-// Inicializar el cliente de Supabase (server-side)
-const supabase = getSupabaseAnon();
+export const prerender = false;
+
+// urlReturn de Flow: el navegador llega aquí por POST con el `token` del pago.
+// Esta página SOLO muestra el estado: el webhook /api/payment-confirmation es quien marca la orden
+// como pagada, emite las entradas y envía el correo. Red de seguridad: si la orden está pagada y el correo
+// aún no se envió (p. ej. Mailgun falló en el webhook), se dispara /api/send-tickets-email (idempotente).
+const supabase = getSupabaseAdmin();
 
 // Configuración de seguridad
 const request = Astro.request;
@@ -22,6 +28,7 @@ if (request.method !== 'POST') {
     <html>
     <head>
       <meta charset="UTF-8">
+      <meta name="robots" content="noindex, nofollow">
       <title>Redirigiendo...</title>
     </head>
     <body>
@@ -71,274 +78,225 @@ if (request.method !== 'POST') {
     status: 200,
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
+      'X-Robots-Tag': 'noindex, nofollow',
     },
   });
 }
 
 const allowedOrigins = ['https://aitickets.cl', 'https://www.aitickets.cl', 'https://www.flow.cl', 'https://sandbox.flow.cl'];
 const origin = request.headers.get('origin');
-if (origin && !allowedOrigins.includes(origin)) {
+if (origin && origin !== 'null' && !allowedOrigins.includes(origin)) {
   return new Response('Origen no permitido', { status: 403 });
 }
 
-/**
- * Firma los parámetros usando HMAC-SHA256 con secretKey
- */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Firma los parámetros de Flow con HMAC-SHA256 (claves ordenadas, nombre+valor). */
 function generateSignature(params: Record<string, any>, secretKey: string): string {
-  // 1. Claves ordenadas alfabéticamente
   const keys = Object.keys(params).filter(key => key !== 's').sort();
-
-  // 2. Concatenar en formato nombre + valor
   const stringToSign = keys.map(key => key + params[key]).join('');
-
-  // 3. Firmar con HMAC-SHA256
-  const hmac = createHmac('sha256', secretKey);
-  hmac.update(stringToSign);
-  const signature = hmac.digest('hex');
-
-  return signature;
+  return createHmac('sha256', secretKey).update(stringToSign).digest('hex');
 }
 
-// Variables para almacenar datos
-let paymentDetails = null;
-let paymentStatusMessage = '';
-let eventData = null;
-let ticketData = [];
+type ViewState = 'paid' | 'processing' | 'pending' | 'review' | 'rejected' | 'cancelled' | 'error';
 
-// Procesar la solicitud POST
-if (request.method === 'POST') {
-  const formData = await request.formData();
-  const token = formData.get('token');
+let state: ViewState = 'error';
+let paymentStatusMessage = 'No se recibió la información necesaria para verificar tu pago.';
+let order: any = null;
+let eventData: any = null;
+let tickets: any[] = [];
+let totalPaid = 0;
+let purchase: any = null;      // payload GA4 `purchase` (solo si está pagada)
+let purchaseData: any = null;  // resumen para localStorage ("Mis entradas")
 
-  if (token) {
-    // Consultar el estado del pago en Flow
+const formData = await request.formData();
+const token = formData.get('token');
+
+if (typeof token === 'string' && token) {
+  try {
     const flowApiKey = import.meta.env.FLOW_API_KEY;
     const flowApiSecret = import.meta.env.FLOW_SECRET_KEY;
-    const flowApiUrl = `${import.meta.env.FLOW_BASE_URL}/payment/getStatus`;
-    const signature = generateSignature({ apiKey: flowApiKey, token }, flowApiSecret);
+    const params = { apiKey: flowApiKey, token };
+    const qs = new URLSearchParams({ ...params, s: generateSignature(params, flowApiSecret) });
+    const flowResponse = await fetch(`${import.meta.env.FLOW_BASE_URL}/payment/getStatus?${qs.toString()}`);
 
-    // Construir la URL con los parámetros necesarios
-    const url = `${flowApiUrl}?apiKey=${flowApiKey}&token=${token}&s=${signature}`;
+    if (!flowResponse.ok) {
+      paymentStatusMessage = 'No se pudo verificar el estado de tu pago en este momento. Revisa tu correo o intenta más tarde.';
+    } else {
+      const flowPayment = await flowResponse.json();
+      const commerceOrder = String(flowPayment.commerceOrder || '');
 
-    const flowResponse = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (flowResponse.ok) {
-      const paymentStatus = await flowResponse.json();
-      console.log(paymentStatus)
-      const { commerceOrder, status, amount } = paymentStatus;
-
-      // Obtener detalles de la orden desde Supabase
-      const { data: orderData, error } = await supabase
-        .from('event_orders')
-        .select('*')
-        .eq('id', commerceOrder)
-        .single();
-
-      console.log('Datos de la orden:', orderData);
-
-                // obtener evento
-      const { data: eventInfo } = await supabase
-        .from('events')
-        .select('*')
-        .eq('id', orderData.event_id)
-        .single();
-
-        eventData = eventInfo;
-
-      if (error) {
-        console.error('Error al obtener la orden desde Supabase:', error.message);
-        paymentStatusMessage = 'Hubo un problema al recuperar los detalles de tu orden. Por favor, contacta a soporte.';
+      if (!UUID_RE.test(commerceOrder)) {
+        paymentStatusMessage = 'No encontramos tu orden. Por favor, contacta a soporte.';
       } else {
+        const { data: orderData } = await supabase
+          .from('event_orders')
+          .select('id, status, event_id, amount, ticket_fee, total_payment, ticket_qty, ticket_details, created_at, email_sent_at')
+          .eq('id', commerceOrder)
+          .maybeSingle();
 
-           // Obtener tickets de la orden desde Supabase
-        const { data: ticketsInfo, error: ticketsError } = await supabase
-          .from('event_attendees')
-          .select('*')
-          .eq('event_order_id', commerceOrder);
-
-        console.log('Tickets obtenidos:', ticketsInfo);
-        
-        if (ticketsError) {
-          console.error('Error al obtener los tickets desde Supabase:', ticketsError.message);
-          paymentStatusMessage = 'Hubo un problema al recuperar los detalles de tus tickets. Por favor, contacta a soporte.';
-        }  else {
-          ticketData = ticketsInfo;
-        }
-        paymentDetails = {
-          ...orderData,
-          flowStatus: status,
-          flowAmount: amount,
-          // flowFee: fee,
-          flowCommerceId: orderData.payment_external_id || null,
-          ticketsData: ticketData,
-          event: eventData
-        };
-
-        // Verificar si el estado en la base de datos es diferente al estado en Flow
-        if (orderData.status == 'paid' && status === 2) {
-          paymentDetails.status = 'paid';
-          paymentStatusMessage = '¡Gracias por tu pago! Tu transacción ha sido completada exitosamente.';
-          
-          // Enviar email de confirmación con tickets
-          try {
-            const emailResponse = await fetch(`${import.meta.env.SITE_URL}/api/send-tickets-email`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                orderId: commerceOrder
-              })
-            });
-
-            if (emailResponse.ok) {
-              console.log('✉️ Email de confirmación enviado exitosamente');
-            } else {
-              console.error('❌ Error enviando email de confirmación:', await emailResponse.text());
-            }
-          } catch (emailError) {
-            console.error('❌ Error al llamar función de email:', emailError);
-          }
+        if (!orderData) {
+          paymentStatusMessage = 'No encontramos tu orden. Por favor, contacta a soporte.';
         } else {
-          // Determinar el mensaje de estado del pago
-          switch (status) {
-            case 1:
-              paymentStatusMessage = 'Tu pago está pendiente de confirmación. Te notificaremos una vez que se confirme.';
-              break;
-            case 3:
-              paymentStatusMessage = 'Lamentablemente, tu pago ha sido rechazado. Por favor, intenta nuevamente o utiliza otro método de pago.';
-              break;
-            case 4:
-              paymentStatusMessage = 'Tu pago ha sido anulado. Si crees que esto es un error, por favor, contacta a soporte.';
-              break;
-            default:
-              paymentStatusMessage = 'Estado del pago desconocido. Por favor, contacta a soporte para más información.';
+          order = orderData;
+          totalPaid = Number(orderData.total_payment ?? (Number(orderData.amount) + Number(orderData.ticket_fee || 0))) || 0;
+
+          const { data: eventInfo } = await supabase
+            .from('events')
+            .select('id, name, title, slug, image_url, location, start_date, end_date')
+            .eq('id', orderData.event_id)
+            .maybeSingle();
+          eventData = eventInfo ? { ...eventInfo, address: eventInfo.location } : null;
+
+          if (orderData.status === 'paid') {
+            state = 'paid';
+            paymentStatusMessage = '¡Gracias por tu compra! Tu pago fue confirmado.';
+            const { data: ticketsInfo } = await supabase
+              .from('event_attendees')
+              .select('id, qr_code, status, event_tickets ( ticket_name )')
+              .eq('event_order_id', orderData.id);
+            tickets = (ticketsInfo || []).map((t: any) => ({
+              id: t.id,
+              qr_code: t.qr_code,
+              status: t.status,
+              ticket_name: t.event_tickets?.ticket_name || 'Entrada',
+            }));
+            if (!orderData.email_sent_at && tickets.length) {
+              const mail = await sendTicketsEmail(new URL(request.url), orderData.id);
+              if (!mail.ok) console.error(`payment-confirmation: no se pudo enviar el correo de la orden ${orderData.id} (${mail.status})`);
+            }
+          } else if (orderData.status === 'review') {
+            // Pago recibido pero requiere revisión manual (monto no coincide o sin stock): no prometer entradas
+            state = 'review';
+            paymentStatusMessage = 'Recibimos tu pago, pero tu orden requiere una revisión manual. Nuestro equipo te contactará por correo; si tienes dudas escríbenos a soporte@aitickets.cl indicando tu número de orden.';
+          } else if (flowPayment.status === 2) {
+            // Flow ya cobró pero el webhook aún no termina de procesar la orden
+            state = 'processing';
+            paymentStatusMessage = '¡Pago recibido! Estamos emitiendo tus entradas; llegarán a tu correo en unos minutos.';
+          } else if (flowPayment.status === 1) {
+            state = 'pending';
+            paymentStatusMessage = 'Tu pago está pendiente de confirmación. Te enviaremos las entradas por correo apenas se confirme.';
+          } else if (flowPayment.status === 3 || orderData.status === 'rejected') {
+            state = 'rejected';
+            paymentStatusMessage = 'Tu pago fue rechazado. Puedes intentarlo nuevamente o usar otro medio de pago.';
+          } else if (flowPayment.status === 4 || orderData.status === 'cancelled') {
+            state = 'cancelled';
+            paymentStatusMessage = 'El pago fue anulado. Si crees que es un error, contacta a soporte.';
+          } else {
+            paymentStatusMessage = 'No pudimos determinar el estado de tu pago. Por favor, contacta a soporte.';
+          }
+
+          if (state === 'paid' && eventData) {
+            const lines = Array.isArray(orderData.ticket_details) ? orderData.ticket_details : [];
+            purchase = {
+              transaction_id: orderData.id,
+              value: totalPaid,
+              currency: 'CLP',
+              items: lines.map((l: any) => ({
+                item_id: `${eventData.id}-${l.id}`,
+                item_name: `${eventData.name} - ${l.name}`,
+                item_category: 'event_ticket',
+                price: Number(l.price) || 0,
+                quantity: Number(l.quantity) || 1,
+              })),
+            };
+            purchaseData = {
+              orderId: orderData.id,
+              eventId: eventData.id,
+              eventSlug: eventData.slug,
+              eventName: eventData.name,
+              eventStartDate: eventData.start_date,
+              amount: totalPaid,
+              ticketsCount: tickets.length,
+              tickets: tickets.map((t) => ({ id: t.id, ticket_name: t.ticket_name })),
+            };
           }
         }
       }
-    } else {
-      console.error('Error al consultar el estado del pago en Flow:', flowResponse.statusText);
-      paymentStatusMessage = 'No se pudo verificar el estado de tu pago en este momento. Por favor, intenta más tarde.';
     }
-  } else {
-    console.error('Token no proporcionado en la solicitud.');
-    paymentStatusMessage = 'No se recibió la información necesaria para verificar tu pago.';
+  } catch (err: any) {
+    console.error('Error verificando pago:', err?.message);
+    paymentStatusMessage = 'No se pudo verificar el estado de tu pago en este momento. Revisa tu correo o intenta más tarde.';
   }
 }
+
+const orderUrl = order ? `/order/${order.id}` : null;
+const retryUrl = eventData?.slug ? `/eventos/${eventData.slug}` : '/eventos';
+const headingColor = state === 'paid' || state === 'processing' ? 'text-green-600' : state === 'pending' || state === 'review' ? 'text-amber-600' : 'text-red-600';
 ---
-<Layout>
+<Layout title="Confirmación de pago | AI Tickets" noindex>
   <AppHeader client:idle />
 
   <main class="flex flex-col items-center min-h-screen bg-gray-100 py-10">
     <div class="max-w-3xl w-full bg-white shadow-lg rounded-2xl p-6 lg:p-10 mx-4">
+      <h1 class={`text-2xl font-semibold ${headingColor} pt-4 mb-4 font-[Unbounded] text-center`}>{paymentStatusMessage}</h1>
 
-      {paymentDetails ? (
-        <>
-          <h1 class="text-2xl font-semibold text-green-600 pt-4 mb-4 font-[Unbounded] text-center">{paymentStatusMessage}</h1>
+      {order && eventData && <EventDetails event={eventData} client:load />}
 
-          <EventDetails event={paymentDetails.event} client:load />
-
-          {/* Detalles del Pago */}
-          <div class="space-y-3 text-gray-700 font-[Prompt]" >
-            <p><span class="font-semibold">ID de la Orden:</span> {paymentDetails.id}</p>
-            <p><span class="font-semibold">Estado:</span> {paymentDetails.flowStatus === 2 ? 'Pagado' : 'No Pagado'}</p>
-            <p><span class="font-semibold">Monto Total:</span> ${paymentDetails.flowAmount}</p>
-            <p><span class="font-semibold">ID de Pago en Comercio:</span> {paymentDetails.flowCommerceId}</p>
-          </div>
-
-          {(paymentDetails.status === 'paid' && paymentDetails.ticketsData.length) && (
-            <div class="mt-8">
-              <h2 class="text-xl font-bold text-gray-800 mb-4 font-[Unbounded] text-center">Tickets Adquiridos</h2>
-              <div class="space-y-6">
-                {paymentDetails.ticketsData.map((ticketItem: any) => (
-                  <div class="mt-0 pt-8 lg:pt-12 px-4 lg:px-0">
-                    <TicketInfo ticket={ticketItem} event={paymentDetails.event} client:only />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {(paymentDetails.status !== 'paid') && (
-            <div class="mt-10 text-center">
-              <a 
-                href={`/eventos/${paymentDetails?.event?.slug}`} 
-                class="inline-block px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition"
-              >
-                Reintentar Pago
-              </a>
-            </div>
-          )}
-        </>
-      ) : (
-        <p class="text-gray-600">{paymentStatusMessage}</p>
+      {order && (
+        <div class="space-y-2 text-gray-700 font-[Prompt] mt-4 break-words">
+          <p><span class="font-semibold">Orden:</span> {order.id}</p>
+          <p><span class="font-semibold">Total:</span> {totalPaid > 0 ? `$${totalPaid.toLocaleString('es-CL')} CLP` : 'Gratis'}</p>
+        </div>
       )}
 
+      {(state === 'paid' || state === 'processing' || state === 'pending') && orderUrl && (
+        <div class="mt-8 text-center">
+          <a href={orderUrl} class="inline-block px-6 py-3 bg-black hover:bg-gray-800 text-white font-semibold rounded-xl transition">
+            Ver mis entradas
+          </a>
+          <p class="text-sm text-gray-500 mt-2 font-[Prompt]">También te enviamos las entradas por correo.</p>
+        </div>
+      )}
+
+      {state === 'paid' && tickets.length > 0 && (
+        <div class="mt-8">
+          <h2 class="text-xl font-bold text-gray-800 mb-4 font-[Unbounded] text-center">Tus entradas</h2>
+          <div class="space-y-6">
+            {tickets.map((ticketItem: any) => (
+              <div class="mt-0 pt-8 lg:pt-12 px-4 lg:px-0">
+                <TicketInfo ticket={ticketItem} event={eventData} client:only />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {(state === 'rejected' || state === 'cancelled' || state === 'error') && (
+        <div class="mt-10 text-center">
+          <a href={retryUrl} class="inline-block px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition">
+            Volver al evento
+          </a>
+        </div>
+      )}
     </div>
   </main>
 
   <AppFooter />
 
-  {/* Google Analytics Purchase Tracking */}
-  {paymentDetails?.status === 'paid' && (
-    <script type="text/partytown">
-      gtag('event', 'purchase', {
-        transaction_id: paymentDetails.id,
-        currency: 'CLP',
-        value: paymentDetails.flowAmount,
-        items: paymentDetails.ticketsData.map(ticket => ({
-          item_id: paymentDetails.event.id,
-          item_name: paymentDetails.event.title,
-          item_category: 'event_ticket',
-          quantity: ticket.quantity || 1,
-          price: ticket.price || (paymentDetails.flowAmount / paymentDetails.ticketsData.length)
-        }))
-      });
-    </script>
-  )}
+  {purchase && (
+    <script define:vars={{ purchase, purchaseData }}>
+      // GA4 purchase: una sola vez por orden (recargar la página no duplica la conversión)
+      try {
+        const gaKey = 'ga_purchase_' + purchase.transaction_id;
+        if (!sessionStorage.getItem(gaKey)) {
+          window.gtag?.('event', 'purchase', purchase);
+          sessionStorage.setItem(gaKey, '1');
+        }
+      } catch (e) { /* storage o gtag no disponibles */ }
 
-  {/* Guardar información de la orden en localStorage */}
-  {paymentDetails?.status === 'paid' && (
-    <script define:vars={{ paymentDetails }}>
-      // Guardar información de la compra en localStorage para mostrar después
-      const purchaseData = {
-        orderId: paymentDetails.id,
-        eventId: paymentDetails.event.id,
-        eventSlug: paymentDetails.event.slug,
-        eventName: paymentDetails.event.name,
-        eventAddress: paymentDetails.event.address,
-        eventSecretLocation: paymentDetails.event.secret_location,
-        eventStartDate: paymentDetails.event.start_date,
-        purchaseDate: new Date().toISOString(),
-        amount: paymentDetails.flowAmount,
-        ticketsCount: paymentDetails.ticketsData.length,
-        tickets: paymentDetails.ticketsData
-      };
-      
-      // Obtener órdenes existentes para este evento específico
-      const eventOrdersKey = `purchase_event_${paymentDetails.event.id}`;
-      const existingEventOrders = JSON.parse(localStorage.getItem(eventOrdersKey) || '[]');
-      
-      // Verificar si esta orden ya existe (evitar duplicados)
-      const orderExists = existingEventOrders.some(order => order.orderId === paymentDetails.id);
-      
-      if (!orderExists) {
-        // Agregar la nueva orden al array de órdenes del evento
-        existingEventOrders.push(purchaseData);
-        
-        // Guardar todas las órdenes de este evento
-        localStorage.setItem(eventOrdersKey, JSON.stringify(existingEventOrders));
-      }
-      
-      // También limpiar datos temporales del modal de reserva
-      localStorage.removeItem(`selectedTickets_event_${paymentDetails.event.id}`);
-      localStorage.removeItem(`buyerInfo_event_${paymentDetails.event.id}`);
-      localStorage.removeItem(`currentStep_event_${paymentDetails.event.id}`);
+      // Guardar la compra para "Mis entradas" en la página del evento y limpiar el flujo de reserva
+      try {
+        const key = 'purchase_event_' + purchaseData.eventId;
+        const orders = JSON.parse(localStorage.getItem(key) || '[]');
+        if (!orders.some((o) => o.orderId === purchaseData.orderId)) {
+          orders.push({ ...purchaseData, purchaseDate: new Date().toISOString() });
+          localStorage.setItem(key, JSON.stringify(orders));
+        }
+        localStorage.removeItem('selectedTickets_event_' + purchaseData.eventId);
+        localStorage.removeItem('buyerInfo_event_' + purchaseData.eventId);
+        localStorage.removeItem('currentStep_event_' + purchaseData.eventId);
+      } catch (e) { /* storage no disponible */ }
     </script>
   )}
 </Layout>

@@ -22,7 +22,7 @@ const accounts = ref(JSON.parse(props.accountsJson))
 const posts = ref(JSON.parse(props.postsJson))
 const events = ref(JSON.parse(props.eventsJson))
 const stats = ref(JSON.parse(props.statsJson))
-const activeTab = ref(props.initialTab === 'ads' ? 'ads' : 'overview')
+const activeTab = ref(props.initialTab === 'posts' ? 'posts' : 'overview')
 
 const notification = ref({ show: false, type: '', message: '' })
 
@@ -39,6 +39,11 @@ onMounted(() => {
       invalid_platform: 'Plataforma no válida.',
       db_error: 'Error al guardar la cuenta.',
       internal: 'Error interno. Intenta nuevamente.',
+      invalid_state: 'La conexión no es válida. Vuelve a iniciarla desde este panel.',
+      expired_state: 'La conexión expiró. Vuelve a intentarlo.',
+      invalid_profile: 'La cuenta no corresponde a tu organización.',
+      invalid_account: 'No pudimos verificar la cuenta conectada. Intenta nuevamente.',
+      forbidden: 'No tienes permisos para conectar cuentas.',
     }
     notification.value = { show: true, type: 'error', message: messages[props.errorType] || 'Error desconocido.' }
     setTimeout(() => { notification.value.show = false }, 5000)
@@ -99,7 +104,7 @@ const handleDisconnect = async (accountId) => {
     </div>
 
     <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
       <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
         <div class="flex items-center gap-3 mb-2">
           <div class="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center">
@@ -130,25 +135,6 @@ const handleDisconnect = async (accountId) => {
         <p class="text-2xl font-bold">{{ stats.scheduledPosts }}</p>
       </div>
 
-      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-        <div class="flex items-center gap-3 mb-2">
-          <div class="w-10 h-10 bg-orange-50 rounded-lg flex items-center justify-center">
-            <Target :size="20" class="text-orange-600" />
-          </div>
-          <span class="text-sm text-gray-500">Ads Activas</span>
-        </div>
-        <p class="text-2xl font-bold">{{ stats.activeCampaigns || 0 }}</p>
-      </div>
-
-      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-        <div class="flex items-center gap-3 mb-2">
-          <div class="w-10 h-10 bg-pink-50 rounded-lg flex items-center justify-center">
-            <DollarSign :size="20" class="text-pink-600" />
-          </div>
-          <span class="text-sm text-gray-500">Gasto Ads</span>
-        </div>
-        <p class="text-2xl font-bold">{{ stats.totalAdSpend ? `$${stats.totalAdSpend.toLocaleString('es-CL')}` : '$0' }}</p>
-      </div>
     </div>
 
     <!-- Tabs -->
@@ -167,13 +153,12 @@ const handleDisconnect = async (accountId) => {
       >
         Historial de Posts
       </button>
-      <button
-        @click="activeTab = 'ads'"
-        class="px-4 py-2 rounded-md text-sm font-medium transition-colors"
-        :class="activeTab === 'ads' ? 'bg-white text-black shadow-sm' : 'text-gray-500 hover:text-gray-700'"
+      <span
+        class="px-4 py-2 rounded-md text-sm font-medium text-gray-400 cursor-not-allowed"
+        title="Las campañas pagadas en Meta estarán disponibles pronto"
       >
-        Meta Ads
-      </button>
+        Meta Ads · Próximamente
+      </span>
     </div>
 
     <!-- Tab Content -->
@@ -188,24 +173,6 @@ const handleDisconnect = async (accountId) => {
       <PostHistory :posts="posts" />
     </div>
 
-    <div v-if="activeTab === 'ads'">
-      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
-        <div class="w-16 h-16 bg-gradient-to-br from-[#1877F2] to-[#E1306C] rounded-2xl flex items-center justify-center mx-auto mb-4">
-          <Target :size="32" class="text-white" />
-        </div>
-        <h3 class="text-lg font-semibold mb-2">Meta Ads</h3>
-        <p class="text-gray-500 mb-6 max-w-md mx-auto">
-          Crea campañas de anuncios pagados en Facebook e Instagram para llegar a más personas.
-        </p>
-        <a
-          href="/dashboard/promote/ads"
-          class="inline-flex items-center gap-2 bg-black text-white px-6 py-3 rounded-lg hover:bg-gray-800 transition font-medium"
-        >
-          <Megaphone :size="18" />
-          {{ stats.hasMetaAds ? 'Gestionar Campañas' : 'Comenzar con Ads' }}
-        </a>
-      </div>
-    </div>
   </div>
 </template>
 

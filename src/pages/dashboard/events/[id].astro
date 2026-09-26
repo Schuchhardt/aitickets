@@ -1,8 +1,11 @@
 ---
+import { siteUrl as siteUrlFromEnv } from "../../api/_lib/server-utils";
 import DashboardLayout from "../../../layouts/DashboardLayout.astro";
 import EventFAQManager from "../../../components/dashboard/EventFAQManager.vue";
+import CourtesyTicketsForm from "../../../components/dashboard/CourtesyTicketsForm.vue";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
-import { createSupabaseServerClient } from "../../../lib/supabaseServer";
+import { EVENT_MANAGER_ROLES } from "../../../lib/supabaseServer";
+import { requireDashboardSession } from "../_lib/guard";
 import {
     Calendar,
     MapPin,
@@ -14,45 +17,32 @@ import {
     Share2,
     BarChart3,
     Users,
+    Copy,
+    Download,
 } from "lucide-vue-next";
 
 const { id } = Astro.params;
-const supabase = createSupabaseServerClient(Astro);
+const guard = await requireDashboardSession(Astro, EVENT_MANAGER_ROLES);
+if (!guard.ok) return guard.response;
+const { dbUser } = guard.session;
 const supabaseAdmin = getSupabaseAdmin();
 
-const {
-    data: { user },
-} = await supabase.auth.getUser();
-
-if (!user) {
-    return Astro.redirect("/organizadores/login");
-}
-
-// Get public user info
-const { data: dbUser } = await supabase
-    .from("users")
-    .select("id, organization_id")
-    .eq("auth_user_id", user.id)
-    .single();
-
-if (!dbUser || !dbUser.organization_id) {
-    return Astro.redirect("/dashboard/events");
-}
-
-// Fetch event details
+// Detalle del evento (solo si pertenece a la organización)
 const { data: event, error } = await supabaseAdmin
     .from("events")
     .select(
         `
-    *,
+    id, name, slug, status, start_date, end_date, location, accessibility,
     event_tickets (
       id,
       ticket_name,
       price,
-      total_quantity
+      total_quantity,
+      status
     ),
+    event_dates ( id ),
     event_locations (
-      *,
+      id,
       venues (
         name,
         city
@@ -79,13 +69,13 @@ const totalTickets =
 const { count: ticketsSold } = await supabaseAdmin
     .from("event_attendees")
     .select("id", { count: "exact", head: true })
-    .eq("event_id", id);
+    .eq("event_id", event.id);
 
 // Real revenue from paid orders
 const { data: ordersData } = await supabaseAdmin
     .from("event_orders")
     .select("amount")
-    .eq("event_id", id)
+    .eq("event_id", event.id)
     .eq("status", "paid");
 const totalRevenue = ordersData?.reduce((sum, o) => sum + (o.amount || 0), 0) || 0;
 
@@ -93,7 +83,7 @@ const totalRevenue = ordersData?.reduce((sum, o) => sum + (o.amount || 0), 0) ||
 const { data: ticketSalesData } = await supabaseAdmin
     .from("event_attendees")
     .select("event_ticket_id")
-    .eq("event_id", id);
+    .eq("event_id", event.id);
 const ticketSalesMap: Record<string, number> = {};
 ticketSalesData?.forEach((ea: any) => {
     ticketSalesMap[ea.event_ticket_id] = (ticketSalesMap[ea.event_ticket_id] || 0) + 1;
@@ -103,18 +93,26 @@ ticketSalesData?.forEach((ea: any) => {
 const { count: totalVisits } = await supabaseAdmin
     .from("event_visits")
     .select("id", { count: "exact", head: true })
-    .eq("event_id", id);
+    .eq("event_id", event.id);
 
 // Unique visitors (by ip_hash) — fetch distinct hashes
 const { data: uniqueVisitorsData } = await supabaseAdmin
     .from("event_visits")
     .select("ip_hash")
-    .eq("event_id", id);
+    .eq("event_id", event.id);
 const uniqueVisitors = new Set(uniqueVisitorsData?.map((v: any) => v.ip_hash)).size;
 
 const conversion = totalTickets > 0 ? Math.round(((ticketsSold || 0) / totalTickets) * 100) : 0;
 
 const publicLink = `/eventos/${event.slug}`;
+const siteUrl = (siteUrlFromEnv() || Astro.url.origin).replace(/\/+$/, "");
+const activeTickets = (event.event_tickets || []).filter((t: any) => t.status !== "unavailable");
+const courtesyTickets = activeTickets.map((t: any) => ({ id: t.id, ticket_name: t.ticket_name }));
+const hasDates = (event.event_dates?.length || 0) > 0 || !!event.start_date;
+const publishBlockers = [
+    !hasDates ? "Agrega al menos una función (fecha y hora)." : null,
+    activeTickets.length === 0 ? "Agrega al menos un tipo de entrada." : null,
+].filter(Boolean);
 ---
 
 <DashboardLayout title={event.name}>
@@ -146,14 +144,14 @@ const publicLink = `/eventos/${event.slug}`;
                     <Calendar size={16} />
                     {
                         event.start_date
-                            ? new Date(event.start_date).toLocaleDateString()
+                            ? new Date(event.start_date).toLocaleString("es-CL", { timeZone: "America/Santiago", dateStyle: "medium", timeStyle: "short" })
                             : "Fecha por definir"
                     }
                 </span>
             </div>
         </div>
 
-        <div class="flex gap-3">
+        <div class="flex flex-wrap gap-3">
             <a
                 href={publicLink}
                 target="_blank"
@@ -173,6 +171,15 @@ const publicLink = `/eventos/${event.slug}`;
             >
                 <BarChart3 size={18} /> Analytics
             </a>
+            <button
+                id="duplicateEventBtn"
+                type="button"
+                data-event-id={event.id}
+                class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
+                title="Crea una copia en borrador con las mismas entradas y lugar, sin fechas"
+            >
+                <Copy size={18} /> Duplicar
+            </button>
             <a
                 href={`/dashboard/events/${event.id}/edit`}
                 class="flex items-center gap-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-900 transition font-medium"
@@ -237,9 +244,10 @@ const publicLink = `/eventos/${event.slug}`;
                     class="p-6 border-b border-gray-100 flex justify-between items-center"
                 >
                     <h3 class="font-bold text-lg">Tipos de Entrada</h3>
-                    <button
+                    <a
+                        href={`/dashboard/events/${event.id}/edit`}
                         class="text-sm text-black font-medium hover:underline"
-                        >Gestionar</button
+                        >Gestionar</a
                     >
                 </div>
                 <div class="divide-y divide-gray-100">
@@ -252,12 +260,12 @@ const publicLink = `/eventos/${event.slug}`;
                                     </p>
                                     <p class="text-sm text-gray-500">
                                         ${Number(ticket.price).toLocaleString()}{" "}
-                                        • {ticketSalesMap[ticket.id] || 0} vendidas / {ticket.total_quantity || 0} disponibles
+                                        • {ticketSalesMap[ticket.id] || 0} emitidas / {ticket.total_quantity ?? "sin límite"}
                                     </p>
                                 </div>
                                 <div>
-                                    <span class="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs font-medium">
-                                        Activo
+                                    <span class={`px-2 py-1 rounded text-xs font-medium ${ticket.status === "unavailable" ? "bg-red-50 text-red-600" : "bg-gray-100 text-gray-600"}`}>
+                                        {ticket.status === "unavailable" ? "Retirada" : "Activo"}
                                     </span>
                                 </div>
                             </div>
@@ -273,6 +281,9 @@ const publicLink = `/eventos/${event.slug}`;
                     }
                 </div>
             </section>
+
+            <!-- Cortesías -->
+            <CourtesyTicketsForm client:visible eventId={Number(event.id)} tickets={courtesyTickets} />
 
             <!-- FAQ Section -->
             <EventFAQManager client:load eventId={Number(event.id)} />
@@ -292,15 +303,49 @@ const publicLink = `/eventos/${event.slug}`;
                     <input
                         type="text"
                         readonly
-                        value={`https://aitickets.cl${publicLink}`}
+                        value={`${siteUrl}${publicLink}`}
                         class="bg-gray-50 border border-gray-200 text-gray-600 text-sm rounded-lg px-3 py-2 w-full outline-none"
                     />
                     <button
+                        id="copyLinkBtn"
+                        type="button"
+                        data-link={`${siteUrl}${publicLink}`}
+                        title="Copiar link"
                         class="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition text-gray-700"
                     >
                         <Share2 size={18} />
                     </button>
                 </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm" id="trackingBuilder" data-base={`${siteUrl}${publicLink}`}>
+                <h3 class="font-bold text-lg mb-2">Link con seguimiento</h3>
+                <p class="text-sm text-gray-500 mb-4">
+                    Crea un link por canal (Instagram, un promotor, un afiche) y mira sus visitas y ventas en Analíticas &rarr; "Ventas por canal".
+                </p>
+                <div class="space-y-2">
+                    <input data-param="utm_source" type="text" maxlength="64" placeholder="Fuente (ej: instagram)" class="w-full bg-gray-50 border border-gray-200 text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-black" />
+                    <input data-param="utm_medium" type="text" maxlength="64" placeholder="Medio (ej: historia, bio, afiche)" class="w-full bg-gray-50 border border-gray-200 text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-black" />
+                    <input data-param="utm_campaign" type="text" maxlength="64" placeholder="Campaña (ej: preventa)" class="w-full bg-gray-50 border border-gray-200 text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-black" />
+                    <input data-param="ref" type="text" maxlength="64" placeholder="Código de promotor / ref (opcional)" class="w-full bg-gray-50 border border-gray-200 text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-black" />
+                </div>
+                <div class="flex gap-2 mt-3">
+                    <input id="trackingLinkOutput" type="text" readonly value={`${siteUrl}${publicLink}`} class="bg-gray-50 border border-gray-200 text-gray-600 text-xs rounded-lg px-3 py-2 w-full outline-none" />
+                    <button id="copyTrackingLinkBtn" type="button" title="Copiar link con seguimiento" class="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition text-gray-700">
+                        <Share2 size={18} />
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                <h3 class="font-bold text-lg mb-2">Órdenes</h3>
+                <p class="text-sm text-gray-500 mb-4">Descarga las órdenes pagadas del evento (CSV compatible con Excel).</p>
+                <a
+                    href={`/api/events/orders-csv?event_id=${event.id}`}
+                    class="flex items-center justify-center gap-2 w-full py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition text-gray-800 font-medium text-sm"
+                >
+                    <Download size={16} /> Exportar CSV
+                </a>
             </div>
 
             <div
@@ -316,6 +361,12 @@ const publicLink = `/eventos/${event.slug}`;
                         }</strong
                     >.
                 </p>
+
+                {event.status !== "published" && publishBlockers.length > 0 && (
+                    <ul class="text-sm text-yellow-300 mb-4 list-disc pl-5">
+                        {publishBlockers.map((b) => <li>{b}</li>)}
+                    </ul>
+                )}
 
                 <button
                     id="toggleStatusBtn"
@@ -335,6 +386,63 @@ const publicLink = `/eventos/${event.slug}`;
 </DashboardLayout>
 
 <script>
+  const copyBtn = document.getElementById('copyLinkBtn');
+  copyBtn?.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(copyBtn.dataset.link || '');
+      copyBtn.setAttribute('title', '¡Copiado!');
+      alert('Link copiado');
+    } catch {
+      prompt('Copia el link:', copyBtn.dataset.link || '');
+    }
+  });
+
+  // Constructor de link con seguimiento (utm_* / ref)
+  const builder = document.getElementById('trackingBuilder');
+  const trackingOutput = document.getElementById('trackingLinkOutput') as HTMLInputElement | null;
+  const buildTrackingLink = () => {
+    if (!builder || !trackingOutput) return;
+    const url = new URL(builder.dataset.base || window.location.origin);
+    builder.querySelectorAll<HTMLInputElement>('input[data-param]').forEach((input) => {
+      const value = input.value.trim().toLowerCase().replace(/\s+/g, '-');
+      if (value) url.searchParams.set(input.dataset.param!, value);
+    });
+    trackingOutput.value = url.toString();
+  };
+  builder?.querySelectorAll('input[data-param]').forEach((input) => input.addEventListener('input', buildTrackingLink));
+  document.getElementById('copyTrackingLinkBtn')?.addEventListener('click', async () => {
+    const link = trackingOutput?.value || '';
+    try {
+      await navigator.clipboard.writeText(link);
+      alert('Link copiado');
+    } catch {
+      prompt('Copia el link:', link);
+    }
+  });
+
+  const dupBtn = document.getElementById('duplicateEventBtn') as HTMLButtonElement | null;
+  dupBtn?.addEventListener('click', async () => {
+    if (!confirm('Se creará una copia en borrador con las mismas entradas y lugar, sin fechas. ¿Continuar?')) return;
+    dupBtn.disabled = true;
+    try {
+      const res = await fetch('/api/events/duplicate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventId: Number(dupBtn.dataset.eventId) })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.id) {
+        window.location.href = `/dashboard/events/${data.id}/edit`;
+      } else {
+        alert(data.message || 'No se pudo duplicar el evento');
+        dupBtn.disabled = false;
+      }
+    } catch {
+      alert('Error de conexión');
+      dupBtn.disabled = false;
+    }
+  });
+
   const btn = document.getElementById('toggleStatusBtn');
   if (btn) {
     btn.addEventListener('click', async () => {

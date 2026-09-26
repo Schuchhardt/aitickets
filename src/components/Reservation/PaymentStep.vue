@@ -1,124 +1,228 @@
 <script setup>
-import { ref, defineProps, computed } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
+import { trackPurchase } from "../../composables/useGoogleAnalytics.js";
+import { buildSelectedLines, computeTotals, formatCLP, readAttribution } from "./pricing.js";
 
 const props = defineProps({
   selectedTickets: Object,
   buyerInfo: Object,
-  totalAmount: Number,
-  discount: Number,
-  event: Object, // Se necesita para obtener los nombres y precios de los tickets
+  event: Object,
 });
 
 const isLoading = ref(false);
 const errorMessage = ref("");
 
-const selectedTicketList = computed(() => {
-  return Object.keys(props.selectedTickets)
-    .filter(ticketId => props.selectedTickets[ticketId] > 0)
-    .map(ticketId => {
-      const ticket = props.event.tickets.find(t => t.id == ticketId);
-      return {
-        id: ticketId,
-        name: ticket?.ticket_name,
-        quantity: props.selectedTickets[ticketId],
-        price: ticket?.price || 0,
-        total: (ticket?.price || 0) * props.selectedTickets[ticketId],
-      };
-    });
+// ==== Cloudflare Turnstile (antiabuso). Sin site key configurada (desarrollo) no se exige. ====
+const turnstileEl = ref(null);
+const turnstileSiteKey = ref("");
+const turnstileToken = ref("");
+const turnstileReady = ref(false);
+let turnstileWidgetId = null;
+let turnstilePoll = null;
+
+const loadTurnstileScript = () => {
+  if (window.turnstile || document.getElementById("cf-turnstile-script")) return;
+  const script = document.createElement("script");
+  script.id = "cf-turnstile-script";
+  script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+  script.async = true;
+  script.defer = true;
+  document.head.appendChild(script);
+};
+
+const renderTurnstile = () => {
+  if (!window.turnstile || !turnstileEl.value || turnstileWidgetId !== null) return;
+  turnstileWidgetId = window.turnstile.render(turnstileEl.value, {
+    sitekey: turnstileSiteKey.value,
+    language: "es",
+    callback: (token) => { turnstileToken.value = token; },
+    "expired-callback": () => { turnstileToken.value = ""; },
+    "error-callback": () => { turnstileToken.value = ""; },
+  });
+  turnstileReady.value = true;
+};
+
+const resetTurnstile = () => {
+  turnstileToken.value = "";
+  if (window.turnstile && turnstileWidgetId !== null) {
+    try { window.turnstile.reset(turnstileWidgetId); } catch { /* widget no disponible */ }
+  }
+};
+
+onMounted(async () => {
+  let key = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY || "";
+  if (!key) {
+    // La site key es pública: el servidor la entrega si no se inyectó en el build
+    try {
+      const res = await fetch("/api/purchase-ticket", { method: "GET" });
+      if (res.ok) key = (await res.json())?.turnstileSiteKey || "";
+    } catch { /* sin captcha */ }
+  }
+  if (!key) return;
+  turnstileSiteKey.value = key;
+  loadTurnstileScript();
+  turnstilePoll = setInterval(() => {
+    if (window.turnstile) {
+      clearInterval(turnstilePoll);
+      turnstilePoll = null;
+      renderTurnstile();
+    }
+  }, 100);
+  setTimeout(() => { if (turnstilePoll) clearInterval(turnstilePoll); }, 15000);
 });
 
-const calculateFee = computed(() => {
-  return props.totalAmount > 0 ? props.totalAmount * 0.1 : 0; // 10% de fee si hay pago
+onUnmounted(() => {
+  if (turnstilePoll) clearInterval(turnstilePoll);
+  if (window.turnstile && turnstileWidgetId !== null) {
+    try { window.turnstile.remove(turnstileWidgetId); } catch { /* ya eliminado */ }
+  }
 });
 
-const calculateDiscount = computed(() => {
-  return props.discount ? (props.totalAmount * props.discount) / 100 : 0;
-});
+const needsCaptcha = computed(() => Boolean(turnstileSiteKey.value) && !turnstileToken.value);
 
-const finalTotal = computed(() => {
-  return props.totalAmount + calculateFee.value - calculateDiscount.value;
-});
+const selectedTicketList = computed(() => buildSelectedLines(props.selectedTickets, props.event?.tickets, props.event?.dates));
+const totals = computed(() => computeTotals(selectedTicketList.value));
+
+const clearReservationStorage = () => {
+  try {
+    localStorage.removeItem(`selectedTickets_event_${props.event.id}`);
+    localStorage.removeItem(`buyerInfo_event_${props.event.id}`);
+    localStorage.removeItem(`currentStep_event_${props.event.id}`);
+  } catch { /* storage no disponible */ }
+};
+
+// Guarda la orden gratis para el botón "Mis entradas" de la página del evento
+const rememberFreeOrder = (orderId) => {
+  try {
+    const key = `purchase_event_${props.event.id}`;
+    const orders = JSON.parse(localStorage.getItem(key) || "[]");
+    if (!orders.some((o) => o.orderId === orderId)) {
+      orders.push({
+        orderId,
+        eventId: props.event.id,
+        eventSlug: props.event.slug,
+        eventName: props.event.name,
+        purchaseDate: new Date().toISOString(),
+        amount: 0,
+        ticketsCount: totals.value.quantity,
+        tickets: [],
+      });
+      localStorage.setItem(key, JSON.stringify(orders));
+    }
+  } catch { /* storage no disponible */ }
+};
 
 const handlePayment = async () => {
+  if (isLoading.value) return;
+  if (turnstileSiteKey.value && !turnstileToken.value) {
+    errorMessage.value = "Completa la verificación de seguridad para continuar.";
+    return;
+  }
   isLoading.value = true;
   errorMessage.value = "";
 
+  const { ref: refCode, utm } = readAttribution();
+
   try {
+    // Contrato C5: solo ids y cantidades; el servidor calcula precios y cargo
     const response = await fetch("/api/purchase-ticket", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        buyer: props.buyerInfo,
-        tickets: selectedTicketList.value,
-        total: finalTotal.value,
-        discount: props.discount,
         eventId: props.event.id,
-        event: props.event,
+        buyer: {
+          firstName: (props.buyerInfo.firstName || "").trim(),
+          lastName: (props.buyerInfo.lastName || "").trim(),
+          email: (props.buyerInfo.email || "").trim(),
+          phone: (props.buyerInfo.phone || "").trim() || undefined,
+        },
+        tickets: selectedTicketList.value.map((t) => ({ id: t.id, quantity: t.quantity })),
+        ref: refCode,
+        utm,
+        cfToken: turnstileToken.value || undefined,
       }),
     });
 
-    const data = await response.json();
+    let data = {};
+    try { data = await response.json(); } catch { /* sin cuerpo */ }
 
     if (!response.ok) {
-      throw new Error(data.message || "Error en la compra");
+      throw new Error(data.message || "Ha ocurrido un error. Por favor intenta más tarde.");
     }
 
     if (data.paymentLink) {
-      window.location.href = data.paymentLink; // Redirigir a pago
-    } else if (data.ticketId) {
-      window.location.href = `/ticket/${data.ticketId}`; // Redirigir al ticket
+      window.location.href = data.paymentLink; // Pago en Flow
+      return;
     }
+    if (data.redirectUrl && data.orderId) {
+      trackPurchase(data.orderId, props.event.id, props.event.name, totals.value.quantity, 0);
+      rememberFreeOrder(data.orderId);
+      clearReservationStorage();
+      window.location.href = data.redirectUrl; // Orden gratis: /order/<id>
+      return;
+    }
+    throw new Error("Ha ocurrido un error. Por favor intenta más tarde.");
   } catch (error) {
-    console.error(error.message)
-    errorMessage.value = "Ha ocurrido un error. por favor intenta mas tarde" //error.message;
-  } finally {
+    errorMessage.value = error.message || "Ha ocurrido un error. Por favor intenta más tarde.";
     isLoading.value = false;
+    // Cada token de Turnstile sirve una sola vez: pedir uno nuevo para reintentar
+    resetTurnstile();
   }
 };
 </script>
 
 <template>
-  <div class="text-center font-[Prompt]">
-    <h3 class="text-lg font-semibold mb-4">Completa tu registro</h3>
-    <p class="text-gray-600 mb-4">Revisa tu pedido antes de continuar.</p>
-
-    <div class="border p-4 rounded-lg mb-4">
-      <p class="text-lg font-bold">Total a pagar:</p>
-      <p class="text-xl" :class="{ 'text-green-600': totalAmount > 0, 'text-lime-600 font-[Unbounded]': totalAmount === 0 }">
-        {{ totalAmount > 0 ? `$${finalTotal.toLocaleString("es-CL")}` : "Evento gratuito" }}
-      </p>
-    </div>
+  <div class="font-[Prompt] max-w-xl mx-auto">
+    <h3 class="text-lg font-semibold mb-1 text-center">{{ totals.total > 0 ? "Revisa y paga" : "Confirma tu registro" }}</h3>
+    <p class="text-gray-600 text-sm mb-4 text-center">Revisa tu pedido antes de continuar.</p>
 
     <div class="border p-4 rounded-lg text-left mb-4">
-      <h4 class="font-semibold mb-2">Detalles del comprador:</h4>
-      <p><strong>Nombre:</strong> {{ buyerInfo.firstName }} {{ buyerInfo.lastName }}</p>
-      <p><strong>Email:</strong> {{ buyerInfo.email }}</p>
-      <p><strong>Teléfono:</strong> {{ buyerInfo.phone }}</p>
-    </div>
-
-    <div class="border p-4 rounded-lg text-left mb-4">
-      <h4 class="font-semibold mb-2">Entradas seleccionadas:</h4>
-      <ul>
-        <li v-for="ticket in selectedTicketList" :key="ticket.id" class="flex justify-between">
-          <span>{{ ticket.quantity }} x {{ ticket.name }}</span>
-          <span class="font-medium" v-if="ticket.total !== 0">
-            ${{ ticket.total.toLocaleString("es-CL") }}
+      <h4 class="font-semibold mb-2">Entradas</h4>
+      <ul class="space-y-1">
+        <li v-for="ticket in selectedTicketList" :key="ticket.id" class="flex justify-between gap-2">
+          <span>
+            {{ ticket.quantity }} x {{ ticket.name }}
+            <span v-if="ticket.functionLabel" class="block text-xs text-gray-500">{{ ticket.functionLabel }}</span>
           </span>
-          <span class="font-medium" v-if="ticket.total == 0">
-            Gratis
-          </span>
+          <span class="font-medium whitespace-nowrap">{{ ticket.total > 0 ? formatCLP(ticket.total) : "Gratis" }}</span>
         </li>
       </ul>
+      <div class="border-t mt-3 pt-3 space-y-1 text-sm text-gray-600">
+        <div class="flex justify-between">
+          <span>Subtotal</span>
+          <span>{{ totals.subtotal > 0 ? formatCLP(totals.subtotal) : "Gratis" }}</span>
+        </div>
+        <div v-if="totals.subtotal > 0" class="flex justify-between">
+          <span>Cargo por servicio (10%)</span>
+          <span>{{ formatCLP(totals.fee) }}</span>
+        </div>
+      </div>
+      <div class="flex justify-between border-t mt-3 pt-3 text-lg font-bold">
+        <span>Total a pagar</span>
+        <span :class="totals.total > 0 ? 'text-green-700' : 'text-lime-600'">
+          {{ totals.total > 0 ? `${formatCLP(totals.total)} CLP` : "Gratis" }}
+        </span>
+      </div>
     </div>
 
-    <p v-if="errorMessage" class="text-red-600 mb-4">{{ errorMessage }}</p>
+    <div class="border p-4 rounded-lg text-left mb-4 text-sm break-words">
+      <h4 class="font-semibold mb-2 text-base">Comprador</h4>
+      <p><strong>Nombre:</strong> {{ buyerInfo.firstName }} {{ buyerInfo.lastName }}</p>
+      <p><strong>Email:</strong> {{ buyerInfo.email }}</p>
+      <p v-if="buyerInfo.phone"><strong>Teléfono:</strong> {{ buyerInfo.phone }}</p>
+    </div>
+
+    <div v-if="turnstileSiteKey" ref="turnstileEl" class="flex justify-center mb-4 min-h-[65px]"></div>
+
+    <p v-if="errorMessage" class="text-red-600 mb-4 text-center" role="alert">{{ errorMessage }}</p>
 
     <button
       @click="handlePayment"
-      :disabled="isLoading"
-      class="bg-black text-white px-6 py-2 rounded-md inline-block cursor-pointer"
+      :disabled="isLoading || !selectedTicketList.length || needsCaptcha"
+      class="bg-black text-white px-6 py-3 rounded-md w-full cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
     >
-      {{ isLoading ? "Procesando..." : totalAmount > 0 ? "Ir a pagar" : "Finalizar registro" }}
+      {{ isLoading ? "Procesando..." : totals.total > 0 ? `Ir a pagar ${formatCLP(totals.total)}` : "Finalizar registro" }}
     </button>
+    <p v-if="totals.total > 0" class="text-xs text-gray-500 text-center mt-2">Serás redirigido a Flow para pagar de forma segura.</p>
   </div>
 </template>

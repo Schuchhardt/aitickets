@@ -124,22 +124,33 @@ const submitForm = async (event) => {
 
     <!-- Redes sociales -->
     <div class="flex justify-center space-x-4 mt-4">
-  <a href="https://www.facebook.com/profile.php?id=61573771138631" target="_blank" class="cursor-pointer">
-    <img src="https://cdn.simpleicons.org/facebook/000000" alt="Facebook" class="w-6 h-6" />
+  <a href="https://www.facebook.com/profile.php?id=61573771138631" target="_blank" rel="noopener noreferrer" class="cursor-pointer">
+    <img src="https://cdn.simpleicons.org/facebook/000000" alt="Facebook" class="w-6 h-6" loading="lazy" width="24" height="24" />
   </a>
-  <a href="https://www.linkedin.com/company/ai-tickets" target="_blank" class="cursor-pointer">
-    <img src="https://upload.wikimedia.org/wikipedia/commons/8/81/LinkedIn_icon.svg" alt="LinkedIn" class="w-6 h-6" />
+  <a href="https://www.linkedin.com/company/ai-tickets" target="_blank" rel="noopener noreferrer" class="cursor-pointer">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/8/81/LinkedIn_icon.svg" alt="LinkedIn" class="w-6 h-6" loading="lazy" width="24" height="24" />
   </a>
 </div>
 
 
+    <!-- Links internos -->
+    <nav aria-label="Enlaces del sitio" class="mt-6 text-center text-gray-600 text-sm font-['Prompt']">
+      <ul class="flex flex-wrap justify-center gap-x-6 gap-y-2 px-6">
+        <li><a href="/eventos" class="hover:underline">Eventos</a></li>
+        <li><a href="/organizadores" class="hover:underline">Para organizadores</a></li>
+        <li><a href="/organizadores/registro" class="hover:underline">Crear cuenta de productor</a></li>
+        <li><a href="/presentacion" class="hover:underline">Presentación</a></li>
+      </ul>
+    </nav>
+
     <!-- Links de términos y condiciones -->
-    <div class="mt-6 text-center text-gray-500 text-sm font-['Prompt']">
+    <div class="mt-4 text-center text-gray-500 text-sm font-['Prompt']">
       <div class="flex justify-center space-x-4">
         <a href="/terms" class="hover:underline">Términos y condiciones</a>
         <span>|</span>
         <a href="/privacy" class="hover:underline">Aviso de privacidad</a>
       </div>
+      <p class="mt-3 text-xs text-gray-400">© AI Tickets SpA · Chile</p>
     </div>
 
   </footer>

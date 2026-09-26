@@ -1,163 +1,119 @@
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin, getFriendlyErrorMessage } from "../../../lib/auth-helpers";
-import { getSessionUser, createSupabaseServerClient } from "../../../lib/supabaseServer";
+import { getSessionContext, hasRole, ORG_ADMIN_ROLES } from "../../../lib/supabaseServer";
+import { ASSIGNABLE_ROLES, EMAIL_RE, countActiveOrgAdmins, isAiticketsAuthUser, json } from "./_team";
 
 export const POST: APIRoute = async (context) => {
-    const user = await getSessionUser(context);
+    const session = await getSessionContext(context);
+    if (!session) return json({ error: "Unauthorized" }, 401);
+    const { dbUser: currentUser } = session;
 
-    if (!user) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), {
-            status: 401,
-            headers: { "Content-Type": "application/json" },
-        });
+    if (!hasRole(currentUser, ORG_ADMIN_ROLES)) {
+        return json({ error: "Solo los administradores pueden editar miembros" }, 403);
     }
 
     try {
         const body = await context.request.json();
-        const { userId, name, email, role } = body;
+        const userId = body?.userId;
+        const name = String(body?.name || "").trim().slice(0, 150);
+        const email = String(body?.email || "").trim().toLowerCase().slice(0, 200);
+        let role = String(body?.role || "");
 
-        // Validate required fields
         if (!userId || !name || !email || !role) {
-            return new Response(JSON.stringify({ error: "Todos los campos son requeridos" }), {
-                status: 400,
-                headers: { "Content-Type": "application/json" },
-            });
+            return json({ error: "Todos los campos son requeridos" }, 400);
+        }
+        if (!EMAIL_RE.test(email)) {
+            return json({ error: "Email inválido" }, 400);
         }
 
-        // Validate role
-        const validRoles = ["admin", "editor", "validator"];
-        if (!validRoles.includes(role)) {
-            return new Response(JSON.stringify({ error: "Rol no válido" }), {
-                status: 400,
-                headers: { "Content-Type": "application/json" },
-            });
-        }
-
-        const supabase = createSupabaseServerClient(context);
         const supabaseAdmin = getSupabaseAdmin();
 
-        // Get current user's organization_id and verify admin role
-        const { data: currentUser, error: userError } = await supabase
+        // El usuario a editar debe ser de la misma organización
+        const { data: targetUser } = await supabaseAdmin
             .from("users")
-            .select("organization_id, role, id")
-            .eq("auth_user_id", user.id)
-            .single();
-
-        if (userError || !currentUser) {
-            return new Response(JSON.stringify({ error: "Usuario no encontrado" }), {
-                status: 404,
-                headers: { "Content-Type": "application/json" },
-            });
-        }
-
-        // Check if current user is admin
-        if (currentUser.role !== "admin") {
-            return new Response(JSON.stringify({ error: "Solo los administradores pueden editar miembros" }), {
-                status: 403,
-                headers: { "Content-Type": "application/json" },
-            });
-        }
-
-        // Get the target user to verify they belong to same organization
-        const { data: targetUser, error: targetError } = await supabaseAdmin
-            .from("users")
-            .select("id, organization_id, auth_user_id, email")
+            .select("id, organization_id, auth_user_id, email, role, active")
             .eq("id", userId)
-            .single();
+            .eq("organization_id", currentUser.organization_id)
+            .maybeSingle();
 
-        if (targetError || !targetUser) {
-            return new Response(JSON.stringify({ error: "Usuario a editar no encontrado" }), {
-                status: 404,
-                headers: { "Content-Type": "application/json" },
-            });
+        if (!targetUser) {
+            return json({ error: "Usuario a editar no encontrado" }, 404);
         }
 
-        // Verify target user belongs to same organization
-        if (targetUser.organization_id !== currentUser.organization_id) {
-            return new Response(JSON.stringify({ error: "No tienes permiso para editar este usuario" }), {
-                status: 403,
-                headers: { "Content-Type": "application/json" },
-            });
+        // El dueño de la cuenta (producer) solo puede ser editado por un producer y conserva su rol
+        if (targetUser.role === "producer") {
+            if (currentUser.role !== "producer") {
+                return json({ error: "No puedes editar al dueño de la cuenta" }, 403);
+            }
+            if (role !== "producer" && !ASSIGNABLE_ROLES.includes(role)) {
+                return json({ error: "Rol no válido" }, 400);
+            }
+        } else if (!ASSIGNABLE_ROLES.includes(role)) {
+            return json({ error: "Rol no válido" }, 400);
+        }
+        // Si el formulario no ofrece 'producer', mantenerlo cuando el producer se edita a sí mismo como admin
+        if (targetUser.role === "producer" && role === "admin" && targetUser.id === currentUser.id) {
+            role = "producer";
         }
 
-        // Prevent admin from removing their own admin role (to avoid lockout)
-        if (targetUser.id === currentUser.id && role !== "admin") {
-            return new Response(JSON.stringify({ error: "No puedes remover tu propio rol de administrador" }), {
-                status: 400,
-                headers: { "Content-Type": "application/json" },
-            });
+        // No dejar a la organización sin administradores activos
+        const wasOrgAdmin = ORG_ADMIN_ROLES.includes(targetUser.role || "");
+        const willBeOrgAdmin = ORG_ADMIN_ROLES.includes(role);
+        if (wasOrgAdmin && !willBeOrgAdmin) {
+            if (targetUser.id === currentUser.id) {
+                return json({ error: "No puedes quitarte tu propio rol de administrador" }, 400);
+            }
+            if ((await countActiveOrgAdmins(currentUser.organization_id, targetUser.id)) < 1) {
+                return json({ error: "La organización debe tener al menos un administrador activo" }, 400);
+            }
         }
 
-        // Check if new email already exists (if email is being changed)
-        if (email !== targetUser.email) {
+        const emailChanged = email !== (targetUser.email || "").toLowerCase();
+        if (emailChanged) {
             const { data: existingUser } = await supabaseAdmin
                 .from("users")
                 .select("id")
-                .eq("email", email)
-                .neq("id", userId)
-                .single();
-
+                .ilike("email", email.replace(/[\\%_]/g, "\\$&"))
+                .neq("id", targetUser.id)
+                .maybeSingle();
             if (existingUser) {
-                return new Response(JSON.stringify({ error: "Este correo electrónico ya está en uso" }), {
-                    status: 400,
-                    headers: { "Content-Type": "application/json" },
-                });
+                return json({ error: "Este correo electrónico ya está en uso" }, 400);
             }
         }
 
-        // Update the user in public.users table
+        // La cuenta de Auth es compartida con otras apps: solo se modifica si la creó AI Tickets
+        const ownsAuthUser = targetUser.auth_user_id ? await isAiticketsAuthUser(targetUser.auth_user_id) : false;
+        if (emailChanged && !ownsAuthUser) {
+            return json({
+                error: "No es posible cambiar el email de este miembro porque su cuenta se usa también en otros servicios. Pídele que lo cambie él mismo o agrégalo nuevamente con el email correcto.",
+            }, 400);
+        }
+
+        // Actualizar primero auth (el email puede fallar si ya existe en Auth)
+        if (targetUser.auth_user_id && ownsAuthUser) {
+            const authUpdatePayload: Record<string, unknown> = { user_metadata: { full_name: name } };
+            if (emailChanged) authUpdatePayload.email = email;
+            const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(targetUser.auth_user_id, authUpdatePayload);
+            if (authError) {
+                console.error("Auth update error:", authError);
+                if (emailChanged) return json({ error: getFriendlyErrorMessage(authError) }, 400);
+            }
+        }
+
         const { error: updateDbError } = await supabaseAdmin
             .from("users")
-            .update({
-                name: name,
-                email: email,
-                role: role,
-                updated_at: new Date().toISOString()
-            })
-            .eq("id", userId);
+            .update({ name, email, role, updated_at: new Date().toISOString() })
+            .eq("id", targetUser.id)
+            .eq("organization_id", currentUser.organization_id);
 
         if (updateDbError) {
             console.error("Database update error:", updateDbError);
-            return new Response(JSON.stringify({ error: getFriendlyErrorMessage(updateDbError) }), {
-                status: 500,
-                headers: { "Content-Type": "application/json" },
-            });
+            return json({ error: getFriendlyErrorMessage(updateDbError) }, 500);
         }
 
-        // Update auth user if they have an auth_user_id
-        if (targetUser.auth_user_id) {
-            const authUpdatePayload: any = {
-                user_metadata: { full_name: name }
-            };
-
-            // Only update email in auth if it changed
-            if (email !== targetUser.email) {
-                authUpdatePayload.email = email;
-            }
-
-            const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(
-                targetUser.auth_user_id,
-                authUpdatePayload
-            );
-
-            if (authError) {
-                console.error("Auth update error:", authError);
-                // Don't fail the whole request, but log it
-            }
-        }
-
-        return new Response(JSON.stringify({
-            message: "Usuario actualizado exitosamente"
-        }), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-        });
-
+        return json({ message: "Usuario actualizado exitosamente" });
     } catch (error) {
         console.error("Update team member error:", error);
-        return new Response(JSON.stringify({ error: "Internal Server Error" }), {
-            status: 500,
-            headers: { "Content-Type": "application/json" },
-        });
+        return json({ error: "Internal Server Error" }, 500);
     }
 };

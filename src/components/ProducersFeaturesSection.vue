@@ -12,8 +12,8 @@
         </FadeInSection>
         <FadeInSection :delay="200">
           <p class="text-gray-500 max-w-2xl mx-auto">
-            AI Tickets fue diseñado para facilitar la gestión, promoción y análisis de tus eventos en un solo lugar. 
-            Simplifica el trabajo, automatiza procesos y enfócate en hacer crecer tu comunidad.
+            Pensado para stand-up, teatro independiente y productoras chicas y medianas con funciones recurrentes.
+            Vende, promociona y controla el acceso desde un solo lugar, sin ser experto en tecnología.
           </p>
         </FadeInSection>
       </div>
@@ -61,33 +61,33 @@ import FadeInSection from './Hero/FadeInSection.vue';
 const producerFeatures = [
   {
     icon: Calendar,
-    title: 'Gestión de eventos',
-    description: 'Crea y gestiona eventos fácilmente desde tu panel de control con todos los detalles necesarios.'
+    title: 'Eventos con varias funciones',
+    description: 'Una página con todas tus fechas y horarios, y cupos por función si los necesitas. Usa "Duplicar evento" para tus shows recurrentes.'
   },
   {
     icon: ShoppingCart,
-    title: 'Venta de entradas',
-    description: 'Venta directa a través de WebPay y MercadoPago con validación de entradas mediante QR.'
+    title: 'Venta online y entradas QR',
+    description: 'Vende con Webpay (vía Flow). Tus asistentes reciben su entrada con código QR por email al instante.'
   },
   {
     icon: Users,
-    title: 'Equipo colaborativo',
-    description: 'Asigna permisos y roles para que tu equipo pueda gestionar el evento de forma compartida.'
+    title: 'Equipo y check-in',
+    description: 'Suma a tu equipo con roles (admin, editor, validador) y valida entradas escaneando el QR desde el celular.'
   },
   {
     icon: Lightbulb,
-    title: 'Marketing con IA',
-    description: 'Promoción automática en Meta, Google y TikTok optimizada con inteligencia artificial.'
+    title: 'Posts y asistente con IA',
+    description: 'Genera posts para Instagram y Facebook con IA, y un asistente en tu página responde las dudas de los compradores.'
   },
   {
     icon: CreditCard,
-    title: 'Modelo de créditos',
-    description: 'Compra anticipada de créditos por evento que solo se descuentan si se vende una entrada.'
+    title: '0% de comisión para ti',
+    description: 'El comprador paga un cargo por servicio de 10%. Te transferimos lo recaudado 48–72 h después de cada función.'
   },
   {
     icon: BarChart3,
-    title: 'Analítica avanzada',
-    description: 'Métricas de ventas, tasa de conversión, fuente de tráfico y más en tiempo real.'
+    title: 'Analítica por evento',
+    description: 'Visitas, ventas, canal de origen (UTM), ciudad y hora peak de tu público. Exporta tus órdenes a CSV.'
   }
 ];
 </script>

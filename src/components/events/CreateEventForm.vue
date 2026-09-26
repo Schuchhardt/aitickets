@@ -1,11 +1,11 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { Calendar, MapPin, Ticket, CheckCircle, Image as ImageIcon, Plus, Trash2, ChevronRight, ChevronLeft, UploadCloud } from 'lucide-vue-next'
 
 const props = defineProps({
   initialVenues: {
     type: Array,
-    default: () => []
+    required: true
   }
 })
 
@@ -25,6 +25,7 @@ const form = ref({
     description: '',
     imageUrl: '',
     category: '',
+    isPrivate: false,
   },
   // Step 2: List of Locations (Venue + Dates)
   locations: [
@@ -69,16 +70,20 @@ const prevStep = () => {
   if (currentStep.value > 1) currentStep.value--
 }
 
+// Ids temporales únicos (> 1e12 => el servidor los trata como nuevos)
+let tempSeq = 0
+const newTempId = () => Date.now() * 1000 + (tempSeq++ % 1000)
+
 // Logic Step 2 (Locations)
 const addLocation = () => {
   form.value.locations.push({
-    id: Date.now(),
+    id: newTempId(),
     venueId: '',
     isNewVenue: false,
     newVenueName: '',
     newVenueAddress: '',
     newVenueCity: '',
-    dates: [{ id: Date.now(), date: '', startTime: '21:00', endTime: '04:00' }]
+    dates: [{ id: newTempId(), date: '', startTime: '21:00', endTime: '04:00' }]
   })
 }
 
@@ -87,7 +92,7 @@ const removeLocation = (index) => {
 }
 
 const addDate = (locationIndex) => {
-  form.value.locations[locationIndex].dates.push({ id: Date.now(), date: '', startTime: '21:00', endTime: '04:00' })
+  form.value.locations[locationIndex].dates.push({ id: newTempId(), date: '', startTime: '21:00', endTime: '04:00' })
 }
 
 const removeDate = (locationIndex, dateIndex) => {
@@ -96,12 +101,51 @@ const removeDate = (locationIndex, dateIndex) => {
 
 // Logic Step 3 (Tickets)
 const addTicket = () => {
-  form.value.tickets.push({ id: Date.now(), name: '', price: 0, quantity: 100, description: '' })
+  form.value.tickets.push({ id: newTempId(), name: '', price: 0, quantity: 100, description: '', eventDateId: '' })
 }
 
 const removeTicket = (index) => {
   form.value.tickets.splice(index, 1)
 }
+
+// R1: funciones disponibles para asignar a cada tipo de entrada
+const formatFunctionLabel = (d, venueName) => {
+  let dayLabel = d.date
+  try {
+    const [y, m, day] = d.date.split('-').map(Number)
+    dayLabel = new Intl.DateTimeFormat('es-CL', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' })
+      .format(new Date(Date.UTC(y, m - 1, day, 12)))
+  } catch { /* fecha incompleta */ }
+  return [dayLabel, d.startTime, venueName].filter(Boolean).join(' · ')
+}
+
+const venueNameFor = (loc) => loc.isNewVenue
+  ? loc.newVenueName
+  : (props.initialVenues?.find(v => String(v.id) === String(loc.venueId))?.name || '')
+
+const functionOptions = computed(() => {
+  const multipleVenues = form.value.locations.length > 1
+  return form.value.locations.flatMap(loc =>
+    loc.dates
+      .filter(d => d.date)
+      .map(d => ({ id: d.id, label: formatFunctionLabel(d, multipleVenues ? venueNameFor(loc) : '') }))
+  )
+})
+
+const functionLabelFor = (eventDateId) => {
+  if (eventDateId === '' || eventDateId === null || eventDateId === undefined) return 'Todas las funciones'
+  return functionOptions.value.find(o => String(o.id) === String(eventDateId))?.label || 'Todas las funciones'
+}
+
+// Si se elimina la función asignada, la entrada vuelve a "Todas las funciones"
+watch(functionOptions, (options) => {
+  const ids = new Set(options.map(o => String(o.id)))
+  for (const t of form.value.tickets) {
+    if (t.eventDateId !== '' && t.eventDateId !== null && t.eventDateId !== undefined && !ids.has(String(t.eventDateId))) {
+      t.eventDateId = ''
+    }
+  }
+})
 
 // Image Upload Handling
 const isDragging = ref(false)
@@ -218,7 +262,7 @@ if (form.value.tickets.length === 0) addTicket()
     <!-- Steps Header -->
     <div class="border-b border-gray-100 p-6">
       <div class="flex items-center justify-between max-w-2xl mx-auto">
-        <div v-for="(step, index) in steps" :keyিতা="step.number" class="flex flex-col items-center relative z-10">
+        <div v-for="(step, index) in steps" :key="step.number" class="flex flex-col items-center relative z-10">
           <div 
             class="w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all duration-300"
             :class="[
@@ -254,6 +298,33 @@ if (form.value.tickets.length === 0) addTicket()
             <input v-model="form.general.name" type="text" placeholder="Ej: Festival de Verano 2025" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black focus:border-black outline-none" />
           </div>
           
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
+              <select v-model="form.general.category" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black focus:border-black outline-none bg-white">
+                <option value="">Selecciona una categoría...</option>
+              <option value="Comedia / Stand-up">Comedia / Stand-up</option>
+              <option value="Teatro">Teatro</option>
+              <option value="Música">Música</option>
+              <option value="Fiesta">Fiesta</option>
+              <option value="Festival">Festival</option>
+              <option value="Circo">Circo</option>
+              <option value="Danza">Danza</option>
+              <option value="Infantil">Infantil</option>
+              <option value="Taller / Charla">Taller / Charla</option>
+              <option value="Deportes">Deportes</option>
+              <option value="Gastronomía">Gastronomía</option>
+              <option value="Otro">Otro</option>
+              </select>
+            </div>
+            <div class="flex items-end">
+              <label class="flex items-center gap-2 text-sm text-gray-700 pb-2 cursor-pointer">
+                <input v-model="form.general.isPrivate" type="checkbox" class="w-4 h-4 rounded border-gray-300" />
+                Evento privado (no aparece en la cartelera pública; solo con el link)
+              </label>
+            </div>
+          </div>
+
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
             <textarea v-model="form.general.description" rows="4" placeholder="¿De qué trata tu evento?" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black focus:border-black outline-none"></textarea>
@@ -353,6 +424,7 @@ if (form.value.tickets.length === 0) addTicket()
                 <div v-else class="space-y-3">
                    <input v-model="loc.newVenueName" type="text" placeholder="Nombre del Lugar" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black outline-none" />
                    <input v-model="loc.newVenueAddress" type="text" placeholder="Dirección" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black outline-none" />
+                   <input v-model="loc.newVenueCity" type="text" placeholder="Ciudad / Comuna" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black outline-none" />
                 </div>
              </div>
 
@@ -382,6 +454,9 @@ if (form.value.tickets.length === 0) addTicket()
 
         <!-- Step 3: Tickets -->
         <div v-show="currentStep === 3" class="space-y-6">
+           <p v-if="functionOptions.length > 1" class="text-sm text-gray-600 bg-blue-50 border border-blue-100 rounded-lg p-3">
+             Para vender cupos separados por función, crea un tipo de entrada por función. Una entrada con "Todas las funciones" comparte su cupo entre todas las fechas.
+           </p>
            <div v-for="(ticket, index) in form.tickets" :key="ticket.id" class="p-6 bg-gray-50 rounded-xl border border-gray-200 relative flex gap-6 items-start">
              <button @click="removeTicket(index)" v-if="form.tickets.length > 1" class="absolute top-4 right-4 text-gray-400 hover:text-red-500">
                <Trash2 size="18" />
@@ -406,6 +481,13 @@ if (form.value.tickets.length === 0) addTicket()
                <div>
                   <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Cantidad</label>
                   <input v-model="ticket.quantity" type="number" class="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black outline-none" />
+               </div>
+               <div v-if="functionOptions.length > 1" class="col-span-2">
+                  <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Función</label>
+                  <select v-model="ticket.eventDateId" class="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black outline-none bg-white">
+                    <option value="">Todas las funciones</option>
+                    <option v-for="opt in functionOptions" :key="opt.id" :value="opt.id">{{ opt.label }}</option>
+                  </select>
                </div>
              </div>
            </div>
@@ -436,7 +518,8 @@ if (form.value.tickets.length === 0) addTicket()
                  <p class="text-xs font-bold text-gray-500 uppercase mb-2">Entradas</p>
                  <ul class="text-sm space-y-1">
                    <li v-for="t in form.tickets" :key="t.id">
-                     {{ t.name }}: {{ t.quantity }} x ${{ t.price }}
+                     {{ t.name }}: {{ t.quantity ?? 'Sin límite' }} x ${{ t.price }}
+                     <span v-if="functionOptions.length > 1" class="text-gray-500"> · {{ functionLabelFor(t.eventDateId) }}</span>
                    </li>
                  </ul>
                </div>
@@ -448,7 +531,7 @@ if (form.value.tickets.length === 0) addTicket()
            </div>
            
            <div v-if="submitSuccess" class="p-4 bg-green-50 text-green-600 rounded-lg text-sm border border-green-100 font-bold text-center">
-             ¡Evento creado exitosamente! Redirigiendo...
+             ¡Evento creado como borrador! Redirigiendo para que lo publiques...
            </div>
         </div>
 
@@ -483,7 +566,7 @@ if (form.value.tickets.length === 0) addTicket()
         :disabled="isSubmitting"
       >
         <span v-if="isSubmitting" class="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></span>
-        {{ isSubmitting ? 'Creando...' : 'Publicar Evento' }}
+        {{ isSubmitting ? 'Creando...' : 'Crear Evento' }}
       </button>
     </div>
   </div>

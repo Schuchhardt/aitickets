@@ -1,4 +1,5 @@
 ---
+export const prerender = true;
 import AppHeader from "../components/AppHeader.vue";
 import AppFooter from "../components/AppFooter.vue";
 import Layout from '../layouts/Layout.astro';
@@ -6,7 +7,11 @@ import "../styles/global.css";
 
 ---
 
-<Layout>
+<Layout
+  title="Términos y condiciones | AI Tickets"
+  description="Términos y condiciones de uso de AI Tickets para la compra y venta de entradas a eventos en Chile."
+  canonical="/terms"
+>
   <AppHeader client:idle/>
   <main>
         <div class="container mx-auto px-6 py-12 text-gray-700 font-['Prompt']">

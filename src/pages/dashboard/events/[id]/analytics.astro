@@ -1,33 +1,18 @@
 ---
 import DashboardLayout from "../../../../layouts/DashboardLayout.astro";
 import { getSupabaseAdmin } from "../../../../lib/auth-helpers";
-import { createSupabaseServerClient } from "../../../../lib/supabaseServer";
 import LineChart from "../../../../components/dashboard/analytics/LineChart.vue";
 import BarChart from "../../../../components/dashboard/analytics/BarChart.vue";
 import GeoTable from "../../../../components/dashboard/analytics/GeoTable.vue";
 import { Eye, Users, Ticket, BarChart3, TrendingUp } from "lucide-vue-next";
+import { EVENT_MANAGER_ROLES } from "../../../../lib/supabaseServer";
+import { requireDashboardSession } from "../../_lib/guard";
 
 const { id } = Astro.params;
-const supabase = createSupabaseServerClient(Astro);
+const guard = await requireDashboardSession(Astro, EVENT_MANAGER_ROLES);
+if (!guard.ok) return guard.response;
+const { dbUser } = guard.session;
 const supabaseAdmin = getSupabaseAdmin();
-
-const {
-    data: { user },
-} = await supabase.auth.getUser();
-
-if (!user) {
-    return Astro.redirect("/organizadores/login");
-}
-
-const { data: dbUser } = await supabase
-    .from("users")
-    .select("id, organization_id")
-    .eq("auth_user_id", user.id)
-    .single();
-
-if (!dbUser || !dbUser.organization_id) {
-    return Astro.redirect("/dashboard/events");
-}
 
 const { data: event, error } = await supabaseAdmin
     .from("events")
@@ -40,13 +25,20 @@ if (error || !event) {
     return Astro.redirect("/dashboard/events");
 }
 
+// --- Zona horaria: todo se agrupa en hora de Chile (America/Santiago), no en UTC ---
+const TZ = "America/Santiago";
+const dayFmt = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" });
+const hourFmt = new Intl.DateTimeFormat("en-US", { timeZone: TZ, hour: "2-digit", hourCycle: "h23" });
+const localDay = (iso: string) => dayFmt.format(new Date(iso)); // YYYY-MM-DD
+const localHour = (iso: string) => Number(hourFmt.format(new Date(iso))) % 24;
+
 // --- Data Queries ---
 
 // 1. All visits (for visits/day, peak hours, unique visitors)
 const { data: visitsRaw } = await supabaseAdmin
     .from("event_visits")
     .select("created_at, ip_hash, referrer, utm_source, country, city")
-    .eq("event_id", id)
+    .eq("event_id", event.id)
     .order("created_at", { ascending: true });
 
 const totalVisits = visitsRaw?.length || 0;
@@ -55,7 +47,7 @@ const uniqueVisitors = new Set(visitsRaw?.map((v: any) => v.ip_hash)).size;
 // Group visits by day
 const visitsByDay: Record<string, number> = {};
 visitsRaw?.forEach((v: any) => {
-    const day = new Date(v.created_at).toISOString().split("T")[0];
+    const day = localDay(v.created_at);
     visitsByDay[day] = (visitsByDay[day] || 0) + 1;
 });
 const visitDates = Object.keys(visitsByDay);
@@ -64,7 +56,7 @@ const visitCounts = Object.values(visitsByDay);
 // Peak hours
 const hourCounts = new Array(24).fill(0);
 visitsRaw?.forEach((v: any) => {
-    const hour = new Date(v.created_at).getHours();
+    const hour = localHour(v.created_at);
     hourCounts[hour]++;
 });
 const hourLabels = hourCounts.map((_: number, i: number) => `${i.toString().padStart(2, "0")}:00`);
@@ -73,7 +65,7 @@ const hourLabels = hourCounts.map((_: number, i: number) => `${i.toString().padS
 const { data: ordersRaw } = await supabaseAdmin
     .from("event_orders")
     .select("created_at, amount, ticket_qty")
-    .eq("event_id", id)
+    .eq("event_id", event.id)
     .eq("status", "paid")
     .order("created_at", { ascending: true });
 
@@ -82,7 +74,7 @@ const totalTicketsSold = ordersRaw?.reduce((sum: number, o: any) => sum + (o.tic
 
 const salesByDay: Record<string, { count: number; revenue: number }> = {};
 ordersRaw?.forEach((o: any) => {
-    const day = new Date(o.created_at).toISOString().split("T")[0];
+    const day = localDay(o.created_at);
     if (!salesByDay[day]) salesByDay[day] = { count: 0, revenue: 0 };
     salesByDay[day].count += o.ticket_qty || 1;
     salesByDay[day].revenue += o.amount || 0;
@@ -90,6 +82,29 @@ ordersRaw?.forEach((o: any) => {
 const salesDates = Object.keys(salesByDay);
 const salesCounts = salesDates.map((d) => salesByDay[d].count);
 const salesRevenue = salesDates.map((d) => salesByDay[d].revenue);
+
+// 2b. Ventas por canal (atribución guardada en la orden: ref / utm_*). Consulta aparte para que
+// la página funcione aunque la migración de atribución aún no esté aplicada.
+const { data: channelOrdersRaw, error: channelError } = await supabaseAdmin
+    .from("event_orders")
+    .select("amount, ticket_qty, ref, utm_source, utm_medium, utm_campaign")
+    .eq("event_id", event.id)
+    .eq("status", "paid");
+if (channelError) console.error("Ventas por canal:", channelError.message);
+
+type ChannelRow = { channel: string; orders: number; tickets: number; revenue: number };
+const channelMap = new Map<string, ChannelRow>();
+(channelOrdersRaw || []).forEach((o: any) => {
+    let channel = "Directo / sin seguimiento";
+    if (o.ref) channel = `ref: ${o.ref}`;
+    else if (o.utm_source) channel = [o.utm_source, o.utm_medium, o.utm_campaign].filter(Boolean).join(" / ");
+    const row = channelMap.get(channel) || { channel, orders: 0, tickets: 0, revenue: 0 };
+    row.orders += 1;
+    row.tickets += o.ticket_qty || 1;
+    row.revenue += o.amount || 0;
+    channelMap.set(channel, row);
+});
+const channelRows = [...channelMap.values()].sort((a, b) => b.revenue - a.revenue || b.orders - a.orders);
 
 // 3. Traffic sources
 function categorizeReferrer(referrer: string | null, utmSource: string | null): string {
@@ -119,7 +134,7 @@ const sourceValues = sortedSources.map((s) => s[1]);
 const { data: ticketSalesRaw } = await supabaseAdmin
     .from("event_attendees")
     .select("event_ticket_id, event_tickets(ticket_name)")
-    .eq("event_id", id);
+    .eq("event_id", event.id);
 
 const ticketTypeCounts: Record<string, number> = {};
 ticketSalesRaw?.forEach((ea: any) => {
@@ -148,7 +163,7 @@ const geoData = Object.entries(geoCounts)
 const { data: eventTickets } = await supabaseAdmin
     .from("event_tickets")
     .select("total_quantity")
-    .eq("event_id", id);
+    .eq("event_id", event.id);
 const totalCapacity = eventTickets?.reduce((acc: number, t: any) => acc + (t.total_quantity || 0), 0) || 0;
 const conversion = totalCapacity > 0 ? Math.round((totalTicketsSold / totalCapacity) * 100) : 0;
 
@@ -223,35 +238,35 @@ const peakDatasets = JSON.stringify([
     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
         <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
             <div class="p-2 bg-blue-50 text-blue-600 rounded-lg w-fit mb-3">
-                <Eye size="18" />
+                <Eye size={18} />
             </div>
             <p class="text-gray-500 text-xs mb-1">Visitas</p>
             <h3 class="text-xl font-bold">{totalVisits.toLocaleString()}</h3>
         </div>
         <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
             <div class="p-2 bg-purple-50 text-purple-600 rounded-lg w-fit mb-3">
-                <Users size="18" />
+                <Users size={18} />
             </div>
             <p class="text-gray-500 text-xs mb-1">Visitantes unicos</p>
             <h3 class="text-xl font-bold">{uniqueVisitors.toLocaleString()}</h3>
         </div>
         <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
             <div class="p-2 bg-green-50 text-green-600 rounded-lg w-fit mb-3">
-                <Ticket size="18" />
+                <Ticket size={18} />
             </div>
             <p class="text-gray-500 text-xs mb-1">Entradas vendidas</p>
             <h3 class="text-xl font-bold">{totalTicketsSold}</h3>
         </div>
         <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
             <div class="p-2 bg-orange-50 text-orange-600 rounded-lg w-fit mb-3">
-                <BarChart3 size="18" />
+                <BarChart3 size={18} />
             </div>
             <p class="text-gray-500 text-xs mb-1">Ingresos</p>
             <h3 class="text-xl font-bold">${totalRevenue.toLocaleString()}</h3>
         </div>
         <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
             <div class="p-2 bg-pink-50 text-pink-600 rounded-lg w-fit mb-3">
-                <TrendingUp size="18" />
+                <TrendingUp size={18} />
             </div>
             <p class="text-gray-500 text-xs mb-1">Conversion</p>
             <h3 class="text-xl font-bold">{conversion}%</h3>
@@ -281,12 +296,14 @@ const peakDatasets = JSON.stringify([
         />
         <BarChart
             client:visible
+            horizontal={false}
             title="Ventas por tipo de entrada"
             labelsJson={JSON.stringify(ticketLabels)}
             datasetsJson={ticketDatasets}
         />
         <BarChart
             client:visible
+            horizontal={false}
             title="Horas pico de visitas"
             labelsJson={JSON.stringify(hourLabels)}
             datasetsJson={peakDatasets}
@@ -296,5 +313,40 @@ const peakDatasets = JSON.stringify([
             title="Ubicacion de visitantes"
             dataJson={JSON.stringify(geoData)}
         />
+    </div>
+
+    <!-- Ventas por canal (UTM / ref) -->
+    <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm mt-6">
+        <div class="flex flex-wrap items-baseline justify-between gap-2 mb-4">
+            <h3 class="font-bold text-lg">Ventas por canal</h3>
+            <a href={`/dashboard/events/${event.id}#trackingBuilder`} class="text-sm text-blue-600 hover:underline">Crear link con seguimiento</a>
+        </div>
+        {channelRows.length === 0 ? (
+            <p class="text-sm text-gray-500">Aún no hay ventas pagadas. Comparte links con <code>utm_source</code> o <code>ref</code> para saber qué canal vende más.</p>
+        ) : (
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-gray-500 border-b border-gray-100">
+                            <th class="py-2 pr-4 font-medium">Canal</th>
+                            <th class="py-2 pr-4 font-medium text-right">Órdenes</th>
+                            <th class="py-2 pr-4 font-medium text-right">Entradas</th>
+                            <th class="py-2 font-medium text-right">Ingresos</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {channelRows.map((row) => (
+                            <tr class="border-b border-gray-50">
+                                <td class="py-2 pr-4 text-gray-900 break-all">{row.channel}</td>
+                                <td class="py-2 pr-4 text-right">{row.orders}</td>
+                                <td class="py-2 pr-4 text-right">{row.tickets}</td>
+                                <td class="py-2 text-right">${row.revenue.toLocaleString("es-CL")}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        )}
+        <p class="text-xs text-gray-400 mt-3">Fechas y horas en horario de Chile continental.</p>
     </div>
 </DashboardLayout>

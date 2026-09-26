@@ -1,10 +1,7 @@
 ---
 import DashboardLayout from "../../layouts/DashboardLayout.astro";
-import {
-  getSessionUser,
-  createSupabaseServerClient,
-} from "../../lib/supabaseServer";
 import { getSupabaseAdmin } from "../../lib/auth-helpers";
+import { requireDashboardSession, VALIDATOR_HOME } from "./_lib/guard";
 import {
   LayoutDashboard,
   CalendarDays,
@@ -12,20 +9,16 @@ import {
   TrendingUp,
 } from "lucide-vue-next";
 
-const user = await getSessionUser(Astro);
+const guard = await requireDashboardSession(Astro);
+if (!guard.ok) return guard.response;
+const { authUser: user, dbUser } = guard.session;
 
-if (!user) {
-  return Astro.redirect("/organizadores/login");
+// Los validadores solo pueden hacer check-in
+if (dbUser.role === "validator") {
+  return Astro.redirect(VALIDATOR_HOME);
 }
 
-const supabase = createSupabaseServerClient(Astro);
 const supabaseAdmin = getSupabaseAdmin();
-
-const { data: dbUser } = await supabase
-  .from("users")
-  .select("name, organization_id")
-  .eq("auth_user_id", user.id)
-  .single();
 
 // Fetch real stats
 let activeEvents = 0;

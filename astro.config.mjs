@@ -12,13 +12,13 @@ export default defineConfig({
   adapter: netlify(),
   integrations: [vue(), partytown({
     config: {
-      forward: ["dataLayer.push"]
+      forward: ["dataLayer.push", "gtag"]
     }
   }), sentry()
   ],
   vite: {
     plugins: [tailwindcss(), svgLoader()],
-    envPrefix: ['PUBLIC_', 'SUPABASE_URL', 'SUPABASE_ANON_KEY'],
+    envPrefix: ['PUBLIC_'],
     server: {
       host: true,
       port: 4321,

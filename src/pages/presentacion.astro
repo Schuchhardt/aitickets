@@ -1,14 +1,25 @@
 ---
+export const prerender = true;
 import "../styles/global.css";
 ---
 
 <!doctype html>
-<html lang="es">
+<html lang="es-CL">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI Tickets - Presentación</title>
-    <meta name="description" content="AI Tickets - Más asientos vendidos, menos dolores de cabeza">
+    <title>Presentación de AI Tickets para productores de eventos</title>
+    <meta name="description" content="Conoce AI Tickets: la plataforma chilena para vender entradas online con 0% de comisión para el productor, pagos, QR y check-in.">
+    <link rel="canonical" href="https://aitickets.cl/presentacion">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="AI Tickets">
+    <meta property="og:locale" content="es_CL">
+    <meta property="og:title" content="Presentación de AI Tickets para productores de eventos">
+    <meta property="og:description" content="Conoce AI Tickets: la plataforma chilena para vender entradas online con 0% de comisión para el productor, pagos, QR y check-in.">
+    <meta property="og:url" content="https://aitickets.cl/presentacion">
+    <meta property="og:image" content="https://aitickets.cl/aitickets_preview.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="manifest" href="/site.webmanifest">
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
     <style>
@@ -521,17 +532,17 @@ import "../styles/global.css";
       <!-- SLIDE 1: Portada -->
       <div class="slide active" data-slide="1">
         <h1>¿Y si cada función <span class="highlight-green">estuviera llena</span>?</h1>
-        <p class="subtitle">AI Tickets - Más asientos vendidos, menos dolores de cabeza.</p>
+        <p class="subtitle">AI Tickets - La ticketera que llena tus funciones.</p>
       </div>
       
       <!-- SLIDE 2: El Dolor -->
       <div class="slide" data-slide="2">
         <h2 class="highlight-pink">¿Te suena familiar?</h2>
         <ul>
-          <li data-icon="😫">"Cancelaron la función y no pudimos avisar a todos a tiempo"</li>
+          <li data-icon="😫">"Cambiamos el horario y no pudimos avisar a todos a tiempo"</li>
           <li data-icon="📉">"Lunes y martes siempre están vacíos"</li>
-          <li data-icon="🤯">"Paso más tiempo en el Excel que produciendo"</li>
-          <li data-icon="📱">"La gente pregunta lo mismo mil veces por WhatsApp"</li>
+          <li data-icon="🤯">"Paso más tiempo en la planilla que produciendo"</li>
+          <li data-icon="📱">"La gente pregunta lo mismo mil veces por mensaje"</li>
           <li data-icon="💸">"Invertimos en publicidad pero no sabemos si funcionó"</li>
         </ul>
       </div>
@@ -540,24 +551,24 @@ import "../styles/global.css";
       <div class="slide bg-gradient-pink" data-slide="3">
         <h2>El costo real de <span class="highlight-pink">seguir igual</span></h2>
         <ul>
-          <li data-icon="📊">30-40% de asientos vacíos en funciones "flojas"</li>
-          <li data-icon="⏰">+15 horas semanales en tareas manuales</li>
-          <li data-icon="😤">Clientes frustrados = malas reseñas</li>
-          <li data-icon="💰">Dinero en publicidad sin saber qué funciona</li>
-          <li data-icon="🔥">Estrés operativo que mata la creatividad</li>
+          <li data-icon="📊">Funciones "flojas" con asientos vacíos</li>
+          <li data-icon="⏰">Horas en tareas manuales: planillas, mensajes, listas en la puerta</li>
+          <li data-icon="😤">Asistentes que no se enteran de un cambio</li>
+          <li data-icon="💰">Plata en publicidad sin saber qué canal vendió</li>
+          <li data-icon="⌛">Esperar semanas para recibir lo recaudado</li>
         </ul>
-        <p class="subtitle" style="margin-top: 2rem;">"Cada función con asientos vacíos es dinero que ya no vuelve."</p>
+        <p class="subtitle" style="margin-top: 2rem;">"Cada función con asientos vacíos es plata que no vuelve."</p>
       </div>
       
       <!-- SLIDE 4: La Solución -->
       <div class="slide bg-gradient-green" data-slide="4">
-        <h2>Imagina tener un equipo que:</h2>
+        <h2>Imagina una herramienta que:</h2>
         <ul>
-          <li data-icon="✅">Vende entradas mientras duermes</li>
-          <li data-icon="✅">Avisa a todos si algo cambia (en segundos)</li>
-          <li data-icon="✅">Llena las funciones difíciles automáticamente</li>
-          <li data-icon="✅">Te dice exactamente qué está funcionando</li>
-          <li data-icon="✅">Hace todo esto sin que contrates a nadie</li>
+          <li data-icon="✅">Vende tus entradas online las 24 horas, con Webpay</li>
+          <li data-icon="✅">Avisa por email a tus asistentes si cambia algo del evento</li>
+          <li data-icon="✅">Te ayuda a promocionar cada función con posts hechos con IA</li>
+          <li data-icon="✅">Te muestra qué canal te trae visitas y ventas</li>
+          <li data-icon="✅">Te transfiere lo recaudado 48–72 h después de cada función</li>
         </ul>
         <p class="subtitle" style="margin-top: 2rem; font-size: 2rem;">Eso es <span class="highlight-green">AI Tickets</span>.</p>
       </div>
@@ -569,95 +580,85 @@ import "../styles/global.css";
           <div class="step">
             <div class="step-number">1</div>
             <h3>Crea tu evento</h3>
-            <p>Sube la info de tus funciones en minutos. Nosotros te ayudamos la primera vez.</p>
+            <p>Sube tus funciones, fechas y entradas en minutos. Te ayudamos a armar el primero.</p>
           </div>
           <div class="step">
             <div class="step-number">2</div>
             <h3>Comparte el link</h3>
-            <p>Tu página de ventas está lista. Acepta WebPay, MercadoPago, transferencia.</p>
+            <p>Tu página de venta queda lista. Tus compradores pagan con Webpay (vía Flow).</p>
           </div>
           <div class="step">
             <div class="step-number">3</div>
-            <h3>Nosotros hacemos el resto</h3>
-            <p>Promoción, comunicación, check-in. Tú solo recibe a tu público.</p>
+            <h3>Recibe a tu público</h3>
+            <p>Entradas QR por email, recordatorio 24 h antes y check-in desde el celular.</p>
           </div>
         </div>
       </div>
       
-      <!-- SLIDE 6: Beneficio 1 -->
+      <!-- SLIDE 6: Beneficio 1 - Promoción -->
       <div class="slide" data-slide="6">
         <h2><span class="highlight-green">"Los lunes ya no son un problema"</span></h2>
         <ul>
-          <li data-icon="📧">Emails automáticos a quienes buscaron pero no compraron</li>
-          <li data-icon="📱">WhatsApp con promociones de último minuto</li>
-          <li data-icon="📢">Publicidad dirigida solo a tu zona</li>
-          <li data-icon="🎯">Descuentos inteligentes para funciones con baja venta</li>
+          <li data-icon="✨">Posts para Instagram y Facebook generados con IA desde tu evento</li>
+          <li data-icon="🔗">Links con UTM para saber qué canal vende más</li>
+          <li data-icon="📊">Visitas, ventas, ciudad y hora peak de cada evento</li>
+          <li data-icon="🤖">Un asistente con IA en tu página responde las dudas de los compradores</li>
         </ul>
-        <div class="metrics" style="margin-top: 3rem;">
-          <div class="metric">
-            <div class="metric-value">+25%</div>
-            <div class="metric-label">más asistentes en funciones "flojas"</div>
-          </div>
-        </div>
+        <p class="subtitle" style="margin-top: 2rem;">Próximamente: WhatsApp y cupones de descuento.</p>
       </div>
       
-      <!-- SLIDE 7: Beneficio 2 -->
+      <!-- SLIDE 7: Beneficio 2 - Comunicación -->
       <div class="slide" data-slide="7">
-        <h2 class="highlight-pink">"Cambió la función. ¿Cómo aviso a 500 personas?"</h2>
+        <h2 class="highlight-pink">"Cambió la función. ¿Cómo aviso a todos?"</h2>
         <ul>
-          <li data-icon="✅">1 click → Todos notificados por email Y WhatsApp</li>
-          <li data-icon="✅">Recordatorios automáticos antes de cada función</li>
-          <li data-icon="✅">Respuestas automáticas a preguntas frecuentes</li>
-          <li data-icon="✅">Los asistentes siempre saben qué hacer</li>
+          <li data-icon="✅">Si editas un evento publicado, tus asistentes reciben un email automático</li>
+          <li data-icon="✅">Recordatorio automático por email 24 h antes de la función</li>
+          <li data-icon="✅">El asistente con IA responde con la info y preguntas frecuentes de tu evento</li>
+          <li data-icon="✅">Cada comprador recibe su entrada QR por email al instante</li>
         </ul>
-        <p class="subtitle" style="margin-top: 2rem;">"Nunca más perder clientes por mala comunicación"</p>
+        <p class="subtitle" style="margin-top: 2rem;">"Menos mensajes repetidos, asistentes mejor informados."</p>
       </div>
       
-      <!-- SLIDE 8: Beneficio 3 -->
+      <!-- SLIDE 8: Beneficio 3 - Operación -->
       <div class="slide" data-slide="8">
-        <h2 class="highlight-cyan">Tu marca, tu control</h2>
+        <h2 class="highlight-cyan">Tu equipo, tu control</h2>
         <div class="cards-grid" style="grid-template-columns: repeat(2, 1fr);">
           <div class="card cyan">
-            <h3>🌐 tucirco.cl</h3>
-            <p>Vende bajo tu propio dominio</p>
+            <h3>👥 Equipo con roles</h3>
+            <p>Admin, editor y validador para la puerta</p>
           </div>
           <div class="card cyan">
-            <h3>🌐 entradas.tuteatro.com</h3>
-            <p>Sin logos de terceros que confundan</p>
+            <h3>🎟️ Cortesías</h3>
+            <p>Emite entradas de cortesía desde el panel</p>
           </div>
         </div>
         <ul style="margin-top: 2rem;">
-          <li data-icon="✅">Más confianza del público</li>
-          <li data-icon="✅">Mejor posicionamiento en Google</li>
-          <li data-icon="✅">Imagen profesional</li>
+          <li data-icon="✅">Varias fechas y horarios en un mismo evento</li>
+          <li data-icon="✅">"Duplicar evento" para tus shows recurrentes</li>
+          <li data-icon="✅">Exporta tus órdenes a CSV</li>
         </ul>
       </div>
       
-      <!-- SLIDE 9: Beneficio 4 - Upselling -->
+      <!-- SLIDE 9: Próximamente -->
       <div class="slide bg-gradient-pink" data-slide="9">
-        <h2>Cada entrada puede <span class="highlight-pink">valer más</span></h2>
+        <h2>Lo que <span class="highlight-pink">viene</span></h2>
+        <p style="text-align: center; margin-bottom: 1rem; opacity: 0.8;">Aún no disponible. Te avisamos cuando esté listo.</p>
         <div class="cards-grid">
           <div class="card pink">
-            <h3>🎟️ Upgrade a VIP</h3>
-            <p>Antes del pago</p>
+            <h3>💬 WhatsApp</h3>
+            <p>Próximamente</p>
           </div>
           <div class="card pink">
-            <h3>👨‍👩‍👧‍👦 Packs familiares</h3>
-            <p>Con descuento</p>
+            <h3>🏷️ Cupones de descuento</h3>
+            <p>Próximamente</p>
           </div>
           <div class="card pink">
-            <h3>📸 Fotos con elenco</h3>
-            <p>Experiencia premium</p>
+            <h3>💳 MercadoPago</h3>
+            <p>Próximamente</p>
           </div>
           <div class="card pink">
-            <h3>🛍️ Merchandising</h3>
-            <p>En el checkout</p>
-          </div>
-        </div>
-        <div class="metrics" style="margin-top: 2rem;">
-          <div class="metric">
-            <div class="metric-value">+$2.500</div>
-            <div class="metric-label">extra por entrada vendida</div>
+            <h3>🌐 Dominio propio</h3>
+            <p>Próximamente</p>
           </div>
         </div>
       </div>
@@ -666,96 +667,64 @@ import "../styles/global.css";
       <div class="slide" data-slide="10">
         <h2 class="highlight-green">Entrada sin filas, sin estrés</h2>
         <ul>
-          <li data-icon="📱">QR que funciona SIN internet</li>
-          <li data-icon="⚡">Escaneo en menos de 2 segundos</li>
-          <li data-icon="🖥️">Totems de autoservicio (opcional)</li>
-          <li data-icon="👥">Control de aforo en tiempo real</li>
+          <li data-icon="📱">Escanea el QR desde tu celular, sin instalar nada</li>
+          <li data-icon="📶">Si se cae la señal, sigue validando con la lista descargada y sincroniza después</li>
+          <li data-icon="🚫">Detecta entradas ya usadas o de otro evento</li>
+          <li data-icon="👥">Suma validadores a tu equipo para la puerta</li>
         </ul>
         <p class="subtitle" style="margin-top: 2rem;">"Tu equipo en puerta solo saluda. El sistema hace el resto."</p>
       </div>
       
-      <!-- SLIDE 11: Social Proof -->
+      <!-- SLIDE 11: Piloto -->
       <div class="slide" data-slide="11">
-        <h2 class="highlight-green">Resultados reales</h2>
-        <div class="metrics">
-          <div class="metric">
-            <div class="metric-value">+50K</div>
-            <div class="metric-label">entradas vendidas</div>
-          </div>
-          <div class="metric">
-            <div class="metric-value">+200</div>
-            <div class="metric-label">funciones gestionadas</div>
-          </div>
-          <div class="metric">
-            <div class="metric-value">98%</div>
-            <div class="metric-label">notificados a tiempo</div>
-          </div>
-        </div>
-        <div class="cards-grid" style="margin-top: 3rem;">
+        <h2 class="highlight-green">Estamos en piloto</h2>
+        <p style="text-align: center; max-width: 800px; margin: 1rem auto; opacity: 0.9;">
+          Estamos trabajando codo a codo con los primeros productores de stand-up y teatro independiente.
+          Si te sumas ahora, te ayudamos personalmente a armar tus eventos y tu opinión define lo que construimos.
+        </p>
+        <div class="cards-grid" style="margin-top: 2rem;">
           <div class="card green">
-            <h3>🎪 Circos</h3>
-            <p>"Llenamos 3 funciones extra por semana"</p>
+            <h3>🎤 Stand-up</h3>
+            <p>Funciones semanales</p>
           </div>
           <div class="card cyan">
-            <h3>🎭 Teatros</h3>
-            <p>"Dejé de contestar WhatsApp todo el día"</p>
+            <h3>🎭 Teatro independiente</h3>
+            <p>Temporadas con varias funciones</p>
           </div>
           <div class="card pink">
-            <h3>🎨 Ferias</h3>
-            <p>"Las preventas se agotan en horas"</p>
+            <h3>🎶 Productoras chicas</h3>
+            <p>Sin equipo técnico</p>
           </div>
         </div>
       </div>
       
-      <!-- SLIDE 12: Testimonial -->
+      <!-- SLIDE 12: Para quién -->
       <div class="slide" data-slide="12">
         <div class="quote">
-          Antes pasaba 20 horas a la semana en Excel, WhatsApp y correos. Ahora paso ese tiempo creando mejor contenido para mi show.
+          Hecho para productores que hacen funciones todas las semanas y no quieren pelearse con la tecnología.
           <br><br>
-          AI Tickets me devolvió las ganas de producir.
-          <div class="quote-author">— Productor de evento</div>
+          Tú haces el show. Nosotros te ayudamos a venderlo.
+          <div class="quote-author">— Equipo AI Tickets</div>
         </div>
       </div>
       
-      <!-- SLIDE 13: Pricing -->
+      <!-- SLIDE 13: Precio -->
       <div class="slide" data-slide="13">
-        <h2>Solo pagas cuando vendes</h2>
-        <p style="text-align: center; margin-bottom: 1rem; opacity: 0.8;">Sin setup. Sin mensualidad. Sin permanencia.</p>
-        <div class="pricing">
-          <div class="price-card">
-            <h3 class="highlight-green">ESENCIAL</h3>
-            <div class="percentage highlight-green">10%</div>
-            <ul>
-              <li>Venta online</li>
-              <li>Funciones múltiples</li>
-              <li>Check-in QR</li>
-              <li>Soporte básico</li>
-            </ul>
-            <p style="margin-top: 1rem; opacity: 0.7;">Para empezar sin riesgo</p>
-          </div>
+        <h2>Un solo precio, claro</h2>
+        <p style="text-align: center; margin-bottom: 1rem; opacity: 0.8;">Sin mensualidad. Sin costos fijos. Sin permanencia.</p>
+        <div class="pricing" style="grid-template-columns: 1fr; max-width: 560px;">
           <div class="price-card featured">
-            <h3 class="highlight-cyan">PRO ⭐</h3>
-            <div class="percentage highlight-cyan">15%</div>
+            <h3 class="highlight-cyan">PARA EL PRODUCTOR</h3>
+            <div class="percentage highlight-green">0%</div>
+            <p style="margin-bottom: 1rem;">de comisión. El comprador paga un cargo por servicio de 10%.</p>
             <ul>
-              <li>Todo Esencial +</li>
-              <li>Emails automáticos</li>
-              <li>Cupones y descuentos</li>
-              <li>WhatsApp básico</li>
-              <li>Reportes avanzados</li>
+              <li>Venta online con Webpay (vía Flow)</li>
+              <li>Funciones múltiples y entradas QR</li>
+              <li>Check-in desde el celular</li>
+              <li>Posts con IA y asistente IA en tu página</li>
+              <li>Analítica por evento y canal</li>
             </ul>
-            <p style="margin-top: 1rem;">Más popular</p>
-          </div>
-          <div class="price-card">
-            <h3 class="highlight-pink">FULL</h3>
-            <div class="percentage highlight-pink">20%</div>
-            <ul>
-              <li>Todo Pro +</li>
-              <li>Meta Ads</li>
-              <li>Google Ads</li>
-              <li>WhatsApp full</li>
-              <li>Manager dedicado</li>
-            </ul>
-            <p style="margin-top: 1rem; opacity: 0.7;">Para llenar TODO</p>
+            <p style="margin-top: 1rem; opacity: 0.8;">Te transferimos lo recaudado 48–72 h después de cada función.</p>
           </div>
         </div>
       </div>
@@ -769,83 +738,80 @@ import "../styles/global.css";
               <tr>
                 <th></th>
                 <th class="highlight-green">AI Tickets</th>
-                <th>Ticketeras</th>
-                <th>Manual</th>
+                <th>Planilla + transferencias</th>
               </tr>
             </thead>
             <tbody>
               <tr>
                 <td>Funciones múltiples</td>
                 <td class="check">✓ Sí</td>
-                <td class="warn">⚠ Limitado</td>
                 <td class="cross">✗ Caos</td>
               </tr>
               <tr>
-                <td>WhatsApp integrado</td>
+                <td>Entradas QR y check-in</td>
                 <td class="check">✓ Sí</td>
-                <td class="cross">✗ No</td>
-                <td class="warn">⚠ Manual</td>
+                <td class="warn">⚠ Lista en papel</td>
               </tr>
               <tr>
-                <td>Marketing incluido</td>
+                <td>Posts con IA</td>
                 <td class="check">✓ Sí</td>
-                <td class="cross">✗ Extra</td>
                 <td class="cross">✗ No</td>
               </tr>
               <tr>
-                <td>Dominio propio</td>
-                <td class="check">✓ Sí</td>
+                <td>Saber qué canal vende</td>
+                <td class="check">✓ UTM por evento</td>
                 <td class="cross">✗ No</td>
-                <td class="warn">⚠ Caro</td>
               </tr>
               <tr>
                 <td>Soporte en español</td>
                 <td class="check">✓ Directo</td>
-                <td class="warn">⚠ Bot</td>
                 <td class="cross">—</td>
               </tr>
             </tbody>
           </table>
         </div>
-        <p class="subtitle" style="margin-top: 2rem;">"Hacemos más, cobramos igual o menos."</p>
+        <p class="subtitle" style="margin-top: 2rem;">0% para ti. 10% de cargo al comprador. Pago 48–72 h después de cada función.</p>
       </div>
       
       <!-- SLIDE 15: Garantía -->
       <div class="slide bg-gradient-green" data-slide="15">
-        <h2 class="highlight-green">🛡️ Prueba sin riesgo</h2>
+        <h2 class="highlight-green">🛡️ Empieza sin riesgo</h2>
         <div class="cards-grid">
           <div class="card green">
-            <h3>🎁 Primera función GRATIS</h3>
-            <p>Hasta 100 entradas, sin comisión</p>
+            <h3>💸 0% de comisión</h3>
+            <p>El comprador paga un cargo por servicio de 10%</p>
           </div>
           <div class="card green">
-            <h3>🤝 Setup gratuito</h3>
-            <p>Nosotros configuramos todo por ti</p>
+            <h3>🤝 Te acompañamos</h3>
+            <p>Te ayudamos a armar tu primer evento</p>
           </div>
           <div class="card green">
-            <h3>🚪 Sin contratos</h3>
-            <p>Te vas cuando quieras</p>
+            <h3>🚪 Sin permanencia</h3>
+            <p>Sin mensualidad ni costos fijos</p>
           </div>
           <div class="card green">
             <h3>📞 Soporte humano</h3>
-            <p>Respuesta en menos de 2 horas</p>
+            <p>Por WhatsApp y email, en español</p>
           </div>
         </div>
-        <p class="subtitle" style="margin-top: 2rem;">"Si no vendes más, no pagas. Así de simple."</p>
+        <p class="subtitle" style="margin-top: 2rem;">"Si no vendes, no pagas nada."</p>
       </div>
       
       <!-- SLIDE 16: CTA Final -->
       <div class="slide" data-slide="16">
         <h1 class="highlight-green">¿Listo para llenar más funciones?</h1>
         <p style="text-align: center; font-size: 1.3rem; margin: 1rem 0;">
-          📅 Agenda tu demo de 15 minutos
+          Crea tu cuenta gratis y publica tu primera función
         </p>
         <ul style="margin: 1.5rem 0;">
-          <li data-icon="→">Te mostramos la plataforma con TU evento</li>
+          <li data-icon="→">Te ayudamos a armar tu evento</li>
           <li data-icon="→">Respondemos todas tus dudas</li>
           <li data-icon="→">Sin compromiso</li>
         </ul>
-        <a href="https://calendar.app.google/CMt97vedNjzBaoEX7" target="_blank" rel="noopener noreferrer" class="cta-button">Solicitar Demo</a>
+        <a href="/organizadores/registro" class="cta-button">Crear mi cuenta gratis</a>
+        <p style="margin-top: 1.5rem; text-align: center;">
+          <a href="https://calendar.app.google/CMt97vedNjzBaoEX7" target="_blank" rel="noopener noreferrer" style="color: #9AE600;">o agenda una demo de 15 minutos</a>
+        </p>
         <p style="margin-top: 2rem; opacity: 0.7; text-align: center;">
           📧 contacto@aitickets.cl
         </p>

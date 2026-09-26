@@ -1,15 +1,18 @@
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
-import { getSessionUser } from "../../../lib/supabaseServer";
+import { getSessionContext, hasRole, EVENT_MANAGER_ROLES } from "../../../lib/supabaseServer";
 import type { APIRoute } from "astro";
 
 export const POST: APIRoute = async ({ request, cookies }) => {
     try {
-        const user = await getSessionUser({ cookies });
-        if (!user) {
+        const session = await getSessionContext({ cookies });
+        if (!session) {
             return new Response(JSON.stringify({ message: "No autorizado" }), { 
                 status: 401,
                 headers: { "Content-Type": "application/json" }
             });
+        }
+        if (!hasRole(session.dbUser, EVENT_MANAGER_ROLES)) {
+            return new Response(JSON.stringify({ message: "No tienes permisos para esta acción" }), { status: 403, headers: { "Content-Type": "application/json" } });
         }
 
         const formData = await request.formData();
@@ -22,8 +25,10 @@ export const POST: APIRoute = async ({ request, cookies }) => {
             });
         }
 
-        if (!file.type.startsWith("image/")) {
-            return new Response(JSON.stringify({ message: "Solo se permiten imágenes" }), { 
+        // Solo formatos raster (sin SVG, que puede contener scripts)
+        const ALLOWED_TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif" };
+        if (!ALLOWED_TYPES[file.type]) {
+            return new Response(JSON.stringify({ message: "Solo se permiten imágenes JPG, PNG, WEBP o GIF" }), { 
                 status: 400,
                 headers: { "Content-Type": "application/json" }
             });
@@ -38,8 +43,8 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
         const supabase = getSupabaseAdmin();
 
-        const fileExt = file.name.split('.').pop();
-        const fileName = `promote/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const fileExt = ALLOWED_TYPES[file.type];
+        const fileName = `promote/${session.dbUser.organization_id}-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
         const arrayBuffer = await file.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);

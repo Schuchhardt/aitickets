@@ -1,74 +1,116 @@
 ---
 import DashboardLayout from "../../../layouts/DashboardLayout.astro";
-import { createSupabaseServerClient } from "../../../lib/supabaseServer";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
+import { ORG_ADMIN_ROLES } from "../../../lib/supabaseServer";
+import { requireDashboardSession } from "../_lib/guard";
 
-const supabase = createSupabaseServerClient(Astro);
+const guard = await requireDashboardSession(Astro, ORG_ADMIN_ROLES);
+if (!guard.ok) return guard.response;
+const { dbUser } = guard.session;
 const supabaseAdmin = getSupabaseAdmin();
-const {
-    data: { user },
-} = await supabase.auth.getUser();
 
-if (!user) {
-    return Astro.redirect("/organizadores/login");
-}
+type Tx = {
+    event: string;
+    amount: number;
+    ticketFee: number;
+    paymentFee: number;
+    total: number;
+    qty: number;
+    date: string;
+};
+type EventSummary = { id: number; name: string; endDate: string | null; qty: number; amount: number; ticketFee: number; paid: number };
 
-const { data: dbUser } = await supabase
-    .from("users")
-    .select("organization_id")
-    .eq("auth_user_id", user.id)
-    .single();
+let totalRevenue = 0; // ventas de entradas (lo que recibe el productor)
+let totalServiceFees = 0; // cargo por servicio pagado por los compradores
+let paidOut = 0;
+let balanceDue = 0;
+let transactions: Tx[] = [];
+const summaries: EventSummary[] = [];
 
-let totalRevenue = 0;
-let pendingPayout = 0;
-let transactions: Array<{event: string; amount: number; fee: number; qty: number; date: string; status: string}> = [];
+const { data: orgEvents } = await supabaseAdmin
+    .from("events")
+    .select("id, name, end_date, start_date")
+    .eq("organization_id", dbUser.organization_id)
+    .order("start_date", { ascending: false });
 
-if (dbUser?.organization_id) {
-    const { data: orgEvents } = await supabaseAdmin
-        .from("events")
-        .select("id, name")
-        .eq("organization_id", dbUser.organization_id);
+if (orgEvents && orgEvents.length > 0) {
+    const eventIds = orgEvents.map((e) => e.id);
+    const eventNameMap = Object.fromEntries(orgEvents.map((e) => [e.id, e.name]));
+    const byEvent = new Map<number, EventSummary>(
+        orgEvents.map((e) => [e.id, { id: e.id, name: e.name, endDate: e.end_date, qty: 0, amount: 0, ticketFee: 0, paid: 0 }]),
+    );
 
-    if (orgEvents && orgEvents.length > 0) {
-        const eventIds = orgEvents.map((e) => e.id);
-        const eventNameMap = Object.fromEntries(orgEvents.map((e) => [e.id, e.name]));
-
-        // Get all paid orders
-        const { data: orders } = await supabaseAdmin
+    // Solo órdenes pagadas. Paginado con .range(): PostgREST corta en 1000 filas y los totales quedarían incompletos.
+    const orders: any[] = [];
+    const PAGE_SIZE = 1000;
+    for (let from = 0; ; from += PAGE_SIZE) {
+        const { data: page, error: pageError } = await supabaseAdmin
             .from("event_orders")
-            .select("id, event_id, amount, payment_fee, total_payment, ticket_qty, created_at, status")
+            .select("id, event_id, amount, ticket_fee, payment_fee, total_payment, ticket_qty, created_at")
             .in("event_id", eventIds)
-            .order("created_at", { ascending: false });
+            .eq("status", "paid")
+            .order("created_at", { ascending: false })
+            .order("id", { ascending: true })
+            .range(from, from + PAGE_SIZE - 1);
+        if (pageError) {
+            console.error("Error cargando órdenes para finanzas:", pageError.message);
+            break;
+        }
+        orders.push(...(page || []));
+        if (!page || page.length < PAGE_SIZE) break;
+    }
 
-        if (orders) {
-            totalRevenue = orders
-                .filter((o) => o.status === "paid")
-                .reduce((sum, o) => sum + (o.amount || 0), 0);
-
-            // Get already withdrawn amounts
-            const { data: withdrawals } = await supabaseAdmin
-                .from("event_withdrawals")
-                .select("amount, status")
-                .in("event_id", eventIds)
-                .in("status", ["paid", "requested"]);
-
-            const withdrawnAmount = (withdrawals || []).reduce((sum, w) => sum + Number(w.amount || 0), 0);
-            pendingPayout = totalRevenue - withdrawnAmount;
-            if (pendingPayout < 0) pendingPayout = 0;
-
-            transactions = orders.map((o) => ({
-                event: eventNameMap[o.event_id] || "—",
-                amount: o.amount || 0,
-                fee: o.payment_fee || 0,
-                qty: o.ticket_qty || 0,
-                date: new Date(o.created_at).toLocaleDateString("es-CL"),
-                status: o.status,
-            }));
+    for (const o of orders || []) {
+        const amount = Number(o.amount) || 0;
+        const ticketFee = Number(o.ticket_fee) || 0;
+        totalRevenue += amount;
+        totalServiceFees += ticketFee;
+        const s = byEvent.get(o.event_id);
+        if (s) {
+            s.qty += o.ticket_qty || 0;
+            s.amount += amount;
+            s.ticketFee += ticketFee;
         }
     }
+
+    transactions = (orders || []).slice(0, 300).map((o) => ({
+        event: eventNameMap[o.event_id] || "—",
+        amount: Number(o.amount) || 0,
+        ticketFee: Number(o.ticket_fee) || 0,
+        paymentFee: Number(o.payment_fee) || 0,
+        total: Number(o.total_payment) || 0,
+        qty: o.ticket_qty || 0,
+        date: new Date(o.created_at).toLocaleDateString("es-CL", { timeZone: "America/Santiago" }),
+    }));
+
+    // Transferencias ya realizadas al productor
+    const { data: withdrawals } = await supabaseAdmin
+        .from("event_withdrawals")
+        .select("event_id, amount, status")
+        .in("event_id", eventIds)
+        .eq("status", "paid");
+    for (const w of withdrawals || []) {
+        const amount = Number(w.amount) || 0;
+        paidOut += amount;
+        const s = byEvent.get(w.event_id);
+        if (s) s.paid += amount;
+    }
+
+    balanceDue = Math.max(0, totalRevenue - paidOut);
+    summaries.push(...[...byEvent.values()].filter((s) => s.amount > 0 || s.qty > 0));
 }
 
-const formatCLP = (amount: number) => `$${Number(amount).toLocaleString("es-CL")}`;
+// Datos bancarios (tabla organization_payout_accounts, migración 20260926_C_dashboard)
+const { data: payout } = await supabaseAdmin
+    .from("organization_payout_accounts")
+    .select("bank_name, bank_account_number, bank_account_holder, bank_account_rut")
+    .eq("organization_id", dbUser.organization_id)
+    .maybeSingle();
+const hasBankData = !!(payout?.bank_name && payout?.bank_account_number && payout?.bank_account_holder && payout?.bank_account_rut);
+
+const formatCLP = (amount: number) => `$${Math.round(Number(amount) || 0).toLocaleString("es-CL")}`;
+const formatDate = (d: string | null) =>
+    d ? new Date(d).toLocaleDateString("es-CL", { timeZone: "America/Santiago" }) : "—";
 ---
 
 <DashboardLayout title="Ingresos">
@@ -79,62 +121,69 @@ const formatCLP = (amount: number) => `$${Number(amount).toLocaleString("es-CL")
             </h1>
         </div>
 
+        <!-- Cómo se paga -->
+        <div class="bg-blue-50 border border-blue-100 rounded-xl p-5 text-sm text-blue-900">
+            <p class="font-semibold mb-1">¿Cómo recibo mi dinero?</p>
+            <p>
+                Recibes el <strong>100% del valor de tus entradas</strong>: el cargo por servicio lo paga el comprador.
+                Los pagos se hacen <strong>manualmente por transferencia bancaria dentro de 48–72 horas después de cada función</strong>,
+                a la cuenta que registres en <a href="/dashboard/settings" class="underline font-medium">Configuración</a>.
+            </p>
+            {!hasBankData && (
+                <p class="mt-2 text-red-700 font-medium">
+                    ⚠️ Aún no registras tus datos bancarios. Complétalos en Configuración para poder recibir tus pagos.
+                </p>
+            )}
+        </div>
+
         <!-- Quick Stats -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div
-                class="bg-white p-6 rounded-xl border border-gray-100 shadow-sm"
-            >
-                <h3 class="text-gray-500 text-sm font-medium">
-                    Ingresos Totales
-                </h3>
+            <div class="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
+                <h3 class="text-gray-500 text-sm font-medium">Ventas de entradas</h3>
                 <p class="text-3xl font-bold mt-2">{formatCLP(totalRevenue)}</p>
+                <p class="text-xs text-gray-400 mt-1">Órdenes pagadas. No incluye el cargo por servicio ({formatCLP(totalServiceFees)}).</p>
             </div>
-            <div
-                class="bg-white p-6 rounded-xl border border-gray-100 shadow-sm"
-            >
-                <h3 class="text-gray-500 text-sm font-medium">
-                    Pendiente de Pago
-                </h3>
-                <p class="text-3xl font-bold mt-2">{formatCLP(pendingPayout)}</p>
+            <div class="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
+                <h3 class="text-gray-500 text-sm font-medium">Transferido a la fecha</h3>
+                <p class="text-3xl font-bold mt-2">{formatCLP(paidOut)}</p>
             </div>
-            <div
-                class="bg-white p-6 rounded-xl border border-gray-100 shadow-sm"
-            >
-                <h3 class="text-gray-500 text-sm font-medium">Próximo Pago</h3>
-                <p class="text-lg font-semibold mt-2 text-gray-900">Próximamente</p>
+            <div class="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
+                <h3 class="text-gray-500 text-sm font-medium">Saldo a pagar</h3>
+                <p class="text-3xl font-bold mt-2 text-green-600">{formatCLP(balanceDue)}</p>
+                <p class="text-xs text-gray-400 mt-1">Se transfiere 48–72 h después de cada función.</p>
             </div>
         </div>
 
-        <!-- Transactions Table -->
-        {transactions.length > 0 ? (
+        <!-- Resumen por evento -->
+        {summaries.length > 0 && (
             <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
                 <div class="p-6 border-b border-gray-100">
-                    <h3 class="text-lg font-bold text-gray-900">Detalle de Transacciones</h3>
+                    <h3 class="text-lg font-bold text-gray-900">Resumen por evento</h3>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-sm text-gray-600">
                         <thead class="bg-gray-50 text-gray-900 font-semibold border-b border-gray-100">
                             <tr>
                                 <th class="px-6 py-4">Evento</th>
+                                <th class="px-6 py-4">Última función</th>
                                 <th class="px-6 py-4">Entradas</th>
-                                <th class="px-6 py-4">Monto</th>
-                                <th class="px-6 py-4">Comisión</th>
-                                <th class="px-6 py-4">Fecha</th>
-                                <th class="px-6 py-4">Estado</th>
+                                <th class="px-6 py-4">Ventas de entradas</th>
+                                <th class="px-6 py-4">Transferido</th>
+                                <th class="px-6 py-4">Saldo a pagar</th>
+                                <th class="px-6 py-4"></th>
                             </tr>
                         </thead>
                         <tbody>
-                            {transactions.map((t) => (
+                            {summaries.map((s) => (
                                 <tr class="border-b border-gray-50 hover:bg-gray-50 transition">
-                                    <td class="px-6 py-4 font-medium text-gray-900">{t.event}</td>
-                                    <td class="px-6 py-4">{t.qty}</td>
-                                    <td class="px-6 py-4">{formatCLP(t.amount)}</td>
-                                    <td class="px-6 py-4 text-gray-400">{formatCLP(t.fee)}</td>
-                                    <td class="px-6 py-4">{t.date}</td>
+                                    <td class="px-6 py-4 font-medium text-gray-900">{s.name}</td>
+                                    <td class="px-6 py-4">{formatDate(s.endDate)}</td>
+                                    <td class="px-6 py-4">{s.qty}</td>
+                                    <td class="px-6 py-4">{formatCLP(s.amount)}</td>
+                                    <td class="px-6 py-4">{formatCLP(s.paid)}</td>
+                                    <td class="px-6 py-4 font-semibold text-gray-900">{formatCLP(Math.max(0, s.amount - s.paid))}</td>
                                     <td class="px-6 py-4">
-                                        <span class={`px-2 py-1 rounded-full text-xs font-bold ${t.status === 'paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                            {t.status === 'paid' ? 'Pagado' : t.status}
-                                        </span>
+                                        <a href={`/api/events/orders-csv?event_id=${s.id}`} class="text-blue-600 hover:underline whitespace-nowrap">Exportar CSV</a>
                                     </td>
                                 </tr>
                             ))}
@@ -142,16 +191,52 @@ const formatCLP = (amount: number) => `$${Number(amount).toLocaleString("es-CL")
                     </table>
                 </div>
             </div>
+        )}
+
+        <!-- Transactions Table -->
+        {transactions.length > 0 ? (
+            <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                <div class="p-6 border-b border-gray-100">
+                    <h3 class="text-lg font-bold text-gray-900">Órdenes pagadas</h3>
+                    <p class="text-xs text-gray-500 mt-1">
+                        El cargo por servicio lo paga el comprador y la comisión de la pasarela de pago la cubre AI Tickets: ninguno se descuenta de tu saldo.
+                    </p>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm text-gray-600">
+                        <thead class="bg-gray-50 text-gray-900 font-semibold border-b border-gray-100">
+                            <tr>
+                                <th class="px-6 py-4">Evento</th>
+                                <th class="px-6 py-4">Entradas</th>
+                                <th class="px-6 py-4">Monto entradas</th>
+                                <th class="px-6 py-4">Cargo por servicio</th>
+                                <th class="px-6 py-4">Total pagado</th>
+                                <th class="px-6 py-4">Comisión pasarela</th>
+                                <th class="px-6 py-4">Fecha</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {transactions.map((t) => (
+                                <tr class="border-b border-gray-50 hover:bg-gray-50 transition">
+                                    <td class="px-6 py-4 font-medium text-gray-900">{t.event}</td>
+                                    <td class="px-6 py-4">{t.qty}</td>
+                                    <td class="px-6 py-4 font-medium text-gray-900">{formatCLP(t.amount)}</td>
+                                    <td class="px-6 py-4">{formatCLP(t.ticketFee)}</td>
+                                    <td class="px-6 py-4">{formatCLP(t.total)}</td>
+                                    <td class="px-6 py-4 text-gray-400">{formatCLP(t.paymentFee)}</td>
+                                    <td class="px-6 py-4">{t.date}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         ) : (
-            <div
-                class="bg-white rounded-xl border border-gray-100 p-8 text-center shadow-sm mt-6"
-            >
+            <div class="bg-white rounded-xl border border-gray-100 p-8 text-center shadow-sm mt-6">
                 <div class="max-w-md mx-auto">
-                    <h3 class="text-lg font-medium text-gray-900 mb-2">
-                        Detalle de Transacciones
-                    </h3>
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">Órdenes pagadas</h3>
                     <p class="text-gray-500">
-                        Aún no hay transacciones registradas. Cuando vendas entradas, aquí verás el desglose.
+                        Aún no hay ventas registradas. Cuando vendas entradas, aquí verás el desglose.
                     </p>
                 </div>
             </div>

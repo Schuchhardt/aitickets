@@ -1,7 +1,8 @@
 <script setup>
-import { defineProps, defineEmits, ref } from "vue";
+import { ref, watch, computed } from "vue";
 import { useGoogleAnalytics } from "../../composables/useGoogleAnalytics.js";
 import { formatLocalTime, formatLocalDate } from "../../utils/dateHelpers.js";
+import { maxPerPurchase, formatCLP, formatFunctionLabel, findTicketFunction } from "./pricing.js";
 
 const props = defineProps({
   event: Object,
@@ -9,14 +10,27 @@ const props = defineProps({
 });
 
 const emit = defineEmits(["update:selectedTickets"]);
-const selectedTickets = ref({});
-const showTooltip = ref(false); // Controla la visibilidad del tooltip
+// Copia local sincronizada con el v-model (para reflejar selecciones restauradas o hechas por el asistente)
+const selectedTickets = ref({ ...(props.selectedTickets || {}) });
+watch(() => props.selectedTickets, (value) => { selectedTickets.value = { ...(value || {}) }; }, { deep: true });
+
+const tooltipTicketId = ref(null);
 const { trackAddToCart } = useGoogleAnalytics();
 
 const updateSelection = (ticketId, quantity) => {
-  selectedTickets.value[ticketId] = quantity;
-  emit("update:selectedTickets", selectedTickets.value);
+  const next = { ...selectedTickets.value };
+  if (quantity > 0) next[ticketId] = quantity;
+  else delete next[ticketId];
+  selectedTickets.value = next;
+  emit("update:selectedTickets", next);
 };
+
+// max_quantity ya viene limitado por el stock desde la página del evento; remaining null = ilimitado
+const ticketLimit = (ticket) => {
+  const max = maxPerPurchase(ticket);
+  return ticket.remaining == null ? max : Math.max(0, Math.min(max, Number(ticket.remaining)));
+};
+const isSoldOut = (ticket) => ticketLimit(ticket) <= 0;
 
 const isSuperFan = (ticket) => {
   return ticket.price > 0 && ticket.price === Math.max(...props.event.tickets.map(t => t.price));
@@ -24,22 +38,14 @@ const isSuperFan = (ticket) => {
 
 const increaseTicket = (ticket) => {
   const currentQuantity = selectedTickets.value[ticket.id] || 0;
-  if (currentQuantity < ticket.max_quantity) {
+  if (currentQuantity < ticketLimit(ticket)) {
     updateSelection(ticket.id, currentQuantity + 1);
-    showTooltip.value = false; // Oculta el tooltip si la cantidad es válida
-    
-    // Track cuando se agrega un ticket
-    trackAddToCart(
-      props.event.id, 
-      props.event.title, 
-      1, 
-      ticket.price || 0
-    );
+    tooltipTicketId.value = null;
+    trackAddToCart(props.event.id, props.event.name || props.event.title, 1, ticket.price || 0);
   } else {
-    console.log("Máximo de tickets alcanzado");
-    showTooltip.value = true; // Muestra el tooltip si se supera el máximo
+    tooltipTicketId.value = ticket.id;
     setTimeout(() => {
-      showTooltip.value = false; // Oculta el tooltip después de 2 segundos
+      if (tooltipTicketId.value === ticket.id) tooltipTicketId.value = null;
     }, 2000);
   }
 };
@@ -48,20 +54,32 @@ const decreaseTicket = (ticket) => {
   updateSelection(ticket.id, Math.max((selectedTickets.value[ticket.id] || 0) - 1, 0));
 };
 
+// R1: entradas agrupadas por función (event_date_id). NULL = válida para cualquier función.
+const ticketGroups = computed(() => {
+  const tickets = props.event?.tickets || [];
+  const dates = (props.event?.dates || []).filter((d) => d?.id != null);
+  const groups = [];
+  for (const d of dates) {
+    const items = tickets.filter((t) => findTicketFunction(t, dates)?.id === d.id);
+    if (items.length) groups.push({ key: `fn-${d.id}`, label: formatFunctionLabel(d), items });
+  }
+  const anyFunction = tickets.filter((t) => !findTicketFunction(t, dates));
+  if (anyFunction.length) {
+    groups.push({ key: "any", label: dates.length > 1 ? "Válida para cualquier función" : "", items: anyFunction });
+  }
+  // Un solo grupo sin función específica: sin encabezado (evento de una sola fecha)
+  if (groups.length === 1 && groups[0].key === "any") groups[0].label = "";
+  return groups;
+});
+
 const formatTime = (datetime) => {
   return datetime ? formatLocalTime(datetime) : "";
 };
 
-const formatPrice = (price) => {
-  return price !== null && price !== undefined ? price.toLocaleString("es-CL") : "";
-};
-
 const formatFullDate = (dateArray) => {
-  if (!dateArray.length) return "No hay fechas disponibles";
-
+  if (!dateArray || !dateArray.length) return "";
   const start = dateArray[0];
   const end = dateArray[dateArray.length - 1];
-
   const startDate = formatLocalDate(start.date);
   const endDate = formatLocalDate(end.date);
   return startDate !== endDate ? `Del ${startDate} al ${endDate}` : `${startDate}`;
@@ -70,82 +88,77 @@ const formatFullDate = (dateArray) => {
 
 <template>
   <div v-if="event.tickets && event.tickets.length" class="w-full font-[Prompt]">
-    <!-- <h3 class="text-lg font-semibold text-center pt-0 mb-2 font-[Prompt]">Selecciona tus tickets</h3> -->
     <div class="w-full">
-      <div class="text-center p-2 mb-4 bg-gray-50 rounded-[10px]">
+      <div v-if="(event.dates && event.dates.length) || event.start_date" class="text-center p-2 mb-4 bg-gray-50 rounded-[10px]">
         <p class="text-gray-500 text-sm">Fecha</p>
-        <p class="text-lg font-semibold">
-          <template v-if="event.start_date || event.end_date">
-            {{formatFullDate(event.dates)}}
-          </template>
-        </p>
-        <p class="text-gray-500 text-sm">
-          <template v-if="event.start_date || event.end_date">
-            {{ formatTime(event.start_date) }}<span v-if="event.start_date && event.end_date"> - </span>{{ formatTime(event.end_date) }}
-          </template>
+        <p class="text-lg font-semibold">{{ formatFullDate(event.dates) }}</p>
+        <p class="text-gray-500 text-sm" v-if="event.start_date">
+          {{ formatTime(event.start_date) }}<span v-if="event.end_date"> - </span>{{ formatTime(event.end_date) }}
         </p>
       </div>
 
-      <div class="grid grid-cols-1 gap-4 w-full">
+      <div v-for="group in ticketGroups" :key="group.key" class="mb-4 last:mb-0">
+      <p v-if="group.label" class="text-sm font-semibold text-gray-700 mb-2">{{ group.label }}</p>
+      <div class="grid grid-cols-1 gap-3 w-full">
         <div
-          v-for="ticket in event.tickets"
+          v-for="ticket in group.items"
           :key="ticket.id"
-          class="border p-4 rounded-lg flex justify-between items-center w-full"
+          class="border p-4 rounded-lg flex justify-between items-center gap-3 w-full"
+          :class="{ 'opacity-60': isSoldOut(ticket) }"
         >
-          <div>
+          <div class="min-w-0">
             <div v-if="isSuperFan(ticket)" class="bg-green-200 text-green-800 text-xs font-bold px-2 py-1 rounded-full inline-block mb-2">
               Super Fan
             </div>
-            <div v-if="!isSuperFan(ticket)" class="bg-gray-200 text-xs font-bold px-2 py-1 rounded-full inline-block mb-2">
+            <div v-else class="bg-gray-200 text-xs font-bold px-2 py-1 rounded-full inline-block mb-2">
               Fan
             </div>
-            <p class="font-medium">{{ ticket.ticket_name }}</p>
-            <p v-if="ticket.price !== null && ticket.price !== undefined" class="text-gray-500">
-              {{ ticket.price > 0 ? `$${formatPrice(ticket.price)}` : "Gratis" }}
+            <p class="font-medium break-words">{{ ticket.ticket_name }}</p>
+            <p v-if="ticket.price !== null && ticket.price !== undefined" class="text-gray-700">
+              {{ ticket.price > 0 ? formatCLP(ticket.price) : "Gratis" }}
+              <span v-if="ticket.price > 0" class="text-gray-500 text-xs">+ 10% cargo por servicio</span>
+            </p>
+            <p v-if="ticket.remaining != null && ticket.remaining > 0 && ticket.remaining <= 10" class="text-orange-600 text-xs mt-1">
+              ¡Quedan {{ ticket.remaining }}!
             </p>
           </div>
 
-        <!-- Botón Añadir / Controles de cantidad alineados al centro -->
-        <div class="flex justify-center items-center">
-          <button 
-            v-if="!selectedTickets[ticket.id]" 
-            @click="increaseTicket(ticket)"
-            aria-label="Añadir ticket"
-            class="border px-4 py-1 rounded-lg text-black hover:bg-gray-100 cursor-pointer"
-          >
-            Añadir
-          </button>
-          <div v-else class="flex items-center justify-center space-x-2 border rounded-lg px-2 py-1">
-            <button aria-label="Disminuir cantidad de tickets" @click="decreaseTicket(ticket)" class="px-2 py-1 cursor-pointer">-</button>
-            <span class="w-6 text-center">{{ selectedTickets[ticket.id] || 0 }}</span>
-            <!-- Botón "+" con tooltip debajo -->
+          <div class="flex justify-center items-center shrink-0">
+            <span v-if="isSoldOut(ticket)" class="text-sm font-semibold text-gray-500 px-2">Agotada</span>
             <button
-              aria-label="Aumentar cantidad de tickets"
+              v-else-if="!selectedTickets[ticket.id]"
               @click="increaseTicket(ticket)"
-              class="px-2 py-1 relative cursor-pointer"
+              aria-label="Añadir entrada"
+              class="border px-4 py-2 rounded-lg text-black hover:bg-gray-100 cursor-pointer"
             >
-              +
-              <!-- Tooltip debajo con animación -->
-              <transition name="fade">
-                <span
-                  v-if="showTooltip"
-                  class="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-gray-900 text-white text-xs rounded px-2 py-1 z-50 whitespace-nowrap"
-                >
-                  Solo se puede {{ ticket.max_quantity }} ticket(s) máximo
-                  <span
-                    class="absolute top-0 left-1/2 -translate-x-1/2 -mt-1 w-0 h-0 border-l-4 border-r-4 border-b-4 border-l-transparent border-r-transparent border-b-gray-900"
-                  ></span>
-                </span>
-              </transition>
+              Añadir
             </button>
-
+            <div v-else class="flex items-center justify-center space-x-1 border rounded-lg px-1 py-1">
+              <button aria-label="Disminuir cantidad de entradas" @click="decreaseTicket(ticket)" class="w-9 h-9 cursor-pointer text-lg">-</button>
+              <span class="w-6 text-center">{{ selectedTickets[ticket.id] || 0 }}</span>
+              <button
+                aria-label="Aumentar cantidad de entradas"
+                @click="increaseTicket(ticket)"
+                class="w-9 h-9 relative cursor-pointer text-lg"
+              >
+                +
+                <transition name="fade">
+                  <span
+                    v-if="tooltipTicketId === ticket.id"
+                    class="absolute top-full right-0 mt-2 bg-gray-900 text-white text-xs rounded px-2 py-1 z-50 whitespace-nowrap"
+                  >
+                    Máximo {{ ticketLimit(ticket) }} por compra
+                  </span>
+                </transition>
+              </button>
+            </div>
           </div>
         </div>
-        
       </div>
       </div>
     </div>
   </div>
+  <p v-else class="text-center text-gray-500 font-[Prompt] p-4">No hay entradas a la venta en este momento.</p>
 </template>
 
 <style scoped>

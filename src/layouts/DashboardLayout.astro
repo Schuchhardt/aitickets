@@ -1,41 +1,32 @@
 ---
 import DashboardSidebar from "../components/dashboard/DashboardSidebar.vue";
 import "../styles/global.css";
-import {
-  getSessionUser,
-  createSupabaseServerClient,
-} from "../lib/supabaseServer";
+import { getSessionContext, type SessionContext } from "../lib/supabaseServer";
 
 const { title = "Dashboard" } = Astro.props;
-const userRaw = await getSessionUser(Astro);
 
-// Fetch user name from public.users table
-let dbUserName = null;
-if (userRaw) {
-  const supabase = createSupabaseServerClient(Astro);
-  const { data: dbUser } = await supabase
-    .from("users")
-    .select("name")
-    .eq("auth_user_id", userRaw.id)
-    .single();
-  dbUserName = dbUser?.name || null;
-}
+// La página ya validó la sesión con requireDashboardSession (queda en Astro.locals);
+// si no, se consulta aquí.
+const session: SessionContext | null =
+  (Astro.locals as any).sessionContext || (await getSessionContext(Astro));
 
-const userData = userRaw
+const userData = session
   ? {
-      email: userRaw.email,
-      user_metadata: userRaw.user_metadata,
-      id: userRaw.id,
-      dbName: dbUserName, // Name from public.users table
+      email: session.authUser.email,
+      user_metadata: session.authUser.user_metadata,
+      id: session.authUser.id,
+      dbName: session.dbUser.name || null, // Nombre desde public.users
+      role: session.dbUser.role || null,
     }
   : null;
 ---
 
 <!doctype html>
-<html lang="es">
+<html lang="es-CL">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width" />
+    <meta name="robots" content="noindex, nofollow" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, defineProps } from "vue";
+import { ref, onMounted } from "vue";
 import QRCode from "qrcode";
 
 const props = defineProps({
@@ -10,14 +10,11 @@ const qrSrc = ref("");
 
 onMounted(async () => {
   if (props.code) {
-    console.log("Generando QR para:", props.code); // Debugging en consola
     try {
-      qrSrc.value = await QRCode.toDataURL(props.code); // Genera la imagen
+      qrSrc.value = await QRCode.toDataURL(props.code, { margin: 1, width: 384 }); // Genera la imagen
     } catch (err) {
       console.error("Error generando QR:", err);
     }
-  } else {
-    console.error("No se recibió código QR válido.");
   }
 });
 </script>

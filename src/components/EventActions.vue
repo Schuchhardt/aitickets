@@ -90,23 +90,95 @@ const isEventFinished = computed(() => {
 
 // format price with thousands separator (dot)
 const formatPrice = (price) => {
-  return price !== null && price !== undefined ? price.toLocaleString("es-CL") : "";
+  return price !== null && price !== undefined ? Number(price).toLocaleString("es-CL") : "";
 };
-// get lowest ticket price and maximum price
-// and return the price of the event
-// if all tickets have the same price, return the price
-// if all tickets has price equals to zero, return "Gratis"
-// if tickets have different prices, return the range in string format
-const getEventPrice = (tickets) => {
-  if (!tickets || tickets.length === 0) return "Gratis";
-  const prices = tickets.map((ticket) => ticket.price);
+
+// Cargo por servicio al comprador (C5: 10% del subtotal)
+const SERVICE_FEE_RATE = 0.10;
+
+// Entradas a la venta (el servidor ya filtra por ventana de venta y stock)
+const onSaleTickets = computed(() => (props.event?.tickets || []).filter(
+  (t) => t.remaining === null || t.remaining === undefined || t.remaining > 0
+));
+
+// Estado de venta: on_sale | sold_out | upcoming | closed
+const saleState = computed(() => {
+  if (onSaleTickets.value.length > 0) return "on_sale";
+  return props.event?.sale_state && props.event.sale_state !== "on_sale" ? props.event.sale_state : "closed";
+});
+
+const canBuy = computed(() => saleState.value === "on_sale");
+
+const hasPaidTickets = computed(() => onSaleTickets.value.some((t) => Number(t.price) > 0));
+
+// Texto de precio / estado
+const priceLabel = computed(() => {
+  switch (saleState.value) {
+    case "sold_out":
+      return "Agotado";
+    case "upcoming":
+      return "Próximamente";
+    case "closed":
+      return "Venta cerrada";
+  }
+  const prices = onSaleTickets.value.map((t) => Number(t.price) || 0);
   const minPrice = Math.min(...prices);
   const maxPrice = Math.max(...prices);
-  if (minPrice === maxPrice) {
-    return minPrice === 0 ? "Gratis" : `$${formatPrice(minPrice)}`;
+  if (maxPrice === 0) return "Gratis";
+  if (minPrice === maxPrice) return `$${formatPrice(minPrice)}`;
+  if (minPrice === 0) {
+    const minPaid = Math.min(...prices.filter((p) => p > 0));
+    return `Gratis o desde $${formatPrice(minPaid)}`;
   }
-  return `Desde $${formatPrice(minPrice)} hasta $${formatPrice(maxPrice)}`;
-};
+  return `Desde $${formatPrice(minPrice)}`;
+});
+
+const feeNote = computed(() =>
+  canBuy.value && hasPaidTickets.value
+    ? `+ cargo por servicio ${Math.round(SERVICE_FEE_RATE * 100)}%`
+    : ""
+);
+
+// Fecha de inicio de venta (para "Próximamente")
+const saleStartsLabel = computed(() => {
+  if (saleState.value !== "upcoming" || !props.event?.sale_starts_at) return "";
+  const d = new Date(props.event.sale_starts_at);
+  if (Number.isNaN(d.getTime())) return "";
+  return "Venta desde el " + d.toLocaleDateString("es-CL", {
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: props.event?.timezone || "America/Santiago",
+  }) + " hrs";
+});
+
+// "¡Quedan N!" cuando el stock total restante es bajo (solo si todas las entradas tienen stock limitado)
+const LOW_STOCK_THRESHOLD = 20;
+const remainingTotal = computed(() => {
+  const tickets = onSaleTickets.value;
+  if (!tickets.length || tickets.some((t) => t.remaining === null || t.remaining === undefined)) return null;
+  return tickets.reduce((sum, t) => sum + Number(t.remaining || 0), 0);
+});
+const lowStockLabel = computed(() =>
+  canBuy.value && remainingTotal.value !== null && remainingTotal.value <= LOW_STOCK_THRESHOLD
+    ? `¡Quedan ${remainingTotal.value}!`
+    : ""
+);
+
+const unavailableLabel = computed(() => {
+  switch (saleState.value) {
+    case "sold_out":
+      return "Entradas agotadas";
+    case "upcoming":
+      return "Venta próximamente";
+    default:
+      return "Venta cerrada";
+  }
+});
+
+const stripHtml = (html) => (html || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 
 // Función para agregar evento al calendario
 const addToCalendar = () => {
@@ -117,11 +189,17 @@ const addToCalendar = () => {
     return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
   };
   
+  const firstFunction = (props.event.dates || []).find((d) => d.start_iso);
+  const start = firstFunction?.start_iso || props.event.start_date;
+  const end = firstFunction?.end_iso || props.event.end_date || start;
+  if (!start) return;
+
+  const eventUrl = `${window.location.origin}/eventos/${props.event.slug}`;
   const title = encodeURIComponent(props.event.name || props.event.title || 'Evento');
-  const description = encodeURIComponent(props.event.description || '');
+  const description = encodeURIComponent(`${stripHtml(props.event.description).slice(0, 500)}\n\n${eventUrl}`);
   const location = encodeURIComponent(props.event.location || '');
-  const startDate = formatDate(props.event.start_date);
-  const endDate = formatDate(props.event.end_date);
+  const startDate = formatDate(start);
+  const endDate = formatDate(end);
   
   // URL para Google Calendar
   const googleUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startDate}/${endDate}&details=${description}&location=${location}`;
@@ -179,12 +257,23 @@ const addToCalendar = () => {
             <img :src="iconTicket.src" alt="ticket icon" class="w-5 h-5 mr-2" />
             Precio
           </span>
-          <span class="text-xl">{{ getEventPrice(event.tickets) }}</span>
+          <span class="text-xl">{{ priceLabel }}</span>
         </div>
+        <p v-if="feeNote" class="text-right text-xs font-normal font-['Prompt'] text-gray-500 mt-1">{{ feeNote }}</p>
+        <p v-if="lowStockLabel" class="text-right text-sm text-red-600 mt-1">{{ lowStockLabel }}</p>
+        <p v-if="saleStartsLabel" class="text-right text-xs font-normal font-['Prompt'] text-gray-600 mt-1">{{ saleStartsLabel }}</p>
 
         <!-- Botones -->
+        <button
+          v-if="!canBuy && !hasPurchasedTickets"
+          disabled
+          class="w-full py-3 rounded-full mt-4 text-gray-600 bg-gray-200 cursor-not-allowed"
+        >
+          {{ unavailableLabel }}
+        </button>
+
         <button 
-          v-if="!hasPurchasedTickets"
+          v-else-if="!hasPurchasedTickets"
           @click="openReserveModal" 
           aria-label="Comprar entrada" 
           class="w-full bg-black text-white py-3 rounded-full flex items-center justify-center mt-4 cursor-pointer relative z-10 pointer-events-auto"
@@ -204,6 +293,7 @@ const addToCalendar = () => {
           </button>
 
           <button 
+            v-if="canBuy"
             @click="openReserveModal" 
             aria-label="Comprar más entradas" 
             class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-full flex items-center justify-center mt-3 cursor-pointer relative z-10 pointer-events-auto"
@@ -233,9 +323,22 @@ const addToCalendar = () => {
       <p class="mt-2 text-gray-600 text-sm">Te vemos en el próximo</p>
     </div>
 
-    <div v-else-if="!hasPurchasedTickets" class="lg:hidden fixed bottom-0 left-0 w-full bg-lime-400 py-4 px-6 flex justify-between items-center shadow-md z-50">
-      <span class="text-lg text-gray-900">{{ getEventPrice(event.tickets) }}</span>
+    <div v-else-if="!hasPurchasedTickets" class="lg:hidden fixed bottom-0 left-0 w-full py-4 px-6 flex justify-between items-center shadow-md z-50" :class="canBuy ? 'bg-lime-400' : 'bg-gray-300'">
+      <div class="flex flex-col">
+        <span class="text-lg text-gray-900">{{ priceLabel }}</span>
+        <span v-if="feeNote" class="text-xs font-normal font-['Prompt'] text-gray-800">{{ feeNote }}</span>
+        <span v-if="lowStockLabel" class="text-xs text-red-700">{{ lowStockLabel }}</span>
+        <span v-if="saleStartsLabel" class="text-xs font-normal font-['Prompt'] text-gray-700">{{ saleStartsLabel }}</span>
+      </div>
+      <button
+        v-if="!canBuy"
+        disabled
+        class="bg-gray-200 text-gray-600 py-2 px-6 rounded-full cursor-not-allowed"
+      >
+        {{ unavailableLabel }}
+      </button>
       <button 
+        v-else
         @click="openReserveModal" 
         aria-label="Comprar entrada" 
         class="bg-black text-white py-2 px-6 rounded-full flex items-center cursor-pointer relative z-10 pointer-events-auto"
@@ -248,7 +351,7 @@ const addToCalendar = () => {
     <div v-else-if="!isEventFinished" class="lg:hidden fixed bottom-0 left-0 w-full bg-lime-400 py-3 px-4 shadow-md z-50">
       <div class="flex flex-col gap-2">
         <div class="flex justify-between items-center">
-          <span class="text-sm text-gray-900 font-medium">{{ getEventPrice(event.tickets) }}</span>
+          <span class="text-sm text-gray-900 font-medium">{{ priceLabel }}</span>
           <span class="text-xs text-gray-700">Ya tienes {{ eventOrders.length }} orden(es)</span>
         </div>
         <div class="flex gap-2">
@@ -260,6 +363,7 @@ const addToCalendar = () => {
             Ver entradas
           </button>
           <button 
+            v-if="canBuy"
             @click="openReserveModal" 
             aria-label="Comprar más entradas" 
             class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded-full text-sm font-medium cursor-pointer relative z-10 pointer-events-auto"

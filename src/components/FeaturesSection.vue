@@ -2,13 +2,13 @@
 import {
   CalendarDays,
   MessageSquare,
-  Globe,
+  Bot,
   TrendingUp,
   QrCode,
   BarChart3,
   Ticket,
   Bell,
-  Gift
+  HelpCircle
 } from 'lucide-vue-next';
 import FadeInSection from './Hero/FadeInSection.vue';
 
@@ -16,32 +16,32 @@ const producerFeatures = [
   {
     icon: CalendarDays,
     title: 'Funciones múltiples',
-    description: 'Gestiona temporadas completas con múltiples horarios, sedes y aforos desde un solo lugar.'
+    description: 'Un evento con todas sus fechas y horarios. Para shows recurrentes, usa "Duplicar evento" y listo.'
   },
   {
     icon: MessageSquare,
     title: 'Comunicación automática',
-    description: 'Notifica cambios, envía recordatorios y responde preguntas frecuentes por WhatsApp y email.'
+    description: 'Recordatorio por email 24 h antes de la función y aviso automático a tus asistentes si cambia algo del evento.'
   },
   {
-    icon: Globe,
-    title: 'Tu dominio propio',
-    description: 'Vende bajo tucirco.cl o entradas.tuteatro.com. Más confianza, mejor conversión.'
+    icon: Bot,
+    title: 'Asistente IA en tu página',
+    description: 'Responde las dudas de los compradores con la información y preguntas frecuentes de tu evento.'
   },
   {
     icon: TrendingUp,
-    title: 'Marketing que funciona',
-    description: 'Promoción en Meta y Google Ads optimizada para llenar las funciones con menos demanda.'
+    title: 'Posts con IA',
+    description: 'Genera publicaciones para Instagram y Facebook a partir de tu evento y publícalas desde el panel.'
   },
   {
     icon: QrCode,
-    title: 'Check-in profesional',
-    description: 'QR que funciona sin internet, escaneo en 2 segundos y control de aforo en tiempo real.'
+    title: 'Check-in con QR',
+    description: 'Tu equipo escanea las entradas desde el celular. Si se cae la señal, sigue validando con la lista descargada y sincroniza después.'
   },
   {
     icon: BarChart3,
     title: 'Métricas claras',
-    description: 'Ventas por función, conversión por canal, horas pico y todo lo que necesitas para decidir.'
+    description: 'Visitas, ventas, canal de origen (UTM), ciudad y hora peak de cada evento. Exporta tus órdenes a CSV.'
   }
 ];
 
@@ -49,28 +49,32 @@ const attendeeFeatures = [
   {
     icon: Ticket,
     title: 'Compra simple',
-    description: 'WebPay, MercadoPago o transferencia. Recibe tu entrada al instante por email y WhatsApp.'
+    description: 'Paga con Webpay (vía Flow) y recibe tu entrada con código QR por email al instante.'
   },
   {
     icon: Bell,
     title: 'Siempre informado',
-    description: 'Recordatorios antes de la función y avisos inmediatos si hay cambios o reprogramaciones.'
+    description: 'Recordatorio 24 h antes de la función y aviso por email si cambia algo del evento.'
   },
   {
-    icon: Gift,
-    title: 'Extras y upgrades',
-    description: 'Accede a VIP, packs familiares, fotos con el elenco y más beneficios exclusivos.'
+    icon: HelpCircle,
+    title: 'Respuestas al instante',
+    description: 'Pregúntale al asistente con IA de la página del evento: horarios, lugar, edad mínima y más.'
   }
 ];
 
 const tags = [
-  'Circos',
-  'Teatros',
-  'Ferias culturales',
-  'Museos',
-  'Festivales',
-  'Experiencias inmersivas'
+  'Stand-up',
+  'Comedia',
+  'Teatro independiente',
+  'Música en vivo',
+  'Talleres',
+  'Temporadas con varias funciones'
 ];
+
+// Próximamente (no prometer como disponible): WhatsApp, cupones de descuento,
+// MercadoPago, dominio propio, campañas de Meta Ads gestionadas, mapa de asientos, POS.
+const comingSoon = ['WhatsApp', 'Cupones de descuento', 'MercadoPago', 'Dominio propio'];
 </script>
 
 <template>
@@ -88,7 +92,7 @@ const tags = [
         </FadeInSection>
         <FadeInSection :delay="200">
           <p class="text-gray-500 max-w-2xl mx-auto">
-            Venta de entradas, comunicación con asistentes, marketing y check-in. 
+            Venta de entradas, comunicación con asistentes, posts con IA y check-in.
             Todo desde un solo lugar, sin necesidad de ser experto en tecnología.
           </p>
         </FadeInSection>
@@ -150,13 +154,16 @@ const tags = [
 
           <FadeInSection :delay="400" direction="up">
             <div class="mt-8 p-6 rounded-xl bg-gradient-to-br from-lime-400/10 to-lime-400/5 border border-lime-400/20">
-              <h4 class="text-lg font-semibold mb-2 font-[Unbounded]">Ideal para eventos con funciones múltiples</h4>
+              <h4 class="text-lg font-semibold mb-2 font-[Unbounded]">Ideal para funciones recurrentes</h4>
               <p class="text-gray-600 mb-4">
-                Diseñado especialmente para productores que manejan temporadas, múltiples horarios y sedes diferentes.
+                Pensado para productores chicos y medianos que hacen funciones todas las semanas.
               </p>
               <div class="flex flex-wrap gap-2">
                 <span v-for="tag in tags" :key="tag" class="text-xs bg-white px-3 py-1 rounded-full">{{ tag }}</span>
               </div>
+              <p class="text-gray-500 text-xs mt-4">
+                Próximamente: {{ comingSoon.join(' · ') }}.
+              </p>
             </div>
           </FadeInSection>
         </div>
