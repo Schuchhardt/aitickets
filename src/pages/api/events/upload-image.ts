@@ -57,7 +57,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
         // Subir archivo
         const { data, error } = await supabase.storage
-            .from("events")
+            .from("Events")
             .upload(fileName, buffer, {
                 contentType: file.type,
                 upsert: false
@@ -73,7 +73,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
         // Obtener URL pública
         const { data: { publicUrl } } = supabase.storage
-            .from("events")
+            .from("Events")
             .getPublicUrl(fileName);
 
         return new Response(JSON.stringify({ 

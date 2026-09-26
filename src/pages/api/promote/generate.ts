@@ -21,15 +21,6 @@ export const POST: APIRoute = async (context) => {
             return new Response(JSON.stringify({ message: "Faltan datos requeridos" }), { status: 400 });
         }
 
-        if (type === "image") {
-            // Claude no genera imágenes; el botón está oculto en el dashboard.
-            return new Response(JSON.stringify({ message: "La generación de imágenes con IA no está disponible. Sube una imagen propia." }), { status: 501, headers: { "Content-Type": "application/json" } });
-        }
-
-        const anthropicKey = process.env.ANTHROPIC_API_KEY ?? import.meta.env.ANTHROPIC_API_KEY;
-        if (!anthropicKey) {
-            return new Response(JSON.stringify({ message: "IA no configurada" }), { status: 500 });
-        }
 
         const supabaseAdmin = getSupabaseAdmin();
 
@@ -60,7 +51,23 @@ export const POST: APIRoute = async (context) => {
         // Build event context
         const eventContext = buildEventContext(event);
 
+        if (type === "image") {
+            const openaiKey = process.env.OPENAI_API_KEY ?? import.meta.env.OPENAI_API_KEY;
+            if (!openaiKey) {
+                return new Response(JSON.stringify({ message: "La generación de imágenes con IA no está configurada. Sube una imagen propia." }), { status: 501, headers: { "Content-Type": "application/json" } });
+            }
+            const imageUrl = await generateImage(openaiKey, eventContext, dbUser.organization_id);
+            return new Response(JSON.stringify({ imageUrl }), {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+            });
+        }
+
         if (type === "text") {
+            const anthropicKey = process.env.ANTHROPIC_API_KEY ?? import.meta.env.ANTHROPIC_API_KEY;
+            if (!anthropicKey) {
+                return new Response(JSON.stringify({ message: "IA no configurada" }), { status: 500 });
+            }
             const content = await generateText(anthropicKey, eventContext, tone);
             return new Response(JSON.stringify({ content }), {
                 status: 200,
@@ -124,4 +131,40 @@ async function generateText(apiKey: string, eventContext: string, tone?: string)
         .map((block) => block.text)
         .join("")
         .trim();
+}
+
+/** Genera una imagen con OpenAI (gpt-image-1) y la guarda en Supabase Storage (las URLs de OpenAI expiran). */
+async function generateImage(apiKey: string, eventContext: string, organizationId: number): Promise<string> {
+    const response = await fetch("https://api.openai.com/v1/images/generations", {
+        method: "POST",
+        headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+            model: (process.env.OPENAI_IMAGE_MODEL ?? import.meta.env.OPENAI_IMAGE_MODEL) || "gpt-image-1",
+            prompt: `Create a visually striking, photographic social media promotional image for this event. Vibrant, modern and eye-catching. NO TEXT, no letters, no logos in the image.\n\nEvent details: ${eventContext}`,
+            n: 1,
+            size: "1024x1024",
+            quality: "medium",
+        }),
+    });
+
+    if (!response.ok) {
+        console.error("OpenAI image error:", response.status, (await response.text()).slice(0, 300));
+        throw new Error("Error al generar imagen con OpenAI");
+    }
+
+    const data = await response.json();
+    const b64 = data.data?.[0]?.b64_json;
+    if (!b64) throw new Error("OpenAI no devolvió la imagen");
+
+    const fileName = `promote/${organizationId}-${Date.now()}-ai.png`;
+    const supabase = getSupabaseAdmin();
+    const { error } = await supabase.storage
+        .from("Events")
+        .upload(fileName, Buffer.from(b64, "base64"), { contentType: "image/png", cacheControl: "31536000" });
+    if (error) throw new Error(`Error guardando imagen: ${error.message}`);
+
+    return supabase.storage.from("Events").getPublicUrl(fileName).data.publicUrl;
 }
