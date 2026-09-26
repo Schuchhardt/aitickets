@@ -389,7 +389,16 @@ const selectedTone = ref('')
             </button>
             <input ref="fileInput" type="file" accept="image/*" @change="handleFileUpload" class="hidden" />
 
-            <!-- Generación de imágenes con IA: desactivada (Claude no genera imágenes). generateImage se conserva por si se agrega otro proveedor. -->
+            <!-- Imagen con IA (OpenAI gpt-image-1, se guarda en Supabase Storage) -->
+            <button
+              @click="generateImage"
+              :disabled="isGeneratingImage || imageUrls.length >= 4"
+              class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition disabled:opacity-50"
+            >
+              <Loader2 v-if="isGeneratingImage" :size="16" class="animate-spin" />
+              <Sparkles v-else :size="16" />
+              {{ isGeneratingImage ? 'Generando...' : 'Generar con IA' }}
+            </button>
           </div>
           <p class="text-xs text-gray-400 mt-2">Máximo 4 imágenes. JPG, PNG, WebP. 5MB máx. cada una.</p>
         </div>
