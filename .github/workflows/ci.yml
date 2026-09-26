@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# E2E (Playwright) NO corre en CI: nunca se ejecuta contra deploy previews ni producción (comparten la
+# BD de producción). Se corre en local contra `netlify dev` / `npm run dev` con `npm run test:e2e`.
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Valores ficticios: el build no debe conectarse a nada real.
+      SUPABASE_URL: https://example.supabase.co
+      SUPABASE_SERVICE_ROLE_KEY: ci-dummy-service-role
+      SITE_URL: https://aitickets.cl
+      INTERNAL_API_SECRET: ci-dummy-internal-secret
+      TURNSTILE_SITE_KEY: 1x00000000000000000000AA
+      PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
+      TURNSTILE_SECRET_KEY: 1x0000000000000000000000000000000AA
+      FLOW_API_KEY: ci-dummy
+      FLOW_SECRET_KEY: ci-dummy
+      FLOW_BASE_URL: https://sandbox.flow.cl/api
+      PAYMENT_PROVIDERS: flow
+      OUTREACH_ENABLED: 'false'
+      OUTREACH_DRY_RUN: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: astro check
+        run: npm run check
+        continue-on-error: true
+      - run: npm run build
+
+  migrations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          # Base desechable solo para CI: sin contraseña (autenticación trust)
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGDATABASE: postgres
+      SUPABASE_DB_URL: postgresql://postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Lint de migraciones (solo objetos de AI Tickets)
+        run: npm run db:lint
+      - name: Stubs de Supabase + esquema de referencia
+        run: |
+          psql -v ON_ERROR_STOP=1 -q -f db/ci/stubs.sql
+          psql -v ON_ERROR_STOP=1 -q -f db/schema.sql
+      - name: Aplicar migraciones (primera pasada)
+        run: node scripts/migrate.mjs --no-baseline
+      - name: Aplicar migraciones (segunda pasada, debe aplicar 0)
+        run: |
+          node scripts/migrate.mjs --no-baseline | tee second-run.log
+          grep -q "0 pendientes" second-run.log
+          node scripts/migrate.mjs --status --fail-on-pending
+      - name: Permisos (anon/authenticated sin acceso; RLS activo)
+        run: psql -v ON_ERROR_STOP=1 -f db/ci/assert-grants.sql
+      - name: Rechazo del transaction pooler (6543)
+        run: |
+          if SUPABASE_DB_URL=postgresql://u:p@localhost:6543/postgres node scripts/migrate.mjs --status; then
+            echo "debió rechazar el puerto 6543"; exit 1
+          fi
+
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:unit

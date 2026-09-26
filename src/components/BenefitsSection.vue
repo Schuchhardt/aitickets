@@ -112,7 +112,8 @@
   ];
   
   const solutions = [
-    'Vende entradas online las 24 horas, con Webpay',
+    'Vende entradas online las 24 horas, con Webpay y tarjetas',
+    'Ten una web de eventos gratis con tu dominio',
     'Avisa por email a tus asistentes si cambia algo del evento',
     'Promociona cada función con posts generados con IA',
     'Mira qué canal (UTM) te trae visitas y ventas',

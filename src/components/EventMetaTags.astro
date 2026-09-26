@@ -13,6 +13,8 @@ interface Props {
   noindex?: boolean;
 }
 
+import { LEGAL } from "../lib/legal";
+
 const { event, title, description, canonicalPath, noindex = false } = Astro.props;
 const siteUrl = (import.meta.env.SITE_URL || "https://aitickets.cl").replace(/\/$/, "");
 const fallbackImagePath = "/aitickets_preview.png";
@@ -97,7 +99,18 @@ const generateEventJsonLd = () => {
         name: event.organization.name,
         ...(event.organization.website ? { url: event.organization.website } : {}),
       }
-    : { "@type": "Organization", name: "AI Tickets", url: siteUrl };
+    : {
+        "@type": "Organization",
+        name: LEGAL.brand,
+        legalName: LEGAL.entity,
+        url: siteUrl,
+        contactPoint: {
+          "@type": "ContactPoint",
+          contactType: "customer support",
+          email: LEGAL.supportEmail,
+          availableLanguage: ["es"],
+        },
+      };
   const offers = buildOffers();
   const baseDescription = stripHtml(event.description) || description;
 

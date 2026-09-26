@@ -1,0 +1,247 @@
+// Cumplimiento de órdenes (netlify/lib/orders.mjs) con un Supabase en memoria.
+// Se mockean emisión de entradas, correo y Slack: solo se prueba la máquina de estados del pago.
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { createFakeSupabase } from '../fixtures/fake-supabase.mjs'
+import { DEMO_EVENT_SLUG } from '../../src/lib/demoEvent.mjs'
+
+const mocks = vi.hoisted(() => ({
+  ensureOrderAttendees: vi.fn(async () => ({ created: 0 })),
+  getSoldCounts: vi.fn(async () => new Map()),
+  sendOrderTicketsEmail: vi.fn(async () => ({ ok: true })),
+  notifySlack: vi.fn(async () => {}),
+}))
+
+vi.mock('../../netlify/lib/tickets.mjs', () => ({ ensureOrderAttendees: mocks.ensureOrderAttendees, getSoldCounts: mocks.getSoldCounts }))
+vi.mock('../../netlify/lib/tickets-email.mjs', () => ({ sendOrderTicketsEmail: mocks.sendOrderTicketsEmail }))
+vi.mock('../../netlify/lib/slack.mjs', () => ({ notifySlack: mocks.notifySlack }))
+
+import {
+  CLAIMABLE_STATUSES,
+  confirmPaidOrder,
+  findOversell,
+  hasLiveHold,
+  isMissingSchemaError,
+  markOrderFailed,
+  recordPaymentEvent,
+} from '../../netlify/lib/orders.mjs'
+
+const ORDER_ID = '0f8fad5b-d9cb-469f-a165-70867728950e'
+
+function order(overrides = {}) {
+  return {
+    id: ORDER_ID,
+    status: 'pending',
+    event_id: 7,
+    attendee_id: 3,
+    amount: 30000,
+    ticket_fee: 3000,
+    total_payment: 33000,
+    ticket_details: [{ id: 1, quantity: 2 }],
+    payment_external_id: null,
+    processing_started_at: null,
+    payment_provider: 'flow',
+    currency: 'CLP',
+    provider_session_id: null,
+    payment_intent_id: null,
+    ...overrides,
+  }
+}
+
+beforeEach(() => {
+  mocks.ensureOrderAttendees.mockClear()
+  mocks.sendOrderTicketsEmail.mockReset()
+  mocks.sendOrderTicketsEmail.mockResolvedValue({ ok: true })
+  mocks.notifySlack.mockClear()
+})
+
+describe('confirmPaidOrder', () => {
+  it('id inválido u orden inexistente → not_found (404)', async () => {
+    const db = createFakeSupabase({ tables: { event_orders: [] } })
+    expect(await confirmPaidOrder(db, 'no-es-uuid', { provider: 'flow', amount: 1 })).toMatchObject({ status: 'not_found', httpStatus: 404 })
+    expect(await confirmPaidOrder(db, ORDER_ID, { provider: 'flow', amount: 1 })).toMatchObject({ status: 'not_found', httpStatus: 404 })
+  })
+
+  it('orden ya pagada → already_paid, sin volver a reclamarla (solo asegura entradas y correo)', async () => {
+    const db = createFakeSupabase({ tables: { event_orders: [order({ status: 'paid', payment_external_id: '999' })] } })
+    const res = await confirmPaidOrder(db, ORDER_ID, { provider: 'flow', amount: 33000, externalId: '999' })
+    expect(res).toMatchObject({ status: 'already_paid', httpStatus: 200 })
+    expect(db.calls.filter((c) => c.op === 'update')).toHaveLength(0)
+    expect(mocks.ensureOrderAttendees).toHaveBeenCalledTimes(1)
+    expect(mocks.sendOrderTicketsEmail).toHaveBeenCalledWith(ORDER_ID)
+    expect(db.tables.event_orders[0].status).toBe('paid')
+  })
+
+  it('orden ya pagada con correo fallido → retry 503 para que el proveedor reintente', async () => {
+    mocks.sendOrderTicketsEmail.mockResolvedValue({ ok: false, status: 500 })
+    const db = createFakeSupabase({ tables: { event_orders: [order({ status: 'paid' })] } })
+    expect(await confirmPaidOrder(db, ORDER_ID, { provider: 'flow', amount: 33000 })).toMatchObject({ status: 'retry', httpStatus: 503 })
+  })
+
+  it('monto distinto al esperado → review, Slack y sin emitir entradas', async () => {
+    const db = createFakeSupabase({ tables: { event_orders: [order()] } })
+    const res = await confirmPaidOrder(db, ORDER_ID, { provider: 'flow', amount: 1000, externalId: '555' })
+    expect(res).toMatchObject({ status: 'review', httpStatus: 200 })
+    expect(db.tables.event_orders[0]).toMatchObject({ status: 'review', total_payment: 1000, payment_external_id: '555' })
+    expect(mocks.notifySlack).toHaveBeenCalledWith(expect.stringMatching(/revisión/))
+    expect(mocks.ensureOrderAttendees).not.toHaveBeenCalled()
+    expect(mocks.sendOrderTicketsEmail).not.toHaveBeenCalled()
+  })
+
+  it('moneda distinta → review', async () => {
+    const db = createFakeSupabase({ tables: { event_orders: [order({ payment_provider: 'stripe' })] } })
+    const res = await confirmPaidOrder(db, ORDER_ID, { provider: 'stripe', amount: 33000, currency: 'usd' })
+    expect(res.status).toBe('review')
+    expect(db.tables.event_orders[0].status).toBe('review')
+  })
+
+  it('pago de un proveedor distinto al de la orden → review', async () => {
+    const db = createFakeSupabase({ tables: { event_orders: [order({ payment_provider: 'flow' })] } })
+    expect((await confirmPaidOrder(db, ORDER_ID, { provider: 'stripe', amount: 33000, currency: 'clp' })).status).toBe('review')
+  })
+
+  it('sesión de Stripe distinta a la guardada → review', async () => {
+    const db = createFakeSupabase({ tables: { event_orders: [order({ payment_provider: 'stripe', provider_session_id: 'cs_test_A' })] } })
+    const res = await confirmPaidOrder(db, ORDER_ID, { provider: 'stripe', amount: 33000, currency: 'clp', externalId: 'cs_test_B' })
+    expect(res.status).toBe('review')
+  })
+
+  it('una orden en review no se toca', async () => {
+    const db = createFakeSupabase({ tables: { event_orders: [order({ status: 'review' })] } })
+    expect(await confirmPaidOrder(db, ORDER_ID, { provider: 'flow', amount: 33000 })).toMatchObject({ status: 'review' })
+    expect(db.calls.filter((c) => c.op === 'update')).toHaveLength(0)
+  })
+
+  it('un pago sobre una orden reembolsada queda en review y avisa a Slack', async () => {
+    const db = createFakeSupabase({ tables: { event_orders: [order({ status: 'refunded' })] } })
+    expect((await confirmPaidOrder(db, ORDER_ID, { provider: 'flow', amount: 33000 })).status).toBe('review')
+    expect(mocks.notifySlack).toHaveBeenCalledWith(expect.stringMatching(/reembolsada/))
+    expect(db.tables.event_orders[0].status).toBe('refunded')
+  })
+})
+
+describe('findOversell', () => {
+  const tickets = [{ id: 1, event_id: 7, ticket_name: 'General', total_quantity: 100 }]
+
+  it('no cuenta dos veces las entradas ya emitidas de la propia orden (reclamo de un processing abandonado)', async () => {
+    // 98 de otros + 2 de esta orden ya insertadas por un intento anterior = 100 emitidas
+    mocks.getSoldCounts.mockResolvedValueOnce(new Map([[1, 100]]))
+    const db = createFakeSupabase({
+      tables: {
+        event_tickets: tickets,
+        event_attendees: [
+          { id: 1, event_order_id: ORDER_ID, event_ticket_id: 1, status: 'active' },
+          { id: 2, event_order_id: ORDER_ID, event_ticket_id: 1, status: null },
+        ],
+      },
+    })
+    expect(await findOversell(db, order({ status: 'processing' }))).toBeNull()
+    expect(mocks.getSoldCounts).toHaveBeenLastCalledWith(db, 7, [1], { includePending: false })
+  })
+
+  it('sobreventa real sigue detectándose', async () => {
+    mocks.getSoldCounts.mockResolvedValueOnce(new Map([[1, 99]]))
+    const db = createFakeSupabase({ tables: { event_tickets: tickets, event_attendees: [] } })
+    expect(await findOversell(db, order({ status: 'processing' }))).toMatch(/General: 99 emitidas \+ 2 > 100/)
+  })
+
+  it('pago tardío: cuenta las reservas vigentes de otros y descuenta la propia orden en processing', async () => {
+    // 96 emitidas; pending = 2 (reserva de otro comprador) + 2 (esta orden, ya en processing) = 100
+    mocks.getSoldCounts.mockResolvedValueOnce(new Map([[1, 100]]))
+    const db = createFakeSupabase({ tables: { event_tickets: tickets, event_attendees: [] } })
+    expect(await findOversell(db, order({ status: 'processing' }), { includeHolds: true })).toBeNull()
+    expect(mocks.getSoldCounts).toHaveBeenLastCalledWith(db, 7, [1], { includePending: true })
+
+    // 98 emitidas + 2 reservadas por otro + 2 propias: el tardío no cabe
+    mocks.getSoldCounts.mockResolvedValueOnce(new Map([[1, 102]]))
+    expect(await findOversell(db, order({ status: 'processing' }), { includeHolds: true })).toMatch(/100 emitidas\/reservadas \+ 2 > 100/)
+  })
+})
+
+describe('hasLiveHold', () => {
+  const now = Date.parse('2026-09-26T12:00:00Z')
+  it('pending con hold_expires_at futuro → vigente; vencido u otro estado → no', () => {
+    expect(hasLiveHold(order({ hold_expires_at: '2026-09-26T12:10:00Z' }), now)).toBe(true)
+    expect(hasLiveHold(order({ hold_expires_at: '2026-09-26T11:59:00Z' }), now)).toBe(false)
+    expect(hasLiveHold(order({ status: 'expired', hold_expires_at: '2026-09-26T12:10:00Z' }), now)).toBe(false)
+    expect(hasLiveHold(order({ status: 'processing', hold_expires_at: '2026-09-26T12:10:00Z' }), now)).toBe(false)
+  })
+  it('sin hold_expires_at usa created_at + 15 min', () => {
+    expect(hasLiveHold(order({ created_at: '2026-09-26T11:50:00Z' }), now)).toBe(true)
+    expect(hasLiveHold(order({ created_at: '2026-09-26T11:40:00Z' }), now)).toBe(false)
+    expect(hasLiveHold(order(), now)).toBe(false)
+  })
+})
+
+describe('otros helpers de órdenes', () => {
+  it('CLAIMABLE_STATUSES permite cumplir pagos tardíos sobre órdenes expiradas', () => {
+    expect(CLAIMABLE_STATUSES).toEqual(['pending', 'failed', 'rejected', 'cancelled', 'expired'])
+  })
+
+  it('markOrderFailed solo transiciona desde pending por defecto', async () => {
+    const PAID_ID = '7c9e6679-7425-40de-944b-e07fc1f90ae7'
+    const db = createFakeSupabase({ tables: { event_orders: [order(), order({ id: PAID_ID, status: 'paid' })] } })
+    expect(await markOrderFailed(db, ORDER_ID, 'rejected')).toBe(true)
+    expect(db.tables.event_orders[0].status).toBe('rejected')
+    expect(await markOrderFailed(db, PAID_ID, 'rejected')).toBe(false)
+    expect(db.tables.event_orders[1].status).toBe('paid')
+    expect(await markOrderFailed(db, PAID_ID, 'refunded', { from: ['paid'] })).toBe(true)
+    expect(await markOrderFailed(db, 'no-es-uuid', 'rejected')).toBe(false)
+  })
+
+  it('recordPaymentEvent deduplica por id', async () => {
+    const db = createFakeSupabase({ tables: { aitickets_payment_events: [] } })
+    expect(await recordPaymentEvent(db, { id: 'evt_1', provider: 'stripe', type: 'checkout.session.completed' })).toBe(true)
+    db.failOn('aitickets_payment_events', 'insert', { code: '23505', message: 'duplicate key' })
+    expect(await recordPaymentEvent(db, { id: 'evt_1', provider: 'stripe', type: 'checkout.session.completed' })).toBe(false)
+  })
+
+  it('isMissingSchemaError reconoce columnas/funciones/tablas inexistentes', () => {
+    for (const code of ['42703', '42883', 'PGRST202', 'PGRST204', '42P01', 'PGRST205']) expect(isMissingSchemaError({ code })).toBe(true)
+    expect(isMissingSchemaError({ code: '23505' })).toBe(false)
+    expect(isMissingSchemaError(null)).toBe(false)
+  })
+})
+
+describe('confirmPaidOrder: pagos de prueba de Stripe', () => {
+  afterEach(() => vi.unstubAllEnvs())
+  const stripeOrder = () => order({ payment_provider: 'stripe', provider_session_id: 'cs_test_A' })
+  const pay = (extra = {}) => ({ provider: 'stripe', amount: 33000, currency: 'clp', externalId: 'cs_test_A', ...extra })
+
+  it('livemode=false en un evento real → review + Slack, sin emitir entradas', async () => {
+    const db = createFakeSupabase({ tables: { event_orders: [stripeOrder()], events: [{ id: 7, slug: 'concierto-real' }] } })
+    const res = await confirmPaidOrder(db, ORDER_ID, pay({ livemode: false }))
+    expect(res).toMatchObject({ status: 'review', httpStatus: 200 })
+    expect(db.tables.event_orders[0].status).toBe('review')
+    expect(mocks.notifySlack).toHaveBeenCalledWith(expect.stringMatching(/PRUEBA/))
+    expect(mocks.ensureOrderAttendees).not.toHaveBeenCalled()
+    expect(mocks.sendOrderTicketsEmail).not.toHaveBeenCalled()
+  })
+
+  it('sin livemode y con clave sk_test_ en un evento real → review', async () => {
+    vi.stubEnv('STRIPE_SECRET_KEY', 'sk_test_x')
+    const db = createFakeSupabase({ tables: { event_orders: [stripeOrder()], events: [{ id: 7, slug: 'concierto-real' }] } })
+    expect((await confirmPaidOrder(db, ORDER_ID, pay())).status).toBe('review')
+    expect(mocks.ensureOrderAttendees).not.toHaveBeenCalled()
+  })
+
+  // El fake no soporta el .or() del reclamo atómico: llegar a él demuestra que el filtro de modo prueba dejó pasar la orden
+  const REACHED_CLAIM = /or\(\) no está soportado/
+
+  it('livemode=false en el evento demo o uno marcado de prueba → sigue al reclamo (se cumple)', async () => {
+    const db = createFakeSupabase({ tables: { event_orders: [stripeOrder()], events: [{ id: 7, slug: DEMO_EVENT_SLUG }] } })
+    await expect(confirmPaidOrder(db, ORDER_ID, pay({ livemode: false }))).rejects.toThrow(REACHED_CLAIM)
+    expect(db.tables.event_orders[0].status).toBe('pending')
+    vi.stubEnv('STRIPE_TEST_EVENT_SLUGS', 'mi-prueba')
+    const db2 = createFakeSupabase({ tables: { event_orders: [stripeOrder()], events: [{ id: 7, slug: 'mi-prueba' }] } })
+    await expect(confirmPaidOrder(db2, ORDER_ID, pay({ livemode: false }))).rejects.toThrow(REACHED_CLAIM)
+    expect(mocks.notifySlack).not.toHaveBeenCalled()
+  })
+
+  it('livemode=true en un evento real → sigue al reclamo (se cumple)', async () => {
+    vi.stubEnv('STRIPE_SECRET_KEY', 'sk_test_x')
+    const db = createFakeSupabase({ tables: { event_orders: [stripeOrder()], events: [{ id: 7, slug: 'concierto-real' }] } })
+    await expect(confirmPaidOrder(db, ORDER_ID, pay({ livemode: true }))).rejects.toThrow(REACHED_CLAIM)
+    expect(mocks.notifySlack).not.toHaveBeenCalled()
+  })
+})

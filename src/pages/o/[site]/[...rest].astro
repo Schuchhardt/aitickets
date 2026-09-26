@@ -1,0 +1,9 @@
+---
+// Comodín de /o/<slug>/*: cualquier ruta no definida del sitio es 404.
+// Existe para que TODA ruta /o/_host/* (prefijo que agrega la Edge Function tenant-router en dominios
+// propios) coincida con una página y pase por src/middleware.ts, que redirige /dashboard,
+// /organizadores, etc. a aitickets.cl y reescribe las rutas permitidas del sitio. Sin una ruta que
+// coincida, Astro sirve el 404 estático sin ejecutar el middleware.
+export const prerender = false;
+return new Response(null, { status: 404 });
+---

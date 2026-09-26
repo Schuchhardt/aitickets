@@ -106,6 +106,32 @@ const channelMap = new Map<string, ChannelRow>();
 });
 const channelRows = [...channelMap.values()].sort((a, b) => b.revenue - a.revenue || b.orders - a.orders);
 
+// 2c. Ventas por medio de pago (payment_provider, migración 202609270100) y órdenes fuera del saldo.
+// Consultas aparte: si la columna aún no existe, la sección simplemente no se muestra.
+const PROVIDER_LABELS: Record<string, string> = { flow: "Webpay", stripe: "Tarjeta internacional", free: "Gratis", courtesy: "Cortesía", demo: "Demo" };
+const { data: providerOrdersRaw, error: providerError } = await supabaseAdmin
+    .from("event_orders")
+    .select("amount, ticket_qty, payment_provider")
+    .eq("event_id", event.id)
+    .eq("status", "paid");
+const providerMap = new Map<string, ChannelRow>();
+if (!providerError) {
+    (providerOrdersRaw || []).forEach((o: any) => {
+        const channel = PROVIDER_LABELS[o.payment_provider] || o.payment_provider || "Webpay";
+        const row = providerMap.get(channel) || { channel, orders: 0, tickets: 0, revenue: 0 };
+        row.orders += 1;
+        row.tickets += o.ticket_qty || 1;
+        row.revenue += o.amount || 0;
+        providerMap.set(channel, row);
+    });
+}
+const providerRows = [...providerMap.values()].sort((a, b) => b.revenue - a.revenue || b.orders - a.orders);
+const { count: refundedOrders } = await supabaseAdmin
+    .from("event_orders")
+    .select("id", { count: "exact", head: true })
+    .eq("event_id", event.id)
+    .eq("status", "refunded");
+
 // 3. Traffic sources
 function categorizeReferrer(referrer: string | null, utmSource: string | null): string {
     if (utmSource) return utmSource;
@@ -349,4 +375,35 @@ const peakDatasets = JSON.stringify([
         )}
         <p class="text-xs text-gray-400 mt-3">Fechas y horas en horario de Chile continental.</p>
     </div>
+
+    {providerRows.length > 0 && (
+        <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm mt-6">
+            <h3 class="font-bold text-lg mb-4">Ventas por medio de pago</h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-gray-500 border-b border-gray-100">
+                            <th class="py-2 pr-4 font-medium">Medio de pago</th>
+                            <th class="py-2 pr-4 font-medium text-right">Órdenes</th>
+                            <th class="py-2 pr-4 font-medium text-right">Entradas</th>
+                            <th class="py-2 font-medium text-right">Ingresos</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {providerRows.map((row) => (
+                            <tr class="border-b border-gray-50">
+                                <td class="py-2 pr-4 text-gray-900">{row.channel}</td>
+                                <td class="py-2 pr-4 text-right">{row.orders}</td>
+                                <td class="py-2 pr-4 text-right">{row.tickets}</td>
+                                <td class="py-2 text-right">${row.revenue.toLocaleString("es-CL")}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+            {(refundedOrders || 0) > 0 && (
+                <p class="text-xs text-gray-500 mt-3">{refundedOrders} orden(es) reembolsada(s) no se incluyen en las ventas.</p>
+            )}
+        </div>
+    )}
 </DashboardLayout>

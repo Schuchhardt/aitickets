@@ -1,0 +1,123 @@
+---
+// /comparar/<competidor> — comparación neutral y factual con otras ticketeras (datos en src/data/comparisons.ts).
+// Solo se indexa (y entra al sitemap) si todos los datos del competidor tienen fuente pública y fecha.
+// Sin logos ni marcas como imagen: el nombre del competidor se usa solo como referencia.
+export const prerender = true;
+import AppHeader from "../../components/AppHeader.vue";
+import AppFooter from "../../components/AppFooter.vue";
+import Layout from "../../layouts/Layout.astro";
+import { COMPARISONS, isComparisonVerified, isRowVerified, type Comparison } from "../../data/comparisons";
+import { LEGAL, formatLegalDate } from "../../lib/legal";
+import "../../styles/global.css";
+
+export function getStaticPaths() {
+  return COMPARISONS.map((c) => ({ params: { competitor: c.slug }, props: { comparison: c } }));
+}
+
+const { comparison } = Astro.props as { comparison: Comparison };
+const verified = isComparisonVerified(comparison);
+const sources = comparison.rows
+  .filter((r) => isRowVerified(r) && r.source)
+  .map((r) => ({ ...r.source!, checkedAt: r.checkedAt! }))
+  .filter((s, i, arr) => arr.findIndex((o) => o.url === s.url) === i);
+const reviewed = formatLegalDate(comparison.reviewedAt);
+---
+
+<Layout
+  title={`AI Tickets vs ${comparison.name}: comparación de cargos y funciones`}
+  description={`Comparación entre AI Tickets y ${comparison.name} para productores de eventos en Chile: comisión, cargo al comprador, pagos al productor y herramientas.`}
+  canonical={`/comparar/${comparison.slug}`}
+  noindex={!verified}
+>
+  <AppHeader client:idle />
+
+  <main class="bg-white font-['Prompt']">
+    <section class="px-4 pt-28 pb-10 sm:pt-32 bg-gradient-to-b from-lime-50 to-white">
+      <div class="mx-auto max-w-4xl">
+        <p class="text-sm font-semibold text-lime-800">Comparar ticketeras</p>
+        <h1 class="mt-2 text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl font-['Unbounded']">
+          AI Tickets vs {comparison.name}
+        </h1>
+        <p class="mt-4 text-lg text-gray-600">
+          {comparison.summary} Aquí comparamos datos públicos que sirven para elegir dónde vender las entradas de tu evento.
+          Cuando un dato no está publicado por la otra plataforma, lo indicamos como "Por confirmar".
+        </p>
+      </div>
+    </section>
+
+    <section class="px-4 pb-12">
+      <div class="mx-auto max-w-4xl overflow-x-auto rounded-2xl border border-gray-200" data-testid="comparison-table">
+        <table class="w-full min-w-[600px] text-left text-sm">
+          <thead class="bg-gray-50 text-gray-700">
+            <tr>
+              <th class="px-4 py-3 font-semibold w-1/4">Característica</th>
+              <th class="px-4 py-3 font-semibold">AI Tickets</th>
+              <th class="px-4 py-3 font-semibold">{comparison.name}</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-200">
+            {comparison.rows.map((row) => (
+              <tr>
+                <td class="px-4 py-3 align-top font-medium text-gray-900">{row.feature}</td>
+                <td class="px-4 py-3 align-top text-gray-800">{row.aitickets}</td>
+                <td class="px-4 py-3 align-top text-gray-800">
+                  {isRowVerified(row) ? (
+                    <>
+                      {row.competitor}
+                      <a href={row.source!.url} rel="nofollow noopener" target="_blank" class="ml-1 text-xs text-gray-500 underline">fuente</a>
+                    </>
+                  ) : (
+                    <span class="text-gray-500">Por confirmar</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="mx-auto mt-6 max-w-4xl rounded-xl bg-gray-50 p-4 text-sm text-gray-600">
+        <p class="font-semibold text-gray-800">Fuentes y fecha de revisión</p>
+        <p class="mt-1">
+          Datos de AI Tickets: <a href="/precios" class="underline">precios</a> y
+          <a href="/terminos-productores" class="underline">términos para productores</a>.
+          Revisión: {reviewed}.
+        </p>
+        {sources.length > 0 ? (
+          <ul class="mt-2 list-disc pl-5">
+            {sources.map((s) => (
+              <li>
+                <a href={s.url} rel="nofollow noopener" target="_blank" class="underline">{s.label}</a> (revisado el {formatLegalDate(s.checkedAt)})
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p class="mt-2">
+            {comparison.name} no publica en su sitio una tarifa estándar para productores que podamos citar. Te recomendamos
+            pedirle una cotización para tu evento y compararla con nuestros <a href="/precios" class="underline">precios</a>.
+          </p>
+        )}
+        <p class="mt-2 text-xs text-gray-500">
+          {comparison.name} es una marca de su respectivo titular y se menciona solo como referencia. {LEGAL.brand} no está
+          afiliada a {comparison.name}. Si encuentras un dato incorrecto, escríbenos a
+          <a href={`mailto:${LEGAL.supportEmail}`} class="underline">{LEGAL.supportEmail}</a> y lo corregimos.
+        </p>
+      </div>
+    </section>
+
+    <section class="px-4 pb-20">
+      <div class="mx-auto max-w-4xl rounded-3xl bg-gray-900 px-6 py-10 text-center text-white sm:px-12">
+        <h2 class="text-2xl font-bold font-['Unbounded']">Prueba AI Tickets gratis</h2>
+        <p class="mx-auto mt-3 max-w-2xl text-white/80">
+          0% de comisión para el productor, web de eventos gratis y check-in desde el celular.
+        </p>
+        <div class="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <a href={`/organizadores/registro?utm_source=comparar&utm_campaign=${comparison.slug}`} class="rounded-xl bg-lime-400 px-6 py-3 font-semibold text-gray-900 hover:bg-lime-300">Crear cuenta gratis</a>
+          <a href="/precios" class="rounded-xl border border-white/30 px-6 py-3 font-semibold text-white hover:bg-white/10">Ver precios</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <AppFooter client:idle />
+</Layout>

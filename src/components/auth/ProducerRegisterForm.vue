@@ -58,6 +58,54 @@ const phone = ref('')
 const organizationName = ref('')
 const termsAccepted = ref(false)
 
+// Registro desde un enlace de lead (outreach / formulario "web gratis"): ?lead=<token firmado>
+const leadToken = ref('')
+const leadPrefilled = ref(false)
+// Estado posterior al registro: "revisa tu correo"
+const submitted = ref(false)
+const submittedEmail = ref('')
+const emailSent = ref(true)
+const resendLoading = ref(false)
+const resendMsg = ref('')
+
+const loadLeadPrefill = async () => {
+  let token = ''
+  try {
+    token = new URLSearchParams(window.location.search).get('lead') || ''
+  } catch (e) { token = '' }
+  if (!token || token.length > 2048) return
+  leadToken.value = token
+  try {
+    const res = await fetch(`/api/outreach/lead-prefill?t=${encodeURIComponent(token)}`)
+    if (!res.ok) {
+      leadToken.value = ''
+      return
+    }
+    const lead = await res.json()
+    if (lead.org_name && !organizationName.value) organizationName.value = String(lead.org_name).slice(0, 120)
+    if (lead.email && !email.value) email.value = String(lead.email).slice(0, 254)
+    leadPrefilled.value = true
+  } catch (e) { /* sin prellenado */ }
+}
+
+const resendVerification = async () => {
+  try {
+    resendLoading.value = true
+    resendMsg.value = ''
+    const response = await fetch('/api/auth/resend-verification', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: submittedEmail.value }),
+    })
+    const data = await response.json().catch(() => ({}))
+    resendMsg.value = data.message || (response.ok ? 'Listo. Revisa tu correo.' : 'No pudimos reenviar el enlace. Intenta más tarde.')
+  } catch (e) {
+    resendMsg.value = 'No pudimos reenviar el enlace. Revisa tu conexión e intenta de nuevo.'
+  } finally {
+    resendLoading.value = false
+  }
+}
+
 import { onMounted } from 'vue'
 
 // ... existing refs ...
@@ -67,6 +115,7 @@ const turnstileWidgetId = ref(null)
 
 onMounted(() => {
   loadAttribution()
+  loadLeadPrefill()
 
   // Function to render the widget
   const renderTurnstile = () => {
@@ -107,7 +156,7 @@ const registerSchema = z.object({
   organizationName: z.string().min(1, 'El nombre de la organización es obligatorio'),
   phone: z.string().regex(/^\+?[0-9\s-]+$/, 'Teléfono inválido'),
   termsAccepted: z.literal(true, {
-    errorMap: () => ({ message: 'Debes aceptar los términos' })
+    errorMap: () => ({ message: 'Debes aceptar los Términos para productores y la Política de Privacidad' })
   })
 }).refine(data => data.password === data.confirmPassword, {
   path: ['confirmPassword'],
@@ -152,6 +201,8 @@ const handleRegister = async () => {
       },
       body: JSON.stringify({
         ...registerData,
+        acceptedTerms: true,
+        leadToken: leadToken.value || undefined,
         cfToken: turnstileToken.value,
         attribution: attribution.value
       }),
@@ -163,22 +214,27 @@ const handleRegister = async () => {
       throw new Error(dataRes.message || 'Error al registrarse')
     }
 
-    // Registro exitoso: medir la conversión y redirigir al dashboard (auto-login) o login
+    // Registro exitoso: medir la conversión y pedir que confirme su correo (no hay sesión todavía)
     try {
       trackSignUp('email')
       sessionStorage.removeItem(SIGNUP_ATTRIBUTION_KEY)
     } catch (e) { /* analytics no disponible */ }
-    // pequeña espera para que el evento de analytics alcance a salir
-    await new Promise((resolve) => setTimeout(resolve, 300))
-    window.location.href = dataRes.redirect || '/dashboard'
+    if (dataRes.needsVerification === false && dataRes.redirect) {
+      window.location.href = dataRes.redirect
+      return
+    }
+    submittedEmail.value = result.data.email
+    emailSent.value = dataRes.emailSent !== false
+    submitted.value = true
+    try { window.scrollTo({ top: 0, behavior: 'smooth' }) } catch (e) { /* sin scroll */ }
 
   } catch (error) {
     errorMsg.value = error.message
   } finally {
     loading.value = false
     // Reset Turnstile para obtener un token fresco en caso de reintento
-    if (window.turnstile && turnstileWidgetId.value !== null) {
-      window.turnstile.reset(turnstileWidgetId.value)
+    if (window.turnstile && turnstileWidgetId.value !== null && !submitted.value) {
+      try { window.turnstile.reset(turnstileWidgetId.value) } catch (e) { /* widget ya no existe */ }
       turnstileToken.value = ''
     }
   }
@@ -187,8 +243,40 @@ const handleRegister = async () => {
 
 <template>
   <div class="w-full max-w-2xl mx-auto bg-white/10 backdrop-blur-xl p-8 rounded-xl shadow-2xl border border-white/20 font-[Prompt]">
-    <h2 class="text-2xl font-bold mb-6 text-center font-[Unbounded] text-white">Registro de Productor</h2>
-    
+    <div v-if="submitted" class="text-center" data-testid="register-check-email">
+      <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-lime-400/20 text-lime-300">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l9 6 9-6M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+      </div>
+      <h2 class="text-2xl font-bold mb-3 font-[Unbounded] text-white">Revisa tu correo</h2>
+      <p v-if="emailSent" class="text-white/70 mb-2">
+        Te enviamos un enlace a <strong class="text-white">{{ submittedEmail }}</strong> para confirmar tu cuenta.
+        Ábrelo para activar tu panel y tu web de eventos gratis.
+      </p>
+      <p v-else class="text-white/70 mb-2">
+        Tu cuenta quedó creada, pero no pudimos enviar el correo de confirmación a <strong class="text-white">{{ submittedEmail }}</strong>. Pide uno nuevo:
+      </p>
+      <p class="text-white/50 text-sm mb-6">El enlace dura 48 horas. Si no lo ves, revisa la carpeta de spam o promociones.</p>
+      <button
+        type="button"
+        @click="resendVerification"
+        :disabled="resendLoading"
+        class="w-full bg-white/10 border border-white/20 text-white rounded-lg py-3 px-4 hover:bg-white/20 disabled:opacity-50 transition font-medium"
+      >
+        {{ resendLoading ? 'Enviando...' : 'Reenviar el correo' }}
+      </button>
+      <p v-if="resendMsg" class="text-white/70 text-sm mt-3">{{ resendMsg }}</p>
+      <p class="mt-6 text-sm text-white/60">
+        ¿Ya confirmaste? <a href="/organizadores/login" class="font-medium text-white hover:underline">Inicia sesión</a>
+      </p>
+    </div>
+
+    <template v-else>
+    <h2 class="text-2xl font-bold mb-2 text-center font-[Unbounded] text-white">Registro de Productor</h2>
+    <p class="text-center text-white/70 text-sm mb-6">0% de comisión para el productor. Incluye tu web de eventos gratis.</p>
+    <p v-if="leadPrefilled" class="mb-6 p-3 rounded-lg bg-lime-400/10 border border-lime-300/30 text-lime-100 text-sm text-center">
+      Completamos algunos datos por ti. Revísalos antes de crear tu cuenta.
+    </p>
+
     <form @submit.prevent="handleRegister" class="space-y-6">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div class="col-span-2 md:col-span-1">
@@ -276,14 +364,16 @@ const handleRegister = async () => {
       <div class="flex items-start gap-3 mt-4">
         <div class="flex items-center h-5">
           <input 
+            id="register-terms"
             v-model="termsAccepted" 
             type="checkbox" 
+            data-testid="register-terms-checkbox"
             class="w-4 h-4 rounded border-white/30 bg-white/10 text-white focus:ring-white/50"
           />
         </div>
         <div class="text-sm">
-          <label class="font-medium text-white/80">Acepto los términos y condiciones</label>
-          <p class="text-white/50">Al registrarte aceptas nuestros <a href="/terms" class="underline text-white/80 hover:text-white">Términos del Servicio</a> y <a href="/privacy" class="underline text-white/80 hover:text-white">Política de Privacidad</a>.</p>
+          <label for="register-terms" class="font-medium text-white/80">Acepto los términos para productores</label>
+          <p class="text-white/50">Al registrarte aceptas los <a href="/terminos-productores" target="_blank" rel="noopener" class="underline text-white/80 hover:text-white">Términos para productores</a>, los <a href="/terms" target="_blank" rel="noopener" class="underline text-white/80 hover:text-white">Términos y condiciones</a> y la <a href="/privacy" target="_blank" rel="noopener" class="underline text-white/80 hover:text-white">Política de Privacidad</a>.</p>
           <p v-if="errors.termsAccepted" class="text-red-300 text-xs mt-1">{{ errors.termsAccepted[0] }}</p>
         </div>
       </div>
@@ -294,6 +384,7 @@ const handleRegister = async () => {
 
       <button
         type="submit"
+        data-testid="register-submit"
         :disabled="loading"
         class="w-full bg-white text-gray-900 rounded-lg py-3 px-4 hover:bg-white/90 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
       >
@@ -313,5 +404,6 @@ const handleRegister = async () => {
       ¿Ya tienes cuenta? 
       <a href="/organizadores/login" class="font-medium text-white hover:underline">Inicia sesión</a>
     </div>
+    </template>
   </div>
 </template>

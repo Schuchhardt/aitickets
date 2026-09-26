@@ -43,11 +43,12 @@ if (dbUser?.organization_id) {
   if (orgEvents && orgEvents.length > 0) {
     const eventIds = orgEvents.map((e) => e.id);
 
-    // Count tickets sold (attendees)
+    // Count tickets sold (attendees). Las entradas anuladas (reembolsos) no cuentan.
     const { count: attendeesCount } = await supabaseAdmin
       .from("event_attendees")
       .select("id", { count: "exact", head: true })
-      .in("event_id", eventIds);
+      .in("event_id", eventIds)
+      .or("status.is.null,status.neq.cancelled");
     ticketsSold = attendeesCount || 0;
 
     // Sum revenue from paid orders

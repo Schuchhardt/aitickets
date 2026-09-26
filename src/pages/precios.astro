@@ -1,0 +1,199 @@
+---
+// /precios — precios públicos de AI Tickets: 0% para el productor, cargo por servicio para el comprador.
+// La calculadora usa la misma regla que el checkout (src/components/Reservation/pricing.js).
+export const prerender = true;
+import AppHeader from "../components/AppHeader.vue";
+import AppFooter from "../components/AppFooter.vue";
+import FeeCalculator from "../components/pricing/FeeCalculator.vue";
+import Layout from "../layouts/Layout.astro";
+import { LEGAL } from "../lib/legal";
+import { SERVICE_FEE_RATE } from "../components/Reservation/pricing.js";
+import "../styles/global.css";
+
+const SITE_URL = (import.meta.env.SITE_URL || "https://aitickets.cl").replace(/\/$/, "");
+const feePercent = `${Math.round(SERVICE_FEE_RATE * 100)}%`;
+const feeLabel = LEGAL.serviceFeeLabel;
+
+const included = [
+  "Página de venta para cada evento, lista para compartir",
+  "Web de eventos gratis para tu productora (aitickets.cl/o/tu-productora)",
+  "Pagos con Webpay y tarjetas",
+  "Entradas con QR enviadas por correo",
+  "Check-in desde el celular con tu equipo",
+  "Panel con ventas, asistentes y exportación a CSV",
+  "Entradas de cortesía y avisos a tus asistentes",
+  "Soporte por correo en español",
+];
+
+const methods = [
+  {
+    name: "Webpay",
+    detail: "Tarjetas de débito, crédito y prepago emitidas en Chile.",
+    buyer: `Precio + ${feePercent}`,
+    producer: "100% del precio",
+  },
+  {
+    name: "Tarjeta internacional",
+    detail: "Tarjetas emitidas fuera de Chile, Apple Pay y Google Pay, cuando el evento lo tenga habilitado en el checkout.",
+    buyer: `Precio + ${feePercent}`,
+    producer: "100% del precio",
+  },
+];
+
+const faqs = [
+  {
+    q: "¿Cuánto cobra AI Tickets al productor?",
+    a: `Nada: 0% de comisión para el productor. Publicar eventos y usar tu web de eventos no tiene costo. El comprador paga un ${feeLabel.toLowerCase()} de ${feePercent} sobre el valor de las entradas.`,
+  },
+  {
+    q: "¿El cargo por servicio cambia según el medio de pago?",
+    a: `No. El comprador ve el mismo total con cualquier medio de pago disponible en el checkout, y tú recibes el 100% del precio de tus entradas.`,
+  },
+  {
+    q: "¿Qué pasa con los eventos gratuitos?",
+    a: "Los eventos gratuitos no pagan cargo por servicio. Puedes emitir entradas con QR y hacer check-in igual que en un evento pagado.",
+  },
+  {
+    q: "¿Cuándo recibo el dinero?",
+    a: "Transferimos lo recaudado a la cuenta bancaria que registres en el panel, 48 a 72 horas después de cada función.",
+  },
+  {
+    q: "¿Qué pasa si cancelo el evento?",
+    a: "Los compradores reciben el reembolso del total pagado, incluido el cargo por servicio. El detalle está en los términos para productores.",
+  },
+  {
+    q: "¿Tengo que firmar un contrato o pagar una mensualidad?",
+    a: "No. Creas tu cuenta gratis, aceptas los términos para productores y publicas tu primer evento cuando quieras.",
+  },
+];
+
+const jsonLd = [
+  {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: "AI Tickets para productores",
+    description: `Plataforma de venta de entradas con 0% de comisión para el productor y web de eventos gratis. El comprador paga un ${feeLabel.toLowerCase()} de ${feePercent}.`,
+    brand: { "@type": "Brand", name: LEGAL.brand },
+    url: `${SITE_URL}/precios`,
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "CLP",
+      availability: "https://schema.org/InStock",
+      url: `${SITE_URL}/organizadores/registro`,
+      description: `0% de comisión para el productor. ${feeLabel} de ${feePercent} pagado por el comprador.`,
+    },
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqs.map((f) => ({
+      "@type": "Question",
+      name: f.q,
+      acceptedAnswer: { "@type": "Answer", text: f.a },
+    })),
+  },
+];
+---
+
+<Layout
+  title="Precios – 0% de comisión para el productor | AI Tickets"
+  description={`Vende entradas con 0% de comisión para el productor. El comprador paga un cargo por servicio de ${feePercent}. Calcula cuánto recibes e incluye tu web de eventos gratis.`}
+  canonical="/precios"
+>
+  <AppHeader client:idle />
+
+  <main class="bg-white font-['Prompt']">
+    <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+
+    <section class="px-4 pt-28 pb-16 sm:pt-32 bg-gradient-to-b from-lime-50 to-white">
+      <div class="mx-auto max-w-5xl grid gap-12 lg:grid-cols-2 lg:items-start">
+        <div>
+          <p class="inline-block rounded-full bg-lime-100 px-3 py-1 text-sm font-semibold text-lime-800">Precios simples</p>
+          <h1 class="mt-4 text-4xl font-extrabold tracking-tight text-gray-900 sm:text-5xl font-['Unbounded']">0% de comisión para el productor</h1>
+          <p class="mt-4 text-lg text-gray-600">
+            Tú recibes el 100% del precio de tus entradas. El comprador paga un {feeLabel.toLowerCase()} de {feePercent},
+            que se muestra desglosado antes de pagar. Los eventos gratuitos no tienen costo.
+          </p>
+          <ul class="mt-8 space-y-3">
+            {included.map((item) => (
+              <li class="flex gap-3">
+                <span class="mt-1 inline-flex h-6 w-6 flex-none items-center justify-center rounded-full bg-lime-400 text-sm font-bold text-gray-900">✓</span>
+                <span class="text-gray-700">{item}</span>
+              </li>
+            ))}
+          </ul>
+          <a href="/organizadores/registro?utm_source=precios" class="mt-8 inline-block rounded-xl bg-gray-900 px-6 py-3 font-semibold text-white hover:bg-gray-800">
+            Crea tu cuenta y tu web gratis
+          </a>
+        </div>
+
+        <FeeCalculator client:visible feeLabel={feeLabel} />
+      </div>
+    </section>
+
+    <section class="px-4 py-16">
+      <div class="mx-auto max-w-5xl">
+        <h2 class="text-2xl font-bold text-gray-900 font-['Unbounded']">Por medio de pago</h2>
+        <p class="mt-2 text-gray-600">El total para el comprador y lo que recibes no cambian según cómo pague.</p>
+        <div class="mt-6 overflow-x-auto rounded-2xl border border-gray-200">
+          <table class="w-full min-w-[560px] text-left text-sm">
+            <thead class="bg-gray-50 text-gray-700">
+              <tr>
+                <th class="px-4 py-3 font-semibold">Medio de pago</th>
+                <th class="px-4 py-3 font-semibold">El comprador paga</th>
+                <th class="px-4 py-3 font-semibold">Tú recibes</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+              {methods.map((m) => (
+                <tr>
+                  <td class="px-4 py-3 align-top">
+                    <p class="font-semibold text-gray-900">{m.name}</p>
+                    <p class="text-gray-600">{m.detail}</p>
+                  </td>
+                  <td class="px-4 py-3 align-top text-gray-900">{m.buyer}</td>
+                  <td class="px-4 py-3 align-top text-gray-900">{m.producer}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p class="mt-3 text-xs text-gray-500">
+          El cargo por servicio corresponde a {LEGAL.entity}, operador de {LEGAL.brand}. Condiciones completas en los
+          <a href="/terminos-productores" class="underline">términos para productores</a> y los
+          <a href="/terms" class="underline">términos para compradores</a>.
+        </p>
+      </div>
+    </section>
+
+    <section class="px-4 pb-16">
+      <div class="mx-auto max-w-3xl">
+        <h2 class="text-2xl font-bold text-gray-900 font-['Unbounded']">Preguntas frecuentes</h2>
+        <dl class="mt-6 space-y-6">
+          {faqs.map((f) => (
+            <div>
+              <dt class="font-semibold text-gray-900">{f.q}</dt>
+              <dd class="mt-1 text-gray-600">{f.a}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    </section>
+
+    <section class="px-4 pb-20">
+      <div class="mx-auto max-w-5xl rounded-3xl bg-gray-900 px-6 py-12 text-center text-white sm:px-12">
+        <h2 class="text-2xl font-bold sm:text-3xl font-['Unbounded']">Tu web de eventos, gratis</h2>
+        <p class="mx-auto mt-3 max-w-2xl text-white/80">
+          Al crear tu cuenta te damos una web para tu productora con tu cartelera y venta de entradas integrada.
+        </p>
+        <div class="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <a href="/organizadores/registro?utm_source=precios" class="rounded-xl bg-lime-400 px-6 py-3 font-semibold text-gray-900 hover:bg-lime-300">Crear cuenta gratis</a>
+          <a href="/web-gratis" class="rounded-xl border border-white/30 px-6 py-3 font-semibold text-white hover:bg-white/10">Ver la web gratis</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <AppFooter client:idle />
+</Layout>

@@ -46,9 +46,52 @@ export type DbUser = {
 
 export type SessionContext = { authUser: User; dbUser: DbUser };
 
+// Organizaciones ya verificadas en este proceso: la verificación nunca se revierte, así que se
+// evita repetir la consulta en cada petición.
+const verifiedOrgCache = new Set<number>();
+
+/**
+ * ¿La organización puede usar el panel? Exige organizations.email_verified_at (WP7) en TODA sesión,
+ * no solo en /api/auth/login: el proyecto Supabase es compartido y no se puede depender de su
+ * configuración "Confirm email" (alguien podría obtener tokens directo contra Supabase Auth con la
+ * anon key de otra app y ponerlos como cookies).
+ * - Columna inexistente (preview sin migrar) o error de lectura: se permite, igual que en login.
+ * - Cuentas antiguas (sin aceptación de términos) ya confirmadas en Auth: se marcan verificadas.
+ */
+async function isOrgEmailVerified(orgId: number, authUser: User): Promise<boolean> {
+    if (verifiedOrgCache.has(orgId)) return true;
+    const admin = getSupabaseAdmin();
+    const { data, error } = await admin
+        .from("organizations")
+        .select("id, email_verified_at, terms_accepted_at")
+        .eq("id", orgId)
+        .maybeSingle();
+    if (error) {
+        const missingColumn = error.code === "42703" || /email_verified_at|terms_accepted_at/.test(error.message || "");
+        if (!missingColumn) console.error("getSessionContext: error leyendo verificación de la organización", error.message);
+        return true;
+    }
+    if (!data) return false;
+    if (data.email_verified_at) {
+        verifiedOrgCache.add(orgId);
+        return true;
+    }
+    if (!data.terms_accepted_at && authUser.email_confirmed_at) {
+        await admin
+            .from("organizations")
+            .update({ email_verified_at: new Date().toISOString() })
+            .eq("id", orgId)
+            .is("email_verified_at", null);
+        verifiedOrgCache.add(orgId);
+        return true;
+    }
+    return false;
+}
+
 /**
  * Usuario autenticado + su fila en public.users (con organización y rol).
- * Devuelve null si no hay sesión, no existe el usuario, está inactivo o no tiene organización.
+ * Devuelve null si no hay sesión, no existe el usuario, está inactivo, no tiene organización o la
+ * organización no ha verificado su correo.
  */
 export const getSessionContext = async (context: CookieContext): Promise<SessionContext | null> => {
     const authUser = await getSessionUser(context);
@@ -61,6 +104,7 @@ export const getSessionContext = async (context: CookieContext): Promise<Session
         .single();
 
     if (!dbUser || !dbUser.organization_id || dbUser.active === false) return null;
+    if (!(await isOrgEmailVerified(Number(dbUser.organization_id), authUser))) return null;
     return { authUser, dbUser: dbUser as DbUser };
 }
 

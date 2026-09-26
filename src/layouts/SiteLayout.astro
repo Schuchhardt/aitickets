@@ -1,0 +1,99 @@
+---
+/**
+ * Layout de los sitios de productor (/o/<slug>, dominio propio).
+ * - Tokens del tema como variables CSS (--site-primary, --site-accent, --site-bg, --site-text, --site-font).
+ * - Sin Google Analytics ni cookies propias: el sitio es del productor.
+ * - Slot "head" para meta tags (SiteMetaTags o EventMetaTags).
+ */
+import ToastContainer from "../components/ui/ToastContainer.vue";
+import type { SiteTheme } from "../lib/sites";
+import "../styles/global.css";
+
+interface Props {
+  theme: SiteTheme & { dark?: boolean };
+  /** Muestra la cinta "Vista previa" (sitio no publicado visto por su dueño). */
+  preview?: boolean;
+  /** Favicon del sitio (logo del productor); por defecto el de AI Tickets. */
+  favicon?: string | null;
+}
+
+const { theme, preview = false, favicon } = Astro.props;
+
+const FONT_QUERIES: Record<string, string> = {
+  Inter: "Inter:wght@400;500;600;700",
+  Montserrat: "Montserrat:wght@400;500;600;700",
+  "Playfair Display": "Playfair+Display:wght@400;600;700",
+  "Space Grotesk": "Space+Grotesk:wght@400;500;600;700",
+  "Bebas Neue": "Bebas+Neue",
+};
+const font = theme.font || "Unbounded";
+// Unbounded y Prompt ya vienen en global.css (@fontsource)
+const fontHref = FONT_QUERIES[font] ? `https://fonts.googleapis.com/css2?family=${FONT_QUERIES[font]}&display=swap` : null;
+
+const cssVars = [
+  `--site-primary:${theme.primary}`,
+  `--site-accent:${theme.accent}`,
+  `--site-bg:${theme.background}`,
+  `--site-text:${theme.text}`,
+  `--site-font:'${font}', 'Prompt', system-ui, sans-serif`,
+].join(";");
+---
+<!doctype html>
+<html lang="es-CL">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="theme-color" content={theme.primary} />
+    {favicon ? <link rel="icon" href={favicon} /> : (
+      <>
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+      </>
+    )}
+    {fontHref && (
+      <>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link rel="stylesheet" href={fontHref} />
+      </>
+    )}
+    <slot name="head" />
+  </head>
+  <body style={cssVars} class={theme.dark ? "site-dark" : "site-light"}>
+    {preview && (
+      <div class="site-preview-ribbon" role="status">
+        Vista previa: este sitio aún no es público. Solo tú lo puedes ver.
+      </div>
+    )}
+    <slot />
+    <ToastContainer client:only="vue" />
+  </body>
+</html>
+
+<style is:global>
+  html,
+  body {
+    margin: 0;
+    width: 100%;
+    min-height: 100%;
+    overflow-x: hidden;
+  }
+  body {
+    background: var(--site-bg);
+    color: var(--site-text);
+  }
+  .site-font {
+    font-family: var(--site-font);
+  }
+  .site-preview-ribbon {
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    background: #fde047;
+    color: #111827;
+    text-align: center;
+    font: 600 13px/1.4 system-ui, sans-serif;
+    padding: 6px 12px;
+  }
+</style>

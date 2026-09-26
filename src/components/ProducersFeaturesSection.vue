@@ -54,7 +54,8 @@ import {
   ShoppingCart,
   Users,
   CreditCard,
-  Calendar
+  Calendar,
+  Globe
 } from 'lucide-vue-next';
 import FadeInSection from './Hero/FadeInSection.vue';
 
@@ -67,7 +68,7 @@ const producerFeatures = [
   {
     icon: ShoppingCart,
     title: 'Venta online y entradas QR',
-    description: 'Vende con Webpay (vía Flow). Tus asistentes reciben su entrada con código QR por email al instante.'
+    description: 'Vende con Webpay y tarjetas. Tus asistentes reciben su entrada con código QR por email al instante.'
   },
   {
     icon: Users,
@@ -88,6 +89,11 @@ const producerFeatures = [
     icon: BarChart3,
     title: 'Analítica por evento',
     description: 'Visitas, ventas, canal de origen (UTM), ciudad y hora peak de tu público. Exporta tus órdenes a CSV.'
+  },
+  {
+    icon: Globe,
+    title: 'Web de eventos gratis con tu dominio',
+    description: 'Tu productora tiene su propia web con todos tus eventos, sin costo. Úsala en aitickets.cl o conecta tu dominio.'
   }
 ];
 </script>

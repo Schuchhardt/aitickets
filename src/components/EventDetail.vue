@@ -1,12 +1,15 @@
 <script setup>
 import { onMounted, computed } from "vue";
 import { trackViewItem } from "../composables/useGoogleAnalytics.js";
+import { eventBus } from "../utils/eventbus.js";
 import EventHeader from "./EventHeader.vue";
 import EventTabs from "./EventTabs.vue";
 import EventActions from "./EventActions.vue";
 
 const props = defineProps({
   event: Object,
+  // Sitio de productor (/o/<slug> o dominio propio): sin el banner de adquisición de AI Tickets
+  siteMode: { type: Boolean, default: false },
 });
 
 const producerBannerUrl = computed(() => {
@@ -21,7 +24,24 @@ onMounted(() => {
     const minPrice = prices.length ? Math.min(...prices) : 0;
     trackViewItem(props.event.id, props.event.name, minPrice);
   }
+  autoOpenReservation();
 });
+
+// ?comprar=1 abre el modal de compra al cargar (lo usa el botón "Comprar" de los sitios con dominio
+// propio, que envía al checkout en aitickets.cl). Solo si el evento está a la venta.
+function autoOpenReservation() {
+  try {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("comprar") !== "1") return;
+    url.searchParams.delete("comprar");
+    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+    if (props.event?.sale_state !== "on_sale" || !(props.event?.tickets || []).length) return;
+    eventBus.emit("assistant-hide");
+    eventBus.emit("open-modal");
+  } catch {
+    /* URL no disponible */
+  }
+}
 </script>
 
 <template>
@@ -49,7 +69,7 @@ onMounted(() => {
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8 relative">
       <!-- Columna Derecha en Mobile (Botones arriba) -->
       <div class="lg:hidden relative z-10">
-        <EventActions :event="event" />
+        <EventActions :event="event" :siteMode="siteMode" />
       </div>
 
       <!-- Columna Izquierda (Tabs) -->
@@ -57,12 +77,13 @@ onMounted(() => {
 
       <!-- Columna Derecha (Botones en Desktop) -->
       <div class="hidden lg:block relative z-10">
-        <EventActions :event="event" />
+        <EventActions :event="event" :siteMode="siteMode" />
       </div>
     </div>
 
-    <!-- Banner de adquisición de productores -->
-    <aside class="mt-12 mb-24 lg:mb-8 border-t border-gray-200 pt-6 text-center font-['Prompt']">
+    <!-- Banner de adquisición de productores (no en los sitios de productor) -->
+    <div v-if="siteMode" class="mb-24 lg:mb-8"></div>
+    <aside v-else class="mt-12 mb-24 lg:mb-8 border-t border-gray-200 pt-6 text-center font-['Prompt']">
       <a
         :href="producerBannerUrl"
         class="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-black transition-colors"

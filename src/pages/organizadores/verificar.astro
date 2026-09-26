@@ -1,0 +1,187 @@
+---
+// /organizadores/verificar?t=<token> — enlace del correo de verificación del productor.
+// GET NO confirma nada: muestra el botón "Confirmar mi correo" (los escáneres de enlaces de correo
+// corporativo abren los enlaces solos). POST (formulario con el token en un campo oculto) confirma el
+// correo del lado del servidor y muestra el resultado con el acceso al login.
+// También recibe ?estado=<resultado> (compatibilidad con enlaces antiguos a /api/auth/verify-email).
+import Layout from "../../layouts/Layout.astro";
+import AppHeader from "../../components/AppHeader.vue";
+import AppFooter from "../../components/AppFooter.vue";
+import GradientBackground from "../../components/Hero/GradientBackground.vue";
+import { confirmProducerEmail, verifyEmailVerifyToken } from "../../lib/email-verification";
+import "../../styles/global.css";
+
+export const prerender = false;
+
+type State = "ok" | "already" | "expired" | "invalid" | "not_found" | "server" | "missing" | "confirm";
+
+let state: State = "missing";
+let slug: string | null = null;
+let pendingToken = "";
+
+if (Astro.request.method === "POST") {
+  let token = "";
+  try {
+    const form = await Astro.request.formData();
+    token = String(form.get("t") || "");
+  } catch {
+    token = "";
+  }
+  const result = token ? await confirmProducerEmail(token) : null;
+  if (!result) {
+    state = "invalid";
+  } else if (result.ok) {
+    state = result.alreadyVerified ? "already" : "ok";
+    slug = result.slug;
+  } else {
+    state = result.error;
+  }
+} else if (Astro.url.searchParams.get("t")) {
+  const token = Astro.url.searchParams.get("t") || "";
+  // Solo se valida la firma y el vencimiento (sin efectos) para no mostrar el botón con un enlace malo
+  let check: ReturnType<typeof verifyEmailVerifyToken>;
+  try {
+    check = verifyEmailVerifyToken(token);
+  } catch {
+    check = { ok: false, error: "invalid" };
+  }
+  if (check.ok) {
+    state = "confirm";
+    pendingToken = token;
+  } else {
+    state = check.error;
+  }
+} else {
+  const estado = Astro.url.searchParams.get("estado");
+  if (estado && ["ok", "expired", "invalid", "not_found", "server"].includes(estado)) state = estado as State;
+}
+
+Astro.response.headers.set("Cache-Control", "private, no-store");
+Astro.response.headers.set("Referrer-Policy", "no-referrer");
+
+const success = state === "ok" || state === "already";
+const titles: Record<State, string> = {
+  ok: "¡Correo confirmado!",
+  already: "Tu correo ya estaba confirmado",
+  expired: "El enlace venció",
+  invalid: "El enlace no es válido",
+  not_found: "No encontramos la cuenta",
+  server: "No pudimos confirmar tu correo",
+  missing: "Confirma tu correo",
+  confirm: "Confirma tu correo",
+};
+const messages: Record<State, string> = {
+  ok: "Tu cuenta de productor está activa. Ya puedes ingresar al panel, crear tu primer evento y publicar tu web de eventos gratis.",
+  already: "Tu cuenta ya está activa. Ingresa con tu correo y contraseña.",
+  expired: "Los enlaces de confirmación duran 48 horas. Pide uno nuevo con tu correo:",
+  invalid: "Puede que el enlace esté incompleto o que ya hayas pedido uno más reciente. Pide uno nuevo con tu correo:",
+  not_found: "La cuenta asociada a este enlace no existe. Si crees que es un error, escríbenos o crea tu cuenta de nuevo.",
+  server: "Ocurrió un problema al confirmar tu correo. Intenta abrir el enlace otra vez en unos minutos o pide uno nuevo:",
+  missing: "Te enviamos un correo con un enlace para activar tu cuenta. Si no te llegó, pide uno nuevo:",
+  confirm: "Presiona el botón para confirmar que este correo es tuyo y activar tu cuenta de productor.",
+};
+const showResend = state === "expired" || state === "invalid" || state === "server" || state === "missing";
+---
+
+<Layout title="Confirmar correo | AI Tickets" description="Confirma el correo de tu cuenta de productor en AI Tickets." noindex={true}>
+  <AppHeader client:idle />
+
+  <main class="relative min-h-screen flex items-center justify-center py-20 px-4 overflow-hidden">
+    <GradientBackground variant="soft" client:idle />
+    <div class="relative z-10 w-full">
+      <div
+        class="w-full max-w-md mx-auto bg-white/10 backdrop-blur-xl p-8 rounded-xl shadow-2xl border border-white/20 text-center font-[Prompt]"
+        data-testid="verify-email-result"
+        data-state={state}
+      >
+        <div class={`mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full ${success ? "bg-lime-400/20 text-lime-300" : "bg-white/10 text-white/80"}`}>
+          {success ? (
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l9 6 9-6M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+          )}
+        </div>
+        <h1 class="text-2xl font-bold mb-3 font-[Unbounded] text-white">{titles[state]}</h1>
+        <p class="text-white/70 mb-6">{messages[state]}</p>
+
+        {success && (
+          <>
+            <a href="/organizadores/login?verificado=1" class="block w-full bg-white text-gray-900 font-medium py-3 rounded-lg hover:bg-white/90 transition">
+              Iniciar sesión
+            </a>
+            {slug && (
+              <p class="mt-4 text-sm text-white/60">
+                Tu web de eventos: <span class="text-white/90">aitickets.cl/o/{slug}</span>
+              </p>
+            )}
+          </>
+        )}
+
+        {state === "confirm" && (
+          <form method="post" action="/organizadores/verificar" data-testid="verify-email-confirm-form">
+            <input type="hidden" name="t" value={pendingToken} />
+            <button type="submit" class="block w-full bg-white text-gray-900 font-medium py-3 rounded-lg hover:bg-white/90 transition">
+              Confirmar mi correo
+            </button>
+          </form>
+        )}
+
+        {showResend && (
+          <form id="resend-form" class="space-y-3 text-left" novalidate>
+            <label for="resend-email" class="block text-sm font-medium text-white/80">Email</label>
+            <input
+              id="resend-email"
+              name="email"
+              type="email"
+              required
+              autocomplete="email"
+              class="w-full px-4 py-2 border border-white/20 bg-white/10 text-white placeholder-white/40 rounded-lg focus:ring-2 focus:ring-white/50 outline-none"
+              placeholder="contacto@productora.com"
+            />
+            <button type="submit" class="w-full bg-white text-gray-900 font-medium py-3 rounded-lg hover:bg-white/90 transition disabled:opacity-60">
+              Enviar un nuevo enlace
+            </button>
+            <p id="resend-msg" class="text-sm text-white/70 min-h-[1.25rem]" aria-live="polite"></p>
+          </form>
+        )}
+
+        {!success && state !== "confirm" && (
+          <p class="mt-6 text-sm text-white/60">
+            ¿Ya confirmaste? <a href="/organizadores/login" class="font-medium text-white hover:underline">Inicia sesión</a>
+          </p>
+        )}
+      </div>
+    </div>
+  </main>
+
+  <AppFooter client:idle />
+</Layout>
+
+<script>
+  const form = document.getElementById("resend-form") as HTMLFormElement | null;
+  const msg = document.getElementById("resend-msg");
+  form?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const input = form.querySelector("input[name=email]") as HTMLInputElement;
+    const button = form.querySelector("button") as HTMLButtonElement;
+    const email = input.value.trim();
+    if (!email) {
+      if (msg) msg.textContent = "Ingresa tu correo.";
+      return;
+    }
+    button.disabled = true;
+    try {
+      const res = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (msg) msg.textContent = data.message || (res.ok ? "Listo. Revisa tu correo." : "No pudimos enviar el enlace. Intenta más tarde.");
+    } catch {
+      if (msg) msg.textContent = "No pudimos enviar el enlace. Revisa tu conexión e intenta de nuevo.";
+    } finally {
+      button.disabled = false;
+    }
+  });
+</script>

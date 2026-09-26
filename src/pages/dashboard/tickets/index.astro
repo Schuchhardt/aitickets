@@ -81,7 +81,8 @@ async function getTicketStats(eventId: number) {
     const { data: attendees } = await supabaseAdmin
         .from("event_attendees")
         .select("id, event_ticket_id, event_order_id")
-        .eq("event_id", eventId);
+        .eq("event_id", eventId)
+        .or("status.is.null,status.neq.cancelled"); // anuladas (reembolsos) no cuentan como vendidas
 
     // Get paid orders for this event
     const { data: paidOrders } = await supabaseAdmin
@@ -597,7 +598,11 @@ function formatDate(dateString: string | null): string {
                                                                                     )}
                                                                                 </td>
                                                                                 <td class="px-4 py-3">
-                                                                                    {attendee.validated ? (
+                                                                                    {attendee.status === "cancelled" ? (
+                                                                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-red-50 text-red-600 rounded-full text-xs font-medium">
+                                                                                            Anulada
+                                                                                        </span>
+                                                                                    ) : attendee.validated ? (
                                                                                         <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">
                                                                                             <CheckCircle class="w-3 h-3" />
                                                                                             Validado
@@ -949,7 +954,11 @@ function formatDate(dateString: string | null): string {
                                                                                     )}
                                                                                 </td>
                                                                                 <td class="px-4 py-3">
-                                                                                    {attendee.validated ? (
+                                                                                    {attendee.status === "cancelled" ? (
+                                                                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-red-50 text-red-600 rounded-full text-xs font-medium">
+                                                                                            Anulada
+                                                                                        </span>
+                                                                                    ) : attendee.validated ? (
                                                                                         <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">
                                                                                             <CheckCircle class="w-3 h-3" />
                                                                                             Validado

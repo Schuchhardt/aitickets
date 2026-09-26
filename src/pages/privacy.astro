@@ -3,112 +3,206 @@ export const prerender = true;
 import AppHeader from "../components/AppHeader.vue";
 import AppFooter from "../components/AppFooter.vue";
 import Layout from '../layouts/Layout.astro';
+import { LEGAL, formatLegalDate } from '../lib/legal';
 import "../styles/global.css";
 
+const effective = formatLegalDate(LEGAL.effectiveDate);
+
+const processors = [
+  { name: 'Supabase', purpose: 'Base de datos, autenticación y almacenamiento de archivos', where: 'Brasil (servidores en São Paulo)' },
+  { name: 'Netlify', purpose: 'Alojamiento del sitio y ejecución del servidor', where: 'EE.UU.' },
+  { name: 'Mailgun', purpose: 'Envío de correos transaccionales (entradas, avisos, verificación)', where: 'EE.UU.' },
+  { name: 'Flow', purpose: 'Procesamiento de pagos con Webpay', where: 'Chile' },
+  { name: 'Stripe', purpose: 'Procesamiento de pagos con tarjetas internacionales, Apple Pay y Google Pay', where: 'EE.UU.' },
+  { name: 'Anthropic', purpose: 'Modelos de inteligencia artificial (asistente virtual, textos y clasificación de mensajes)', where: 'EE.UU.' },
+  { name: 'Google', purpose: 'Analítica web (Google Analytics) y mapas', where: 'EE.UU.' },
+  { name: 'OpenAI', purpose: 'Generación de imágenes con IA para eventos', where: 'EE.UU.' },
+  { name: 'Cloudflare Turnstile', purpose: 'Protección contra bots en formularios y compras', where: 'EE.UU.' },
+  { name: 'Sentry', purpose: 'Registro de errores técnicos', where: 'EE.UU.' },
+  { name: 'Slack', purpose: 'Alertas internas del equipo (operación y soporte)', where: 'EE.UU.' },
+  { name: 'MailerLite', purpose: 'Envío del boletín a quienes se suscriben', where: 'UE / EE.UU.' },
+  { name: 'Proveedor de correo comercial B2B', purpose: 'Envío y seguimiento de correos a productores de eventos (ver sección 9)', where: 'EE.UU.' },
+];
 ---
 
 <Layout
   title="Aviso de privacidad | AI Tickets"
-  description="Cómo AI Tickets SpA recopila, usa, almacena y protege los datos personales de compradores y productores de eventos."
+  description={`Cómo ${LEGAL.entity} (AI Tickets) trata los datos personales de compradores, productores, visitantes y contactos comerciales.`}
   canonical="/privacy"
 >
   <AppHeader client:idle/>
   <main>
-        <div class="container mx-auto px-6 py-12 text-gray-700 font-['Prompt']">
-          <h1 class="text-3xl font-bold mb-6 pt-12 font-['Unbounded'] text-gray-900">Aviso de Privacidad</h1>
-      
-          <p class="mb-4 font-['Prompt']">
-            En <strong>AI Tickets SpA</strong>, la privacidad de nuestros usuarios es una prioridad. 
-            Este aviso de privacidad describe cómo recopilamos, utilizamos, almacenamos y protegemos su información personal al utilizar nuestra plataforma.
-          </p>
-      
-          <section class="mb-8">
-            <h2 class="text-xl font-bold mb-2 font-['Unbounded'] text-gray-900">1. Información que recopilamos</h2>
-            <p class="font-['Prompt']">
-              Al utilizar nuestros servicios, podemos recopilar información personal como su nombre, correo electrónico, número de teléfono y detalles de pago. 
-              También podemos almacenar datos relacionados con sus preferencias de compra y el uso de nuestra plataforma.
-            </p>
-          </section>
-      
-          <section class="mb-8">
-            <h2 class="text-xl font-bold mb-2 font-['Unbounded'] text-gray-900">2. Uso de la información</h2>
-            <p class="font-['Prompt']">
-              La información recopilada se utiliza para:
-            </p>
-            <ul class="list-disc list-inside ml-4">
-              <li>Procesar y gestionar la compra de entradas.</li>
-              <li>Enviar confirmaciones y actualizaciones de eventos.</li>
-              <li>Mejorar la experiencia del usuario en nuestra plataforma.</li>
-              <li>Brindar soporte al cliente y responder consultas.</li>
-              <li>Cumplir con obligaciones legales y regulatorias.</li>
-            </ul>
-          </section>
-      
-          <section class="mb-8">
-            <h2 class="text-xl font-bold mb-2 font-['Unbounded'] text-gray-900">3. Protección de datos</h2>
-            <p class="font-['Prompt']">
-              Implementamos medidas de seguridad para proteger su información contra accesos no autorizados, pérdidas o alteraciones. 
-              Sin embargo, ningún sistema es completamente seguro, por lo que no podemos garantizar la seguridad absoluta de sus datos.
-            </p>
-          </section>
-      
-          <section class="mb-8">
-            <h2 class="text-xl font-bold mb-2 font-['Unbounded'] text-gray-900">4. Compartición de información</h2>
-            <p class="font-['Prompt']">
-              No compartimos su información personal con terceros, salvo en los siguientes casos:
-            </p>
-            <ul class="list-disc list-inside ml-4">
-              <li>Cuando sea necesario para procesar su compra (por ejemplo, con procesadores de pago).</li>
-              <li>Si lo exige la ley o una autoridad competente.</li>
-              <li>Con proveedores de servicio que nos ayudan a mejorar la plataforma (por ejemplo, servicios de análisis y marketing).</li>
-            </ul>
-          </section>
-      
-          <section class="mb-8">
-            <h2 class="text-xl font-bold mb-2 font-['Unbounded'] text-gray-900">5. Derechos del usuario</h2>
-            <p class="font-['Prompt']">
-              Usted tiene derecho a:
-            </p>
-            <ul class="list-disc list-inside ml-4">
-              <li>Acceder, modificar o eliminar su información personal.</li>
-              <li>Solicitar la restricción del procesamiento de sus datos.</li>
-              <li>Oponerse al uso de su información para fines específicos.</li>
-            </ul>
-            <p class="font-['Prompt']">
-              Para ejercer estos derechos, puede contactarnos a través de nuestros canales de atención al cliente.
-            </p>
-          </section>
-      
-          <section class="mb-8">
-            <h2 class="text-xl font-bold mb-2 font-['Unbounded'] text-gray-900">6. Uso de cookies</h2>
-            <p class="font-['Prompt']">
-              Nuestro sitio web utiliza cookies para mejorar su experiencia de navegación. Estas cookies nos permiten almacenar preferencias de usuario, 
-              analizar el tráfico en el sitio y ofrecer contenido personalizado. Puede gestionar sus preferencias de cookies desde la configuración de su navegador.
-            </p>
-          </section>
-      
-          <section class="mb-8">
-            <h2 class="text-xl font-bold mb-2 font-['Unbounded'] text-gray-900">7. Cambios en la política de privacidad</h2>
-            <p class="font-['Prompt']">
-              Nos reservamos el derecho de actualizar esta política en cualquier momento. Cualquier cambio será publicado en nuestro sitio web y entrará en vigor 
-              desde su publicación. Se recomienda revisar periódicamente esta sección para estar informado de cualquier actualización.
-            </p>
-          </section>
-      
-          <section class="mb-8">
-            <h2 class="text-xl font-bold mb-2 font-['Unbounded'] text-gray-900">8. Contacto</h2>
-            <p class="font-['Prompt']">
-              Si tiene preguntas o inquietudes sobre nuestra política de privacidad, puede contactarnos a través de nuestros canales de soporte.
-            </p>
-          </section>
-      
-          <!-- Botón de volver -->
-          <div class="text-center mt-8">
-            <a href="/" class="text-blue-500 hover:underline text-sm">Volver al inicio</a>
-          </div>
-      
-        </div>      
-      
+    <!-- Borrador pendiente de revisión legal (Ley 21.719). Plazos de conservación a confirmar por el dueño. -->
+    <div class="legal container mx-auto px-6 py-12 text-gray-700 font-['Prompt']">
+      <h1 class="text-3xl font-bold mb-2 pt-12 font-['Unbounded'] text-gray-900">Aviso de privacidad</h1>
+      <p class="text-sm text-gray-500 mb-6">Vigente desde el {effective}</p>
+
+      <p>
+        Este aviso explica qué datos personales tratamos en AI Tickets, para qué, con quién los compartimos y cómo puedes ejercer tus derechos,
+        conforme a la Ley N° 19.628 y a la Ley N° 21.719 sobre protección de datos personales.
+      </p>
+
+      <section>
+        <h2>1. Responsable del tratamiento</h2>
+        <p>
+          <strong>{LEGAL.entity}</strong>, {LEGAL.stateLabel}{LEGAL.address ? `, con domicilio en ${LEGAL.address}` : ''}, que opera AI Tickets.
+          Contacto para privacidad: <a href={`mailto:${LEGAL.privacyEmail}`}>{LEGAL.privacyEmail}</a>.
+        </p>
+        <p>
+          Los datos que un productor descarga o exporta sobre los asistentes de sus eventos quedan bajo la responsabilidad de ese productor,
+          que los trata como responsable independiente.
+        </p>
+      </section>
+
+      <section>
+        <h2>2. Datos que tratamos</h2>
+        <ul>
+          <li><strong>Compradores y asistentes:</strong> nombre, correo, teléfono (opcional), entradas compradas, evento y función, montos, estado del pago, registro de ingreso (check-in) y datos técnicos de la compra (IP, navegador). No almacenamos los datos completos de tu tarjeta.</li>
+          <li><strong>Productores y sus equipos:</strong> nombre, correo, teléfono, datos de la organización, información de los eventos, datos bancarios para transferir lo recaudado y registros de uso del panel.</li>
+          <li><strong>Visitantes del sitio:</strong> páginas visitadas, origen de la visita (por ejemplo, parámetros UTM), ciudad aproximada, dispositivo, cookies y mensajes enviados al asistente virtual o a formularios de contacto.</li>
+          <li><strong>Contactos comerciales B2B:</strong> nombre de la productora o espacio cultural, correo y sitio web de contacto publicados por ellos, ciudad, eventos públicos y el historial de nuestras comunicaciones (ver sección 9).</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>3. Finalidades y bases de licitud</h2>
+        <ul>
+          <li><strong>Vender y entregar entradas, gestionar el ingreso, reembolsos y soporte:</strong> ejecución del contrato de compra.</li>
+          <li><strong>Avisos sobre el evento</strong> (recordatorios, cambios de horario o lugar, cancelaciones): ejecución del contrato.</li>
+          <li><strong>Prestar el servicio a productores</strong> (cuenta, panel, web de eventos, transferencias): ejecución del contrato.</li>
+          <li><strong>Prevenir fraude, contracargos y abusos, y mantener la seguridad:</strong> interés legítimo.</li>
+          <li><strong>Cumplir obligaciones legales, contables y tributarias</strong> y atender requerimientos de autoridades: obligación legal.</li>
+          <li><strong>Analítica y mejora del servicio:</strong> interés legítimo o consentimiento, según corresponda para las cookies.</li>
+          <li><strong>Boletín y novedades:</strong> tu consentimiento, que puedes retirar en cualquier momento.</li>
+          <li><strong>Contacto comercial con productores de eventos:</strong> interés legítimo (ver sección 9).</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>4. Con quién compartimos datos</h2>
+        <p>
+          <strong>Con el productor del evento:</strong> al comprar, el productor recibe tus datos de contacto y de compra para gestionar el ingreso y comunicarse contigo sobre su evento.
+        </p>
+        <p>
+          <strong>Con nuestros proveedores (encargados del tratamiento)</strong>, que tratan los datos solo para prestarnos sus servicios:
+        </p>
+        <div class="overflow-x-auto">
+          <table>
+            <thead><tr><th>Proveedor</th><th>Finalidad</th><th>Ubicación</th></tr></thead>
+            <tbody>
+              {processors.map((p) => (
+                <tr><td>{p.name}</td><td>{p.purpose}</td><td>{p.where}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p class="mt-3">
+          También podemos comunicar datos cuando lo exija la ley o una autoridad competente. No vendemos datos personales.
+        </p>
+      </section>
+
+      <section>
+        <h2>5. Transferencias internacionales</h2>
+        <p>
+          {LEGAL.entity} es una sociedad de EE.UU. y varios de nuestros proveedores están en EE.UU. u otros países. Por eso tus datos se transfieren fuera de Chile.
+          Elegimos proveedores con estándares de seguridad reconocidos y, cuando corresponde, cláusulas contractuales de protección de datos.
+        </p>
+      </section>
+
+      <section>
+        <h2>6. Cuánto tiempo conservamos los datos</h2>
+        <ul>
+          <li><strong>Compras y entradas:</strong> mientras sea necesario para el evento y la atención de reclamos, y luego por los plazos que exigen las normas contables, tributarias y de protección al consumidor.</li>
+          <li><strong>Cuentas de productores:</strong> mientras la cuenta esté activa y, después, por el tiempo necesario para cerrar pagos pendientes y cumplir obligaciones legales.</li>
+          <li><strong>Analítica y registros técnicos:</strong> por un período limitado, tras el cual se eliminan o anonimizan.</li>
+          <li><strong>Contactos comerciales B2B:</strong> mientras exista una relación comercial potencial; si pides no ser contactado, conservamos solo el correo o dominio en una lista de exclusión para respetar tu decisión.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>7. Tus derechos</h2>
+        <p>
+          Puedes ejercer tus derechos de <strong>acceso, rectificación, supresión, oposición, portabilidad y bloqueo</strong> del tratamiento,
+          y retirar tu consentimiento cuando esa sea la base del tratamiento.
+        </p>
+        <p>
+          Para hacerlo, escribe a <a href={`mailto:${LEGAL.privacyEmail}`}>{LEGAL.privacyEmail}</a> desde el correo asociado a tus datos, indicando qué derecho quieres ejercer.
+          Podemos pedirte información adicional para verificar tu identidad. Responderemos dentro de los plazos legales.
+          Si tu solicitud se refiere a datos que un productor exportó, también puedes dirigirte a ese productor.
+        </p>
+        <p>
+          Si no estás conforme con nuestra respuesta, puedes reclamar ante la <strong>Agencia de Protección de Datos Personales</strong> de Chile.
+        </p>
+      </section>
+
+      <section>
+        <h2>8. Seguridad</h2>
+        <p>
+          Aplicamos medidas técnicas y organizativas razonables: acceso restringido a los datos, conexiones cifradas, control de acceso por organización y registros de actividad.
+          Si ocurre una vulneración de seguridad que afecte tus datos, te informaremos y a la autoridad cuando la ley lo exija.
+        </p>
+      </section>
+
+      <section id="contacto-comercial">
+        <h2>9. Contacto comercial B2B con productores de eventos</h2>
+        <p>
+          Contactamos por correo a productoras, espacios culturales y organizadores de eventos para ofrecerles AI Tickets. Obtenemos sus datos de contacto de estas fuentes:
+        </p>
+        <ul>
+          <li>La cartelera pública del Ministerio de las Culturas (Chile Cultura).</li>
+          <li>Los sitios web públicos de las propias productoras y espacios culturales.</li>
+          <li>El formulario de <a href="/web-gratis">aitickets.cl/web-gratis</a> y otros formularios que la propia productora completa en nuestro sitio.</li>
+        </ul>
+        <p>
+          La base de licitud es nuestro <strong>interés legítimo</strong> en ofrecer un servicio relacionado con la actividad profesional del destinatario.
+          Solo usamos datos de contacto profesionales, enviamos pocos mensajes y cada correo identifica a {LEGAL.entity} e incluye una forma simple de darse de baja.
+        </p>
+        <p>
+          Para no recibir más correos, responde "NO" a cualquiera de ellos o entra a <a href="/outreach/baja">aitickets.cl/outreach/baja</a>.
+          En <a href="/bot">aitickets.cl/bot</a> explicamos cómo funciona nuestro sistema de contacto automatizado. Para consultar qué datos tenemos o pedir su eliminación,
+          escribe a <a href={`mailto:${LEGAL.privacyEmail}`}>{LEGAL.privacyEmail}</a>.
+        </p>
+      </section>
+
+      <section>
+        <h2>10. Cookies</h2>
+        <p>
+          Usamos cookies necesarias para iniciar sesión y completar compras de forma segura, y cookies de analítica (Google Analytics) para entender cómo se usa el sitio.
+          Puedes bloquear o eliminar las cookies desde la configuración de tu navegador; si bloqueas las necesarias, algunas funciones podrían no operar.
+        </p>
+      </section>
+
+      <section>
+        <h2>11. Menores de edad</h2>
+        <p>
+          AI Tickets no está dirigido a menores de 14 años. Si un menor compra entradas, debe hacerlo con autorización de su representante legal.
+        </p>
+      </section>
+
+      <section>
+        <h2>12. Cambios a este aviso</h2>
+        <p>
+          Podemos actualizar este aviso. Publicaremos la versión vigente en esta página con su fecha y, si el cambio es relevante, te lo informaremos por correo.
+        </p>
+      </section>
+
+      <div class="text-center mt-8">
+        <a href="/" class="text-blue-500 hover:underline text-sm">Volver al inicio</a>
+      </div>
+    </div>
   </main>
   <AppFooter client:idle/>
 </Layout>
+
+<style>
+  .legal { max-width: 56rem; }
+  .legal p { margin-bottom: 0.75rem; }
+  .legal section { margin-bottom: 2rem; }
+  .legal h2 { font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 1.25rem; line-height: 1.75rem; color: #111827; margin-bottom: 0.5rem; }
+  .legal ul { list-style: disc; padding-left: 1.5rem; }
+  .legal li { margin-bottom: 0.4rem; }
+  .legal a { color: #2563eb; text-decoration: underline; }
+  .legal table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+  .legal th, .legal td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+  .legal th { color: #111827; font-weight: 600; }
+</style>

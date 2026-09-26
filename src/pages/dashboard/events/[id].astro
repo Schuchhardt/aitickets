@@ -69,7 +69,8 @@ const totalTickets =
 const { count: ticketsSold } = await supabaseAdmin
     .from("event_attendees")
     .select("id", { count: "exact", head: true })
-    .eq("event_id", event.id);
+    .eq("event_id", event.id)
+    .or("status.is.null,status.neq.cancelled"); // anuladas (reembolsos) no cuentan
 
 // Real revenue from paid orders
 const { data: ordersData } = await supabaseAdmin
@@ -83,7 +84,8 @@ const totalRevenue = ordersData?.reduce((sum, o) => sum + (o.amount || 0), 0) ||
 const { data: ticketSalesData } = await supabaseAdmin
     .from("event_attendees")
     .select("event_ticket_id")
-    .eq("event_id", event.id);
+    .eq("event_id", event.id)
+    .or("status.is.null,status.neq.cancelled");
 const ticketSalesMap: Record<string, number> = {};
 ticketSalesData?.forEach((ea: any) => {
     ticketSalesMap[ea.event_ticket_id] = (ticketSalesMap[ea.event_ticket_id] || 0) + 1;

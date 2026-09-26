@@ -5,6 +5,9 @@ import { csvCell, slugify } from "../_lib/server-utils";
 
 const BASE_COLUMNS = "id, created_at, status, amount, ticket_fee, payment_fee, total_payment, ticket_qty, ticket_details, attendees ( first_name, last_name, email, phone )";
 
+const PROVIDER_LABELS: Record<string, string> = { flow: "Webpay (Flow)", stripe: "Tarjeta internacional (Stripe)", free: "Gratis", courtesy: "Cortesía", demo: "Demo" };
+const providerLabel = (p: string | null | undefined) => (p ? PROVIDER_LABELS[p] || p : "");
+
 /** Exporta las órdenes pagadas de un evento de la organización como CSV (separador ;). */
 export const GET: APIRoute = async (context) => {
     const session = await getSessionContext(context);
@@ -21,22 +24,29 @@ export const GET: APIRoute = async (context) => {
     if (!event) return jsonResponse({ message: "Evento no encontrado o no autorizado" }, 404);
 
     const supabase = getSupabaseAdmin();
-    // Las columnas de atribución (ref/utm) existen solo si se aplicó la migración correspondiente
-    let withAttribution = true;
-    let { data: orders, error }: { data: any[] | null; error: any } = await supabase
-        .from("event_orders")
-        .select(`${BASE_COLUMNS}, ref, utm_source, utm_medium, utm_campaign`)
-        .eq("event_id", event.id)
-        .eq("status", "paid")
-        .order("created_at", { ascending: true });
-    if (error) {
-        withAttribution = false;
+    // Columnas opcionales según las migraciones aplicadas: proveedor/moneda (202609270100) y atribución (ref/utm).
+    // Se intenta de la más completa a la mínima (los deploy previews pueden correr contra una base sin migrar).
+    const variants = [
+        { cols: `${BASE_COLUMNS}, ref, utm_source, utm_medium, utm_campaign, payment_provider, currency`, attribution: true, provider: true },
+        { cols: `${BASE_COLUMNS}, ref, utm_source, utm_medium, utm_campaign`, attribution: true, provider: false },
+        { cols: BASE_COLUMNS, attribution: false, provider: false },
+    ];
+    let withAttribution = false;
+    let withProvider = false;
+    let orders: any[] | null = null;
+    let error: any = null;
+    for (const v of variants) {
         ({ data: orders, error } = await supabase
             .from("event_orders")
-            .select(BASE_COLUMNS)
+            .select(v.cols)
             .eq("event_id", event.id)
             .eq("status", "paid")
             .order("created_at", { ascending: true }));
+        if (!error) {
+            withAttribution = v.attribution;
+            withProvider = v.provider;
+            break;
+        }
     }
     if (error) {
         console.error("orders-csv error:", error);
@@ -46,6 +56,7 @@ export const GET: APIRoute = async (context) => {
     const header = [
         "Orden", "Fecha (Chile)", "Nombre", "Apellido", "Email", "Teléfono", "Entradas", "Cantidad",
         "Monto entradas (a pagar al productor)", "Cargo por servicio (comprador)", "Total pagado", "Comisión pasarela", "Cortesía",
+        ...(withProvider ? ["Medio de pago", "Moneda"] : []),
         ...(withAttribution ? ["Ref", "UTM source", "UTM medium", "UTM campaign"] : []),
     ];
 
@@ -68,6 +79,7 @@ export const GET: APIRoute = async (context) => {
             Number(o.total_payment) || 0,
             Number(o.payment_fee) || 0,
             isCourtesy ? "Sí" : "No",
+            ...(withProvider ? [providerLabel(o.payment_provider), o.currency || "CLP"] : []),
             ...(withAttribution ? [o.ref, o.utm_source, o.utm_medium, o.utm_campaign] : []),
         ].map(csvCell).join(";");
     });

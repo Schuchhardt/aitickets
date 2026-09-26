@@ -19,3 +19,5 @@ dist/
 node_modules/
 # /brag video output
 brag-output/
+test-results/
+playwright-report/

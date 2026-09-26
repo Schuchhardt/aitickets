@@ -1,5 +1,6 @@
 [build]
-  command = "npm install && npm run build"
+  # npm ci: instala exactamente package-lock.json (builds reproducibles).
+  command = "npm ci && npm run build"
   publish = "dist"
   functions = "netlify/functions"
 
@@ -12,4 +13,14 @@
     "netlify/functions/**/node_modules/**"
   ]
 
+# Migraciones automáticas de BD (plugins/db-migrate + scripts/migrate.mjs).
+# Corre en onPostBuild SOLO con CONTEXT=production: si una migración falla, el deploy no ocurre.
+# Deploy previews y branch deploys nunca migran (comparten la BD de producción y son código no confiable).
+# Requiere SUPABASE_DB_URL (Session pooler, puerto 5432) con scope Builds y contexto Production.
+# MIGRATE_ON_BUILD=false lo desactiva; ALLOW_MISSING_DB_URL=true solo para el primer deploy.
+[[plugins]]
+  package = "/plugins/db-migrate"
+
 # Recordatorios 24h antes: el schedule vive en netlify/functions/send-event-reminders (config.schedule).
+# Funciones programadas y background: su configuración va en el código de cada función
+# (export const config = { schedule } / sufijo -background), no aquí.

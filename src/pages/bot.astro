@@ -1,0 +1,106 @@
+---
+// Página pública de AITicketsBot: qué hace, qué no hace y formulario de exclusión (bot_optout).
+import AppHeader from "../components/AppHeader.vue";
+import AppFooter from "../components/AppFooter.vue";
+import Layout from "../layouts/Layout.astro";
+import { LEGAL } from "../lib/legal";
+import "../styles/global.css";
+
+export const prerender = false;
+
+const turnstileSiteKey = import.meta.env.TURNSTILE_SITE_KEY || import.meta.env.PUBLIC_TURNSTILE_SITE_KEY || "";
+---
+
+<Layout
+  title="AITicketsBot | AI Tickets"
+  description="Qué es AITicketsBot, qué información revisa y cómo excluir tu sitio."
+  canonical="/bot"
+>
+  {turnstileSiteKey && <script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>}
+  <AppHeader client:idle />
+
+  <main class="bg-white px-4 pt-28 pb-16 sm:pt-32">
+    <article class="mx-auto max-w-3xl text-gray-700">
+      <h1 class="text-3xl font-extrabold text-gray-900 sm:text-4xl">AITicketsBot</h1>
+      <p class="mt-4">
+        <code class="rounded bg-gray-100 px-1.5 py-0.5 text-sm">AITicketsBot/1.0 (+https://aitickets.cl/bot)</code> es el agente de
+        {" "}{LEGAL.brand} ({LEGAL.entity}). Visita sitios públicos de productoras, salas y centros culturales para encontrar su
+        correo de contacto comercial y sus próximos eventos, y así ofrecerles una web de eventos gratis y venta de entradas.
+      </p>
+
+      <h2 class="mt-10 text-xl font-bold text-gray-900">Qué hace</h2>
+      <ul class="mt-3 list-disc space-y-2 pl-6">
+        <li>Revisa como máximo 5 páginas públicas de tu sitio (inicio, contacto, nosotros), con pausas y un tiempo máximo por página.</li>
+        <li>Respeta <code class="text-sm">robots.txt</code>. Para excluirlo: <code class="rounded bg-gray-100 px-1.5 py-0.5 text-sm">User-agent: AITicketsBot</code> + <code class="rounded bg-gray-100 px-1.5 py-0.5 text-sm">Disallow: /</code>.</li>
+        <li>Guarda solo el correo de contacto publicado, la página donde aparece y datos públicos de tus eventos.</li>
+      </ul>
+
+      <h2 class="mt-10 text-xl font-bold text-gray-900">Qué no hace</h2>
+      <ul class="mt-3 list-disc space-y-2 pl-6">
+        <li>No inicia sesión, no llena formularios, no compra entradas ni evade bloqueos.</li>
+        <li>No adivina ni verifica correos contra servidores de correo (solo revisa que el dominio reciba correo).</li>
+        <li>No revisa redes sociales ni plataformas que lo prohíben en sus términos.</li>
+      </ul>
+
+      <h2 class="mt-10 text-xl font-bold text-gray-900">Excluir mi sitio o mi correo</h2>
+      <p class="mt-3">
+        Indica tu dominio (y, si quieres, tu correo). No volveremos a visitar tu sitio ni a escribirte. Más información en la
+        {" "}<a href="/privacy#contacto-comercial" class="underline">política de privacidad</a>.
+      </p>
+      <form id="bot-optout-form" class="mt-6 space-y-4 rounded-2xl border border-gray-200 p-6" novalidate>
+        <div>
+          <label for="bo-domain" class="block text-sm font-medium text-gray-700">Dominio de tu sitio</label>
+          <input id="bo-domain" name="domain" placeholder="miproductora.cl" maxlength="253" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-violet-500 focus:outline-none" />
+        </div>
+        <div>
+          <label for="bo-email" class="block text-sm font-medium text-gray-700">Correo (opcional)</label>
+          <input id="bo-email" name="email" type="email" maxlength="254" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-violet-500 focus:outline-none" />
+        </div>
+        {turnstileSiteKey && <div class="cf-turnstile" data-sitekey={turnstileSiteKey} data-language="es"></div>}
+        <p id="bo-msg" class="hidden rounded-lg px-3 py-2 text-sm" role="status"></p>
+        <button type="submit" id="bo-submit" class="rounded-xl bg-gray-900 px-6 py-3 font-semibold text-white hover:bg-gray-700 disabled:opacity-60">Excluir</button>
+      </form>
+
+      <p class="mt-10 text-sm text-gray-500">Contacto: <a class="underline" href={`mailto:${LEGAL.legalEmail}`}>{LEGAL.legalEmail}</a> · {LEGAL.addressLine}</p>
+    </article>
+  </main>
+
+  <AppFooter client:idle />
+</Layout>
+
+<script>
+  const form = document.getElementById("bot-optout-form") as HTMLFormElement | null;
+  const msg = document.getElementById("bo-msg");
+  const submit = document.getElementById("bo-submit") as HTMLButtonElement | null;
+  const show = (text: string, ok: boolean) => {
+    if (!msg) return;
+    msg.textContent = text;
+    msg.className = `rounded-lg px-3 py-2 text-sm ${ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`;
+  };
+  form?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const data = new FormData(form);
+    const domain = String(data.get("domain") || "").trim();
+    const email = String(data.get("email") || "").trim();
+    if (!domain && !email) return show("Indica tu dominio o tu correo.", false);
+    const cfToken = String(data.get("cf-turnstile-response") || "");
+    if (form.querySelector(".cf-turnstile") && !cfToken) return show("Completa la verificación de seguridad.", false);
+    if (submit) submit.disabled = true;
+    try {
+      const res = await fetch("/api/outreach/bot-optout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domain, email, cfToken }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.message || "No pudimos registrar la solicitud.");
+      show("Listo. No volveremos a visitar tu sitio ni a escribirte.", true);
+      form.reset();
+    } catch (err) {
+      show(err instanceof Error ? err.message : "No pudimos registrar la solicitud.", false);
+      (window as any).turnstile?.reset?.();
+    } finally {
+      if (submit) submit.disabled = false;
+    }
+  });
+</script>

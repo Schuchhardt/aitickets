@@ -5,12 +5,17 @@ import { getSessionContext, getOwnedEvent, hasRole, EVENT_MANAGER_ROLES, jsonRes
 import { sendTicketsEmail } from "../_lib/server-utils";
 
 const MAX_COURTESY_PER_REQUEST = 50;
+
+/** Columna inexistente (PostgREST/Postgres): la base todavía no tiene la migración 202609270100. */
+const isMissingColumnError = (error: any) => ["42703", "PGRST204"].includes(String(error?.code || ""));
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
  * Emite N entradas de cortesía de un tipo de entrada a un nombre + email.
  * Crea (o reutiliza) el attendee, una event_order pagada con monto 0 y N event_attendees
  * con is_complimentary=true, y envía las entradas por email (contrato C6).
+ * Las cortesías NO pasan por la reserva atómica (aitickets_reserve_order): a propósito pueden superar
+ * el stock (total_quantity), porque las decide el productor. Quedan con payment_provider='courtesy'.
  */
 export const POST: APIRoute = async (context) => {
     const session = await getSessionContext(context);
@@ -71,30 +76,35 @@ export const POST: APIRoute = async (context) => {
         }
 
         // 2. Orden pagada con monto 0
-        const { data: order, error: orderError } = await supabase
+        const orderRow = {
+            event_id: event.id,
+            attendee_id: attendeeId,
+            status: "paid",
+            amount: 0,
+            payment_fee: 0,
+            ticket_fee: 0,
+            total_payment: 0,
+            balance: 0,
+            ticket_qty: quantity,
+            // R2: destinatario de esta orden (attendees se comparte por email)
+            buyer_first_name: firstName,
+            buyer_last_name: lastName || null,
+            buyer_email: email,
+            // Mismo formato que purchase-tickets: { id, name, price, quantity, total }
+            ticket_details: [
+                { id: ticket.id, name: ticket.ticket_name, price: 0, quantity, total: 0, complimentary: true, issued_by: dbUser.id },
+            ],
+        };
+        let { data: order, error: orderError } = await supabase
             .from("event_orders")
-            .insert({
-                event_id: event.id,
-                attendee_id: attendeeId,
-                status: "paid",
-                amount: 0,
-                payment_fee: 0,
-                ticket_fee: 0,
-                total_payment: 0,
-                balance: 0,
-                ticket_qty: quantity,
-                // R2: destinatario de esta orden (attendees se comparte por email)
-                buyer_first_name: firstName,
-                buyer_last_name: lastName || null,
-                buyer_email: email,
-                // Mismo formato que purchase-tickets: { id, name, price, quantity, total }
-                ticket_details: [
-                    { id: ticket.id, name: ticket.ticket_name, price: 0, quantity, total: 0, complimentary: true, issued_by: dbUser.id },
-                ],
-            })
+            .insert({ ...orderRow, payment_provider: "courtesy", currency: "CLP" })
             .select("id")
             .single();
-        if (orderError) throw orderError;
+        if (orderError && isMissingColumnError(orderError)) {
+            // Base aún sin la migración de proveedores (deploy preview): insertar sin las columnas nuevas
+            ({ data: order, error: orderError } = await supabase.from("event_orders").insert(orderRow).select("id").single());
+        }
+        if (orderError || !order) throw orderError || new Error("No se pudo crear la orden de cortesía");
 
         // 3. N entradas con QR único
         const attendeesRows = Array.from({ length: quantity }, () => ({

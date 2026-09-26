@@ -22,6 +22,7 @@ const supabase = getSupabaseAdmin();
 let ticket: Record<string, any> | undefined = undefined;
 let event: Record<string, any> | undefined = undefined;
 let errorMessage: string | null = null;
+let voidMessage: string | null = null;
 
 const toChileTime = (value: string | null) =>
   value
@@ -108,9 +109,17 @@ if (!id || !UUID_RE.test(id)) {
       ticket_name: ticketType?.ticket_name || "Entrada General",
       attendee_name: `${attendee?.first_name || ""} ${attendee?.last_name || ""}`.trim(),
       attendee_email: attendee?.email || "",
-      qr_code: ticketData.qr_code || null,
+      // Entrada anulada (p. ej. orden reembolsada): no se muestra el QR
+      qr_code: ticketData.status === "cancelled" ? null : ticketData.qr_code || null,
       status: ticketData.status,
     };
+    if (ticketData.status === "cancelled") {
+      voidMessage = order?.status === "refunded"
+        ? "Esta entrada fue anulada porque la orden se reembolsó. Ya no sirve para ingresar al evento."
+        : "Esta entrada fue anulada y ya no sirve para ingresar al evento.";
+    } else if (order && order.status !== "paid" && order.status !== "processing") {
+      voidMessage = "Esta entrada todavía no está confirmada: su orden no figura como pagada.";
+    }
   }
 }
 ---
@@ -126,6 +135,11 @@ if (!id || !UUID_RE.test(id)) {
         </div>
       ) : (
         <>
+          {voidMessage && (
+            <div class="mt-12 mx-4 lg:mx-0 bg-amber-50 border border-amber-300 text-amber-800 px-4 py-3 rounded-lg font-[Prompt]">
+              {voidMessage}
+            </div>
+          )}
           <div class="mt-0 pt-8 lg:pt-12 px-4 lg:px-0">
             <TicketInfo ticket={ticket} event={event} client:only />
           </div>

@@ -17,6 +17,7 @@ type Tx = {
     total: number;
     qty: number;
     date: string;
+    provider: string;
 };
 type EventSummary = { id: number; name: string; endDate: string | null; qty: number; amount: number; ticketFee: number; paid: number };
 
@@ -25,6 +26,8 @@ let totalServiceFees = 0; // cargo por servicio pagado por los compradores
 let paidOut = 0;
 let balanceDue = 0;
 let transactions: Tx[] = [];
+let refundedCount = 0; // órdenes reembolsadas (no suman al saldo)
+let reviewCount = 0; // pagos en revisión manual (monto no coincide o sin stock)
 const summaries: EventSummary[] = [];
 
 const { data: orgEvents } = await supabaseAdmin
@@ -41,17 +44,30 @@ if (orgEvents && orgEvents.length > 0) {
     );
 
     // Solo órdenes pagadas. Paginado con .range(): PostgREST corta en 1000 filas y los totales quedarían incompletos.
+    // payment_provider existe desde la migración 202609270100; sin ella (deploy preview) se omite.
     const orders: any[] = [];
     const PAGE_SIZE = 1000;
+    let orderColumns = "id, event_id, amount, ticket_fee, payment_fee, total_payment, ticket_qty, created_at, payment_provider";
     for (let from = 0; ; from += PAGE_SIZE) {
-        const { data: page, error: pageError } = await supabaseAdmin
+        let { data: page, error: pageError }: { data: any[] | null; error: any } = await supabaseAdmin
             .from("event_orders")
-            .select("id, event_id, amount, ticket_fee, payment_fee, total_payment, ticket_qty, created_at")
+            .select(orderColumns)
             .in("event_id", eventIds)
             .eq("status", "paid")
             .order("created_at", { ascending: false })
             .order("id", { ascending: true })
             .range(from, from + PAGE_SIZE - 1);
+        if (pageError && from === 0 && orderColumns.includes("payment_provider")) {
+            orderColumns = "id, event_id, amount, ticket_fee, payment_fee, total_payment, ticket_qty, created_at";
+            ({ data: page, error: pageError } = await supabaseAdmin
+                .from("event_orders")
+                .select(orderColumns)
+                .in("event_id", eventIds)
+                .eq("status", "paid")
+                .order("created_at", { ascending: false })
+                .order("id", { ascending: true })
+                .range(from, from + PAGE_SIZE - 1));
+        }
         if (pageError) {
             console.error("Error cargando órdenes para finanzas:", pageError.message);
             break;
@@ -81,7 +97,16 @@ if (orgEvents && orgEvents.length > 0) {
         total: Number(o.total_payment) || 0,
         qty: o.ticket_qty || 0,
         date: new Date(o.created_at).toLocaleDateString("es-CL", { timeZone: "America/Santiago" }),
+        provider: providerLabel(o.payment_provider),
     }));
+
+    // Órdenes fuera del saldo que conviene mostrar: reembolsadas y en revisión
+    const [{ count: refunded }, { count: review }] = await Promise.all([
+        supabaseAdmin.from("event_orders").select("id", { count: "exact", head: true }).in("event_id", eventIds).eq("status", "refunded"),
+        supabaseAdmin.from("event_orders").select("id", { count: "exact", head: true }).in("event_id", eventIds).eq("status", "review"),
+    ]);
+    refundedCount = refunded || 0;
+    reviewCount = review || 0;
 
     // Transferencias ya realizadas al productor
     const { data: withdrawals } = await supabaseAdmin
@@ -107,6 +132,11 @@ const { data: payout } = await supabaseAdmin
     .eq("organization_id", dbUser.organization_id)
     .maybeSingle();
 const hasBankData = !!(payout?.bank_name && payout?.bank_account_number && payout?.bank_account_holder && payout?.bank_account_rut);
+
+const PROVIDER_LABELS: Record<string, string> = { flow: "Webpay", stripe: "Tarjeta internacional", free: "Gratis", courtesy: "Cortesía", demo: "Demo" };
+function providerLabel(p: string | null | undefined): string {
+    return p ? PROVIDER_LABELS[p] || p : "Webpay";
+}
 
 const formatCLP = (amount: number) => `$${Math.round(Number(amount) || 0).toLocaleString("es-CL")}`;
 const formatDate = (d: string | null) =>
@@ -193,6 +223,13 @@ const formatDate = (d: string | null) =>
             </div>
         )}
 
+        {(refundedCount > 0 || reviewCount > 0) && (
+            <div class="bg-amber-50 border border-amber-100 rounded-xl p-4 text-sm text-amber-900">
+                {refundedCount > 0 && <p>{refundedCount} orden(es) reembolsada(s): sus entradas fueron anuladas y no suman a tu saldo.</p>}
+                {reviewCount > 0 && <p>{reviewCount} pago(s) en revisión manual por nuestro equipo: se sumarán a tu saldo cuando se emitan las entradas.</p>}
+            </div>
+        )}
+
         <!-- Transactions Table -->
         {transactions.length > 0 ? (
             <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
@@ -212,6 +249,7 @@ const formatDate = (d: string | null) =>
                                 <th class="px-6 py-4">Cargo por servicio</th>
                                 <th class="px-6 py-4">Total pagado</th>
                                 <th class="px-6 py-4">Comisión pasarela</th>
+                                <th class="px-6 py-4">Medio de pago</th>
                                 <th class="px-6 py-4">Fecha</th>
                             </tr>
                         </thead>
@@ -224,6 +262,7 @@ const formatDate = (d: string | null) =>
                                     <td class="px-6 py-4">{formatCLP(t.ticketFee)}</td>
                                     <td class="px-6 py-4">{formatCLP(t.total)}</td>
                                     <td class="px-6 py-4 text-gray-400">{formatCLP(t.paymentFee)}</td>
+                                    <td class="px-6 py-4">{t.provider}</td>
                                     <td class="px-6 py-4">{t.date}</td>
                                 </tr>
                             ))}

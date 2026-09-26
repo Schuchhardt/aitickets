@@ -1,0 +1,53 @@
+---
+// Contacto del sitio del productor. El mensaje se guarda y se envía por correo al productor
+// (POST /api/sites/contact). Turnstile solo bajo aitickets.cl (su lista de hostnames no incluye
+// los dominios propios); en dominios propios quedan el honeypot, el tiempo mínimo y el límite por IP.
+import SiteLayout from "../../../layouts/SiteLayout.astro";
+import SiteMetaTags from "../../../components/sites/SiteMetaTags.astro";
+import SiteHeader from "../../../components/sites/SiteHeader.vue";
+import SiteFooter from "../../../components/sites/SiteFooter.vue";
+import ContactForm from "../../../components/sites/ContactForm.vue";
+import { getSiteEvents, isUnderRootDomain, publicSiteProps, siteUrl } from "../../../lib/sites";
+import { loadSiteForPage } from "../_site";
+
+export const prerender = false;
+
+const loaded = await loadSiteForPage(Astro);
+if (!loaded || !loaded.site.contact_form_enabled) {
+  return new Response(null, { status: 404 });
+}
+const { site, preview, base, template } = loaded;
+const props = publicSiteProps(site, template);
+
+const effectiveHost = Astro.locals.effectiveHost || Astro.url.host;
+const turnstileSiteKey =
+  isUnderRootDomain(effectiveHost) && import.meta.env.TURNSTILE_SECRET_KEY ? import.meta.env.TURNSTILE_SITE_KEY || "" : "";
+
+const events = await getSiteEvents(site, 1);
+const noindex = preview || !!site.is_demo || events.length === 0;
+---
+<SiteLayout theme={props.theme} preview={preview} favicon={props.theme.logo_url}>
+  <SiteMetaTags
+    slot="head"
+    title={`Contacto – ${props.name}`}
+    description={`Escríbele a ${props.name}: consultas, prensa y colaboraciones.`}
+    canonicalUrl={siteUrl(site, "/contacto")}
+    siteName={props.name}
+    imageUrl={props.theme.hero_image_url || null}
+    noindex={noindex}
+  />
+  {turnstileSiteKey && (
+    <script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
+  )}
+  <div class="site-font min-h-screen bg-[var(--site-bg)] text-[var(--site-text)]">
+    <SiteHeader site={props} base={base} variant="light" />
+    <main class="max-w-2xl mx-auto px-5 lg:px-8 pt-12">
+      <h1 class="text-3xl sm:text-4xl font-bold">Contacto</h1>
+      <p class="mt-3 opacity-75">Escríbele a {props.name}. Te responderán directamente a tu correo.</p>
+      <div class="mt-8">
+        <ContactForm client:load siteSlug={site.slug} turnstileSiteKey={turnstileSiteKey} isDemo={!!site.is_demo} />
+      </div>
+    </main>
+    <SiteFooter site={props} base={base} />
+  </div>
+</SiteLayout>

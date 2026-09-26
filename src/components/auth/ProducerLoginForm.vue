@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { Eye, EyeOff } from 'lucide-vue-next'
 
 const email = ref('')
@@ -7,6 +7,40 @@ const password = ref('')
 const loading = ref(false)
 const errorMsg = ref('')
 const showPassword = ref(false)
+// Correo sin confirmar: el login responde code 'email_not_verified' y se ofrece reenviar el enlace
+const needsVerification = ref(false)
+const resendLoading = ref(false)
+const resendMsg = ref('')
+const infoMsg = ref('')
+
+onMounted(() => {
+  try {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('verificado') === '1') infoMsg.value = '¡Correo confirmado! Ya puedes iniciar sesión.'
+  } catch (e) { /* sin URL */ }
+})
+
+const resendVerification = async () => {
+  if (!email.value) {
+    resendMsg.value = 'Ingresa tu correo para reenviar el enlace.'
+    return
+  }
+  try {
+    resendLoading.value = true
+    resendMsg.value = ''
+    const response = await fetch('/api/auth/resend-verification', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.value.trim() }),
+    })
+    const data = await response.json().catch(() => ({}))
+    resendMsg.value = data.message || (response.ok ? 'Listo. Revisa tu correo.' : 'No pudimos reenviar el enlace. Intenta más tarde.')
+  } catch (e) {
+    resendMsg.value = 'No pudimos reenviar el enlace. Revisa tu conexión e intenta de nuevo.'
+  } finally {
+    resendLoading.value = false
+  }
+}
 
 const togglePassword = () => {
   showPassword.value = !showPassword.value
@@ -16,6 +50,8 @@ const handleLogin = async () => {
   try {
     loading.value = true
     errorMsg.value = ''
+    needsVerification.value = false
+    resendMsg.value = ''
    
     const response = await fetch('/api/auth/login', {
       method: 'POST',
@@ -31,6 +67,7 @@ const handleLogin = async () => {
     const data = await response.json()
 
     if (!response.ok) {
+      if (data.code === 'email_not_verified') needsVerification.value = true
       throw new Error(data.message || 'Error al iniciar sesión')
     }
 
@@ -79,7 +116,24 @@ const handleLogin = async () => {
         </div>
       </div>
       
-      <div v-if="errorMsg" class="p-3 bg-red-500/20 text-red-200 text-sm rounded-lg border border-red-400/30 flex items-center gap-2">
+      <div v-if="infoMsg && !errorMsg" class="p-3 bg-lime-400/15 text-lime-100 text-sm rounded-lg border border-lime-300/30" data-testid="login-info">
+        {{ infoMsg }}
+      </div>
+
+      <div v-if="needsVerification" class="p-3 bg-amber-400/15 text-amber-100 text-sm rounded-lg border border-amber-300/30 space-y-2" data-testid="login-needs-verification">
+        <p>{{ errorMsg }}</p>
+        <button
+          type="button"
+          @click="resendVerification"
+          :disabled="resendLoading"
+          class="font-medium underline hover:text-white disabled:opacity-60"
+          data-testid="login-resend-verification"
+        >
+          {{ resendLoading ? 'Enviando...' : 'Reenviar el correo de confirmación' }}
+        </button>
+        <p v-if="resendMsg" class="text-amber-50/90">{{ resendMsg }}</p>
+      </div>
+      <div v-else-if="errorMsg" class="p-3 bg-red-500/20 text-red-200 text-sm rounded-lg border border-red-400/30 flex items-center gap-2">
         <span class="font-bold">Error:</span> {{ errorMsg }}
       </div>
       
