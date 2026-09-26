@@ -26,6 +26,22 @@ onMounted(() => {
 
 <template>
   <div class="max-w-6xl mx-auto px-6 lg:px-12 py-8 relative">
+    <!-- Aviso de evento de demostración -->
+    <div
+      v-if="event.is_demo"
+      class="mb-6 rounded-xl border border-purple-200 bg-purple-50 px-4 py-3 text-sm text-purple-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
+      role="note"
+    >
+      <p>
+        <strong>Evento de demostración.</strong>
+        Puedes recorrer todo el flujo de compra, pero no se venden entradas reales ni se cobra nada.
+      </p>
+      <a
+        href="/organizadores/registro?utm_source=aitickets&utm_medium=demo_event&utm_campaign=banner"
+        class="shrink-0 font-semibold underline hover:no-underline"
+      >Crea tu evento gratis →</a>
+    </div>
+
     <!-- Header -->
     <EventHeader :event="event" />
 

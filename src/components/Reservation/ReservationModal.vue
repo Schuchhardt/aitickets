@@ -148,6 +148,9 @@ function handleRemoteGoToNextStep() {
       @click.stop
     >
       <HeaderSteps :eventName="event.name" :currentStep="currentStep" @close="handleClose" />
+      <p v-if="event.is_demo" class="bg-purple-50 text-purple-900 text-xs sm:text-sm text-center px-4 py-2 border-b border-purple-100">
+        Modo demostración: el flujo es real, pero al final no se crea ninguna orden ni se cobra nada.
+      </p>
 
       <div class="flex-1 overflow-y-auto">
         <div v-if="currentStep === 1 || currentStep === 2" class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 p-2 w-full md:min-w-[732px] md:max-w-[800px] mx-auto">

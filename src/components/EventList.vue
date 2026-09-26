@@ -32,6 +32,12 @@ const eventList = computed(() => props.events || []);
         >
           Vende tus entradas con AI Tickets
         </a>
+        <a
+          href="/eventos/evento-demo-aitickets?utm_source=aitickets&utm_medium=eventos_empty&utm_campaign=demo"
+          class="block mt-3 text-sm text-gray-700 underline underline-offset-4 hover:text-black"
+        >
+          Ver un evento de demostración
+        </a>
       </div>
     </div>
 
