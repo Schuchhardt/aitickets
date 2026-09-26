@@ -15,6 +15,7 @@ import {
 } from "../../utils/dateHelpers.js";
 
 import { descriptionToHtml } from "../../lib/sanitize";
+import { isDemoEventSlug, getDemoEventDate } from "../../lib/demoEvent.mjs";
 import Layout from '../../layouts/Layout.astro';
 import "../../styles/global.css";
 
@@ -45,6 +46,12 @@ if (!event) {
 }
 
 const isPrivate = !!event.accessibility && event.accessibility !== "public";
+// Evento demo: fecha dinámica (último día del mes), sin indexar y sin venta real
+const isDemo = isDemoEventSlug(event.slug);
+if (isDemo) {
+  event.start_date = null;
+  event.end_date = null;
+}
 
 // ---------------------------------------------------------------------------
 // Tracking de visita (server-side, no bloqueante). Solo se guarda el hash de la IP.
@@ -265,7 +272,8 @@ const buildVenue = (loc: any) => {
 
 const THREE_HOURS = 3 * 60 * 60 * 1000;
 
-let dates = (datesRes.data || []).map((d: any) => {
+const demoDate = isDemo ? getDemoEventDate(now) : null;
+let dates = (datesRes.data || []).map((d: any) => (demoDate ? { ...d, date: demoDate } : d)).map((d: any) => {
   const venue = buildVenue(pickOne(d.event_locations));
   const tz = venue?.timezone || DEFAULT_EVENT_TIMEZONE;
   const start = zonedDateTimeToDate(d.date, d.start_time, tz);
@@ -344,6 +352,7 @@ const eventData = {
   has_secret_location: hasSecretLocation,
   organization,
   venue: primaryVenue,
+  is_demo: isDemo,
 };
 
 // ---------------------------------------------------------------------------
@@ -397,7 +406,7 @@ const pageTitle = truncate(`${event.name}${city ? ` en ${city}` : ""} – Entrad
     title={pageTitle}
     description={metaDescription}
     canonicalPath={canonicalPath}
-    noindex={isPrivate}
+    noindex={isPrivate || isDemo}
   />
   <script is:inline>
     // Atribución (C10): guardar ?ref= y utm_* para enviarlos con la compra

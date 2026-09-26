@@ -11,6 +11,9 @@ const props = defineProps({
 
 const isLoading = ref(false);
 const errorMessage = ref("");
+// Evento demo: se muestra todo el flujo, pero no se llama a la API de compra ni a Flow
+const isDemo = computed(() => Boolean(props.event?.is_demo));
+const demoCompleted = ref(false);
 
 // ==== Cloudflare Turnstile (antiabuso). Sin site key configurada (desarrollo) no se exige. ====
 const turnstileEl = ref(null);
@@ -50,6 +53,7 @@ const resetTurnstile = () => {
 };
 
 onMounted(async () => {
+  if (isDemo.value) return; // sin captcha en la demo: no hay compra real
   let key = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY || "";
   if (!key) {
     // La site key es pública: el servidor la entrega si no se inyectó en el build
@@ -114,6 +118,10 @@ const rememberFreeOrder = (orderId) => {
 
 const handlePayment = async () => {
   if (isLoading.value) return;
+  if (isDemo.value) {
+    demoCompleted.value = true;
+    return;
+  }
   if (turnstileSiteKey.value && !turnstileToken.value) {
     errorMessage.value = "Completa la verificación de seguridad para continuar.";
     return;
@@ -172,7 +180,23 @@ const handlePayment = async () => {
 </script>
 
 <template>
-  <div class="font-[Prompt] max-w-xl mx-auto">
+  <div v-if="isDemo && demoCompleted" class="font-[Prompt] max-w-xl mx-auto text-center">
+    <div class="text-4xl mb-2" aria-hidden="true">🎟️</div>
+    <h3 class="text-lg font-semibold mb-2">Así terminaría la compra</h3>
+    <ol class="text-left text-sm text-gray-700 space-y-3 border rounded-lg p-4 mb-4">
+      <li><strong>1. Pago seguro:</strong> te llevaríamos a Webpay (vía Flow) para pagar {{ formatCLP(totals.total) }}.</li>
+      <li><strong>2. Entradas por email:</strong> al confirmarse el pago, {{ buyerInfo.email || "el comprador" }} recibiría sus entradas con código QR y un recordatorio 24 h antes.</li>
+      <li><strong>3. Check-in en la puerta:</strong> el equipo del productor escanea el QR desde el celular, incluso si se cae la señal.</li>
+      <li><strong>4. Para el productor:</strong> ve la venta al instante en su panel, con el canal que la trajo, y recibe lo recaudado 48–72 h después de la función.</li>
+    </ol>
+    <p class="text-xs text-gray-500 mb-4">Esto es una demostración: no se creó ninguna orden ni se realizó ningún cobro.</p>
+    <a
+      href="/organizadores/registro?utm_source=aitickets&utm_medium=demo_event&utm_campaign=checkout"
+      class="inline-block bg-black text-white px-6 py-3 rounded-md w-full"
+    >Quiero vender entradas así</a>
+    <button type="button" class="mt-3 text-sm underline text-gray-600" @click="demoCompleted = false">Volver al resumen</button>
+  </div>
+  <div v-else class="font-[Prompt] max-w-xl mx-auto">
     <h3 class="text-lg font-semibold mb-1 text-center">{{ totals.total > 0 ? "Revisa y paga" : "Confirma tu registro" }}</h3>
     <p class="text-gray-600 text-sm mb-4 text-center">Revisa tu pedido antes de continuar.</p>
 
@@ -221,8 +245,9 @@ const handlePayment = async () => {
       :disabled="isLoading || !selectedTicketList.length || needsCaptcha"
       class="bg-black text-white px-6 py-3 rounded-md w-full cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
     >
-      {{ isLoading ? "Procesando..." : totals.total > 0 ? `Ir a pagar ${formatCLP(totals.total)}` : "Finalizar registro" }}
+      {{ isLoading ? "Procesando..." : isDemo ? `Simular pago de ${formatCLP(totals.total)}` : totals.total > 0 ? `Ir a pagar ${formatCLP(totals.total)}` : "Finalizar registro" }}
     </button>
-    <p v-if="totals.total > 0" class="text-xs text-gray-500 text-center mt-2">Serás redirigido a Flow para pagar de forma segura.</p>
+    <p v-if="isDemo" class="text-xs text-purple-700 text-center mt-2">Demo: no se realizará ningún cobro.</p>
+    <p v-else-if="totals.total > 0" class="text-xs text-gray-500 text-center mt-2">Serás redirigido a Flow para pagar de forma segura.</p>
   </div>
 </template>

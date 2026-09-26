@@ -21,6 +21,7 @@ import {
   PENDING_HOLD_MINUTES,
 } from '../../lib/tickets.mjs'
 import { sendOrderTicketsEmail } from '../../lib/tickets-email.mjs'
+import { isDemoEventSlug } from '../../../src/lib/demoEvent.mjs'
 
 const MAX_TICKET_LINES = 20
 const MAX_PENDING_PER_BUYER = 2
@@ -179,6 +180,7 @@ export default async function handler(req) {
       .maybeSingle()
     if (eventError) throw new Error(`Error cargando evento: ${eventError.message}`)
     if (!event) return json({ message: 'El evento no está disponible para la venta' }, 404)
+    if (isDemoEventSlug(event.slug)) return json({ message: 'Este es un evento de demostración: no se venden entradas.' }, 403)
     if (!(await isEventStillOn(supabase, event))) return json({ message: 'Este evento ya finalizó' }, 409)
 
     // 2. Tipos de entrada: deben pertenecer al evento y estar a la venta (C2)

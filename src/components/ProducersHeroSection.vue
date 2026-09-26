@@ -45,6 +45,9 @@ import GradientBackground from './Hero/GradientBackground.vue';
                 <a href="https://wa.me/56982347140?text=Hola%2C%20quiero%20vender%20entradas%20con%20AI%20Tickets" target="_blank" rel="noopener noreferrer" class="px-6 py-3 text-lg font-[Prompt] text-white/90 underline underline-offset-4 hover:text-lime-400 transition w-full sm:w-auto">
                   Hablar por WhatsApp
                 </a>
+                <a href="/eventos/evento-demo-aitickets?utm_source=aitickets&utm_medium=organizadores&utm_campaign=demo" class="px-6 py-3 text-lg font-[Prompt] text-white/90 underline underline-offset-4 hover:text-lime-400 transition w-full sm:w-auto">
+                  Ver evento demo
+                </a>
               </div>
             </FadeInSection>
   
