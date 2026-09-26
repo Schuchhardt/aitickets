@@ -83,7 +83,9 @@ export function formatInstantTime(value) {
 export function formatEventLocation(loc) {
   if (!loc) return ''
   const venue = loc.venues || {}
-  const name = loc.display_name || loc.name || venue.name || ''
+  // event_locations.name = 'Main' es un nombre interno que pone el dashboard: mostrar el del recinto
+  const internalName = loc.name && loc.name !== 'Main' ? loc.name : ''
+  const name = loc.display_name || venue.name || internalName || ''
   const address = loc.address_line1_override || venue.address_line1 || ''
   const city = loc.city_override || venue.city || ''
   return [name, address, city].filter(Boolean).filter((v, i, arr) => arr.indexOf(v) === i).join(', ')

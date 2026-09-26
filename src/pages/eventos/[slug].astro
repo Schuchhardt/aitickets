@@ -250,7 +250,9 @@ const pickOne = (v: any) => (Array.isArray(v) ? v[0] : v) || null;
 const buildVenue = (loc: any) => {
   if (!loc) return null;
   const venue = pickOne(loc.venues);
-  const name = loc.display_name || loc.name || venue?.name || null;
+  // event_locations.name = 'Main' es un nombre interno que pone el dashboard: mostrar el del recinto
+  const internalName = loc.name && loc.name !== "Main" ? loc.name : null;
+  const name = loc.display_name || venue?.name || internalName || null;
   const address = [loc.address_line1_override || venue?.address_line1, loc.address_line2_override || venue?.address_line2]
     .filter(Boolean)
     .join(", ");
