@@ -1,4 +1,5 @@
 import type { APIRoute } from "astro";
+import Anthropic from "@anthropic-ai/sdk";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { getSessionContext, hasRole, EVENT_MANAGER_ROLES } from "../../../lib/supabaseServer";
 
@@ -20,9 +21,14 @@ export const POST: APIRoute = async (context) => {
             return new Response(JSON.stringify({ message: "Faltan datos requeridos" }), { status: 400 });
         }
 
-        const openaiKey = import.meta.env.OPENAI_API_KEY;
-        if (!openaiKey) {
-            return new Response(JSON.stringify({ message: "OpenAI API no configurada" }), { status: 500 });
+        if (type === "image") {
+            // Claude no genera imágenes; el botón está oculto en el dashboard.
+            return new Response(JSON.stringify({ message: "La generación de imágenes con IA no está disponible. Sube una imagen propia." }), { status: 501, headers: { "Content-Type": "application/json" } });
+        }
+
+        const anthropicKey = process.env.ANTHROPIC_API_KEY ?? import.meta.env.ANTHROPIC_API_KEY;
+        if (!anthropicKey) {
+            return new Response(JSON.stringify({ message: "IA no configurada" }), { status: 500 });
         }
 
         const supabaseAdmin = getSupabaseAdmin();
@@ -55,16 +61,8 @@ export const POST: APIRoute = async (context) => {
         const eventContext = buildEventContext(event);
 
         if (type === "text") {
-            const content = await generateText(openaiKey, eventContext, tone);
+            const content = await generateText(anthropicKey, eventContext, tone);
             return new Response(JSON.stringify({ content }), {
-                status: 200,
-                headers: { "Content-Type": "application/json" },
-            });
-        }
-
-        if (type === "image") {
-            const imageUrl = await generateImage(openaiKey, eventContext);
-            return new Response(JSON.stringify({ imageUrl }), {
                 status: 200,
                 headers: { "Content-Type": "application/json" },
             });
@@ -101,58 +99,29 @@ Entradas: ${tickets}
 
 async function generateText(apiKey: string, eventContext: string, tone?: string): Promise<string> {
     const toneInstruction = tone ? `El tono debe ser ${tone}.` : "El tono debe ser atractivo y llamativo.";
+    const client = new Anthropic({ apiKey });
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-            "Authorization": `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-            model: "gpt-4o-mini",
-            messages: [
-                {
-                    role: "system",
-                    content: `Eres un experto en marketing de eventos y redes sociales. Genera posts promocionales en español para Instagram y Facebook. ${toneInstruction} Incluye emojis relevantes. No uses hashtags excesivos (máximo 5). El post debe ser conciso pero impactante. No incluyas URLs.`
-                },
-                {
-                    role: "user",
-                    content: `Genera un post promocional para redes sociales basado en este evento:\n\n${eventContext}`
-                }
-            ],
-            max_tokens: 500,
-            temperature: 0.8,
-        }),
+    const response = await client.beta.messages.create({
+        model: (process.env.ANTHROPIC_MODEL ?? import.meta.env.ANTHROPIC_MODEL) || "claude-opus-5",
+        max_tokens: 4000,
+        output_config: { effort: "low" },
+        betas: ["server-side-fallback-2026-07-01"],
+        fallbacks: "default",
+        system: `Eres un experto en marketing de eventos y redes sociales. Genera posts promocionales en español de Chile para Instagram y Facebook. ${toneInstruction} Incluye emojis relevantes. Usa como máximo 5 hashtags. El post debe ser conciso pero impactante. No incluyas URLs. Responde solo con el texto del post, sin introducción ni comentarios.`,
+        messages: [
+            {
+                role: "user",
+                content: `Genera un post promocional para redes sociales basado en este evento:\n\n${eventContext}`,
+            },
+        ],
     });
 
-    if (!response.ok) {
-        throw new Error("Error al generar texto con OpenAI");
+    if (response.stop_reason === "refusal") {
+        throw new Error("La IA rechazó generar este contenido");
     }
-
-    const data = await response.json();
-    return data.choices[0]?.message?.content || "";
-}
-
-async function generateImage(apiKey: string, eventContext: string): Promise<string> {
-    const response = await fetch("https://api.openai.com/v1/images/generations", {
-        method: "POST",
-        headers: {
-            "Authorization": `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-            model: "dall-e-3",
-            prompt: `Create a visually striking social media promotional image for this event. The image should be vibrant, modern, and eye-catching. NO TEXT in the image. Abstract or thematic representation only.\n\nEvent details: ${eventContext}`,
-            n: 1,
-            size: "1024x1024",
-            quality: "standard",
-        }),
-    });
-
-    if (!response.ok) {
-        throw new Error("Error al generar imagen con OpenAI");
-    }
-
-    const data = await response.json();
-    return data.data[0]?.url || "";
+    return response.content
+        .filter((block): block is Anthropic.Beta.BetaTextBlock => block.type === "text")
+        .map((block) => block.text)
+        .join("")
+        .trim();
 }

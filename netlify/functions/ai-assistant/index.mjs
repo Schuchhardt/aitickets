@@ -3,13 +3,13 @@
 // Body: { eventId, messages: [{ role: 'user'|'assistant', text }] }
 // El contexto del evento se arma EN EL SERVIDOR desde la BD (solo eventos publicados, columnas
 // explícitas, nunca secret_location); el cliente no puede inyectar instrucciones de sistema.
-import OpenAI from 'openai'
+import Anthropic from '@anthropic-ai/sdk'
 import { getSupabaseAdmin, json } from '../../lib/supabase.mjs'
 import { isValidEmail } from '../../lib/mailer.mjs'
 import { TICKET_COLUMNS, isTicketOnSale, maxPerPurchase, getSoldCounts } from '../../lib/tickets.mjs'
 import { EVENT_DATE_COLUMNS, todayInTimeZone, formatDateOnlyLong, formatTimeShort, formatEventLocation } from '../../lib/dates.mjs'
 
-const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini'
+const MODEL = process.env.ANTHROPIC_MODEL || 'claude-opus-5'
 const MAX_HISTORY = 10
 const MAX_MESSAGE_LENGTH = 1000
 
@@ -34,38 +34,32 @@ function takeToken(ip) {
 
 const TOOLS = [
   {
-    type: 'function',
-    function: {
-      name: 'fill_buyer_information',
-      description: 'Prellena el formulario de compra con los datos del comprador y la entrada elegida. Úsala solo cuando el usuario ya entregó nombre, apellido y correo.',
-      parameters: {
-        type: 'object',
-        properties: {
-          first_name: { type: 'string', description: 'Nombre del comprador.' },
-          last_name: { type: 'string', description: 'Apellido del comprador.' },
-          email: { type: 'string', description: 'Correo electrónico del comprador.' },
-          phone: { type: 'string', description: 'Teléfono del comprador (opcional).' },
-          ticket_type_id: { type: 'integer', description: 'ID del tipo de entrada seleccionada (de la lista de entradas a la venta).' },
-          quantity: { type: 'integer', description: 'Cantidad de entradas.' },
+    name: 'fill_buyer_information',
+    description: 'Prellena el formulario de compra con los datos del comprador y la entrada elegida. Úsala solo cuando el usuario ya entregó nombre, apellido y correo.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        first_name: { type: 'string', description: 'Nombre del comprador.' },
+        last_name: { type: 'string', description: 'Apellido del comprador.' },
+        email: { type: 'string', description: 'Correo electrónico del comprador.' },
+        phone: { type: 'string', description: 'Teléfono del comprador (opcional).' },
+        ticket_type_id: { type: 'integer', description: 'ID del tipo de entrada seleccionada (de la lista de entradas a la venta).' },
+        quantity: { type: 'integer', description: 'Cantidad de entradas.' },
         },
-        required: ['first_name', 'last_name', 'email'],
-      },
+      required: ['first_name', 'last_name', 'email'],
     },
   },
   {
-    type: 'function',
-    function: {
-      name: 'send_message_to_producer',
-      description: 'Envía una pregunta del usuario a la productora del evento cuando la respuesta no está en la información disponible. Requiere nombre y correo del usuario.',
-      parameters: {
-        type: 'object',
-        properties: {
-          message: { type: 'string', description: 'Pregunta o mensaje del usuario.' },
-          user_name: { type: 'string', description: 'Nombre del usuario.' },
-          user_email: { type: 'string', description: 'Correo del usuario.' },
+    name: 'send_message_to_producer',
+    description: 'Envía una pregunta del usuario a la productora del evento cuando la respuesta no está en la información disponible. Requiere nombre y correo del usuario.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', description: 'Pregunta o mensaje del usuario.' },
+        user_name: { type: 'string', description: 'Nombre del usuario.' },
+        user_email: { type: 'string', description: 'Correo del usuario.' },
         },
-        required: ['message', 'user_name', 'user_email'],
-      },
+      required: ['message', 'user_name', 'user_email'],
     },
   },
 ]
@@ -148,6 +142,8 @@ function sanitizeHistory(messages) {
     .filter(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.text === 'string' && m.text.trim())
     .slice(-MAX_HISTORY)
     .map(m => ({ role: m.role, content: m.text.trim().slice(0, m.role === 'user' ? MAX_MESSAGE_LENGTH : 2000) }))
+    // La API de Anthropic exige que el primer mensaje sea del usuario (ej: saludo inicial del widget)
+    .filter((m, i, all) => all.slice(0, i + 1).some(x => x.role === 'user'))
 }
 
 export default async function handler(req, context) {
@@ -176,8 +172,8 @@ export default async function handler(req, context) {
   const history = sanitizeHistory(body.messages)
   if (!history.some(m => m.role === 'user')) return json({ message: 'No se enviaron mensajes válidos.' }, 400)
 
-  if (!process.env.OPENAI_API_KEY) {
-    console.error('Falta OPENAI_API_KEY')
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.error('Falta ANTHROPIC_API_KEY')
     return json({ message: 'El asistente no está disponible en este momento.' }, 503)
   }
 
@@ -186,27 +182,35 @@ export default async function handler(req, context) {
     const eventContext = await loadEventContext(supabase, eventId)
     if (!eventContext) return json({ message: 'Evento no encontrado' }, 404)
 
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-    const messages = [{ role: 'system', content: buildSystemPrompt(eventContext) }, ...history]
+    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 45_000, maxRetries: 1 })
+    const system = buildSystemPrompt(eventContext)
+    const messages = [...history]
 
-    const response = await openai.chat.completions.create({
+    // Chat corto de preguntas y respuestas: esfuerzo bajo para mantener la latencia.
+    // fallbacks "default": si el modelo rechaza por política, la API reintenta con el modelo recomendado.
+    const request = {
       model: MODEL,
-      messages,
-      temperature: 0.4,
-      max_tokens: 600,
+      max_tokens: 4000,
+      system,
       tools: TOOLS,
-      tool_choice: 'auto',
-    })
-    const choice = response.choices?.[0]
-    const toolCalls = choice?.message?.tool_calls || []
+      output_config: { effort: 'low' },
+      betas: ['server-side-fallback-2026-07-01'],
+      fallbacks: 'default',
+    }
+    const textOf = (message) => message.content.filter(b => b.type === 'text').map(b => b.text).join('').trim()
 
-    if (toolCalls.length) {
-      const toolResponses = []
-      for (const toolCall of toolCalls) {
-        let args = {}
-        try { args = JSON.parse(toolCall.function.arguments || '{}') } catch { args = {} }
+    const response = await anthropic.beta.messages.create({ ...request, messages })
+    if (response.stop_reason === 'refusal') {
+      return json({ message: 'No puedo ayudarte con eso. ¿Tienes alguna pregunta sobre el evento?' }, 200)
+    }
 
-        if (toolCall.function.name === 'fill_buyer_information') {
+    const toolUses = response.content.filter(b => b.type === 'tool_use')
+    if (response.stop_reason === 'tool_use' && toolUses.length) {
+      const toolResults = []
+      for (const toolUse of toolUses) {
+        const args = toolUse.input || {}
+
+        if (toolUse.name === 'fill_buyer_information') {
           const ticket = eventContext.tickets.find(t => t.id === Number(args.ticket_type_id) && !t.soldOut)
           const quantity = ticket ? Math.min(Math.max(Number.parseInt(args.quantity, 10) || 1, 1), ticket.max) : undefined
           return json({
@@ -225,40 +229,45 @@ export default async function handler(req, context) {
           }, 200)
         }
 
-        if (toolCall.function.name === 'send_message_to_producer') {
+        if (toolUse.name === 'send_message_to_producer') {
           const question = String(args.message || '').trim().slice(0, 2000)
           const userName = String(args.user_name || '').trim().slice(0, 100)
           const userEmail = String(args.user_email || '').trim().toLowerCase()
           let result
+          let isError = false
           if (!question || !userName || !isValidEmail(userEmail)) {
             result = 'Faltan datos: se necesita la pregunta, el nombre y un correo válido.'
+            isError = true
           } else {
             const { error } = await supabase
               .from('questions')
               .insert([{ event_id: eventId, question, user_name: userName, user_email: userEmail }])
             result = error ? 'No se pudo enviar la pregunta. Pide al usuario intentarlo más tarde.' : 'La pregunta fue enviada a la productora.'
+            isError = Boolean(error)
             if (error) console.error('Error guardando pregunta:', error.message)
           }
-          toolResponses.push({ role: 'tool', tool_call_id: toolCall.id, content: result })
+          toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: result, is_error: isError })
         } else {
-          toolResponses.push({ role: 'tool', tool_call_id: toolCall.id, content: 'Función no disponible.' })
+          toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: 'Función no disponible.', is_error: true })
         }
       }
 
-      const second = await openai.chat.completions.create({
-        model: MODEL,
-        messages: [...messages, choice.message, ...toolResponses],
-        temperature: 0.4,
-        max_tokens: 400,
+      // Devolver el turno del asistente completo (incluye bloques de thinking) y todos los resultados juntos
+      const second = await anthropic.beta.messages.create({
+        ...request,
+        messages: [...messages, { role: 'assistant', content: response.content }, { role: 'user', content: toolResults }],
       })
-      const finalContent = second.choices?.[0]?.message?.content?.trim()
+      const finalContent = second.stop_reason === 'refusal' ? '' : textOf(second)
       return json({ message: finalContent || '✅ Tu pregunta fue enviada a la productora.' }, 200)
     }
 
-    const content = choice?.message?.content?.trim()
+    const content = textOf(response)
     return json({ message: content || 'No pude generar una respuesta. ¿Puedes reformular tu pregunta?' }, 200)
   } catch (error) {
-    console.error('Error en ai-assistant:', error?.message)
+    if (error instanceof Anthropic.RateLimitError) {
+      return json({ message: 'El asistente está recibiendo muchas consultas. Inténtalo en un momento. 🙏' }, 429)
+    }
+    console.error('Error en ai-assistant:', error?.status, error?.message)
     return json({ message: 'Lo siento, hubo un error. Inténtalo de nuevo más tarde.' }, 500)
   }
 }
