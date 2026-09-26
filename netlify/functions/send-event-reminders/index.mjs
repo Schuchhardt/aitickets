@@ -7,7 +7,8 @@
 //   recordado quien tenga un 'reminder_24h' de ese evento en las últimas 20 horas.
 // - CTA a /order/<order_id> de cada asistente cuando existe (vía recipient-variables de Mailgun).
 import { getSupabaseAdmin, escapeHtml, fetchAllRows } from '../../lib/supabase.mjs'
-import { getMailgun, MAIL_DOMAIN, MAIL_FROM, SITE_URL, formatRecipient, isValidEmail } from '../../lib/mailer.mjs'
+import { getMailgun, MAIL_DOMAIN, MAIL_FROM, SITE_URL, formatRecipient, isValidEmail, legalFooterHtml } from '../../lib/mailer.mjs'
+import { LEGAL } from '../../lib/legal.mjs'
 import { EVENT_DATE_COLUMNS, todayInTimeZone, addDays, formatDateOnlyLong, formatTimeShort, formatEventLocation } from '../../lib/dates.mjs'
 
 const REMINDER_TYPE = 'reminder_24h'
@@ -45,7 +46,7 @@ function buildReminderHtml(eventName, eventDate, startTime, venue) {
       <div style="text-align:center;">
         <a href="%recipient.order_url%" style="display:inline-block;padding:12px 24px;background:#111;color:white;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Ver mis entradas</a>
       </div>
-      <p style="color:#9ca3af;font-size:12px;text-align:center;margin-top:32px;">Recibiste este email porque tienes entradas para este evento.</p>
+      ${legalFooterHtml({ reason: 'Recibiste este correo porque tienes entradas para este evento. El evento es organizado por su productora.' })}
     </div>
   </div>
 </body>
@@ -172,6 +173,7 @@ export default async function handler() {
               to: toList,
               subject,
               html,
+              'h:Reply-To': LEGAL.supportEmail,
               'recipient-variables': JSON.stringify(recipientVars),
             })
             sent.push(...batch)

@@ -1,0 +1,51 @@
+---
+// Confirmación de baja del outreach. El GET nunca da de baja (los escáneres de enlaces hacen GET):
+// muestra un botón que hace POST a /api/outreach/unsubscribe.
+import Layout from "../../layouts/Layout.astro";
+import { LEGAL } from "../../lib/legal";
+import "../../styles/global.css";
+
+export const prerender = false;
+
+const t = Astro.url.searchParams.get("t") || "";
+const done = Astro.url.searchParams.get("listo") === "1";
+const failed = Astro.url.searchParams.get("error") === "1";
+Astro.response.headers.set("Cache-Control", "no-store");
+---
+
+<Layout title="Darse de baja | AI Tickets" description="Deja de recibir correos comerciales de AI Tickets." noindex>
+  <main class="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-16">
+    <div class="w-full max-w-md bg-white border border-gray-200 rounded-2xl p-8 text-center shadow-sm">
+      <a href="/" class="inline-block mb-6 text-lg font-bold text-gray-900">AI Tickets</a>
+      {done ? (
+        <>
+          <h1 class="text-2xl font-bold text-gray-900 mb-3">Listo, te dimos de baja</h1>
+          <p class="text-gray-600">No volverás a recibir correos comerciales de {LEGAL.brand}. Si fue un error, escríbenos a <a class="underline" href={`mailto:${LEGAL.supportEmail}`}>{LEGAL.supportEmail}</a>.</p>
+        </>
+      ) : failed ? (
+        <>
+          <h1 class="text-2xl font-bold text-gray-900 mb-3">No pudimos procesar la baja</h1>
+          <p class="text-gray-600">El enlace no es válido o expiró. Responde <strong>NO</strong> al correo que recibiste, o escríbenos a <a class="underline" href={`mailto:${LEGAL.legalEmail}`}>{LEGAL.legalEmail}</a>, y te daremos de baja de inmediato.</p>
+        </>
+      ) : t ? (
+        <>
+          <h1 class="text-2xl font-bold text-gray-900 mb-3">¿Dejar de recibir nuestros correos?</h1>
+          <p class="text-gray-600 mb-6">Confirma y no volveremos a escribirte con ofertas de {LEGAL.brand}.</p>
+          <form method="post" action="/api/outreach/unsubscribe">
+            <input type="hidden" name="t" value={t} />
+            <input type="hidden" name="from" value="page" />
+            <button type="submit" data-testid="baja-confirm" class="w-full rounded-xl bg-gray-900 px-6 py-3 font-semibold text-white hover:bg-gray-700">
+              Sí, darme de baja
+            </button>
+          </form>
+        </>
+      ) : (
+        <>
+          <h1 class="text-2xl font-bold text-gray-900 mb-3">Darse de baja</h1>
+          <p class="text-gray-600">Usa el enlace de baja del correo que recibiste, o responde <strong>NO</strong> a ese correo. También puedes escribirnos a <a class="underline" href={`mailto:${LEGAL.legalEmail}`}>{LEGAL.legalEmail}</a>.</p>
+        </>
+      )}
+      <p class="mt-8 text-xs text-gray-400">{LEGAL.brand} es un servicio de {LEGAL.entity} · {LEGAL.addressLine}</p>
+    </div>
+  </main>
+</Layout>

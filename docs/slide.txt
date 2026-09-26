@@ -127,7 +127,7 @@ Texto:
 
 	Imagina una herramienta que:
 	
-	✅  Vende tus entradas online las 24 horas, con Webpay (vía Flow)
+	✅  Vende tus entradas online las 24 horas, con Webpay y tarjetas
 	
 	✅  Avisa por email a tus asistentes si cambia algo del evento
 	
@@ -159,7 +159,7 @@ Texto:
 	
 	[2] COMPARTE EL LINK  
 	    Tu página de ventas está lista.
-	    Tus compradores pagan con Webpay (vía Flow).
+	    Tus compradores pagan con Webpay y tarjetas.
 	
 	[3] RECIBE A TU PÚBLICO
 	    Entradas QR por email, recordatorio 24 h antes
@@ -334,7 +334,8 @@ Texto:
 	│  0% DE COMISIÓN PARA EL PRODUCTOR                           │
 	│  El comprador paga un cargo por servicio de 10%.            │
 	│                                                             │
-	│  ✓ Venta online con Webpay (vía Flow)                       │
+	│  ✓ Venta online con Webpay y tarjetas                       │
+	│  ✓ Web de eventos gratis con tu dominio                     │
 	│  ✓ Funciones múltiples y entradas QR por email              │
 	│  ✓ Check-in desde el celular                                │
 	│  ✓ Posts con IA y asistente IA en tu página                 │

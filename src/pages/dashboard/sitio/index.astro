@@ -1,0 +1,85 @@
+---
+// /dashboard/sitio — editor del sitio web gratis del productor (plantilla, colores, banners,
+// contacto y dominio propio). Solo admin/producer; todo se filtra por la organización de la sesión.
+import DashboardLayout from "../../../layouts/DashboardLayout.astro";
+import { ORG_ADMIN_ROLES } from "../../../lib/supabaseServer";
+import { requireDashboardSession } from "../_lib/guard";
+import SiteEditor from "../../../components/dashboard/site/SiteEditor.vue";
+import BannerManager from "../../../components/dashboard/site/BannerManager.vue";
+import ContactSettings from "../../../components/dashboard/site/ContactSettings.vue";
+import DomainConnect from "../../../components/dashboard/site/DomainConnect.vue";
+import {
+  EDITOR_FONTS,
+  EDITOR_TEMPLATES,
+  SitesUnavailableError,
+  editorView,
+  loadBanners,
+  loadOrgSite,
+  orgStatus,
+} from "./_lib/site-admin";
+
+const guard = await requireDashboardSession(Astro, ORG_ADMIN_ROLES);
+if (!guard.ok) return guard.response;
+const orgId = Number(guard.session.dbUser.organization_id);
+
+let view: ReturnType<typeof editorView> | null = null;
+let org: Awaited<ReturnType<typeof orgStatus>> | null = null;
+let unavailable = false;
+let loadError = false;
+try {
+  const site = await loadOrgSite(orgId);
+  const [banners, status] = await Promise.all([loadBanners(site.id), orgStatus(orgId)]);
+  view = editorView(site, banners);
+  org = status;
+} catch (err) {
+  if (err instanceof SitesUnavailableError) unavailable = true;
+  else {
+    loadError = true;
+    console.error("dashboard/sitio: error cargando el sitio", err);
+  }
+}
+
+const editorJson = view && org ? JSON.stringify({ ...view, org, templates: EDITOR_TEMPLATES, fonts: EDITOR_FONTS }) : "";
+const bannersJson = view ? JSON.stringify(view.banners) : "[]";
+const domainJson = view && org ? JSON.stringify({ domain: view.domain, provider: org.domainProvider }) : "";
+---
+
+<DashboardLayout title="Mi sitio web">
+  <div class="space-y-6">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900 font-[Unbounded]">Mi sitio web</h1>
+      <p class="text-gray-500 text-sm mt-1">
+        Tu productora tiene un sitio web gratis con tus próximos eventos. Personalízalo y, si quieres, conéctalo a tu propio dominio.
+      </p>
+    </div>
+
+    {unavailable && (
+      <div class="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-700">
+        El editor del sitio web estará disponible muy pronto. Vuelve a intentarlo en unos minutos.
+      </div>
+    )}
+    {loadError && (
+      <div class="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-800">
+        No pudimos cargar tu sitio. Recarga la página o escríbenos si el problema continúa.
+      </div>
+    )}
+
+    {view && org && (
+      <>
+        <SiteEditor client:only="vue" initialJson={editorJson} />
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+          <div class="space-y-6">
+            <BannerManager client:only="vue" initialJson={bannersJson} />
+            <ContactSettings
+              client:only="vue"
+              contactEmail={view.site.contact_email}
+              contactFormEnabled={view.site.contact_form_enabled}
+              orgEmail={org.orgEmail}
+            />
+          </div>
+          <DomainConnect client:only="vue" initialJson={domainJson} freeUrl={view.urls.free} />
+        </div>
+      </>
+    )}
+  </div>
+</DashboardLayout>

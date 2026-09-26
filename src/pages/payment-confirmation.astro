@@ -7,11 +7,13 @@ import Layout from '../layouts/Layout.astro';
 import "../styles/global.css";
 import { getSupabaseAdmin } from "../lib/auth-helpers";
 import { sendTicketsEmail } from "./api/_lib/server-utils";
-import { createHmac } from 'node:crypto';
+import { LEGAL } from "../lib/legal";
+import { verifyFlowReturnToken } from "../../netlify/lib/payments/flow.mjs";
 
 export const prerender = false;
 
 // urlReturn de Flow: el navegador llega aquí por POST con el `token` del pago.
+// (Stripe vuelve por GET a /pago/retorno, página común de retorno de pagos.)
 // Esta página SOLO muestra el estado: el webhook /api/payment-confirmation es quien marca la orden
 // como pagada, emite las entradas y envía el correo. Red de seguridad: si la orden está pagada y el correo
 // aún no se envió (p. ej. Mailgun falló en el webhook), se dispara /api/send-tickets-email (idempotente).
@@ -89,16 +91,7 @@ if (origin && origin !== 'null' && !allowedOrigins.includes(origin)) {
   return new Response('Origen no permitido', { status: 403 });
 }
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-/** Firma los parámetros de Flow con HMAC-SHA256 (claves ordenadas, nombre+valor). */
-function generateSignature(params: Record<string, any>, secretKey: string): string {
-  const keys = Object.keys(params).filter(key => key !== 's').sort();
-  const stringToSign = keys.map(key => key + params[key]).join('');
-  return createHmac('sha256', secretKey).update(stringToSign).digest('hex');
-}
-
-type ViewState = 'paid' | 'processing' | 'pending' | 'review' | 'rejected' | 'cancelled' | 'error';
+type ViewState = 'paid' | 'processing' | 'pending' | 'review' | 'rejected' | 'cancelled' | 'refunded' | 'error';
 
 let state: ViewState = 'error';
 let paymentStatusMessage = 'No se recibió la información necesaria para verificar tu pago.';
@@ -114,19 +107,15 @@ const token = formData.get('token');
 
 if (typeof token === 'string' && token) {
   try {
-    const flowApiKey = import.meta.env.FLOW_API_KEY;
-    const flowApiSecret = import.meta.env.FLOW_SECRET_KEY;
-    const params = { apiKey: flowApiKey, token };
-    const qs = new URLSearchParams({ ...params, s: generateSignature(params, flowApiSecret) });
-    const flowResponse = await fetch(`${import.meta.env.FLOW_BASE_URL}/payment/getStatus?${qs.toString()}`);
+    const verified = await verifyFlowReturnToken(token);
 
-    if (!flowResponse.ok) {
+    if (!verified.ok) {
       paymentStatusMessage = 'No se pudo verificar el estado de tu pago en este momento. Revisa tu correo o intenta más tarde.';
     } else {
-      const flowPayment = await flowResponse.json();
-      const commerceOrder = String(flowPayment.commerceOrder || '');
+      const flowPayment: any = verified.payment;
+      const commerceOrder = verified.orderId;
 
-      if (!UUID_RE.test(commerceOrder)) {
+      if (!commerceOrder) {
         paymentStatusMessage = 'No encontramos tu orden. Por favor, contacta a soporte.';
       } else {
         const { data: orderData } = await supabase
@@ -168,7 +157,10 @@ if (typeof token === 'string' && token) {
           } else if (orderData.status === 'review') {
             // Pago recibido pero requiere revisión manual (monto no coincide o sin stock): no prometer entradas
             state = 'review';
-            paymentStatusMessage = 'Recibimos tu pago, pero tu orden requiere una revisión manual. Nuestro equipo te contactará por correo; si tienes dudas escríbenos a soporte@aitickets.cl indicando tu número de orden.';
+            paymentStatusMessage = `Recibimos tu pago, pero tu orden requiere una revisión manual. Nuestro equipo te contactará por correo; si tienes dudas escríbenos a ${LEGAL.supportEmail} indicando tu número de orden.`;
+          } else if (orderData.status === 'refunded') {
+            state = 'refunded';
+            paymentStatusMessage = 'Esta orden fue reembolsada y sus entradas fueron anuladas.';
           } else if (flowPayment.status === 2) {
             // Flow ya cobró pero el webhook aún no termina de procesar la orden
             state = 'processing';
@@ -179,7 +171,7 @@ if (typeof token === 'string' && token) {
           } else if (flowPayment.status === 3 || orderData.status === 'rejected') {
             state = 'rejected';
             paymentStatusMessage = 'Tu pago fue rechazado. Puedes intentarlo nuevamente o usar otro medio de pago.';
-          } else if (flowPayment.status === 4 || orderData.status === 'cancelled') {
+          } else if (flowPayment.status === 4 || orderData.status === 'cancelled' || orderData.status === 'expired') {
             state = 'cancelled';
             paymentStatusMessage = 'El pago fue anulado. Si crees que es un error, contacta a soporte.';
           } else {
@@ -262,7 +254,7 @@ const headingColor = state === 'paid' || state === 'processing' ? 'text-green-60
         </div>
       )}
 
-      {(state === 'rejected' || state === 'cancelled' || state === 'error') && (
+      {(state === 'rejected' || state === 'cancelled' || state === 'refunded' || state === 'error') && (
         <div class="mt-10 text-center">
           <a href={retryUrl} class="inline-block px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition">
             Volver al evento

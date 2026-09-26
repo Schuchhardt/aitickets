@@ -1,6 +1,9 @@
 import { getSupabaseAdmin, getFriendlyErrorMessage } from "../../../lib/auth-helpers";
-import { setSessionCookies } from "../../../lib/supabaseServer";
 import { verifyTurnstileToken } from "../../../lib/turnstile";
+import { verifyLeadToken } from "../../../lib/lead-token";
+import { ensureOrgSite } from "../../../lib/sites";
+import { sendVerificationEmail } from "../../../lib/email-verification";
+import { TERMS_VERSION } from "../../../lib/legal";
 import { createEphemeralAuthClient, notifySlack as sendSlack } from "../_lib/server-utils";
 import type { APIRoute } from "astro";
 
@@ -13,11 +16,21 @@ const cleanAttr = (v: unknown, max = 200): string | null => {
 
 export const prerender = false; // Ensure this endpoint is server-rendered
 
+// Registro de productores (WP7):
+// - Exige aceptar los Términos para productores (acceptedTerms === true); se guarda la versión aceptada.
+// - La cuenta de Auth se crea SIN confirmar y NO se inicia sesión: se envía un enlace firmado
+//   (EMAIL_VERIFY_SECRET, 48 h) y /api/auth/login rechaza el ingreso hasta verificar.
+// - Si viene un leadToken válido (enlace del outreach / formulario /web-gratis), el lead queda
+//   'converted' y la atribución es signup_ref = 'lead_<id>'.
+// - Crea el sitio gratis de la organización (ensureOrgSite); nunca bloquea el registro si falla.
+// Respuesta: { ok: true, needsVerification: true, emailSent, message }.
+
 export const POST: APIRoute = async (context) => {
     const { request } = context;
     try {
         const data = await request.json();
         const { password, name, organizationName, phone, cfToken } = data;
+        const acceptedTerms = data.acceptedTerms === true;
         const email = typeof data.email === "string" ? data.email.trim().toLowerCase() : data.email;
         const attribution = (data.attribution && typeof data.attribution === "object") ? data.attribution : {};
         const signupAttribution = {
@@ -32,6 +45,13 @@ export const POST: APIRoute = async (context) => {
         if (!email || !password || !name || !organizationName) {
             return new Response(JSON.stringify({ message: "Faltan campos obligatorios" }), { status: 400 });
         }
+        if (!acceptedTerms) {
+            return new Response(JSON.stringify({ message: "Debes aceptar los Términos para productores y la Política de Privacidad." }), { status: 400 });
+        }
+
+        // Lead del outreach / formulario "web gratis": solo con token firmado válido
+        const lead = typeof data.leadToken === "string" && data.leadToken ? verifyLeadToken(data.leadToken) : null;
+        if (lead) signupAttribution.signup_ref = `lead_${lead.leadId}`.slice(0, 200);
 
         // Verify Turnstile Token
         const remoteip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
@@ -48,19 +68,15 @@ export const POST: APIRoute = async (context) => {
 
         const supabaseAdmin = getSupabaseAdmin();
 
-        // 1. Crear el usuario en Auth (service role).
-        // email_confirm: true permite el auto-login inmediato, pero significa que NO se verifica que el
-        // registrante sea dueño del email. Como el proyecto Supabase Auth es compartido con otras apps,
-        // alguien podría "ocupar" un email ajeno en Auth. Mitigación actual: la cuenta queda marcada con
-        // app_metadata.app='aitickets' y el camino de recuperación (usuario de Auth ya existente) exige la
-        // contraseña. Solución de fondo pendiente: verificación de email (enlace de confirmación) antes de
-        // activar la cuenta.
+        // 1. Crear el usuario en Auth (service role) SIN confirmar el correo: la cuenta se activa con el
+        // enlace de verificación. El camino de recuperación (usuario de Auth ya existente, p. ej. de otra
+        // app del proyecto compartido) exige la contraseña, y la organización igual queda sin verificar.
         let userId: string;
         let createdAuthUserId: string | null = null;
         const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
             email,
             password,
-            email_confirm: true,
+            email_confirm: false,
             user_metadata: {
                 full_name: name,
                 role: 'producer'
@@ -112,11 +128,22 @@ export const POST: APIRoute = async (context) => {
         let orgId: number;
         {
             const orgBase = { public_name: organizationName, email: email, phone: phone };
+            const termsFields = { terms_version: TERMS_VERSION, terms_accepted_at: new Date().toISOString() };
             let { data: orgData, error: orgError } = await supabaseAdmin
                 .from('organizations')
-                .insert({ ...orgBase, ...signupAttribution })
+                .insert({ ...orgBase, ...signupAttribution, ...termsFields })
                 .select('id')
                 .single();
+
+            // Preview sin la migración 202609270400: crear sin las columnas de términos
+            if (orgError && /terms_/.test(orgError.message || '')) {
+                console.warn("Columnas terms_* no existen; se crea la organización sin registrar la aceptación");
+                ({ data: orgData, error: orgError } = await supabaseAdmin
+                    .from('organizations')
+                    .insert({ ...orgBase, ...signupAttribution })
+                    .select('id')
+                    .single());
+            }
 
             // Si la migración de atribución (20260926_C_dashboard) aún no está aplicada, crear sin esas columnas
             if (orgError && /signup_/.test(orgError.message || '')) {
@@ -180,26 +207,42 @@ export const POST: APIRoute = async (context) => {
             }
         }
 
-        // Auto-login: obtener sesión para el nuevo usuario
-        const supabaseLogin = createEphemeralAuthClient();
-        const { data: loginData, error: loginError } = await supabaseLogin.auth.signInWithPassword({
-            email,
-            password,
-        });
-
-        if (loginError || !loginData.session) {
-            // Registro exitoso pero auto-login falló, redirigir al login manual
-            return new Response(JSON.stringify({ message: "Registro exitoso", redirect: "/organizadores/login" }), { status: 200 });
+        // 4. Sitio gratis de la organización (/o/<slug>). Se muestra recién cuando verifique el correo.
+        try {
+            await ensureOrgSite(orgId, organizationName);
+        } catch (err: any) {
+            console.error("No se pudo crear el sitio de la organización:", err?.message || err);
         }
 
-        setSessionCookies(context, loginData.session.access_token, loginData.session.refresh_token);
+        // 5. Lead convertido (outreach / formulario web gratis)
+        if (lead) {
+            await convertLead(lead.leadId, orgId).catch((err) =>
+                console.error("No se pudo marcar el lead como convertido:", err?.message || err)
+            );
+        }
+
+        // 6. Correo de verificación. Si falla, la cuenta queda creada y se puede reenviar desde el login.
+        let emailSent = false;
+        try {
+            await sendVerificationEmail({ uid: userId, email, name });
+            emailSent = true;
+        } catch (err: any) {
+            console.error("No se pudo enviar el correo de verificación:", err?.message || err);
+        }
 
         // Notificar en Slack sobre nuevo productor
-        await notifySlack({ name, email, phone, organizationName, attribution: signupAttribution }).catch(err =>
+        await notifySlack({ name, email, phone, organizationName, attribution: signupAttribution, emailSent }).catch(err =>
             console.error("Error al notificar a Slack:", err.message)
         );
 
-        return new Response(JSON.stringify({ message: "Registro exitoso", redirect: "/dashboard", userId }), { status: 200 });
+        return new Response(JSON.stringify({
+            ok: true,
+            needsVerification: true,
+            emailSent,
+            message: emailSent
+                ? "Cuenta creada. Te enviamos un correo para confirmar tu dirección."
+                : "Cuenta creada, pero no pudimos enviar el correo de confirmación. Puedes reenviarlo desde el inicio de sesión.",
+        }), { status: 200 });
 
     } catch (error) {
         console.error("Server error:", error);
@@ -207,9 +250,27 @@ export const POST: APIRoute = async (context) => {
     }
 };
 
-async function notifySlack({ name, email, phone, organizationName, attribution }: {
+/** Marca el lead como convertido (organization_id, consent_at se conserva si ya existía). */
+async function convertLead(leadId: string, orgId: number) {
+    const supabase = getSupabaseAdmin();
+    const { data: row, error: readError } = await supabase
+        .from("aitickets_leads")
+        .select("id, consent_at")
+        .eq("id", leadId)
+        .maybeSingle();
+    if (readError) throw readError;
+    if (!row) return;
+    const now = new Date().toISOString();
+    const { error } = await supabase
+        .from("aitickets_leads")
+        .update({ status: "converted", organization_id: orgId, consent_at: row.consent_at || now, updated_at: now })
+        .eq("id", leadId);
+    if (error) throw error;
+}
+
+async function notifySlack({ name, email, phone, organizationName, attribution, emailSent }: {
     name: string; email: string; phone?: string; organizationName: string;
-    attribution: Record<string, string | null>;
+    attribution: Record<string, string | null>; emailSent: boolean;
 }) {
     const source = [attribution.signup_utm_source, attribution.signup_utm_medium, attribution.signup_utm_campaign]
         .filter(Boolean).join(" / ");
@@ -223,5 +284,6 @@ async function notifySlack({ name, email, phone, organizationName, attribution }
     if (source) lines.push(`• *UTM:* ${source}`);
     if (attribution.signup_ref) lines.push(`• *Ref:* ${attribution.signup_ref}`);
     if (attribution.signup_referrer) lines.push(`• *Referrer:* ${attribution.signup_referrer}`);
+    lines.push(emailSent ? `• Correo de verificación enviado` : `• ⚠️ No se pudo enviar el correo de verificación`);
     await sendSlack(lines.join("\n"));
 }

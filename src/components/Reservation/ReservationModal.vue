@@ -46,8 +46,9 @@ onMounted(() => {
   const storedBuyer = readStorage("buyerInfo");
   if (storedBuyer && typeof storedBuyer === "object") buyerInfo.value = { ...emptyBuyer(), ...storedBuyer, termsAccepted: false };
 
+  // La aceptación de términos no se guarda: si quedó en el paso de pago, vuelve a datos del comprador
   const storedStep = Number(readStorage("currentStep"));
-  if ([1, 2, 3].includes(storedStep)) currentStep.value = storedStep;
+  if ([1, 2, 3].includes(storedStep)) currentStep.value = Math.min(storedStep, 2);
   if (!Object.keys(selectedTickets.value).length) currentStep.value = 1;
 
   eventBus.on('ticket-selection', handleRemoteTicketSelection);
@@ -157,19 +158,20 @@ function handleRemoteGoToNextStep() {
           <div class="w-full">
             <TicketSelection
               v-if="currentStep === 1"
+              data-testid="resv-step-tickets"
               :event="event"
               v-model:selectedTickets="selectedTickets"
               class="w-full"
             />
-            <BuyerInfo v-if="currentStep === 2" v-model:buyerInfo="buyerInfo" class="w-full" />
+            <BuyerInfo v-if="currentStep === 2" data-testid="resv-step-buyer" v-model:buyerInfo="buyerInfo" class="w-full" />
           </div>
 
           <div class="bg-gray-50 p-4 md:p-6 w-full rounded-[10px]">
-            <OrderSummary :selectedTickets="selectedTickets" :event="event" class="w-full" />
+            <OrderSummary data-testid="resv-step-summary" :selectedTickets="selectedTickets" :event="event" class="w-full" />
           </div>
         </div>
 
-        <div v-if="currentStep === 3" class="p-4 md:p-6 w-full">
+        <div v-if="currentStep === 3" class="p-4 md:p-6 w-full" data-testid="resv-step-payment">
           <PaymentStep :selectedTickets="selectedTickets" :buyerInfo="buyerInfo" :event="event" />
         </div>
       </div>

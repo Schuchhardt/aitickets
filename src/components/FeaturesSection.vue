@@ -8,7 +8,8 @@ import {
   BarChart3,
   Ticket,
   Bell,
-  HelpCircle
+  HelpCircle,
+  Globe
 } from 'lucide-vue-next';
 import FadeInSection from './Hero/FadeInSection.vue';
 
@@ -42,6 +43,11 @@ const producerFeatures = [
     icon: BarChart3,
     title: 'Métricas claras',
     description: 'Visitas, ventas, canal de origen (UTM), ciudad y hora peak de cada evento. Exporta tus órdenes a CSV.'
+  },
+  {
+    icon: Globe,
+    title: 'Web de eventos gratis con tu dominio',
+    description: 'Una web para tu productora con todos tus eventos, gratis. Puedes conectar tu propio dominio.'
   }
 ];
 
@@ -49,7 +55,7 @@ const attendeeFeatures = [
   {
     icon: Ticket,
     title: 'Compra simple',
-    description: 'Paga con Webpay (vía Flow) y recibe tu entrada con código QR por email al instante.'
+    description: 'Paga con Webpay o tarjeta y recibe tu entrada con código QR por email al instante.'
   },
   {
     icon: Bell,
@@ -73,8 +79,8 @@ const tags = [
 ];
 
 // Próximamente (no prometer como disponible): WhatsApp, cupones de descuento,
-// MercadoPago, dominio propio, campañas de Meta Ads gestionadas, mapa de asientos, POS.
-const comingSoon = ['WhatsApp', 'Cupones de descuento', 'MercadoPago', 'Dominio propio'];
+// MercadoPago, campañas de Meta Ads gestionadas, mapa de asientos, POS.
+const comingSoon = ['WhatsApp', 'Cupones de descuento', 'MercadoPago'];
 </script>
 
 <template>

@@ -1,6 +1,6 @@
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin } from "../../../../lib/auth-helpers";
-import { getSessionUser } from "../../../../lib/supabaseServer";
+import { getSessionContext } from "../../../../lib/supabaseServer";
 import { verifyOAuthState, encryptToken } from "../../../../lib/crypto";
 
 export const GET: APIRoute = async (context) => {
@@ -8,7 +8,9 @@ export const GET: APIRoute = async (context) => {
 
     try {
         // Fix #1: Validate session — user must be logged in
-        const user = await getSessionUser(context);
+        // getSessionContext exige además usuario activo y organización con correo verificado
+        const session = await getSessionContext(context);
+        const user = session?.authUser;
         if (!user) {
             return redirect("/organizadores/login?redirect=/dashboard/promote");
         }

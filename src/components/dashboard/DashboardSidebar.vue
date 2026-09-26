@@ -8,6 +8,7 @@ import {
   Megaphone,
   UserCog,
   Settings,
+  Globe,
   LogOut,
   ChevronLeft,
   ChevronRight
@@ -41,6 +42,7 @@ const allMenuItems = [
   { name: 'Comunidad', path: '/dashboard/community', icon: Users, roles: EVENT_MANAGER_ROLES },
   { name: 'Ingresos', path: '/dashboard/finance', icon: DollarSign, roles: ORG_ADMIN_ROLES },
   { name: 'Promocionar', path: '/dashboard/promote', icon: Megaphone, roles: EVENT_MANAGER_ROLES },
+  { name: 'Mi sitio web', path: '/dashboard/sitio', icon: Globe, roles: ORG_ADMIN_ROLES },
   { name: 'Equipo', path: '/dashboard/team', icon: UserCog, roles: ORG_ADMIN_ROLES },
   { name: 'Configuración', path: '/dashboard/settings', icon: Settings, roles: ORG_ADMIN_ROLES },
 ]

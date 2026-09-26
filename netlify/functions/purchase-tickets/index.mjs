@@ -1,13 +1,19 @@
-// POST /api/purchase-ticket (contrato C5)
-// Request: { eventId, buyer:{firstName,lastName,email,phone?}, tickets:[{id, quantity}], ref?, utm?:{source,medium,campaign} }
+// POST /api/purchase-ticket (contrato C5 + WP2)
+// Request: { eventId, buyer:{firstName,lastName,email,phone?}, tickets:[{id, quantity}], ref?, utm?:{source,medium,campaign},
+//            paymentProvider?: 'flow'|'stripe', termsAccepted: true, termsVersion?: string, cfToken? }
 // El precio se calcula SIEMPRE en el servidor desde event_tickets; se ignora cualquier total/precio/evento del cliente.
-// Respuesta: pagado -> { paymentLink } (sin orderId: el link /order/<id> da acceso a las entradas y solo
-// se entrega por correo / página de retorno de Flow); gratis -> { orderId, redirectUrl: '/order/<orderId>' }
+// Respuesta: pagado -> { paymentLink, provider, orderId }; gratis -> { orderId, redirectUrl: '/order/<orderId>', provider: 'free' }
+// Stock: la reserva es ATÓMICA en SQL (aitickets_reserve_order bloquea los tipos de entrada y recuenta);
+// la orden 'pending' reserva stock hasta hold_expires_at (15 min Flow, 31 min Stripe).
 // Antiabuso: Cloudflare Turnstile (body.cfToken, si está configurado), rate limit en memoria por IP y
 // máximo MAX_PENDING_PER_BUYER órdenes pendientes simultáneas por comprador + evento.
-// GET /api/purchase-ticket -> { turnstileSiteKey } (clave pública para renderizar el widget).
+// GET /api/purchase-ticket[?event=<slug>] -> { turnstileSiteKey, enabledProviders } (datos públicos para el checkout).
+//   Con ?event, Stripe en modo prueba solo aparece para el evento demo o los marcados de prueba (el POST lo exige igual).
 import { getSupabaseAdmin, json } from '../../lib/supabase.mjs'
-import { createFlowPayment } from '../../lib/flow.mjs'
+import { enabledProviders, defaultProvider, createCheckout, holdMinutesFor, isStripeAllowedForEvent } from '../../lib/payments/index.mjs'
+import { stripeMinAmount } from '../../lib/payments/stripe.mjs'
+import { isMissingSchemaError } from '../../lib/orders.mjs'
+import { TERMS_VERSION } from '../../lib/legal.mjs'
 import { verifyTurnstile, isTurnstileEnabled, turnstileSiteKey } from '../../lib/turnstile.mjs'
 import { isValidEmail } from '../../lib/mailer.mjs'
 import { todayInTimeZone, zonedDateTimeToUtc } from '../../lib/dates.mjs'
@@ -86,9 +92,20 @@ function validateRequest(body) {
   }
   if (quantities.size === 0) return { error: 'Selecciona al menos una entrada' }
 
+  if (body?.termsAccepted !== true) return { error: 'Debes aceptar los Términos y Condiciones para continuar' }
+  const termsVersion = cleanText(body?.termsVersion, 20).replace(/[^\w.\-]/g, '') || TERMS_VERSION
+
+  const providers = enabledProviders()
+  const paymentProvider = body?.paymentProvider == null || body.paymentProvider === ''
+    ? defaultProvider()
+    : String(body.paymentProvider).toLowerCase()
+  if (!providers.includes(paymentProvider)) return { error: 'El medio de pago seleccionado no está disponible' }
+
   const utm = body?.utm && typeof body.utm === 'object' ? body.utm : {}
   return {
     eventId,
+    paymentProvider,
+    termsVersion,
     cfToken: typeof body?.cfToken === 'string' ? body.cfToken : '',
     buyer: { firstName, lastName, email, phone: phone || null },
     quantities,
@@ -143,9 +160,93 @@ async function isEventStillOn(supabase, event) {
   return (count || 0) > 0
 }
 
+/** Órdenes pendientes con reserva vigente de un comprador en un evento. */
+async function countLivePendingOrders(supabase, eventId, attendeeId) {
+  const nowIso = new Date().toISOString()
+  const legacySince = new Date(Date.now() - PENDING_HOLD_MINUTES * 60 * 1000).toISOString()
+  let { count, error } = await supabase
+    .from('event_orders')
+    .select('id', { count: 'exact', head: true })
+    .eq('event_id', eventId)
+    .eq('attendee_id', attendeeId)
+    .eq('status', 'pending')
+    .or(`hold_expires_at.gt.${nowIso},and(hold_expires_at.is.null,created_at.gte.${legacySince})`)
+  // HEAD sin cuerpo: PostgREST no siempre entrega el código de error; ante cualquier error se reintenta sin hold_expires_at
+  if (error) {
+    ;({ count, error } = await supabase
+      .from('event_orders')
+      .select('id', { count: 'exact', head: true })
+      .eq('event_id', eventId)
+      .eq('attendee_id', attendeeId)
+      .eq('status', 'pending')
+      .gte('created_at', legacySince))
+  }
+  if (error) throw new Error(`Error revisando órdenes pendientes: ${error.message}`)
+  return count || 0
+}
+
+/** Traduce los errores del RPC ('SOLD_OUT:<id>' / 'TICKET_UNAVAILABLE:<id>') a un error con .stock. */
+function stockErrorFrom(error) {
+  const m = /\b(SOLD_OUT|TICKET_UNAVAILABLE):(\d+)/.exec(String(error?.message || ''))
+  if (!m) return null
+  const err = new Error(m[1])
+  err.stock = m[1]
+  err.ticketId = Number(m[2])
+  return err
+}
+
+/**
+ * Reserva la orden con aitickets_reserve_order (atómico). Si el RPC no existe (deploy preview contra una
+ * base sin migrar) usa el camino antiguo: insertar 'pending' y re-contar (chequeo optimista).
+ * @returns {Promise<{id:string, event_id:number, attendee_id:number, ticket_details:any}>}
+ */
+async function reserveOrder(supabase, { eventId, lines, order, holdMinutes, baseOrder, limited }) {
+  const { data: orderId, error } = await supabase.rpc('aitickets_reserve_order', {
+    p_event_id: eventId,
+    p_lines: lines,
+    p_order: order,
+    p_hold_minutes: holdMinutes,
+  })
+  if (!error && orderId) {
+    return { id: orderId, event_id: eventId, attendee_id: order.attendee_id, ticket_details: order.ticket_details }
+  }
+  const stockErr = stockErrorFrom(error)
+  if (stockErr) throw stockErr
+  if (!isMissingSchemaError(error)) throw new Error(`Error reservando la orden: ${error?.message || 'sin id'}`)
+
+  console.warn('aitickets_reserve_order no disponible; usando reserva optimista antigua')
+  const { data: inserted, error: insertError } = await supabase
+    .from('event_orders')
+    .insert([{ ...baseOrder, status: 'pending' }])
+    .select('id, event_id, attendee_id, ticket_details')
+    .single()
+  if (insertError) throw new Error(`Error creando orden: ${insertError.message}`)
+  if (limited.length) {
+    const sold = await getSoldCounts(supabase, eventId, limited)
+    const { data: tickets } = await supabase.from('event_tickets').select('id, total_quantity').eq('event_id', eventId).in('id', limited)
+    const over = (tickets || []).find(t => Number(t.total_quantity) - (sold.get(Number(t.id)) || 0) < 0)
+    if (over) {
+      await supabase.from('event_orders').update({ status: 'failed' }).eq('id', inserted.id).eq('status', 'pending')
+      const err = new Error('SOLD_OUT')
+      err.stock = 'SOLD_OUT'
+      err.ticketId = Number(over.id)
+      throw err
+    }
+  }
+  return inserted
+}
+
 export default async function handler(req) {
   if (req.method === 'GET') {
-    return json({ turnstileSiteKey: isTurnstileEnabled() ? turnstileSiteKey() : null }, 200)
+    let eventSlug
+    try {
+      const raw = new URL(req.url).searchParams.get('event')
+      if (raw) eventSlug = raw.slice(0, 200)
+    } catch { /* URL inválida: lista global */ }
+    return json({
+      turnstileSiteKey: isTurnstileEnabled() ? turnstileSiteKey() : null,
+      enabledProviders: enabledProviders(eventSlug ? { eventSlug } : {}),
+    }, 200)
   }
   if (req.method !== 'POST') return json({ message: 'Método no permitido' }, 405)
 
@@ -163,7 +264,7 @@ export default async function handler(req) {
 
   const input = validateRequest(body)
   if (input.error) return json({ message: input.error }, 400)
-  const { eventId, buyer, quantities, attribution, cfToken } = input
+  const { eventId, buyer, quantities, attribution, cfToken, paymentProvider, termsVersion } = input
 
   const captcha = await verifyTurnstile(cfToken, ip)
   if (!captcha.success) return json({ message: captcha.message, captcha: true }, 403)
@@ -182,6 +283,10 @@ export default async function handler(req) {
     if (!event) return json({ message: 'El evento no está disponible para la venta' }, 404)
     if (isDemoEventSlug(event.slug)) return json({ message: 'Este es un evento de demostración: no se venden entradas.' }, 403)
     if (!(await isEventStillOn(supabase, event))) return json({ message: 'Este evento ya finalizó' }, 409)
+    // Stripe en modo prueba: solo evento demo o marcados de prueba (un pago de prueba no emite entradas reales)
+    if (paymentProvider === 'stripe' && !isStripeAllowedForEvent(event.slug)) {
+      return json({ message: 'El pago con tarjeta internacional no está disponible para este evento. Usa Webpay.' }, 400)
+    }
 
     // 2. Tipos de entrada: deben pertenecer al evento y estar a la venta (C2)
     const ticketIds = [...quantities.keys()]
@@ -220,18 +325,8 @@ export default async function handler(req) {
       }
     }
 
-    // 3. Stock (total_quantity NULL = ilimitado)
+    // 3. Pre-chequeo de stock (solo para dar un mensaje claro; la reserva atómica del paso 5 es la que manda)
     const limited = ticketIds.filter(id => byId.get(id).total_quantity != null)
-    const stockError = async () => {
-      if (!limited.length) return null
-      const sold = await getSoldCounts(supabase, eventId, limited)
-      for (const id of limited) {
-        const ticket = byId.get(id)
-        const available = Number(ticket.total_quantity) - (sold.get(id) || 0)
-        if (available < 0) return `"${ticket.ticket_name}" está agotada`
-      }
-      return null
-    }
     if (limited.length) {
       const sold = await getSoldCounts(supabase, eventId, limited)
       for (const id of limited) {
@@ -258,22 +353,21 @@ export default async function handler(req) {
     const fee = computeServiceFee(subtotal)
     const total = subtotal + fee
     const ticketQty = ticketDetails.reduce((sum, t) => sum + t.quantity, 0)
+    const provider = total === 0 ? 'free' : paymentProvider
+    const holdMinutes = total === 0 ? PENDING_HOLD_MINUTES : holdMinutesFor(provider)
 
+    if (provider === 'stripe' && total < stripeMinAmount()) {
+      return json({ message: `El pago con tarjeta internacional requiere un total de al menos $${stripeMinAmount().toLocaleString('es-CL')}. Usa Webpay para este monto.` }, 400)
+    }
+
+    // Asistente antes de reservar (event_orders.attendee_id es NOT NULL)
     const attendeeId = await findOrCreateAttendee(supabase, buyer)
 
     // 4b. Máximo de órdenes pendientes simultáneas por comprador + evento (evita acaparar stock)
-    const holdSince = new Date(Date.now() - PENDING_HOLD_MINUTES * 60 * 1000).toISOString()
-    const { count: pendingCount, error: pendingError } = await supabase
-      .from('event_orders')
-      .select('id', { count: 'exact', head: true })
-      .eq('event_id', eventId)
-      .eq('attendee_id', attendeeId)
-      .eq('status', 'pending')
-      .gte('created_at', holdSince)
-    if (pendingError) throw new Error(`Error revisando órdenes pendientes: ${pendingError.message}`)
-    if ((pendingCount || 0) >= MAX_PENDING_PER_BUYER) {
+    const pendingCount = await countLivePendingOrders(supabase, eventId, attendeeId)
+    if (pendingCount >= MAX_PENDING_PER_BUYER) {
       return json({
-        message: `Ya tienes ${pendingCount} pagos pendientes para este evento. Complétalos o espera ${PENDING_HOLD_MINUTES} minutos para intentarlo de nuevo.`,
+        message: `Ya tienes ${pendingCount} pagos pendientes para este evento. Complétalos o espera ${holdMinutes} minutos para intentarlo de nuevo.`,
       }, 429)
     }
 
@@ -284,6 +378,7 @@ export default async function handler(req) {
       ticket_fee: fee,
       ticket_qty: ticketQty,
       ticket_details: ticketDetails,
+      total_payment: total === 0 ? 0 : null,
       // R2: datos del comprador de esta orden (attendees se comparte por email)
       buyer_first_name: buyer.firstName,
       buyer_last_name: buyer.lastName,
@@ -292,21 +387,30 @@ export default async function handler(req) {
       ...attribution,
     }
 
-    // 5. Se inserta la orden como 'pending' (reserva stock) y se vuelve a contar: si dos compras
-    //    concurrentes se llevaron las últimas entradas, esta se marca 'failed' (chequeo optimista).
-    //    TODO: reemplazar por una función SECURITY DEFINER con bloqueo por event_ticket (ver reporte).
-    const { data: order, error: orderError } = await supabase
-      .from('event_orders')
-      .insert([{ ...baseOrder, status: 'pending', total_payment: total === 0 ? 0 : null }])
-      .select('id, event_id, attendee_id, ticket_details')
-      .single()
-    if (orderError) throw new Error(`Error creando orden: ${orderError.message}`)
-
-    const oversold = await stockError()
-    if (oversold) {
-      await supabase.from('event_orders').update({ status: 'failed' }).eq('id', order.id).eq('status', 'pending')
-      console.warn(`Orden ${order.id}: sobreventa detectada al re-contar (${oversold}); marcada failed`)
-      return json({ message: 'Se agotaron las entradas mientras completabas tu compra. Revisa la disponibilidad e intenta nuevamente.' }, 409)
+    // 5. Reserva atómica (orden 'pending' con hold_expires_at). Gratis también pasa por aquí.
+    let order
+    try {
+      order = await reserveOrder(supabase, {
+        eventId,
+        lines: ticketDetails.map(t => ({ id: t.id, quantity: t.quantity })),
+        order: { ...baseOrder, payment_provider: provider, currency: 'CLP', terms_version: termsVersion },
+        holdMinutes,
+        baseOrder,
+        limited,
+      })
+    } catch (err) {
+      if (err?.stock) {
+        const ticket = err.ticketId != null ? byId.get(Number(err.ticketId)) : null
+        if (err.stock === 'SOLD_OUT') {
+          return json({
+            message: ticket
+              ? `"${ticket.ticket_name}" se agotó mientras completabas tu compra. Revisa la disponibilidad e intenta nuevamente.`
+              : 'Se agotaron las entradas mientras completabas tu compra. Revisa la disponibilidad e intenta nuevamente.',
+          }, 409)
+        }
+        return json({ message: 'Una de las entradas seleccionadas ya no está a la venta' }, 409)
+      }
+      throw err
     }
 
     // 5a. Orden gratis: pagada por $0 + una entrada por unidad + correo
@@ -324,37 +428,39 @@ export default async function handler(req) {
       if (!emailResult.ok) console.error(`Orden gratis ${order.id}: no se pudo enviar el correo (${emailResult.status})`)
 
       console.log(`🎟️ Orden gratis ${order.id} evento ${eventId}: ${ticketQty} entrada(s)`)
-      return json({ orderId: order.id, redirectUrl: `/order/${order.id}`, message: 'Registro completado' }, 200)
+      return json({ orderId: order.id, redirectUrl: `/order/${order.id}`, provider: 'free', message: 'Registro completado' }, 200)
     }
 
-    // 5b. Orden pagada: pendiente hasta que Flow confirme en /api/payment-confirmation
+    // 5b. Orden pagada: pendiente hasta que el proveedor confirme por webhook
+    //     (Flow: /api/payment-confirmation; Stripe: /api/webhooks/stripe)
     const siteUrl = (process.env.SITE_URL || new URL(req.url).origin).replace(/\/$/, '')
-    let payment
+    let checkout
     try {
-      payment = await createFlowPayment({
-        commerceOrder: order.id,
-        subject: `${ticketQty === 1 ? '1 entrada' : `${ticketQty} entradas`} - ${event.name}`,
-        amount: total,
-        email: buyer.email,
-        urlConfirmation: `${siteUrl}/api/payment-confirmation`,
-        urlReturn: `${siteUrl}/payment-confirmation`,
-        // El pago expira cuando se libera la reserva de stock de la orden pendiente
-        timeoutSeconds: PENDING_HOLD_MINUTES * 60,
+      checkout = await createCheckout(provider, {
+        order: { id: order.id, ticket_fee: fee },
+        eventName: event.name,
+        lines: ticketDetails,
+        ticketQty,
+        subtotal,
+        fee,
+        total,
+        buyerEmail: buyer.email,
+        siteUrl,
+        holdMinutes,
       })
     } catch (err) {
-      await supabase.from('event_orders').update({ status: 'failed' }).eq('id', order.id)
-      console.error(`Flow payment/create falló para la orden ${order.id}:`, err.message)
+      await supabase.from('event_orders').update({ status: 'failed' }).eq('id', order.id).eq('status', 'pending')
+      console.error(`${provider} checkout falló para la orden ${order.id}:`, err?.message)
       return json({ message: 'No pudimos iniciar el pago. Intenta nuevamente en unos minutos.' }, 502)
     }
 
-    const { error: updateError } = await supabase
-      .from('event_orders')
-      .update({ payment_external_id: payment.flowOrder != null ? String(payment.flowOrder) : null })
-      .eq('id', order.id)
-    if (updateError) console.error(`No se pudo guardar flowOrder en la orden ${order.id}:`, updateError.message)
+    const paymentUpdate = { payment_external_id: checkout.externalId ?? null }
+    if (checkout.sessionId) paymentUpdate.provider_session_id = checkout.sessionId
+    const { error: updateError } = await supabase.from('event_orders').update(paymentUpdate).eq('id', order.id)
+    if (updateError) console.error(`No se pudo guardar la referencia de pago en la orden ${order.id}:`, updateError.message)
 
-    console.log(`💳 Orden ${order.id} evento ${eventId}: ${ticketQty} entrada(s), total ${total}`)
-    return json({ paymentLink: `${payment.url}?token=${payment.token}`, message: 'Redirigiendo a pago' }, 200)
+    console.log(`💳 Orden ${order.id} evento ${eventId}: ${ticketQty} entrada(s), total ${total}, ${provider}`)
+    return json({ paymentLink: checkout.redirectUrl, provider, orderId: order.id, message: 'Redirigiendo a pago' }, 200)
   } catch (error) {
     console.error('Error en purchase-ticket:', error?.message)
     return json({ message: 'Ha ocurrido un error. Por favor intenta más tarde.' }, 500)

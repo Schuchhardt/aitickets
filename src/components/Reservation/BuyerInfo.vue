@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from "vue";
 import { isValidEmail } from "./pricing.js";
+import { LEGAL } from "../../lib/legal";
 
 const props = defineProps({
   buyerInfo: Object,
@@ -108,19 +109,23 @@ const confirmEmailError = computed(() => {
     <div class="flex items-start mt-4">
       <input
         id="terms-accepted"
+        data-testid="resv-terms-checkbox"
         :checked="props.buyerInfo.termsAccepted"
         @change="updateBuyerInfo('termsAccepted', $event.target.checked)"
         type="checkbox"
         class="mr-3 mt-0.5 cursor-pointer w-5 h-5 shrink-0 accent-black"
+        aria-describedby="terms-retracto"
         required
       />
       <label for="terms-accepted" class="text-gray-600 text-sm leading-5">
         Acepto los
-        <a href="/terms" class="text-black underline font-medium" target="_blank">Términos del Servicio</a>
-        y
-        <a href="/privacy" class="text-black underline font-medium" target="_blank">Políticas de Privacidad</a>
+        <a href="/terms" class="text-black underline font-medium" target="_blank" rel="noopener">Términos y Condiciones</a>
+        y la
+        <a href="/privacy" class="text-black underline font-medium" target="_blank" rel="noopener">Política de Privacidad</a>,
+        y entiendo que esta compra no tiene derecho de retracto.
         <span class="text-red-500"> (Requerido)</span>
       </label>
     </div>
+    <p id="terms-retracto" class="text-xs text-gray-500 mt-2 ml-8 leading-4">{{ LEGAL.retractoNotice }}</p>
   </div>
 </template>

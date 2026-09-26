@@ -2,7 +2,8 @@
 // Lo usan: send-tickets-email (llamadas internas), payment-confirmation (webhook de Flow)
 // y purchase-tickets (órdenes gratis). Idempotente vía event_orders.email_sent_at.
 import { getSupabaseAdmin, escapeHtml } from './supabase.mjs'
-import { getMailgun, MAIL_DOMAIN, MAIL_FROM, SITE_URL, formatRecipient, isValidEmail } from './mailer.mjs'
+import { getMailgun, MAIL_DOMAIN, MAIL_FROM, SITE_URL, formatRecipient, isValidEmail, legalFooterHtml } from './mailer.mjs'
+import { LEGAL } from './legal.mjs'
 import {
   EVENT_DATE_COLUMNS,
   zonedDateTimeToUtc,
@@ -53,7 +54,7 @@ function buildIcs({ orderId, eventName, description, start, end, location, order
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//aitickets.cl//ES',
+    'PRODID:-//Chanium LLC//AI Tickets//ES',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     'BEGIN:VEVENT',
@@ -105,7 +106,7 @@ function buildTicketsHtml({ customerName, eventName, dateLines, secretLocation, 
           </tr>`).join('')
   const totalsHtml = total > 0 ? `
           <tr><td style="padding:4px 0;color:#6b7280;font-size:13px;">Subtotal</td><td style="padding:4px 0;text-align:right;color:#6b7280;font-size:13px;">${e(clp(subtotal))}</td></tr>
-          <tr><td style="padding:4px 0;color:#6b7280;font-size:13px;">Cargo por servicio</td><td style="padding:4px 0;text-align:right;color:#6b7280;font-size:13px;">${e(clp(fee))}</td></tr>
+          <tr><td style="padding:4px 0;color:#6b7280;font-size:13px;">${e(LEGAL.serviceFeeLabel)}</td><td style="padding:4px 0;text-align:right;color:#6b7280;font-size:13px;">${e(clp(fee))}</td></tr>
           <tr><td style="padding:8px 0;color:#111;font-size:15px;font-weight:700;border-top:1px solid #e5e7eb;">Total pagado</td><td style="padding:8px 0;text-align:right;color:#111;font-size:15px;font-weight:700;border-top:1px solid #e5e7eb;">${e(clp(total))}</td></tr>`
     : `
           <tr><td style="padding:8px 0;color:#111;font-size:15px;font-weight:700;border-top:1px solid #e5e7eb;">Total</td><td style="padding:8px 0;text-align:right;color:#111;font-size:15px;font-weight:700;border-top:1px solid #e5e7eb;">Gratis</td></tr>`
@@ -140,12 +141,12 @@ function buildTicketsHtml({ customerName, eventName, dateLines, secretLocation, 
       </div>` : ''}
 
       <div style="border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:16px;">
-        <p style="margin:0 0 8px;color:#6b7280;font-size:13px;">Tu pedido</p>
+        <p style="margin:0 0 8px;color:#6b7280;font-size:13px;">${e(LEGAL.receiptLabel)}</p>
         <table style="width:100%;border-collapse:collapse;">${ticketsHtml}${totalsHtml}</table>
         <p style="margin:12px 0 0;color:#9ca3af;font-size:12px;">Orden ${e(orderId)} · ${e(orderDate)}</p>
       </div>
 
-      <p style="color:#9ca3af;font-size:12px;text-align:center;margin-top:24px;">¿Problemas con tus entradas? Escríbenos a soporte@aitickets.cl</p>
+      ${legalFooterHtml({ reason: 'Recibes este correo porque compraste entradas en AI Tickets. Guárdalo como comprobante de compra: el evento es organizado y ofrecido por su productora.' })}
     </div>
   </div>
 </body>
@@ -308,8 +309,8 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
       calendarUrl,
     })
 
-    // Copia oculta al equipo y al administrador de la productora
-    const bcc = ['contacto@aitickets.cl']
+    // Copia oculta al administrador de la productora (y al equipo solo si TICKETS_BCC está definido)
+    const bcc = String(process.env.TICKETS_BCC || '').split(',').map(s => s.trim()).filter(isValidEmail)
     if (event.organization_id) {
       const { data: admins } = await supabase
         .from('users')
@@ -323,10 +324,11 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
     const message = {
       from: MAIL_FROM,
       to: [formatRecipient(`${buyer.first_name || ''} ${buyer.last_name || ''}`, buyer.email)],
-      bcc,
       subject: `🎟️ Tus entradas para ${String(event.name || 'tu evento').replace(/[\r\n]/g, ' ')}`,
       html,
+      'h:Reply-To': LEGAL.supportEmail,
     }
+    if (bcc.length) message.bcc = bcc
     if (start) {
       message.attachment = [{
         filename: 'evento.ics',

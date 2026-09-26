@@ -1,0 +1,79 @@
+---
+// Evento dentro del sitio del productor. Mismos datos que /eventos/[slug] (src/lib/eventPage.ts), pero
+// solo si el evento pertenece a la organización del sitio. El canónico sigue siendo
+// aitickets.cl/eventos/<slug>. En un dominio propio, "Comprar" lleva al checkout en aitickets.cl
+// (purchaseUrlFor, ?comprar=1 abre el modal automáticamente).
+import SiteLayout from "../../../../layouts/SiteLayout.astro";
+import SiteHeader from "../../../../components/sites/SiteHeader.vue";
+import SiteFooter from "../../../../components/sites/SiteFooter.vue";
+import EventDetail from "../../../../components/EventDetail.vue";
+import EventMetaTags from "../../../../components/EventMetaTags.astro";
+import { getPublicEventData } from "../../../../lib/eventPage";
+import { publicSiteProps, purchaseUrlFor, siteCanonicalOrigin } from "../../../../lib/sites";
+import { isDemoEventSlug } from "../../../../lib/demoEvent.mjs";
+import { loadSiteForPage } from "../../_site";
+
+export const prerender = false;
+
+const loaded = await loadSiteForPage(Astro);
+if (!loaded) {
+  return new Response(null, { status: 404 });
+}
+const { site, preview, base, template } = loaded;
+const eventSlug = Astro.params.slug;
+
+// El sitio demo solo muestra el evento demo; los demás, solo eventos de su organización
+if (site.is_demo && !isDemoEventSlug(eventSlug)) {
+  return new Response(null, { status: 404 });
+}
+
+const result = await getPublicEventData(eventSlug, {
+  organizationId: site.is_demo ? undefined : site.organization_id,
+  siteOrigin: siteCanonicalOrigin(site),
+  request: Astro.request,
+  url: Astro.url,
+  locals: Astro.locals,
+});
+if (!result) {
+  return new Response(null, { status: 404 });
+}
+
+const { seo } = result;
+const eventData = { ...result.eventData, purchase_url: purchaseUrlFor(site, result.eventData.slug) };
+const props = publicSiteProps(site, template);
+const title = seo.title.replace(/\| AI Tickets$/, `| ${props.name}`);
+---
+<SiteLayout theme={props.theme} preview={preview} favicon={props.theme.logo_url}>
+  <EventMetaTags
+    slot="head"
+    event={eventData}
+    title={title}
+    description={seo.description}
+    canonicalPath={seo.canonicalPath}
+    noindex={seo.noindex || preview}
+  />
+  <script is:inline>
+    // Atribución (C10): guardar ?ref= y utm_* para enviarlos con la compra
+    (function () {
+      try {
+        var p = new URLSearchParams(window.location.search);
+        var ref = p.get('ref');
+        var source = p.get('utm_source');
+        var medium = p.get('utm_medium');
+        var campaign = p.get('utm_campaign');
+        if (!ref && !source && !medium && !campaign) return;
+        var clip = function (v) { return v ? String(v).slice(0, 128) : null; };
+        sessionStorage.setItem('aitickets_attribution', JSON.stringify({
+          ref: clip(ref),
+          utm: { source: clip(source), medium: clip(medium), campaign: clip(campaign) },
+          landing_at: new Date().toISOString()
+        }));
+      } catch (e) { /* sessionStorage no disponible */ }
+    })();
+  </script>
+  <SiteHeader site={props} base={base} variant="light" />
+  <main class="bg-white text-gray-900">
+    <EventDetail event={eventData} siteMode={true} client:idle />
+  </main>
+  <SiteFooter site={props} base={base} />
+</SiteLayout>

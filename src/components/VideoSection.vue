@@ -20,7 +20,7 @@ import FadeInSection from './Hero/FadeInSection.vue';
         </FadeInSection>
         <FadeInSection :delay="200">
           <p class="text-white/70 max-w-2xl mx-auto">
-            Crea tu evento, compártelo con posts generados con IA, vende con Webpay y valida las entradas con QR desde tu celular.
+            Crea tu evento, compártelo con posts generados con IA, vende con Webpay y tarjetas, y valida las entradas con QR desde tu celular.
           </p>
         </FadeInSection>
       </div>

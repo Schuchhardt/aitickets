@@ -1,0 +1,41 @@
+---
+/**
+ * Meta tags de las páginas de un sitio de productor (inicio, contacto).
+ * canonical y og:url apuntan al origen canónico del sitio (dominio propio > aitickets.cl/o/<slug>).
+ * Las páginas de evento usan EventMetaTags (canónico único en aitickets.cl/eventos/<slug>).
+ */
+interface Props {
+  title: string;
+  description: string;
+  canonicalUrl: string;
+  siteName: string;
+  imageUrl?: string | null;
+  noindex?: boolean;
+  /** JSON-LD ya serializado (opcional). */
+  jsonLd?: string | null;
+}
+
+const { title, description, canonicalUrl, siteName, imageUrl, noindex = false, jsonLd } = Astro.props;
+const mainUrl = (import.meta.env.SITE_URL || "https://aitickets.cl").replace(/\/$/, "");
+const image = imageUrl && /^https?:\/\//i.test(imageUrl) ? imageUrl : `${mainUrl}/aitickets_preview.png`;
+---
+
+<title>{title}</title>
+<meta name="description" content={description} />
+<link rel="canonical" href={canonicalUrl} />
+{noindex && <meta name="robots" content="noindex, nofollow" />}
+
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content={siteName} />
+<meta property="og:locale" content="es_CL" />
+<meta property="og:url" content={canonicalUrl} />
+<meta property="og:title" content={title} />
+<meta property="og:description" content={description} />
+<meta property="og:image" content={image} />
+
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={title} />
+<meta name="twitter:description" content={description} />
+<meta name="twitter:image" content={image} />
+
+{jsonLd && !noindex && <script is:inline type="application/ld+json" set:html={jsonLd}></script>}

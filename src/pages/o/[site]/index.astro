@@ -1,0 +1,62 @@
+---
+// Inicio del sitio de un productor: aitickets.cl/o/<slug> o su dominio propio (vía middleware).
+import SiteLayout from "../../../layouts/SiteLayout.astro";
+import SiteMetaTags from "../../../components/sites/SiteMetaTags.astro";
+import Clasico from "../../../components/sites/templates/Clasico.vue";
+import Nocturno from "../../../components/sites/templates/Nocturno.vue";
+import Minimal from "../../../components/sites/templates/Minimal.vue";
+import Festival from "../../../components/sites/templates/Festival.vue";
+import { getSiteBanners, getSiteEvents, publicSiteProps, siteUrl } from "../../../lib/sites";
+import { sanitizeRichText } from "../../../lib/sanitize";
+import { stripHtml, truncate } from "../../../lib/eventPage";
+import { loadSiteForPage } from "../_site";
+
+export const prerender = false;
+
+const loaded = await loadSiteForPage(Astro);
+if (!loaded) {
+  return new Response(null, { status: 404 });
+}
+const { site, preview, base, template } = loaded;
+
+const [events, banners] = await Promise.all([getSiteEvents(site), getSiteBanners(site)]);
+const props = publicSiteProps(site, template);
+const aboutHtml = sanitizeRichText(site.content?.about || "");
+
+const TEMPLATES = { clasico: Clasico, nocturno: Nocturno, minimal: Minimal, festival: Festival } as const;
+const Template = TEMPLATES[template] || Clasico;
+
+// SEO: canónico en el origen del sitio (dominio propio > /o/<slug>). noindex hasta tener eventos publicados.
+const canonicalUrl = siteUrl(site, "/");
+const title = truncate(site.seo?.title || `${props.name} – Próximos eventos y entradas`, 70);
+const description = truncate(
+  site.seo?.description ||
+    stripHtml(aboutHtml) ||
+    `Próximos eventos de ${props.name}. Compra tus entradas online de forma segura.`,
+  158
+);
+const ogImage = site.seo?.og_image || props.theme.hero_image_url || banners[0]?.image_url || events[0]?.image_url || null;
+const noindex = preview || site.is_demo || events.length === 0;
+
+const jsonLd = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: props.name,
+  url: canonicalUrl,
+  ...(props.theme.logo_url ? { logo: props.theme.logo_url } : {}),
+  ...(Object.values(props.socials).length ? { sameAs: Object.values(props.socials) } : {}),
+}).replace(/</g, "\\u003c");
+---
+<SiteLayout theme={props.theme} preview={preview} favicon={props.theme.logo_url}>
+  <SiteMetaTags
+    slot="head"
+    title={title}
+    description={description}
+    canonicalUrl={canonicalUrl}
+    siteName={props.name}
+    imageUrl={ogImage}
+    noindex={noindex}
+    jsonLd={jsonLd}
+  />
+  <Template site={props} events={events} banners={banners} aboutHtml={aboutHtml} base={base} />
+</SiteLayout>

@@ -1,5 +1,18 @@
--- Initial schema for aitickets
--- Generated from Supabase Dashboard on 2025-12-12
+-- NO EJECUTAR EN PRODUCCIÓN: snapshot de referencia; la fuente de verdad es db/migrations
+--
+-- Esquema consolidado de las tablas de AI Tickets tal como quedan DESPUÉS de las migraciones
+-- 20260926_* (A0, B, C, D, Z), que son la línea base ya aplicada en el proyecto compartido.
+-- NO incluye objetos de migraciones posteriores (202609270100 en adelante): esos los crea el runner
+-- (scripts/migrate.mjs) al desplegar.
+--
+-- Usos:
+--   * CI (.github/workflows/ci.yml): se carga en postgres:15 vanilla después de db/ci/stubs.sql y luego
+--     se aplican TODAS las migraciones con --no-baseline; deben ser idempotentes sobre este estado.
+--   * Referencia para leer el modelo de datos.
+-- Para regenerarlo desde la base real (solo lectura): scripts/dump-schema.sh.
+--
+-- El proyecto de Supabase es COMPARTIDO con otras apps: este archivo solo describe tablas de AI Tickets.
+-- Origen: dashboard de Supabase (2025-12-12) + migraciones 20260926_*, consolidado a mano (WP7).
 
 -- Independent tables first (no foreign keys to other tables)
 
@@ -49,13 +62,21 @@ CREATE TABLE public.organizations (
   tiktok text,
   country text,
   zernio_profile_id text,
+  -- 20260926_C: atribución del registro del productor
+  signup_utm_source text,
+  signup_utm_medium text,
+  signup_utm_campaign text,
+  signup_ref text,
+  signup_referrer text,
   CONSTRAINT organizations_pkey PRIMARY KEY (id)
 );
 
 CREATE TABLE public.venues (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   name text NOT NULL,
-  slug text DEFAULT regexp_replace(lower(name), '[^a-z0-9]+'::text, '-'::text, 'g'::text),
+  -- El export del dashboard lo mostraba como DEFAULT (inválido en Postgres: un DEFAULT no puede
+  -- referenciar columnas). Es una columna generada; la app nunca la escribe.
+  slug text GENERATED ALWAYS AS (regexp_replace(lower(name), '[^a-z0-9]+'::text, '-'::text, 'g'::text)) STORED,
   address_line1 text,
   address_line2 text,
   city text,
@@ -131,6 +152,8 @@ CREATE TABLE public.event_tickets (
   init_date timestamp with time zone,
   end_date timestamp with time zone,
   total_quantity integer,
+  -- 20260926_D: NULL = válida para cualquier función (FK a event_dates más abajo)
+  event_date_id bigint,
   CONSTRAINT event_tickets_pkey PRIMARY KEY (id),
   CONSTRAINT event_tickets_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.events(id)
 );
@@ -176,6 +199,18 @@ CREATE TABLE public.event_orders (
   ticket_fee bigint,
   balance bigint,
   ticket_details jsonb,
+  -- 20260926_B: atribución, idempotencia del correo y datos del comprador por orden
+  ref text,
+  utm_source text,
+  utm_medium text,
+  utm_campaign text,
+  email_sent_at timestamp with time zone,
+  buyer_first_name text,
+  buyer_last_name text,
+  buyer_email text,
+  buyer_phone text,
+  email_claimed_at timestamp with time zone,
+  processing_started_at timestamp with time zone,
   CONSTRAINT event_orders_pkey PRIMARY KEY (id),
   CONSTRAINT event_orders_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.events(id),
   CONSTRAINT event_orders_attendee_id_fkey FOREIGN KEY (attendee_id) REFERENCES public.attendees(id)
@@ -404,3 +439,102 @@ CREATE TABLE public.notification_log (
 );
 
 CREATE INDEX idx_notification_log_event ON public.notification_log(event_id, type);
+
+-- ---------------------------------------------------------------------------
+-- 20260926_C: datos bancarios para pagos a productores (tabla separada: datos sensibles)
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE public.organization_payout_accounts (
+  organization_id bigint NOT NULL,
+  legal_name text,
+  legal_rut text,
+  bank_name text,
+  bank_account_type text,
+  bank_account_number text,
+  bank_account_holder text,
+  bank_account_rut text,
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_by bigint,
+  CONSTRAINT organization_payout_accounts_pkey PRIMARY KEY (organization_id),
+  CONSTRAINT organization_payout_accounts_organization_id_fkey
+    FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
+  CONSTRAINT organization_payout_accounts_updated_by_fkey
+    FOREIGN KEY (updated_by) REFERENCES public.users(id) ON DELETE SET NULL
+);
+
+-- ---------------------------------------------------------------------------
+-- 20260926_D: entradas por función
+-- ---------------------------------------------------------------------------
+
+ALTER TABLE public.event_tickets
+  ADD CONSTRAINT event_tickets_event_date_id_fkey
+  FOREIGN KEY (event_date_id) REFERENCES public.event_dates(id) ON DELETE SET NULL;
+
+CREATE INDEX event_tickets_event_date_id_idx
+  ON public.event_tickets (event_date_id)
+  WHERE event_date_id IS NOT NULL;
+
+-- ---------------------------------------------------------------------------
+-- Índices de 20260926_B y 20260926_C (mismos nombres que en las migraciones)
+-- ---------------------------------------------------------------------------
+
+CREATE INDEX idx_event_orders_event_status_created ON public.event_orders (event_id, status, created_at);
+CREATE INDEX idx_event_attendees_event_order_id ON public.event_attendees (event_order_id);
+CREATE INDEX idx_event_attendees_event_ticket ON public.event_attendees (event_id, event_ticket_id);
+CREATE INDEX idx_event_attendees_qr_code ON public.event_attendees (qr_code);
+CREATE INDEX idx_event_orders_event_attendee_status ON public.event_orders (event_id, attendee_id, status);
+CREATE INDEX idx_event_tags_event_id ON public.event_tags (event_id);
+
+-- ---------------------------------------------------------------------------
+-- Seguridad (20260926_A0 + 20260926_Z + ex db/policies.sql)
+-- ---------------------------------------------------------------------------
+-- Todo el acceso de la app es server-side con la service role (que se salta RLS) y la autorización se
+-- hace en el código (sesión -> public.users -> organization_id). Por eso TODAS las tablas tienen RLS
+-- activado, NINGUNA política, y anon/authenticated no tienen privilegios (REVOKE explícito, porque
+-- Supabase les otorga default privileges directos, no solo vía PUBLIC).
+--
+-- Historial de db/policies.sql (eliminado; reemplazado por 20260926_A0 y 20260926_Z). Se documenta
+-- para no reintroducir estos agujeros:
+--   * organizations: "Enable read access for all users" (SELECT a public), "Enable insert for
+--     authenticated users" (INSERT sin chequeo) y "Enable update for organization owners" (cualquier
+--     miembro, incluido un validador, podía editar la organización saltándose los roles).
+--   * users: "Enable read access for own profile" y "Enable update for own profile" SIN WITH CHECK
+--     (un usuario podía cambiarse organization_id/role y quedar como admin de otra organización).
+--   * event_visits: INSERT anónimo para el tracking y SELECT para miembros de la organización.
+--   * social_accounts, social_posts, ad_account_connections, ad_campaigns: CRUD para miembros de la
+--     organización vía auth.uid().
+--   * notification_log: SELECT para miembros e INSERT anónimo (las funciones usaban la anon key).
+-- Hoy ninguna de esas rutas existe: el tracking, los logs y el dashboard escriben con la service role.
+
+ALTER TABLE public.attendees ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.category_tags ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.newsletter ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.organizations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.venues ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.event_tickets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.event_locations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.event_orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.event_faqs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.event_tags ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.event_withdrawals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.questions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.event_dates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.event_visits ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.event_attendees ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.social_accounts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.social_posts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ad_account_connections ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ad_campaigns ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.notification_log ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.organization_payout_accounts ENABLE ROW LEVEL SECURITY;
+
+REVOKE ALL ON TABLE
+  public.attendees, public.category_tags, public.newsletter, public.organizations, public.venues,
+  public.users, public.events, public.event_tickets, public.event_locations, public.event_orders,
+  public.event_faqs, public.event_tags, public.event_withdrawals, public.questions, public.event_dates,
+  public.event_visits, public.event_attendees, public.social_accounts, public.social_posts,
+  public.ad_account_connections, public.ad_campaigns, public.notification_log,
+  public.organization_payout_accounts
+FROM anon, authenticated;

@@ -1,4 +1,6 @@
 # https://developers.google.com/search/docs/crawling-indexing/robots/create-robots-txt
+# robots.txt de aitickets.cl. Los sitios de productor en dominio propio sirven su propio robots.txt
+# (src/pages/o/[site]/robots.txt.ts, vía la Edge Function netlify/tenant-router/tenant-router.ts).
 User-agent: *
 Allow: /
 Disallow: /dashboard/
@@ -6,6 +8,8 @@ Disallow: /api/
 Disallow: /order/
 Disallow: /ticket/
 Disallow: /qr/
+Disallow: /pago/
 Disallow: /payment-confirmation
+Disallow: /o/_host/
 
 Sitemap: https://aitickets.cl/sitemap.xml

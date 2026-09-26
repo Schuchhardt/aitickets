@@ -5,6 +5,7 @@
 // Los datos del comprador salen de event_orders.buyer_* (R2), no del registro compartido `attendees`.
 import { getSupabaseAdmin } from "../../lib/auth-helpers";
 import { descriptionToHtml } from "../../lib/sanitize";
+import { LEGAL } from "../../lib/legal";
 import Layout from "../../layouts/Layout.astro";
 import AppHeader from "../../components/AppHeader.vue";
 import AppFooter from "../../components/AppFooter.vue";
@@ -117,7 +118,8 @@ if (!id || !UUID_RE.test(id)) {
             ticket_name: ticketData.event_tickets?.ticket_name || "Entrada General",
             attendee_name: `${attendeeInfo?.first_name || ""} ${attendeeInfo?.last_name || ""}`.trim(),
             attendee_email: attendeeInfo?.email || "",
-            qr_code: ticketData.qr_code || null,
+            // Entrada anulada (p. ej. orden reembolsada): no se muestra el QR
+            qr_code: ticketData.status === "cancelled" ? null : ticketData.qr_code || null,
             status: ticketData.status,
             };
           });
@@ -135,10 +137,12 @@ if (!id || !UUID_RE.test(id)) {
             pendingMessage = "¡Pago recibido! Estamos emitiendo tus entradas; aparecerán aquí y en tu correo en unos minutos.";
           } else if (orderData.status === "pending") {
             pendingMessage = "Estamos confirmando tu pago. Tus entradas aparecerán aquí y llegarán a tu correo apenas se confirme (recarga la página en unos minutos).";
-          } else if (orderData.status === "rejected" || orderData.status === "cancelled" || orderData.status === "failed") {
+          } else if (orderData.status === "refunded") {
+            pendingMessage = "Esta orden fue reembolsada: sus entradas fueron anuladas y ya no sirven para ingresar al evento.";
+          } else if (["rejected", "cancelled", "failed", "expired"].includes(orderData.status)) {
             pendingMessage = "El pago de esta orden no se completó, por lo que no tiene entradas asociadas.";
           } else {
-            pendingMessage = "Esta orden está en revisión. Si ya pagaste, escríbenos a soporte@aitickets.cl.";
+            pendingMessage = `Esta orden está en revisión. Si ya pagaste, escríbenos a ${LEGAL.supportEmail} indicando el número de orden.`;
           }
         }
       }

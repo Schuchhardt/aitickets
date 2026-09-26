@@ -11,7 +11,15 @@ import { eventBus } from '../utils/eventbus.js';
 
 const props = defineProps({
   event: Object,
+  // Sitio de productor: en un dominio propio (fuera de aitickets.cl) "Comprar" lleva al checkout en
+  // aitickets.cl (event.purchase_url, con ?comprar=1), donde funcionan Turnstile y el pago.
+  siteMode: { type: Boolean, default: false },
 });
+
+// Se calcula en el cliente (onMounted) para no romper la hidratación
+const externalPurchaseUrl = ref("");
+const isAiticketsHost = (host) =>
+  host === "aitickets.cl" || host.endsWith(".aitickets.cl") || host === "localhost" || host === "127.0.0.1" || host.endsWith(".netlify.app");
 
 const showModal = ref(false);
 const showReserveModal = ref(false);
@@ -39,6 +47,10 @@ const checkPurchasedTickets = () => {
 };
 
 const openReserveModal = () => {
+  if (externalPurchaseUrl.value) {
+    window.location.href = externalPurchaseUrl.value;
+    return;
+  }
   eventBus.emit('open-modal'); // Emitir evento al abrir el modal (para el asistente de IA)
   eventBus.emit('assistant-hide'); // Evento específico para ocultar el asistente
   showReserveModal.value = true;
@@ -61,6 +73,10 @@ const closePurchasedTickets = () => {
 onMounted(() => {
   // Verificar entradas compradas solo en el cliente
   checkPurchasedTickets();
+
+  if (props.siteMode && props.event?.purchase_url && !isAiticketsHost(window.location.hostname.toLowerCase())) {
+    externalPurchaseUrl.value = props.event.purchase_url;
+  }
   
   eventBus.on('open-modal', handleOpenModal);
   eventBus.on('purchase-completed', handlePurchaseCompleted);

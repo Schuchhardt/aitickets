@@ -7,12 +7,21 @@ import GradientBackground from "../../components/Hero/GradientBackground.vue";
 import "../../styles/global.css";
 
 const turnstileSiteKey = import.meta.env.TURNSTILE_SITE_KEY;
+
+// Registro desde un enlace de lead (?lead=<token>): el token no debe filtrarse por Referer a terceros
+// (Turnstile, analítica) ni indexarse.
+const hasLead = Astro.url.searchParams.has("lead");
+if (hasLead) {
+  Astro.response.headers.set("Referrer-Policy", "no-referrer");
+  Astro.response.headers.set("Cache-Control", "private, no-store");
+}
 ---
 
 <Layout
   title="Crea tu cuenta de productor | AI Tickets"
-  description="Registra tu productora gratis y vende entradas para tus eventos en Chile con 0% de comisión para el productor. Página del evento, pagos, QR y check-in."
+  description="Registra tu productora gratis y vende entradas para tus eventos en Chile con 0% de comisión para el productor. Incluye tu web de eventos gratis, pagos, QR y check-in."
   canonical="/organizadores/registro"
+  noindex={hasLead}
 >
   <script
     src="https://challenges.cloudflare.com/turnstile/v0/api.js"

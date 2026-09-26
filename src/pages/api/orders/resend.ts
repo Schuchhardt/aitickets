@@ -29,6 +29,7 @@ export const POST: APIRoute = async (context) => {
             .maybeSingle();
 
         if (!order) return jsonResponse({ message: "Orden no encontrada" }, 404);
+        if (order.status === "refunded") return jsonResponse({ message: "La orden fue reembolsada: sus entradas están anuladas" }, 400);
         if (order.status !== "paid") return jsonResponse({ message: "Solo se pueden reenviar órdenes pagadas" }, 400);
 
         const result = await sendTicketsEmail(new URL(context.request.url), order.id, true);

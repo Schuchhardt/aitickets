@@ -1,0 +1,189 @@
+---
+// Landing "Tu web de eventos gratis": destino de los enlaces del outreach y fuente de leads con
+// consentimiento con doble opt-in (formulario → /api/outreach/inbound-lead → correo de confirmación →
+// /api/outreach/inbound-confirm → registro prellenado).
+import AppHeader from "../components/AppHeader.vue";
+import AppFooter from "../components/AppFooter.vue";
+import Layout from "../layouts/Layout.astro";
+import { LEGAL } from "../lib/legal";
+import "../styles/global.css";
+
+export const prerender = false;
+
+const turnstileSiteKey = import.meta.env.TURNSTILE_SITE_KEY || import.meta.env.PUBLIC_TURNSTILE_SITE_KEY || "";
+
+const features = [
+  { title: "Tu web lista al registrarte", text: "Una página para tu productora en aitickets.cl/o/tu-productora con la cartelera de tus eventos. Sin programar ni pagar hosting." },
+  { title: "Plantillas y banner", text: "Elige una plantilla, sube tu logo y un banner principal para destacar tu próximo evento." },
+  { title: "Venta de entradas integrada", text: "Cada evento de tu web vende entradas con Webpay y tarjetas, con QR y check-in desde el celular." },
+  { title: "Formulario de contacto", text: "Tus asistentes y marcas te escriben desde tu web y el mensaje llega a tu correo." },
+];
+
+const faqs = [
+  { q: "¿Cuánto cuesta?", a: "La web es gratis. Para ti es 0% de comisión: el comprador paga un cargo por servicio de 10% sobre el valor de la entrada. Los eventos gratuitos no tienen costo." },
+  { q: "¿Cuándo recibo el dinero de las entradas?", a: "Transferimos lo recaudado 48 a 72 horas después de cada función." },
+  { q: "¿Puedo usar mi propio dominio?", a: "Puedes solicitar conectar tu dominio desde el panel. Te indicamos el registro DNS que debes configurar." },
+];
+---
+
+<Layout
+  title="Tu web de eventos gratis | AI Tickets"
+  description="Crea gratis la web de tu productora con tu cartelera, banner, formulario de contacto y venta de entradas integrada. 0% de comisión para el productor."
+  canonical="/web-gratis"
+>
+  {turnstileSiteKey && <script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>}
+  <AppHeader client:idle />
+
+  <main class="bg-white">
+    <section class="px-4 pt-28 pb-16 sm:pt-32 bg-gradient-to-b from-violet-50 to-white">
+      <div class="mx-auto max-w-5xl grid gap-12 lg:grid-cols-2 lg:items-start">
+        <div>
+          <p class="inline-block rounded-full bg-violet-100 px-3 py-1 text-sm font-semibold text-violet-700">Para productoras, salas y centros culturales</p>
+          <h1 class="mt-4 text-4xl font-extrabold tracking-tight text-gray-900 sm:text-5xl">Tu web de eventos gratis</h1>
+          <p class="mt-4 text-lg text-gray-600">
+            Una web para tu productora con tu cartelera y venta de entradas integrada. Para ti es 0% de comisión:
+            el comprador paga un cargo por servicio de 10%.
+          </p>
+          <ul class="mt-8 space-y-5">
+            {features.map((f) => (
+              <li class="flex gap-3">
+                <span class="mt-1 inline-flex h-6 w-6 flex-none items-center justify-center rounded-full bg-violet-600 text-sm font-bold text-white">✓</span>
+                <div>
+                  <p class="font-semibold text-gray-900">{f.title}</p>
+                  <p class="text-gray-600">{f.text}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-lg sm:p-8">
+          <h2 class="text-xl font-bold text-gray-900">Crea tu web</h2>
+          <p class="mt-1 text-sm text-gray-600">Déjanos tus datos, confirma tu correo y sigue al registro con todo prellenado.</p>
+          <div id="wg-success" class="mt-6 hidden rounded-lg bg-green-50 px-4 py-3 text-sm text-green-800" role="status">
+            <p id="wg-success-msg" class="font-medium"></p>
+            <p class="mt-2">¿Prefieres no esperar? <a id="wg-register-link" href="/organizadores/registro?utm_source=web-gratis" class="underline">Regístrate ahora</a> (sin prellenado).</p>
+          </div>
+          <form id="web-gratis-form" class="mt-6 space-y-4" novalidate>
+            <div>
+              <label for="wg-org" class="block text-sm font-medium text-gray-700">Nombre de tu productora *</label>
+              <input id="wg-org" name="orgName" required maxlength="200" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-violet-500 focus:outline-none" />
+            </div>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label for="wg-name" class="block text-sm font-medium text-gray-700">Tu nombre</label>
+                <input id="wg-name" name="name" maxlength="120" autocomplete="name" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-violet-500 focus:outline-none" />
+              </div>
+              <div>
+                <label for="wg-email" class="block text-sm font-medium text-gray-700">Correo *</label>
+                <input id="wg-email" name="email" type="email" required maxlength="254" autocomplete="email" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-violet-500 focus:outline-none" />
+              </div>
+            </div>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label for="wg-site" class="block text-sm font-medium text-gray-700">Sitio web o Instagram</label>
+                <input id="wg-site" name="website" maxlength="300" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-violet-500 focus:outline-none" />
+              </div>
+              <div>
+                <label for="wg-city" class="block text-sm font-medium text-gray-700">Ciudad</label>
+                <input id="wg-city" name="city" maxlength="120" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-violet-500 focus:outline-none" />
+              </div>
+            </div>
+            <div>
+              <label for="wg-event" class="block text-sm font-medium text-gray-700">Tu próximo evento</label>
+              <input id="wg-event" name="eventName" maxlength="200" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-violet-500 focus:outline-none" />
+            </div>
+            <div class="hidden" aria-hidden="true">
+              <label>No completar <input name="company_website_hp" tabindex="-1" autocomplete="off" /></label>
+            </div>
+            <label class="flex items-start gap-2 text-sm text-gray-600">
+              <input type="checkbox" name="acceptedPrivacy" required class="mt-1" />
+              <span>Acepto que {LEGAL.brand} ({LEGAL.entity}) use estos datos para contactarme sobre mi web y la venta de entradas, según la <a href="/privacy" class="underline" target="_blank">política de privacidad</a>.</span>
+            </label>
+            {turnstileSiteKey && <div class="cf-turnstile" data-sitekey={turnstileSiteKey} data-language="es"></div>}
+            <p id="wg-error" class="hidden rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert"></p>
+            <button type="submit" id="wg-submit" class="w-full rounded-xl bg-violet-600 px-6 py-3 font-semibold text-white hover:bg-violet-700 disabled:opacity-60">
+              Quiero mi web gratis
+            </button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <section class="px-4 py-16">
+      <div class="mx-auto max-w-3xl">
+        <h2 class="text-2xl font-bold text-gray-900">Preguntas frecuentes</h2>
+        <dl class="mt-6 space-y-6">
+          {faqs.map((f) => (
+            <div>
+              <dt class="font-semibold text-gray-900">{f.q}</dt>
+              <dd class="mt-1 text-gray-600">{f.a}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    </section>
+  </main>
+
+  <AppFooter client:idle />
+</Layout>
+
+<script>
+  const form = document.getElementById("web-gratis-form") as HTMLFormElement | null;
+  const errorBox = document.getElementById("wg-error");
+  const submit = document.getElementById("wg-submit") as HTMLButtonElement | null;
+  const showError = (msg: string) => {
+    if (!errorBox) return;
+    errorBox.textContent = msg;
+    errorBox.classList.remove("hidden");
+  };
+  form?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    errorBox?.classList.add("hidden");
+    const data = new FormData(form);
+    const email = String(data.get("email") || "").trim();
+    const orgName = String(data.get("orgName") || "").trim();
+    if (!orgName || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return showError("Ingresa el nombre de tu productora y un correo válido.");
+    if (!data.get("acceptedPrivacy")) return showError("Debes aceptar la política de privacidad.");
+    const cfToken = String(data.get("cf-turnstile-response") || "");
+    if (form.querySelector(".cf-turnstile") && !cfToken) return showError("Completa la verificación de seguridad.");
+    if (submit) submit.disabled = true;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const res = await fetch("/api/outreach/inbound-lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orgName,
+          email,
+          name: data.get("name"),
+          website: data.get("website"),
+          city: data.get("city"),
+          eventName: data.get("eventName"),
+          company_website_hp: data.get("company_website_hp"),
+          acceptedPrivacy: true,
+          cfToken,
+          ref: params.get("ref"),
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.message || "No pudimos enviar el formulario.");
+      (window as any).gtag?.("event", "generate_lead", { form: "web_gratis" });
+      if (json.confirmationSent) {
+        // Doble opt-in: el prellenado y el consentimiento se aplican al confirmar desde el correo.
+        const msg = document.getElementById("wg-success-msg");
+        if (msg) msg.textContent = json.message || "Te enviamos un correo. Ábrelo y confirma tu dirección para seguir.";
+        const link = document.getElementById("wg-register-link") as HTMLAnchorElement | null;
+        if (link && json.redirectUrl) link.href = json.redirectUrl;
+        form.classList.add("hidden");
+        document.getElementById("wg-success")?.classList.remove("hidden");
+        return;
+      }
+      window.location.href = json.redirectUrl || "/organizadores/registro";
+    } catch (err) {
+      showError(err instanceof Error ? err.message : "No pudimos enviar el formulario.");
+      (window as any).turnstile?.reset?.();
+      if (submit) submit.disabled = false;
+    }
+  });
+</script>

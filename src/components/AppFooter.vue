@@ -2,6 +2,7 @@
 import logoLight from "../images/logo.png";
 import iconArrowGreen from "../images/icon-arrow-green.png";
 import { ref, onMounted } from "vue";
+import { LEGAL } from "../lib/legal";
 
 // Estado del formulario
 const email = ref("");
@@ -139,18 +140,22 @@ const submitForm = async (event) => {
         <li><a href="/eventos" class="hover:underline">Eventos</a></li>
         <li><a href="/organizadores" class="hover:underline">Para organizadores</a></li>
         <li><a href="/organizadores/registro" class="hover:underline">Crear cuenta de productor</a></li>
+        <li><a href="/precios" class="hover:underline">Precios</a></li>
+        <li><a href="/web-gratis" class="hover:underline">Web de eventos gratis</a></li>
         <li><a href="/presentacion" class="hover:underline">Presentación</a></li>
       </ul>
     </nav>
 
     <!-- Links de términos y condiciones -->
     <div class="mt-4 text-center text-gray-500 text-sm font-['Prompt']">
-      <div class="flex justify-center space-x-4">
+      <div class="flex flex-wrap justify-center gap-x-4 gap-y-2 px-6">
         <a href="/terms" class="hover:underline">Términos y condiciones</a>
-        <span>|</span>
+        <span aria-hidden="true">|</span>
+        <a href="/terminos-productores" class="hover:underline">Términos para productores</a>
+        <span aria-hidden="true">|</span>
         <a href="/privacy" class="hover:underline">Aviso de privacidad</a>
       </div>
-      <p class="mt-3 text-xs text-gray-400">© AI Tickets SpA · Chile</p>
+      <p class="mt-3 text-xs text-gray-400">© 2026 {{ LEGAL.entity }} · {{ LEGAL.brand }}</p>
     </div>
 
   </footer>
