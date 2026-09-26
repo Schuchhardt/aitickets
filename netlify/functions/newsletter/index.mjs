@@ -1,123 +1,65 @@
-import fetch from 'node-fetch';
-import { createClient } from '@supabase/supabase-js';
+// POST /api/newsletter — suscripción al newsletter (Supabase + MailerLite).
+// Privacidad: no se guarda la IP, solo el país (geo de Netlify).
+import { getSupabaseAdmin, json } from '../../lib/supabase.mjs'
+import { isValidEmail } from '../../lib/mailer.mjs'
 
-// Configurar Supabase
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-// Configurar MailerLite
-const mailerLiteApiKey = process.env.MAILERLITE_API_TOKEN;
-const mailerLiteGroupId = process.env.MAILERLITE_GROUP_ID; // Opcional
+const clean = (value, max) => (typeof value === 'string' ? value.replace(/[\u0000-\u001f]/g, '').trim().slice(0, max) : null) || null
 
 export default async function handler(req, context) {
-  if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ message: 'Método no permitido' }), { status: 405 });
+  if (req.method !== 'POST') return json({ message: 'Método no permitido' }, 405)
+
+  let body
+  try {
+    body = await req.json()
+  } catch {
+    return json({ message: 'Solicitud inválida' }, 400)
   }
 
+  const email = clean(body?.email, 254)?.toLowerCase()
+  if (!email || !isValidEmail(email)) return json({ message: 'Ingresa un correo electrónico válido' }, 400)
+
+  const language = clean(body?.language, 20)
+  const timezone = clean(body?.timezone, 64)
+  const referrer = clean(body?.referrer, 512)
+  const country = context?.geo?.country?.name || null
+
   try {
-    const { email, language, timezone, userAgent, referrer } = await req.json();
-    if (!email) {
-      return new Response(JSON.stringify({ message: 'Email requerido' }), { status: 400 });
-    }
-
-    // Obtener IP y país desde Netlify Context
-    const userIp = context.ip || '0.0.0.0';
-    const country = context.geo?.country?.name || 'Desconocido';
-
-    // Verificar si el correo ya está registrado en Supabase
-    const { data: existingUser, error: fetchError } = await supabase
+    const supabase = getSupabaseAdmin()
+    const { data: existing, error: fetchError } = await supabase
       .from('newsletter')
-      .select('email')
+      .select('id')
       .eq('email', email)
-      .single();
+      .limit(1)
+    if (fetchError) throw new Error(fetchError.message)
+    if (existing?.length) return json({ message: 'Ya estás registrado' }, 200)
 
-    if (fetchError && fetchError.code !== 'PGRST116') {
-      return new Response(JSON.stringify({
-        message: 'Ha ocurrido un error, intenta más tarde',
-        error: fetchError.message
-      }), { status: 500 });
-    }
-
-    if (existingUser) {
-      return new Response(JSON.stringify({
-        message: 'Ya estás registrado',
-        error: 'Correo duplicado en Supabase'
-      }), { status: 400 });
-    }
-
-    // Insertar en Supabase
     const { error: insertError } = await supabase
       .from('newsletter')
-      .insert([{ 
-        email, 
-        ip: userIp, 
-        country, 
-        language, 
-        timezone, 
-        userAgent, 
-        referrer // Guardamos referrer o UTM en un solo campo
-      }]);
+      .insert([{ email, country, language, timezone, referrer }])
+    if (insertError) throw new Error(insertError.message)
 
-    if (insertError) {
-      return new Response(JSON.stringify({
-        message: 'Ha ocurrido un error, intenta más tarde',
-        error: insertError.message
-      }), { status: 500 });
+    const mailerLiteApiKey = process.env.MAILERLITE_API_TOKEN
+    if (mailerLiteApiKey) {
+      const groupId = process.env.MAILERLITE_GROUP_ID
+      const res = await fetch('https://connect.mailerlite.com/api/subscribers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${mailerLiteApiKey}` },
+        body: JSON.stringify({
+          email,
+          groups: groupId ? [groupId] : [],
+          fields: { country, language, timezone, tracking_source: referrer || '' },
+        }),
+      })
+      if (!res.ok) console.error('MailerLite respondió', res.status)
     }
 
-    // Enviar a MailerLite
-    const mailerLiteResponse = await fetch('https://connect.mailerlite.com/api/subscribers', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${mailerLiteApiKey}`,
-      },
-      body: JSON.stringify({
-        email,
-        groups: mailerLiteGroupId ? [mailerLiteGroupId] : [],
-        fields: { 
-          country, 
-          ip_address: userIp, 
-          language, 
-          timezone, 
-          user_agent: userAgent, 
-          tracking_source: referrer || ''
-        },
-      }),
-    });
-
-    const mailerLiteData = await mailerLiteResponse.json();
-
-    if (!mailerLiteResponse.ok) {
-      return new Response(JSON.stringify({
-        message: 'Ha ocurrido un error, intenta más tarde',
-        error: mailerLiteData
-      }), { status: 500 });
-    }
-
-    return new Response(
-      JSON.stringify({
-        message: 'Correo agregado y registrado en MailerLite con éxito',
-        email,
-        ip: userIp,
-        country,
-        language,
-        timezone,
-        userAgent,
-        referrer
-      }),
-      { status: 200 }
-    );
+    return json({ message: '¡Gracias por suscribirte!' }, 200)
   } catch (error) {
-    return new Response(JSON.stringify({
-      message: 'Ha ocurrido un error, intenta más tarde',
-      error: error.message
-    }), { status: 500 });
+    console.error('Error en newsletter:', error?.message)
+    return json({ message: 'Ha ocurrido un error, intenta más tarde' }, 500)
   }
 }
 
-// Definir rutas personalizadas
 export const config = {
   path: ['/api/newsletter', '/api/subscribe'],
-};
+}

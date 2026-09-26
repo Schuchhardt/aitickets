@@ -1,205 +1,382 @@
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin, getFriendlyErrorMessage } from "../../../lib/auth-helpers";
-import { getSessionUser } from "../../../lib/supabaseServer";
+import { getSessionContext, getOwnedEvent, hasRole, EVENT_MANAGER_ROLES, jsonResponse } from "../../../lib/supabaseServer";
+import { callInternalFunction, notifySlack, siteUrl } from "../_lib/server-utils";
+import { syncEventCategory, refreshEventDenorm, normalizeTicket, isClientTempId, isValidDateInput, resolveTicketDateId } from "../_lib/events";
+import { sanitizeRichText } from "../../../lib/sanitize";
 
 export const POST: APIRoute = async (context) => {
-    const user = await getSessionUser(context);
-
-    if (!user) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+    const session = await getSessionContext(context);
+    if (!session) return jsonResponse({ error: "Unauthorized" }, 401);
+    const { dbUser } = session;
+    if (!hasRole(dbUser, EVENT_MANAGER_ROLES)) {
+        return jsonResponse({ message: "No tienes permisos para editar eventos" }, 403);
     }
 
     try {
         const body = await context.request.json();
-        const { eventId, general, locations, tickets, statusOnly, status } = body;
+        const { eventId, general, locations, tickets, statusOnly, status } = body || {};
 
         if (!eventId) {
-            return new Response(JSON.stringify({ message: "Event ID is required" }), { status: 400 });
+            return jsonResponse({ message: "Event ID is required" }, 400);
         }
 
         const supabaseAdmin = getSupabaseAdmin();
 
-        // 1. Verify Ownership
-        const { data: dbUser } = await supabaseAdmin
-            .from('users')
-            .select('id')
-            .eq('auth_user_id', user.id)
-            .single();
-
-        if (!dbUser) throw new Error("User not found");
-
-        const { data: event, error: fetchError } = await supabaseAdmin
-            .from('events')
-            .select('id')
-            .eq('id', eventId)
-            .eq('created_by', dbUser.id)
-            .single();
-
-        if (fetchError || !event) {
-            return new Response(JSON.stringify({ message: "Evento no encontrado o no autorizado" }), { status: 403 });
+        // 1. Verificar que el evento pertenece a la organización del usuario (cualquier miembro del equipo con rol de gestión)
+        const event = await getOwnedEvent<{ id: number; name: string; slug: string; status: string; accessibility: string | null; start_date: string | null }>(
+            eventId, dbUser.organization_id, "id, name, slug, status, accessibility, start_date",
+        );
+        if (!event) {
+            return jsonResponse({ message: "Evento no encontrado o no autorizado" }, 403);
         }
 
-        // Status-only update (publish/pause)
+        // Cambio de estado (publicar / pausar)
         if (statusOnly && status) {
-            const validStatuses = ['published', 'draft'];
-            if (!validStatuses.includes(status)) {
-                return new Response(JSON.stringify({ message: "Estado inválido" }), { status: 400 });
+            if (!["published", "draft"].includes(status)) {
+                return jsonResponse({ message: "Estado inválido" }, 400);
             }
+
+            const update: Record<string, unknown> = { status };
+
+            if (status === "published") {
+                const [{ count: datesCount }, { count: ticketsCount }] = await Promise.all([
+                    supabaseAdmin.from("event_dates").select("id", { count: "exact", head: true }).eq("event_id", event.id),
+                    supabaseAdmin.from("event_tickets").select("id", { count: "exact", head: true }).eq("event_id", event.id),
+                ]);
+                if (!datesCount && !event.start_date) {
+                    return jsonResponse({ message: "Para publicar, el evento debe tener al menos una función (fecha y hora)." }, 400);
+                }
+                if (!ticketsCount) {
+                    return jsonResponse({ message: "Para publicar, el evento debe tener al menos un tipo de entrada." }, 400);
+                }
+                if (!event.accessibility) update.accessibility = "public";
+                if (datesCount) await refreshEventDenorm(event.id);
+            }
+
             const { error: statusError } = await supabaseAdmin
-                .from('events')
-                .update({ status })
-                .eq('id', eventId);
+                .from("events")
+                .update(update)
+                .eq("id", event.id)
+                .eq("organization_id", dbUser.organization_id);
             if (statusError) throw statusError;
-            return new Response(JSON.stringify({ message: "Estado actualizado", id: eventId }), { status: 200 });
+
+            if (status === "published" && event.status !== "published") {
+                const { data: org } = await supabaseAdmin
+                    .from("organizations")
+                    .select("public_name")
+                    .eq("id", dbUser.organization_id)
+                    .single();
+                const site = siteUrl() || new URL(context.request.url).origin;
+                await notifySlack(
+                    `🚀 *Evento publicado*\n• *Evento:* ${event.name}\n• *Organización:* ${org?.public_name || dbUser.organization_id}\n• *Publicado por:* ${dbUser.name || dbUser.email}\n• *Link:* ${site}/eventos/${event.slug}`,
+                );
+            }
+
+            return jsonResponse({ message: "Estado actualizado", id: event.id }, 200);
         }
 
-        // 2. Update Event Details
-        const { error: updateError } = await supabaseAdmin
-            .from('events')
-            .update({
-                name: general.name,
-                description: general.description,
-                image_url: general.imageUrl,
-                title: general.name
-            })
-            .eq('id', eventId);
+        if (!general?.name || !Array.isArray(locations) || !Array.isArray(tickets)) {
+            return jsonResponse({ message: "Faltan datos requeridos" }, 400);
+        }
+        for (const loc of locations) {
+            if (!Array.isArray(loc?.dates) || !loc.dates.every(isValidDateInput)) {
+                return jsonResponse({ message: "Revisa las funciones: fecha y hora deben ser válidas" }, 400);
+            }
+        }
+        const normalizedTickets = tickets.map((t: any) => ({ raw: t, data: normalizeTicket(t) }));
+        if (normalizedTickets.some((t: any) => !t.data)) {
+            return jsonResponse({ message: "Revisa las entradas: nombre, precio y cantidad deben ser válidos" }, 400);
+        }
+        const notifyAttendees = body?.notifyAttendees === true;
+        const notifyMessage = typeof body?.notifyMessage === "string" ? body.notifyMessage.trim().slice(0, 1500) : "";
 
+        // Foto "antes" de funciones y recintos, para decidir si hay que avisar a los asistentes
+        const before = await loadSchedule(event.id);
+
+        // 2. Datos generales
+        const name = String(general.name).trim().slice(0, 200);
+        const { error: updateError } = await supabaseAdmin
+            .from("events")
+            .update({
+                name,
+                title: name,
+                description: sanitizeRichText(general.description),
+                image_url: general.imageUrl || null,
+                accessibility: general.isPrivate ? "private" : "public",
+            })
+            .eq("id", event.id)
+            .eq("organization_id", dbUser.organization_id);
         if (updateError) throw updateError;
 
-        // 3. Update/Upsert Tickets
-        // Strategy: We loop through tickets. If ID exists (and is numeric/bigint), update. If ID is timestamp-ish (from Date.now() on client), it's new -> insert.
-        // Actually, client sends ID for existing ones.
-        for (const t of tickets) {
-            // Check if ID is a real DB ID (assuming standard integer IDs, or BigInt). 
-            // New items from client have ID = Date.now(), which is very large but distinct. 
-            // We can check if it exists in DB? Or relies on explicit "isNew" flag?
-            // "Date.now()" IDs will fail if we try to update them in DB if they don't exist.
-            // Better: If we can't find it, insert. Wait, `upsert` needs the PK.
-            // If we send an ID that doesn't exist, Supabase Upsert attempts to insert it WITH that ID.
-            // But we want DB to generate ID for new ones.
-            // So: Separate New vs Existing.
+        await syncEventCategory(event.id, general.category);
 
-            // Heuristic: If ID looks generated (from frontend we might not know), but we can trust if it came from `initialFormState` it's real.
-            // Simple: If `t.id` is present in the `initialFormState` passed to frontend, it's real.
-            // But API doesn't know `initialFormState`.
-
-            // Let's assume we pass `id` only for existing. Frontend `id` for new items (Date.now()) should be stripped or ignored?
-            // Actually, `EditEventForm` initializes with real IDs. New items get `Date.now()`.
-            // Real IDs usually are small integers (1, 2, 100). `Date.now()` is 1700000000xxx.
-            // DB IDs are BigInt... so they could be large.
-            // Better: Try to Update. If 0 rows affected, Insert? No, that's heavy.
-
-            // Let's just Upsert everything? No, autoincrement.
-            // Let's try to pass `id` ONLY if it is a persistent ID.
-            // Frontend: `addTicket` uses `Date.now()`.
-            // We can just strip the ID if it's > 2000000000 (roughly). Or just handle inserts separately.
-
-            // Simpler: The payload could separate `newTickets` vs `existingTickets`.
-            // But for now, let's just attempt to Insert if it looks like a new item?
-            // Actually, let's iterate. 
-            // If we strip ID from insert, it creates new.
-            // If we include ID for update, it updates.
-
-            // Hacky check: Is ID > 1000000000000? -> It's a timestamp -> Treat as New (Undefined ID).
-            const isNew = t.id > 1000000000000;
-
-            const ticketPayload = {
-                ticket_name: t.name,
-                price: t.price,
-                total_quantity: t.quantity,
-                event_id: eventId
-            };
-
-            if (isNew) {
-                // Insert
-                await supabaseAdmin.from('event_tickets').insert(ticketPayload);
-            } else {
-                // Update
-                await supabaseAdmin.from('event_tickets').update(ticketPayload).eq('id', t.id);
-            }
-        }
-
-        // 4. Locations & Dates - Similar logic
-        // This is nested and harder.
-        // For existing location, update details. For new, insert.
-        // Inside location, handle dates.
+        // 3. Ubicaciones y funciones (antes que las entradas: las entradas pueden apuntar a una función nueva — R1)
+        const existingLocationIds = new Set(before.locations.map((l) => String(l.id)));
+        const existingDateIds = new Set(before.dates.map((d) => String(d.id)));
+        const keptLocationIds = new Set<string>();
+        const keptDateIds = new Set<string>();
+        // id del formulario (real o temporal) -> id real de event_dates de este evento
+        const dateIdMap = new Map<string, number>();
 
         for (const loc of locations) {
-            const isLocNew = loc.id > 1000000000000;
-            let locationId = loc.id;
-
             let venueId = loc.venueId;
-            if (loc.isNewVenue && loc.newVenueName) {
-                // Create Venue if needed (this logic reused from create)
-                const { data: newVenue } = await supabaseAdmin.from('venues').insert({
-                    name: loc.newVenueName,
-                    address_line1: loc.newVenueAddress,
-                    city: loc.newVenueCity,
-                    country_code: 'CL'
-                }).select().single();
-                venueId = newVenue?.id;
+            if (loc.isNewVenue && String(loc.newVenueName || "").trim()) {
+                const { data: newVenue, error: venueError } = await supabaseAdmin
+                    .from("venues")
+                    .insert({
+                        name: String(loc.newVenueName).trim(),
+                        address_line1: loc.newVenueAddress || null,
+                        city: loc.newVenueCity || null,
+                        country_code: "CL",
+                        timezone: "America/Santiago",
+                    })
+                    .select("id")
+                    .single();
+                if (venueError) throw venueError;
+                venueId = newVenue.id;
             }
 
-            if (isLocNew) {
-                const { data: newLoc } = await supabaseAdmin.from('event_locations').insert({
-                    event_id: eventId,
-                    venue_id: venueId,
-                    name: 'Main'
-                }).select().single();
-                locationId = newLoc?.id;
-            } else {
-                // Update Location (e.g. venue changed)
+            let locationId: string | null = null;
+            const isExistingLoc = !isClientTempId(loc.id) && existingLocationIds.has(String(loc.id));
+            if (isExistingLoc) {
+                locationId = String(loc.id);
                 if (venueId) {
-                    await supabaseAdmin.from('event_locations').update({ venue_id: venueId }).eq('id', locationId);
+                    const { error } = await supabaseAdmin
+                        .from("event_locations")
+                        .update({ venue_id: venueId })
+                        .eq("id", locationId)
+                        .eq("event_id", event.id);
+                    if (error) throw error;
                 }
+            } else {
+                if (!venueId) continue;
+                const { data: newLoc, error } = await supabaseAdmin
+                    .from("event_locations")
+                    .insert({ event_id: event.id, venue_id: venueId, name: "Main" })
+                    .select("id")
+                    .single();
+                if (error) throw error;
+                locationId = newLoc.id;
             }
+            keptLocationIds.add(String(locationId));
 
-            // Dates
-            if (locationId && loc.dates) {
-                for (const d of loc.dates) {
-                    const isDateNew = d.id > 1000000000000;
-                    const datePayload = {
-                        date: d.date,
-                        start_time: d.startTime,
-                        end_time: d.endTime,
-                        event_location_id: locationId,
-                        event_id: eventId
-                    };
-
-                    if (isDateNew) {
-                        await supabaseAdmin.from('event_dates').insert(datePayload);
-                    } else {
-                        await supabaseAdmin.from('event_dates').update(datePayload).eq('id', d.id);
-                    }
+            for (const d of loc.dates || []) {
+                const datePayload = {
+                    date: d.date,
+                    start_time: d.startTime,
+                    end_time: d.endTime || null,
+                    event_location_id: locationId,
+                    event_id: event.id,
+                };
+                if (!isClientTempId(d.id) && existingDateIds.has(String(d.id))) {
+                    keptDateIds.add(String(d.id));
+                    const { error } = await supabaseAdmin
+                        .from("event_dates")
+                        .update(datePayload)
+                        .eq("id", d.id)
+                        .eq("event_id", event.id);
+                    if (error) throw error;
+                    dateIdMap.set(String(d.id), Number(d.id));
+                } else {
+                    const { data: newDate, error } = await supabaseAdmin
+                        .from("event_dates")
+                        .insert(datePayload)
+                        .select("id")
+                        .single();
+                    if (error) throw error;
+                    if (d.id !== undefined && d.id !== null && d.id !== "") dateIdMap.set(String(d.id), newDate.id as number);
                 }
             }
         }
 
-
-        // Notify attendees if the event is published and this is a real content update
-        const { data: currentEvent } = await supabaseAdmin
-            .from('events')
-            .select('status')
-            .eq('id', eventId)
-            .single();
-
-        if (currentEvent?.status === 'published') {
-            const origin = new URL(context.request.url).origin;
-            fetch(`${origin}/api/send-event-notification`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    eventId,
-                    changeType: 'general_update',
-                    changeDescription: 'El organizador ha actualizado la información del evento. Revisa los detalles actualizados.'
-                })
-            }).catch(err => console.error('Notification error:', err));
+        // Funciones y ubicaciones eliminadas en el formulario
+        // (event_tickets.event_date_id tiene ON DELETE SET NULL: sus entradas pasan a "todas las funciones")
+        const removedDateIds = [...existingDateIds].filter((id) => !keptDateIds.has(id));
+        if (removedDateIds.length) {
+            await supabaseAdmin.from("event_dates").delete().eq("event_id", event.id).in("id", removedDateIds);
+        }
+        const removedLocationIds = [...existingLocationIds].filter((id) => !keptLocationIds.has(id));
+        if (removedLocationIds.length) {
+            await supabaseAdmin.from("event_dates").delete().eq("event_id", event.id).in("event_location_id", removedLocationIds);
+            const { error } = await supabaseAdmin.from("event_locations").delete().eq("event_id", event.id).in("id", removedLocationIds);
+            if (error) console.error("No se pudieron borrar ubicaciones:", error);
         }
 
-        return new Response(JSON.stringify({ message: "Evento actualizado", id: eventId }), { status: 200 });
+        // 4. Entradas: actualizar existentes (solo las de ESTE evento), insertar nuevas, retirar las eliminadas
+        const { data: existingTickets } = await supabaseAdmin
+            .from("event_tickets")
+            .select("id")
+            .eq("event_id", event.id);
+        const existingTicketIds = new Set((existingTickets || []).map((t: any) => String(t.id)));
+        const keptTicketIds = new Set<string>();
 
+        for (const { raw, data } of normalizedTickets) {
+            const eventDateId = resolveTicketDateId(raw.eventDateId, dateIdMap);
+            if (!isClientTempId(raw.id) && existingTicketIds.has(String(raw.id))) {
+                keptTicketIds.add(String(raw.id));
+                const { error } = await supabaseAdmin
+                    .from("event_tickets")
+                    .update({
+                        ticket_name: data!.ticket_name,
+                        price: data!.price,
+                        total_quantity: data!.total_quantity,
+                        // solo tocar la función / ventana de venta si el formulario las envía
+                        ...(raw.eventDateId !== undefined ? { event_date_id: eventDateId } : {}),
+                        ...(raw.initDate !== undefined ? { init_date: data!.init_date } : {}),
+                        ...(raw.endDate !== undefined ? { end_date: data!.end_date } : {}),
+                    })
+                    .eq("id", raw.id)
+                    .eq("event_id", event.id);
+                if (error) throw error;
+            } else {
+                const { error } = await supabaseAdmin.from("event_tickets").insert({
+                    ...data,
+                    event_date_id: eventDateId,
+                    event_id: event.id,
+                    max_quantity: 10,
+                    is_gift: false,
+                    status: "available",
+                });
+                if (error) throw error;
+            }
+        }
+
+        // Entradas eliminadas en el formulario: se borran si no tienen ventas; si tienen, se retiran de la venta
+        for (const ticketId of existingTicketIds) {
+            if (keptTicketIds.has(ticketId)) continue;
+            const { count: sold } = await supabaseAdmin
+                .from("event_attendees")
+                .select("id", { count: "exact", head: true })
+                .eq("event_ticket_id", ticketId);
+            if (sold) {
+                await supabaseAdmin.from("event_tickets").update({ status: "unavailable" }).eq("id", ticketId).eq("event_id", event.id);
+            } else {
+                const { error } = await supabaseAdmin.from("event_tickets").delete().eq("id", ticketId).eq("event_id", event.id);
+                if (error) {
+                    // p. ej. referenciada por otra tabla: retirarla de la venta
+                    await supabaseAdmin.from("event_tickets").update({ status: "unavailable" }).eq("id", ticketId).eq("event_id", event.id);
+                }
+            }
+        }
+
+        // 5. Recalcular start_date / end_date / location
+        await refreshEventDenorm(event.id);
+
+        // 6. Avisar a los asistentes SOLO si cambió algo relevante (contrato C8, server-to-server)
+        let notified: string | null = null;
+        if (event.status === "published") {
+            const after = await loadSchedule(event.id);
+            const change = describeScheduleChange(before, after);
+            let payload: { changeType: string; changeDescription: string } | null = null;
+            if (change) {
+                const extra = notifyMessage ? `\n\nMensaje del organizador: ${notifyMessage}` : "";
+                payload = { changeType: change.type, changeDescription: change.description + extra };
+            } else if (notifyAttendees) {
+                payload = {
+                    changeType: "general_update",
+                    changeDescription: notifyMessage || "El organizador actualizó la información del evento. Revisa los detalles actualizados.",
+                };
+            }
+            if (payload) {
+                notified = payload.changeType;
+                // Se espera un máximo de 5s: en serverless un fetch no esperado puede cortarse al responder.
+                const notification = callInternalFunction(new URL(context.request.url), "/api/send-event-notification", {
+                    eventId: event.id,
+                    ...payload,
+                }).then((r) => {
+                    if (!r.ok) console.error("Notification error:", r.status, r.data);
+                });
+                await Promise.race([notification, new Promise((resolve) => setTimeout(resolve, 5000))]);
+            }
+        }
+
+        return jsonResponse({ message: "Evento actualizado", id: event.id, notified }, 200);
     } catch (error) {
         console.error("Update error:", error);
-        return new Response(JSON.stringify({ message: getFriendlyErrorMessage(error) }), { status: 500 });
+        return jsonResponse({ message: getFriendlyErrorMessage(error) }, 500);
     }
 };
+
+// ---------------------------------------------------------------------------
+// Detección de cambios de funciones / recinto
+// ---------------------------------------------------------------------------
+type Schedule = {
+    locations: { id: string; venue_id: string | null }[];
+    dates: { id: number; date: string; start_time: string; end_time: string | null; event_location_id: string | null }[];
+    venueNames: Map<string, string>;
+};
+
+async function loadSchedule(eventId: number): Promise<Schedule> {
+    const supabase = getSupabaseAdmin();
+    const [{ data: locs }, { data: dates }] = await Promise.all([
+        supabase.from("event_locations").select("id, venue_id, venues ( id, name )").eq("event_id", eventId),
+        supabase.from("event_dates").select("id, date, start_time, end_time, event_location_id").eq("event_id", eventId),
+    ]);
+    const venueNames = new Map<string, string>();
+    for (const l of locs || []) {
+        const v: any = Array.isArray((l as any).venues) ? (l as any).venues[0] : (l as any).venues;
+        if (v?.id) venueNames.set(String(v.id), v.name || "");
+    }
+    return {
+        locations: (locs || []).map((l: any) => ({ id: String(l.id), venue_id: l.venue_id ? String(l.venue_id) : null })),
+        dates: (dates || []).map((d: any) => ({
+            id: d.id,
+            date: String(d.date).slice(0, 10),
+            start_time: String(d.start_time || "").slice(0, 5),
+            end_time: d.end_time ? String(d.end_time).slice(0, 5) : null,
+            event_location_id: d.event_location_id ? String(d.event_location_id) : null,
+        })),
+        venueNames,
+    };
+}
+
+const DAY_FMT = new Intl.DateTimeFormat("es-CL", { timeZone: "UTC", weekday: "short", day: "numeric", month: "short" });
+
+function functionLabel(d: Schedule["dates"][number], s: Schedule): string {
+    const [y, m, day] = d.date.split("-").map(Number);
+    const dayLabel = DAY_FMT.format(new Date(Date.UTC(y, m - 1, day, 12)));
+    const loc = s.locations.find((l) => l.id === d.event_location_id);
+    const venue = loc?.venue_id ? s.venueNames.get(loc.venue_id) : "";
+    return `${dayLabel} · ${d.start_time}${d.end_time ? `–${d.end_time}` : ""}${venue ? ` · ${venue}` : ""}`;
+}
+
+/** Devuelve null si no cambiaron fechas/horarios ni recintos. */
+function describeScheduleChange(before: Schedule, after: Schedule): { type: "date_change" | "venue_change"; description: string } | null {
+    const timeKey = (d: Schedule["dates"][number]) => `${d.date}|${d.start_time}|${d.end_time || ""}`;
+    const beforeTimes = new Map(before.dates.map((d) => [timeKey(d), d]));
+    const afterTimes = new Map(after.dates.map((d) => [timeKey(d), d]));
+    const removed = [...beforeTimes.keys()].filter((k) => !afterTimes.has(k)).map((k) => beforeTimes.get(k)!);
+    const added = [...afterTimes.keys()].filter((k) => !beforeTimes.has(k)).map((k) => afterTimes.get(k)!);
+    const datesChanged = removed.length > 0 || added.length > 0;
+
+    const venueSet = (s: Schedule) => new Set(s.locations.map((l) => l.venue_id).filter(Boolean) as string[]);
+    const beforeVenues = venueSet(before);
+    const afterVenues = venueSet(after);
+    // también cuenta como cambio de lugar si una función que se mantiene cambió de recinto
+    const venueOf = (s: Schedule, d: Schedule["dates"][number]) => s.locations.find((l) => l.id === d.event_location_id)?.venue_id || null;
+    const movedFunctions = [...afterTimes.entries()]
+        .filter(([k, d]) => beforeTimes.has(k) && venueOf(before, beforeTimes.get(k)!) !== venueOf(after, d));
+    const venuesChanged =
+        beforeVenues.size !== afterVenues.size || [...afterVenues].some((v) => !beforeVenues.has(v)) || movedFunctions.length > 0;
+
+    if (!datesChanged && !venuesChanged) return null;
+
+    const lines: string[] = [];
+    if (datesChanged) {
+        if (removed.length) lines.push(`Funciones que ya no se realizan en ese horario:\n${removed.map((d) => `• ${functionLabel(d, before)}`).join("\n")}`);
+        if (added.length) lines.push(`Nuevas fechas u horarios:\n${added.map((d) => `• ${functionLabel(d, after)}`).join("\n")}`);
+    }
+    if (venuesChanged) {
+        const names = (s: Schedule, ids: Set<string>) => [...ids].map((id) => s.venueNames.get(id) || "").filter(Boolean);
+        const beforeNames = names(before, beforeVenues);
+        const afterNames = names(after, afterVenues);
+        lines.push(
+            `Cambio de lugar: ${beforeNames.join(", ") || "lugar anterior"} → ${afterNames.join(", ") || "nuevo lugar"}` +
+            (movedFunctions.length ? `\n${movedFunctions.map(([, d]) => `• ${functionLabel(d, after)}`).join("\n")}` : ""),
+        );
+    }
+    lines.push("Tu entrada sigue siendo válida. Revisa los detalles actualizados del evento.");
+
+    return { type: datesChanged ? "date_change" : "venue_change", description: lines.join("\n\n") };
+}

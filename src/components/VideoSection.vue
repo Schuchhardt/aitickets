@@ -15,28 +15,26 @@ import FadeInSection from './Hero/FadeInSection.vue';
         </FadeInSection>
         <FadeInSection :delay="100">
           <h2 class="text-3xl md:text-4xl font-bold mt-4 mb-4 font-[Unbounded]">
-            De función floja a función agotada
+            Así vendes tu próxima función
           </h2>
         </FadeInSection>
         <FadeInSection :delay="200">
           <p class="text-white/70 max-w-2xl mx-auto">
-            Asistente con IA que vende por chat, check-in QR en 2 segundos y un click para avisar a todos tus asistentes.
+            Crea tu evento, compártelo con posts generados con IA, vende con Webpay y valida las entradas con QR desde tu celular.
           </p>
         </FadeInSection>
       </div>
 
       <FadeInSection :delay="300">
         <div class="max-w-5xl mx-auto rounded-2xl overflow-hidden border border-white/10 shadow-2xl shadow-lime-400/10 bg-black">
+          <!-- preload="none" + sin autoplay: el mp4 (~2,7 MB) solo se descarga cuando el usuario aprieta play -->
           <video
             class="w-full h-auto block aspect-video"
             src="/videos/aitickets-demo.mp4"
             poster="/videos/aitickets-demo-poster.jpg"
             controls
-            autoplay
-            muted
-            loop
             playsinline
-            preload="metadata"
+            preload="none"
             aria-label="Video de demostración de AI Tickets"
           ></video>
         </div>

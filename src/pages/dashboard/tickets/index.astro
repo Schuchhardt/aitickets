@@ -1,7 +1,8 @@
 ---
 import DashboardLayout from "../../../layouts/DashboardLayout.astro";
-import { createSupabaseServerClient } from "../../../lib/supabaseServer";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
+import { EVENT_MANAGER_ROLES } from "../../../lib/supabaseServer";
+import { requireDashboardSession } from "../_lib/guard";
 import {
     Ticket,
     Calendar,
@@ -15,27 +16,10 @@ import {
     Search,
 } from "lucide-vue-next";
 
-const supabase = createSupabaseServerClient(Astro);
+const guard = await requireDashboardSession(Astro, EVENT_MANAGER_ROLES);
+if (!guard.ok) return guard.response;
+const { dbUser } = guard.session;
 const supabaseAdmin = getSupabaseAdmin();
-
-const {
-    data: { user },
-} = await supabase.auth.getUser();
-
-if (!user) {
-    return Astro.redirect("/organizadores/login");
-}
-
-// Get public user info (organization_id)
-const { data: dbUser } = await supabase
-    .from("users")
-    .select("organization_id")
-    .eq("auth_user_id", user.id)
-    .single();
-
-if (!dbUser || !dbUser.organization_id) {
-    console.error("User request without organization_id");
-}
 
 const now = new Date().toISOString();
 
@@ -61,8 +45,8 @@ const { data: currentEvents } = await supabaseAdmin
     )
   `,
     )
-    .eq("organization_id", dbUser?.organization_id)
-    .gte("end_date", now)
+    .eq("organization_id", dbUser.organization_id)
+    .or(`end_date.gte.${now},end_date.is.null`)
     .order("start_date", { ascending: true });
 
 // Fetch past events (end_date < now)
@@ -87,7 +71,7 @@ const { data: pastEvents } = await supabaseAdmin
     )
   `,
     )
-    .eq("organization_id", dbUser?.organization_id)
+    .eq("organization_id", dbUser.organization_id)
     .lt("end_date", now)
     .order("end_date", { ascending: false });
 
@@ -173,7 +157,7 @@ async function getAttendeeList(eventId: number) {
             return paidOrderMap.has(a.event_order_id);
         }) || [];
 
-    return validAttendees.map((a) => ({
+    return validAttendees.map((a: any) => ({
         id: a.id,
         name:
             `${a.attendees?.first_name || ""} ${a.attendees?.last_name || ""}`.trim() ||
@@ -215,8 +199,10 @@ function formatPrice(price: number): string {
 }
 
 // Format date
-function formatDate(dateString: string): string {
+function formatDate(dateString: string | null): string {
+    if (!dateString) return "Sin fecha";
     return new Date(dateString).toLocaleDateString("es-CL", {
+        timeZone: "America/Santiago",
         day: "2-digit",
         month: "short",
         year: "numeric",

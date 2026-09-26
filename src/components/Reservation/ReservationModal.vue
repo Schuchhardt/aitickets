@@ -1,31 +1,54 @@
 <script setup>
-import { ref, computed, defineProps, defineEmits, onMounted, onUnmounted, watch } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { eventBus } from '../../utils/eventbus.js';
-import { useGoogleAnalytics } from "../../composables/useGoogleAnalytics.js";
+import { trackBeginCheckout } from "../../composables/useGoogleAnalytics.js";
 import HeaderSteps from "./HeaderSteps.vue";
 import TicketSelection from "./TicketSelection.vue";
 import OrderSummary from "./OrderSummary.vue";
 import BuyerInfo from "./BuyerInfo.vue";
 import PaymentStep from "./PaymentStep.vue";
+import { buildSelectedLines, computeTotals, isValidEmail, maxPerPurchase } from "./pricing.js";
 
 const props = defineProps({ event: Object });
 const emit = defineEmits(["close"]);
 
+const emptyBuyer = () => ({ firstName: "", lastName: "", email: "", confirmEmail: "", phone: "", termsAccepted: false });
+
 const currentStep = ref(1);
 const selectedTickets = ref({});
-const buyerInfo = ref({ firstName: "", lastName: "", email: "", phone: "", termsAccepted: false });
-const discount = ref(0);
-const { trackBeginCheckout } = useGoogleAnalytics();
+const buyerInfo = ref(emptyBuyer());
+
+const storageKey = (name) => `${name}_event_${props.event.id}`;
+const readStorage = (name) => {
+  try {
+    const raw = localStorage.getItem(storageKey(name));
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+const writeStorage = (name, value) => {
+  try { localStorage.setItem(storageKey(name), JSON.stringify(value)); } catch { /* storage no disponible */ }
+};
 
 onMounted(() => {
-  const storedTickets = localStorage.getItem(`selectedTickets_event_${props.event.id}`);
-  if (storedTickets) selectedTickets.value = JSON.parse(storedTickets);
+  const storedTickets = readStorage("selectedTickets");
+  if (storedTickets && typeof storedTickets === "object") {
+    // Solo entradas que siguen a la venta en la página
+    const valid = {};
+    for (const [id, qty] of Object.entries(storedTickets)) {
+      const ticket = (props.event.tickets || []).find((t) => String(t.id) === String(id));
+      if (ticket && Number(qty) > 0) valid[id] = Math.min(Number(qty), maxPerPurchase(ticket));
+    }
+    selectedTickets.value = valid;
+  }
 
-  const storedBuyer = localStorage.getItem(`buyerInfo_event_${props.event.id}`);
-  if (storedBuyer) buyerInfo.value = JSON.parse(storedBuyer);
+  const storedBuyer = readStorage("buyerInfo");
+  if (storedBuyer && typeof storedBuyer === "object") buyerInfo.value = { ...emptyBuyer(), ...storedBuyer, termsAccepted: false };
 
-  const storedStep = localStorage.getItem(`currentStep_event_${props.event.id}`);
-  if (storedStep) currentStep.value = parseInt(storedStep);
+  const storedStep = Number(readStorage("currentStep"));
+  if ([1, 2, 3].includes(storedStep)) currentStep.value = storedStep;
+  if (!Object.keys(selectedTickets.value).length) currentStep.value = 1;
 
   eventBus.on('ticket-selection', handleRemoteTicketSelection);
   eventBus.on('proceed-to-next-step', handleRemoteGoToNextStep);
@@ -39,94 +62,61 @@ onUnmounted(() => {
 });
 
 // ==== PERSISTIR EN LOCALSTORAGE AUTOMÁTICAMENTE ====
-watch(selectedTickets, () => {
-  localStorage.setItem(`selectedTickets_event_${props.event.id}`, JSON.stringify(selectedTickets.value));
-}, { deep: true });
+watch(selectedTickets, () => writeStorage("selectedTickets", selectedTickets.value), { deep: true });
+watch(buyerInfo, () => writeStorage("buyerInfo", { ...buyerInfo.value, termsAccepted: false }), { deep: true });
+watch(currentStep, () => writeStorage("currentStep", currentStep.value));
 
-watch(buyerInfo, () => {
-  localStorage.setItem(`buyerInfo_event_${props.event.id}`, JSON.stringify(buyerInfo.value));
-}, { deep: true });
-
-watch(currentStep, () => {
-  localStorage.setItem(`currentStep_event_${props.event.id}`, currentStep.value.toString());
-});
-
-// ==== CALCULOS ====
-const calculateSubtotal = computed(() => {
-  return Object.keys(selectedTickets.value).reduce((sum, ticketId) => {
-    const ticket = props.event.tickets.find((t) => t.id == ticketId);
-    return sum + (ticket ? ticket.price * selectedTickets.value[ticketId] : 0);
-  }, 0);
-});
-
-const calculateTotal = computed(() => {
-  const discountAmount = discount.value ? (calculateSubtotal.value * discount.value) / 100 : 0;
-  return calculateSubtotal.value - discountAmount;
-});
+// ==== CALCULOS (solo para mostrar; el servidor recalcula) ====
+const totals = computed(() => computeTotals(buildSelectedLines(selectedTickets.value, props.event.tickets, props.event.dates)));
 
 // ==== NAVEGACIÓN ====
-const applyDiscount = (discountValue) => {
-  discount.value = discountValue;
-};
+const buyerIsValid = computed(() => {
+  const b = buyerInfo.value;
+  const email = (b.email || "").trim();
+  return (
+    (b.firstName || "").trim() !== "" &&
+    (b.lastName || "").trim() !== "" &&
+    isValidEmail(email) &&
+    email.toLowerCase() === (b.confirmEmail || "").trim().toLowerCase() &&
+    b.termsAccepted === true
+  );
+});
 
 const canProceed = computed(() => {
-  if (currentStep.value === 1) {
-    return Object.values(selectedTickets.value).some((qty) => qty > 0);
-  } else if (currentStep.value === 2) {
-    return (
-      buyerInfo.value.firstName.trim() !== "" &&
-      buyerInfo.value.lastName.trim() !== "" &&
-      buyerInfo.value.email.trim() !== "" &&
-      buyerInfo.value.phone.trim() !== "" &&
-      buyerInfo.value.termsAccepted !== false
-    );
-  }
+  if (currentStep.value === 1) return totals.value.quantity > 0;
+  if (currentStep.value === 2) return buyerIsValid.value;
   return true;
 });
 
 const nextStep = () => {
   if (canProceed.value && currentStep.value < 3) {
-    // Track begin_checkout when moving from ticket selection to buyer info (step 1 to 2)
+    // begin_checkout al pasar de la selección de entradas a los datos del comprador
     if (currentStep.value === 1) {
-      const totalQuantity = Object.values(selectedTickets.value).reduce((sum, qty) => sum + qty, 0);
-      const totalPrice = calculateTotal.value;
-      
-      trackBeginCheckout(
-        props.event.id,
-        props.event.title,
-        totalQuantity,
-        totalPrice
-      );
+      trackBeginCheckout(props.event.id, props.event.name || props.event.title, totals.value.quantity, totals.value.total);
     }
-    
     currentStep.value++;
   }
 };
 
 const prevStep = () => {
-  if (currentStep.value > 1) {
-    currentStep.value--;
-  }
+  if (currentStep.value > 1) currentStep.value--;
 };
 
 const closeModal = (event) => {
-  if (event.target.id === "modal-overlay") {
-    handleClose();
-  }
+  if (event.target.id === "modal-overlay") handleClose();
 };
 
 const handleClose = () => {
-  console.log('ReservationModal: Cerrando modal');
-  eventBus.emit('close-modal'); // Notificar que el modal se está cerrando
-  eventBus.emit('assistant-show'); // Mostrar el asistente al cerrar el modal
+  eventBus.emit('close-modal');
+  eventBus.emit('assistant-show');
   emit("close");
 };
 
 function handleRemoteTicketSelection(data) {
-  selectedTickets.value = {
-    ...selectedTickets.value,
-    [data.ticket_type_id]: data.quantity
-  };
+  const ticket = (props.event.tickets || []).find((t) => String(t.id) === String(data?.ticket_type_id));
+  if (!ticket) return;
+  const qty = Math.min(Math.max(Number(data.quantity) || 1, 1), maxPerPurchase(ticket));
+  selectedTickets.value = { ...selectedTickets.value, [ticket.id]: qty };
 }
 
 function handleRemoteFillBuyerInfo(data) {
@@ -148,54 +138,47 @@ function handleRemoteGoToNextStep() {
 <template>
   <div
     id="modal-overlay"
-    class="fixed inset-0 bg-black flex items-center justify-center z-[55] overflow-y-auto md:p-4"
+    class="fixed inset-0 flex items-stretch md:items-center justify-center z-[55] md:p-4"
     @click="closeModal"
   >
     <div
-      class="bg-white rounded-lg shadow-xl max-w-3xl w-full md:w-auto md:max-w-5xl md:flex md:flex-col md:items-start max-h-[90vh] overflow-y-auto"
+      class="bg-white md:rounded-lg shadow-xl w-full md:max-w-5xl flex flex-col h-full md:h-auto md:max-h-[90vh]"
+      role="dialog"
+      aria-modal="true"
       @click.stop
     >
       <HeaderSteps :eventName="event.name" :currentStep="currentStep" @close="handleClose" />
 
-      <div v-if="currentStep === 1 || currentStep === 2" class="grid grid-cols-1 md:grid-cols-2 gap-6 p-2 w-full md:min-w-[732px] md:max-w-[800px] mx-auto">
-        <div class="w-full">
-          <TicketSelection
-            v-if="currentStep === 1"
-            :event="event"
-            v-model:selectedTickets="selectedTickets"
-            class="w-full"
-          />
-          <BuyerInfo v-if="currentStep === 2" v-model:buyerInfo="buyerInfo" class="w-full" />
+      <div class="flex-1 overflow-y-auto">
+        <div v-if="currentStep === 1 || currentStep === 2" class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 p-2 w-full md:min-w-[732px] md:max-w-[800px] mx-auto">
+          <div class="w-full">
+            <TicketSelection
+              v-if="currentStep === 1"
+              :event="event"
+              v-model:selectedTickets="selectedTickets"
+              class="w-full"
+            />
+            <BuyerInfo v-if="currentStep === 2" v-model:buyerInfo="buyerInfo" class="w-full" />
+          </div>
+
+          <div class="bg-gray-50 p-4 md:p-6 w-full rounded-[10px]">
+            <OrderSummary :selectedTickets="selectedTickets" :event="event" class="w-full" />
+          </div>
         </div>
 
-        <div class="bg-gray-50 p-6 w-full rounded-[10px]">
-          <OrderSummary
-            :selectedTickets="selectedTickets"
-            :event="event"
-            :totalAmount="calculateTotal"
-            @apply-discount="applyDiscount"
-            class="w-full"
-          />
+        <div v-if="currentStep === 3" class="p-4 md:p-6 w-full">
+          <PaymentStep :selectedTickets="selectedTickets" :buyerInfo="buyerInfo" :event="event" />
         </div>
       </div>
 
-      <div v-if="currentStep === 3" class="p-6 w-full">
-        <PaymentStep
-          :selectedTickets="selectedTickets"
-          :buyerInfo="buyerInfo"
-          :totalAmount="calculateTotal"
-          :discount="discount"
-          :event="event"
-        />
-      </div>
-
-      <div class="w-full flex justify-between p-6 border-t bg-white md:rounded-b-lg">
-        <button v-if="currentStep > 1" @click="prevStep" aria-label="atras" class="cursor-pointer text-gray-600 hover:text-black">Atrás</button>
+      <div class="w-full flex justify-between items-center gap-4 p-4 md:p-6 border-t bg-white md:rounded-b-lg">
+        <button v-if="currentStep > 1" @click="prevStep" aria-label="atras" class="cursor-pointer text-gray-600 hover:text-black py-2">Atrás</button>
+        <span v-else></span>
         <button
           v-if="currentStep < 3"
           @click="nextStep"
           :disabled="!canProceed"
-          class="px-6 py-2 rounded-md"
+          class="px-6 py-3 rounded-md"
           :class="{
             'bg-lime-500 text-white cursor-pointer': canProceed,
             'bg-gray-300 text-gray-500 cursor-not-allowed': !canProceed

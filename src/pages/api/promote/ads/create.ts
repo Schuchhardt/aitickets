@@ -1,12 +1,26 @@
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin } from "../../../../lib/auth-helpers";
-import { getSessionUser } from "../../../../lib/supabaseServer";
+import { getSessionContext, hasRole, EVENT_MANAGER_ROLES } from "../../../../lib/supabaseServer";
 import { decryptToken } from "../../../../lib/crypto";
 
 export const POST: APIRoute = async (context) => {
-    const user = await getSessionUser(context);
-    if (!user) {
+    const session = await getSessionContext(context);
+    if (!session) {
         return new Response(JSON.stringify({ error: "No autorizado" }), { status: 401 });
+    }
+    if (!hasRole(session.dbUser, EVENT_MANAGER_ROLES)) {
+        return new Response(JSON.stringify({ message: "No tienes permisos para esta acción" }), { status: 403, headers: { "Content-Type": "application/json" } });
+    }
+    const user = session.authUser;
+
+    // Meta Ads deshabilitado temporalmente ("Próximamente"). La implementación de abajo tiene errores
+    // conocidos (multiplica el presupuesto CLP por 100, envía daily y lifetime budget a la vez y no
+    // define page_id) y no debe ejecutarse hasta corregirlos.
+    if (import.meta.env.META_ADS_ENABLED !== "true") {
+        return new Response(JSON.stringify({ message: "Próximamente: la creación de campañas en Meta Ads estará disponible pronto." }), {
+            status: 503,
+            headers: { "Content-Type": "application/json" },
+        });
     }
 
     try {
@@ -27,11 +41,7 @@ export const POST: APIRoute = async (context) => {
 
         const supabaseAdmin = getSupabaseAdmin();
 
-        const { data: dbUser } = await supabaseAdmin
-            .from("users")
-            .select("organization_id")
-            .eq("auth_user_id", user.id)
-            .single();
+        const dbUser = session.dbUser;
 
         if (!dbUser?.organization_id) {
             return new Response(JSON.stringify({ message: "Organización no encontrada" }), { status: 404 });

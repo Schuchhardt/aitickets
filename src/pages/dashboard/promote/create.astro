@@ -1,29 +1,14 @@
 ---
 import DashboardLayout from "../../../layouts/DashboardLayout.astro";
-import { createSupabaseServerClient } from "../../../lib/supabaseServer";
+import { EVENT_MANAGER_ROLES } from "../../../lib/supabaseServer";
+import { requireDashboardSession } from "../_lib/guard";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import CreateSocialPost from "../../../components/dashboard/promote/CreateSocialPost.vue";
 
-const supabase = createSupabaseServerClient(Astro);
+const guard = await requireDashboardSession(Astro, EVENT_MANAGER_ROLES);
+if (!guard.ok) return guard.response;
+const { dbUser } = guard.session;
 const supabaseAdmin = getSupabaseAdmin();
-
-const {
-  data: { user },
-} = await supabase.auth.getUser();
-
-if (!user) {
-  return Astro.redirect("/organizadores/login");
-}
-
-const { data: dbUser } = await supabase
-  .from("users")
-  .select("organization_id")
-  .eq("auth_user_id", user.id)
-  .single();
-
-if (!dbUser?.organization_id) {
-  return Astro.redirect("/dashboard");
-}
 
 // Fetch published events
 const { data: events } = await supabaseAdmin

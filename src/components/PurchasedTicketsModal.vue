@@ -40,7 +40,7 @@
                 <div class="flex-1">
                   <!-- Order Header -->
                   <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-semibold text-gray-900 font-['Unbounded']">
+                    <h3 class="text-sm sm:text-lg font-semibold text-gray-900 font-['Unbounded'] break-all">
                       Orden #{{ order.orderId }}
                     </h3>
                     <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
@@ -49,7 +49,7 @@
                   </div>
 
                   <!-- Order Details -->
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                     <div class="space-y-2">
                       <p class="text-sm text-gray-600">
                         <span class="font-medium">Fecha de compra:</span>
@@ -57,7 +57,7 @@
                       </p>
                       <p class="text-sm text-gray-600">
                         <span class="font-medium">Total pagado:</span>
-                        ${{ formatPrice(order.amount) }}
+                        {{ order.amount > 0 ? `$${formatPrice(order.amount)}` : 'Gratis' }}
                       </p>
                     </div>
                     <div class="space-y-2">
@@ -65,15 +65,12 @@
                         <span class="font-medium">Cantidad de entradas:</span>
                         {{ order.ticketsCount }}
                       </p>
-                      <p class="text-sm text-gray-600">
-                        <span class="font-medium">Entradas por:</span>
-                        ${{ formatPrice(order.amount / order.ticketsCount) }} c/u
-                      </p>
+
                     </div>
                   </div>
 
                   <!-- Tickets Preview -->
-                  <div class="mb-4">
+                  <div class="mb-4" v-if="order.tickets && order.tickets.length">
                     <h4 class="text-sm font-medium text-gray-900 mb-2">Entradas en esta orden:</h4>
                     <div class="space-y-2">
                       <div
@@ -84,7 +81,7 @@
                         <svg class="w-4 h-4 mr-2 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                           <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
                         </svg>
-                        {{ ticket.first_name }} {{ ticket.last_name }}
+                        {{ ticket.ticket_name || 'Entrada' }}
                       </div>
                       <div v-if="order.tickets.length > 3" class="text-sm text-gray-500 ml-6">
                         +{{ order.tickets.length - 3 }} más
@@ -96,7 +93,6 @@
                   <div class="flex flex-col sm:flex-row gap-3">
                     <a
                       :href="`/order/${order.orderId}`"
-                      target="_blank"
                       class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg font-medium transition-colors text-center inline-flex items-center justify-center"
                     >
                       <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
@@ -105,12 +101,6 @@
                       </svg>
                       Ver detalles y QR
                     </a>
-                    <button
-                      @click="downloadOrderTickets(order)"
-                      class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-900 py-2 px-4 rounded-lg font-medium transition-colors"
-                    >
-                      Descargar PDF
-                    </button>
                   </div>
                 </div>
               </div>
@@ -146,8 +136,7 @@
 </template>
 
 <script setup>
-import { defineProps, defineEmits, computed } from 'vue'
-import { showInfo } from '../lib/toastBus.js'
+import { computed } from 'vue'
 
 const props = defineProps({
   show: {
@@ -168,11 +157,11 @@ const emit = defineEmits(['close'])
 
 // Computed properties for summary
 const totalTickets = computed(() => {
-  return props.eventOrders.reduce((total, order) => total + order.ticketsCount, 0)
+  return props.eventOrders.reduce((total, order) => total + (Number(order.ticketsCount) || 0), 0)
 })
 
 const totalAmount = computed(() => {
-  return props.eventOrders.reduce((total, order) => total + order.amount, 0)
+  return props.eventOrders.reduce((total, order) => total + (Number(order.amount) || 0), 0)
 })
 
 // Format price with thousands separator
@@ -192,8 +181,4 @@ const formatDate = (dateString) => {
   })
 }
 
-// Download tickets for a specific order (placeholder)
-const downloadOrderTickets = (order) => {
-  showInfo(`Descargando entradas de la orden #${order.orderId}`)
-}
 </script>

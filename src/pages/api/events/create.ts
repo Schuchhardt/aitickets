@@ -1,159 +1,145 @@
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin, getFriendlyErrorMessage } from "../../../lib/auth-helpers";
-import { getSessionUser } from "../../../lib/supabaseServer";
+import { getSessionContext, hasRole, EVENT_MANAGER_ROLES, jsonResponse } from "../../../lib/supabaseServer";
+import { notifySlack, slugify } from "../_lib/server-utils";
+import { syncEventCategory, refreshEventDenorm, normalizeTicket, isValidDateInput, resolveTicketDateId } from "../_lib/events";
+import { sanitizeRichText } from "../../../lib/sanitize";
 
 export const POST: APIRoute = async (context) => {
-    const user = await getSessionUser(context);
-
-    if (!user) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+    const session = await getSessionContext(context);
+    if (!session) return jsonResponse({ error: "Unauthorized" }, 401);
+    const { dbUser } = session;
+    if (!hasRole(dbUser, EVENT_MANAGER_ROLES)) {
+        return jsonResponse({ message: "No tienes permisos para crear eventos" }, 403);
     }
 
+    let eventId: number | null = null;
+    const supabaseAdmin = getSupabaseAdmin();
+
     try {
-
         const body = await context.request.json();
-        const { general, locations, tickets } = body;
+        const { general, locations, tickets } = body || {};
 
-        // Validate basic data
-        if (!general.name || !locations.length || !tickets.length) {
-            return new Response(JSON.stringify({ message: "Faltan datos requeridos" }), { status: 400 });
+        // Validaciones básicas
+        if (!general?.name || !Array.isArray(locations) || !locations.length || !Array.isArray(tickets) || !tickets.length) {
+            return jsonResponse({ message: "Faltan datos requeridos" }, 400);
+        }
+        for (const loc of locations) {
+            if (!Array.isArray(loc?.dates) || !loc.dates.length || !loc.dates.every(isValidDateInput)) {
+                return jsonResponse({ message: "Cada ubicación debe tener al menos una función con fecha y hora válidas" }, 400);
+            }
+            if (!loc.isNewVenue && !loc.venueId) {
+                return jsonResponse({ message: "Selecciona un lugar para cada ubicación" }, 400);
+            }
+            if (loc.isNewVenue && !String(loc.newVenueName || "").trim()) {
+                return jsonResponse({ message: "El nuevo lugar debe tener nombre" }, 400);
+            }
+        }
+        const ticketsPayload = tickets.map(normalizeTicket);
+        if (ticketsPayload.some((t: any) => !t)) {
+            return jsonResponse({ message: "Revisa las entradas: nombre, precio y cantidad deben ser válidos" }, 400);
         }
 
-        const supabaseAdmin = getSupabaseAdmin();
-
-        // 1. Create Event
-        const slug = general.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now().toString().slice(-4);
-
-        // We should look it up from 'users' table
-        const { data: dbUser, error: userError } = await supabaseAdmin.from('users').select('organization_id, id').eq('auth_user_id', user.id).single();
-
-        if (userError) console.error("User lookup error:", userError);
-        if (!dbUser) {
-            console.error("User not found in public.users");
-            throw new Error("Usuario no encontrado en base de datos");
-        }
-
-        const eventPayload = {
-            name: general.name,
-            description: general.description,
-            image_url: general.imageUrl,
-            slug: slug,
-            status: 'draft',
-            created_by: dbUser.id, // Reference to public.users ID
-            organization_id: dbUser.organization_id,
-            title: general.name
-        };
+        // 1. Crear evento (siempre como borrador; se publica desde el dashboard)
+        const name = String(general.name).trim().slice(0, 200);
+        const slug = `${slugify(name) || "evento"}-${Date.now().toString().slice(-4)}`;
 
         const { data: eventData, error: eventError } = await supabaseAdmin
-            .from('events')
-            .insert(eventPayload)
-            .select()
+            .from("events")
+            .insert({
+                name,
+                title: name,
+                description: sanitizeRichText(general.description),
+                image_url: general.imageUrl || null,
+                slug,
+                status: "draft",
+                accessibility: general.isPrivate ? "private" : "public",
+                created_by: dbUser.id,
+                organization_id: dbUser.organization_id,
+            })
+            .select("id")
             .single();
 
         if (eventError) {
             console.error("Event insert error:", eventError);
             throw eventError;
         }
-        const eventId = eventData.id;
+        eventId = eventData.id as number;
 
-        // 2. Process Locations & Dates
+        // 2. Ubicaciones y funciones (antes que las entradas, para mapear la función de cada entrada — R1)
+        const dateIdMap = new Map<string, number>();
         for (const loc of locations) {
             let venueId = loc.venueId;
 
-            // Create new Venue if needed
             if (loc.isNewVenue) {
                 const { data: newVenue, error: venueError } = await supabaseAdmin
-                    .from('venues')
+                    .from("venues")
                     .insert({
-                        name: loc.newVenueName,
-                        address_line1: loc.newVenueAddress,
-                        city: loc.newVenueCity,
-                        country_code: 'CL' // Default
+                        name: String(loc.newVenueName).trim(),
+                        address_line1: loc.newVenueAddress || null,
+                        city: loc.newVenueCity || null,
+                        country_code: "CL",
+                        timezone: "America/Santiago",
                     })
-                    .select()
+                    .select("id")
                     .single();
-
                 if (venueError) throw venueError;
                 venueId = newVenue.id;
             }
 
-            // Create Event Location (Link)
             const { data: locationData, error: locError } = await supabaseAdmin
-                .from('event_locations')
-                .insert({
-                    event_id: eventId,
-                    venue_id: venueId,
-                    name: 'Main', // Default location name
-                })
-                .select()
+                .from("event_locations")
+                .insert({ event_id: eventId, venue_id: venueId, name: "Main" })
+                .select("id")
                 .single();
-
             if (locError) throw locError;
 
-            // Create Dates (Functions)
-            const datesPayload = loc.dates.map((d: any) => ({
-                event_id: eventId,
-                event_location_id: locationData.id,
-                date: d.date,
-                start_time: d.startTime,
-                end_time: d.endTime
-            }));
-
-            const { error: datesError } = await supabaseAdmin.from('event_dates').insert(datesPayload);
-            if (datesError) throw datesError;
+            for (const d of loc.dates) {
+                const { data: dateRow, error: dateError } = await supabaseAdmin
+                    .from("event_dates")
+                    .insert({
+                        event_id: eventId,
+                        event_location_id: locationData.id,
+                        date: d.date,
+                        start_time: d.startTime,
+                        end_time: d.endTime || null,
+                    })
+                    .select("id")
+                    .single();
+                if (dateError) throw dateError;
+                if (d.id !== undefined && d.id !== null && d.id !== "") dateIdMap.set(String(d.id), dateRow.id as number);
+            }
         }
 
-        // 3. Process Tickets
-        const ticketsPayload = tickets.map((t: any) => ({
-            event_id: eventId,
-            ticket_name: t.name,
-            price: t.price,
-            total_quantity: t.quantity,
-            max_quantity: 10, // Default purchase limit
-            status: 'available'
-        }));
-
-        const { error: ticketsError } = await supabaseAdmin.from('event_tickets').insert(ticketsPayload);
+        // 3. Entradas (ventana de venta NULL salvo que el productor la defina)
+        const { error: ticketsError } = await supabaseAdmin.from("event_tickets").insert(
+            ticketsPayload.map((t: any, i: number) => ({
+                ...t,
+                event_date_id: resolveTicketDateId(tickets[i]?.eventDateId, dateIdMap),
+                event_id: eventId,
+                max_quantity: 10,
+                is_gift: false,
+                status: "available",
+            })),
+        );
         if (ticketsError) throw ticketsError;
 
-        // Notificar en Slack sobre nuevo evento
-        notifySlackNewEvent({ eventName: general.name, slug, locations, tickets }).catch(err =>
-            console.error("Error al notificar a Slack:", err.message)
+        // 4. Categoría + campos denormalizados (start_date, end_date, location)
+        await syncEventCategory(eventId, general.category);
+        await refreshEventDenorm(eventId);
+
+        // Notificar en Slack
+        const totalDates = locations.reduce((sum: number, loc: any) => sum + (loc.dates?.length || 0), 0);
+        const ticketLines = ticketsPayload
+            .map((t: any) => `  - ${t.ticket_name}: $${t.price} (${t.total_quantity ?? "sin límite"} disponibles)`)
+            .join("\n");
+        await notifySlack(
+            `🎫 *Nuevo evento creado*\n• *Nombre:* ${name}\n• *Categoría:* ${general.category || "-"}\n• *Ubicaciones:* ${locations.length}\n• *Fechas:* ${totalDates}\n• *Tickets:*\n${ticketLines}\n• *Link:* /eventos/${slug}`,
         );
 
-        return new Response(JSON.stringify({ message: "Evento creado exitosamente", id: eventId }), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-        });
-
+        return jsonResponse({ message: "Evento creado exitosamente", id: eventId }, 200);
     } catch (error) {
         console.error("Event creation error:", error);
-        return new Response(JSON.stringify({ message: getFriendlyErrorMessage(error) }), {
-            status: 500,
-            headers: { "Content-Type": "application/json" },
-        });
+        return jsonResponse({ message: getFriendlyErrorMessage(error), id: eventId }, 500);
     }
 };
-
-async function notifySlackNewEvent({ eventName, slug, locations, tickets }: { eventName: string; slug: string; locations: any[]; tickets: any[] }) {
-    const webhookUrl = import.meta.env.SLACK_WEBHOOK_URL;
-    if (!webhookUrl) {
-        console.warn("SLACK_WEBHOOK_URL no configurado, omitiendo notificación");
-        return;
-    }
-
-    const totalDates = locations.reduce((sum: number, loc: any) => sum + (loc.dates?.length || 0), 0);
-    const ticketLines = tickets.map((t: any) => `  - ${t.name}: $${t.price} (${t.quantity} disponibles)`).join("\n");
-
-    const res = await fetch(webhookUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            text: `🎫 *Nuevo evento creado*\n• *Nombre:* ${eventName}\n• *Ubicaciones:* ${locations.length}\n• *Fechas:* ${totalDates}\n• *Tickets:*\n${ticketLines}\n• *Link:* /eventos/${slug}`
-        })
-    });
-
-    if (!res.ok) {
-        throw new Error(`Slack respondió con status ${res.status}`);
-    }
-}

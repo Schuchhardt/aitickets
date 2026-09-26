@@ -1,5 +1,10 @@
 ---
-import { getSupabaseAnon } from "../../lib/auth-helpers";
+// Página de una orden (event_orders.id, uuid). Es el link que recibe el comprador por correo:
+// muestra sus entradas con QR y, solo aquí (y en /ticket), la dirección secreta del evento.
+// secret_location solo se consulta/serializa si la orden está pagada y tiene al menos una entrada no anulada.
+// Los datos del comprador salen de event_orders.buyer_* (R2), no del registro compartido `attendees`.
+import { getSupabaseAdmin } from "../../lib/auth-helpers";
+import { descriptionToHtml } from "../../lib/sanitize";
 import Layout from "../../layouts/Layout.astro";
 import AppHeader from "../../components/AppHeader.vue";
 import AppFooter from "../../components/AppFooter.vue";
@@ -11,142 +16,162 @@ import { formatLocalDate, formatLocalTime } from "../../utils/dateHelpers.js";
 
 import "../../styles/global.css";
 
-// Obtener el ID de la orden desde la URL
+export const prerender = false;
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const { id } = Astro.params;
-const supabase = getSupabaseAnon();
+const supabase = getSupabaseAdmin();
 
 let tickets: any[] = [];
 let event: any = null;
 let orderInfo: any = null;
 let attendeeInfo: any = null;
 let errorMessage: string | null = null;
+let pendingMessage: string | null = null;
 
-if (id) {
+const formatVenue = (loc: any) => {
+  if (!loc) return "";
+  const venue = loc.venues || {};
+  return [loc.display_name || loc.name || venue.name, loc.address_line1_override || venue.address_line1, loc.city_override || venue.city]
+    .filter(Boolean)
+    .filter((v: string, i: number, arr: string[]) => arr.indexOf(v) === i)
+    .join(", ");
+};
+
+if (!id || !UUID_RE.test(id)) {
+  errorMessage = "Orden no encontrada";
+} else {
   try {
-    // Obtener los datos de la orden
-    const { data: orderData, error: orderError } = await supabase
+    const { data: orderData } = await supabase
       .from("event_orders")
-      .select("*")
+      .select("id, created_at, status, event_id, attendee_id, amount, ticket_fee, total_payment, ticket_qty, buyer_first_name, buyer_last_name, buyer_email")
       .eq("id", id)
-      .single();
+      .maybeSingle();
 
-    if (orderError || !orderData) {
+    if (!orderData) {
       errorMessage = "Orden no encontrada";
     } else {
       orderInfo = orderData;
 
-      // Obtener datos del evento
-      const { data: eventData, error: eventError } = await supabase
+      const { data: eventData } = await supabase
         .from("events")
-        .select("*")
+        .select("id, name, title, slug, description, image_url, location, start_date, end_date")
         .eq("id", orderData.event_id)
-        .single();
+        .maybeSingle();
 
-      if (eventError) {
+      if (!eventData) {
         errorMessage = "Evento no encontrado";
       } else {
-        event = eventData;
+        event = { ...eventData, description: descriptionToHtml(eventData.description) };
 
-        // Cargar fechas del evento (para procesamiento interno solamente)
-        const getTimeFromTimestamp = (timestamp: string | number | Date) => {
-          const date = new Date(timestamp);
-          return date.toLocaleTimeString("es-CL", {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit", 
-            hour12: false
-            // Nota: No se especifica timeZone para que use la del servidor
-            // Esto solo se usa para procesamiento interno, no para mostrar al usuario
-          });
-        };
+        const [{ data: eventDates }, { data: faqs }, { data: categories }, { data: attendee }] = await Promise.all([
+          supabase
+            .from("event_dates")
+            .select("id, date, start_time, end_time, event_location_id, event_locations ( name, display_name, address_line1_override, city_override, venues ( name, address_line1, city ) )")
+            .eq("event_id", event.id)
+            .order("date", { ascending: true })
+            .order("start_time", { ascending: true }),
+          supabase.from("event_faqs").select("question, answer").eq("event_id", event.id),
+          supabase.from("event_tags").select("category_tags(name)").eq("event_id", event.id),
+          orderData.buyer_email
+            ? Promise.resolve({ data: null })
+            : supabase.from("attendees").select("first_name, last_name, email").eq("id", orderData.attendee_id).maybeSingle(),
+        ]);
 
         const defaultDate = {
-          date: event.start_date, 
-          start_time: getTimeFromTimestamp(event.start_date), 
-          end_time: getTimeFromTimestamp(event.end_date)
+          date: event.start_date,
+          start_time: event.start_date
+            ? new Date(event.start_date).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false, timeZone: "America/Santiago" })
+            : null,
+          end_time: event.end_date
+            ? new Date(event.end_date).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false, timeZone: "America/Santiago" })
+            : null,
         };
+        event.dates = eventDates?.length ? eventDates : event.start_date ? [defaultDate] : [];
+        event.faqs = faqs || [];
+        event.tags = (categories || []).map((c: any) => c.category_tags?.name).filter(Boolean);
+        event.address = formatVenue(eventDates?.[0]?.event_locations) || event.location || "";
+        // R2: comprador de esta orden (fallback al registro attendees para órdenes antiguas)
+        attendeeInfo = orderData.buyer_email
+          ? { first_name: orderData.buyer_first_name, last_name: orderData.buyer_last_name, email: orderData.buyer_email }
+          : attendee || null;
 
-        const { data: event_dates, error: errorDates } = await supabase
-          .from("event_dates")
-          .select("*")
-          .eq("event_id", event.id);
-
-        if (errorDates) {
-          console.error("Error al obtener las fechas:", errorDates);
-          event.dates = [defaultDate];
-        } else {
-          event.dates = event_dates.length > 0 ? event_dates : [defaultDate];
-        }
-
-        // Obtener datos del asistente
-        const { data: attendee, error: attendeeError } = await supabase
-          .from("attendees")
-          .select("first_name, last_name, email")
-          .eq("id", orderData.attendee_id)
-          .single();
-
-        if (!attendeeError && attendee) {
-          attendeeInfo = attendee;
-        }
-
-        // Obtener todos los tickets de la orden
         const { data: ticketsData, error: ticketsError } = await supabase
           .from("event_attendees")
-          .select(`
-            *,
-            event_tickets (
-              ticket_name,
-              price
-            )
-          `)
+          .select("id, qr_code, status, validated_at, event_tickets ( ticket_name, price, event_date_id )")
           .eq("event_order_id", id);
 
         if (ticketsError) {
-          console.error("Error al obtener tickets:", ticketsError);
-          errorMessage = "Error al cargar los tickets";
+          console.error("Error al obtener tickets:", ticketsError.message);
+          errorMessage = "Error al cargar las entradas";
         } else {
-          // Formatear tickets para mostrar
-          tickets = ticketsData.map(ticketData => ({
+          tickets = (ticketsData || []).map((ticketData: any) => {
+            // R1: entrada de una función específica -> solo esa función
+            const fnId = ticketData.event_tickets?.event_date_id;
+            const fnDates = fnId != null ? (event?.dates || []).filter((d: any) => String(d.id) === String(fnId)) : [];
+            return {
             id: ticketData.id,
-            event_name: event?.name || "Evento desconocido",
-            event_dates: event?.dates || "Fecha no disponible",
+            event_name: event?.name || "Evento",
+            event_dates: fnDates.length ? fnDates : event?.dates || [],
             ticket_name: ticketData.event_tickets?.ticket_name || "Entrada General",
             attendee_name: `${attendeeInfo?.first_name || ""} ${attendeeInfo?.last_name || ""}`.trim(),
-            attendee_email: attendeeInfo?.email || "Correo no disponible",
+            attendee_email: attendeeInfo?.email || "",
             qr_code: ticketData.qr_code || null,
-            internal_id: ticketData.internal_id,
             status: ticketData.status,
-          }));
+            };
+          });
+        }
+
+        // Dirección secreta: solo para órdenes pagadas con al menos una entrada vigente
+        const hasLiveTicket = (ticketsData || []).some((t: any) => t.status !== "cancelled");
+        if (orderData.status === "paid" && hasLiveTicket) {
+          const { data: secretRow } = await supabase.from("events").select("secret_location").eq("id", event.id).maybeSingle();
+          if (secretRow?.secret_location) event.secret_location = secretRow.secret_location;
+        }
+
+        if (orderData.status !== "paid") {
+          if (orderData.status === "processing") {
+            pendingMessage = "¡Pago recibido! Estamos emitiendo tus entradas; aparecerán aquí y en tu correo en unos minutos.";
+          } else if (orderData.status === "pending") {
+            pendingMessage = "Estamos confirmando tu pago. Tus entradas aparecerán aquí y llegarán a tu correo apenas se confirme (recarga la página en unos minutos).";
+          } else if (orderData.status === "rejected" || orderData.status === "cancelled" || orderData.status === "failed") {
+            pendingMessage = "El pago de esta orden no se completó, por lo que no tiene entradas asociadas.";
+          } else {
+            pendingMessage = "Esta orden está en revisión. Si ya pagaste, escríbenos a soporte@aitickets.cl.";
+          }
         }
       }
     }
-  } catch (error) {
-    console.error("Error general:", error);
+  } catch (error: any) {
+    console.error("Error cargando la orden:", error?.message);
     errorMessage = "Error interno del servidor";
   }
 }
+
+const totalPaid = orderInfo
+  ? Number(orderInfo.total_payment ?? (Number(orderInfo.amount || 0) + Number(orderInfo.ticket_fee || 0))) || 0
+  : 0;
 ---
 
-<Layout>
+<Layout title={event?.name ? `Tus entradas: ${event.name} | AI Tickets` : "Tu orden | AI Tickets"} noindex>
   <AppHeader client:idle />
   <main class="flex flex-col items-center min-h-screen bg-gray-100">
     <div class="max-w-6xl mx-auto w-full px-4 lg:px-0">
-      
+
       {errorMessage ? (
-        <!-- Mensaje de Error -->
         <div class="mt-12 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
           <h2 class="text-xl font-semibold font-[Unbounded] mb-2">Error</h2>
           <p>{errorMessage}</p>
         </div>
       ) : (
         <>
-          <!-- Información de la Orden -->
           <div class="mt-16 lg:mt-12 bg-white rounded-lg shadow-lg p-6">
-            <h3 class="text-lg font-bold font-[Unbounded] text-gray-800 mb-4">
+            <h3 class="text-lg font-bold font-[Unbounded] text-gray-800 mb-4 break-words">
               🎟️ Orden #{orderInfo?.id}
             </h3>
-            
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600 font-[Prompt]">
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600 font-[Prompt] break-words">
               <div>
                 <span class="font-semibold">Cliente:</span>
                 <p>{attendeeInfo?.first_name} {attendeeInfo?.last_name}</p>
@@ -157,37 +182,43 @@ if (id) {
                 <p>{orderInfo?.created_at ? `${formatLocalDate(orderInfo.created_at, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} a las ${formatLocalTime(orderInfo.created_at)} hrs` : 'N/A'}</p>
               </div>
               <div>
-                <span class="font-semibold">Total pagado:</span>
+                <span class="font-semibold">{orderInfo?.status === 'paid' ? 'Total pagado:' : 'Total:'}</span>
                 <p class="text-lg font-bold text-green-600">
-                  ${orderInfo?.total_payment ? orderInfo.total_payment.toLocaleString('es-CL') : '0'}
+                  {totalPaid > 0 ? `$${totalPaid.toLocaleString('es-CL')}` : 'Gratis'}
                 </p>
               </div>
             </div>
           </div>
 
+          {pendingMessage && (
+            <div class="mt-6 bg-amber-50 border border-amber-300 text-amber-800 px-4 py-3 rounded-lg font-[Prompt]">
+              {pendingMessage}
+            </div>
+          )}
+
           <EventDetails event={event} client:load />
 
-          <!-- Tickets -->
-          <div class="mt-6">
-            <h2 class="text-xl font-semibold font-[Unbounded] text-gray-800 mb-4">
-              {tickets.length === 1 ? 'Tu Entrada' : `Tus Entradas (${tickets.length})`}
-            </h2>
-            
-            <div class="space-y-6">
-              {tickets.map((ticket, index) => (
-                <div class="relative">
-                  {tickets.length > 1 && (
-                    <div class="text-sm text-gray-500 font-[Prompt] mb-2">
-                      Entrada {index + 1} de {tickets.length}
-                    </div>
-                  )}
-                  <TicketInfo ticket={ticket} event={event} client:only />
-                </div>
-              ))}
-            </div>
-          </div>
+          {tickets.length > 0 && (
+            <div class="mt-6">
+              <h2 class="text-xl font-semibold font-[Unbounded] text-gray-800 mb-4">
+                {tickets.length === 1 ? 'Tu Entrada' : `Tus Entradas (${tickets.length})`}
+              </h2>
 
-          <!-- Contenedor colapsable del evento -->
+              <div class="space-y-6">
+                {tickets.map((ticket, index) => (
+                  <div class="relative">
+                    {tickets.length > 1 && (
+                      <div class="text-sm text-gray-500 font-[Prompt] mb-2">
+                        Entrada {index + 1} de {tickets.length}
+                      </div>
+                    )}
+                    <TicketInfo ticket={ticket} event={event} client:only />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div class="w-full mt-8 mb-8">
             <details class="bg-white p-4 rounded-lg shadow-lg">
               <summary class="text-lg font-semibold cursor-pointer font-[Unbounded]">

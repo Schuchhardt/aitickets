@@ -1,53 +1,39 @@
-import { getSupabaseAnon, getFriendlyErrorMessage } from "../../../lib/auth-helpers";
+import { getFriendlyErrorMessage } from "../../../lib/auth-helpers";
+import { setSessionCookies, jsonResponse } from "../../../lib/supabaseServer";
+import { createEphemeralAuthClient } from "../_lib/server-utils";
 import type { APIRoute } from "astro";
 
-export const POST: APIRoute = async ({ request, cookies }) => {
+export const POST: APIRoute = async (context) => {
     try {
-        const data = await request.json();
+        const data = await context.request.json();
         const { email, password } = data;
 
         if (!email || !password) {
-            return new Response(JSON.stringify({ message: "Email y contraseña son obligatorios" }), { status: 400 });
+            return jsonResponse({ message: "Email y contraseña son obligatorios" }, 400);
         }
 
-        const supabase = getSupabaseAnon();
+        // Cliente efímero con service role: signInWithPassword guarda la sesión en memoria del cliente,
+        // por eso no se usa el singleton getSupabaseAdmin().
+        const supabase = createEphemeralAuthClient();
 
         const { data: authData, error } = await supabase.auth.signInWithPassword({
-            email,
+            email: String(email).trim(),
             password,
         });
 
         if (error) {
-            return new Response(JSON.stringify({ message: getFriendlyErrorMessage(error) }), { status: 401 });
+            return jsonResponse({ message: getFriendlyErrorMessage(error) }, 401);
         }
 
         if (!authData.session) {
-            return new Response(JSON.stringify({ message: "No se pudo obtener la sesión" }), { status: 500 });
+            return jsonResponse({ message: "No se pudo obtener la sesión" }, 500);
         }
 
-        const { access_token, refresh_token } = authData.session;
+        setSessionCookies(context, authData.session.access_token, authData.session.refresh_token);
 
-        // Set cookies
-        cookies.set("sb-access-token", access_token, {
-            path: "/",
-            httpOnly: true,
-            secure: import.meta.env.PROD, // Secure in production
-            sameSite: "lax",
-            maxAge: 60 * 60 * 24 * 30, // 1 month
-        });
-
-        cookies.set("sb-refresh-token", refresh_token, {
-            path: "/",
-            httpOnly: true,
-            secure: import.meta.env.PROD,
-            sameSite: "lax",
-            maxAge: 60 * 60 * 24 * 30, // 1 month
-        });
-
-        return new Response(JSON.stringify({ message: "Login exitoso" }), { status: 200 });
-
+        return jsonResponse({ message: "Login exitoso" }, 200);
     } catch (error) {
         console.error("Login error:", error);
-        return new Response(JSON.stringify({ message: "Error interno del servidor" }), { status: 500 });
+        return jsonResponse({ message: "Error interno del servidor" }, 500);
     }
 };

@@ -1,6 +1,8 @@
 ---
-import _ from "lodash";
-import { getSupabaseAnon } from "../../lib/auth-helpers";
+// Validador de QR para la puerta. Antes se protegía con ?token=qrvalidator (fijo en el código);
+// ahora exige sesión de un usuario de la organización dueña del evento con rol de check-in.
+import { getSupabaseAdmin, createEphemeralAuthClient } from "../../lib/auth-helpers";
+import { getSessionContext, setSessionCookies, clearSessionCookies } from "../../lib/supabaseServer";
 import AppFooter from "../../components/AppFooter.vue";
 import Layout from '../../layouts/Layout.astro';
 import ValidateQR from "../../components/ValidateQR.vue";
@@ -9,75 +11,91 @@ import logoImg from '../../images/logo.png';
 
 export const prerender = false;
 
+const CHECKIN_ROLES = ["admin", "producer", "editor", "validator"];
 const { slug } = Astro.params;
-const supabase = getSupabaseAnon();
+const supabase = getSupabaseAdmin();
 
-// Validar token de acceso
-const token = Astro.url.searchParams.get('token');
-if (token !== 'qrvalidator') {
+// Esta ruta no pasa por el refresco de sesión del middleware: refrescar aquí si el access token venció
+let session = await getSessionContext(Astro);
+if (!session) {
+  const refreshToken = Astro.cookies.get("sb-refresh-token")?.value;
+  if (refreshToken) {
+    const { data, error } = await createEphemeralAuthClient().auth.refreshSession({ refresh_token: refreshToken });
+    if (data?.session && !error) {
+      setSessionCookies(Astro, data.session.access_token, data.session.refresh_token);
+      session = await getSessionContext(Astro);
+    } else {
+      clearSessionCookies(Astro);
+    }
+  }
+}
+if (!session) {
+  return Astro.redirect('/organizadores/login');
+}
+if (!CHECKIN_ROLES.includes(session.dbUser.role || "")) {
+  return Astro.redirect('/dashboard');
+}
+
+const { data: event } = await supabase
+  .from("events")
+  .select("id, name, slug, start_date, end_date")
+  .eq("slug", slug)
+  .eq("organization_id", session.dbUser.organization_id)
+  .maybeSingle();
+
+if (!event) {
   return Astro.redirect('/404');
 }
 
-// Obtener el evento
-const { data: event, error } = await supabase
-  .from("events")
-  .select("*")
-  .eq("slug", slug)
-  .single();
-
-if (!error && event) {
-  // Cargar asistentes con información completa
-  const { data: event_attendees, error: errorTickets } = await supabase
+// Paginado con .range(): PostgREST devuelve como máximo 1000 filas por consulta.
+const PAGE_SIZE = 1000;
+const event_attendees: any[] = [];
+for (let from = 0; ; from += PAGE_SIZE) {
+  const { data: page, error: pageError } = await supabase
     .from("event_attendees")
     .select(`
       id,
       event_id,
+      event_order_id,
       qr_code,
       status,
+      is_complimentary,
       validated_at,
-      attendees (
-        first_name,
-        last_name,
-        email
-      ),
-      event_tickets (
-        ticket_name
-      )
+      attendees ( first_name, last_name, email ),
+      event_tickets ( ticket_name, event_date_id )
     `)
-    .eq("event_id", event.id);
-
-  console.log("event_attendees", event_attendees);
-
-  if (errorTickets) {
-    console.error("Error al obtener las entradas:", errorTickets);
-    event.attendees = [];
-  } else {
-    event.attendees = event_attendees || [];
+    .eq("event_id", event.id)
+    .order("id", { ascending: true })
+    .range(from, from + PAGE_SIZE - 1);
+  if (pageError) {
+    console.error("Error al obtener las entradas:", pageError.message);
+    break;
   }
-} else {
-  console.error("Error al obtener el evento:", error);
-  return Astro.redirect('/404');
+  event_attendees.push(...(page || []));
+  if (!page || page.length < PAGE_SIZE) break;
 }
 
+// Funciones del evento (aviso de "otra función", contrato R1)
+const { data: eventDates } = await supabase
+  .from("event_dates")
+  .select("id, date, start_time")
+  .eq("event_id", event.id)
+  .order("date", { ascending: true })
+  .order("start_time", { ascending: true });
+
+const eventWithAttendees = { ...event, dates: eventDates || [], attendees: event_attendees };
 ---
 
-<Layout>
-  <head>
-    <!-- Evitar indexación en motores de búsqueda -->
-    <meta name="robots" content="noindex, nofollow" />
-    <meta name="googlebot" content="noindex, nofollow" />
-  </head>
+<Layout title={`Validar entradas: ${event.name} | AI Tickets`} noindex>
   <main>
-    <section class="relative w-full flex flex-col items-center text-center px-6 overflow-hidden">
-      
+    <section class="relative w-full flex flex-col items-center text-center px-4 md:px-6 overflow-hidden">
       <div class="flex items-center justify-between m-6">
         <a href="/" class="flex items-center space-x-2">
           <img src={logoImg.src} alt="AI Tickets" class="h-8" />
         </a>
       </div>
-      <ValidateQR event={event} client:idle  />
+      <ValidateQR event={eventWithAttendees} client:idle />
     </section>
-
   </main>
 
   <AppFooter client:idle />

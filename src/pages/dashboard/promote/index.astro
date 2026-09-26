@@ -1,34 +1,19 @@
 ---
 import DashboardLayout from "../../../layouts/DashboardLayout.astro";
-import { createSupabaseServerClient } from "../../../lib/supabaseServer";
+import { EVENT_MANAGER_ROLES } from "../../../lib/supabaseServer";
+import { requireDashboardSession } from "../_lib/guard";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import PromoteOverview from "../../../components/dashboard/promote/PromoteOverview.vue";
 
-const supabase = createSupabaseServerClient(Astro);
+const guard = await requireDashboardSession(Astro, EVENT_MANAGER_ROLES);
+if (!guard.ok) return guard.response;
+const { dbUser } = guard.session;
 const supabaseAdmin = getSupabaseAdmin();
-
-const {
-  data: { user },
-} = await supabase.auth.getUser();
-
-if (!user) {
-  return Astro.redirect("/organizadores/login");
-}
-
-const { data: dbUser } = await supabase
-  .from("users")
-  .select("organization_id")
-  .eq("auth_user_id", user.id)
-  .single();
-
-if (!dbUser?.organization_id) {
-  return Astro.redirect("/dashboard");
-}
 
 // Fetch connected social accounts
 const { data: socialAccounts } = await supabaseAdmin
   .from("social_accounts")
-  .select("*")
+  .select("id, platform, account_name, avatar_url, status, created_at")
   .eq("organization_id", dbUser.organization_id)
   .order("created_at", { ascending: false });
 
@@ -48,29 +33,19 @@ const { data: events } = await supabaseAdmin
   .eq("status", "published")
   .order("created_at", { ascending: false });
 
-// Fetch ad account connections
-const { data: adConnections } = await supabaseAdmin
-  .from("ad_account_connections")
-  .select("id, platform, account_name, status")
-  .eq("organization_id", dbUser.organization_id);
-
-// Fetch ad campaigns
-const { data: adCampaigns } = await supabaseAdmin
-  .from("ad_campaigns")
-  .select("id, status, spend, impressions")
-  .eq("organization_id", dbUser.organization_id);
-
+// Meta Ads está deshabilitado ("Próximamente"): no se consultan conexiones ni campañas
 // Stats
 const totalPosts = socialPosts?.length || 0;
 const publishedPosts = socialPosts?.filter((p) => p.status === "published").length || 0;
 const scheduledPosts = socialPosts?.filter((p) => p.status === "scheduled").length || 0;
-const activeCampaigns = adCampaigns?.filter((c) => c.status === "active").length || 0;
-const totalAdSpend = adCampaigns?.reduce((sum, c) => sum + (c.spend || 0), 0) || 0;
-const hasMetaAds = (adConnections?.length || 0) > 0;
+const activeCampaigns = 0;
+const totalAdSpend = 0;
+const hasMetaAds = false;
 
 const connected = Astro.url.searchParams.get("connected");
 const error = Astro.url.searchParams.get("error");
-const tab = Astro.url.searchParams.get("tab");
+const rawTab = Astro.url.searchParams.get("tab");
+const tab = rawTab === "ads" ? "" : rawTab;
 ---
 
 <DashboardLayout title="Promocionar">

@@ -10,7 +10,6 @@ const props = defineProps({
   }
 })
 
-console.log("📅 Evento recibido:", props.event)
 
 // Estado local
 const scannedCode = ref('')
@@ -49,6 +48,70 @@ const totalTickets = computed(() => {
   return localEvent.value?.attendees?.length || 0
 })
 
+// ==== Helpers de estado / funciones (R1) ====
+const isActiveStatus = (status) => status == null || status === 'active'
+
+const SHORT_WEEKDAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+const SHORT_MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+const todayInSantiago = () =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+const functionLabel = (d) => {
+  if (!d?.date) return ''
+  const [y, m, day] = String(d.date).slice(0, 10).split('-').map(Number)
+  const dt = new Date(Date.UTC(y, m - 1, day, 12))
+  return `${SHORT_WEEKDAYS[dt.getUTCDay()]} ${day} ${SHORT_MONTHS[m - 1]}${d.start_time ? ` · ${String(d.start_time).slice(0, 5)}` : ''}`
+}
+
+/** Aviso si la entrada es de una función específica que no es hoy (se puede validar igual). */
+const localFunctionCheck = (attendee) => {
+  const fnId = attendee?.event_tickets?.event_date_id ?? attendee?.event_date_id ?? null
+  if (fnId == null) return { function_mismatch: false, function_label: null }
+  const dates = localEvent.value?.dates || props.event.dates || []
+  const fn = dates.find(d => String(d.id) === String(fnId))
+  if (!fn) return { function_mismatch: false, function_label: null }
+  return { function_mismatch: String(fn.date).slice(0, 10) !== todayInSantiago(), function_label: functionLabel(fn) }
+}
+
+/**
+ * Combina la lista fresca del servidor con el estado local: las entradas validadas offline que siguen
+ * pendientes de sincronizar se mantienen como validadas (salvo que el servidor diga que están anuladas).
+ */
+const mergeWithLocalState = (serverAttendees) => {
+  const pendingById = new Map((pendingValidations.value || []).map(p => [p.ticket_id, p]))
+  const previousById = new Map((localEvent.value?.attendees || []).map(a => [a.id, a]))
+  return (serverAttendees || []).map(a => {
+    const previous = previousById.get(a.id)
+    const pending = pendingById.get(a.id)
+    const merged = { ...a, event_order_id: a.event_order_id ?? previous?.event_order_id ?? null }
+    if (pending && isActiveStatus(a.status)) {
+      merged.status = 'validated'
+      merged.validated_at = pending.validated_at
+    }
+    return merged
+  })
+}
+
+const applyServerList = (attendees, dates) => {
+  const now = new Date().toISOString()
+  setLocalEvent({
+    ...props.event,
+    ...(localEvent.value?.id === props.event.id ? localEvent.value : {}),
+    dates: dates || localEvent.value?.dates || props.event.dates || [],
+    attendees: mergeWithLocalState(attendees),
+    last_sync: now
+  })
+  lastSyncDate.value = now
+}
+
+/** Descarga la lista completa del servidor (paginada en la API) y la combina con el estado local. */
+const refreshFromServer = async () => {
+  const response = await fetch(`/api/get-event-attendees?event_id=${props.event.id}`)
+  if (response.status === 401) throw new Error('Tu sesión expiró. Vuelve a iniciar sesión para sincronizar.')
+  if (!response.ok) throw new Error('Error al obtener datos del servidor')
+  const data = await response.json()
+  applyServerList(data.attendees || [], data.dates)
+}
+
 // Inicializar datos locales
 onMounted(() => {
   // Inicializar sonidos en el cliente
@@ -59,17 +122,21 @@ onMounted(() => {
   // Establecer estado de conexión en el cliente
   isOnline.value = navigator.onLine
 
-  // Guardar evento en localStorage al cargar por primera vez
-  if (!localEvent.value || localEvent.value.id !== props.event.id) {
-    setLocalEvent(props.event)
-    lastSyncDate.value = new Date().toISOString()
+  const hasCache = localEvent.value && localEvent.value.id === props.event.id
+  if (isOnline.value || !hasCache) {
+    // La página se acaba de renderizar en el servidor: su lista es la más fresca.
+    // Se combina con las validaciones locales pendientes en vez de conservar un caché viejo.
+    applyServerList(props.event.attendees || [], props.event.dates || [])
   } else {
-    // Cargar fecha de última sincronización
+    // Offline con caché de este evento: conservarlo
     lastSyncDate.value = localEvent.value.last_sync || null
   }
 
-  // Escuchar cambios de conexión
-  window.addEventListener('online', () => { isOnline.value = true })
+  // Escuchar cambios de conexión (al volver la conexión se sincroniza lo pendiente)
+  window.addEventListener('online', () => {
+    isOnline.value = true
+    if (pendingValidations.value.length && !syncing.value) syncWithServer()
+  })
   window.addEventListener('offline', () => { isOnline.value = false })
 })
 
@@ -137,47 +204,94 @@ const onCameraError = (error) => {
 }
 
 
-// Validar QR offline
+const toTicketData = (ticket, fnCheck) => ({
+  id: ticket.id,
+  event_id: ticket.event_id,
+  status: ticket.status,
+  validated_at: ticket.validated_at,
+  full_name: `${ticket.attendees?.first_name || ''} ${ticket.attendees?.last_name || ''}`.trim(),
+  email: ticket.attendees?.email || '',
+  ticket_name: ticket.event_tickets?.ticket_name || '',
+  qr_code: ticket.qr_code,
+  function_mismatch: Boolean(fnCheck?.function_mismatch),
+  function_label: fnCheck?.function_label || null
+})
+
+/** Busca en el servidor un QR que no está en la lista local (entrada vendida después de la última carga). */
+const lookupTicketOnServer = async (qrCode) => {
+  const res = await fetch('/api/validate-ticket', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ qr_code: qrCode, event_id: props.event.id })
+  })
+  if (res.status === 404) return null
+  if (!res.ok) throw new Error('No se pudo consultar la entrada en el servidor')
+  const { ticket } = await res.json()
+  if (!ticket) return null
+  // Normalizar a la forma de la lista local y agregarla
+  const attendee = {
+    id: ticket.id,
+    event_id: ticket.event_id,
+    qr_code: ticket.qr_code || qrCode,
+    status: ticket.status,
+    validated_at: ticket.validated_at,
+    event_order_id: ticket.event_order_id || null,
+    is_complimentary: ticket.is_complimentary || false,
+    attendees: {
+      first_name: (ticket.full_name || '').split(' ')[0] || '',
+      last_name: (ticket.full_name || '').split(' ').slice(1).join(' '),
+      email: ticket.email || ''
+    },
+    event_tickets: { ticket_name: ticket.ticket_name || '', event_date_id: ticket.event_date_id ?? null }
+  }
+  const others = (localEvent.value?.attendees || []).filter(a => a.id !== attendee.id)
+  setLocalEvent({ ...localEvent.value, attendees: [...others, attendee] })
+  return { attendee, fnCheck: { function_mismatch: ticket.function_mismatch, function_label: ticket.function_label } }
+}
+
+// Validar QR (lista local; si no está y hay conexión, se consulta al servidor)
 const onDetect = async ([result]) => {
-  console.log("📸 QR detectado:", result?.rawValue)
   if (!result?.rawValue) return
-  
+
   scannedCode.value = result.rawValue
   resultMessage.value = ''
   ticketData.value = null
   loading.value = true
 
   try {
-    // Buscar ticket en datos locales
-    const ticket = localEvent.value.attendees.find(a => a.qr_code === scannedCode.value)
-    
+    let ticket = (localEvent.value?.attendees || []).find(a => a.qr_code === scannedCode.value)
+    let fnCheck = ticket ? localFunctionCheck(ticket) : null
+
+    if (!ticket && isOnline.value) {
+      const found = await lookupTicketOnServer(scannedCode.value)
+      if (found) {
+        ticket = found.attendee
+        fnCheck = found.fnCheck
+      }
+    }
+
     if (!ticket) {
       if (errorSound) errorSound.play()
-      resultMessage.value = '❌ Este QR no corresponde a este evento.'
-      loading.value = false
+      resultMessage.value = isOnline.value
+        ? '❌ Este QR no corresponde a este evento.'
+        : '❌ Este QR no está en la lista descargada. Sincroniza con conexión para verificar entradas nuevas.'
       return
     }
 
     if (ticket.status === 'validated') {
       if (errorSound) errorSound.play()
       resultMessage.value = '❌ Este QR ya ha sido validado anteriormente.'
-      loading.value = false
+      return
+    }
+
+    if (!isActiveStatus(ticket.status)) {
+      if (errorSound) errorSound.play()
+      resultMessage.value = ticket.status === 'cancelled' ? '❌ Esta entrada fue anulada.' : `❌ Entrada no válida (estado: ${ticket.status}).`
       return
     }
 
     // Mostrar datos del ticket para confirmar
-    ticketData.value = {
-      id: ticket.id,
-      event_id: ticket.event_id,
-      status: ticket.status,
-      validated_at: ticket.validated_at,
-      full_name: `${ticket.attendees.first_name} ${ticket.attendees.last_name}`,
-      email: ticket.attendees.email,
-      ticket_name: ticket.event_tickets.ticket_name,
-      price: ticket.event_tickets.price,
-      qr_code: ticket.qr_code
-    }
-    
+    ticketData.value = toTicketData(ticket, fnCheck)
     cameraVisible.value = false
   } catch (err) {
     if (errorSound) errorSound.play()
@@ -187,41 +301,86 @@ const onDetect = async ([result]) => {
   }
 }
 
-// Confirmar validación (offline)
-const confirmValidation = () => {
+// Actualiza el estado local de una entrada
+const setLocalStatus = (ticketId, status, validatedAt = null) => {
+  const updatedAttendees = (localEvent.value?.attendees || []).map(a => {
+    if (a.id === ticketId) {
+      return { ...a, status, validated_at: status === 'validated' ? (validatedAt || a.validated_at || new Date().toISOString()) : a.validated_at }
+    }
+    return a
+  })
+  setLocalEvent({ ...localEvent.value, attendees: updatedAttendees })
+}
+const markLocalValidated = (ticketId, validatedAt = null) => setLocalStatus(ticketId, 'validated', validatedAt || new Date().toISOString())
+
+const queuePendingValidation = (ticketId) => {
+  const others = pendingValidations.value.filter(p => p.ticket_id !== ticketId)
+  setPendingValidations([...others, {
+    ticket_id: ticketId,
+    validated_at: new Date().toISOString()
+  }])
+}
+
+/** 409 de confirm-ticket: ¿la entrada ya estaba validada (y no anulada / otro estado)? */
+const isAlreadyValidated = (data) => data?.code === 'already_validated' || (!data?.code && /ya validada/i.test(data?.message || ''))
+
+/**
+ * Valida una entrada. Online: confirma en el servidor (/api/confirm-ticket con event_id).
+ * Offline o si el servidor no responde: la valida localmente y la deja pendiente de sincronizar.
+ * Devuelve { ok, message, offline?, function_mismatch?, function_label? }.
+ */
+const validateTicket = async (ticketId) => {
+  if (isOnline.value) {
+    try {
+      const res = await fetch('/api/confirm-ticket', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticket_id: ticketId, event_id: props.event.id })
+      })
+      let data = {}
+      try { data = await res.json() } catch (e) { /* sin cuerpo */ }
+      if (res.ok) {
+        markLocalValidated(ticketId, data.validated_at)
+        return { ok: true, function_mismatch: data.function_mismatch, function_label: data.function_label }
+      }
+      if (res.status === 401) {
+        return { ok: false, message: 'Tu sesión expiró. Vuelve a iniciar sesión.' }
+      }
+      if (res.status >= 400 && res.status < 500) {
+        if (res.status === 409) {
+          if (isAlreadyValidated(data)) markLocalValidated(ticketId, data.validated_at)
+          else if (data?.status) setLocalStatus(ticketId, data.status)
+        }
+        return { ok: false, message: data.message || 'No se pudo validar la entrada.' }
+      }
+      // 5xx: se valida offline y se reintenta al sincronizar
+    } catch (err) {
+      console.error('Error validando en servidor, se guarda offline:', err)
+    }
+  }
+  markLocalValidated(ticketId)
+  queuePendingValidation(ticketId)
+  return { ok: true, offline: true }
+}
+
+// Confirmar validación del QR escaneado
+const confirmValidation = async () => {
   if (!ticketData.value) return
 
   try {
     loading.value = true
+    const result = await validateTicket(ticketData.value.id)
 
-    // Actualizar estado local
-    const updatedAttendees = localEvent.value.attendees.map(a => {
-      if (a.qr_code === ticketData.value.qr_code) {
-        return {
-          ...a,
-          status: 'validated',
-          validated_at: new Date().toISOString()
-        }
-      }
-      return a
-    })
-
-    setLocalEvent({
-      ...localEvent.value,
-      attendees: updatedAttendees
-    })
-
-    // Agregar a validaciones pendientes de sincronización
-    const pending = [...pendingValidations.value, {
-      ticket_id: ticketData.value.id,
-      validated_at: new Date().toISOString()
-    }]
-    setPendingValidations(pending)
-
-    // Reproducir sonido de éxito
-    if (successSound) successSound.play()
-
-    resultMessage.value = `✅ Entrada validada con éxito para ${ticketData.value.full_name}`
+    if (result.ok) {
+      if (successSound) successSound.play()
+      const fnWarning = ticketData.value.function_mismatch && ticketData.value.function_label
+        ? ` · Ojo: entrada para ${ticketData.value.function_label}`
+        : ''
+      resultMessage.value = `✅ Entrada validada con éxito para ${ticketData.value.full_name}${result.offline ? ' (pendiente de sincronizar)' : ''}${fnWarning}`
+    } else {
+      if (errorSound) errorSound.play()
+      resultMessage.value = `❌ ${result.message}`
+    }
     ticketData.value = null
     scannedCode.value = ''
     cameraVisible.value = true
@@ -239,50 +398,58 @@ const syncWithServer = async () => {
     resultMessage.value = '❌ No hay conexión a internet. Conéctate para sincronizar.'
     return
   }
+  if (syncing.value) return
 
   try {
     syncing.value = true
     resultMessage.value = '🔄 Sincronizando...'
 
-    // 1. Enviar validaciones pendientes
-    if (pendingValidations.value.length > 0) {
-      for (const validation of pendingValidations.value) {
-        try {
-          const res = await fetch('/api/confirm-ticket', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ticket_id: validation.ticket_id })
-          })
-          
-          if (!res.ok) {
-            console.error('Error al sincronizar ticket:', validation.ticket_id)
-          }
-        } catch (err) {
-          console.error('Error en sincronización:', err)
+    // 1. Enviar validaciones pendientes. Solo se quitan de la cola las confirmadas (2xx) o las que el
+    //    servidor ya tenía validadas (409 already_validated). Errores de red / 5xx / sesión quedan en cola.
+    //    Rechazos definitivos (anulada, no pertenece al evento) se quitan y se informan.
+    const resolved = new Set()
+    const rejected = []
+    let authError = false
+    for (const validation of [...pendingValidations.value]) {
+      try {
+        const res = await fetch('/api/confirm-ticket', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ticket_id: validation.ticket_id, event_id: props.event.id, validated_at: validation.validated_at })
+        })
+        let data = {}
+        try { data = await res.json() } catch (e) { /* sin cuerpo */ }
+
+        if (res.ok || (res.status === 409 && isAlreadyValidated(data))) {
+          resolved.add(validation.ticket_id)
+        } else if (res.status === 401 || res.status === 403) {
+          authError = true
+          break
+        } else if (res.status === 404 || res.status === 409) {
+          resolved.add(validation.ticket_id)
+          rejected.push(validation.ticket_id)
+        } else {
+          console.error('Error al sincronizar ticket (se reintentará):', validation.ticket_id, res.status)
         }
+      } catch (err) {
+        console.error('Error de red al sincronizar (se reintentará):', err)
       }
-      
-      // Limpiar validaciones pendientes
-      setPendingValidations([])
+    }
+    // Conservar lo no resuelto (y lo que se haya encolado durante la sincronización)
+    setPendingValidations(pendingValidations.value.filter(p => !resolved.has(p.ticket_id)))
+
+    if (authError) {
+      throw new Error('Tu sesión expiró. Vuelve a iniciar sesión para sincronizar.')
     }
 
-    // 2. Obtener datos actualizados del servidor
-    const response = await fetch(`/api/get-event-attendees?event_id=${props.event.id}`)
-    
-    if (response.ok) {
-      const data = await response.json()
-      
-      setLocalEvent({
-        ...localEvent.value,
-        attendees: data.attendees,
-        last_sync: new Date().toISOString()
-      })
-      
-      lastSyncDate.value = new Date().toISOString()
-      resultMessage.value = '✅ Sincronización completada exitosamente.'
-    } else {
-      throw new Error('Error al obtener datos del servidor')
-    }
+    // 2. Obtener datos actualizados del servidor y combinarlos con lo pendiente
+    await refreshFromServer()
+
+    const stillPending = pendingValidations.value.length
+    const parts = ['✅ Sincronización completada.']
+    if (rejected.length) parts.push(`${rejected.length} validación(es) rechazada(s) por el servidor (entrada anulada o de otro evento).`)
+    if (stillPending) parts.push(`${stillPending} validación(es) siguen pendientes; se reintentarán.`)
+    resultMessage.value = parts.join(' ')
   } catch (err) {
     resultMessage.value = `❌ Error al sincronizar: ${err.message}`
   } finally {
@@ -300,7 +467,7 @@ const cancelValidation = () => {
 
 // Gestión de lista de asistentes
 const searchQuery = ref('')
-const showAttendeesList = ref(false)
+const showAttendeesList = ref(true)
 
 const filteredAttendees = computed(() => {
   if (!localEvent.value?.attendees) return []
@@ -309,8 +476,8 @@ const filteredAttendees = computed(() => {
   if (!query) return localEvent.value.attendees
 
   return localEvent.value.attendees.filter(attendee => {
-    const fullName = `${attendee.attendees.first_name} ${attendee.attendees.last_name}`.toLowerCase()
-    const email = attendee.attendees.email.toLowerCase()
+    const fullName = `${attendee.attendees?.first_name || ''} ${attendee.attendees?.last_name || ''}`.toLowerCase()
+    const email = (attendee.attendees?.email || '').toLowerCase()
     return fullName.includes(query) || email.includes(query)
   })
 })
@@ -319,40 +486,60 @@ const toggleAttendeesList = () => {
   showAttendeesList.value = !showAttendeesList.value
 }
 
-const manualValidation = (attendee) => {
+const manualValidation = async (attendee) => {
   if (attendee.status === 'validated') {
     resultMessage.value = '❌ Este ticket ya fue validado'
     return
   }
+  if (!isActiveStatus(attendee.status)) {
+    resultMessage.value = attendee.status === 'cancelled' ? '❌ Esta entrada fue anulada' : `❌ Entrada no válida (estado: ${attendee.status})`
+    return
+  }
 
-  // Actualizar estado local
-  const updatedAttendees = localEvent.value.attendees.map(a => {
-    if (a.id === attendee.id) {
-      return {
-        ...a,
-        status: 'validated',
-        validated_at: new Date().toISOString()
-      }
-    }
-    return a
-  })
+  const fnCheck = localFunctionCheck(attendee)
+  if (fnCheck.function_mismatch && !confirm(`Esta entrada es para otra función (${fnCheck.function_label}). ¿Validarla de todas formas?`)) return
 
-  setLocalEvent({
-    ...localEvent.value,
-    attendees: updatedAttendees
-  })
+  const name = `${attendee.attendees?.first_name || ''} ${attendee.attendees?.last_name || ''}`.trim()
+  const result = await validateTicket(attendee.id)
+  if (result.ok) {
+    if (successSound) successSound.play()
+    resultMessage.value = `✅ Entrada validada manualmente para ${name}${result.offline ? ' (pendiente de sincronizar)' : ''}`
+  } else {
+    if (errorSound) errorSound.play()
+    resultMessage.value = `❌ ${result.message}`
+  }
+}
 
-  // Agregar a validaciones pendientes
-  const pending = [...pendingValidations.value, {
-    ticket_id: attendee.id,
-    validated_at: new Date().toISOString()
-  }]
-  setPendingValidations(pending)
+// Reenviar entradas de una orden (p. ej. "no me llegó la entrada")
+const resendingOrderId = ref(null)
+const resendTickets = async (attendee) => {
+  const orderId = attendee.event_order_id
+  if (!orderId) {
+    resultMessage.value = '❌ Esta entrada no tiene una orden asociada para reenviar.'
+    return
+  }
+  if (!isOnline.value) {
+    resultMessage.value = '❌ Necesitas conexión a internet para reenviar entradas.'
+    return
+  }
+  if (!confirm(`¿Reenviar las entradas de esta orden a ${attendee.attendees?.email || 'el comprador'}?`)) return
 
-  // Reproducir sonido de éxito
-  if (successSound) successSound.play()
-
-  resultMessage.value = `✅ Entrada validada manualmente para ${attendee.attendees.first_name} ${attendee.attendees.last_name}`
+  resendingOrderId.value = orderId
+  try {
+    const res = await fetch('/api/orders/resend', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId })
+    })
+    const data = await res.json().catch(() => ({}))
+    resultMessage.value = res.ok
+      ? `✅ Entradas reenviadas a ${attendee.attendees?.email || 'el comprador'}`
+      : `❌ ${data.message || 'No se pudieron reenviar las entradas'}`
+  } catch (err) {
+    resultMessage.value = `❌ ${err.message}`
+  } finally {
+    resendingOrderId.value = null
+  }
 }
 </script>
 
@@ -437,6 +624,9 @@ const manualValidation = (attendee) => {
         <p class="break-all"><strong>Email:</strong> {{ ticketData.email }}</p>
         <p><strong>Ticket:</strong> {{ ticketData.ticket_name }}</p>
       </div>
+      <div v-if="ticketData.function_mismatch" class="mt-3 p-2 bg-yellow-100 border border-yellow-400 rounded text-xs sm:text-sm text-yellow-900" role="alert">
+        ⚠️ Esta entrada es para otra función<span v-if="ticketData.function_label">: <strong>{{ ticketData.function_label }}</strong></span>. Puedes validarla de todas formas si corresponde.
+      </div>
 
       <div class="flex flex-col sm:flex-row gap-2 mt-4">
         <button
@@ -458,7 +648,8 @@ const manualValidation = (attendee) => {
     <p v-if="resultMessage" class="mt-4 text-xs sm:text-sm font-semibold p-3 rounded break-words" :class="{
       'text-green-700 bg-green-100': resultMessage.startsWith('✅'),
       'text-red-700 bg-red-100': resultMessage.startsWith('❌'),
-      'text-blue-700 bg-blue-100': resultMessage.startsWith('🔄')
+      'text-blue-700 bg-blue-100': resultMessage.startsWith('🔄'),
+      'text-yellow-800 bg-yellow-100': resultMessage.startsWith('⚠️')
     }">
       {{ resultMessage }}
     </p>
@@ -474,7 +665,7 @@ const manualValidation = (attendee) => {
         @click="toggleAttendeesList"
         class="w-full px-4 py-3 bg-gray-700 text-white rounded hover:bg-gray-800 font-semibold text-sm sm:text-base"
       >
-        {{ showAttendeesList ? '▲ Ocultar Lista de Asistentes' : '▼ Ver Lista de Asistentes' }}
+        {{ showAttendeesList ? '▲ Ocultar búsqueda de asistentes' : '▼ Buscar asistente (validación manual / reenviar entradas)' }}
       </button>
     </div>
 
@@ -519,7 +710,7 @@ const manualValidation = (attendee) => {
             <div class="flex-1 min-w-0">
               <div class="flex flex-wrap items-center gap-2 mb-1">
                 <p class="font-semibold text-sm sm:text-base break-words">
-                  {{ attendee.attendees.first_name }} {{ attendee.attendees.last_name }}
+                  {{ attendee.attendees?.first_name }} {{ attendee.attendees?.last_name }}
                 </p>
                 <span
                   v-if="attendee.status === 'validated'"
@@ -534,16 +725,29 @@ const manualValidation = (attendee) => {
                   Pendiente
                 </span>
               </div>
-              <p class="text-xs sm:text-sm text-gray-600 break-all">{{ attendee.attendees.email }}</p>
+              <p class="text-xs sm:text-sm text-gray-600 break-all">{{ attendee.attendees?.email }}</p>
               <p class="text-xs sm:text-sm text-gray-700 mt-1">
-                <strong>Ticket:</strong> {{ attendee.event_tickets.ticket_name }}
+                <strong>Ticket:</strong> {{ attendee.event_tickets?.ticket_name }}
+                <span v-if="localFunctionCheck(attendee).function_label" class="ml-1 text-xs text-gray-500">({{ localFunctionCheck(attendee).function_label }})</span>
+                <span v-if="attendee.is_complimentary" class="ml-1 text-xs text-purple-600">(cortesía)</span>
               </p>
+              <button
+                v-if="attendee.event_order_id"
+                @click="resendTickets(attendee)"
+                :disabled="resendingOrderId === attendee.event_order_id"
+                class="mt-2 text-xs text-blue-600 hover:underline disabled:text-gray-400"
+              >
+                {{ resendingOrderId === attendee.event_order_id ? 'Reenviando...' : '✉️ Reenviar entradas' }}
+              </button>
               <p v-if="attendee.validated_at" class="text-xs text-gray-500 mt-1">
                 Validado: {{ new Date(attendee.validated_at).toLocaleString('es-ES') }}
               </p>
             </div>
+            <div v-if="attendee.status === 'cancelled'" class="w-full sm:w-auto px-3 sm:px-4 py-2 bg-red-100 text-red-700 rounded text-xs sm:text-sm whitespace-nowrap text-center flex-shrink-0">
+              Anulada
+            </div>
             <button
-              v-if="attendee.status !== 'validated'"
+              v-else-if="attendee.status !== 'validated'"
               @click="manualValidation(attendee)"
               class="w-full sm:w-auto px-3 sm:px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-xs sm:text-sm whitespace-nowrap flex-shrink-0"
             >

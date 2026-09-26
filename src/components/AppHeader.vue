@@ -34,11 +34,22 @@ const toggleMenu = () => {
     <div class="w-full max-w-screen-xl mx-auto px-4 md:px-8 overflow-hidden">
       <div class="flex items-center justify-between">
         <a href="/" class="flex items-center space-x-2">
-          <img :src="logoLight.src" alt="AI Tickets" class="h-8" />
+          <img :src="logoLight.src" alt="AI Tickets" class="h-8" width="128" height="32" />
         </a>
 
         <!-- Desktop Menu -->
         <div class="hidden md:flex items-center space-x-8">
+          <a
+            href="/eventos"
+            :class="[
+              'text-sm font-medium font-[Unbounded] px-3 py-1.5 rounded-lg transition-colors text-black hover:text-gray-600',
+              currentPath.startsWith('/eventos')
+                ? 'border-b-2 border-lime-400'
+                : ''
+            ]"
+          >
+            Eventos
+          </a>
           <a
             href="/organizadores"
             :class="[
@@ -48,7 +59,7 @@ const toggleMenu = () => {
                 : ''
             ]"
           >
-            Para Organizadores
+            Para organizadores
           </a>
           <a
             href="/organizadores/login"
@@ -78,13 +89,22 @@ const toggleMenu = () => {
       >
         <div class="flex flex-col space-y-4">
           <a
+            href="/eventos"
+            :class="[
+              'text-sm font-medium font-[Unbounded] px-4 py-2 rounded-md transition-colors',
+              currentPath.startsWith('/eventos') ? 'border-b-2 border-lime-400' : 'hover:bg-gray-100'
+            ]"
+          >
+            Eventos
+          </a>
+          <a
             href="/organizadores"
             :class="[
               'text-sm font-medium font-[Unbounded] px-4 py-2 rounded-md transition-colors',
               currentPath === '/organizadores' ? 'border-b-2 border-lime-400' : 'hover:bg-gray-100'
             ]"
           >
-            Para Organizadores
+            Para organizadores
           </a>
           <a
             href="/organizadores/login"

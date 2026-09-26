@@ -1,3 +1,5 @@
+-- NOTA (2026-09-26): la app ya no usa anon/authenticated; todo va por service role.
+-- Ver db/migrations/20260926_Z_lockdown_rls.sql, que reemplaza estas políticas.
 -- Enable RLS on tables
 ALTER TABLE public.organizations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;

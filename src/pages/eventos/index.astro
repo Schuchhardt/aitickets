@@ -1,25 +1,82 @@
 ---
-import { getSupabaseAnon } from "../../lib/auth-helpers";
+import { getSupabaseAdmin } from "../../lib/auth-helpers";
 import AppHeader from "../../components/AppHeader.vue";
 import AppFooter from "../../components/AppFooter.vue";
 import EventList from "../../components/EventList.vue";
 import Layout from '../../layouts/Layout.astro';
+import { zonedDateTimeToDate, getZonedParts } from "../../utils/dateHelpers.js";
 import "../../styles/global.css";
 
+export const prerender = false;
 
-// Consulta los eventos en el servidor (SSR)
-const supabase = getSupabaseAnon();
-const { data: events, error } = await supabase.from("events").select("*").eq("status", "published").eq("accessibility", "public") ;
+// Listado público (C3): publicados, públicos y próximos. Columnas explícitas (C4: nunca secret_location).
+const supabase = getSupabaseAdmin();
+const now = new Date();
+const todaySantiago = getZonedParts(now)?.date || now.toISOString().slice(0, 10);
 
-// Si hay error o no hay eventos, definir un fallback vacío
-const eventData = error || !events ? [] : events;
+const { data: events, error } = await supabase
+  .from("events")
+  .select("id, slug, name, title, image_url, location, start_date, end_date")
+  .eq("status", "published")
+  .or("accessibility.is.null,accessibility.eq.public")
+  .not("slug", "is", null);
+
+if (error) console.error("Error al obtener eventos:", error);
+
+const eventIds = (events || []).map((e) => e.id);
+const { data: dates, error: datesError } = eventIds.length
+  ? await supabase
+      .from("event_dates")
+      .select("event_id, date, start_time, end_time")
+      .in("event_id", eventIds)
+      .order("date", { ascending: true })
+      .order("start_time", { ascending: true })
+  : { data: [], error: null };
+
+if (datesError) console.error("Error al obtener fechas de eventos:", datesError);
+
+const datesByEvent = new Map<number, any[]>();
+for (const d of dates || []) {
+  const list = datesByEvent.get(d.event_id) || [];
+  list.push({ date: String(d.date).slice(0, 10), start_time: d.start_time, end_time: d.end_time });
+  datesByEvent.set(d.event_id, list);
+}
+
+const eventData = (events || [])
+  .map((e) => {
+    const eventDates = datesByEvent.get(e.id) || [];
+    const upcomingDates = eventDates.filter((d) => d.date >= todaySantiago);
+    const lastDate = eventDates.length ? eventDates[eventDates.length - 1].date : null;
+    const isUpcoming =
+      !e.end_date || new Date(e.end_date) >= now || (lastDate !== null && lastDate >= todaySantiago);
+    // Próxima función (para ordenar); si no hay event_dates, start_date
+    const nextStart = upcomingDates.length
+      ? zonedDateTimeToDate(upcomingDates[0].date, upcomingDates[0].start_time)
+      : e.start_date
+        ? new Date(e.start_date)
+        : null;
+    const firstStart = eventDates.length ? zonedDateTimeToDate(eventDates[0].date, eventDates[0].start_time) : null;
+    return {
+      ...e,
+      start_date: e.start_date || firstStart?.toISOString() || null,
+      dates: upcomingDates.length ? upcomingDates : eventDates,
+      _isUpcoming: isUpcoming,
+      _sortKey: nextStart ? nextStart.getTime() : Number.MAX_SAFE_INTEGER,
+    };
+  })
+  .filter((e) => e._isUpcoming)
+  .sort((a, b) => a._sortKey - b._sortKey)
+  .map(({ _isUpcoming, _sortKey, ...e }) => e);
 ---
 
-<Layout>
+<Layout
+  title="Próximos eventos en Chile – Compra tus entradas | AI Tickets"
+  description="Encuentra los próximos eventos en Chile: stand-up, teatro, música y más. Compra tus entradas online de forma segura con AI Tickets."
+  canonical="/eventos"
+>
   <AppHeader client:idle/>
-  
-    <main>
-      <EventList events={eventData} client:idle />
-    </main>
+  <main>
+    <EventList events={eventData} client:idle />
+  </main>
   <AppFooter client:idle/>
 </Layout>

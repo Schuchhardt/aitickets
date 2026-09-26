@@ -15,36 +15,26 @@ const props = defineProps({
 const isDownloading = ref(false);
 const showShareModal = ref(false);
 
-// URL del ticket para compartir
-const ticketUrl = computed(() => {
-  
-  // Obtener el ID del ticket - puede venir como 'id' o como parte del objeto ticket
-  const ticketId = props.ticket?.id || props.ticket?.internal_id;
-  
-  if (!ticketId) {
-    console.warn('No se encontró ID del ticket');
-    return window.location.href;
-  }
-  
-  if (typeof window === "undefined") return "";
-  // Construir la URL del ticket usando el origin actual y el ID del ticket
-  const origin = window.location.origin;
-  return `${origin}/ticket/${ticketId}`;
+// URL para compartir: la página pública del evento con ?ref=share.
+// NUNCA compartir /ticket/<id> ni el QR: quien tenga ese link podría usar la entrada.
+const eventShareUrl = computed(() => {
+  if (typeof window === "undefined" || !props.event?.slug) return "";
+  return `${window.location.origin}/eventos/${encodeURIComponent(props.event.slug)}?ref=share`;
 });
 
 // Título personalizado para compartir
 const shareTitle = computed(() => {
-  return `La entrada para ${props.event?.name || 'el evento'}`;
+  return `Voy a ${props.event?.name || 'este evento'}`;
 });
 
-// Texto personalizado para compartir
+// Texto personalizado para compartir (invita a comprar, sin datos de la entrada)
 const shareText = computed(() => {
-  return `¡Mira la entrada para ${props.event?.name}! ${formattedDate(props.event)} a las ${formattedTime(props.event)}`;
+  return `¡Voy a ${props.event?.name}! ${formattedDate(props.event)} a las ${formattedTime(props.event)}. Consigue tu entrada acá:`;
 });
 
-// Formatear fecha del evento usando zona horaria local del usuario
+// Formatear fecha del evento en la zona horaria del evento (America/Santiago)
 const formattedDate = (event) => {
-  if (!event.start_date) return "Fecha no disponible";
+  if (!event?.start_date) return "Fecha no disponible";
   return formatLocalDate(event.start_date, {
     weekday: "long",
     day: "numeric",
@@ -53,9 +43,9 @@ const formattedDate = (event) => {
   });
 };
 
-// Formatear hora del evento usando zona horaria local del usuario
+// Formatear hora del evento en la zona horaria del evento (America/Santiago)
 const formattedTime = (event) => {
-  if (!event.start_date) return "Hora no disponible";
+  if (!event?.start_date) return "Hora no disponible";
   return formatLocalTime(event.start_date) + " hrs";
 };
 
@@ -343,7 +333,7 @@ const downloadAsPDF = async () => {
     <div class="mt-4 flex gap-2">
       <!-- Botón principal de compartir entrada -->
       <button
-        aria-label="Compartir entrada"
+        aria-label="Compartir evento"
         @click="openShareModal"
         :disabled="isDownloading"
         class="flex-1 bg-lime-500 font-[Unbounded] text-white text-center py-2 rounded-lg hover:bg-lime-600 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
@@ -351,7 +341,7 @@ const downloadAsPDF = async () => {
         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z"></path>
         </svg>
-        Compartir Entrada
+        Invitar amigos
       </button>
       
       <!-- Botón PDF (solo icono) -->
@@ -376,7 +366,7 @@ const downloadAsPDF = async () => {
     <ShareEventModal 
       :show="showShareModal" 
       :event="event"
-      :customUrl="ticketUrl"
+      :customUrl="eventShareUrl"
       :customTitle="shareTitle"
       :customText="shareText"
       @close="closeShareModal"

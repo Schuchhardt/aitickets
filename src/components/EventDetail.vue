@@ -1,6 +1,6 @@
 <script setup>
-import { onMounted } from "vue";
-import { useGoogleAnalytics } from "../composables/useGoogleAnalytics.js";
+import { onMounted, computed } from "vue";
+import { trackViewItem } from "../composables/useGoogleAnalytics.js";
 import EventHeader from "./EventHeader.vue";
 import EventTabs from "./EventTabs.vue";
 import EventActions from "./EventActions.vue";
@@ -9,16 +9,17 @@ const props = defineProps({
   event: Object,
 });
 
-const { trackViewEvent } = useGoogleAnalytics();
+const producerBannerUrl = computed(() => {
+  const campaign = encodeURIComponent(props.event?.slug || "evento");
+  return `/organizadores?utm_source=aitickets&utm_medium=event_footer&utm_campaign=${campaign}`;
+});
 
 onMounted(() => {
   if (props.event) {
-    // Rastrear cuando alguien ve un evento
-    const avgPrice = props.event.tickets?.length 
-      ? props.event.tickets.reduce((sum, ticket) => sum + (ticket.price || 0), 0) / props.event.tickets.length
-      : 0;
-      
-    trackViewEvent(props.event.id, props.event.title, avgPrice);
+    // Rastrear cuando alguien ve un evento (precio más bajo a la venta)
+    const prices = (props.event.tickets || []).map((t) => Number(t.price) || 0);
+    const minPrice = prices.length ? Math.min(...prices) : 0;
+    trackViewItem(props.event.id, props.event.name, minPrice);
   }
 });
 </script>
@@ -43,5 +44,18 @@ onMounted(() => {
         <EventActions :event="event" />
       </div>
     </div>
+
+    <!-- Banner de adquisición de productores -->
+    <aside class="mt-12 mb-24 lg:mb-8 border-t border-gray-200 pt-6 text-center font-['Prompt']">
+      <a
+        :href="producerBannerUrl"
+        class="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-black transition-colors"
+      >
+        ¿Organizas eventos?
+        <span class="font-semibold underline decoration-lime-400 decoration-2 underline-offset-4">
+          Vende tus entradas con AI Tickets →
+        </span>
+      </a>
+    </aside>
   </div>
 </template>

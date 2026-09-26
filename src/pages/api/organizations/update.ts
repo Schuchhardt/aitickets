@@ -1,47 +1,95 @@
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
-import { getSessionUser } from "../../../lib/supabaseServer";
+import { getSessionContext, hasRole, ORG_ADMIN_ROLES, jsonResponse } from "../../../lib/supabaseServer";
+
+// Campos editables de la organización (public.organizations) y su largo máximo
+const ORG_FIELDS: Record<string, number> = {
+    public_name: 150,
+    email: 200,
+    phone: 50,
+};
+
+// Datos para pagos (public.organization_payout_accounts, migración 20260926_C_dashboard).
+// Tabla aparte con RLS sin políticas: solo se accede desde aquí con la service role.
+const PAYOUT_FIELDS: Record<string, number> = {
+    legal_name: 200,
+    legal_rut: 20,
+    bank_name: 100,
+    bank_account_type: 50,
+    bank_account_number: 50,
+    bank_account_holder: 150,
+    bank_account_rut: 20,
+};
+
+const RUT_REGEX = /^[0-9]{1,2}\.?[0-9]{3}\.?[0-9]{3}-?[0-9kK]$/;
+
+function pickFields(body: any, fields: Record<string, number>) {
+    const out: Record<string, string | null> = {};
+    for (const [field, max] of Object.entries(fields)) {
+        if (body?.[field] === undefined) continue;
+        const value = body[field] === null ? "" : String(body[field]).trim().slice(0, max);
+        out[field] = value || null;
+    }
+    return out;
+}
 
 export const POST: APIRoute = async (context) => {
-    const user = await getSessionUser(context);
-
-    if (!user) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+    const session = await getSessionContext(context);
+    if (!session) return jsonResponse({ error: "Unauthorized" }, 401);
+    const { dbUser } = session;
+    if (!hasRole(dbUser, ORG_ADMIN_ROLES)) {
+        return jsonResponse({ message: "Solo los administradores pueden editar la organización" }, 403);
     }
 
     try {
         const body = await context.request.json();
-        const { public_name, email, phone } = body;
+        // Compatibilidad: el formulario antiguo enviaba legal_id como RUT de la empresa
+        if (body && body.legal_rut === undefined && body.legal_id !== undefined) body.legal_rut = body.legal_id;
+
+        const orgData = pickFields(body, ORG_FIELDS);
+        const payoutData = pickFields(body, PAYOUT_FIELDS);
+
+        if ("public_name" in orgData && !orgData.public_name) {
+            return jsonResponse({ message: "El nombre de la organización es obligatorio" }, 400);
+        }
+        if (payoutData.bank_account_rut && !RUT_REGEX.test(payoutData.bank_account_rut)) {
+            return jsonResponse({ message: "RUT del titular inválido (ej: 12.345.678-9)" }, 400);
+        }
+        if (payoutData.legal_rut && !RUT_REGEX.test(payoutData.legal_rut)) {
+            return jsonResponse({ message: "RUT de la empresa inválido (ej: 76.123.456-7)" }, 400);
+        }
+        if (!Object.keys(orgData).length && !Object.keys(payoutData).length) {
+            return jsonResponse({ message: "Nada que actualizar" }, 400);
+        }
 
         const supabaseAdmin = getSupabaseAdmin();
 
-        // Get user's organization_id
-        const { data: dbUser } = await supabaseAdmin
-            .from('users')
-            .select('organization_id')
-            .eq('auth_user_id', user.id)
-            .single();
-
-        if (!dbUser?.organization_id) {
-            return new Response(JSON.stringify({ message: "Organización no encontrada" }), { status: 404 });
+        if (Object.keys(orgData).length) {
+            const { error } = await supabaseAdmin
+                .from("organizations")
+                .update(orgData)
+                .eq("id", dbUser.organization_id);
+            if (error) throw error;
         }
 
-        const updateData: Record<string, string> = {};
-        if (public_name !== undefined) updateData.public_name = public_name;
-        if (email !== undefined) updateData.email = email;
-        if (phone !== undefined) updateData.phone = phone;
+        if (Object.keys(payoutData).length) {
+            const { error } = await supabaseAdmin
+                .from("organization_payout_accounts")
+                .upsert(
+                    {
+                        ...payoutData,
+                        organization_id: dbUser.organization_id,
+                        updated_at: new Date().toISOString(),
+                        updated_by: dbUser.id,
+                    },
+                    { onConflict: "organization_id" }
+                );
+            if (error) throw error;
+        }
 
-        const { error } = await supabaseAdmin
-            .from('organizations')
-            .update(updateData)
-            .eq('id', dbUser.organization_id);
-
-        if (error) throw error;
-
-        return new Response(JSON.stringify({ message: "Organización actualizada" }), { status: 200 });
-
+        return jsonResponse({ message: "Organización actualizada" }, 200);
     } catch (error: any) {
         console.error("Organization update error:", error);
-        return new Response(JSON.stringify({ message: error.message || "Error al actualizar" }), { status: 500 });
+        return jsonResponse({ message: "Error al actualizar la organización" }, 500);
     }
 };

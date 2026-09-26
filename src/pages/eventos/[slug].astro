@@ -1,156 +1,427 @@
 ---
-import _ from "lodash";
-import { getSupabaseAnon, getSupabaseAdmin } from "../../lib/auth-helpers";
+import { getSupabaseAdmin } from "../../lib/auth-helpers";
+import AppHeader from "../../components/AppHeader.vue";
 import AppFooter from "../../components/AppFooter.vue";
 import EventDetail from "../../components/EventDetail.vue";
 import EventAssistant from "../../components/EventAssistant.vue";
 import EventMetaTags from "../../components/EventMetaTags.astro";
+import {
+  DEFAULT_EVENT_TIMEZONE,
+  resolveTimeZone,
+  zonedDateTimeToDate,
+  toZonedISOString,
+  getZonedParts,
+  formatLocalDate,
+} from "../../utils/dateHelpers.js";
 
+import { descriptionToHtml } from "../../lib/sanitize";
 import Layout from '../../layouts/Layout.astro';
 import "../../styles/global.css";
 
 export const prerender = false;
 
 const { slug } = Astro.params;
-const supabase = getSupabaseAnon();
+const supabase = getSupabaseAdmin();
+const now = new Date();
 
-// Obtener el evento
+// Columnas públicas del evento. NUNCA incluir secret_location (C4).
+const EVENT_PUBLIC_COLUMNS =
+  "id, slug, name, title, description, image_url, location, capacity, status, accessibility, start_date, end_date, organization_id";
+
 const { data: event, error } = await supabase
   .from("events")
-  .select("*")
+  .select(EVENT_PUBLIC_COLUMNS)
   .eq("slug", slug)
-  .single();
+  .eq("status", "published")
+  .maybeSingle();
 
-if (!error || event) {
-  // Track visit (server-side, non-blocking)
-  const BOT_PATTERNS = /bot|crawl|spider|slurp|bingpreview|mediapartners|facebookexternalhit|bytespider|gptbot/i;
-  const ua = Astro.request.headers.get("user-agent") || "";
-  if (!BOT_PATTERNS.test(ua)) {
-    const ip = Astro.request.headers.get("x-nf-client-connection-ip")
-      || Astro.request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
-      || Astro.request.headers.get("x-real-ip")
-      || "unknown";
-    const encoder = new TextEncoder();
-    const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(ip));
-    const ipHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, "0")).join("");
-    const referrer = Astro.request.headers.get("referer") || null;
-    const country = Astro.request.headers.get("x-country") || null;
-    const city = Astro.request.headers.get("x-nf-geo")
-      ? (() => { try { return JSON.parse(Astro.request.headers.get("x-nf-geo")!).city || null; } catch { return null; } })()
-      : null;
-
-    const utmSource = Astro.url.searchParams.get("utm_source") || null;
-    const utmMedium = Astro.url.searchParams.get("utm_medium") || null;
-    const utmCampaign = Astro.url.searchParams.get("utm_campaign") || null;
-
-    const supabaseAdmin = getSupabaseAdmin();
-    supabaseAdmin.from("event_visits").insert({
-      event_id: event.id,
-      ip_hash: ipHash,
-      ip_raw: ip,
-      user_agent: ua.substring(0, 512),
-      referrer: referrer?.substring(0, 1024) || null,
-      country,
-      city,
-      utm_source: utmSource?.substring(0, 256) || null,
-      utm_medium: utmMedium?.substring(0, 256) || null,
-      utm_campaign: utmCampaign?.substring(0, 256) || null,
-    }).then(({ error: visitError }) => {
-      if (visitError) console.error("Error tracking visit:", visitError);
-    });
-  }
-
-  // Obtener las categorías del evento
-  const { data: categories, error: errorCategories } = await supabase
-    .from("event_tags")
-    .select("category_tags(name)") 
-    .eq("event_id", event.id);
-
-  //load categories
-  if (errorCategories) {
-    console.error("Error al obtener las categorías:", errorCategories);
-  } else {
-    // @ts-ignore
-    event.tags = categories.map(c => c.category_tags).map(ct => ct.name);
-  }
-
-  //load tickets // TODO VALIDAR STOCK DE VENDIDAS QUE SEA MENOR A MAX_QTY
-  const { data: event_tickets, error: errorTickets } = await supabase
-  .from("event_tickets")
-  .select("*")
-  .eq("event_id", event.id) 
-  .eq("is_gift", false) 
-  .eq("status", "available")
-  .lte("init_date", new Date().toISOString())
-  .gte("end_date", new Date().toISOString())
-  .gte("max_quantity", 1)
-  .order("price", { ascending: true }); // Ordenar por precio
-
-  console.log("event_tickets", event_tickets);
-
-  if (errorTickets){
-    console.error("Error al obtener las entradas:", errorTickets);
-    event.tickets = []
-  } else {
-    event.tickets = event_tickets
-  }
-
-  // load event faqs
-  const { data: event_faqs, error: errorFaqs } = await supabase
-  .from("event_faqs")
-  .select("*")
-  .eq("event_id", event.id)
-  if (errorFaqs){
-    console.error("Error al obtener las faqs:", errorTickets);
-    event.faqs = []
-  } else {
-    event.faqs = event_faqs;
-  }
-
-  // load event dates
-  const getTimeFromTimestamp = (timestamp: string | number | Date) => {
-    // IMPORTANTE: Extraer la hora usando la zona horaria del usuario
-    // para que sea consistente con el resto de la aplicación
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString("es-CL", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone // Zona horaria del usuario
-    });
-  };
-  
-  // Para eventos de un solo día, usar start_date como referencia de fecha
-  // pero mantener el timestamp completo para que la conversión de zona horaria sea correcta
-  const defaultDate = {
-    date: event.start_date, 
-    start_time: getTimeFromTimestamp(event.start_date), 
-    end_time: getTimeFromTimestamp(event.end_date)
-  };
-  
-  const { data: event_dates, error: errorDates } = await supabase
-  .from("event_dates")
-  .select("*")
-  .eq("event_id", event.id)
-  if (errorDates){
-    console.error("Error al obtener las fechas:", errorDates);
-    event.dates = [defaultDate]
-  } else {
-    event.dates = event_dates.length > 0 ? event_dates : [defaultDate];
-  }
-  
-  
-} else {
+if (error) {
   console.error("Error al obtener el evento:", error);
-  // redirect to 404
-  Astro.redirect('/404');
 }
 
+// Borradores, eventos inexistentes o slugs inválidos => 404 real (Astro renderiza src/pages/404.astro)
+if (!event) {
+  return new Response(null, { status: 404 });
+}
 
+const isPrivate = !!event.accessibility && event.accessibility !== "public";
+
+// ---------------------------------------------------------------------------
+// Tracking de visita (server-side, no bloqueante). Solo se guarda el hash de la IP.
+// ---------------------------------------------------------------------------
+const BOT_PATTERNS = /bot|crawl|spider|slurp|bingpreview|mediapartners|facebookexternalhit|bytespider|gptbot|lighthouse|headless/i;
+const ua = Astro.request.headers.get("user-agent") || "";
+if (!BOT_PATTERNS.test(ua)) {
+  const ip = Astro.request.headers.get("x-nf-client-connection-ip")
+    || Astro.request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+    || Astro.request.headers.get("x-real-ip")
+    || "unknown";
+  const hashBuffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(ip));
+  const ipHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, "0")).join("");
+  const referrer = Astro.request.headers.get("referer") || null;
+  // Geo de Netlify: context.geo (adapter). Fallback: header x-nf-geo (JSON en base64) / x-country.
+  let geo: any = (Astro.locals as any)?.netlify?.context?.geo || null;
+  if (!geo) {
+    const geoHeader = Astro.request.headers.get("x-nf-geo");
+    if (geoHeader) {
+      try {
+        geo = JSON.parse(atob(geoHeader));
+      } catch {
+        try { geo = JSON.parse(geoHeader); } catch { geo = null; }
+      }
+    }
+  }
+  const clip = (v: unknown, n: number) => (typeof v === "string" && v.trim() ? v.trim().slice(0, n) : null);
+  const country = clip(geo?.country?.code, 8) || clip(Astro.request.headers.get("x-country"), 8);
+  const city = clip(geo?.city, 128);
+
+  const utmSource = Astro.url.searchParams.get("utm_source") || null;
+  const utmMedium = Astro.url.searchParams.get("utm_medium") || null;
+  const utmCampaign = Astro.url.searchParams.get("utm_campaign") || null;
+
+  supabase.from("event_visits").insert({
+    event_id: event.id,
+    ip_hash: ipHash,
+    user_agent: ua.substring(0, 512),
+    referrer: referrer?.substring(0, 1024) || null,
+    country,
+    city,
+    utm_source: utmSource?.substring(0, 256) || null,
+    utm_medium: utmMedium?.substring(0, 256) || null,
+    utm_campaign: utmCampaign?.substring(0, 256) || null,
+  }).then(({ error: visitError }) => {
+    if (visitError) console.error("Error tracking visit:", visitError);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Datos relacionados (en paralelo)
+// ---------------------------------------------------------------------------
+const DATE_COLUMNS = `
+  id, date, start_time, end_time, event_location_id,
+  event_locations (
+    id, name, display_name, is_virtual,
+    address_line1_override, address_line2_override, city_override, state_province_override,
+    postal_code_override, country_code_override, latitude_override, longitude_override,
+    venues ( id, name, address_line1, address_line2, city, state_province, postal_code, country_code, latitude, longitude, timezone )
+  )
+`;
+
+const [
+  categoriesRes,
+  ticketsRes,
+  faqsRes,
+  datesRes,
+  orgRes,
+  secretRes,
+  pendingOrdersRes,
+] = await Promise.all([
+  supabase.from("event_tags").select("category_tags(name)").eq("event_id", event.id),
+  supabase
+    .from("event_tickets")
+    .select("id, ticket_name, price, max_quantity, total_quantity, status, is_gift, init_date, end_date, event_date_id")
+    .eq("event_id", event.id)
+    .eq("is_gift", false)
+    .eq("status", "available")
+    .order("price", { ascending: true }),
+  supabase.from("event_faqs").select("id, question, answer").eq("event_id", event.id).order("id", { ascending: true }),
+  supabase
+    .from("event_dates")
+    .select(DATE_COLUMNS)
+    .eq("event_id", event.id)
+    .order("date", { ascending: true })
+    .order("start_time", { ascending: true }),
+  event.organization_id
+    ? supabase.from("organizations").select("public_name, website, instagram").eq("id", event.organization_id).maybeSingle()
+    : Promise.resolve({ data: null, error: null }),
+  // Solo saber SI existe dirección secreta, sin leer su valor (C4)
+  supabase
+    .from("events")
+    .select("id", { count: "exact", head: true })
+    .eq("id", event.id)
+    .not("secret_location", "is", null)
+    .neq("secret_location", ""),
+  // Órdenes pendientes recientes (reservan stock por 15 min, C2)
+  supabase
+    .from("event_orders")
+    .select("ticket_details")
+    .eq("event_id", event.id)
+    .in("status", ["pending", "processing"])
+    .gte("created_at", new Date(now.getTime() - 15 * 60 * 1000).toISOString()),
+]);
+
+// Categorías
+if (categoriesRes.error) console.error("Error al obtener las categorías:", categoriesRes.error);
+const tags: string[] = (categoriesRes.data || [])
+  // @ts-ignore relación embebida
+  .map((c) => (Array.isArray(c.category_tags) ? c.category_tags[0]?.name : c.category_tags?.name))
+  .filter(Boolean);
+
+// FAQs
+if (faqsRes.error) console.error("Error al obtener las faqs:", faqsRes.error);
+const faqs = faqsRes.data || [];
+
+// Organización
+const organization = orgRes.data
+  ? { name: orgRes.data.public_name, website: orgRes.data.website, instagram: orgRes.data.instagram }
+  : null;
+
+const hasSecretLocation = (secretRes.count ?? 0) > 0;
+
+// ---------------------------------------------------------------------------
+// Entradas (C2): a la venta = available, no regalo, dentro de la ventana (NULL = abierta)
+// ---------------------------------------------------------------------------
+if (ticketsRes.error) console.error("Error al obtener las entradas:", ticketsRes.error);
+const allTickets = ticketsRes.data || [];
+
+const pendingByTicket = new Map<string, number>();
+for (const order of pendingOrdersRes.data || []) {
+  const details = Array.isArray(order.ticket_details) ? order.ticket_details : [];
+  for (const t of details) {
+    if (!t?.id) continue;
+    const key = String(t.id);
+    pendingByTicket.set(key, (pendingByTicket.get(key) || 0) + (Number(t.quantity) || 0));
+  }
+}
+
+const inWindow = (t: any) =>
+  (!t.init_date || new Date(t.init_date) <= now) && (!t.end_date || new Date(t.end_date) >= now);
+
+const windowTickets = allTickets.filter(inWindow);
+
+const soldCounts = await Promise.all(
+  windowTickets.map(async (t: any) => {
+    if (t.total_quantity === null || t.total_quantity === undefined) return 0;
+    const { count, error: countError } = await supabase
+      .from("event_attendees")
+      .select("id", { count: "exact", head: true })
+      .eq("event_ticket_id", t.id)
+      .or("status.is.null,status.neq.cancelled");
+    if (countError) console.error("Error contando entradas vendidas:", countError);
+    return count || 0;
+  })
+);
+
+const ticketsWithStock = windowTickets.map((t: any, i: number) => {
+  const unlimited = t.total_quantity === null || t.total_quantity === undefined;
+  const remaining = unlimited
+    ? null
+    : Math.max(0, Number(t.total_quantity) - soldCounts[i] - (pendingByTicket.get(String(t.id)) || 0));
+  const maxPerPurchase = Number(t.max_quantity) > 0 ? Number(t.max_quantity) : 10;
+  return {
+    id: t.id,
+    ticket_name: t.ticket_name,
+    price: Number(t.price) || 0,
+    max_quantity: remaining === null ? maxPerPurchase : Math.min(maxPerPurchase, remaining),
+    init_date: t.init_date,
+    end_date: t.end_date,
+    // R1: null = válida para cualquier función; si no, id de event.dates[]
+    event_date_id: t.event_date_id ?? null,
+    remaining,
+  };
+});
+
+const onSaleTickets = ticketsWithStock.filter((t) => t.remaining === null || t.remaining > 0);
+const upcomingSaleDates = allTickets
+  .filter((t: any) => t.init_date && new Date(t.init_date) > now && (!t.end_date || new Date(t.end_date) >= now))
+  .map((t: any) => t.init_date)
+  .sort();
+
+// Estado de venta para la UI y el JSON-LD
+let saleState: "on_sale" | "sold_out" | "upcoming" | "closed" = "closed";
+if (onSaleTickets.length > 0) saleState = "on_sale";
+else if (ticketsWithStock.length > 0) saleState = "sold_out";
+else if (upcomingSaleDates.length > 0) saleState = "upcoming";
+
+// ---------------------------------------------------------------------------
+// Funciones (event_dates + recinto), con horas en la zona horaria del recinto
+// ---------------------------------------------------------------------------
+if (datesRes.error) console.error("Error al obtener las fechas:", datesRes.error);
+
+const pickOne = (v: any) => (Array.isArray(v) ? v[0] : v) || null;
+
+const buildVenue = (loc: any) => {
+  if (!loc) return null;
+  const venue = pickOne(loc.venues);
+  const name = loc.display_name || loc.name || venue?.name || null;
+  const address = [loc.address_line1_override || venue?.address_line1, loc.address_line2_override || venue?.address_line2]
+    .filter(Boolean)
+    .join(", ");
+  const lat = loc.latitude_override ?? venue?.latitude;
+  const lng = loc.longitude_override ?? venue?.longitude;
+  return {
+    name,
+    address: address || null,
+    city: loc.city_override || venue?.city || null,
+    region: loc.state_province_override || venue?.state_province || null,
+    postal_code: loc.postal_code_override || venue?.postal_code || null,
+    country: (loc.country_code_override || venue?.country_code || "CL").trim().toUpperCase(),
+    latitude: lat !== null && lat !== undefined ? Number(lat) : null,
+    longitude: lng !== null && lng !== undefined ? Number(lng) : null,
+    timezone: resolveTimeZone(venue?.timezone),
+    is_virtual: !!loc.is_virtual,
+  };
+};
+
+const THREE_HOURS = 3 * 60 * 60 * 1000;
+
+let dates = (datesRes.data || []).map((d: any) => {
+  const venue = buildVenue(pickOne(d.event_locations));
+  const tz = venue?.timezone || DEFAULT_EVENT_TIMEZONE;
+  const start = zonedDateTimeToDate(d.date, d.start_time, tz);
+  let end = d.end_time ? zonedDateTimeToDate(d.date, d.end_time, tz) : null;
+  if (start && end && end <= start) end = new Date(end.getTime() + 24 * 60 * 60 * 1000); // termina después de medianoche
+  if (start && !end) end = new Date(start.getTime() + THREE_HOURS);
+  return {
+    id: d.id,
+    date: String(d.date).slice(0, 10),
+    start_time: d.start_time,
+    end_time: d.end_time,
+    timezone: tz,
+    start_iso: start ? toZonedISOString(start, tz) : null,
+    end_iso: end ? toZonedISOString(end, tz) : null,
+    venue,
+  };
+});
+
+if (dates.length === 0 && event.start_date) {
+  // Fallback: eventos antiguos sin event_dates
+  const startParts = getZonedParts(event.start_date);
+  const endParts = event.end_date ? getZonedParts(event.end_date) : null;
+  if (startParts) {
+    const endInstant = event.end_date ? new Date(event.end_date) : new Date(new Date(event.start_date).getTime() + THREE_HOURS);
+    dates = [{
+      id: null,
+      date: startParts.date,
+      start_time: startParts.time,
+      end_time: endParts?.time || null,
+      timezone: DEFAULT_EVENT_TIMEZONE,
+      start_iso: toZonedISOString(event.start_date),
+      end_iso: toZonedISOString(endInstant),
+      venue: null,
+    }];
+  }
+}
+
+// Denormalizar start/end si faltan (eventos autoservicio antiguos)
+const firstIso = dates.find((d) => d.start_iso)?.start_iso;
+const lastIso = [...dates].reverse().find((d) => d.end_iso)?.end_iso;
+const startDate = event.start_date || (firstIso ? new Date(firstIso).toISOString() : null);
+const endDate = event.end_date || (lastIso ? new Date(lastIso).toISOString() : null);
+const primaryVenue = dates.find((d) => d.venue)?.venue || null;
+const eventTimezone = primaryVenue?.timezone || DEFAULT_EVENT_TIMEZONE;
+
+const location =
+  event.location ||
+  (primaryVenue ? [primaryVenue.name, primaryVenue.address, primaryVenue.city].filter(Boolean).join(", ") : "");
+
+// Tickets asignados a una función que ya no existe (o ya pasó y fue borrada) => tratarlos como "cualquier función"
+// y ocultar las entradas de una función que ya terminó.
+const dateEndById = new Map(dates.filter((d) => d.id !== null && d.id !== undefined).map((d) => [String(d.id), d.end_iso]));
+const publicTickets = onSaleTickets
+  .map((t) => (t.event_date_id !== null && !dateEndById.has(String(t.event_date_id)) ? { ...t, event_date_id: null } : t))
+  .filter((t) => {
+    if (t.event_date_id === null) return true;
+    const endIso = dateEndById.get(String(t.event_date_id));
+    return !endIso || new Date(endIso) >= now;
+  });
+if (saleState === "on_sale" && publicTickets.length === 0) saleState = "closed";
+
+const eventData = {
+  ...event,
+  // R3: la descripción se renderiza con v-html => siempre sanitizada
+  description: descriptionToHtml(event.description),
+  location,
+  start_date: startDate,
+  end_date: endDate,
+  timezone: eventTimezone,
+  tags,
+  faqs,
+  dates,
+  tickets: publicTickets,
+  sale_state: saleState,
+  sale_starts_at: upcomingSaleDates[0] || null,
+  has_secret_location: hasSecretLocation,
+  organization,
+  venue: primaryVenue,
+};
+
+// ---------------------------------------------------------------------------
+// SEO
+// ---------------------------------------------------------------------------
+const stripHtml = (html: string) =>
+  (html || "")
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const truncate = (text: string, max: number) => {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max - 1);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${(lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).trim()}…`;
+};
+
+const city = primaryVenue?.city || (event.location ? String(event.location).split(",").pop()?.trim() : "") || "";
+const firstDate = dates[0];
+const dateLabel = firstDate
+  ? formatLocalDate(firstDate.date, { weekday: "short", day: "numeric", month: "long" }) +
+    (dates.length > 1 ? ` (+${dates.length - 1} funciones)` : "")
+  : "";
+const minPrice = publicTickets.length ? Math.min(...publicTickets.map((t) => t.price)) : null;
+const priceLabel =
+  minPrice === null ? "" : minPrice === 0 ? "Entrada liberada" : `Entradas desde $${minPrice.toLocaleString("es-CL")}`;
+
+let metaDescription = `${event.name}${dateLabel ? ` – ${dateLabel}` : ""}${city ? ` en ${city}` : ""}.`;
+if (priceLabel) metaDescription += ` ${priceLabel}.`;
+const plainDescription = stripHtml(event.description || "");
+if (metaDescription.length < 140 && plainDescription) {
+  metaDescription += ` ${plainDescription}`;
+}
+metaDescription = truncate(metaDescription, 158);
+
+const canonicalPath = `/eventos/${event.slug}`;
+const pageTitle = truncate(`${event.name}${city ? ` en ${city}` : ""} – Entradas | AI Tickets`, 70);
 ---
 <Layout>
-  <EventMetaTags event={event} slot="head" />
-    <EventDetail event={event} v-if={event} client:idle/>
-    <EventAssistant event={event} v-if={event} client:idle/>
-    <AppFooter client:idle/>
+  <EventMetaTags
+    slot="head"
+    event={eventData}
+    title={pageTitle}
+    description={metaDescription}
+    canonicalPath={canonicalPath}
+    noindex={isPrivate}
+  />
+  <script is:inline>
+    // Atribución (C10): guardar ?ref= y utm_* para enviarlos con la compra
+    (function () {
+      try {
+        var p = new URLSearchParams(window.location.search);
+        var ref = p.get('ref');
+        var source = p.get('utm_source');
+        var medium = p.get('utm_medium');
+        var campaign = p.get('utm_campaign');
+        if (!ref && !source && !medium && !campaign) return;
+        var clip = function (v) { return v ? String(v).slice(0, 128) : null; };
+        sessionStorage.setItem('aitickets_attribution', JSON.stringify({
+          ref: clip(ref),
+          utm: { source: clip(source), medium: clip(medium), campaign: clip(campaign) },
+          landing_at: new Date().toISOString()
+        }));
+      } catch (e) { /* sessionStorage no disponible */ }
+    })();
+  </script>
+  <AppHeader client:idle/>
+  <main class="pt-16">
+    <EventDetail event={eventData} client:idle/>
+  </main>
+  <EventAssistant event={eventData} client:idle/>
+  <AppFooter client:idle/>
 </Layout>

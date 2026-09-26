@@ -1,16 +1,37 @@
 ---
+export const prerender = true;
 import AppHeader from "../components/AppHeader.vue";
 import AppFooter from "../components/AppFooter.vue";
 import Layout from '../layouts/Layout.astro';
 import "../styles/global.css";
-
 ---
 
-<Layout>
+<Layout
+  title="Página no encontrada | AI Tickets"
+  description="La página que buscas no existe o el evento ya no está disponible."
+  canonical="/404"
+  noindex
+>
   <AppHeader client:idle/>
-  <main>
-      <p>La pagina solicitada no existe</p>  
-      
+  <main class="container mx-auto px-6 pt-32 pb-20 text-center font-['Prompt']">
+    <h1 class="text-3xl font-bold font-['Unbounded'] text-gray-900">Página no encontrada</h1>
+    <p class="mt-4 text-gray-600">
+      La página que buscas no existe o el evento ya no está disponible.
+    </p>
+    <div class="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
+      <a
+        href="/eventos"
+        class="px-5 py-2 font-bold text-black bg-lime-400 rounded-full transition hover:bg-lime-500 font-['Unbounded']"
+      >
+        Ver próximos eventos
+      </a>
+      <a
+        href="/organizadores"
+        class="px-5 py-2 font-bold text-gray-800 border border-gray-300 rounded-full transition hover:bg-gray-100 font-['Unbounded']"
+      >
+        Soy organizador
+      </a>
+    </div>
   </main>
   <AppFooter client:idle/>
 </Layout>

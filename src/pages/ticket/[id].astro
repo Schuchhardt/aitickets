@@ -1,5 +1,8 @@
 ---
-import { getSupabaseAnon } from "../../lib/auth-helpers";
+// Página de una entrada individual (event_attendees.id, uuid). Muestra la dirección secreta solo si la
+// entrada está vigente (active/validated/NULL) y su orden (si tiene) está pagada.
+import { getSupabaseAdmin } from "../../lib/auth-helpers";
+import { descriptionToHtml } from "../../lib/sanitize";
 import Layout from "../../layouts/Layout.astro";
 import AppHeader from "../../components/AppHeader.vue";
 import AppFooter from "../../components/AppFooter.vue";
@@ -9,107 +12,135 @@ import TicketInfo from "../../components/TicketInfo.vue";
 
 import "../../styles/global.css";
 
-// Obtener el ID de la entrada desde la URL
+export const prerender = false;
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const { id } = Astro.params;
-const supabase = getSupabaseAnon();
+const supabase = getSupabaseAdmin();
 
 let ticket: Record<string, any> | undefined = undefined;
 let event: Record<string, any> | undefined = undefined;
 let errorMessage: string | null = null;
 
-if (id) {
-  // Obtener los datos del ticket
-  const { data: ticketData, error } = await supabase
+const toChileTime = (value: string | null) =>
+  value
+    ? new Date(value).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false, timeZone: "America/Santiago" })
+    : null;
+
+if (!id || !UUID_RE.test(id)) {
+  errorMessage = "Entrada no encontrada";
+} else {
+  const { data: ticketData } = await supabase
     .from("event_attendees")
-    .select("*")
+    .select("id, event_id, attendee_id, qr_code, status, event_order_id, event_tickets ( ticket_name, event_date_id )")
     .eq("id", id)
-    .single();
+    .maybeSingle();
 
-  console.log("Datos obtenidos del ticket:", ticketData);
-
-  if (error || !ticketData) {
-    errorMessage = "Ticket no encontrado";
+  if (!ticketData) {
+    errorMessage = "Entrada no encontrada";
   } else {
-    // Obtener datos completos del evento
     const { data: eventData } = await supabase
       .from("events")
-      .select("*")
+      .select("id, name, title, slug, description, image_url, location, start_date, end_date")
       .eq("id", ticketData.event_id)
-      .single();
+      .maybeSingle();
 
-    event = eventData;
+    const ticketType: any = Array.isArray(ticketData.event_tickets) ? ticketData.event_tickets[0] : ticketData.event_tickets;
+    const { data: order } = ticketData.event_order_id
+      ? await supabase
+          .from("event_orders")
+          .select("status, buyer_first_name, buyer_last_name, buyer_email")
+          .eq("id", ticketData.event_order_id)
+          .maybeSingle()
+      : { data: null };
 
-    // load event dates
-    const getTimeFromTimestamp = (timestamp: string | number | Date) => {
-      // IMPORTANTE: Extraer la hora usando una zona horaria específica
-      // para que sea consistente independientemente del servidor
-      const date = new Date(timestamp);
-      return date.toLocaleTimeString("es-CL", {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit", 
-        hour12: false,
-        timeZone: "America/Santiago" // Zona horaria donde están los eventos
-      });
-    };
+    if (eventData) {
+      event = { ...eventData, description: descriptionToHtml(eventData.description) };
+      const [{ data: eventDates }, { data: faqs }, { data: categories }] = await Promise.all([
+        supabase
+          .from("event_dates")
+          .select("id, date, start_time, end_time, event_location_id, event_locations ( name, display_name, address_line1_override, city_override, venues ( name, address_line1, city ) )")
+          .eq("event_id", eventData.id)
+          .order("date", { ascending: true })
+          .order("start_time", { ascending: true }),
+        supabase.from("event_faqs").select("question, answer").eq("event_id", eventData.id),
+        supabase.from("event_tags").select("category_tags(name)").eq("event_id", eventData.id),
+      ]);
+      const defaultDate = { date: eventData.start_date, start_time: toChileTime(eventData.start_date), end_time: toChileTime(eventData.end_date) };
+      event.dates = eventDates?.length ? eventDates : eventData.start_date ? [defaultDate] : [];
 
-    if (event) {
-      const defaultDate = {date: event.start_date, start_time: getTimeFromTimestamp(event.start_date), end_time: getTimeFromTimestamp(event.end_date)};
-      const { data: event_dates, error: errorDates } = await supabase
-        .from("event_dates")
-        .select("*")
-        .eq("event_id", event.id)
-      if (errorDates){
-        console.error("Error al obtener las fechas:", errorDates);
-        event.dates = [defaultDate]
-      } else {
-        event.dates = event_dates && event_dates.length > 0 ? event_dates : [defaultDate];
+      const liveTicket = ticketData.status == null || ticketData.status === "active" || ticketData.status === "validated";
+      const paidOrder = !ticketData.event_order_id || order?.status === "paid";
+      if (liveTicket && paidOrder) {
+        const { data: secretRow } = await supabase.from("events").select("secret_location").eq("id", eventData.id).maybeSingle();
+        if (secretRow?.secret_location) event.secret_location = secretRow.secret_location;
       }
+      event.faqs = faqs || [];
+      event.tags = (categories || []).map((c: any) => c.category_tags?.name).filter(Boolean);
+      const loc: any = eventDates?.[0]?.event_locations;
+      const venue = loc?.venues || {};
+      event.address = [loc?.display_name || loc?.name || venue.name, loc?.address_line1_override || venue.address_line1, loc?.city_override || venue.city]
+        .filter(Boolean)
+        .join(", ") || eventData.location || "";
     }
-  
-    // Obtener datos del asistente
-    const { data: attendee } = await supabase
-      .from("attendees")
-      .select("first_name, last_name, email")
-      .eq("id", ticketData.attendee_id)
-      .single();
 
-    
+    // R2: comprador de la orden; fallback al registro attendees (entradas antiguas)
+    let attendee: any = order?.buyer_email
+      ? { first_name: order.buyer_first_name, last_name: order.buyer_last_name, email: order.buyer_email }
+      : null;
+    if (!attendee) {
+      const { data } = await supabase
+        .from("attendees")
+        .select("first_name, last_name, email")
+        .eq("id", ticketData.attendee_id)
+        .maybeSingle();
+      attendee = data;
+    }
 
+    // R1: entrada de una función específica -> solo esa función
+    const fnId = ticketType?.event_date_id;
+    const fnDates = fnId != null ? (event?.dates || []).filter((d: any) => String(d.id) === String(fnId)) : [];
     ticket = {
       id: ticketData.id,
-      event_name: event?.name || "Evento desconocido",
-      event_dates: event?.dates || "Fecha no disponible",
-      ticket_name: "Entrada General",
+      event_name: event?.name || "Evento",
+      event_dates: fnDates.length ? fnDates : event?.dates || [],
+      ticket_name: ticketType?.ticket_name || "Entrada General",
       attendee_name: `${attendee?.first_name || ""} ${attendee?.last_name || ""}`.trim(),
-      attendee_email: attendee?.email || "Correo no disponible",
+      attendee_email: attendee?.email || "",
       qr_code: ticketData.qr_code || null,
-      internal_id: ticketData.internal_id,
+      status: ticketData.status,
     };
   }
 }
 ---
 
-<Layout>
+<Layout title={event?.name ? `Tu entrada: ${event.name} | AI Tickets` : "Tu entrada | AI Tickets"} noindex>
   <AppHeader client:idle />
   <main class="flex flex-col items-center min-h-screen bg-gray-100">
     <div class="max-w-6xl mx-auto w-full">
-      
-      <!-- Tarjeta del Ticket (Pegada arriba) -->
-      <div class="mt-0 pt-8 lg:pt-12 px-4 lg:px-0">
-        <TicketInfo ticket={ticket} event={event} client:only />
-      </div>
-
-      <!-- Contenedor colapsable del evento -->
-      <div class="w-full mt-6">
-        <details class="bg-white p-4 rounded-lg shadow-lg">
-          <summary class="text-lg font-semibold cursor-pointer font-[Unbounded]">Detalles del Evento</summary>
-          <div class="mt-4">
-            <EventHeader event={event} client:idle />
-            <EventTabs event={event} client:only />
+      {errorMessage ? (
+        <div class="mt-12 mx-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
+          <h2 class="text-xl font-semibold font-[Unbounded] mb-2">Error</h2>
+          <p>{errorMessage}</p>
+        </div>
+      ) : (
+        <>
+          <div class="mt-0 pt-8 lg:pt-12 px-4 lg:px-0">
+            <TicketInfo ticket={ticket} event={event} client:only />
           </div>
-        </details>
-      </div>
+
+          <div class="w-full mt-6 px-4 lg:px-0 mb-8">
+            <details class="bg-white p-4 rounded-lg shadow-lg">
+              <summary class="text-lg font-semibold cursor-pointer font-[Unbounded]">Detalles del Evento</summary>
+              <div class="mt-4">
+                <EventHeader event={event} client:idle />
+                <EventTabs event={event} client:only />
+              </div>
+            </details>
+          </div>
+        </>
+      )}
     </div>
   </main>
   <AppFooter client:idle />

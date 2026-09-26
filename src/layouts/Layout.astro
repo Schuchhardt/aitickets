@@ -1,20 +1,59 @@
 ---
 import ToastContainer from '../components/ui/ToastContainer.vue';
+
+interface Props {
+	title?: string;
+	description?: string;
+	/** Ruta ("/eventos") o URL absoluta. Por defecto: la ruta actual sin query string. */
+	canonical?: string;
+	/** Ruta o URL absoluta de la imagen para compartir */
+	image?: string;
+	noindex?: boolean;
+	ogType?: string;
+}
+
+const SITE_URL = (import.meta.env.SITE_URL || 'https://aitickets.cl').replace(/\/$/, '');
+const DEFAULT_TITLE = 'AI Tickets – Venta de entradas para eventos en Chile';
+const DEFAULT_DESCRIPTION = 'Vende entradas para tus eventos en Chile con 0% de comisión para el productor. Página del evento, pagos, QR y check-in en un solo lugar.';
+const DEFAULT_IMAGE = '/aitickets_preview.png';
+
+const absolute = (pathOrUrl: string) =>
+	/^https?:\/\//i.test(pathOrUrl) ? pathOrUrl : `${SITE_URL}${pathOrUrl.startsWith('/') ? '' : '/'}${pathOrUrl}`;
+
+const {
+	title = DEFAULT_TITLE,
+	description = DEFAULT_DESCRIPTION,
+	canonical,
+	image = DEFAULT_IMAGE,
+	noindex = false,
+	ogType = 'website',
+} = Astro.props;
+
+const canonicalUrl = absolute(canonical ?? Astro.url.pathname);
+const imageUrl = absolute(image);
+const hasCustomHead = Astro.slots.has('head');
 ---
 <!doctype html>
-<html lang="en">
+<html lang="es-CL">
 	<head>
 		<meta charset="UTF-8" />
-		<meta name="viewport" content="width=device-width" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 		<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
 		<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
 		<link rel="manifest" href="/site.webmanifest">
+		<meta name="theme-color" content="#a3e635">
 		<meta name="generator" content={Astro.generator} />
-		
+
+		<!-- Google Analytics: stub en el hilo principal para que window.gtag / window.dataLayer
+		     funcionen desde el código de la app (Partytown reenvía 'gtag' y 'dataLayer.push' al worker). -->
+		<script is:inline>
+			window.dataLayer = window.dataLayer || [];
+			window.gtag = window.gtag || function () { window.dataLayer.push(arguments); };
+		</script>
 		<!-- Google Analytics (optimized with Partytown) -->
-		<script type="text/partytown" async src="https://www.googletagmanager.com/gtag/js?id=G-ZKTCNLYSQT"></script>
-		<script type="text/partytown">
+		<script is:inline type="text/partytown" async src="https://www.googletagmanager.com/gtag/js?id=G-ZKTCNLYSQT"></script>
+		<script is:inline type="text/partytown">
 			window.dataLayer = window.dataLayer || [];
 			function gtag(){dataLayer.push(arguments);}
 			gtag('js', new Date());
@@ -23,30 +62,33 @@ import ToastContainer from '../components/ui/ToastContainer.vue';
 				page_location: window.location.href
 			});
 		</script>
-		
-		<!-- Named slot for page-specific meta tags (if provided, default meta tags won't be used) -->
-		<slot name="head">
-			<!-- Default meta tags (only used if no page-specific head slot is provided) -->
-			<title>AI Tickets</title>
-			<meta name="description" content="Conecta con tu público ideal, vende entradas automáticamente y obtén métricas clave en tiempo real. Todo desde un solo lugar.">
-			<!-- Open Graph / Facebook -->
-			<meta property="og:type" content="website">
-			<meta property="og:title" content="AI Tickets">
-			<meta property="og:url" content="https://aitickets.cl/">
-			<meta property="og:site_name" content="AI Tickets">
-			<meta property="og:locale" content="es_CL">
-			<meta property="og:locale:alternate" content="en_US">
-			<meta property="og:description" content="Conecta con tu público ideal, vende entradas automáticamente y obtén métricas clave en tiempo real. Todo desde un solo lugar.">
-			<meta property="og:image" content="https://aitickets.cl/aitickets_preview.png">
-			<!-- Twitter -->
-			<meta name="twitter:card" content="summary_large_image">
-			<meta name="twitter:title" content="AI Tickets">
-			<meta name="twitter:url" content="https://aitickets.cl/">
-			<meta name="twitter:site" content="@aitickets">
-			<meta name="twitter:creator" content="@aitickets">
-			<meta name="twitter:description" content="Conecta con tu público ideal, vende entradas automáticamente y obtén métricas clave en tiempo real. Todo desde un solo lugar.">
-			<meta name="twitter:image" content="https://aitickets.cl/aitickets_preview.png">
-		</slot>
+
+		{hasCustomHead ? (
+			<slot name="head" />
+		) : (
+			<>
+				<title>{title}</title>
+				<meta name="description" content={description}>
+				<link rel="canonical" href={canonicalUrl}>
+				{noindex && <meta name="robots" content="noindex, nofollow">}
+				<!-- Open Graph / Facebook -->
+				<meta property="og:type" content={ogType}>
+				<meta property="og:title" content={title}>
+				<meta property="og:description" content={description}>
+				<meta property="og:url" content={canonicalUrl}>
+				<meta property="og:site_name" content="AI Tickets">
+				<meta property="og:locale" content="es_CL">
+				<meta property="og:image" content={imageUrl}>
+				<!-- Twitter -->
+				<meta name="twitter:card" content="summary_large_image">
+				<meta name="twitter:title" content={title}>
+				<meta name="twitter:description" content={description}>
+				<meta name="twitter:url" content={canonicalUrl}>
+				<meta name="twitter:site" content="@aitickets">
+				<meta name="twitter:creator" content="@aitickets">
+				<meta name="twitter:image" content={imageUrl}>
+			</>
+		)}
 	</head>
 	<body>
 		<slot />

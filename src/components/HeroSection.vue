@@ -18,7 +18,7 @@ import GradientBackground from './Hero/GradientBackground.vue';
           <FadeInSection direction="up">
             <span class="inline-flex border items-center gap-2 text-lime-400 font-semibold sm:text-xs text-sm md:text-base mb-4 bg-lime-400/10 px-4 py-1.5 rounded-full font-[Prompt]">
               <Sparkles class="h-4 w-4" />
-              Para circos, teatros y eventos con funciones múltiples
+              Para stand-up, teatro y funciones recurrentes
             </span>
           </FadeInSection>
 
@@ -34,31 +34,31 @@ import GradientBackground from './Hero/GradientBackground.vue';
 
           <FadeInSection direction="up" :delay="200">
             <p class="text-lg text-white/80 mb-8 max-w-2xl mx-auto lg:mx-0 font-[Prompt]">
-              Más asientos vendidos, menos dolores de cabeza. AI Tickets es como tener un equipo completo de ventas, marketing y operaciones trabajando 24/7 para tu evento.
+              La ticketera que llena tus funciones: 0% de comisión para ti, el comprador paga un cargo por servicio de 10%, te transferimos lo recaudado 48–72 h después de cada función y te ayudamos a armar el evento y los posts con IA.
             </p>
           </FadeInSection>
 
           <FadeInSection direction="up" :delay="300">
             <div class="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 mb-12">
-              <a href="https://calendar.app.google/CMt97vedNjzBaoEX7" target="_blank" rel="noopener noreferrer" class="px-6 py-3 text-lg font-bold font-[Unbounded] bg-lime-400 text-black border border-lime-400 rounded-lg transition hover:bg-black hover:text-lime-400 hover:border-lime-400 w-full sm:w-auto group">
-                Solicitar Demo Gratis
+              <a href="/organizadores/registro" class="px-6 py-3 text-lg font-bold font-[Unbounded] bg-lime-400 text-black border border-lime-400 rounded-lg transition hover:bg-black hover:text-lime-400 hover:border-lime-400 w-full sm:w-auto group">
+                Crear mi cuenta gratis
                 <ArrowRight class="ml-2 inline-block h-4 w-4 transition-transform group-hover:translate-x-1" />
               </a>
-              <a href="/organizadores/registro" class="px-6 py-3 text-lg font-bold font-[Unbounded] border border-white rounded-lg hover:bg-white hover:text-black transition w-full sm:w-auto">
-                Crear un Evento
+              <a href="https://wa.me/56982347140?text=Hola%2C%20quiero%20vender%20entradas%20con%20AI%20Tickets" target="_blank" rel="noopener noreferrer" class="px-6 py-3 text-lg font-bold font-[Unbounded] border border-white rounded-lg hover:bg-white hover:text-black transition w-full sm:w-auto">
+                Hablar por WhatsApp
               </a>
             </div>
           </FadeInSection>
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 pb-8">
             <FadeInSection direction="up" :delay="400">
-              <FeatureCard :icon="TrendingUp" title="+25% más ventas" text="Llena las funciones difíciles con promociones automáticas y publicidad inteligente" />
+              <FeatureCard :icon="TrendingUp" title="0% para ti" text="Sin comisión para el productor. El comprador paga un cargo por servicio de 10%." />
             </FadeInSection>
             <FadeInSection direction="up" :delay="500">
-              <FeatureCard :icon="Clock" title="15 hrs menos/semana" text="Deja de perder tiempo en Excel, WhatsApp y tareas manuales repetitivas" />
+              <FeatureCard :icon="Clock" title="Pago en 48–72 h" text="Te transferimos lo recaudado 48–72 h después de cada función." />
             </FadeInSection>
             <FadeInSection direction="up" :delay="600">
-              <FeatureCard :icon="MessageSquare" title="1 click = todos avisados" text="Si algo cambia, notifica a todos tus asistentes por email y WhatsApp al instante" />
+              <FeatureCard :icon="MessageSquare" title="Asistentes avisados" text="Si cambias algo del evento, les llega un email automático. Y un recordatorio 24 h antes." />
             </FadeInSection>
           </div>
         </div>

@@ -1,14 +1,19 @@
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
-import { getSessionUser } from "../../../lib/supabaseServer";
+import { getSessionContext, hasRole, EVENT_MANAGER_ROLES } from "../../../lib/supabaseServer";
+import { createOAuthState } from "../../../lib/crypto";
 
 const ZERNIO_BASE = "https://zernio.com/api/v1";
 
 export const POST: APIRoute = async (context) => {
-    const user = await getSessionUser(context);
-    if (!user) {
+    const session = await getSessionContext(context);
+    if (!session) {
         return new Response(JSON.stringify({ error: "No autorizado" }), { status: 401 });
     }
+    if (!hasRole(session.dbUser, EVENT_MANAGER_ROLES)) {
+        return new Response(JSON.stringify({ message: "No tienes permisos para esta acción" }), { status: 403, headers: { "Content-Type": "application/json" } });
+    }
+    const user = session.authUser;
 
     try {
         const body = await context.request.json();
@@ -24,11 +29,7 @@ export const POST: APIRoute = async (context) => {
         }
 
         const supabaseAdmin = getSupabaseAdmin();
-        const { data: dbUser } = await supabaseAdmin
-            .from("users")
-            .select("organization_id")
-            .eq("auth_user_id", user.id)
-            .single();
+        const dbUser = session.dbUser;
 
         if (!dbUser?.organization_id) {
             return new Response(JSON.stringify({ message: "Organización no encontrada" }), { status: 404 });
@@ -72,7 +73,15 @@ export const POST: APIRoute = async (context) => {
 
         // Get OAuth connect URL from Zernio
         const siteUrl = import.meta.env.SITE_URL || "https://aitickets.cl";
-        const redirectUrl = `${siteUrl}/api/promote/callback?org=${dbUser.organization_id}`;
+        // State firmado (HMAC) ligado a la organización, al usuario y con expiración: el callback lo verifica
+        const state = createOAuthState({
+            purpose: "zernio",
+            org: dbUser.organization_id,
+            uid: user.id,
+            platform,
+            ts: Date.now(),
+        });
+        const redirectUrl = `${siteUrl}/api/promote/callback?state=${encodeURIComponent(state)}`;
 
         const connectUrl = new URL(`${ZERNIO_BASE}/connect/${platform}`);
         connectUrl.searchParams.set("profileId", profileId);

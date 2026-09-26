@@ -3,6 +3,39 @@ import { reactive, ref } from 'vue'
 
 import * as z from 'zod'
 import { Eye, EyeOff } from 'lucide-vue-next'
+import { trackSignUp } from '../../composables/useGoogleAnalytics.js'
+
+// Atribución del registro (utm_* / ref / referrer). Se guarda en sessionStorage para
+// no perderla si el productor navega antes de registrarse.
+const SIGNUP_ATTRIBUTION_KEY = 'aitickets_signup_attribution'
+const attribution = ref({})
+
+const loadAttribution = () => {
+  let stored = {}
+  try {
+    stored = JSON.parse(sessionStorage.getItem(SIGNUP_ATTRIBUTION_KEY) || '{}') || {}
+  } catch (e) {
+    stored = {}
+  }
+  const params = new URLSearchParams(window.location.search)
+  const fromUrl = {}
+  for (const key of ['utm_source', 'utm_medium', 'utm_campaign', 'ref']) {
+    const value = params.get(key)
+    if (value) fromUrl[key] = value.slice(0, 200)
+  }
+  let referrer = stored.referrer || ''
+  try {
+    if (!referrer && document.referrer && new URL(document.referrer).host !== window.location.host) {
+      referrer = document.referrer.slice(0, 500)
+    }
+  } catch (e) { /* referrer inválido */ }
+  const merged = Object.keys(fromUrl).length ? { ...fromUrl } : { ...stored }
+  if (referrer) merged.referrer = referrer
+  attribution.value = merged
+  try {
+    sessionStorage.setItem(SIGNUP_ATTRIBUTION_KEY, JSON.stringify(merged))
+  } catch (e) { /* storage bloqueado */ }
+}
 
 const props = defineProps({
   turnstileSiteKey: {
@@ -33,6 +66,8 @@ const turnstileToken = ref('')
 const turnstileWidgetId = ref(null)
 
 onMounted(() => {
+  loadAttribution()
+
   // Function to render the widget
   const renderTurnstile = () => {
     if (window.turnstile) {
@@ -117,7 +152,8 @@ const handleRegister = async () => {
       },
       body: JSON.stringify({
         ...registerData,
-        cfToken: turnstileToken.value
+        cfToken: turnstileToken.value,
+        attribution: attribution.value
       }),
     })
 
@@ -127,7 +163,13 @@ const handleRegister = async () => {
       throw new Error(dataRes.message || 'Error al registrarse')
     }
 
-    // Registro exitoso, redirigir al dashboard (auto-login) o login
+    // Registro exitoso: medir la conversión y redirigir al dashboard (auto-login) o login
+    try {
+      trackSignUp('email')
+      sessionStorage.removeItem(SIGNUP_ATTRIBUTION_KEY)
+    } catch (e) { /* analytics no disponible */ }
+    // pequeña espera para que el evento de analytics alcance a salir
+    await new Promise((resolve) => setTimeout(resolve, 300))
     window.location.href = dataRes.redirect || '/dashboard'
 
   } catch (error) {

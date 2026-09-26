@@ -1,22 +1,17 @@
 ---
 import DashboardLayout from "../../layouts/DashboardLayout.astro";
-import {
-    getSessionUser,
-    createSupabaseServerClient,
-} from "../../lib/supabaseServer";
+import { getSupabaseAdmin } from "../../lib/auth-helpers";
+import { requireDashboardSession } from "./_lib/guard";
 
-const user = await getSessionUser(Astro);
+// Perfil propio: cualquier rol
+const guard = await requireDashboardSession(Astro);
+if (!guard.ok) return guard.response;
+const { authUser: user } = guard.session;
 
-if (!user) {
-    return Astro.redirect("/organizadores/login");
-}
-
-// Fetch additional profile data from `public.users` table
-const supabase = createSupabaseServerClient(Astro);
-const { data: dbUser } = await supabase
+const { data: dbUser } = await getSupabaseAdmin()
     .from("users")
-    .select("*")
-    .eq("auth_user_id", user.id)
+    .select("id, name, email, phone, role, organization_id")
+    .eq("id", guard.session.dbUser.id)
     .single();
 ---
 
@@ -30,13 +25,13 @@ const { data: dbUser } = await supabase
                     class="w-16 h-16 rounded-full bg-black text-white flex items-center justify-center text-2xl font-bold"
                 >
                     {
-                        user.user_metadata?.full_name?.[0]?.toUpperCase() ||
+                        (dbUser?.name || user.user_metadata?.full_name)?.[0]?.toUpperCase() ||
                             user.email?.[0]?.toUpperCase()
                     }
                 </div>
                 <div>
                     <h2 class="text-lg font-bold">
-                        {user.user_metadata?.full_name || "Usuario"}
+                        {dbUser?.name || user.user_metadata?.full_name || "Usuario"}
                     </h2>
                     <p class="text-gray-500">{user.email}</p>
                 </div>
@@ -102,15 +97,46 @@ const { data: dbUser } = await supabase
                 </div>
             </form>
         </div>
+
+        <!-- Seguridad: cambio de contraseña (cualquier rol) -->
+        <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm mt-6">
+            <h2 class="text-lg font-bold mb-1">Contraseña</h2>
+            <p class="text-gray-500 text-sm mb-4">Para cambiarla necesitas tu contraseña actual.</p>
+
+            <form id="passwordForm" class="space-y-4">
+                <div id="pwMsg" class="hidden p-4 rounded-lg"></div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1" for="currentPassword">Contraseña actual</label>
+                    <input id="currentPassword" name="currentPassword" type="password" autocomplete="current-password" required
+                        class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1" for="newPassword">Nueva contraseña</label>
+                    <input id="newPassword" name="newPassword" type="password" autocomplete="new-password" minlength="6" required placeholder="Mínimo 6 caracteres"
+                        class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1" for="confirmPassword">Confirmar nueva contraseña</label>
+                    <input id="confirmPassword" name="confirmPassword" type="password" autocomplete="new-password" minlength="6" required placeholder="Repite la nueva contraseña"
+                        class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all" />
+                </div>
+                <div class="pt-2">
+                    <button type="submit" id="savePwBtn"
+                        class="px-6 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                        Cambiar contraseña
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <script>
         const form = document.getElementById("profileForm") as HTMLFormElement;
-        const messageContainer = document.getElementById("messageContainer");
+        const messageContainer = document.getElementById("messageContainer") as HTMLElement;
         const submitBtn = document.getElementById(
             "submitBtn",
         ) as HTMLButtonElement;
-        const spinner = document.getElementById("spinner");
+        const spinner = document.getElementById("spinner") as HTMLElement;
 
         if (form) {
             form.addEventListener("submit", async (e) => {
@@ -164,12 +190,59 @@ const { data: dbUser } = await supabase
                         "border",
                         "border-red-200",
                     );
-                    messageContainer.textContent = error.message;
+                    messageContainer.textContent = error instanceof Error ? error.message : String(error);
                 } finally {
                     submitBtn.disabled = false;
                     spinner.classList.add("hidden");
                 }
             });
         }
+
+        // Cambio de contraseña
+        const pwForm = document.getElementById("passwordForm") as HTMLFormElement | null;
+        const pwMsg = document.getElementById("pwMsg") as HTMLElement | null;
+        const savePwBtn = document.getElementById("savePwBtn") as HTMLButtonElement | null;
+
+        const showPwMsg = (text: string, isError: boolean) => {
+            if (!pwMsg) return;
+            pwMsg.textContent = text;
+            pwMsg.className = `p-4 rounded-lg border ${isError ? "bg-red-50 text-red-800 border-red-200" : "bg-green-50 text-green-800 border-green-200"}`;
+        };
+
+        pwForm?.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const currentPassword = (document.getElementById("currentPassword") as HTMLInputElement).value;
+            const newPassword = (document.getElementById("newPassword") as HTMLInputElement).value;
+            const confirmPassword = (document.getElementById("confirmPassword") as HTMLInputElement).value;
+
+            if (newPassword.length < 6) return showPwMsg("La contraseña debe tener al menos 6 caracteres", true);
+            if (newPassword !== confirmPassword) return showPwMsg("Las contraseñas no coinciden", true);
+
+            if (savePwBtn) {
+                savePwBtn.disabled = true;
+                savePwBtn.textContent = "Guardando...";
+            }
+            try {
+                const res = await fetch("/api/auth/change-password", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ currentPassword, newPassword }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok) {
+                    showPwMsg("Contraseña actualizada correctamente", false);
+                    pwForm.reset();
+                } else {
+                    showPwMsg(data.message || "Error al cambiar la contraseña", true);
+                }
+            } catch {
+                showPwMsg("Error de conexión", true);
+            } finally {
+                if (savePwBtn) {
+                    savePwBtn.disabled = false;
+                    savePwBtn.textContent = "Cambiar contraseña";
+                }
+            }
+        });
     </script>
 </DashboardLayout>

@@ -1,14 +1,19 @@
 ---
 import DashboardLayout from "../../../layouts/DashboardLayout.astro";
 import CreateEventForm from "../../../components/events/CreateEventForm.vue";
-import { createSupabaseServerClient } from "../../../lib/supabaseServer";
+import { getSupabaseAdmin } from "../../../lib/auth-helpers";
+import { EVENT_MANAGER_ROLES } from "../../../lib/supabaseServer";
+import { requireDashboardSession } from "../_lib/guard";
 
-// Fetch venues for the form selection
-const supabase = createSupabaseServerClient(Astro);
-const { data: venues } = await supabase
+const guard = await requireDashboardSession(Astro, EVENT_MANAGER_ROLES);
+if (!guard.ok) return guard.response;
+
+// Lugares para el selector del formulario
+const { data: venues } = await getSupabaseAdmin()
   .from("venues")
   .select("id, name, city")
-  .order("name");
+  .order("name")
+  .limit(1000);
 ---
 
 <DashboardLayout title="Crear Evento">
@@ -21,6 +26,6 @@ const { data: venues } = await supabase
     </div>
 
     <!-- The Wizard Form -->
-    <CreateEventForm client:only="vue" :initialVenues="venues || []" />
+    <CreateEventForm client:only="vue" initialVenues={venues || []} />
   </div>
 </DashboardLayout>
