@@ -53,8 +53,8 @@ interface AiticketsEnv {
   readonly FLOW_MERCHANT_LEGAL_NAME?: string
 
   // Correo / notificaciones
-  readonly MAILGUN_API_KEY: string
-  readonly MAILGUN_DOMAIN: string
+  readonly RESEND_API_KEY: string
+  readonly RESEND_DOMAIN?: string
   readonly MAIL_FROM?: string
   readonly TICKETS_BCC?: string
   readonly MAILERLITE_API_TOKEN: string

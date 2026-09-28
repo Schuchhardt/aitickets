@@ -4,7 +4,7 @@
 // máximo 5 mensajes por hora por IP (hash sha256(IP + INTERNAL_API_SECRET)), máximo 20 por día por sitio
 // y un tope global por hora (SITE_CONTACT_GLOBAL_HOURLY_CAP, 200 por defecto), todo contado en
 // aitickets_site_contact_messages, y Turnstile cuando el host efectivo está bajo aitickets.cl.
-// El mensaje se guarda primero y luego se envía por Mailgun al productor con Reply-To = visitante.
+// El mensaje se guarda primero y luego se envía por Resend al productor con Reply-To = visitante.
 // Destinatario: contact_email del sitio (solo se guarda tras confirmar el enlace, ver
 // src/lib/site-contact-email.ts) o el correo que la organización verificó (email_verified_for, nunca
 // organizations.email, que se edita sin confirmar); nunca si la organización no verificó su

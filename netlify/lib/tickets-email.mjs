@@ -2,7 +2,7 @@
 // Lo usan: send-tickets-email (llamadas internas), payment-confirmation (webhook de Flow)
 // y purchase-tickets (órdenes gratis). Idempotente vía event_orders.email_sent_at.
 import { getSupabaseAdmin, escapeHtml } from './supabase.mjs'
-import { getMailgun, MAIL_DOMAIN, MAIL_FROM, SITE_URL, formatRecipient, isValidEmail, legalFooterHtml } from './mailer.mjs'
+import { sendEmail, SITE_URL, formatRecipient, isValidEmail, legalFooterHtml } from './mailer.mjs'
 import { LEGAL } from './legal.mjs'
 import {
   EVENT_DATE_COLUMNS,
@@ -321,23 +321,23 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
       if (admins?.[0]?.email && isValidEmail(admins[0].email)) bcc.push(admins[0].email)
     }
 
-    const message = {
-      from: MAIL_FROM,
-      to: [formatRecipient(`${buyer.first_name || ''} ${buyer.last_name || ''}`, buyer.email)],
+    const attachments = start
+      ? [{
+          filename: 'evento.ics',
+          content: Buffer.from(buildIcs({ orderId: order.id, eventName: event.name || 'Evento', description, start, end, location: calendarLocation, orderUrl }), 'utf-8'),
+          contentType: 'text/calendar',
+        }]
+      : []
+
+    await sendEmail({
+      to: formatRecipient(`${buyer.first_name || ''} ${buyer.last_name || ''}`, buyer.email),
       subject: `🎟️ Tus entradas para ${String(event.name || 'tu evento').replace(/[\r\n]/g, ' ')}`,
       html,
-      'h:Reply-To': LEGAL.supportEmail,
-    }
-    if (bcc.length) message.bcc = bcc
-    if (start) {
-      message.attachment = [{
-        filename: 'evento.ics',
-        data: Buffer.from(buildIcs({ orderId: order.id, eventName: event.name || 'Evento', description, start, end, location: calendarLocation, orderUrl }), 'utf-8'),
-        contentType: 'text/calendar',
-      }]
-    }
-
-    await getMailgun().messages.create(MAIL_DOMAIN, message)
+      replyTo: LEGAL.supportEmail,
+      bcc,
+      attachments,
+      tags: ['tickets'],
+    })
 
     const { error: markError } = await supabase
       .from('event_orders')

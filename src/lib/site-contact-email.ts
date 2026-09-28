@@ -3,7 +3,7 @@
 //
 // Un contact_email distinto del correo (verificado) de la organización NO se guarda al escribirlo en el
 // dashboard: se envía un enlace firmado a esa dirección y recién al abrirlo se guarda. Así nadie puede
-// usar el formulario de contacto para mandar correos, desde nuestro dominio de Mailgun, a una dirección
+// usar el formulario de contacto para mandar correos, desde nuestro dominio de envío (Resend), a una dirección
 // que no controla.
 //
 // Token: base64url(JSON {p:'site_contact_email', sid, oid, e, exp}).base64url(HMAC-SHA256), 48 h.
@@ -81,7 +81,7 @@ const escapeHtml = (v: unknown) =>
 
 /**
  * Envía el enlace de confirmación a `email`. Devuelve { ok:false, reason:'throttled' } si se pidió
- * hace menos de un minuto para el mismo sitio. Lanza si Mailgun falla.
+ * hace menos de un minuto para el mismo sitio. Lanza si Resend falla.
  */
 export async function sendContactEmailConfirmation(opts: {
   siteId: number;

@@ -83,7 +83,7 @@ const escapeHtml = (v: unknown) =>
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;");
 
-/** Envía el correo con el enlace de verificación. Lanza si Mailgun falla. */
+/** Envía el correo con el enlace de verificación. Lanza si Resend falla. */
 export async function sendVerificationEmail({ uid, email, name }: { uid: string; email: string; name?: string | null }) {
     const link = `${siteOrigin()}/organizadores/verificar?t=${encodeURIComponent(signEmailVerifyToken(uid, email))}`;
     const firstName = String(name || "").trim().split(/\s+/)[0] || "";
