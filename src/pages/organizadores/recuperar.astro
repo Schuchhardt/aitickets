@@ -16,7 +16,7 @@ const env = (name: string): string =>
 const turnstileSiteKey = env("TURNSTILE_SECRET_KEY") ? env("TURNSTILE_SITE_KEY") : "";
 Astro.response.headers.set("Cache-Control", "private, no-store");
 // ?email= (prellenado desde el login) no debe filtrarse por Referer a Turnstile
-Astro.response.headers.set("Referrer-Policy", "no-referrer");
+Astro.response.headers.set("Referrer-Policy", "same-origin");
 ---
 
 <Layout

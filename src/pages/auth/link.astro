@@ -35,7 +35,7 @@ let purpose: AuthLinkPurpose = "recovery";
 let pendingToken = "";
 
 Astro.response.headers.set("Cache-Control", "private, no-store");
-Astro.response.headers.set("Referrer-Policy", "no-referrer");
+Astro.response.headers.set("Referrer-Policy", "same-origin");
 
 if (Astro.request.method === "POST") {
   let token = "";

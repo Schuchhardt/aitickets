@@ -18,7 +18,7 @@ const page = (title: string, inner: string, status = 200) =>
     new Response(
         `<!doctype html><html lang="es-CL"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${escapeHtml(title)}</title>
 <style>body{font-family:system-ui,-apple-system,sans-serif;background:#f9fafb;color:#111;margin:0;padding:24px}main{max-width:560px;margin:40px auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:24px}button,.btn{display:inline-block;padding:12px 20px;border-radius:8px;border:0;font-weight:600;cursor:pointer;background:#111;color:#fff;text-decoration:none;font-size:15px}</style></head><body><main>${inner}</main></body></html>`,
-        { status, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Robots-Tag": "noindex", "Referrer-Policy": "no-referrer" } }
+        { status, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Robots-Tag": "noindex", "Referrer-Policy": "same-origin" } }
     );
 
 const invalid = () =>
