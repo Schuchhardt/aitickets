@@ -115,3 +115,26 @@ describe('plantillas de correo', () => {
     expect(emails.logoUrl()).toBe(LOGO)
   })
 })
+
+describe('entradas: QR inline', () => {
+  it('muestra un QR por entrada como imagen cid: y avisa si hay más que el límite', async () => {
+    const emails = await import('../../netlify/lib/emails/index.mjs')
+    const { html, text } = await emails.renderTicketsEmail({
+      customerName: 'Ana',
+      eventName: 'Evento',
+      qrTickets: [
+        { cid: 'qr-entrada-1', index: 1, total: 3, label: 'General', functionLabel: '' },
+        { cid: 'qr-entrada-2', index: 2, total: 3, label: 'VIP <b>', functionLabel: 'vie 2 oct · 20:30' },
+      ],
+      qrMoreCount: 1,
+      ticketLines: [{ name: 'General', quantity: 3, unitPrice: 0 }],
+      orderUrl: 'https://aitickets.cl/order/x',
+    })
+    expect(html).toContain('src="cid:qr-entrada-1"')
+    expect(html).toContain('src="cid:qr-entrada-2"')
+    expect(html).toContain('Entrada 2 de 3 · vie 2 oct · 20:30')
+    expect(html).not.toContain('VIP <b>')
+    expect(html).toMatch(/Y 1 entrada más/)
+    expect(text).toContain('General')
+  })
+})

@@ -119,7 +119,7 @@ const emailOf = (recipient) => {
  *   replyTo?: string, from?: string, bcc?: string | string[],
  *   headers?: Record<string, string>, tags?: string[],
  *   recipientVariables?: Record<string, Record<string, unknown>>,
- *   attachments?: Array<{ filename: string, content: Buffer | string, contentType?: string }>,
+ *   attachments?: Array<{ filename: string, content: Buffer | string, contentType?: string, contentId?: string }>,
  *   idempotencyKey?: string,
  * }} opts
  * @returns {Promise<{ id: string | null, ids?: string[] }>}
@@ -148,6 +148,8 @@ export async function sendEmail({ to, subject, html, text, replyTo, from, bcc, h
     filename: a.filename,
     content: Buffer.isBuffer(a.content) ? a.content.toString('base64') : Buffer.from(String(a.content), 'utf-8').toString('base64'),
     ...(a.contentType ? { content_type: a.contentType } : {}),
+    // Imagen inline: se referencia en el HTML como <img src="cid:ID">
+    ...(a.contentId ? { content_id: a.contentId } : {}),
   }))
   if (files.length) base.attachments = files
 
