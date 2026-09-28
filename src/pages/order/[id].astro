@@ -6,6 +6,7 @@
 import { getSupabaseAdmin } from "../../lib/auth-helpers";
 import { descriptionToHtml } from "../../lib/sanitize";
 import { LEGAL } from "../../lib/legal";
+import { SERVICE_FEE_LABEL, SERVICE_FEE_TAX_LABEL, orderFeeBreakdown } from "../../../netlify/lib/fees.mjs";
 import Layout from "../../layouts/Layout.astro";
 import AppHeader from "../../components/AppHeader.vue";
 import AppFooter from "../../components/AppFooter.vue";
@@ -44,11 +45,16 @@ if (!id || !UUID_RE.test(id)) {
   errorMessage = "Orden no encontrada";
 } else {
   try {
-    const { data: orderData } = await supabase
+    const ORDER_COLS = "id, created_at, status, event_id, attendee_id, amount, ticket_fee, total_payment, ticket_qty, buyer_first_name, buyer_last_name, buyer_email";
+    let { data: orderData, error: orderError } = await supabase
       .from("event_orders")
-      .select("id, created_at, status, event_id, attendee_id, amount, ticket_fee, total_payment, ticket_qty, buyer_first_name, buyer_last_name, buyer_email")
+      .select(`${ORDER_COLS}, service_fee_tax`)
       .eq("id", id)
       .maybeSingle();
+    if (orderError && ["42703", "PGRST204"].includes(String(orderError.code || ""))) {
+      // Base sin la columna service_fee_tax (202609290100)
+      ({ data: orderData } = await supabase.from("event_orders").select(ORDER_COLS).eq("id", id).maybeSingle());
+    }
 
     if (!orderData) {
       errorMessage = "Orden no encontrada";
@@ -153,9 +159,12 @@ if (!id || !UUID_RE.test(id)) {
   }
 }
 
+// amount = subtotal; ticket_fee = cargo por servicio neto; service_fee_tax = IVA del cargo
+const breakdown = orderInfo ? orderFeeBreakdown(orderInfo) : null;
 const totalPaid = orderInfo
-  ? Number(orderInfo.total_payment ?? (Number(orderInfo.amount || 0) + Number(orderInfo.ticket_fee || 0))) || 0
+  ? Number(orderInfo.total_payment ?? breakdown?.total) || 0
   : 0;
+const clp = (n: number) => `$${Math.round(Number(n) || 0).toLocaleString("es-CL")}`;
 ---
 
 <Layout title={event?.name ? `Tus entradas: ${event.name} | AI Tickets` : "Tu orden | AI Tickets"} noindex>
@@ -190,6 +199,15 @@ const totalPaid = orderInfo
                 <p class="text-lg font-bold text-green-600">
                   {totalPaid > 0 ? `$${totalPaid.toLocaleString('es-CL')}` : 'Gratis'}
                 </p>
+                {breakdown && breakdown.fee > 0 && (
+                  <dl class="mt-1 space-y-0.5 text-xs text-gray-500" data-testid="order-fee-breakdown">
+                    <div class="flex justify-between gap-2"><dt>Subtotal</dt><dd>{clp(breakdown.subtotal)}</dd></div>
+                    <div class="flex justify-between gap-2"><dt>{SERVICE_FEE_LABEL}</dt><dd>{clp(breakdown.feeNet)}</dd></div>
+                    {breakdown.feeIva > 0 && (
+                      <div class="flex justify-between gap-2"><dt>{SERVICE_FEE_TAX_LABEL}</dt><dd>{clp(breakdown.feeIva)}</dd></div>
+                    )}
+                  </dl>
+                )}
               </div>
             </div>
           </div>

@@ -19,6 +19,7 @@ vi.mock('../../netlify/lib/slack.mjs', () => ({ notifySlack: mocks.notifySlack }
 import {
   CLAIMABLE_STATUSES,
   confirmPaidOrder,
+  expectedPaymentAmounts,
   findOversell,
   hasLiveHold,
   isMissingSchemaError,
@@ -86,6 +87,14 @@ describe('confirmPaidOrder', () => {
     expect(mocks.notifySlack).toHaveBeenCalledWith(expect.stringMatching(/revisión/))
     expect(mocks.ensureOrderAttendees).not.toHaveBeenCalled()
     expect(mocks.sendOrderTicketsEmail).not.toHaveBeenCalled()
+  })
+
+  it('con service_fee_tax: un pago sin el IVA del cargo no coincide → review', async () => {
+    const db = createFakeSupabase({ tables: { event_orders: [order({ service_fee_tax: 570 })] } })
+    const res = await confirmPaidOrder(db, ORDER_ID, { provider: 'flow', amount: 33000, externalId: '556' })
+    expect(res).toMatchObject({ status: 'review' })
+    expect(mocks.notifySlack).toHaveBeenCalledWith(expect.stringMatching(/esperado 33570/))
+    expect(mocks.ensureOrderAttendees).not.toHaveBeenCalled()
   })
 
   it('moneda distinta → review', async () => {
@@ -243,5 +252,25 @@ describe('confirmPaidOrder: pagos de prueba de Stripe', () => {
     const db = createFakeSupabase({ tables: { event_orders: [stripeOrder()], events: [{ id: 7, slug: 'concierto-real' }] } })
     await expect(confirmPaidOrder(db, ORDER_ID, pay({ livemode: true }))).rejects.toThrow(REACHED_CLAIM)
     expect(mocks.notifySlack).not.toHaveBeenCalled()
+  })
+})
+
+describe('expectedPaymentAmounts', () => {
+  it('monto esperado = amount + ticket_fee + service_fee_tax', () => {
+    expect(expectedPaymentAmounts({ amount: 8000, ticket_fee: 800, service_fee_tax: 152 })).toEqual([8952])
+  })
+
+  it('órdenes anteriores al IVA (service_fee_tax 0) esperan subtotal + cargo', () => {
+    expect(expectedPaymentAmounts({ amount: 8000, ticket_fee: 800, service_fee_tax: 0 })).toEqual([8800])
+  })
+
+  it('sin la columna (base sin migrar): acepta el total con o sin el IVA calculado del cargo', () => {
+    expect(expectedPaymentAmounts({ amount: 8000, ticket_fee: 800 })).toEqual([8800, 8952])
+    expect(expectedPaymentAmounts({ amount: 8000, ticket_fee: 800, service_fee_tax: null })).toEqual([8800, 8952])
+  })
+
+  it('orden gratis o cortesía: 0', () => {
+    expect(expectedPaymentAmounts({ amount: 0, ticket_fee: 0 })).toEqual([0])
+    expect(expectedPaymentAmounts({ amount: 0, ticket_fee: 0, service_fee_tax: 0 })).toEqual([0])
   })
 })

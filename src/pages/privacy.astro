@@ -13,7 +13,7 @@ const processors = [
   { name: 'Netlify', purpose: 'Alojamiento del sitio y ejecución del servidor', where: 'EE.UU.' },
   { name: 'Resend', purpose: 'Envío de correos transaccionales (entradas, avisos, verificación)', where: 'EE.UU. (envío desde São Paulo, Brasil)' },
   { name: 'Flow', purpose: 'Procesamiento de pagos con Webpay', where: 'Chile' },
-  { name: 'Stripe', purpose: 'Procesamiento de pagos con tarjetas internacionales, Apple Pay y Google Pay', where: 'EE.UU.' },
+  { name: 'Stripe', purpose: `Procesamiento de pagos con tarjetas internacionales, Apple Pay y Google Pay (cuenta de Stripe de ${LEGAL.legalName})`, where: 'EE.UU.' },
   { name: 'Anthropic', purpose: 'Modelos de inteligencia artificial (asistente virtual, textos y clasificación de mensajes)', where: 'EE.UU.' },
   { name: 'Google', purpose: 'Analítica web (Google Analytics) y mapas', where: 'EE.UU.' },
   { name: 'OpenAI', purpose: 'Generación de imágenes con IA para eventos', where: 'EE.UU.' },
@@ -27,7 +27,7 @@ const processors = [
 
 <Layout
   title="Aviso de privacidad | AI Tickets"
-  description={`Cómo ${LEGAL.entity} (AI Tickets) trata los datos personales de compradores, productores, visitantes y contactos comerciales.`}
+  description={`Cómo ${LEGAL.legalName} (AI Tickets) trata los datos personales de compradores, productores, visitantes y contactos comerciales.`}
   canonical="/privacy"
 >
   <AppHeader client:idle/>
@@ -45,7 +45,7 @@ const processors = [
       <section>
         <h2>1. Responsable del tratamiento</h2>
         <p>
-          <strong>{LEGAL.entity}</strong>, {LEGAL.stateLabel}{LEGAL.address ? `, con domicilio en ${LEGAL.address}` : ''}, que opera AI Tickets.
+          <strong>{LEGAL.legalName}</strong>, {LEGAL.stateLabel} (archivo N° {LEGAL.delawareFileNumber} de la División de Sociedades de {LEGAL.state}), con domicilio comercial en {LEGAL.address}, que opera AI Tickets.
           Contacto para privacidad: <a href={`mailto:${LEGAL.privacyEmail}`}>{LEGAL.privacyEmail}</a>.
         </p>
         <p>
@@ -104,7 +104,7 @@ const processors = [
       <section>
         <h2>5. Transferencias internacionales</h2>
         <p>
-          {LEGAL.entity} es una sociedad de EE.UU. y varios de nuestros proveedores están en EE.UU. u otros países. Por eso tus datos se transfieren fuera de Chile.
+          {LEGAL.legalName} es una sociedad de EE.UU. y varios de nuestros proveedores están en EE.UU. u otros países. Por eso tus datos se transfieren fuera de Chile.
           Elegimos proveedores con estándares de seguridad reconocidos y, cuando corresponde, cláusulas contractuales de protección de datos.
         </p>
       </section>
@@ -155,7 +155,7 @@ const processors = [
         </ul>
         <p>
           La base de licitud es nuestro <strong>interés legítimo</strong> en ofrecer un servicio relacionado con la actividad profesional del destinatario.
-          Solo usamos datos de contacto profesionales, enviamos pocos mensajes y cada correo identifica a {LEGAL.entity} e incluye una forma simple de darse de baja.
+          Solo usamos datos de contacto profesionales, enviamos pocos mensajes y cada correo identifica a {LEGAL.legalName} e incluye una forma simple de darse de baja.
         </p>
         <p>
           Para no recibir más correos, responde "NO" a cualquiera de ellos o entra a <a href="/outreach/baja">aitickets.cl/outreach/baja</a>.

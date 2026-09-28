@@ -7,11 +7,13 @@ import { LEGAL, formatLegalDate } from '../lib/legal';
 import "../styles/global.css";
 
 const effective = formatLegalDate(LEGAL.effectiveDate);
+const feePct = Math.round(LEGAL.serviceFeeRate * 100);
+const vatPct = Math.round(LEGAL.serviceFeeVatRate * 100);
 ---
 
 <Layout
   title="Términos para productores | AI Tickets"
-  description={`Condiciones del servicio de AI Tickets (${LEGAL.entity}) para productores y organizadores de eventos: web de eventos gratis, comisiones, transferencias y datos.`}
+  description={`Condiciones del servicio de AI Tickets (${LEGAL.legalName}) para productores y organizadores de eventos: web de eventos gratis, comisiones, transferencias y datos.`}
   canonical="/terminos-productores"
 >
   <AppHeader client:idle/>
@@ -30,8 +32,9 @@ const effective = formatLegalDate(LEGAL.effectiveDate);
       <section>
         <h2>1. Partes</h2>
         <p>
-          AI Tickets es un servicio operado por <strong>{LEGAL.entity}</strong>, {LEGAL.stateLabel}{LEGAL.address ? `, con domicilio en ${LEGAL.address}` : ''}.
-          Contacto: <a href={`mailto:${LEGAL.supportEmail}`}>{LEGAL.supportEmail}</a> · Legal: <a href={`mailto:${LEGAL.legalEmail}`}>{LEGAL.legalEmail}</a>.
+          AI Tickets es un servicio operado por <strong>{LEGAL.legalName}</strong>, {LEGAL.stateLabel} (archivo N° {LEGAL.delawareFileNumber} de la División de Sociedades de {LEGAL.state}),
+          con domicilio comercial en {LEGAL.address}.
+          Soporte: <a href={`mailto:${LEGAL.supportEmail}`}>{LEGAL.supportEmail}</a> · Contacto legal: <a href={`mailto:${LEGAL.legalEmail}`}>{LEGAL.legalEmail}</a>.
         </p>
         <p>
           Quien acepta estos términos en nombre de una organización declara tener facultades para obligarla.
@@ -42,7 +45,7 @@ const effective = formatLegalDate(LEGAL.effectiveDate);
         <h2>2. El servicio</h2>
         <ul>
           <li>Publicación de eventos con una o varias funciones, venta de entradas con código QR, check-in, avisos a asistentes, analítica y herramientas con inteligencia artificial.</li>
-          <li>{LEGAL.entity} vende las entradas y recauda su precio <strong>como mandatario del productor</strong>. El productor es quien organiza el evento y responde ante los asistentes por su realización.</li>
+          <li>{LEGAL.legalName} vende las entradas y recauda su precio <strong>como mandatario del productor</strong>. El productor es quien organiza el evento y responde ante los asistentes por su realización.</li>
           <li>El productor es responsable de contar con los permisos, autorizaciones, derechos de autor y seguros que exija su evento, y de cumplir sus obligaciones tributarias.</li>
         </ul>
       </section>
@@ -68,7 +71,7 @@ const effective = formatLegalDate(LEGAL.effectiveDate);
       <section>
         <h2>5. Contenido y licencia</h2>
         <ul>
-          <li>El productor conserva los derechos sobre el contenido que sube (textos, imágenes, logos) y otorga a {LEGAL.entity} una licencia no exclusiva, gratuita y mundial para alojarlo, adaptarlo al formato de la plataforma y mostrarlo para promocionar y vender sus eventos, mientras esté publicado.</li>
+          <li>El productor conserva los derechos sobre el contenido que sube (textos, imágenes, logos) y otorga a {LEGAL.legalName} una licencia no exclusiva, gratuita y mundial para alojarlo, adaptarlo al formato de la plataforma y mostrarlo para promocionar y vender sus eventos, mientras esté publicado.</li>
           <li>El productor garantiza que tiene los derechos necesarios sobre ese contenido y que la información del evento es veraz, completa y actualizada (fechas, lugar, precios, edad mínima, condiciones de ingreso).</li>
           <li>Los textos, imágenes y posts generados con IA son sugerencias: el productor debe revisarlos antes de publicarlos y es responsable de lo que publica.</li>
         </ul>
@@ -93,7 +96,13 @@ const effective = formatLegalDate(LEGAL.effectiveDate);
         <h2>7. Comisiones y cargos</h2>
         <ul>
           <li>Publicar eventos y usar la web de eventos no tiene costo para el productor. La comisión para el productor es de <strong>0%</strong> salvo que se acuerde otra cosa por escrito.</li>
-          <li>El comprador paga un <strong>cargo por servicio</strong> que se suma al precio de la entrada y que corresponde a {LEGAL.entity}. El valor vigente se publica en <a href="/precios">aitickets.cl/precios</a>.</li>
+          <li>
+            El comprador paga un <strong>cargo por servicio</strong> que se suma al precio de la entrada, se le muestra antes de pagar y corresponde a {LEGAL.legalName}.
+            {LEGAL.serviceFeeTaxMode === 'added'
+              ? `Actualmente es de ${feePct}% del valor de las entradas, más IVA (${vatPct}% sobre el cargo).`
+              : `Actualmente es de ${feePct}% del valor de las entradas.`}
+            El valor vigente se publica en <a href="/precios">aitickets.cl/precios</a>.
+          </li>
           <li>Los eventos gratuitos no pagan cargo por servicio.</li>
           <li>Podemos modificar los cargos con al menos 30 días de aviso; los cambios no afectan entradas ya vendidas.</li>
         </ul>
@@ -102,7 +111,7 @@ const effective = formatLegalDate(LEGAL.effectiveDate);
       <section>
         <h2>8. Recaudación y transferencias</h2>
         <ul>
-          <li>{LEGAL.entity} recauda el precio de las entradas por cuenta del productor y le transfiere lo recaudado, descontados los reembolsos, contracargos y montos retenidos según esta sección.</li>
+          <li>{LEGAL.legalName} recauda el precio de las entradas por cuenta del productor y le transfiere lo recaudado, descontados los reembolsos, contracargos y montos retenidos según esta sección.</li>
           <li>Las transferencias se hacen a la cuenta bancaria que el productor registre en el panel, en el plazo informado en el panel (actualmente, 48 a 72 horas después de cada función). El productor es responsable de que los datos bancarios sean correctos.</li>
           <li>Podemos retener temporalmente una reserva razonable cuando haya riesgo de cancelación, reclamos o contracargos (por ejemplo, en eventos de alto monto o productores nuevos), y liberarla cuando el riesgo desaparezca.</li>
           <li>Podemos suspender transferencias si detectamos indicios de fraude, o si el evento fue cancelado o está bajo reclamo, hasta aclarar la situación.</li>
@@ -112,10 +121,11 @@ const effective = formatLegalDate(LEGAL.effectiveDate);
       <section>
         <h2>9. Cancelaciones, reembolsos y contracargos</h2>
         <ul>
-          <li>Si el evento se cancela, los compradores reciben el reembolso del total pagado, incluido el cargo por servicio. El productor debe avisarnos de inmediato.</li>
+          <li>Si el evento se cancela, se reprograma o cambia de forma relevante, el productor debe avisarnos de inmediato. El <strong>reembolso del valor de las entradas a los compradores es responsabilidad del productor</strong>, según su política y la ley (incluida la Ley N° 19.496). Nosotros avisamos a los compradores y procesamos los reembolsos que el productor instruya, en el mismo medio de pago.</li>
           <li>El precio de las entradas reembolsadas es de cargo del productor: se descuenta de lo pendiente por transferir o el productor debe restituirlo si ya se le transfirió.</li>
-          <li>Si la cancelación o el cambio relevante se debe a causas imputables al productor, este también reembolsa a {LEGAL.entity} el cargo por servicio devuelto y los costos de procesamiento.</li>
-          <li>Los contracargos por eventos no realizados o no conformes con lo anunciado son de cargo del productor. Los contracargos por fraude con tarjetas no atribuible al productor son de cargo de {LEGAL.entity}.</li>
+          <li><strong>El cargo por servicio no es reembolsable</strong>, incluso si el evento se cancela o se reprograma: remunera el servicio de venta y emisión de entradas que {LEGAL.legalName} ya prestó. Así se informa a los compradores en los <a href="/terms">Términos para compradores</a>, sin perjuicio de los derechos irrenunciables que les otorga la ley.</li>
+          <li>Si la ley o una autoridad competente obliga a devolver el cargo por servicio y la cancelación o el cambio relevante se debe a causas imputables al productor, este reembolsa a {LEGAL.legalName} el cargo por servicio devuelto y los costos de procesamiento.</li>
+          <li>Los contracargos por eventos no realizados o no conformes con lo anunciado son de cargo del productor. Los contracargos por fraude con tarjetas no atribuible al productor son de cargo de {LEGAL.legalName}.</li>
           <li>El productor debe atender con diligencia los reclamos de los asistentes y colaborar con nosotros para resolverlos.</li>
         </ul>
       </section>
@@ -123,9 +133,9 @@ const effective = formatLegalDate(LEGAL.effectiveDate);
       <section>
         <h2>10. Datos personales</h2>
         <ul>
-          <li>{LEGAL.entity} trata los datos de compradores y visitantes de la plataforma como responsable, según el <a href="/privacy">Aviso de privacidad</a>.</li>
+          <li>{LEGAL.legalName} trata los datos de compradores y visitantes de la plataforma como responsable, según el <a href="/privacy">Aviso de privacidad</a>.</li>
           <li>Cuando el productor accede a los datos de sus asistentes o los exporta (por ejemplo, en CSV), pasa a ser <strong>responsable independiente</strong> de esos datos: debe usarlos solo para gestionar su evento y comunicarse con los asistentes sobre él, o para otros fines permitidos por la ley, protegerlos con medidas de seguridad adecuadas y atender los derechos de sus titulares.</li>
-          <li>Cuando {LEGAL.entity} trata datos por instrucción del productor (por ejemplo, al enviar avisos a sus asistentes), actúa como encargado: solo los trata para prestar el servicio, con deber de confidencialidad, con los proveedores listados en el Aviso de privacidad y aplicando medidas de seguridad razonables. Al terminar el servicio los elimina o devuelve, salvo obligación legal de conservarlos.</li>
+          <li>Cuando {LEGAL.legalName} trata datos por instrucción del productor (por ejemplo, al enviar avisos a sus asistentes), actúa como encargado: solo los trata para prestar el servicio, con deber de confidencialidad, con los proveedores listados en el Aviso de privacidad y aplicando medidas de seguridad razonables. Al terminar el servicio los elimina o devuelve, salvo obligación legal de conservarlos.</li>
           <li>Las partes se avisarán sin demora de cualquier vulneración de seguridad que afecte esos datos y colaborarán para cumplir la Ley N° 19.628 y la Ley N° 21.719.</li>
         </ul>
       </section>
@@ -141,9 +151,9 @@ const effective = formatLegalDate(LEGAL.effectiveDate);
       <section>
         <h2>12. Responsabilidad</h2>
         <p>
-          El servicio se presta con diligencia razonable. Salvo dolo o culpa grave, la responsabilidad de {LEGAL.entity} frente al productor se limita al monto de los cargos
+          El servicio se presta con diligencia razonable. Salvo dolo o culpa grave, la responsabilidad de {LEGAL.legalName} frente al productor se limita al monto de los cargos
           por servicio percibidos por los eventos del productor en los 12 meses anteriores al hecho que la origina, y no incluye lucro cesante ni daños indirectos.
-          El productor mantendrá indemne a {LEGAL.entity} frente a reclamos de terceros derivados de sus eventos o de su contenido.
+          El productor mantendrá indemne a {LEGAL.legalName} frente a reclamos de terceros derivados de sus eventos o de su contenido.
         </p>
       </section>
 

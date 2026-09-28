@@ -32,7 +32,7 @@ import GradientBackground from './Hero/GradientBackground.vue';
   
             <FadeInSection direction="up" :delay="200">
               <p class="text-lg text-white/90 mb-8 max-w-2xl mx-auto lg:mx-0 font-[Prompt]">
-                0% de comisión para ti: el comprador paga un cargo por servicio de 10%. Te transferimos lo recaudado 48–72 h después de cada función, y te ayudamos a armar el evento y los posts con IA.
+                0% de comisión para ti: el comprador paga un cargo por servicio de 10% + IVA. Te transferimos lo recaudado 48–72 h después de cada función, y te ayudamos a armar el evento y los posts con IA.
               </p>
             </FadeInSection>
   

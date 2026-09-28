@@ -2,6 +2,7 @@
 // genera el adjunto .ics); aquí solo se presenta.
 import { Link, Img } from '@react-email/components'
 import { LEGAL } from '../legal.mjs'
+import { SERVICE_FEE_LABEL, SERVICE_FEE_TAX_LABEL } from '../fees.mjs'
 import { h, str, safeHref, COLORS, FONT_FAMILY, EmailLayout, TABLE_PROPS, Title, Subtitle, Paragraph, Badge, PrimaryButton, Panel, renderEmail } from './layout.mjs'
 
 export const clp = (n) => `$${Math.round(Number(n) || 0).toLocaleString('es-CL')}`
@@ -36,7 +37,7 @@ function DateRows({ dateLines }) {
   )
 }
 
-function ReceiptRows({ ticketLines, subtotal, fee, total }) {
+function ReceiptRows({ ticketLines, subtotal, fee, feeNet, feeIva, total }) {
   const rows = ticketLines.map((t, i) => {
     const qty = Number(t.quantity) || 0
     const unit = Number(t.unitPrice) || 0
@@ -55,10 +56,14 @@ function ReceiptRows({ ticketLines, subtotal, fee, total }) {
   })
   const small = { ...cell, fontSize: '13px', color: COLORS.muted, padding: '4px 0' }
   const strong = { ...cell, fontSize: '15px', fontWeight: 700, color: COLORS.text, padding: '10px 0 4px', borderTop: `1px solid ${COLORS.border}` }
+  // feeNet/feeIva: cargo neto e IVA del cargo. Sin ellos (llamadas antiguas) `fee` es el cargo sin desglose.
+  const net = feeNet != null ? Number(feeNet) || 0 : Number(fee) || 0
+  const iva = feeIva != null ? Number(feeIva) || 0 : 0
   if (Number(total) > 0) {
     rows.push(
       h('tr', { key: 'sub' }, h('td', { style: { ...small, paddingTop: '10px' } }, 'Subtotal'), h('td', { style: { ...small, paddingTop: '10px', textAlign: 'right' } }, clp(subtotal))),
-      h('tr', { key: 'fee' }, h('td', { style: small }, LEGAL.serviceFeeLabel), h('td', { style: { ...small, textAlign: 'right' } }, clp(fee))),
+      h('tr', { key: 'fee' }, h('td', { style: small }, SERVICE_FEE_LABEL), h('td', { style: { ...small, textAlign: 'right' } }, clp(net))),
+      iva > 0 ? h('tr', { key: 'iva' }, h('td', { style: small }, SERVICE_FEE_TAX_LABEL), h('td', { style: { ...small, textAlign: 'right' } }, clp(iva))) : null,
       h('tr', { key: 'tot' }, h('td', { style: strong }, 'Total pagado'), h('td', { style: { ...strong, textAlign: 'right' } }, clp(total)))
     )
   } else {
@@ -73,7 +78,7 @@ function ReceiptRows({ ticketLines, subtotal, fee, total }) {
  *   dateLines?: Array<{ date: string, time?: string, place?: string }>,
  *   secretLocation?: string,
  *   ticketLines?: Array<{ name: string, quantity: number, unitPrice: number, url?: string }>,
- *   subtotal?: number, fee?: number, total?: number,
+ *   subtotal?: number, fee?: number, feeNet?: number, feeIva?: number, total?: number,
  *   orderId: string, orderDate?: string, orderUrl: string, calendarUrl?: string | null,
  * }} data
  */
@@ -146,7 +151,7 @@ export async function renderTicketsEmail(data = {}) {
     h(
       Panel,
       { label: LEGAL.receiptLabel, tone: 'outline' },
-      h(ReceiptRows, { ticketLines, subtotal: data.subtotal, fee: data.fee, total: data.total }),
+      h(ReceiptRows, { ticketLines, subtotal: data.subtotal, fee: data.fee, feeNet: data.feeNet, feeIva: data.feeIva, total: data.total }),
       h(Paragraph, { small: true, style: { margin: '12px 0 0', color: COLORS.subtle, fontSize: '12px' } }, `Orden ${str(data.orderId)}${data.orderDate ? ` · ${str(data.orderDate)}` : ''}`)
     )
   )

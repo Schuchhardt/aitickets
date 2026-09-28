@@ -16,6 +16,7 @@ import { getSupabaseAdmin } from "../../lib/auth-helpers";
 import { sendTicketsEmail } from "../api/_lib/server-utils";
 import { LEGAL } from "../../lib/legal";
 import { confirmPaidOrder, markOrderFailed, UUID_RE } from "../../../netlify/lib/orders.mjs";
+import { orderFeeBreakdown } from "../../../netlify/lib/fees.mjs";
 import { retrieveStripeSession, expireStripeSession } from "../../../netlify/lib/payments/stripe.mjs";
 
 export const prerender = false;
@@ -41,8 +42,13 @@ const ORDER_COLS_NEW = "id, status, event_id, amount, ticket_fee, total_payment,
 const ORDER_COLS_OLD = "id, status, event_id, amount, ticket_fee, total_payment, ticket_qty, ticket_details, created_at, email_sent_at";
 
 async function loadOrder(id: string) {
-  let { data, error } = await supabase.from("event_orders").select(ORDER_COLS_NEW).eq("id", id).maybeSingle();
-  if (error) ({ data, error } = await supabase.from("event_orders").select(ORDER_COLS_OLD).eq("id", id).maybeSingle());
+  let data: any = null;
+  let error: any = null;
+  // service_fee_tax (IVA del cargo) llega con 202609290100; sin migrar se cae a las columnas anteriores
+  for (const cols of [`${ORDER_COLS_NEW}, service_fee_tax`, ORDER_COLS_NEW, ORDER_COLS_OLD]) {
+    ({ data, error } = await supabase.from("event_orders").select(cols).eq("id", id).maybeSingle());
+    if (!error) break;
+  }
   return error ? null : data;
 }
 
@@ -83,7 +89,8 @@ if (UUID_RE.test(orderId)) {
     }
 
     if (order) {
-      totalPaid = Number(order.total_payment ?? (Number(order.amount) + Number(order.ticket_fee || 0))) || 0;
+      // Total cobrado = subtotal + cargo por servicio + IVA del cargo (total_payment es lo que confirmó el proveedor)
+      totalPaid = Number(order.total_payment ?? orderFeeBreakdown(order).total) || 0;
       const { data: eventInfo } = await supabase
         .from("events")
         .select("id, name, title, slug, image_url, location, start_date, end_date")
@@ -138,6 +145,7 @@ if (UUID_RE.test(orderId)) {
         purchase = {
           transaction_id: order.id,
           value: totalPaid,
+          tax: orderFeeBreakdown(order).feeIva,
           currency: "CLP",
           items: lines.map((l: any) => ({
             item_id: `${eventData.id}-${l.id}`,

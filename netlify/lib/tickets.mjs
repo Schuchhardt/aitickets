@@ -3,7 +3,8 @@
 // (init_date IS NULL OR init_date <= now) AND (end_date IS NULL OR end_date >= now).
 import crypto from 'node:crypto'
 
-export const SERVICE_FEE_RATE = 0.10
+// Cargo por servicio (10% + IVA del cargo): fuente única en fees.mjs.
+export { SERVICE_FEE_RATE, IVA_RATE, computeServiceFee, computeBuyerTotal } from './fees.mjs'
 export const DEFAULT_MAX_PER_PURCHASE = 10
 /** Reserva por defecto de una orden pendiente (Flow). Stripe usa 31 min: ver payments/index.mjs holdMinutesFor(). */
 export const PENDING_HOLD_MINUTES = 15
@@ -22,11 +23,6 @@ export function isTicketOnSale(ticket, now = new Date()) {
 export function maxPerPurchase(ticket) {
   const max = Number(ticket?.max_quantity)
   return Number.isInteger(max) && max > 0 ? max : DEFAULT_MAX_PER_PURCHASE
-}
-
-/** Cargo por servicio al comprador (10% del subtotal, entero CLP). */
-export function computeServiceFee(subtotal) {
-  return subtotal > 0 ? Math.round(subtotal * SERVICE_FEE_RATE) : 0
 }
 
 /**

@@ -20,9 +20,11 @@ import { sendOrderTicketsEmail } from './tickets-email.mjs'
 import { notifySlack } from './slack.mjs'
 import { SITE_URL } from './mailer.mjs'
 import { isStripeTestKey, isStripeTestEligibleEvent } from './payments/mode.mjs'
+import { computeServiceFeeTax } from './fees.mjs'
 
 const LEGACY_ORDER_COLUMNS = 'id, status, event_id, attendee_id, amount, ticket_fee, total_payment, ticket_details, payment_external_id, processing_started_at, created_at'
-const ORDER_COLUMNS = `${LEGACY_ORDER_COLUMNS}, payment_provider, currency, provider_session_id, payment_intent_id, hold_expires_at`
+const PROVIDER_ORDER_COLUMNS = `${LEGACY_ORDER_COLUMNS}, payment_provider, currency, provider_session_id, payment_intent_id, hold_expires_at`
+const ORDER_COLUMNS = `${PROVIDER_ORDER_COLUMNS}, service_fee_tax`
 export const PROCESSING_STALE_MINUTES = 5
 /** Reserva por defecto de órdenes sin hold_expires_at (misma regla que aitickets_ticket_availability). */
 export const LEGACY_HOLD_MINUTES = 15
@@ -39,12 +41,31 @@ export function isMissingSchemaError(error) {
 
 /** Carga una orden con las columnas nuevas; si la base aún no está migrada, con las antiguas. */
 export async function loadOrder(supabase, orderId, columns = ORDER_COLUMNS) {
-  let { data, error } = await supabase.from('event_orders').select(columns).eq('id', orderId).maybeSingle()
-  if (error && isMissingSchemaError(error) && columns !== LEGACY_ORDER_COLUMNS) {
-    ;({ data, error } = await supabase.from('event_orders').select(LEGACY_ORDER_COLUMNS).eq('id', orderId).maybeSingle())
+  const fallbacks = [columns]
+  if (columns === ORDER_COLUMNS) fallbacks.push(PROVIDER_ORDER_COLUMNS)
+  if (columns !== LEGACY_ORDER_COLUMNS) fallbacks.push(LEGACY_ORDER_COLUMNS)
+  let data = null
+  let error = null
+  for (const cols of fallbacks) {
+    ;({ data, error } = await supabase.from('event_orders').select(cols).eq('id', orderId).maybeSingle())
+    if (!error || !isMissingSchemaError(error)) break
   }
   if (error) throw new Error(`Error buscando orden: ${error.message}`)
   return data
+}
+
+/**
+ * Montos que se aceptan como pago completo de la orden:
+ * amount (subtotal) + ticket_fee (cargo neto) + service_fee_tax (IVA del cargo).
+ * Si la orden no trae service_fee_tax (base sin migrar, o creada por un RPC anterior), se acepta
+ * también el total con el IVA calculado del cargo: ambos montos salen del servidor, nunca del cliente.
+ */
+export function expectedPaymentAmounts(order) {
+  const base = (Number(order?.amount) || 0) + (Number(order?.ticket_fee) || 0)
+  const tax = order?.service_fee_tax
+  if (tax != null && Number.isFinite(Number(tax))) return [base + Number(tax)]
+  const withTax = base + computeServiceFeeTax(order?.ticket_fee)
+  return withTax === base ? [base] : [base, withTax]
 }
 
 /** Emite entradas (idempotente) y envía el correo. Devuelve false si el correo falló. */
@@ -192,7 +213,8 @@ export async function confirmPaidOrder(supabase, orderId, payment) {
     }
   }
 
-  const expected = (Number(order.amount) || 0) + (Number(order.ticket_fee) || 0)
+  const expectedAmounts = expectedPaymentAmounts(order)
+  const expected = expectedAmounts.join(' o ')
   const storedExternal = provider === 'stripe' ? (order.provider_session_id || order.payment_external_id) : order.payment_external_id
   const externalMatches = !storedExternal || externalId == null || String(storedExternal) === String(externalId)
   const providerMatches = !order.payment_provider || order.payment_provider === provider
@@ -201,7 +223,7 @@ export async function confirmPaidOrder(supabase, orderId, payment) {
     total_payment: Number(amount) || null,
     payment_external_id: externalId != null ? String(externalId) : order.payment_external_id,
   }
-  if (Number(amount) !== expected || !currencyOk || !externalMatches || !providerMatches) {
+  if (!expectedAmounts.includes(Number(amount)) || !currencyOk || !externalMatches || !providerMatches) {
     const detail = `${label} ${amount} ${currency || ''}, esperado ${expected} ${order.currency || 'CLP'}, ref ${externalId}, proveedor de la orden ${order.payment_provider || '?'}`
     console.error(`⚠️ Orden ${order.id}: el pago no coincide (${detail}). Requiere revisión manual.`)
     await supabase.from('event_orders').update({ status: 'review', ...paymentFields }).eq('id', order.id).neq('status', 'paid')

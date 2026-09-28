@@ -1,18 +1,15 @@
 <script setup>
-// Calculadora de /precios. Usa exactamente la misma regla que el checkout (Reservation/pricing.js):
-// el comprador paga precio + cargo por servicio (SERVICE_FEE_RATE sobre el subtotal, redondeado a pesos)
-// y el productor recibe el 100% del precio de las entradas (0% de comisión para el productor).
+// Calculadora de /precios. Usa exactamente la misma regla que el checkout (netlify/lib/fees.mjs vía
+// Reservation/pricing.js): el comprador paga precio + cargo por servicio (10% del subtotal, redondeado a
+// pesos) + IVA del cargo (19% del cargo, redondeado), y el productor recibe el 100% del precio de las
+// entradas (0% de comisión para el productor). Ej.: $8.000 → cargo $800 + IVA $152 = $8.952.
 import { computed, ref } from 'vue'
-import { SERVICE_FEE_RATE, computeTotals, formatCLP } from '../Reservation/pricing.js'
-
-const props = defineProps({
-  feeLabel: { type: String, default: 'Cargo por servicio' },
-})
+import { IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL, computeTotals, formatCLP } from '../Reservation/pricing.js'
 
 const MAX_PRICE = 10_000_000
 const MAX_QTY = 100_000
 
-const priceInput = ref('15000')
+const priceInput = ref('8000')
 const quantityInput = ref('100')
 
 const toInt = (value, max) => {
@@ -28,7 +25,6 @@ const quantity = computed(() => toInt(quantityInput.value, MAX_QTY))
 const perTicket = computed(() => computeTotals([{ total: price.value, quantity: 1 }]))
 const totals = computed(() => computeTotals([{ total: price.value * quantity.value, quantity: quantity.value }]))
 
-const feePercent = `${Math.round(SERVICE_FEE_RATE * 100)}%`
 const isFree = computed(() => price.value === 0)
 </script>
 
@@ -66,7 +62,8 @@ const isFree = computed(() => price.value === 0)
       class="mt-6 space-y-3"
       data-testid="fee-calc-result"
       :data-price="price"
-      :data-fee="perTicket.fee"
+      :data-fee="perTicket.feeNet"
+      :data-fee-iva="perTicket.feeIva"
       :data-buyer-total="perTicket.total"
       :data-producer-total="totals.subtotal"
       aria-live="polite"
@@ -76,7 +73,10 @@ const isFree = computed(() => price.value === 0)
         <p class="mt-1 text-3xl font-extrabold text-gray-900">{{ formatCLP(perTicket.total) }}</p>
         <p class="mt-1 text-sm text-gray-600">
           <template v-if="isFree">Evento gratuito: sin cargo por servicio.</template>
-          <template v-else>{{ formatCLP(price) }} de entrada + {{ formatCLP(perTicket.fee) }} de {{ props.feeLabel.toLowerCase() }} ({{ feePercent }}).</template>
+          <template v-else>
+            {{ formatCLP(price) }} de entrada + {{ formatCLP(perTicket.feeNet) }} de cargo por servicio ({{ SERVICE_FEE_PERCENT_LABEL }})
+            + {{ formatCLP(perTicket.feeIva) }} de IVA del cargo ({{ IVA_PERCENT_LABEL }}).
+          </template>
         </p>
       </div>
       <div class="rounded-xl bg-lime-50 p-4 ring-1 ring-lime-200">
@@ -87,8 +87,9 @@ const isFree = computed(() => price.value === 0)
         </p>
       </div>
       <p class="text-xs text-gray-500">
-        Total que pagan tus compradores: {{ formatCLP(totals.total) }} ({{ formatCLP(totals.fee) }} de {{ props.feeLabel.toLowerCase() }}).
-        El cargo se calcula sobre el total de cada compra y se redondea al peso, igual que en el checkout.
+        Total que pagan tus compradores: {{ formatCLP(totals.total) }} ({{ formatCLP(totals.feeNet) }} de cargo por servicio
+        + {{ formatCLP(totals.feeIva) }} de IVA del cargo). El cargo y su IVA se calculan sobre el total de cada compra y se
+        redondean al peso, igual que en el checkout. El precio de tu entrada no lleva cargos ni retenciones.
       </p>
     </div>
   </div>

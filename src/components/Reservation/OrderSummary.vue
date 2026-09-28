@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from "vue";
-import { buildSelectedLines, computeTotals, formatCLP } from "./pricing.js";
+import { SERVICE_FEE_LABEL, SERVICE_FEE_TAX_LABEL, buildSelectedLines, computeTotals, formatCLP } from "./pricing.js";
 
 const props = defineProps({
   selectedTickets: Object,
@@ -71,8 +71,12 @@ const applyDiscount = async () => {
         <span>{{ totals.subtotal > 0 ? formatCLP(totals.subtotal) : "Gratis" }}</span>
       </div>
       <div v-if="totals.subtotal > 0" class="flex justify-between">
-        <span>Cargo por servicio (10%)</span>
-        <span>{{ formatCLP(totals.fee) }}</span>
+        <span>{{ SERVICE_FEE_LABEL }}</span>
+        <span>{{ formatCLP(totals.feeNet) }}</span>
+      </div>
+      <div v-if="totals.feeIva > 0" class="flex justify-between">
+        <span>{{ SERVICE_FEE_TAX_LABEL }}</span>
+        <span>{{ formatCLP(totals.feeIva) }}</span>
       </div>
     </div>
     <div v-if="selectedTicketList.length" class="flex justify-between font-bold border-t pt-2 mt-2">

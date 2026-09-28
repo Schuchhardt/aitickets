@@ -165,7 +165,9 @@ describe('createStripeCheckout', () => {
       { id: 2, name: 'VIP', price: 25000.4, quantity: 1 },
       { id: 3, name: 'Liberada', price: 0, quantity: 1 },
     ],
-    fee: 5500,
+    fee: 6545,
+    feeNet: 5500,
+    feeIva: 1045,
     buyerEmail: 'ana@example.cl',
     holdMinutes: 31,
     siteUrl: 'https://aitickets.cl/',
@@ -184,14 +186,33 @@ describe('createStripeCheckout', () => {
     expect(params.currency).toBe('clp')
     expect(params.mode).toBe('payment')
     const amounts = params.line_items.map((li) => li.price_data.unit_amount)
-    expect(amounts).toEqual([15000, 25000, 5500])
+    expect(amounts).toEqual([15000, 25000, 5500, 1045])
     for (const li of params.line_items) {
       expect(li.price_data.currency).toBe('clp')
       expect(Number.isInteger(li.price_data.unit_amount)).toBe(true)
     }
     const total = params.line_items.reduce((s, li) => s + li.price_data.unit_amount * li.quantity, 0)
-    expect(total).toBe(15000 * 2 + 25000 + 5500)
-    expect(params.line_items.at(-1).price_data.product_data.name).toBe('Cargo por servicio')
+    expect(total).toBe(15000 * 2 + 25000 + 5500 + 1045)
+    expect(params.line_items.at(-2).price_data.product_data.name).toBe('Cargo por servicio (10%)')
+    expect(params.line_items.at(-1).price_data.product_data.name).toBe('IVA del cargo (19%)')
+  })
+
+  it('el total de Stripe coincide exactamente con computeBuyerTotal (subtotal + cargo + IVA)', async () => {
+    const { computeBuyerTotal } = await import('../../netlify/lib/fees.mjs')
+    for (const price of [990, 8000, 12345, 15999]) {
+      stripeMock.create.mockClear()
+      const t = computeBuyerTotal(price * 3)
+      await createStripeCheckout({ ...args, lines: [{ id: 1, name: 'General', price, quantity: 3 }], fee: t.fee, feeNet: t.feeNet, feeIva: t.feeIva })
+      const [params] = stripeMock.create.mock.calls[0]
+      const total = params.line_items.reduce((s, li) => s + li.price_data.unit_amount * li.quantity, 0)
+      expect(total).toBe(t.total)
+    }
+  })
+
+  it('sin feeNet/feeIva usa los montos guardados en la orden', async () => {
+    await createStripeCheckout({ ...args, fee: undefined, feeNet: undefined, feeIva: undefined, order: { id: ORDER_ID, ticket_fee: 800, service_fee_tax: 152 } })
+    const [params] = stripeMock.create.mock.calls[0]
+    expect(params.line_items.slice(-2).map((li) => li.price_data.unit_amount)).toEqual([800, 152])
   })
 
   it('success_url lleva la orden y {CHECKOUT_SESSION_ID}; cancel_url marca cancelled', async () => {
@@ -200,8 +221,9 @@ describe('createStripeCheckout', () => {
     expect(params.success_url).toBe(`https://aitickets.cl/pago/retorno?order=${ORDER_ID}&provider=stripe&session_id={CHECKOUT_SESSION_ID}`)
     expect(params.cancel_url).toBe(`https://aitickets.cl/pago/retorno?order=${ORDER_ID}&provider=stripe&cancelled=1`)
     expect(params.client_reference_id).toBe(ORDER_ID)
-    expect(params.metadata).toEqual({ order_id: ORDER_ID })
-    expect(params.payment_intent_data.metadata).toEqual({ order_id: ORDER_ID })
+    expect(params.metadata).toEqual({ app: 'aitickets', order_id: ORDER_ID })
+    expect(params.payment_intent_data.metadata).toEqual({ app: 'aitickets', order_id: ORDER_ID })
+    expect(params.payment_intent_data.statement_descriptor_suffix).toBe('AITICKETS')
     expect(params.customer_email).toBe('ana@example.cl')
     expect(opts).toEqual({ idempotencyKey: `order-${ORDER_ID}` })
   })
@@ -221,7 +243,7 @@ describe('createStripeCheckout', () => {
   })
 
   it('una orden sin montos cobrables no crea sesión', async () => {
-    await expect(createStripeCheckout({ ...args, lines: [{ id: 3, name: 'Liberada', price: 0, quantity: 2 }], fee: 0 })).rejects.toThrow(/montos cobrables/)
+    await expect(createStripeCheckout({ ...args, lines: [{ id: 3, name: 'Liberada', price: 0, quantity: 2 }], fee: 0, feeNet: 0, feeIva: 0 })).rejects.toThrow(/montos cobrables/)
     expect(stripeMock.create).not.toHaveBeenCalled()
   })
 

@@ -83,7 +83,7 @@
             </div>
             <div class="p-6">
               <div class="text-4xl font-bold text-lime-500 font-[Unbounded]">10%</div>
-              <div class="text-gray-600 text-sm mt-2">cargo por servicio que paga el comprador</div>
+              <div class="text-gray-600 text-sm mt-2">cargo por servicio + IVA que paga el comprador</div>
             </div>
             <div class="p-6">
               <div class="text-4xl font-bold text-lime-500 font-[Unbounded]">48–72 h</div>

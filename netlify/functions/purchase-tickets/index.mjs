@@ -21,7 +21,7 @@ import {
   TICKET_COLUMNS,
   isTicketOnSale,
   maxPerPurchase,
-  computeServiceFee,
+  computeBuyerTotal,
   getSoldCounts,
   ensureOrderAttendees,
   PENDING_HOLD_MINUTES,
@@ -215,11 +215,17 @@ async function reserveOrder(supabase, { eventId, lines, order, holdMinutes, base
   if (!isMissingSchemaError(error)) throw new Error(`Error reservando la orden: ${error?.message || 'sin id'}`)
 
   console.warn('aitickets_reserve_order no disponible; usando reserva optimista antigua')
-  const { data: inserted, error: insertError } = await supabase
+  const insertOrder = row => supabase
     .from('event_orders')
-    .insert([{ ...baseOrder, status: 'pending' }])
+    .insert([row])
     .select('id, event_id, attendee_id, ticket_details')
     .single()
+  let { data: inserted, error: insertError } = await insertOrder({ ...baseOrder, status: 'pending' })
+  if (insertError && isMissingSchemaError(insertError) && 'service_fee_tax' in baseOrder) {
+    // Base sin la columna service_fee_tax (202609290100): la orden se guarda sin el IVA separado.
+    const { service_fee_tax: _tax, ...rest } = baseOrder
+    ;({ data: inserted, error: insertError } = await insertOrder({ ...rest, status: 'pending' }))
+  }
   if (insertError) throw new Error(`Error creando orden: ${insertError.message}`)
   if (limited.length) {
     const sold = await getSoldCounts(supabase, eventId, limited)
@@ -350,8 +356,8 @@ export default async function handler(req) {
       return { id, name: ticket.ticket_name, price, quantity, total: price * quantity, event_date_id: ticket.event_date_id ?? null }
     })
     const subtotal = ticketDetails.reduce((sum, t) => sum + t.total, 0)
-    const fee = computeServiceFee(subtotal)
-    const total = subtotal + fee
+    // Cargo por servicio = 10% del subtotal + IVA (19%) de ese cargo; se cobra el total con IVA.
+    const { feeNet, feeIva, fee, total } = computeBuyerTotal(subtotal)
     const ticketQty = ticketDetails.reduce((sum, t) => sum + t.quantity, 0)
     const provider = total === 0 ? 'free' : paymentProvider
     const holdMinutes = total === 0 ? PENDING_HOLD_MINUTES : holdMinutesFor(provider)
@@ -375,7 +381,8 @@ export default async function handler(req) {
       event_id: eventId,
       attendee_id: attendeeId,
       amount: subtotal,
-      ticket_fee: fee,
+      ticket_fee: feeNet,
+      service_fee_tax: feeIva,
       ticket_qty: ticketQty,
       ticket_details: ticketDetails,
       total_payment: total === 0 ? 0 : null,
@@ -437,12 +444,14 @@ export default async function handler(req) {
     let checkout
     try {
       checkout = await createCheckout(provider, {
-        order: { id: order.id, ticket_fee: fee },
+        order: { id: order.id, ticket_fee: feeNet, service_fee_tax: feeIva },
         eventName: event.name,
         lines: ticketDetails,
         ticketQty,
         subtotal,
         fee,
+        feeNet,
+        feeIva,
         total,
         buyerEmail: buyer.email,
         siteUrl,

@@ -1,18 +1,21 @@
 ---
 // /precios — precios públicos de AI Tickets: 0% para el productor, cargo por servicio para el comprador.
-// La calculadora usa la misma regla que el checkout (src/components/Reservation/pricing.js).
+// La calculadora usa la misma regla que el checkout (netlify/lib/fees.mjs): cargo 10% del subtotal + IVA del cargo.
 export const prerender = true;
 import AppHeader from "../components/AppHeader.vue";
 import AppFooter from "../components/AppFooter.vue";
 import FeeCalculator from "../components/pricing/FeeCalculator.vue";
 import Layout from "../layouts/Layout.astro";
 import { LEGAL } from "../lib/legal";
-import { SERVICE_FEE_RATE } from "../components/Reservation/pricing.js";
+import { IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL, computeBuyerTotal } from "../components/Reservation/pricing.js";
 import "../styles/global.css";
 
 const SITE_URL = (import.meta.env.SITE_URL || "https://aitickets.cl").replace(/\/$/, "");
-const feePercent = `${Math.round(SERVICE_FEE_RATE * 100)}%`;
-const feeLabel = LEGAL.serviceFeeLabel;
+const feePercent = `${SERVICE_FEE_PERCENT_LABEL} + IVA`;
+const feeText = `cargo por servicio de ${SERVICE_FEE_PERCENT_LABEL} más IVA (${IVA_PERCENT_LABEL} sobre el cargo)`;
+const fmt = (n: number) => `$${n.toLocaleString("es-CL")}`;
+const example = computeBuyerTotal(8000);
+const exampleText = `Ejemplo: entrada de ${fmt(example.subtotal)} → cargo ${fmt(example.feeNet)} + IVA ${fmt(example.feeIva)} = el comprador paga ${fmt(example.total)} y tú recibes ${fmt(example.subtotal)}.`;
 
 const included = [
   "Página de venta para cada evento, lista para compartir",
@@ -43,7 +46,7 @@ const methods = [
 const faqs = [
   {
     q: "¿Cuánto cobra AI Tickets al productor?",
-    a: `Nada: 0% de comisión para el productor. Publicar eventos y usar tu web de eventos no tiene costo. El comprador paga un ${feeLabel.toLowerCase()} de ${feePercent} sobre el valor de las entradas.`,
+    a: `Nada: 0% de comisión para el productor. Publicar eventos y usar tu web de eventos no tiene costo. El comprador paga un ${feeText} sobre el valor de las entradas. ${exampleText}`,
   },
   {
     q: "¿El cargo por servicio cambia según el medio de pago?",
@@ -59,7 +62,7 @@ const faqs = [
   },
   {
     q: "¿Qué pasa si cancelo el evento?",
-    a: "Los compradores reciben el reembolso del total pagado, incluido el cargo por servicio. El detalle está en los términos para productores.",
+    a: "Los compradores reciben el reembolso del precio de sus entradas. El cargo por servicio y su IVA no se reembolsan, porque corresponden al servicio de venta ya prestado. El detalle está en los términos para productores y compradores.",
   },
   {
     q: "¿Tengo que firmar un contrato o pagar una mensualidad?",
@@ -72,7 +75,7 @@ const jsonLd = [
     "@context": "https://schema.org",
     "@type": "Product",
     name: "AI Tickets para productores",
-    description: `Plataforma de venta de entradas con 0% de comisión para el productor y web de eventos gratis. El comprador paga un ${feeLabel.toLowerCase()} de ${feePercent}.`,
+    description: `Plataforma de venta de entradas con 0% de comisión para el productor y web de eventos gratis. El comprador paga un ${feeText}.`,
     brand: { "@type": "Brand", name: LEGAL.brand },
     url: `${SITE_URL}/precios`,
     offers: {
@@ -81,7 +84,7 @@ const jsonLd = [
       priceCurrency: "CLP",
       availability: "https://schema.org/InStock",
       url: `${SITE_URL}/organizadores/registro`,
-      description: `0% de comisión para el productor. ${feeLabel} de ${feePercent} pagado por el comprador.`,
+      description: `0% de comisión para el productor. Cargo por servicio de ${feePercent} pagado por el comprador.`,
     },
   },
   {
@@ -112,8 +115,11 @@ const jsonLd = [
           <p class="inline-block rounded-full bg-lime-100 px-3 py-1 text-sm font-semibold text-lime-800">Precios simples</p>
           <h1 class="mt-4 text-4xl font-extrabold tracking-tight text-gray-900 sm:text-5xl font-['Unbounded']">0% de comisión para el productor</h1>
           <p class="mt-4 text-lg text-gray-600">
-            Tú recibes el 100% del precio de tus entradas. El comprador paga un {feeLabel.toLowerCase()} de {feePercent},
+            Tú recibes el 100% del precio de tus entradas. El comprador paga un {feeText},
             que se muestra desglosado antes de pagar. Los eventos gratuitos no tienen costo.
+          </p>
+          <p class="mt-2 text-sm text-gray-500" data-testid="precios-example">
+            {exampleText}
           </p>
           <ul class="mt-8 space-y-3">
             {included.map((item) => (
@@ -128,7 +134,7 @@ const jsonLd = [
           </a>
         </div>
 
-        <FeeCalculator client:visible feeLabel={feeLabel} />
+        <FeeCalculator client:visible />
       </div>
     </section>
 

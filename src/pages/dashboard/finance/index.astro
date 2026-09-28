@@ -13,6 +13,7 @@ type Tx = {
     event: string;
     amount: number;
     ticketFee: number;
+    feeTax: number;
     paymentFee: number;
     total: number;
     qty: number;
@@ -22,7 +23,8 @@ type Tx = {
 type EventSummary = { id: number; name: string; endDate: string | null; qty: number; amount: number; ticketFee: number; paid: number };
 
 let totalRevenue = 0; // ventas de entradas (lo que recibe el productor)
-let totalServiceFees = 0; // cargo por servicio pagado por los compradores
+let totalServiceFees = 0; // cargo por servicio NETO pagado por los compradores (ticket_fee)
+let totalServiceFeeTax = 0; // IVA del cargo por servicio (service_fee_tax)
 let paidOut = 0;
 let balanceDue = 0;
 let transactions: Tx[] = [];
@@ -44,29 +46,26 @@ if (orgEvents && orgEvents.length > 0) {
     );
 
     // Solo órdenes pagadas. Paginado con .range(): PostgREST corta en 1000 filas y los totales quedarían incompletos.
-    // payment_provider existe desde la migración 202609270100; sin ella (deploy preview) se omite.
+    // payment_provider existe desde la migración 202609270100 y service_fee_tax desde 202609290100;
+    // sin ellas (deploy preview contra una base sin migrar) se omiten.
     const orders: any[] = [];
     const PAGE_SIZE = 1000;
-    let orderColumns = "id, event_id, amount, ticket_fee, payment_fee, total_payment, ticket_qty, created_at, payment_provider";
+    const BASE_COLUMNS = "id, event_id, amount, ticket_fee, payment_fee, total_payment, ticket_qty, created_at";
+    const columnSets = [`${BASE_COLUMNS}, payment_provider, service_fee_tax`, `${BASE_COLUMNS}, payment_provider`, BASE_COLUMNS];
+    let columnIndex = 0;
     for (let from = 0; ; from += PAGE_SIZE) {
-        let { data: page, error: pageError }: { data: any[] | null; error: any } = await supabaseAdmin
+        const fetchPage = () => supabaseAdmin
             .from("event_orders")
-            .select(orderColumns)
+            .select(columnSets[columnIndex])
             .in("event_id", eventIds)
             .eq("status", "paid")
             .order("created_at", { ascending: false })
             .order("id", { ascending: true })
             .range(from, from + PAGE_SIZE - 1);
-        if (pageError && from === 0 && orderColumns.includes("payment_provider")) {
-            orderColumns = "id, event_id, amount, ticket_fee, payment_fee, total_payment, ticket_qty, created_at";
-            ({ data: page, error: pageError } = await supabaseAdmin
-                .from("event_orders")
-                .select(orderColumns)
-                .in("event_id", eventIds)
-                .eq("status", "paid")
-                .order("created_at", { ascending: false })
-                .order("id", { ascending: true })
-                .range(from, from + PAGE_SIZE - 1));
+        let { data: page, error: pageError }: { data: any[] | null; error: any } = await fetchPage();
+        while (pageError && from === 0 && columnIndex < columnSets.length - 1) {
+            columnIndex += 1;
+            ({ data: page, error: pageError } = await fetchPage());
         }
         if (pageError) {
             console.error("Error cargando órdenes para finanzas:", pageError.message);
@@ -81,6 +80,7 @@ if (orgEvents && orgEvents.length > 0) {
         const ticketFee = Number(o.ticket_fee) || 0;
         totalRevenue += amount;
         totalServiceFees += ticketFee;
+        totalServiceFeeTax += Number(o.service_fee_tax) || 0;
         const s = byEvent.get(o.event_id);
         if (s) {
             s.qty += o.ticket_qty || 0;
@@ -93,6 +93,7 @@ if (orgEvents && orgEvents.length > 0) {
         event: eventNameMap[o.event_id] || "—",
         amount: Number(o.amount) || 0,
         ticketFee: Number(o.ticket_fee) || 0,
+        feeTax: Number(o.service_fee_tax) || 0,
         paymentFee: Number(o.payment_fee) || 0,
         total: Number(o.total_payment) || 0,
         qty: o.ticket_qty || 0,
@@ -155,7 +156,7 @@ const formatDate = (d: string | null) =>
         <div class="bg-blue-50 border border-blue-100 rounded-xl p-5 text-sm text-blue-900">
             <p class="font-semibold mb-1">¿Cómo recibo mi dinero?</p>
             <p>
-                Recibes el <strong>100% del valor de tus entradas</strong>: el cargo por servicio lo paga el comprador.
+                Recibes el <strong>100% del valor de tus entradas</strong>: el cargo por servicio y su IVA los paga el comprador.
                 Los pagos se hacen <strong>manualmente por transferencia bancaria dentro de 48–72 horas después de cada función</strong>,
                 a la cuenta que registres en <a href="/dashboard/settings" class="underline font-medium">Configuración</a>.
             </p>
@@ -171,7 +172,7 @@ const formatDate = (d: string | null) =>
             <div class="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
                 <h3 class="text-gray-500 text-sm font-medium">Ventas de entradas</h3>
                 <p class="text-3xl font-bold mt-2">{formatCLP(totalRevenue)}</p>
-                <p class="text-xs text-gray-400 mt-1">Órdenes pagadas. No incluye el cargo por servicio ({formatCLP(totalServiceFees)}).</p>
+                <p class="text-xs text-gray-400 mt-1">Órdenes pagadas. No incluye el cargo por servicio ({formatCLP(totalServiceFees)}) ni su IVA ({formatCLP(totalServiceFeeTax)}).</p>
             </div>
             <div class="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
                 <h3 class="text-gray-500 text-sm font-medium">Transferido a la fecha</h3>
@@ -236,7 +237,7 @@ const formatDate = (d: string | null) =>
                 <div class="p-6 border-b border-gray-100">
                     <h3 class="text-lg font-bold text-gray-900">Órdenes pagadas</h3>
                     <p class="text-xs text-gray-500 mt-1">
-                        El cargo por servicio lo paga el comprador y la comisión de la pasarela de pago la cubre AI Tickets: ninguno se descuenta de tu saldo.
+                        El cargo por servicio (10%) y su IVA (19% del cargo) los paga el comprador y la comisión de la pasarela de pago la cubre AI Tickets: ninguno se descuenta de tu saldo.
                     </p>
                 </div>
                 <div class="overflow-x-auto">
@@ -247,6 +248,7 @@ const formatDate = (d: string | null) =>
                                 <th class="px-6 py-4">Entradas</th>
                                 <th class="px-6 py-4">Monto entradas</th>
                                 <th class="px-6 py-4">Cargo por servicio</th>
+                                <th class="px-6 py-4">IVA cargo</th>
                                 <th class="px-6 py-4">Total pagado</th>
                                 <th class="px-6 py-4">Comisión pasarela</th>
                                 <th class="px-6 py-4">Medio de pago</th>
@@ -260,6 +262,7 @@ const formatDate = (d: string | null) =>
                                     <td class="px-6 py-4">{t.qty}</td>
                                     <td class="px-6 py-4 font-medium text-gray-900">{formatCLP(t.amount)}</td>
                                     <td class="px-6 py-4">{formatCLP(t.ticketFee)}</td>
+                                    <td class="px-6 py-4">{formatCLP(t.feeTax)}</td>
                                     <td class="px-6 py-4">{formatCLP(t.total)}</td>
                                     <td class="px-6 py-4 text-gray-400">{formatCLP(t.paymentFee)}</td>
                                     <td class="px-6 py-4">{t.provider}</td>

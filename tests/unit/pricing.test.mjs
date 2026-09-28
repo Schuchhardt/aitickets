@@ -1,9 +1,11 @@
 // Precios mostrados al comprador (src/components/Reservation/pricing.js). El checkout, /precios
-// (FeeCalculator) y el servidor usan la misma regla: cargo por servicio = 10% del subtotal, redondeado.
+// (FeeCalculator) y el servidor usan la misma regla (netlify/lib/fees.mjs): cargo por servicio = 10% del
+// subtotal, redondeado, más IVA (19%) de ese cargo, redondeado.
 import { describe, expect, it } from 'vitest'
 
 import {
   DEFAULT_MAX_PER_PURCHASE,
+  IVA_RATE,
   SERVICE_FEE_RATE,
   buildSelectedLines,
   computeTotals,
@@ -22,26 +24,35 @@ const tickets = [
 const dates = [{ id: 10, date: '2026-10-17', start_time: '20:00:00', venue: { name: 'Teatro Caupolicán' } }]
 
 describe('computeTotals', () => {
-  it('cargo por servicio de 10%: 15.000 → 1.500 y total 16.500', () => {
+  it('cargo 10% + IVA 19% del cargo: 15.000 → 1.500 + 285 = 16.785', () => {
     expect(SERVICE_FEE_RATE).toBe(0.1)
-    expect(computeTotals([{ total: 15000, quantity: 1 }])).toEqual({ subtotal: 15000, fee: 1500, total: 16500, quantity: 1 })
+    expect(IVA_RATE).toBe(0.19)
+    expect(computeTotals([{ total: 15000, quantity: 1 }])).toEqual({ subtotal: 15000, feeNet: 1500, feeIva: 285, fee: 1785, total: 16785, quantity: 1 })
   })
 
-  it('redondea el cargo a pesos enteros (CLP no tiene decimales)', () => {
-    expect(computeTotals([{ total: 9995, quantity: 1 }]).fee).toBe(1000)
-    expect(computeTotals([{ total: 9994, quantity: 1 }]).fee).toBe(999)
+  it('ejemplo de /precios: $8.000 → cargo $800 + IVA $152 = $8.952', () => {
+    expect(computeTotals([{ total: 8000, quantity: 1 }])).toMatchObject({ feeNet: 800, feeIva: 152, total: 8952 })
+  })
+
+  it('redondea cargo e IVA a pesos enteros (CLP no tiene decimales)', () => {
+    expect(computeTotals([{ total: 9995, quantity: 1 }])).toMatchObject({ feeNet: 1000, feeIva: 190, total: 11185 })
+    expect(computeTotals([{ total: 9994, quantity: 1 }])).toMatchObject({ feeNet: 999, feeIva: 190, total: 11183 })
     for (const subtotal of [1, 3333, 7777, 12345]) {
-      expect(Number.isInteger(computeTotals([{ total: subtotal, quantity: 1 }]).fee)).toBe(true)
+      const t = computeTotals([{ total: subtotal, quantity: 1 }])
+      expect(Number.isInteger(t.feeNet)).toBe(true)
+      expect(Number.isInteger(t.feeIva)).toBe(true)
+      expect(t.total).toBe(subtotal + t.feeNet + t.feeIva)
+      expect(t.fee).toBe(t.feeNet + t.feeIva)
     }
   })
 
-  it('una orden gratis no tiene cargo', () => {
-    expect(computeTotals([{ total: 0, quantity: 3 }])).toEqual({ subtotal: 0, fee: 0, total: 0, quantity: 3 })
-    expect(computeTotals([])).toEqual({ subtotal: 0, fee: 0, total: 0, quantity: 0 })
+  it('una orden gratis no tiene cargo ni IVA', () => {
+    expect(computeTotals([{ total: 0, quantity: 3 }])).toEqual({ subtotal: 0, feeNet: 0, feeIva: 0, fee: 0, total: 0, quantity: 3 })
+    expect(computeTotals([])).toEqual({ subtotal: 0, feeNet: 0, feeIva: 0, fee: 0, total: 0, quantity: 0 })
   })
 
-  it('suma varias líneas', () => {
-    expect(computeTotals([{ total: 30000, quantity: 2 }, { total: 25000, quantity: 1 }])).toEqual({ subtotal: 55000, fee: 5500, total: 60500, quantity: 3 })
+  it('suma varias líneas (el cargo se calcula sobre el subtotal de la compra)', () => {
+    expect(computeTotals([{ total: 30000, quantity: 2 }, { total: 25000, quantity: 1 }])).toEqual({ subtotal: 55000, feeNet: 5500, feeIva: 1045, fee: 6545, total: 61545, quantity: 3 })
   })
 })
 
@@ -55,7 +66,7 @@ describe('buildSelectedLines', () => {
 
   it('el total mostrado es el mismo que calcularía el servidor', () => {
     const totals = computeTotals(buildSelectedLines({ 1: 2, 2: 1 }, tickets, dates))
-    expect(totals).toEqual({ subtotal: 55000, fee: 5500, total: 60500, quantity: 3 })
+    expect(totals).toEqual({ subtotal: 55000, feeNet: 5500, feeIva: 1045, fee: 6545, total: 61545, quantity: 3 })
   })
 })
 

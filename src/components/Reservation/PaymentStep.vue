@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { trackPurchase } from "../../composables/useGoogleAnalytics.js";
-import { buildSelectedLines, computeTotals, formatCLP, readAttribution } from "./pricing.js";
+import { SERVICE_FEE_LABEL, SERVICE_FEE_TAX_LABEL, buildSelectedLines, computeTotals, formatCLP, readAttribution } from "./pricing.js";
 import { LEGAL } from "../../lib/legal";
 
 const props = defineProps({
@@ -238,8 +238,12 @@ const handlePayment = async () => {
           <span>{{ totals.subtotal > 0 ? formatCLP(totals.subtotal) : "Gratis" }}</span>
         </div>
         <div v-if="totals.subtotal > 0" class="flex justify-between">
-          <span>{{ LEGAL.serviceFeeLabel }} (10%)</span>
-          <span>{{ formatCLP(totals.fee) }}</span>
+          <span>{{ SERVICE_FEE_LABEL }}</span>
+          <span>{{ formatCLP(totals.feeNet) }}</span>
+        </div>
+        <div v-if="totals.feeIva > 0" class="flex justify-between">
+          <span>{{ SERVICE_FEE_TAX_LABEL }}</span>
+          <span>{{ formatCLP(totals.feeIva) }}</span>
         </div>
       </div>
       <div class="flex justify-between border-t mt-3 pt-3 text-lg font-bold">
