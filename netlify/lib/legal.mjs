@@ -106,7 +106,8 @@ export const LEGAL = Object.freeze({
   /** Aviso de exclusión del derecho de retracto (Ley 19.496 art. 3 bis letra b), para mostrar en el checkout. */
   retractoNotice:
     'Las entradas para eventos en fecha determinada no tienen derecho de retracto (Ley 19.496, art. 3 bis letra b). ' +
-    'Si el evento se cancela o reprograma, el organizador reembolsa el valor de la entrada según su política y la ley. ' +
+    'Una vez completada la compra no hay cambios ni devoluciones, tampoco por errores al comprar. ' +
+    'Si el evento se cancela o reprograma, el valor de la entrada se devuelve previa autorización del organizador, en hasta 20 días hábiles. ' +
     'El cargo por servicio no es reembolsable, sin perjuicio de los derechos irrenunciables que te otorga la ley.',
   /** Documento que acompaña cada compra. Nunca "boleta". */
   receiptLabel: 'Comprobante de compra',
