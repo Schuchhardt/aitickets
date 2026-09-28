@@ -26,7 +26,7 @@ import {
 // sin los <link rel="preload" as="image"> que agrega React 19. El texto plano usa toPlainText de React Email.
 import { renderToStaticMarkup } from 'react-dom/server.edge'
 import { toPlainText } from '@react-email/render'
-import { LEGAL, legalLine } from '../legal.mjs'
+import { LEGAL } from '../legal.mjs'
 
 export const h = React.createElement
 
@@ -270,32 +270,22 @@ export function Divider() {
 // ---------- Pie legal ----------
 
 /**
- * Pie legal (misma información que legalFooterHtml de mailer.mjs): motivo del envío, baja opcional,
- * contacto de soporte, identificación de Chanium LLC y enlaces a términos y privacidad.
+ * Pie mínimo: "AI Tickets · Chanium LLC". Solo agrega el enlace de baja cuando el correo lo requiere
+ * (unsubscribeUrl); `reason` se acepta por compatibilidad pero ya no se muestra.
  */
-export function LegalFooter({ reason, unsubscribeUrl }) {
-  const base = siteUrl()
+export function LegalFooter({ unsubscribeUrl } = {}) {
   const unsub = unsubscribeUrl ? safeHref(unsubscribeUrl) : ''
-  const line = { fontFamily: FONT_FAMILY, fontSize: '12px', lineHeight: '18px', color: COLORS.muted, textAlign: 'center', margin: '0 0 6px' }
+  const line = { fontFamily: FONT_FAMILY, fontSize: '11px', lineHeight: '16px', color: COLORS.muted, textAlign: 'center', margin: 0 }
   const link = { color: COLORS.muted, textDecoration: 'underline' }
   return h(
     Section,
-    { style: { padding: '20px 24px 0' } },
-    reason ? h(Text, { style: line }, str(reason)) : null,
-    unsub ? h(Text, { style: line }, h(Link, { href: unsub, style: link }, 'Darme de baja de estos correos')) : null,
+    { style: { padding: '16px 24px 0' } },
     h(
       Text,
       { style: line },
-      '¿Dudas? Escríbenos a ',
-      h(Link, { href: `mailto:${LEGAL.supportEmail}`, style: link }, LEGAL.supportEmail)
-    ),
-    h(Text, { style: line }, legalLine()),
-    h(
-      Text,
-      { style: { ...line, margin: 0 } },
-      h(Link, { href: `${base}/terms`, style: link }, 'Términos'),
-      ' · ',
-      h(Link, { href: `${base}/privacy`, style: link }, 'Privacidad')
+      `${LEGAL.brand} · ${LEGAL.entity}`,
+      unsub ? ' · ' : null,
+      unsub ? h(Link, { href: unsub, style: link }, 'Darme de baja') : null
     )
   )
 }

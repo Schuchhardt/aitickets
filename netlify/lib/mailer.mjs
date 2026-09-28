@@ -1,6 +1,6 @@
 // Correo transaccional por Resend (entradas, avisos, verificación, respuestas a quien nos escribió),
 // compartido por las funciones y las rutas de Astro. El correo comercial en frío NUNCA sale por aquí.
-import { LEGAL, legalLine } from './legal.mjs'
+import { LEGAL } from './legal.mjs'
 
 const env = (name) => globalThis.process?.env?.[name]
 // Dominio verificado en Resend (región sa-east-1)
@@ -46,37 +46,19 @@ function safeHttpUrl(url) {
  * y, si corresponde, el motivo del envío y un enlace para darse de baja.
  * @param {{ reason?: string, unsubscribeUrl?: string }} [opts]
  */
-export function legalFooterHtml({ reason, unsubscribeUrl } = {}) {
+export function legalFooterHtml({ unsubscribeUrl } = {}) {
   const unsub = unsubscribeUrl ? safeHttpUrl(unsubscribeUrl) : ''
-  const linkStyle = 'color:#6b7280;text-decoration:underline'
-  const parts = []
-  if (reason) parts.push(`<p style="margin:0 0 6px 0">${esc(reason)}</p>`)
-  if (unsub) {
-    parts.push(`<p style="margin:0 0 6px 0"><a href="${esc(unsub)}" style="${linkStyle}">Darme de baja de estos correos</a></p>`)
-  }
-  parts.push(
-    `<p style="margin:0 0 6px 0">¿Dudas? Escríbenos a <a href="mailto:${esc(LEGAL.supportEmail)}" style="${linkStyle}">${esc(LEGAL.supportEmail)}</a></p>`
-  )
-  parts.push(`<p style="margin:0 0 6px 0">${esc(legalLine())}</p>`)
-  parts.push(
-    `<p style="margin:0"><a href="${SITE_URL}/terms" style="${linkStyle}">Términos</a> · <a href="${SITE_URL}/privacy" style="${linkStyle}">Privacidad</a></p>`
-  )
-  return `<div style="margin-top:24px;padding-top:16px;border-top:1px solid #e5e7eb;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:#6b7280;text-align:center">${parts.join('')}</div>`
+  const link = unsub ? ` · <a href="${esc(unsub)}" style="color:#9ca3af;text-decoration:underline">Darme de baja</a>` : ''
+  return `<div style="margin-top:20px;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:16px;color:#9ca3af;text-align:center">${esc(LEGAL.brand)} · ${esc(LEGAL.entity)}${link}</div>`
 }
 
 /**
- * Versión en texto plano del pie legal.
- * @param {{ reason?: string, unsubscribeUrl?: string }} [opts]
+ * Versión en texto plano del pie mínimo.
+ * @param {{ unsubscribeUrl?: string }} [opts]
  */
-export function legalFooterText({ reason, unsubscribeUrl } = {}) {
+export function legalFooterText({ unsubscribeUrl } = {}) {
   const unsub = unsubscribeUrl ? safeHttpUrl(unsubscribeUrl) : ''
-  const lines = ['--']
-  if (reason) lines.push(String(reason))
-  if (unsub) lines.push(`Darme de baja: ${unsub}`)
-  lines.push(`¿Dudas? Escríbenos a ${LEGAL.supportEmail}`)
-  lines.push(legalLine())
-  lines.push(`Términos: ${SITE_URL}/terms · Privacidad: ${SITE_URL}/privacy`)
-  return lines.join('\n')
+  return ['--', `${LEGAL.brand} · ${LEGAL.entity}`, unsub ? `Darme de baja: ${unsub}` : ''].filter(Boolean).join('\n')
 }
 
 function stripHtml(html) {
