@@ -4,50 +4,14 @@
 // Envía en lotes de 50 con recipient-variables (sendEmail manda un correo individual a cada destinatario vía el batch de Resend),
 // con el pie legal, registra notification_log y avisa por Slack si algo falla.
 import { getSupabaseAdmin, hasValidInternalSecret, json, escapeHtml, fetchAllRows } from '../../lib/supabase.mjs'
-import { sendEmail, legalFooterHtml, SITE_URL, formatRecipient, isValidEmail } from '../../lib/mailer.mjs'
+import { sendEmail, SITE_URL, formatRecipient, isValidEmail } from '../../lib/mailer.mjs'
+import { renderEventNotificationEmail, CHANGE_TYPES } from '../../lib/emails/index.mjs'
 import { notifySlack } from '../../lib/slack.mjs'
 
-const CHANGE_TYPES = {
-  date_change: 'Cambio de fecha',
-  venue_change: 'Cambio de lugar',
-  cancellation: 'Cancelación',
-  general_update: 'Actualización',
-}
 const BATCH_SIZE = 50
 
-function buildNotificationHtml(eventName, changeType, changeDescription, eventUrl) {
-  const label = CHANGE_TYPES[changeType] || 'Actualización'
-  const accentColor = changeType === 'cancellation' ? '#dc2626' : '#2563eb'
-  const descriptionHtml = escapeHtml(changeDescription).replace(/\r?\n/g, '<br>')
-
-  return `<!DOCTYPE html>
-<html lang="es">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
-<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f9fafb;">
-  <div style="max-width:600px;margin:0 auto;padding:40px 16px;">
-    <div style="background:white;border-radius:12px;padding:32px 24px;border:1px solid #e5e7eb;">
-      <div style="text-align:center;margin-bottom:24px;">
-        <span style="display:inline-block;padding:4px 12px;background:${accentColor}15;color:${accentColor};border-radius:20px;font-size:13px;font-weight:600;">${escapeHtml(label)}</span>
-      </div>
-      <h1 style="font-size:22px;color:#111;text-align:center;margin:0 0 8px;">${escapeHtml(eventName)}</h1>
-      <p style="color:#6b7280;text-align:center;margin:0 0 24px;font-size:15px;">Hay novedades sobre tu evento</p>
-      <div style="background:#f3f4f6;border-radius:8px;padding:16px;margin-bottom:24px;">
-        <p style="margin:0;color:#374151;font-size:15px;">${descriptionHtml}</p>
-      </div>
-      <div style="text-align:center;">
-        <a href="${escapeHtml(eventUrl)}" style="display:inline-block;padding:12px 24px;background:#111;color:white;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Ver evento actualizado</a>
-      </div>
-      ${legalFooterHtml({ reason: 'Recibiste este correo porque tienes entradas para este evento.' })}
-    </div>
-  </div>
-</body>
-</html>`
-}
-
 async function sendNotificationEmails(attendees, eventName, changeType, changeDescription, eventUrl) {
-  const safeName = String(eventName || '').replace(/[\r\n]/g, ' ')
-  const subject = changeType === 'cancellation' ? `⚠️ Aviso importante sobre ${safeName}` : `📢 Actualización: ${safeName}`
-  const html = buildNotificationHtml(eventName, changeType, changeDescription, eventUrl)
+  const { subject, html, text } = await renderEventNotificationEmail({ eventName, changeType, changeDescription, eventUrl })
   const results = []
 
   for (let i = 0; i < attendees.length; i += BATCH_SIZE) {
@@ -58,7 +22,7 @@ async function sendNotificationEmails(attendees, eventName, changeType, changeDe
       return formatRecipient(`${a.first_name || ''} ${a.last_name || ''}`, a.email)
     })
     try {
-      const data = await sendEmail({ to, subject, html, recipientVariables, tags: ['event-notification', changeType] })
+      const data = await sendEmail({ to, subject, html, text, recipientVariables, tags: ['event-notification', changeType] })
       results.push({ batch: i, success: true, id: data.id, attendees: batch })
     } catch (error) {
       console.error(`Error enviando lote ${i}:`, error?.message)

@@ -2,6 +2,8 @@
 import DashboardSidebar from "../components/dashboard/DashboardSidebar.vue";
 import "../styles/global.css";
 import { getSessionContext, type SessionContext } from "../lib/supabaseServer";
+import SetPasswordModal from "../components/auth/SetPasswordModal.vue";
+import { PW_RESET_COOKIE, verifyPwResetCookie } from "../lib/magic-link";
 
 const { title = "Dashboard" } = Astro.props;
 
@@ -19,6 +21,14 @@ const userData = session
       role: session.dbUser.role || null,
     }
   : null;
+
+// Después de un enlace de acceso (recuperar / cambiar contraseña): modal para crear la contraseña nueva
+const showSetPassword = !!session && Astro.url.searchParams.get("set_password") === "1";
+const canSetPassword =
+  showSetPassword && verifyPwResetCookie(Astro.cookies.get(PW_RESET_COOKIE)?.value, session!.authUser.id);
+
+// Recién verificó su correo (verificar.astro redirige con ?bienvenida=1 ya con sesión iniciada)
+const showWelcome = !!session && Astro.url.searchParams.get("bienvenida") === "1";
 ---
 
 <!doctype html>
@@ -46,9 +56,32 @@ const userData = session
       <!-- Main Content -->
       <main class="flex-1 overflow-y-auto p-8 relative">
         <div class="max-w-7xl mx-auto">
+          {
+            showWelcome && (
+              <div
+                id="welcome-banner"
+                role="status"
+                class="mb-6 flex items-start gap-3 rounded-xl border border-lime-300 bg-lime-50 px-4 py-3 text-sm text-gray-900"
+              >
+                <div class="flex-1">
+                  <p class="font-semibold">¡Correo confirmado! Bienvenido/a a AI Tickets.</p>
+                  <p class="text-gray-700">Ya iniciaste sesión. Crea tu primer evento cuando quieras.</p>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Cerrar"
+                  class="text-gray-500 hover:text-gray-900"
+                  onclick="document.getElementById('welcome-banner')?.remove()"
+                >
+                  ✕
+                </button>
+              </div>
+            )
+          }
           <slot />
         </div>
       </main>
     </div>
+    {showSetPassword && <SetPasswordModal client:only="vue" canSet={canSetPassword} />}
   </body>
 </html>

@@ -1,0 +1,195 @@
+---
+// /auth/link?t=<token> — enlace de acceso directo del correo (recuperar / cambiar contraseña).
+// GET NO consume nada: valida la firma y muestra el botón "Continuar" (los escáneres de enlaces de
+// correo abren los enlaces solos). POST (formulario del mismo sitio con el token oculto) consume el token
+// (uso único), inicia la sesión sin contraseña, deja la cookie aitickets_pw_reset (15 min) y redirige a
+// /dashboard?set_password=1, donde se abre el modal para crear la nueva contraseña.
+import Layout from "../../layouts/Layout.astro";
+import AppHeader from "../../components/AppHeader.vue";
+import AppFooter from "../../components/AppFooter.vue";
+import GradientBackground from "../../components/Hero/GradientBackground.vue";
+import { getSupabaseAdmin } from "../../lib/auth-helpers";
+import { emailHash, getOrgVerification, markOrgVerified } from "../../lib/email-verification";
+import {
+  PW_RESET_COOKIE,
+  PW_RESET_COOKIE_OPTIONS,
+  consumeAuthLinkToken,
+  createPasswordlessSession,
+  dbJtiStore,
+  getUsersRow,
+  isAiticketsIdentity,
+  isSameSitePost,
+  signPwResetCookie,
+  verifyAuthLinkToken,
+  type AuthLinkPurpose,
+} from "../../lib/magic-link";
+import { setSessionCookies } from "../../lib/supabaseServer";
+import "../../styles/global.css";
+
+export const prerender = false;
+
+type State = "confirm" | "invalid" | "expired" | "used" | "not_found" | "server" | "missing";
+
+let state: State = "missing";
+let purpose: AuthLinkPurpose = "recovery";
+let pendingToken = "";
+
+Astro.response.headers.set("Cache-Control", "private, no-store");
+Astro.response.headers.set("Referrer-Policy", "no-referrer");
+
+if (Astro.request.method === "POST") {
+  let token = "";
+  try {
+    const form = await Astro.request.formData();
+    token = String(form.get("t") || "");
+  } catch {
+    token = "";
+  }
+
+  if (!token || !isSameSitePost(Astro.request, Astro.url)) {
+    state = "invalid";
+  } else {
+    let consumed: Awaited<ReturnType<typeof consumeAuthLinkToken>>;
+    try {
+      consumed = await consumeAuthLinkToken(token, dbJtiStore());
+    } catch (err: any) {
+      console.error("auth/link:", err?.message || err);
+      consumed = { ok: false, error: "server" };
+    }
+
+    if (!consumed.ok) {
+      state = consumed.error;
+    } else {
+      purpose = consumed.purpose;
+      const admin = getSupabaseAdmin();
+      const { data: authData } = await admin.auth.admin.getUserById(consumed.uid);
+      const authUser = authData?.user;
+      const profile = authUser ? await getUsersRow(authUser.id) : null;
+
+      if (!authUser?.email || !profile || profile.active === false || !isAiticketsIdentity(authUser, !!profile)) {
+        state = "not_found";
+      } else if (emailHash(authUser.email) !== consumed.eh) {
+        // El correo de la cuenta cambió después de enviar el enlace
+        state = "invalid";
+      } else {
+        // Abrir el enlace prueba que controla el correo: si la organización seguía sin verificar, se verifica
+        // (si no, el panel lo rechazaría y quedaría sin poder entrar).
+        if (profile.organization_id) {
+          try {
+            const orgId = Number(profile.organization_id);
+            const { verified } = await getOrgVerification(orgId);
+            if (verified === false) {
+              if (!authUser.email_confirmed_at) {
+                await admin.auth.admin.updateUserById(authUser.id, { email_confirm: true });
+              }
+              await markOrgVerified(orgId, authUser.email);
+            }
+          } catch (err: any) {
+            console.warn("auth/link: no se pudo verificar la organización", err?.message || err);
+          }
+        }
+
+        const session = await createPasswordlessSession(authUser.email);
+        if (!session) {
+          state = "server";
+        } else {
+          setSessionCookies(Astro, session.accessToken, session.refreshToken);
+          if (purpose === "login") return Astro.redirect("/dashboard", 303);
+          Astro.cookies.set(PW_RESET_COOKIE, signPwResetCookie(authUser.id), PW_RESET_COOKIE_OPTIONS);
+          return Astro.redirect("/dashboard?set_password=1", 303);
+        }
+      }
+    }
+  }
+} else if (Astro.url.searchParams.get("t")) {
+  const token = Astro.url.searchParams.get("t") || "";
+  const check = verifyAuthLinkToken(token);
+  if (check.ok) {
+    state = "confirm";
+    purpose = check.purpose;
+    pendingToken = token;
+  } else {
+    state = check.error;
+  }
+}
+
+const confirmCopy: Record<AuthLinkPurpose, { title: string; message: string }> = {
+  recovery: {
+    title: "Ingresa a tu cuenta",
+    message: "Presiona Continuar para entrar a tu panel. Luego podrás crear una nueva contraseña.",
+  },
+  "change-password": {
+    title: "Cambia tu contraseña",
+    message: "Presiona Continuar para entrar a tu panel y crear tu nueva contraseña.",
+  },
+  login: {
+    title: "Ingresa a tu cuenta",
+    message: "Presiona Continuar para entrar a tu panel de AI Tickets.",
+  },
+};
+const titles: Record<State, string> = {
+  confirm: confirmCopy[purpose].title,
+  invalid: "El enlace no es válido",
+  expired: "El enlace venció",
+  used: "Este enlace ya se usó",
+  not_found: "No encontramos la cuenta",
+  server: "No pudimos iniciar tu sesión",
+  missing: "Enlace incompleto",
+};
+const messages: Record<State, string> = {
+  confirm: confirmCopy[purpose].message,
+  invalid: "Puede que el enlace esté incompleto o que lo hayas copiado mal. Pide uno nuevo.",
+  expired: "Por seguridad, los enlaces de acceso duran 60 minutos. Pide uno nuevo.",
+  used: "Cada enlace sirve una sola vez. Si necesitas entrar de nuevo, pide otro enlace.",
+  not_found: "La cuenta asociada a este enlace no existe o está desactivada. Si crees que es un error, escríbenos.",
+  server: "Ocurrió un problema al iniciar tu sesión. Pide un nuevo enlace e intenta otra vez en unos minutos.",
+  missing: "Abre el enlace completo que te enviamos por correo o pide uno nuevo.",
+};
+---
+
+<Layout title="Ingresar | AI Tickets" description="Acceso directo a tu cuenta de productor en AI Tickets." noindex={true} analytics={false}>
+  <!-- El token ya va en el campo oculto del formulario: se quita de la URL (historial, capturas, extensiones). -->
+  <script is:inline>
+    try { if (/[?&]t=/.test(location.search)) history.replaceState(null, "", location.pathname); } catch (e) {}
+  </script>
+  <AppHeader client:idle />
+
+  <main class="relative min-h-screen flex items-center justify-center py-20 px-4 overflow-hidden">
+    <GradientBackground variant="soft" client:idle />
+    <div class="relative z-10 w-full">
+      <div
+        class="w-full max-w-md mx-auto bg-white/10 backdrop-blur-xl p-8 rounded-xl shadow-2xl border border-white/20 text-center font-[Prompt]"
+        data-testid="auth-link-result"
+        data-state={state}
+      >
+        <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-white/10 text-white/80">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+          </svg>
+        </div>
+        <h1 class="text-2xl font-bold mb-3 font-[Unbounded] text-white">{titles[state]}</h1>
+        <p class="text-white/70 mb-6">{messages[state]}</p>
+
+        {state === "confirm" ? (
+          <form method="post" action="/auth/link" data-testid="auth-link-confirm-form">
+            <input type="hidden" name="t" value={pendingToken} />
+            <button type="submit" class="block w-full bg-white text-gray-900 font-medium py-3 rounded-lg hover:bg-white/90 transition">
+              Continuar
+            </button>
+          </form>
+        ) : (
+          <>
+            <a href="/organizadores/recuperar" class="block w-full bg-white text-gray-900 font-medium py-3 rounded-lg hover:bg-white/90 transition">
+              Pedir un nuevo enlace
+            </a>
+            <p class="mt-6 text-sm text-white/60">
+              ¿Recuerdas tu contraseña? <a href="/organizadores/login" class="font-medium text-white hover:underline">Inicia sesión</a>
+            </p>
+          </>
+        )}
+      </div>
+    </div>
+  </main>
+
+  <AppFooter client:idle />
+</Layout>

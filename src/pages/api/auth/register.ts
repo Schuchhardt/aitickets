@@ -224,7 +224,7 @@ export const POST: APIRoute = async (context) => {
         // 6. Correo de verificación. Si falla, la cuenta queda creada y se puede reenviar desde el login.
         let emailSent = false;
         try {
-            await sendVerificationEmail({ uid: userId, email, name });
+            await sendVerificationEmail({ uid: userId, email, name, orgName: organizationName });
             emailSent = true;
         } catch (err: any) {
             console.error("No se pudo enviar el correo de verificación:", err?.message || err);

@@ -1,0 +1,39 @@
+---
+// /organizadores/recuperar — "¿Olvidaste tu contraseña?": pide el correo y envía un enlace de acceso
+// directo (60 min, uso único). Al abrirlo, el productor entra al panel y crea su nueva contraseña.
+import Layout from "../../layouts/Layout.astro";
+import AppHeader from "../../components/AppHeader.vue";
+import AppFooter from "../../components/AppFooter.vue";
+import ProducerRecoverForm from "../../components/auth/ProducerRecoverForm.vue";
+import GradientBackground from "../../components/Hero/GradientBackground.vue";
+import "../../styles/global.css";
+
+export const prerender = false;
+
+// Turnstile solo si está configurado (mismo criterio que el servidor)
+const env = (name: string): string =>
+  String((typeof process !== "undefined" ? process.env?.[name] : undefined) ?? (import.meta.env as Record<string, string | undefined>)[name] ?? "");
+const turnstileSiteKey = env("TURNSTILE_SECRET_KEY") ? env("TURNSTILE_SITE_KEY") : "";
+Astro.response.headers.set("Cache-Control", "private, no-store");
+// ?email= (prellenado desde el login) no debe filtrarse por Referer a Turnstile
+Astro.response.headers.set("Referrer-Policy", "no-referrer");
+---
+
+<Layout
+  title="Recuperar acceso | AI Tickets para productores"
+  description="Recibe un enlace para ingresar a tu panel de AI Tickets y crear una nueva contraseña."
+  noindex={true}
+  analytics={false}
+>
+  {turnstileSiteKey && <script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>}
+  <AppHeader client:idle />
+
+  <main class="relative min-h-screen flex items-center justify-center py-20 px-4 overflow-hidden">
+    <GradientBackground variant="soft" client:idle />
+    <div class="relative z-10 w-full">
+      <ProducerRecoverForm client:load turnstileSiteKey={turnstileSiteKey} />
+    </div>
+  </main>
+
+  <AppFooter client:idle />
+</Layout>

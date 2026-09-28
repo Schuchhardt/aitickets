@@ -11,7 +11,8 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { getSupabaseAdmin } from "./auth-helpers";
 import { mainOrigin, invalidateSiteCache } from "./sites";
-import { sendEmail, legalFooterHtml, isValidEmail } from "../../netlify/lib/mailer.mjs";
+import { sendEmail, isValidEmail } from "../../netlify/lib/mailer.mjs";
+import { renderContactEmailConfirmEmail } from "../../netlify/lib/emails/index.mjs";
 
 const PURPOSE = "site_contact_email";
 export const CONTACT_EMAIL_CONFIRM_TTL_SECONDS = 48 * 3600;
@@ -71,14 +72,6 @@ export function verifyContactEmailToken(token: string, now = Date.now()): Contac
   }
 }
 
-const escapeHtml = (v: unknown) =>
-  String(v ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-
 /**
  * Envía el enlace de confirmación a `email`. Devuelve { ok:false, reason:'throttled' } si se pidió
  * hace menos de un minuto para el mismo sitio. Lanza si Resend falla.
@@ -97,19 +90,13 @@ export async function sendContactEmailConfirmation(opts: {
   const link = `${mainOrigin()}/api/sites/contact-email-confirm?t=${encodeURIComponent(
     signContactEmailToken(opts.siteId, opts.orgId, opts.email, now)
   )}`;
-  const html = `<!doctype html><html lang="es-CL"><body style="margin:0;background:#f9fafb;padding:24px 12px;font-family:Arial,Helvetica,sans-serif;color:#111827">
-<div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:12px;padding:28px 24px;border:1px solid #e5e7eb">
-<h1 style="font-size:20px;margin:0 0 12px 0">Confirma el correo de contacto de tu sitio</h1>
-<p style="font-size:15px;line-height:1.6;margin:0 0 20px 0">${escapeHtml(opts.orgName)} quiere recibir en esta dirección los mensajes del formulario de contacto de su sitio web en AI Tickets. Si fuiste tú, confírmalo:</p>
-<p style="text-align:center;margin:0 0 20px 0"><a href="${escapeHtml(link)}" style="display:inline-block;padding:12px 24px;background:#111827;color:#ffffff;border-radius:8px;text-decoration:none;font-weight:bold;font-size:15px">Confirmar este correo</a></p>
-<p style="font-size:13px;line-height:1.6;color:#6b7280;margin:0 0 8px 0">El enlace vence en 48 horas. Si no lo pediste, ignora este correo: no recibirás mensajes.</p>
-${legalFooterHtml({ reason: "Recibes este correo porque alguien escribió esta dirección como correo de contacto de un sitio en AI Tickets." })}
-</div></body></html>`;
   try {
+    const email = await renderContactEmailConfirmEmail({ orgName: opts.orgName, url: link });
     await sendEmail({
       to: opts.email,
-      subject: "Confirma el correo de contacto de tu sitio en AI Tickets",
-      html,
+      subject: email.subject,
+      html: email.html,
+      text: email.text,
       tags: ["site-contact-email-confirm"],
     });
   } catch (err) {
