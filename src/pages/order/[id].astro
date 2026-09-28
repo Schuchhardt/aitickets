@@ -34,7 +34,7 @@ let pendingMessage: string | null = null;
 const formatVenue = (loc: any) => {
   if (!loc) return "";
   const venue = loc.venues || {};
-  return [loc.display_name || loc.name || venue.name, loc.address_line1_override || venue.address_line1, loc.city_override || venue.city]
+  return [loc.display_name || venue.name || (loc.name && loc.name !== "Main" ? loc.name : null), loc.address_line1_override || venue.address_line1, loc.city_override || venue.city]
     .filter(Boolean)
     .filter((v: string, i: number, arr: string[]) => arr.indexOf(v) === i)
     .join(", ");

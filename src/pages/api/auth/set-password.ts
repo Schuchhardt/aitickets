@@ -20,7 +20,7 @@ export const POST: APIRoute = async (context) => {
     if (!verifyPwResetCookie(cookie, authUser.id)) {
         return jsonResponse({
             code: "link_required",
-            message: "Para cambiar tu contraseña abre el enlace que te enviamos por correo (dura 60 minutos). Puedes pedir uno nuevo desde Mi Perfil.",
+            message: "Se venció el tiempo para cambiar la contraseña (30 minutos desde que abriste el enlace). Pide un enlace nuevo.",
         }, 403);
     }
 

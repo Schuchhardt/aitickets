@@ -98,18 +98,19 @@ async function expirePending(supabase, started, counters) {
       const canExpire = await settleStripeOrder(supabase, order, counters)
       if (!canExpire) continue
     }
-    const { data: updated, error: updateError } = await supabase
+    // PostgREST 12.2 falla (42703) si un UPDATE con filtro or()/and() pide la fila de vuelta
+    // (return=representation): se usa count exacto y, si hace falta, una lectura aparte.
+    const { count: updatedCount, error: updateError } = await supabase
       .from('event_orders')
-      .update({ status: 'expired' })
+      .update({ status: 'expired' }, { count: 'exact' })
       .eq('id', order.id)
       .eq('status', 'pending')
       .or(expiredFilter())
-      .select('id')
     if (updateError) {
       console.error(`expire-pending-orders: no se pudo expirar ${order.id}:`, updateError.message)
       continue
     }
-    if (updated?.length) counters.expired++
+    if (updatedCount) counters.expired++
   }
   return {}
 }

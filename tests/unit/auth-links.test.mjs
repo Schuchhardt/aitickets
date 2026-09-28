@@ -153,7 +153,7 @@ describe('consumeAuthLinkToken (uso único)', () => {
 })
 
 describe('cookie aitickets_pw_reset', () => {
-  it('vale 15 minutos y solo para el mismo uid', () => {
+  it('vale 30 minutos y solo para el mismo uid', () => {
     const cookie = signPwResetCookie(UID, { now: NOW, key: KEY })
     expect(verifyPwResetCookie(cookie, UID, { now: NOW, key: KEY })).toBe(true)
     expect(verifyPwResetCookie(cookie, UID, { now: NOW + (PW_RESET_TTL_SECONDS - 1) * 1000, key: KEY })).toBe(true)

@@ -19,6 +19,24 @@ const show = ref(false)
 const loading = ref(false)
 const errorMsg = ref('')
 const toast = ref('')
+// Si el plazo vence con el modal abierto, se pasa a la vista de "pedir un nuevo enlace"
+const linkExpired = ref(!props.canSet)
+const resendState = ref('idle') // idle | sending | sent | error
+
+const requestNewLink = async () => {
+  if (resendState.value === 'sending') return
+  resendState.value = 'sending'
+  try {
+    const res = await fetch('/api/auth/magic-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ purpose: 'change-password' }),
+    })
+    resendState.value = res.ok ? 'sent' : 'error'
+  } catch {
+    resendState.value = 'error'
+  }
+}
 const inputRef = ref(null)
 
 const tooShort = computed(() => password.value.length > 0 && password.value.length < MIN)
@@ -69,6 +87,10 @@ async function submit() {
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
+      if (data.code === 'link_required') {
+        linkExpired.value = true
+        return
+      }
       errorMsg.value = data.message || 'No pudimos guardar tu contraseña. Intenta de nuevo.'
       return
     }
@@ -112,7 +134,7 @@ async function submit() {
           <KeyRound :size="22" />
         </div>
 
-        <template v-if="canSet">
+        <template v-if="!linkExpired">
           <h2 id="set-password-title" class="text-xl font-bold font-[Unbounded] mb-1">Crea tu nueva contraseña</h2>
           <p class="text-sm text-gray-500 mb-5">Ya ingresaste a tu cuenta. Elige una contraseña nueva para tus próximos ingresos.</p>
 
@@ -184,16 +206,18 @@ async function submit() {
                 {{ loading ? 'Guardando...' : 'Guardar contraseña' }}
               </button>
             </div>
-            <p class="text-xs text-gray-400">Por seguridad, este paso está disponible durante 15 minutos después de abrir el enlace.</p>
+            <p class="text-xs text-gray-400">Por seguridad, este paso está disponible durante 30 minutos después de abrir el enlace.</p>
           </form>
         </template>
 
         <template v-else>
-          <h2 id="set-password-title" class="text-xl font-bold font-[Unbounded] mb-1">El enlace ya no sirve para cambiar la contraseña</h2>
-          <p class="text-sm text-gray-500 mb-5">Pasaron más de 15 minutos desde que lo abriste. Pide un enlace nuevo desde Mi Perfil y ábrelo desde tu correo.</p>
+          <h2 id="set-password-title" class="text-xl font-bold font-[Unbounded] mb-1">Se venció el tiempo para cambiar la contraseña</h2>
+          <p class="text-sm text-gray-500 mb-5">Por seguridad, tienes 30 minutos desde que abres el enlace. Te enviamos uno nuevo a tu correo con un clic: ábrelo y crea tu contraseña.</p>
+          <p v-if="resendState === 'sent'" class="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg p-3 mb-4" role="status">Listo, revisa tu correo: te enviamos un enlace nuevo.</p>
+          <p v-else-if="resendState === 'error'" class="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3 mb-4" role="alert">No pudimos enviar el enlace. Intenta de nuevo en unos minutos.</p>
           <div class="flex flex-col-reverse sm:flex-row gap-2">
             <button type="button" class="sm:flex-1 px-4 py-2.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium" @click="close">Cerrar</button>
-            <a href="/dashboard/profile#password" class="sm:flex-1 px-4 py-2.5 bg-black text-white rounded-lg hover:bg-gray-800 text-center font-medium">Ir a Mi Perfil</a>
+            <button type="button" class="sm:flex-1 px-4 py-2.5 bg-black text-white rounded-lg hover:bg-gray-800 text-center font-medium disabled:opacity-60" :disabled="resendState === 'sending' || resendState === 'sent'" @click="requestNewLink">{{ resendState === 'sending' ? 'Enviando…' : resendState === 'sent' ? 'Enlace enviado' : 'Enviarme un nuevo enlace' }}</button>
           </div>
         </template>
       </div>

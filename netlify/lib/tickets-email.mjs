@@ -128,15 +128,16 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
   // y caduca a los 10 minutos (si la función murió, otro intento puede reclamarlo).
   if (!force) {
     const staleBefore = new Date(Date.now() - EMAIL_CLAIM_STALE_MINUTES * 60 * 1000).toISOString()
-    const { data: claimed, error: claimError } = await supabase
+    // PostgREST 12.2 falla (42703) si un UPDATE con filtro or()/and() pide la fila de vuelta
+    // (return=representation): se usa count exacto y, si hace falta, una lectura aparte.
+    const { count: claimed, error: claimError } = await supabase
       .from('event_orders')
-      .update({ email_claimed_at: new Date().toISOString() })
+      .update({ email_claimed_at: new Date().toISOString() }, { count: 'exact' })
       .eq('id', order.id)
       .is('email_sent_at', null)
       .or(`email_claimed_at.is.null,email_claimed_at.lt.${staleBefore}`)
-      .select('id')
     if (claimError) return { ok: false, status: 'error', message: claimError.message }
-    if (!claimed?.length) {
+    if (!claimed) {
       // Otro proceso lo envió o lo está enviando ahora mismo
       return { ok: true, status: 'already_sent' }
     }

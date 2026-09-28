@@ -60,16 +60,17 @@ export default async function handler(req) {
     }
 
     const validatedAt = resolveValidatedAt(body?.validated_at)
-    const { data: updated, error: updateError } = await supabase
+    // PostgREST 12.2 falla (42703) si un UPDATE con filtro or()/and() pide la fila de vuelta
+    // (return=representation): se usa count exacto y, si hace falta, una lectura aparte.
+    const { count: updatedCount, error: updateError } = await supabase
       .from('event_attendees')
-      .update({ status: 'validated', validated_at: validatedAt })
+      .update({ status: 'validated', validated_at: validatedAt }, { count: 'exact' })
       .eq('id', ticketId)
       .eq('event_id', eventId)
       .or('status.is.null,status.eq.active')
-      .select('id, validated_at')
     if (updateError) throw new Error(updateError.message)
 
-    if (!updated?.length) {
+    if (!updatedCount) {
       // Otro dispositivo la validó entre la lectura y el update
       const { data: current } = await supabase
         .from('event_attendees')
@@ -83,7 +84,7 @@ export default async function handler(req) {
     }
 
     const fnCheck = await getFunctionCheck(supabase, eventId, ticket.event_tickets?.event_date_id ?? null)
-    return respond({ message: 'Entrada validada exitosamente', validated_at: updated[0].validated_at, ...fnCheck }, 200)
+    return respond({ message: 'Entrada validada exitosamente', validated_at: validatedAt, ...fnCheck }, 200)
   } catch (err) {
     console.error('Error en confirm-ticket:', err?.message)
     return respond({ message: 'Error interno del servidor' }, 500)
