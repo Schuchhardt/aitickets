@@ -81,7 +81,7 @@ if (!id || !UUID_RE.test(id)) {
       event.tags = (categories || []).map((c: any) => c.category_tags?.name).filter(Boolean);
       const loc: any = eventDates?.[0]?.event_locations;
       const venue = loc?.venues || {};
-      event.address = [loc?.display_name || loc?.name || venue.name, loc?.address_line1_override || venue.address_line1, loc?.city_override || venue.city]
+      event.address = [loc?.display_name || venue.name || (loc?.name && loc.name !== "Main" ? loc.name : null), loc?.address_line1_override || venue.address_line1, loc?.city_override || venue.city]
         .filter(Boolean)
         .join(", ") || eventData.location || "";
     }

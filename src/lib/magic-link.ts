@@ -12,7 +12,7 @@
 //
 // /auth/link (GET muestra "Continuar", POST consume el token) crea la sesión SIN contraseña
 // (createPasswordlessSession: generateLink magiclink + verifyOtp en un cliente efímero) y deja la cookie
-// firmada `aitickets_pw_reset` (15 min, atada al uid) que /api/auth/set-password exige para fijar una
+// firmada `aitickets_pw_reset` (30 min, atada al uid) que /api/auth/set-password exige para fijar una
 // contraseña nueva sin pedir la actual.
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import type { User } from "@supabase/supabase-js";
@@ -22,7 +22,7 @@ import { sendEmail } from "../../netlify/lib/mailer.mjs";
 import { renderMagicLinkEmail } from "../../netlify/lib/emails/index.mjs";
 
 export const AUTH_LINK_TTL_SECONDS = 60 * 60;
-export const PW_RESET_TTL_SECONDS = 15 * 60;
+export const PW_RESET_TTL_SECONDS = 30 * 60;
 export const PW_RESET_COOKIE = "aitickets_pw_reset";
 export const AUTH_LINK_PURPOSES = ["recovery", "change-password", "login"] as const;
 export type AuthLinkPurpose = (typeof AUTH_LINK_PURPOSES)[number];
@@ -180,7 +180,7 @@ export function dbJtiStore(): JtiStore {
 }
 
 // ---------------------------------------------------------------------------
-// Cookie de "fijar contraseña" (15 min, atada al uid)
+// Cookie de "fijar contraseña" (30 min, atada al uid)
 // ---------------------------------------------------------------------------
 
 export function signPwResetCookie(uid: string, { now = Date.now(), key }: { now?: number; key?: Buffer } = {}): string {

@@ -2,7 +2,7 @@
 // /auth/link?t=<token> — enlace de acceso directo del correo (recuperar / cambiar contraseña).
 // GET NO consume nada: valida la firma y muestra el botón "Continuar" (los escáneres de enlaces de
 // correo abren los enlaces solos). POST (formulario del mismo sitio con el token oculto) consume el token
-// (uso único), inicia la sesión sin contraseña, deja la cookie aitickets_pw_reset (15 min) y redirige a
+// (uso único), inicia la sesión sin contraseña, deja la cookie aitickets_pw_reset (30 min) y redirige a
 // /dashboard?set_password=1, donde se abre el modal para crear la nueva contraseña.
 import Layout from "../../layouts/Layout.astro";
 import AppHeader from "../../components/AppHeader.vue";

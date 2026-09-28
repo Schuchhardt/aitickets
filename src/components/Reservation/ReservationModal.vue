@@ -137,6 +137,7 @@ function handleRemoteGoToNextStep() {
 </script>
 
 <template>
+  <Teleport to="body">
   <div
     id="modal-overlay"
     class="fixed inset-0 flex items-stretch md:items-center justify-center z-[55] md:p-4"
@@ -195,6 +196,7 @@ function handleRemoteGoToNextStep() {
       </div>
     </div>
   </div>
+  </Teleport>
 </template>
 
 <style>

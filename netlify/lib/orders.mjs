@@ -213,13 +213,24 @@ export async function confirmPaidOrder(supabase, orderId, payment) {
   const claimStartedAt = Date.now()
   const nowIso = new Date(claimStartedAt).toISOString()
   const staleBefore = new Date(Date.now() - PROCESSING_STALE_MINUTES * 60 * 1000).toISOString()
-  let { data: claimed, error: claimError } = await supabase
+  // PostgREST 12.2 falla (42703) si un UPDATE con filtro or()/and() pide la fila de vuelta
+  // (return=representation): se usa count exacto y, si hace falta, una lectura aparte.
+  const { count: claimedCount, error: claimError } = await supabase
     .from('event_orders')
-    .update({ status: 'processing', processing_started_at: nowIso })
+    .update({ status: 'processing', processing_started_at: nowIso }, { count: 'exact' })
     .eq('id', order.id)
     .or(`status.in.(${CLAIMABLE_STATUSES.join(',')}),and(status.eq.processing,processing_started_at.lt.${staleBefore}),and(status.eq.processing,processing_started_at.is.null)`)
-    .select(LEGACY_ORDER_COLUMNS)
   if (claimError) throw new Error(`Error reclamando orden: ${claimError.message}`)
+  let claimed = []
+  if (claimedCount) {
+    const { data: claimedRows, error: claimedReadError } = await supabase
+      .from('event_orders')
+      .select(LEGACY_ORDER_COLUMNS)
+      .eq('id', order.id)
+      .eq('processing_started_at', nowIso)
+    if (claimedReadError) throw new Error(`Error leyendo orden reclamada: ${claimedReadError.message}`)
+    claimed = claimedRows || []
+  }
   if (!claimed?.length) {
     // Otra invocación la está procesando (o ya terminó): el proveedor reintentará y caerá en el camino idempotente
     console.log(`Orden ${order.id}: ya está siendo procesada por otra invocación`)
@@ -306,14 +317,15 @@ export async function markOrderRefunded(supabase, orderId, { refundedAt = new Da
     ;({ data, error } = await supabase.from('event_orders').update({ status: 'refunded' }).eq('id', orderId).neq('status', 'refunded').select('id'))
   }
   if (error) throw new Error(`Error marcando reembolso: ${error.message}`)
-  const { data: voided, error: voidError } = await supabase
+  // PostgREST 12.2 falla (42703) si un UPDATE con filtro or()/and() pide la fila de vuelta
+  // (return=representation): se usa count exacto y, si hace falta, una lectura aparte.
+  const { count: voided, error: voidError } = await supabase
     .from('event_attendees')
-    .update({ status: 'cancelled' })
+    .update({ status: 'cancelled' }, { count: 'exact' })
     .eq('event_order_id', orderId)
     .or('status.is.null,status.neq.cancelled')
-    .select('id')
   if (voidError) throw new Error(`Error anulando entradas: ${voidError.message}`)
-  return { changed: Boolean(data?.length), voided: voided?.length || 0 }
+  return { changed: Boolean(data?.length), voided: voided || 0 }
 }
 
 /**
