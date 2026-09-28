@@ -11,9 +11,13 @@
 // - charge.dispute.created -> Slack.
 // - Modo prueba (livemode=false): un pago solo emite entradas del evento demo o de eventos marcados de prueba
 //   (STRIPE_TEST_EVENT_SLUGS); en cualquier otro evento la orden queda en 'review' + Slack (confirmPaidOrder).
+// - Cuenta de Stripe COMPARTIDA con otros negocios de Chanium: solo se procesan objetos con
+//   metadata.app === 'aitickets' (sesión / PaymentIntent; para cargos y disputas se resuelve el PaymentIntent).
+//   Los eventos ajenos o de tipos no manejados responden 200 sin registrar ni tocar nada (ver ownership.mjs).
 // Sin STRIPE_SECRET_KEY / STRIPE_WEBHOOK_SECRET responde 503 (Stripe no está configurado).
 import { getSupabaseAdmin, json } from '../../lib/supabase.mjs'
-import { verifyStripeWebhook, orderIdFromPaymentIntent } from '../../lib/payments/stripe.mjs'
+import { verifyStripeWebhook, orderIdFromPaymentIntent, getStripe } from '../../lib/payments/stripe.mjs'
+import { HANDLED_EVENT_TYPES, isAiTicketsEvent } from './ownership.mjs'
 import {
   confirmPaidOrder,
   markOrderFailed,
@@ -45,6 +49,40 @@ async function orderIdFromCharge(supabase, charge) {
   if (data?.[0]?.id) return data[0].id
   const fromPi = await orderIdFromPaymentIntent(pi)
   return UUID_RE.test(String(fromPi || '')) ? String(fromPi) : null
+}
+
+/**
+ * Metadata de un PaymentIntent para decidir si un cargo o disputa es nuestro.
+ * null si el PaymentIntent no existe; cualquier otro error se propaga (el webhook responde 500 y Stripe reintenta).
+ */
+async function paymentIntentMetadata(paymentIntentId) {
+  try {
+    const pi = await getStripe().paymentIntents.retrieve(String(paymentIntentId))
+    return pi?.metadata || null
+  } catch (err) {
+    if (err?.statusCode === 404 || err?.code === 'resource_missing') return null
+    throw err
+  }
+}
+
+/**
+ * Respaldo de ownership.mjs para objetos sin metadata.app (órdenes creadas antes de la etiqueta):
+ * true si hay una orden payment_provider='stripe' con ese provider_session_id o payment_intent_id.
+ * Lanza si la base no responde (el webhook responde 500 y Stripe reintenta).
+ */
+function legacyStripeOrderFinder(supabase) {
+  return async ({ sessionId, paymentIntentId } = {}) => {
+    const column = sessionId ? 'provider_session_id' : paymentIntentId ? 'payment_intent_id' : null
+    if (!column) return false
+    const { data, error } = await supabase
+      .from('event_orders')
+      .select('id')
+      .eq('payment_provider', 'stripe')
+      .eq(column, String(sessionId || paymentIntentId))
+      .limit(1)
+    if (error) throw new Error(`Error buscando orden de Stripe: ${error.message}`)
+    return Boolean(data?.[0]?.id)
+  }
 }
 
 /** Comisión y neto de Stripe si el PaymentIntent viene expandido con su balance_transaction (opcional). */
@@ -182,7 +220,24 @@ export default async function handler(req) {
     return json({ message: 'Modo no coincide' }, 200)
   }
 
+  // Cuenta compartida: los eventos de otros negocios de Chanium (o tipos que no manejamos) se ignoran sin registrar.
+  if (!HANDLED_EVENT_TYPES.has(event.type)) {
+    console.debug(`Stripe: evento ${event.id} (${event.type}) no manejado; ignorado`)
+    return json({ message: 'Evento ignorado' }, 200)
+  }
   const supabase = getSupabaseAdmin()
+  let ownership
+  try {
+    ownership = await isAiTicketsEvent(event, paymentIntentMetadata, legacyStripeOrderFinder(supabase))
+  } catch (err) {
+    console.error(`Stripe: no se pudo verificar a qué app pertenece el evento ${event.id}:`, err?.message)
+    return json({ message: 'Error interno' }, 500)
+  }
+  if (!ownership.ours) {
+    console.debug(`Stripe: evento ${event.id} (${event.type}) no es de AI Tickets (${ownership.reason}); ignorado`)
+    return json({ message: 'Evento de otra app' }, 200)
+  }
+
   const obj = event?.data?.object || {}
   const hintedOrder = obj.object === 'checkout.session' ? orderIdFromSession(obj) : null
   const fresh = await recordPaymentEvent(supabase, {

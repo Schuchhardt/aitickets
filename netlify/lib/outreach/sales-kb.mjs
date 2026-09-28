@@ -9,7 +9,7 @@ export const SALES_KB = Object.freeze({
   product: 'AI Tickets, plataforma de venta de entradas para productores de eventos (servicio de Chanium LLC).',
   facts: Object.freeze([
     { key: 'producer_fee', approved: true, text: 'El productor paga 0% de comisión.' },
-    { key: 'buyer_fee', approved: true, text: 'El comprador paga un cargo por servicio de 10% sobre el valor de la entrada.' },
+    { key: 'buyer_fee', approved: true, text: 'El comprador paga un cargo por servicio de 10% + IVA sobre el valor de la entrada.' },
     { key: 'payouts', approved: true, text: 'Transferimos lo recaudado al productor 48 a 72 horas después de cada función.' },
     { key: 'payments', approved: true, text: 'Los compradores pagan con Webpay y tarjetas.' },
     { key: 'free_site', approved: true, text: 'Cada productor tiene una web de eventos gratis en aitickets.cl/o/<nombre-de-tu-productora>, lista al registrarse.' },

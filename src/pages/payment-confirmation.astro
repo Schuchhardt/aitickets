@@ -9,6 +9,7 @@ import { getSupabaseAdmin } from "../lib/auth-helpers";
 import { sendTicketsEmail } from "./api/_lib/server-utils";
 import { LEGAL } from "../lib/legal";
 import { verifyFlowReturnToken } from "../../netlify/lib/payments/flow.mjs";
+import { orderFeeBreakdown } from "../../netlify/lib/fees.mjs";
 
 export const prerender = false;
 
@@ -118,17 +119,23 @@ if (typeof token === 'string' && token) {
       if (!commerceOrder) {
         paymentStatusMessage = 'No encontramos tu orden. Por favor, contacta a soporte.';
       } else {
-        const { data: orderData } = await supabase
+        const ORDER_COLS = 'id, status, event_id, amount, ticket_fee, total_payment, ticket_qty, ticket_details, created_at, email_sent_at';
+        let { data: orderData, error: orderError }: { data: any; error: any } = await supabase
           .from('event_orders')
-          .select('id, status, event_id, amount, ticket_fee, total_payment, ticket_qty, ticket_details, created_at, email_sent_at')
+          .select(`${ORDER_COLS}, service_fee_tax`)
           .eq('id', commerceOrder)
           .maybeSingle();
+        if (orderError) {
+          // Base sin la columna service_fee_tax (202609290100)
+          ({ data: orderData } = await supabase.from('event_orders').select(ORDER_COLS).eq('id', commerceOrder).maybeSingle());
+        }
 
         if (!orderData) {
           paymentStatusMessage = 'No encontramos tu orden. Por favor, contacta a soporte.';
         } else {
           order = orderData;
-          totalPaid = Number(orderData.total_payment ?? (Number(orderData.amount) + Number(orderData.ticket_fee || 0))) || 0;
+          // Total cobrado = subtotal + cargo por servicio + IVA del cargo (total_payment es lo que confirmó Flow)
+          totalPaid = Number(orderData.total_payment ?? orderFeeBreakdown(orderData).total) || 0;
 
           const { data: eventInfo } = await supabase
             .from('events')
@@ -183,6 +190,7 @@ if (typeof token === 'string' && token) {
             purchase = {
               transaction_id: orderData.id,
               value: totalPaid,
+              tax: orderFeeBreakdown(orderData).feeIva,
               currency: 'CLP',
               items: lines.map((l: any) => ({
                 item_id: `${eventData.id}-${l.id}`,

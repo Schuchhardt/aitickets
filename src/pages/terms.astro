@@ -8,11 +8,13 @@ import "../styles/global.css";
 
 // Los datos del operador vienen de LEGAL (netlify/lib/legal.mjs), que lee el entorno en build.
 const effective = formatLegalDate(LEGAL.effectiveDate);
+const feePct = Math.round(LEGAL.serviceFeeRate * 100);
+const vatPct = Math.round(LEGAL.serviceFeeVatRate * 100);
 ---
 
 <Layout
   title="Términos y condiciones para compradores | AI Tickets"
-  description={`Términos y condiciones de compra de entradas en AI Tickets, servicio operado por ${LEGAL.entity}.`}
+  description={`Términos y condiciones de compra de entradas en AI Tickets, servicio operado por ${LEGAL.legalName}.`}
   canonical="/terms"
 >
   <AppHeader client:idle/>
@@ -30,12 +32,13 @@ const effective = formatLegalDate(LEGAL.effectiveDate);
       <section>
         <h2>1. Quiénes somos</h2>
         <p>
-          AI Tickets es un servicio operado por <strong>{LEGAL.entity}</strong>, {LEGAL.stateLabel}{LEGAL.address ? `, con domicilio en ${LEGAL.address}` : ''}.
-          En estos términos, "AI Tickets", "nosotros" o "la plataforma" se refieren a {LEGAL.entity}.
+          AI Tickets es un servicio operado por <strong>{LEGAL.legalName}</strong>, {LEGAL.stateLabel} (archivo N° {LEGAL.delawareFileNumber} de la División de Sociedades de {LEGAL.state}),
+          con domicilio comercial en {LEGAL.address}.
+          En estos términos, "AI Tickets", "nosotros" o "la plataforma" se refieren a {LEGAL.legalName}.
         </p>
         <p>
           Atención a compradores: <a href={`mailto:${LEGAL.supportEmail}`}>{LEGAL.supportEmail}</a>.
-          Asuntos legales: <a href={`mailto:${LEGAL.legalEmail}`}>{LEGAL.legalEmail}</a>.
+          Contacto legal y del proveedor: <a href={`mailto:${LEGAL.legalEmail}`}>{LEGAL.legalEmail}</a>.
         </p>
       </section>
 
@@ -46,7 +49,7 @@ const effective = formatLegalDate(LEGAL.effectiveDate);
           (la persona u organización que aparece en la página del evento), quien fija el precio, el aforo, las condiciones de ingreso y es responsable de realizar el evento.
         </p>
         <p>
-          {LEGAL.entity} actúa como intermediario y mandatario del productor para publicar el evento, vender las entradas y recaudar su precio.
+          {LEGAL.legalName} actúa como intermediario y mandatario del productor para publicar el evento, vender las entradas y recaudar su precio.
           Por ese servicio cobramos al comprador un <strong>cargo por servicio</strong>, que se muestra por separado antes de pagar.
         </p>
       </section>
@@ -55,6 +58,12 @@ const effective = formatLegalDate(LEGAL.effectiveDate);
         <h2>3. Compra y comprobante</h2>
         <ul>
           <li>Antes de pagar verás el detalle de las entradas, el precio de cada una, el cargo por servicio y el total.</li>
+          <li>
+            {LEGAL.serviceFeeTaxMode === 'added'
+              ? `El cargo por servicio es de ${feePct}% del valor de las entradas, más IVA (${vatPct}% calculado sobre el cargo). Lo paga el comprador, se suma al precio de las entradas y corresponde a ${LEGAL.legalName}, no al productor.`
+              : `El cargo por servicio es de ${feePct}% del valor de las entradas. Lo paga el comprador, se suma al precio de las entradas y corresponde a ${LEGAL.legalName}, no al productor.`}
+            Las entradas gratuitas no pagan cargo por servicio.
+          </li>
           <li>La compra queda confirmada cuando el medio de pago autoriza la transacción. Las entradas se reservan por un tiempo limitado mientras completas el pago; si no se completa, la reserva se libera.</li>
           <li>Recibirás por correo un <strong>{LEGAL.receiptLabel.toLowerCase()}</strong> con tus entradas y un enlace para verlas. Este comprobante no reemplaza los documentos tributarios que correspondan.</li>
           <li>Debes ser mayor de edad o contar con autorización de tu representante legal. Algunos eventos exigen edad mínima: revisa las condiciones del evento.</li>
@@ -66,7 +75,7 @@ const effective = formatLegalDate(LEGAL.effectiveDate);
         <h2>4. Medios de pago</h2>
         <ul>
           <li><strong>Webpay, a través de Flow:</strong> tarjetas de débito, crédito y prepago emitidas en Chile. En tu estado de cuenta el cobro aparecerá a nombre de <strong>{LEGAL.flowMerchantName}</strong> o de Flow.</li>
-          <li><strong>Tarjetas internacionales, Apple Pay y Google Pay, a través de Stripe</strong> (cuando esté disponible en el checkout): el cobro aparecerá a nombre de <strong>{LEGAL.brand}</strong> o <strong>{LEGAL.entity}</strong> (EE.UU.), que procesa estos pagos. Tu banco podría aplicar cargos por compra internacional o conversión de moneda.</li>
+          <li><strong>Tarjetas internacionales, Apple Pay y Google Pay, a través de Stripe</strong> (cuando esté disponible en el checkout): el cobro aparecerá a nombre de <strong>{LEGAL.legalName}</strong> (EE.UU.) con la referencia <strong>{LEGAL.stripeStatementDescriptorSuffix}</strong>, porque es quien procesa estos pagos. Tu banco podría aplicar cargos por compra internacional o conversión de moneda.</li>
           <li>Los precios se expresan en pesos chilenos (CLP). No almacenamos los datos completos de tu tarjeta: los procesa directamente el proveedor de pago.</li>
         </ul>
       </section>
@@ -85,18 +94,22 @@ const effective = formatLegalDate(LEGAL.effectiveDate);
         <h2>6. Derecho de retracto</h2>
         <p>
           Las entradas para eventos en una fecha determinada <strong>no tienen derecho de retracto</strong>, conforme al artículo 3 bis letra b) de la Ley N° 19.496.
-          Te lo informamos también en el checkout, antes de pagar. Esto no afecta tus derechos si el evento se cancela o cambia de forma relevante.
+          Te lo informamos también en el checkout, antes de pagar. Esto no afecta tus derechos si el evento se cancela, se reprograma o cambia de forma relevante (sección 7).
         </p>
       </section>
 
       <section>
         <h2>7. Cancelación, reprogramación y cambios del evento</h2>
         <ul>
-          <li><strong>Evento cancelado:</strong> recibirás el reembolso del total pagado, <strong>incluido el cargo por servicio</strong>, en el mismo medio de pago. Te avisaremos por correo cuando se procese.</li>
-          <li><strong>Evento reprogramado:</strong> tus entradas siguen válidas para la nueva fecha. Si no puedes asistir, puedes pedir el reembolso escribiendo a <a href={`mailto:${LEGAL.supportEmail}`}>{LEGAL.supportEmail}</a> en el plazo que informemos en el aviso.</li>
-          <li><strong>Cambios relevantes</strong> (por ejemplo, de recinto o del artista principal): te avisaremos y podrás pedir el reembolso en los mismos términos.</li>
+          <li><strong>Evento cancelado:</strong> tienes derecho al reembolso del <strong>valor de tus entradas</strong>. El reembolso es responsabilidad del productor, que lo realiza según su política y la ley; nosotros te avisaremos por correo y, cuando el productor lo instruya, lo procesaremos en el mismo medio de pago.</li>
+          <li><strong>Evento reprogramado:</strong> tus entradas siguen válidas para la nueva fecha. Si no puedes asistir, puedes pedir el reembolso del valor de tus entradas escribiendo a <a href={`mailto:${LEGAL.supportEmail}`}>{LEGAL.supportEmail}</a> en el plazo que informemos en el aviso.</li>
+          <li><strong>Cambios relevantes</strong> (por ejemplo, de recinto o del artista principal): te avisaremos y podrás pedir el reembolso del valor de tus entradas en los mismos términos.</li>
+          <li>
+            <strong>El cargo por servicio no es reembolsable</strong>, incluso si el evento se cancela o se reprograma: remunera el servicio de intermediación, venta y emisión de entradas que {LEGAL.legalName} ya prestó al completarse tu compra.
+            Esto no limita los derechos que la Ley N° 19.496 te otorga y que son irrenunciables: si en un caso concreto la ley o una autoridad competente dispone su devolución, lo devolveremos.
+          </li>
           <li>Cuando se reembolsa el total de una orden, sus entradas quedan <strong>anuladas</strong> y sus códigos QR dejan de permitir el ingreso.</li>
-          <li>El productor es el responsable principal de la realización del evento. Esto no limita tus derechos frente a {LEGAL.entity} como intermediario según el artículo 43 de la Ley N° 19.496, sin perjuicio de nuestro derecho a repetir contra el productor.</li>
+          <li>El productor es el responsable principal de la realización del evento. Esto no limita tus derechos frente a {LEGAL.legalName} como intermediario según el artículo 43 de la Ley N° 19.496, sin perjuicio de nuestro derecho a repetir contra el productor.</li>
         </ul>
       </section>
 
@@ -169,7 +182,8 @@ const effective = formatLegalDate(LEGAL.effectiveDate);
       <section>
         <h2>16. Contacto</h2>
         <p>
-          {LEGAL.entity}{LEGAL.address ? ` · ${LEGAL.address}` : ` · ${LEGAL.stateLabel}`}<br />
+          {LEGAL.legalName} · {LEGAL.entityKind} · archivo N° {LEGAL.delawareFileNumber}<br />
+          Domicilio comercial: {LEGAL.address}<br />
           Compradores: <a href={`mailto:${LEGAL.supportEmail}`}>{LEGAL.supportEmail}</a> · Legal: <a href={`mailto:${LEGAL.legalEmail}`}>{LEGAL.legalEmail}</a>
         </p>
       </section>

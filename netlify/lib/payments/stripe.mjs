@@ -5,7 +5,11 @@
 // - Cliente perezoso: sin STRIPE_SECRET_KEY este módulo no hace nada ni rompe la carga de funciones.
 // - La activación (qué claves se aceptan, STRIPE_LIVE_APPROVED) se decide en payments/index.mjs.
 import Stripe from 'stripe'
+import { SERVICE_FEE_LABEL, SERVICE_FEE_TAX_LABEL } from '../fees.mjs'
 import { LEGAL } from '../legal.mjs'
+
+/** Marca de propiedad: la cuenta de Stripe es compartida por Chanium; el webhook ignora lo que no la trae. */
+export const STRIPE_APP_TAG = 'aitickets'
 
 /** Versión de la API fijada (la del SDK instalado); se puede sobrescribir con STRIPE_API_VERSION. */
 export const STRIPE_DEFAULT_API_VERSION = '2026-08-26.dahlia'
@@ -36,22 +40,41 @@ export function stripeMinAmount() {
   return Number.isInteger(n) && n > 0 ? n : STRIPE_MIN_AMOUNT_CLP
 }
 
+/**
+ * Líneas de cargo por servicio para Stripe: [{name, amount}] (montos enteros CLP > 0).
+ * Prefiere feeNet/feeIva; si no vienen usa los de la orden; como último recurso, `fee` en una sola línea.
+ */
+export function stripeFeeItems({ order = {}, fee, feeNet, feeIva } = {}) {
+  const net = Math.round(Number(feeNet ?? order.ticket_fee) || 0)
+  const iva = Math.round(Number(feeIva ?? order.service_fee_tax) || 0)
+  if (net > 0 || iva > 0) {
+    const items = []
+    if (net > 0) items.push({ name: SERVICE_FEE_LABEL, amount: net })
+    if (iva > 0) items.push({ name: SERVICE_FEE_TAX_LABEL, amount: iva })
+    return items
+  }
+  const total = Math.round(Number(fee) || 0)
+  return total > 0 ? [{ name: 'Cargo por servicio', amount: total }] : []
+}
+
 const clip = (value, max) => String(value ?? '').replace(/[\r\n\t]+/g, ' ').trim().slice(0, max)
 
 /**
  * Crea la Checkout Session de una orden pendiente.
  * @param {{
- *   order: {id: string, ticket_fee?: number},
+ *   order: {id: string, ticket_fee?: number, service_fee_tax?: number},
  *   eventName: string,
  *   lines: Array<{id:number, name:string, price:number, quantity:number}>,
- *   fee: number,
+ *   fee?: number,      cargo total (neto + IVA); solo se usa si no vienen feeNet/feeIva
+ *   feeNet?: number,   cargo por servicio neto (10% del subtotal)
+ *   feeIva?: number,   IVA (19%) del cargo
  *   buyerEmail: string,
  *   holdMinutes: number,
  *   siteUrl: string,
  * }} args
  * @returns {Promise<{redirectUrl: string, externalId: string, sessionId: string}>}
  */
-export async function createStripeCheckout({ order, eventName, lines, fee, buyerEmail, holdMinutes, siteUrl }) {
+export async function createStripeCheckout({ order, eventName, lines, fee, feeNet, feeIva, buyerEmail, holdMinutes, siteUrl }) {
   const stripe = getStripe()
   const base = String(siteUrl || process.env.SITE_URL || 'https://aitickets.cl').replace(/\/$/, '')
   const orderId = String(order.id)
@@ -68,14 +91,11 @@ export async function createStripeCheckout({ order, eventName, lines, fee, buyer
       },
       quantity: Number(l.quantity),
     }))
-  const serviceFee = Math.round(Number(fee ?? order.ticket_fee) || 0)
-  if (serviceFee > 0) {
+  // Cargo por servicio y su IVA en líneas separadas: la suma de line_items es exactamente el total de la orden
+  // (amount + ticket_fee + service_fee_tax), que es lo que verifica confirmPaidOrder.
+  for (const item of stripeFeeItems({ order, fee, feeNet, feeIva })) {
     lineItems.push({
-      price_data: {
-        currency: 'clp',
-        unit_amount: serviceFee,
-        product_data: { name: LEGAL.serviceFeeLabel || 'Cargo por servicio' },
-      },
+      price_data: { currency: 'clp', unit_amount: item.amount, product_data: { name: item.name } },
       quantity: 1,
     })
   }
@@ -90,9 +110,10 @@ export async function createStripeCheckout({ order, eventName, lines, fee, buyer
       line_items: lineItems,
       customer_email: buyerEmail || undefined,
       client_reference_id: orderId,
-      metadata: { order_id: orderId },
+      metadata: { app: STRIPE_APP_TAG, order_id: orderId },
       payment_intent_data: {
-        metadata: { order_id: orderId },
+        metadata: { app: STRIPE_APP_TAG, order_id: orderId },
+        statement_descriptor_suffix: LEGAL.stripeStatementDescriptorSuffix || undefined,
         description: clip(`AI Tickets · ${eventName} · orden ${orderId}`, 1000),
       },
       locale: 'es-419',

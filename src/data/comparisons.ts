@@ -43,7 +43,7 @@ export interface Comparison {
 
 const AIT = {
   producerFee: "0% (el productor recibe el 100% del precio)",
-  buyerFee: "Cargo por servicio de 10% sobre el precio, visible antes de pagar",
+  buyerFee: "Cargo por servicio de 10% + IVA sobre el precio, visible antes de pagar",
   freeEvents: "Sin costo",
   payouts: "Transferencia 48 a 72 horas después de cada función",
   website: "Web de eventos gratis para la productora",

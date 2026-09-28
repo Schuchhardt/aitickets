@@ -1,6 +1,19 @@
 // Cálculo de precios que se MUESTRA al comprador antes de pagar (ley del consumidor).
-// El servidor (/api/purchase-ticket) recalcula todo desde la BD; esto es solo para la vista y usa la misma regla.
-export const SERVICE_FEE_RATE = 0.1;
+// El servidor (/api/purchase-ticket) recalcula todo desde la BD; esto es solo para la vista y usa la misma
+// regla, importada de la fuente única netlify/lib/fees.mjs (cargo 10% del subtotal + IVA 19% del cargo).
+import { computeBuyerTotal } from "../../../netlify/lib/fees.mjs";
+
+export {
+  SERVICE_FEE_RATE,
+  IVA_RATE,
+  SERVICE_FEE_LABEL,
+  SERVICE_FEE_TAX_LABEL,
+  SERVICE_FEE_NOTE,
+  SERVICE_FEE_PERCENT_LABEL,
+  IVA_PERCENT_LABEL,
+  computeServiceFee,
+  computeBuyerTotal,
+} from "../../../netlify/lib/fees.mjs";
 export const DEFAULT_MAX_PER_PURCHASE = 10;
 
 export const maxPerPurchase = (ticket) => {
@@ -50,11 +63,15 @@ export const buildSelectedLines = (selectedTickets = {}, tickets = [], dates = [
     })
     .filter(Boolean);
 
-export const computeTotals = (lines) => {
-  const subtotal = lines.reduce((sum, l) => sum + l.total, 0);
-  const fee = subtotal > 0 ? Math.round(subtotal * SERVICE_FEE_RATE) : 0;
-  const quantity = lines.reduce((sum, l) => sum + l.quantity, 0);
-  return { subtotal, fee, total: subtotal + fee, quantity };
+/**
+ * Totales de la selección: { subtotal, feeNet, feeIva, fee, total, quantity }.
+ * fee = feeNet + feeIva (cargo por servicio con IVA); total = subtotal + fee (lo que se cobra).
+ */
+export const computeTotals = (lines = []) => {
+  const subtotal = lines.reduce((sum, l) => sum + (Number(l.total) || 0), 0);
+  const quantity = lines.reduce((sum, l) => sum + (Number(l.quantity) || 0), 0);
+  const { feeNet, feeIva, fee, total } = computeBuyerTotal(subtotal);
+  return { subtotal, feeNet, feeIva, fee, total, quantity };
 };
 
 export const formatCLP = (value) => `$${Math.round(Number(value) || 0).toLocaleString("es-CL")}`;

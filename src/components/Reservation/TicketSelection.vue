@@ -2,7 +2,7 @@
 import { ref, watch, computed } from "vue";
 import { useGoogleAnalytics } from "../../composables/useGoogleAnalytics.js";
 import { formatLocalTime, formatLocalDate } from "../../utils/dateHelpers.js";
-import { maxPerPurchase, formatCLP, formatFunctionLabel, findTicketFunction } from "./pricing.js";
+import { SERVICE_FEE_NOTE, maxPerPurchase, formatCLP, formatFunctionLabel, findTicketFunction } from "./pricing.js";
 
 const props = defineProps({
   event: Object,
@@ -116,7 +116,7 @@ const formatFullDate = (dateArray) => {
             <p class="font-medium break-words">{{ ticket.ticket_name }}</p>
             <p v-if="ticket.price !== null && ticket.price !== undefined" class="text-gray-700">
               {{ ticket.price > 0 ? formatCLP(ticket.price) : "Gratis" }}
-              <span v-if="ticket.price > 0" class="text-gray-500 text-xs">+ 10% cargo por servicio</span>
+              <span v-if="ticket.price > 0" class="text-gray-500 text-xs">{{ SERVICE_FEE_NOTE }}</span>
             </p>
             <p v-if="ticket.remaining != null && ticket.remaining > 0 && ticket.remaining <= 10" class="text-orange-600 text-xs mt-1">
               ¡Quedan {{ ticket.remaining }}!

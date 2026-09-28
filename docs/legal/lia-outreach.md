@@ -2,11 +2,11 @@
 
 > **Borrador para revisión legal.** Este documento debe ser revisado y firmado por el responsable
 > (Chanium LLC) antes de activar el envío real. El código exige `OUTREACH_LIA_APPROVED=true`, además
-> de `legalReady()` (dirección postal y correo legal configurados), para enviar cualquier correo en frío.
+> de `legalReady()` (dirección postal y correo legal; por defecto Lican Ray 6742, Vitacura, y hello@chanium.com), para enviar cualquier correo en frío.
 
 | Campo | Valor |
 | --- | --- |
-| Responsable | Chanium LLC (sociedad de Delaware, EE.UU.), operadora de AI Tickets |
+| Responsable | Chanium, LLC (Delaware LLC, archivo N° 10669971; domicilio comercial Lican Ray 6742, Vitacura, Región Metropolitana, Chile; hello@chanium.com), operadora de AI Tickets |
 | Tratamiento | Contacto comercial por correo a productoras, salas y centros culturales |
 | Base de licitud | Interés legítimo (Ley 21.719, vigente desde el 1 de diciembre de 2026; confirmar el artículo con el abogado) |
 | Normas relacionadas | Ley 19.496 art. 28 B (comunicaciones promocionales), CAN-SPAM Act (EE.UU.) |

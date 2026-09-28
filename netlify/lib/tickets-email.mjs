@@ -5,6 +5,7 @@ import { getSupabaseAdmin } from './supabase.mjs'
 import { sendEmail, SITE_URL, formatRecipient, isValidEmail } from './mailer.mjs'
 import { renderTicketsEmail } from './emails/index.mjs'
 import { LEGAL } from './legal.mjs'
+import { orderFeeBreakdown } from './fees.mjs'
 import {
   EVENT_DATE_COLUMNS,
   zonedDateTimeToUtc,
@@ -102,16 +103,21 @@ function googleCalendarUrl({ eventName, start, end, location, details }) {
 export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
   const supabase = getSupabaseAdmin()
 
-  const { data: order, error: orderError } = await supabase
+  const selectOrder = (feeTaxColumn) => supabase
     .from('event_orders')
     .select(`
-      id, created_at, status, event_id, attendee_id, amount, ticket_fee, total_payment, ticket_details, email_sent_at,
+      id, created_at, status, event_id, attendee_id, amount, ticket_fee,${feeTaxColumn} total_payment, ticket_details, email_sent_at,
       buyer_first_name, buyer_last_name, buyer_email,
       attendees ( first_name, last_name, email ),
       events ( id, name, slug, description, location, secret_location, start_date, end_date, organization_id )
     `)
     .eq('id', orderId)
     .maybeSingle()
+  let { data: order, error: orderError } = await selectOrder(' service_fee_tax,')
+  // Base sin la columna service_fee_tax (202609290100): órdenes sin IVA separado
+  if (orderError && ['42703', 'PGRST204'].includes(String(orderError.code || ''))) {
+    ;({ data: order, error: orderError } = await selectOrder(''))
+  }
 
   if (orderError) return { ok: false, status: 'error', message: orderError.message }
   if (!order) return { ok: false, status: 'not_found', message: 'Orden no encontrada' }
@@ -178,9 +184,9 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
     }
     const ticketLines = [...grouped.values()]
 
-    const subtotal = Number(order.amount) || 0
-    const fee = Number(order.ticket_fee) || 0
-    const total = order.total_payment != null ? Number(order.total_payment) : subtotal + fee
+    // amount = subtotal; ticket_fee = cargo neto (10%); service_fee_tax = IVA del cargo (0 en órdenes antiguas)
+    const { subtotal, feeNet, feeIva, fee, total: computedTotal } = orderFeeBreakdown(order)
+    const total = order.total_payment != null ? Number(order.total_payment) : computedTotal
 
     // Fechas y lugar desde event_dates / venues (fallback: columnas denormalizadas de events)
     const { data: eventDates } = await supabase
@@ -268,6 +274,8 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
       ticketLines,
       subtotal,
       fee,
+      feeNet,
+      feeIva,
       total,
       orderId: order.id,
       orderDate: formatInstantLong(order.created_at),

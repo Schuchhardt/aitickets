@@ -67,7 +67,7 @@
 
       <FadeInSection :delay="400">
         <p class="mt-8 text-white/50 text-sm">
-          0% de comisión para el productor. El comprador paga un cargo por servicio de 10%.
+          0% de comisión para el productor. El comprador paga un cargo por servicio de 10% + IVA.
           ¿Prefieres verlo antes? <a href="https://calendar.app.google/CMt97vedNjzBaoEX7" target="_blank" rel="noopener noreferrer" class="underline hover:text-lime-400">Agenda una demo de 15 min</a>.
         </p>
       </FadeInSection>

@@ -8,6 +8,7 @@ import ShareEventModal from "./ShareEventModal.vue";
 import ReservationModal from "./Reservation/ReservationModal.vue";
 import PurchasedTicketsModal from "./PurchasedTicketsModal.vue";
 import { eventBus } from '../utils/eventbus.js';
+import { SERVICE_FEE_NOTE } from "./Reservation/pricing.js";
 
 const props = defineProps({
   event: Object,
@@ -109,8 +110,7 @@ const formatPrice = (price) => {
   return price !== null && price !== undefined ? Number(price).toLocaleString("es-CL") : "";
 };
 
-// Cargo por servicio al comprador (C5: 10% del subtotal)
-const SERVICE_FEE_RATE = 0.10;
+// Cargo por servicio al comprador: 10% del subtotal + IVA del cargo (netlify/lib/fees.mjs)
 
 // Entradas a la venta (el servidor ya filtra por ventana de venta y stock)
 const onSaleTickets = computed(() => (props.event?.tickets || []).filter(
@@ -151,7 +151,7 @@ const priceLabel = computed(() => {
 
 const feeNote = computed(() =>
   canBuy.value && hasPaidTickets.value
-    ? `+ cargo por servicio ${Math.round(SERVICE_FEE_RATE * 100)}%`
+    ? SERVICE_FEE_NOTE
     : ""
 );
 

@@ -24,9 +24,11 @@ export const GET: APIRoute = async (context) => {
     if (!event) return jsonResponse({ message: "Evento no encontrado o no autorizado" }, 404);
 
     const supabase = getSupabaseAdmin();
-    // Columnas opcionales según las migraciones aplicadas: proveedor/moneda (202609270100) y atribución (ref/utm).
+    // Columnas opcionales según las migraciones aplicadas: proveedor/moneda (202609270100), atribución (ref/utm)
+    // e IVA del cargo por servicio (service_fee_tax, 202609290100; sin ella la columna del CSV va en 0).
     // Se intenta de la más completa a la mínima (los deploy previews pueden correr contra una base sin migrar).
     const variants = [
+        { cols: `${BASE_COLUMNS}, ref, utm_source, utm_medium, utm_campaign, payment_provider, currency, service_fee_tax`, attribution: true, provider: true },
         { cols: `${BASE_COLUMNS}, ref, utm_source, utm_medium, utm_campaign, payment_provider, currency`, attribution: true, provider: true },
         { cols: `${BASE_COLUMNS}, ref, utm_source, utm_medium, utm_campaign`, attribution: true, provider: false },
         { cols: BASE_COLUMNS, attribution: false, provider: false },
@@ -55,7 +57,7 @@ export const GET: APIRoute = async (context) => {
 
     const header = [
         "Orden", "Fecha (Chile)", "Nombre", "Apellido", "Email", "Teléfono", "Entradas", "Cantidad",
-        "Monto entradas (a pagar al productor)", "Cargo por servicio (comprador)", "Total pagado", "Comisión pasarela", "Cortesía",
+        "Monto entradas (a pagar al productor)", "Cargo por servicio neto (comprador)", "IVA cargo por servicio", "Total pagado", "Comisión pasarela", "Cortesía",
         ...(withProvider ? ["Medio de pago", "Moneda"] : []),
         ...(withAttribution ? ["Ref", "UTM source", "UTM medium", "UTM campaign"] : []),
     ];
@@ -76,6 +78,7 @@ export const GET: APIRoute = async (context) => {
             o.ticket_qty ?? details.reduce((s: number, d: any) => s + (Number(d.quantity) || 0), 0),
             Number(o.amount) || 0,
             Number(o.ticket_fee) || 0,
+            Number(o.service_fee_tax) || 0,
             Number(o.total_payment) || 0,
             Number(o.payment_fee) || 0,
             isCourtesy ? "Sí" : "No",
