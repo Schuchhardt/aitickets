@@ -440,6 +440,15 @@ export async function runMigrations({
     if (dryRun) {
       await client.query('ROLLBACK');
       log('[dry-run] ROLLBACK: no se guardó ningún cambio');
+    } else if (result.applied.length) {
+      // PostgREST cachea el esquema: sin recarga, las columnas/funciones nuevas fallan vía API
+      // ("column ... does not exist") hasta que otro DDL dispare la recarga.
+      try {
+        await client.query("NOTIFY pgrst, 'reload schema'");
+        log('esquema de PostgREST recargado (NOTIFY pgrst)');
+      } catch (e) {
+        log(`aviso: no se pudo recargar el esquema de PostgREST: ${e?.message || e}`);
+      }
     }
     return result;
   } catch (err) {
