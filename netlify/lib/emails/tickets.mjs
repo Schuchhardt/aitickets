@@ -1,0 +1,128 @@
+// Correo con las entradas de una orden. Los datos los arma netlify/lib/tickets-email.mjs (que también
+// genera el adjunto .ics); aquí solo se presenta.
+import { Link } from '@react-email/components'
+import { LEGAL } from '../legal.mjs'
+import { h, str, safeHref, COLORS, FONT_FAMILY, EmailLayout, TABLE_PROPS, Title, Subtitle, Paragraph, Badge, PrimaryButton, Panel, renderEmail } from './layout.mjs'
+
+export const clp = (n) => `$${Math.round(Number(n) || 0).toLocaleString('es-CL')}`
+
+const cell = { fontFamily: FONT_FAMILY, fontSize: '14px', lineHeight: '20px', padding: '6px 0', verticalAlign: 'top' }
+
+function DateRows({ dateLines }) {
+  if (!dateLines.length) {
+    return h(Paragraph, { small: true, muted: true, style: { margin: 0 } }, 'Revisa los detalles en el link de tus entradas.')
+  }
+  return h(
+    'table',
+    TABLE_PROPS,
+    h(
+      'tbody',
+      null,
+      dateLines.map((d, i) =>
+        h(
+          'tr',
+          { key: `d-${i}` },
+          h(
+            'td',
+            { style: { ...cell, color: COLORS.text } },
+            h('strong', null, str(d.date)),
+            d.time ? ` · ${str(d.time)} hrs` : '',
+            d.place ? h('br') : null,
+            d.place ? h('span', { style: { color: COLORS.muted } }, str(d.place)) : null
+          )
+        )
+      )
+    )
+  )
+}
+
+function ReceiptRows({ ticketLines, subtotal, fee, total }) {
+  const rows = ticketLines.map((t, i) => {
+    const qty = Number(t.quantity) || 0
+    const unit = Number(t.unitPrice) || 0
+    const ticketUrl = safeHref(t.url)
+    return h(
+      'tr',
+      { key: `t-${i}` },
+      h(
+        'td',
+        { style: { ...cell, color: '#3f3f46' } },
+        `${qty} x ${str(t.name)}`,
+        ticketUrl ? h('span', null, ' · ', h(Link, { href: ticketUrl, style: { color: COLORS.text, textDecoration: 'underline', fontSize: '13px' } }, 'Ver QR')) : null
+      ),
+      h('td', { style: { ...cell, color: COLORS.text, textAlign: 'right', whiteSpace: 'nowrap' } }, unit > 0 ? clp(unit * qty) : 'Gratis')
+    )
+  })
+  const small = { ...cell, fontSize: '13px', color: COLORS.muted, padding: '4px 0' }
+  const strong = { ...cell, fontSize: '15px', fontWeight: 700, color: COLORS.text, padding: '10px 0 4px', borderTop: `1px solid ${COLORS.border}` }
+  if (Number(total) > 0) {
+    rows.push(
+      h('tr', { key: 'sub' }, h('td', { style: { ...small, paddingTop: '10px' } }, 'Subtotal'), h('td', { style: { ...small, paddingTop: '10px', textAlign: 'right' } }, clp(subtotal))),
+      h('tr', { key: 'fee' }, h('td', { style: small }, LEGAL.serviceFeeLabel), h('td', { style: { ...small, textAlign: 'right' } }, clp(fee))),
+      h('tr', { key: 'tot' }, h('td', { style: strong }, 'Total pagado'), h('td', { style: { ...strong, textAlign: 'right' } }, clp(total)))
+    )
+  } else {
+    rows.push(h('tr', { key: 'tot' }, h('td', { style: strong }, 'Total'), h('td', { style: { ...strong, textAlign: 'right' } }, 'Gratis')))
+  }
+  return h('table', TABLE_PROPS, h('tbody', null, rows))
+}
+
+/**
+ * @param {{
+ *   customerName?: string, eventName?: string,
+ *   dateLines?: Array<{ date: string, time?: string, place?: string }>,
+ *   secretLocation?: string,
+ *   ticketLines?: Array<{ name: string, quantity: number, unitPrice: number, url?: string }>,
+ *   subtotal?: number, fee?: number, total?: number,
+ *   orderId: string, orderDate?: string, orderUrl: string, calendarUrl?: string | null,
+ * }} data
+ */
+export async function renderTicketsEmail(data = {}) {
+  const customerName = str(data.customerName).trim() || 'asistente'
+  const eventName = str(data.eventName).trim() || 'Tu evento'
+  const dateLines = Array.isArray(data.dateLines) ? data.dateLines : []
+  const ticketLines = Array.isArray(data.ticketLines) ? data.ticketLines : []
+  const calendarUrl = safeHref(data.calendarUrl)
+  const subject = `🎟️ Tus entradas para ${eventName}`
+
+  const element = h(
+    EmailLayout,
+    {
+      preview: `Tus entradas para ${eventName} están listas. Muestra el QR en la puerta.`,
+      footer: {
+        reason: 'Recibes este correo porque compraste entradas en AI Tickets. Guárdalo como comprobante de compra: el evento es organizado y ofrecido por su productora.',
+      },
+    },
+    h(Badge, null, 'Compra confirmada'),
+    h(Title, null, `¡Hola ${customerName}! Aquí están tus entradas`),
+    h(Subtitle, null, eventName),
+    h(PrimaryButton, { href: data.orderUrl, hint: 'Muestra el código QR de cada entrada en la puerta.' }, 'Ver mis entradas (QR)'),
+    h(
+      Panel,
+      { label: 'Cuándo y dónde' },
+      h(DateRows, { dateLines }),
+      calendarUrl
+        ? h(
+            Paragraph,
+            { small: true, style: { margin: '12px 0 0' } },
+            h(Link, { href: calendarUrl, style: { color: COLORS.text, fontWeight: 600, textDecoration: 'underline' } }, '+ Agregar a Google Calendar'),
+            h('span', { style: { color: COLORS.subtle, fontSize: '12px' } }, ' (también adjuntamos un archivo .ics)')
+          )
+        : null
+    ),
+    data.secretLocation
+      ? h(
+          Panel,
+          { label: 'Dirección exclusiva para asistentes', tone: 'warn' },
+          h(Paragraph, { style: { margin: 0 } }, str(data.secretLocation))
+        )
+      : null,
+    h(
+      Panel,
+      { label: LEGAL.receiptLabel, tone: 'outline' },
+      h(ReceiptRows, { ticketLines, subtotal: data.subtotal, fee: data.fee, total: data.total }),
+      h(Paragraph, { small: true, style: { margin: '12px 0 0', color: COLORS.subtle, fontSize: '12px' } }, `Orden ${str(data.orderId)}${data.orderDate ? ` · ${str(data.orderDate)}` : ''}`)
+    )
+  )
+  return renderEmail(subject, element)
+}

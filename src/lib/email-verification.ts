@@ -12,7 +12,8 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { getSupabaseAdmin } from "./auth-helpers";
 import { ensureOrgSite, invalidateSiteCache } from "./sites";
-import { sendEmail, legalFooterHtml } from "../../netlify/lib/mailer.mjs";
+import { sendEmail } from "../../netlify/lib/mailer.mjs";
+import { renderVerifyEmail } from "../../netlify/lib/emails/index.mjs";
 
 export const EMAIL_VERIFY_TTL_SECONDS = 48 * 3600;
 const PURPOSE = "email_verify";
@@ -75,32 +76,19 @@ export function verifyEmailVerifyToken(token: string, now = Date.now()): VerifyT
     }
 }
 
-const escapeHtml = (v: unknown) =>
-    String(v ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
-
-/** Envía el correo con el enlace de verificación. Lanza si Resend falla. */
-export async function sendVerificationEmail({ uid, email, name }: { uid: string; email: string; name?: string | null }) {
-    const link = `${siteOrigin()}/organizadores/verificar?t=${encodeURIComponent(signEmailVerifyToken(uid, email))}`;
-    const firstName = String(name || "").trim().split(/\s+/)[0] || "";
-    const html = `<!doctype html><html lang="es-CL"><body style="margin:0;background:#f9fafb;padding:24px 12px;font-family:Arial,Helvetica,sans-serif;color:#111827">
-<div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:12px;padding:28px 24px;border:1px solid #e5e7eb">
-<h1 style="font-size:20px;margin:0 0 12px 0">Confirma tu correo${firstName ? `, ${escapeHtml(firstName)}` : ""}</h1>
-<p style="font-size:15px;line-height:1.6;margin:0 0 20px 0">Gracias por crear tu cuenta de productor en AI Tickets. Para activarla y publicar tu web de eventos, confirma que este correo es tuyo:</p>
-<p style="text-align:center;margin:0 0 20px 0"><a href="${escapeHtml(link)}" style="display:inline-block;padding:12px 24px;background:#111827;color:#ffffff;border-radius:8px;text-decoration:none;font-weight:bold;font-size:15px">Confirmar mi correo</a></p>
-<p style="font-size:13px;line-height:1.6;color:#6b7280;margin:0 0 8px 0">El enlace vence en 48 horas. Si no funciona, copia esta dirección en tu navegador:</p>
-<p style="font-size:12px;line-height:1.5;color:#6b7280;word-break:break-all;margin:0 0 16px 0">${escapeHtml(link)}</p>
-<p style="font-size:13px;color:#6b7280;margin:0">Si no creaste esta cuenta, ignora este correo.</p>
-${legalFooterHtml({ reason: "Recibes este correo porque se creó una cuenta de productor en AI Tickets con esta dirección." })}
-</div></body></html>`;
+/**
+ * Envía el correo con el enlace de verificación (plantilla React Email de netlify/lib/emails).
+ * El botón "Confirmar mi correo" lleva a /organizadores/verificar, que al confirmar deja la sesión
+ * iniciada. Lanza si Resend falla.
+ */
+export async function sendVerificationEmail({ uid, email, name, orgName }: { uid: string; email: string; name?: string | null; orgName?: string | null }) {
+    const url = `${siteOrigin()}/organizadores/verificar?t=${encodeURIComponent(signEmailVerifyToken(uid, email))}`;
+    const { subject, html, text } = await renderVerifyEmail({ name: name || "", orgName: orgName || "", url });
     return sendEmail({
         to: email,
-        subject: "Confirma tu correo para activar tu cuenta de AI Tickets",
+        subject,
         html,
+        text,
         tags: ["email-verification"],
     });
 }
@@ -175,7 +163,7 @@ export async function getOrgVerifiedEmail(orgId: number): Promise<string | null>
 }
 
 export type ConfirmResult =
-    | { ok: true; alreadyVerified: boolean; slug: string | null }
+    | { ok: true; alreadyVerified: boolean; slug: string | null; uid: string; email: string }
     | { ok: false; error: "invalid" | "expired" | "not_found" | "server" };
 
 /**
@@ -232,7 +220,7 @@ export async function confirmProducerEmail(token: string): Promise<ConfirmResult
             console.warn("email-verification: no se pudo asegurar el sitio", err?.message || err);
         }
 
-        return { ok: true, alreadyVerified: before.verified === true, slug };
+        return { ok: true, alreadyVerified: before.verified === true, slug, uid: parsed.uid, email: authUser.email };
     } catch (err: any) {
         console.error("email-verification: error", err?.message || err);
         return { ok: false, error: "server" };

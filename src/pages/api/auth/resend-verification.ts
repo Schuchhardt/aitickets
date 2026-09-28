@@ -80,7 +80,12 @@ export const POST: APIRoute = async ({ request }) => {
         const lastSent = Date.parse(appMeta.email_verify_sent_at || "");
         if (isAitickets && Number.isFinite(lastSent) && now - lastSent < COOLDOWN_MS) return jsonResponse(GENERIC, 200);
 
-        await sendVerificationEmail({ uid: authUser.id, email: authUser.email, name: profile.name });
+        const { data: org } = await supabase
+            .from("organizations")
+            .select("public_name")
+            .eq("id", profile.organization_id)
+            .maybeSingle();
+        await sendVerificationEmail({ uid: authUser.id, email: authUser.email, name: profile.name, orgName: org?.public_name || null });
         if (isAitickets) {
             await supabase.auth.admin
                 .updateUserById(authUser.id, { app_metadata: { ...appMeta, email_verify_sent_at: new Date(now).toISOString() } })

@@ -24,7 +24,8 @@
 // Lo usan las rutas del dashboard (src/pages/api/sites/domain.ts) y el cron check-custom-domains.
 // Todas las funciones reciben el cliente Supabase (service role) y un sitio YA autorizado por el llamador.
 import { notifySlack } from '../slack.mjs'
-import { sendEmail, legalFooterHtml, isValidEmail, SITE_URL } from '../mailer.mjs'
+import { sendEmail, isValidEmail, SITE_URL } from '../mailer.mjs'
+import { renderDomainActiveEmail, renderDomainFailedEmail } from '../emails/index.mjs'
 import { netlifyProvider, DomainProviderError } from './netlify.mjs'
 import { cloudflareProvider } from './cloudflare.mjs'
 import { noneProvider } from './none.mjs'
@@ -81,14 +82,6 @@ function mainHosts() {
     .map((h) => h.trim().toLowerCase())
     .filter(Boolean)
 }
-
-const esc = (value) =>
-  String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
 
 /** Registros DNS para mostrar (los guardados o recalculados). */
 export function recordsForSite(site) {
@@ -469,31 +462,14 @@ async function producerRecipient(supabase, site) {
   return { to, orgName: org?.public_name || site.slug }
 }
 
-function emailShell(title, bodyHtml, reason) {
-  return `<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#111827;line-height:1.55">
-  <h1 style="font-size:20px;margin:0 0 16px 0">${esc(title)}</h1>
-  ${bodyHtml}
-  ${legalFooterHtml({ reason })}
-</div>`
-}
-
-const REASON = 'Recibes este correo porque conectaste un dominio a tu sitio web en AI Tickets.'
-
 async function notifyDomainActive(supabase, site) {
   const host = site.custom_domain
   await notifySlack(`✅ Dominio activo: https://${host} → sitio /o/${site.slug}`)
   try {
     const { to, orgName } = await producerRecipient(supabase, site)
     if (!to) return
-    const html = emailShell(
-      `Tu dominio ${host} ya está activo`,
-      `<p>Hola ${esc(orgName)}:</p>
-  <p>Tu sitio web ya se ve en <a href="https://${esc(host)}" style="color:#111827;font-weight:bold">https://${esc(host)}</a>, con certificado de seguridad (HTTPS).</p>
-  <p>No borres ni cambies el registro DNS que configuraste: si deja de apuntar a AI Tickets por más de 72 horas, desconectaremos el dominio.</p>
-  <p><a href="${SITE_URL}/dashboard/sitio" style="display:inline-block;background:#111827;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">Ir a mi sitio web</a></p>`,
-      REASON
-    )
-    await sendEmail({ to, subject: `Tu dominio ${host} ya está activo`, html, tags: ['site-domain'] })
+    const email = await renderDomainActiveEmail({ host, orgName, dashboardUrl: `${SITE_URL}/dashboard/sitio` })
+    await sendEmail({ to, subject: email.subject, html: email.html, text: email.text, tags: ['site-domain'] })
   } catch (err) {
     console.error('domains: no se pudo enviar el correo de dominio activo', err?.message)
   }
@@ -505,15 +481,14 @@ async function notifyDomainFailed(supabase, site) {
   try {
     const { to, orgName } = await producerRecipient(supabase, site)
     if (!to) return
-    const html = emailShell(
-      `No pudimos conectar ${host}`,
-      `<p>Hola ${esc(orgName)}:</p>
-  <p>${esc(site.domain_error || 'No pudimos verificar tu dominio.')}</p>
-  <p>Tu sitio sigue disponible en <a href="${SITE_URL}/o/${esc(site.slug)}" style="color:#111827">${SITE_URL}/o/${esc(site.slug)}</a>. Puedes volver a intentarlo desde el dashboard cuando el DNS esté listo.</p>
-  <p><a href="${SITE_URL}/dashboard/sitio" style="display:inline-block;background:#111827;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">Revisar mi dominio</a></p>`,
-      REASON
-    )
-    await sendEmail({ to, subject: `No pudimos conectar ${host}`, html, tags: ['site-domain'] })
+    const email = await renderDomainFailedEmail({
+      host,
+      orgName,
+      error: site.domain_error || 'No pudimos verificar tu dominio.',
+      siteUrl: `${SITE_URL}/o/${encodeURIComponent(site.slug || '')}`,
+      dashboardUrl: `${SITE_URL}/dashboard/sitio`,
+    })
+    await sendEmail({ to, subject: email.subject, html: email.html, text: email.text, tags: ['site-domain'] })
   } catch (err) {
     console.error('domains: no se pudo enviar el correo de dominio fallido', err?.message)
   }

@@ -1,8 +1,9 @@
 // Envío del correo con las entradas de una orden (contrato C6).
 // Lo usan: send-tickets-email (llamadas internas), payment-confirmation (webhook de Flow)
 // y purchase-tickets (órdenes gratis). Idempotente vía event_orders.email_sent_at.
-import { getSupabaseAdmin, escapeHtml } from './supabase.mjs'
-import { sendEmail, SITE_URL, formatRecipient, isValidEmail, legalFooterHtml } from './mailer.mjs'
+import { getSupabaseAdmin } from './supabase.mjs'
+import { sendEmail, SITE_URL, formatRecipient, isValidEmail } from './mailer.mjs'
+import { renderTicketsEmail } from './emails/index.mjs'
 import { LEGAL } from './legal.mjs'
 import {
   EVENT_DATE_COLUMNS,
@@ -18,8 +19,6 @@ import {
 
 // Un claim de envío sin éxito más antiguo que esto se considera abandonado (la función murió a mitad de camino).
 const EMAIL_CLAIM_STALE_MINUTES = 10
-
-const clp = (n) => `$${Math.round(Number(n) || 0).toLocaleString('es-CL')}`
 
 const stripHtml = (html) => String(html || '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, ' ').replace(/[ \t]+/g, ' ').trim()
 
@@ -88,69 +87,6 @@ function googleCalendarUrl({ eventName, start, end, location, details }) {
     location,
   })
   return `https://calendar.google.com/calendar/render?${params.toString()}`
-}
-
-function buildTicketsHtml({ customerName, eventName, dateLines, secretLocation, ticketLines, subtotal, fee, total, orderId, orderDate, orderUrl, calendarUrl }) {
-  const e = escapeHtml
-  const datesHtml = dateLines.map(d => `
-          <tr>
-            <td style="padding:6px 0;color:#111;font-size:14px;">
-              <strong>${e(d.date)}</strong>${d.time ? ` · ${e(d.time)} hrs` : ''}
-              ${d.place ? `<br><span style="color:#6b7280;">${e(d.place)}</span>` : ''}
-            </td>
-          </tr>`).join('')
-  const ticketsHtml = ticketLines.map(t => `
-          <tr>
-            <td style="padding:6px 0;color:#374151;font-size:14px;">${e(t.quantity)} x ${e(t.name)}</td>
-            <td style="padding:6px 0;color:#111;font-size:14px;text-align:right;">${t.unitPrice > 0 ? e(clp(t.unitPrice * t.quantity)) : 'Gratis'}</td>
-          </tr>`).join('')
-  const totalsHtml = total > 0 ? `
-          <tr><td style="padding:4px 0;color:#6b7280;font-size:13px;">Subtotal</td><td style="padding:4px 0;text-align:right;color:#6b7280;font-size:13px;">${e(clp(subtotal))}</td></tr>
-          <tr><td style="padding:4px 0;color:#6b7280;font-size:13px;">${e(LEGAL.serviceFeeLabel)}</td><td style="padding:4px 0;text-align:right;color:#6b7280;font-size:13px;">${e(clp(fee))}</td></tr>
-          <tr><td style="padding:8px 0;color:#111;font-size:15px;font-weight:700;border-top:1px solid #e5e7eb;">Total pagado</td><td style="padding:8px 0;text-align:right;color:#111;font-size:15px;font-weight:700;border-top:1px solid #e5e7eb;">${e(clp(total))}</td></tr>`
-    : `
-          <tr><td style="padding:8px 0;color:#111;font-size:15px;font-weight:700;border-top:1px solid #e5e7eb;">Total</td><td style="padding:8px 0;text-align:right;color:#111;font-size:15px;font-weight:700;border-top:1px solid #e5e7eb;">Gratis</td></tr>`
-
-  return `<!DOCTYPE html>
-<html lang="es">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
-<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f9fafb;">
-  <div style="max-width:600px;margin:0 auto;padding:32px 16px;">
-    <div style="background:#fff;border-radius:12px;padding:32px 24px;border:1px solid #e5e7eb;">
-      <div style="text-align:center;margin-bottom:16px;">
-        <span style="display:inline-block;padding:4px 12px;background:#f0fdf4;color:#16a34a;border-radius:20px;font-size:13px;font-weight:600;">Compra confirmada</span>
-      </div>
-      <h1 style="font-size:22px;color:#111;text-align:center;margin:0 0 4px;">¡Hola ${e(customerName)}! Aquí están tus entradas</h1>
-      <h2 style="font-size:18px;color:#374151;text-align:center;margin:0 0 24px;font-weight:500;">${e(eventName)}</h2>
-
-      <div style="text-align:center;margin-bottom:24px;">
-        <a href="${e(orderUrl)}" style="display:inline-block;padding:14px 28px;background:#111;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">Ver mis entradas (QR)</a>
-        <p style="color:#6b7280;font-size:12px;margin:8px 0 0;">Muestra el código QR de cada entrada en la puerta.</p>
-      </div>
-
-      <div style="background:#f3f4f6;border-radius:8px;padding:16px;margin-bottom:16px;">
-        <p style="margin:0 0 8px;color:#6b7280;font-size:13px;">Cuándo y dónde</p>
-        <table style="width:100%;border-collapse:collapse;">${datesHtml || '<tr><td style="color:#6b7280;font-size:14px;">Revisa los detalles en el link de tus entradas.</td></tr>'}</table>
-        ${calendarUrl ? `<p style="margin:12px 0 0;"><a href="${e(calendarUrl)}" style="color:#2563eb;font-size:13px;">+ Agregar a Google Calendar</a> <span style="color:#9ca3af;font-size:12px;">(también adjuntamos un archivo .ics)</span></p>` : ''}
-      </div>
-
-      ${secretLocation ? `
-      <div style="background:#fefce8;border:1px solid #fde68a;border-radius:8px;padding:16px;margin-bottom:16px;">
-        <p style="margin:0 0 4px;color:#92400e;font-size:13px;font-weight:600;">Dirección exclusiva para asistentes</p>
-        <p style="margin:0;color:#111;font-size:14px;">${e(secretLocation)}</p>
-      </div>` : ''}
-
-      <div style="border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:16px;">
-        <p style="margin:0 0 8px;color:#6b7280;font-size:13px;">${e(LEGAL.receiptLabel)}</p>
-        <table style="width:100%;border-collapse:collapse;">${ticketsHtml}${totalsHtml}</table>
-        <p style="margin:12px 0 0;color:#9ca3af;font-size:12px;">Orden ${e(orderId)} · ${e(orderDate)}</p>
-      </div>
-
-      ${legalFooterHtml({ reason: 'Recibes este correo porque compraste entradas en AI Tickets. Guárdalo como comprobante de compra: el evento es organizado y ofrecido por su productora.' })}
-    </div>
-  </div>
-</body>
-</html>`
 }
 
 /**
@@ -294,7 +230,7 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
       ? googleCalendarUrl({ eventName: event.name || 'Evento', start, end, location: calendarLocation, details: `Tus entradas: ${orderUrl}` })
       : null
 
-    const html = buildTicketsHtml({
+    const email = await renderTicketsEmail({
       customerName: buyer.first_name || 'asistente',
       eventName: event.name || 'Tu evento',
       dateLines,
@@ -331,8 +267,9 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
 
     await sendEmail({
       to: formatRecipient(`${buyer.first_name || ''} ${buyer.last_name || ''}`, buyer.email),
-      subject: `🎟️ Tus entradas para ${String(event.name || 'tu evento').replace(/[\r\n]/g, ' ')}`,
-      html,
+      subject: email.subject,
+      html: email.html,
+      text: email.text,
       replyTo: LEGAL.supportEmail,
       bcc,
       attachments,

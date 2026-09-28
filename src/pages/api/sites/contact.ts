@@ -22,7 +22,8 @@ import {
   siteUrl,
   type SiteRecord,
 } from "../../../lib/sites";
-import { sendEmail, legalFooterHtml, isValidEmail, formatRecipient } from "../../../../netlify/lib/mailer.mjs";
+import { sendEmail, isValidEmail, formatRecipient } from "../../../../netlify/lib/mailer.mjs";
+import { renderSiteContactMessageEmail } from "../../../../netlify/lib/emails/index.mjs";
 
 export const prerender = false;
 
@@ -57,38 +58,11 @@ const BodySchema = z.object({
   startedAt: z.coerce.number().optional().nullable(),
 });
 
-const escapeHtml = (v: unknown) =>
-  String(v ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-
 const oneLine = (v: string) => v.replace(/[\r\n]+/g, " ").trim();
 
 function ipHashFor(ip: string): string {
   const pepper = import.meta.env.INTERNAL_API_SECRET || (globalThis as any).process?.env?.INTERNAL_API_SECRET || "aitickets";
   return createHash("sha256").update(`${ip}|${pepper}`).digest("hex");
-}
-
-function buildEmailHtml(site: SiteRecord, siteName: string, data: { name: string; email: string; phone?: string | null; message: string }) {
-  const messageHtml = escapeHtml(data.message).replace(/\r?\n/g, "<br>");
-  const row = (label: string, value: string) =>
-    `<tr><td style="padding:4px 12px 4px 0;color:#6b7280;white-space:nowrap;vertical-align:top">${label}</td><td style="padding:4px 0">${value}</td></tr>`;
-  return `<!doctype html><html lang="es-CL"><body style="margin:0;background:#f9fafb;padding:24px 12px;font-family:Arial,Helvetica,sans-serif;color:#111827">
-<div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:12px;padding:24px;border:1px solid #e5e7eb">
-<h1 style="font-size:18px;margin:0 0 4px 0">Nuevo mensaje desde tu sitio</h1>
-<p style="margin:0 0 16px 0;color:#6b7280;font-size:14px">${escapeHtml(siteName)} · <a href="${escapeHtml(siteUrl(site, "/contacto"))}" style="color:#4d7c0f">${escapeHtml(siteUrl(site, "/contacto"))}</a></p>
-<table style="font-size:14px;border-collapse:collapse;margin-bottom:16px">
-${row("Nombre", escapeHtml(data.name))}
-${row("Correo", `<a href="mailto:${escapeHtml(data.email)}" style="color:#4d7c0f">${escapeHtml(data.email)}</a>`)}
-${data.phone ? row("Teléfono", escapeHtml(data.phone)) : ""}
-</table>
-<div style="font-size:15px;line-height:1.6;background:#f3f4f6;border-radius:8px;padding:16px">${messageHtml}</div>
-<p style="font-size:13px;color:#6b7280;margin:16px 0 0 0">Responde este correo para contestarle directamente a ${escapeHtml(data.name)}.</p>
-${legalFooterHtml({ reason: "Recibes este correo porque alguien usó el formulario de contacto de tu sitio en AI Tickets." })}
-</div></body></html>`;
 }
 
 export const POST: APIRoute = async ({ request, locals }) => {
@@ -197,10 +171,19 @@ export const POST: APIRoute = async ({ request, locals }) => {
     mailError = "sin_destinatario";
   } else {
     try {
+      const email = await renderSiteContactMessageEmail({
+        siteName,
+        contactUrl: siteUrl(site, "/contacto"),
+        name: oneLine(data.name),
+        email: data.email,
+        phone,
+        message: data.message,
+      });
       await sendEmail({
         to: recipient,
-        subject: `Nuevo mensaje de ${oneLine(data.name).slice(0, 80)} desde tu sitio`,
-        html: buildEmailHtml(site, siteName, { name: oneLine(data.name), email: data.email, phone, message: data.message }),
+        subject: email.subject,
+        html: email.html,
+        text: email.text,
         replyTo: formatRecipient(oneLine(data.name), data.email),
         tags: ["site-contact"],
       });

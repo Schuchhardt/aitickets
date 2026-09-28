@@ -9,6 +9,8 @@ import AppHeader from "../../components/AppHeader.vue";
 import AppFooter from "../../components/AppFooter.vue";
 import GradientBackground from "../../components/Hero/GradientBackground.vue";
 import { confirmProducerEmail, verifyEmailVerifyToken } from "../../lib/email-verification";
+import { createPasswordlessSession, isSameSitePost } from "../../lib/magic-link";
+import { setSessionCookies } from "../../lib/supabaseServer";
 import "../../styles/global.css";
 
 export const prerender = false;
@@ -27,12 +29,22 @@ if (Astro.request.method === "POST") {
   } catch {
     token = "";
   }
-  const result = token ? await confirmProducerEmail(token) : null;
+  const result = token && isSameSitePost(Astro.request, Astro.url) ? await confirmProducerEmail(token) : null;
   if (!result) {
     state = "invalid";
   } else if (result.ok) {
     state = result.alreadyVerified ? "already" : "ok";
     slug = result.slug;
+    // Primera confirmación: el usuario probó que controla el correo => sesión iniciada sin contraseña.
+    // (Un enlace ya usado no vuelve a iniciar sesión: el token de verificación dura 48 h.)
+    if (!result.alreadyVerified) {
+      const session = await createPasswordlessSession(result.email);
+      if (session) {
+        setSessionCookies(Astro, session.accessToken, session.refreshToken);
+        Astro.response.headers.set("Cache-Control", "private, no-store");
+        return Astro.redirect("/dashboard?bienvenida=1", 303);
+      }
+    }
   } else {
     state = result.error;
   }
@@ -71,7 +83,7 @@ const titles: Record<State, string> = {
   confirm: "Confirma tu correo",
 };
 const messages: Record<State, string> = {
-  ok: "Tu cuenta de productor está activa. Ya puedes ingresar al panel, crear tu primer evento y publicar tu web de eventos gratis.",
+  ok: "Tu cuenta de productor está activa. Ingresa al panel para crear tu primer evento y publicar tu web de eventos gratis.",
   already: "Tu cuenta ya está activa. Ingresa con tu correo y contraseña.",
   expired: "Los enlaces de confirmación duran 48 horas. Pide uno nuevo con tu correo:",
   invalid: "Puede que el enlace esté incompleto o que ya hayas pedido uno más reciente. Pide uno nuevo con tu correo:",
@@ -83,7 +95,11 @@ const messages: Record<State, string> = {
 const showResend = state === "expired" || state === "invalid" || state === "server" || state === "missing";
 ---
 
-<Layout title="Confirmar correo | AI Tickets" description="Confirma el correo de tu cuenta de productor en AI Tickets." noindex={true}>
+<Layout title="Confirmar correo | AI Tickets" description="Confirma el correo de tu cuenta de productor en AI Tickets." noindex={true} analytics={false}>
+  <!-- El token ya va en el campo oculto del formulario: se quita de la URL (historial, capturas, extensiones). -->
+  <script is:inline>
+    try { if (/[?&]t=/.test(location.search)) history.replaceState(null, "", location.pathname); } catch (e) {}
+  </script>
   <AppHeader client:idle />
 
   <main class="relative min-h-screen flex items-center justify-center py-20 px-4 overflow-hidden">

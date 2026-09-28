@@ -97,7 +97,14 @@ const handleLogin = async () => {
       </div>
       
       <div>
-        <label class="block text-sm font-medium text-white/80 mb-1">Contraseña</label>
+        <div class="flex items-center justify-between mb-1">
+          <label class="block text-sm font-medium text-white/80">Contraseña</label>
+          <a
+            :href="email ? `/organizadores/recuperar?email=${encodeURIComponent(email.trim())}` : '/organizadores/recuperar'"
+            class="text-xs font-medium text-white/70 hover:text-white hover:underline"
+            data-testid="login-forgot-password"
+          >¿Olvidaste tu contraseña?</a>
+        </div>
         <div class="relative">
           <input 
             v-model="password" 

@@ -98,35 +98,20 @@ const { data: dbUser } = await getSupabaseAdmin()
             </form>
         </div>
 
-        <!-- Seguridad: cambio de contraseña (cualquier rol) -->
-        <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm mt-6">
+        <!-- Seguridad: cambio de contraseña (cualquier rol). Sin contraseña actual: se envía un enlace al
+             correo que abre el panel con el modal para crear la nueva (/api/auth/magic-link → /auth/link). -->
+        <div id="password" class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm mt-6">
             <h2 class="text-lg font-bold mb-1">Contraseña</h2>
-            <p class="text-gray-500 text-sm mb-4">Para cambiarla necesitas tu contraseña actual.</p>
-
-            <form id="passwordForm" class="space-y-4">
-                <div id="pwMsg" class="hidden p-4 rounded-lg"></div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1" for="currentPassword">Contraseña actual</label>
-                    <input id="currentPassword" name="currentPassword" type="password" autocomplete="current-password" required
-                        class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all" />
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1" for="newPassword">Nueva contraseña</label>
-                    <input id="newPassword" name="newPassword" type="password" autocomplete="new-password" minlength="6" required placeholder="Mínimo 6 caracteres"
-                        class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all" />
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1" for="confirmPassword">Confirmar nueva contraseña</label>
-                    <input id="confirmPassword" name="confirmPassword" type="password" autocomplete="new-password" minlength="6" required placeholder="Repite la nueva contraseña"
-                        class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all" />
-                </div>
-                <div class="pt-2">
-                    <button type="submit" id="savePwBtn"
-                        class="px-6 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed">
-                        Cambiar contraseña
-                    </button>
-                </div>
-            </form>
+            <p class="text-gray-500 text-sm mb-4">
+                Te enviaremos un enlace a <span class="font-medium text-gray-700">{user.email}</span>. Al abrirlo
+                entrarás directo a tu panel y podrás crear tu nueva contraseña, sin necesidad de la actual.
+            </p>
+            <div id="pwMsg" class="hidden p-4 rounded-lg mb-4" aria-live="polite"></div>
+            <button type="button" id="sendPwLinkBtn"
+                class="px-6 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                data-testid="profile-change-password">
+                Cambiar contraseña
+            </button>
         </div>
     </div>
 
@@ -198,50 +183,38 @@ const { data: dbUser } = await getSupabaseAdmin()
             });
         }
 
-        // Cambio de contraseña
-        const pwForm = document.getElementById("passwordForm") as HTMLFormElement | null;
+        // Cambio de contraseña: enviar el enlace al correo
         const pwMsg = document.getElementById("pwMsg") as HTMLElement | null;
-        const savePwBtn = document.getElementById("savePwBtn") as HTMLButtonElement | null;
+        const sendPwLinkBtn = document.getElementById("sendPwLinkBtn") as HTMLButtonElement | null;
 
         const showPwMsg = (text: string, isError: boolean) => {
             if (!pwMsg) return;
             pwMsg.textContent = text;
-            pwMsg.className = `p-4 rounded-lg border ${isError ? "bg-red-50 text-red-800 border-red-200" : "bg-green-50 text-green-800 border-green-200"}`;
+            pwMsg.className = `p-4 rounded-lg border mb-4 ${isError ? "bg-red-50 text-red-800 border-red-200" : "bg-green-50 text-green-800 border-green-200"}`;
         };
 
-        pwForm?.addEventListener("submit", async (e) => {
-            e.preventDefault();
-            const currentPassword = (document.getElementById("currentPassword") as HTMLInputElement).value;
-            const newPassword = (document.getElementById("newPassword") as HTMLInputElement).value;
-            const confirmPassword = (document.getElementById("confirmPassword") as HTMLInputElement).value;
-
-            if (newPassword.length < 6) return showPwMsg("La contraseña debe tener al menos 6 caracteres", true);
-            if (newPassword !== confirmPassword) return showPwMsg("Las contraseñas no coinciden", true);
-
-            if (savePwBtn) {
-                savePwBtn.disabled = true;
-                savePwBtn.textContent = "Guardando...";
-            }
+        sendPwLinkBtn?.addEventListener("click", async () => {
+            sendPwLinkBtn.disabled = true;
+            sendPwLinkBtn.textContent = "Enviando...";
             try {
-                const res = await fetch("/api/auth/change-password", {
+                const res = await fetch("/api/auth/magic-link", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ currentPassword, newPassword }),
+                    body: JSON.stringify({ purpose: "change-password" }),
                 });
                 const data = await res.json().catch(() => ({}));
                 if (res.ok) {
-                    showPwMsg("Contraseña actualizada correctamente", false);
-                    pwForm.reset();
+                    showPwMsg(data.message || "Te enviamos un enlace a tu correo.", false);
+                    sendPwLinkBtn.textContent = "Reenviar enlace";
                 } else {
-                    showPwMsg(data.message || "Error al cambiar la contraseña", true);
+                    showPwMsg(data.message || "No pudimos enviar el enlace. Intenta de nuevo.", true);
+                    sendPwLinkBtn.textContent = "Cambiar contraseña";
                 }
             } catch {
                 showPwMsg("Error de conexión", true);
+                sendPwLinkBtn.textContent = "Cambiar contraseña";
             } finally {
-                if (savePwBtn) {
-                    savePwBtn.disabled = false;
-                    savePwBtn.textContent = "Cambiar contraseña";
-                }
+                sendPwLinkBtn.disabled = false;
             }
         });
     </script>

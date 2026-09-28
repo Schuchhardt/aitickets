@@ -10,8 +10,8 @@ import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { signInboundConfirmToken } from "../../../lib/lead-token";
 import { jsonResponse } from "../../../lib/supabaseServer";
 import { verifyTurnstile } from "../../../../netlify/lib/turnstile.mjs";
-import { SITE_URL, legalFooterHtml, legalFooterText, sendEmail } from "../../../../netlify/lib/mailer.mjs";
-import { escapeHtml } from "../../../../netlify/lib/supabase.mjs";
+import { SITE_URL, sendEmail } from "../../../../netlify/lib/mailer.mjs";
+import { renderInboundLeadConfirmEmail } from "../../../../netlify/lib/emails/index.mjs";
 import { normalizeEmail } from "../../../../netlify/lib/outreach/domains.mjs";
 import { createInboundPending } from "../../../../netlify/lib/outreach/sources/inbound.mjs";
 
@@ -54,18 +54,12 @@ export const POST: APIRoute = async ({ request }) => {
         if (!token) throw new Error("LEAD_TOKEN_SECRET no configurado");
         // Nunca el Host de la request (un dominio propio de un productor es alias del mismo sitio).
         const confirmUrl = `${SITE_URL}/api/outreach/inbound-confirm?t=${encodeURIComponent(token)}`;
-        const reason = "Recibes este correo porque alguien ingresó esta dirección en el formulario de aitickets.cl/web-gratis. Si no fuiste tú, ignóralo: no guardaremos tu correo para contactarte.";
+        const confirmEmail = await renderInboundLeadConfirmEmail({ orgName, url: confirmUrl });
         await sendEmail({
             to: email,
-            subject: "Confirma tu correo para tu web de eventos gratis",
-            html: `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#111">
-<p>Hola,</p>
-<p>Recibimos una solicitud para crear la web de eventos gratis de <strong>${escapeHtml(orgName)}</strong> en AI Tickets.</p>
-<p>Para continuar, confirma que este correo es tuyo:</p>
-<p><a href="${escapeHtml(confirmUrl)}" style="display:inline-block;background:#111;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:bold">Confirmar mi correo</a></p>
-<p style="font-size:13px;color:#555">El enlace vence en 72 horas.</p>
-</div>${legalFooterHtml({ reason })}`,
-            text: `Hola,\n\nRecibimos una solicitud para crear la web de eventos gratis de ${orgName} en AI Tickets.\nPara continuar, confirma que este correo es tuyo (el enlace vence en 72 horas):\n${confirmUrl}\n\n${legalFooterText({ reason })}`,
+            subject: confirmEmail.subject,
+            html: confirmEmail.html,
+            text: confirmEmail.text,
             tags: ["web-gratis-confirm"],
         });
         return jsonResponse({

@@ -7,51 +7,13 @@
 //   recordado quien tenga un 'reminder_24h' de ese evento en las últimas 20 horas.
 // - CTA a /order/<order_id> de cada asistente cuando existe (vía recipientVariables de sendEmail).
 import { getSupabaseAdmin, escapeHtml, fetchAllRows } from '../../lib/supabase.mjs'
-import { sendEmail, SITE_URL, formatRecipient, isValidEmail, legalFooterHtml } from '../../lib/mailer.mjs'
+import { sendEmail, SITE_URL, formatRecipient, isValidEmail } from '../../lib/mailer.mjs'
+import { renderReminderEmail } from '../../lib/emails/index.mjs'
 import { LEGAL } from '../../lib/legal.mjs'
 import { EVENT_DATE_COLUMNS, todayInTimeZone, addDays, formatDateOnlyLong, formatTimeShort, formatEventLocation } from '../../lib/dates.mjs'
 
 const REMINDER_TYPE = 'reminder_24h'
 const DEDUPE_WINDOW_HOURS = 20
-
-function buildReminderHtml(eventName, eventDate, startTime, venue) {
-  const e = escapeHtml
-  return `<!DOCTYPE html>
-<html lang="es">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
-<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f9fafb;">
-  <div style="max-width:600px;margin:0 auto;padding:40px 16px;">
-    <div style="background:white;border-radius:12px;padding:32px 24px;border:1px solid #e5e7eb;">
-      <div style="text-align:center;margin-bottom:24px;">
-        <span style="display:inline-block;padding:4px 12px;background:#f0fdf4;color:#16a34a;border-radius:20px;font-size:13px;font-weight:600;">Recordatorio</span>
-      </div>
-      <h1 style="font-size:22px;color:#111;text-align:center;margin:0 0 8px;">¡Hola %recipient.name%, tu evento es mañana!</h1>
-      <h2 style="font-size:18px;color:#374151;text-align:center;margin:0 0 24px;font-weight:500;">${e(eventName)}</h2>
-      <div style="background:#f3f4f6;border-radius:8px;padding:16px;margin-bottom:24px;">
-        <table style="width:100%;border-collapse:collapse;">
-          <tr>
-            <td style="padding:8px 0;color:#6b7280;font-size:14px;">Fecha</td>
-            <td style="padding:8px 0;color:#111;font-size:14px;text-align:right;font-weight:500;">${e(eventDate)}</td>
-          </tr>
-          <tr>
-            <td style="padding:8px 0;color:#6b7280;font-size:14px;">Hora</td>
-            <td style="padding:8px 0;color:#111;font-size:14px;text-align:right;font-weight:500;">${e(startTime)} hrs</td>
-          </tr>
-          <tr>
-            <td style="padding:8px 0;color:#6b7280;font-size:14px;">Lugar</td>
-            <td style="padding:8px 0;color:#111;font-size:14px;text-align:right;font-weight:500;">${e(venue)}</td>
-          </tr>
-        </table>
-      </div>
-      <div style="text-align:center;">
-        <a href="%recipient.order_url%" style="display:inline-block;padding:12px 24px;background:#111;color:white;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Ver mis entradas</a>
-      </div>
-      ${legalFooterHtml({ reason: 'Recibiste este correo porque tienes entradas para este evento. El evento es organizado por su productora.' })}
-    </div>
-  </div>
-</body>
-</html>`
-}
 
 export default async function handler() {
   console.log('🔔 Revisando recordatorios de eventos...')
@@ -154,8 +116,12 @@ export default async function handler() {
         if (!recipients.length) continue
 
         const venue = formatEventLocation(ed.event_locations) || event.location || 'Revisa los detalles del evento'
-        const html = buildReminderHtml(event.name, formatDateOnlyLong(ed.date), formatTimeShort(ed.start_time), venue)
-        const subject = `🎪 Recordatorio: ${String(event.name || '').replace(/[\r\n]/g, ' ')} es mañana`
+        const { subject, html, text } = await renderReminderEmail({
+          eventName: event.name,
+          eventDate: formatDateOnlyLong(ed.date),
+          startTime: formatTimeShort(ed.start_time),
+          venue,
+        })
 
         const sent = []
         for (let i = 0; i < recipients.length; i += 50) {
@@ -171,6 +137,7 @@ export default async function handler() {
               to: toList,
               subject,
               html,
+              text,
               replyTo: LEGAL.supportEmail,
               recipientVariables: recipientVars,
               tags: ['reminder'],
