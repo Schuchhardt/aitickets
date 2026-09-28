@@ -16,6 +16,10 @@ import {
   formatEventLocation,
   formatFunctionLabel,
 } from './dates.mjs'
+import QRCode from 'qrcode'
+
+// Máximo de QR como imagen dentro del correo (el resto se abre con el link de la orden)
+const MAX_INLINE_QR = 20
 
 // Un claim de envío sin éxito más antiguo que esto se considera abandonado (la función murió a mitad de camino).
 const EMAIL_CLAIM_STALE_MINUTES = 10
@@ -151,7 +155,7 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
     // Entradas reales de la orden (sirve también para cortesías sin ticket_details)
     const { data: attendeeRows, error: attendeesError } = await supabase
       .from('event_attendees')
-      .select('id, event_ticket_id, event_tickets ( ticket_name, price, event_date_id )')
+      .select('id, event_ticket_id, qr_code, event_tickets ( ticket_name, price, event_date_id )')
       .eq('event_order_id', order.id)
       .or('status.is.null,status.neq.cancelled')
     if (attendeesError) throw new Error(attendeesError.message)
@@ -231,7 +235,32 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
       ? googleCalendarUrl({ eventName: event.name || 'Evento', start, end, location: calendarLocation, details: `Tus entradas: ${orderUrl}` })
       : null
 
+    // QR listos en el correo (imagen inline por entrada). Límite para no inflar el correo: el resto, por link.
+    const withQr = attendeeRows.filter(r => r.qr_code)
+    const qrTickets = []
+    const qrAttachments = []
+    for (const [i, row] of withQr.slice(0, MAX_INLINE_QR).entries()) {
+      try {
+        const png = await QRCode.toBuffer(String(row.qr_code), { type: 'png', margin: 1, width: 400, errorCorrectionLevel: 'M' })
+        const cid = `qr-entrada-${i + 1}`
+        const fnId = row.event_tickets?.event_date_id
+        const fn = fnId != null ? datesById.get(Number(fnId)) : null
+        qrTickets.push({
+          cid,
+          index: i + 1,
+          total: withQr.length,
+          label: row.event_tickets?.ticket_name || 'Entrada',
+          functionLabel: fn ? formatFunctionLabel(fn, { withPlace: false }) : '',
+        })
+        qrAttachments.push({ filename: `entrada-${i + 1}.png`, content: png, contentType: 'image/png', contentId: cid })
+      } catch (err) {
+        console.warn(`Orden ${order.id}: no se pudo generar el QR ${i + 1}:`, err?.message)
+      }
+    }
+
     const email = await renderTicketsEmail({
+      qrTickets,
+      qrMoreCount: Math.max(0, withQr.length - qrTickets.length),
       customerName: buyer.first_name || 'asistente',
       eventName: event.name || 'Tu evento',
       dateLines,
@@ -265,6 +294,7 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
           contentType: 'text/calendar',
         }]
       : []
+    attachments.push(...qrAttachments)
 
     await sendEmail({
       to: formatRecipient(`${buyer.first_name || ''} ${buyer.last_name || ''}`, buyer.email),

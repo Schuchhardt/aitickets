@@ -1,6 +1,6 @@
 // Correo con las entradas de una orden. Los datos los arma netlify/lib/tickets-email.mjs (que también
 // genera el adjunto .ics); aquí solo se presenta.
-import { Link } from '@react-email/components'
+import { Link, Img } from '@react-email/components'
 import { LEGAL } from '../legal.mjs'
 import { h, str, safeHref, COLORS, FONT_FAMILY, EmailLayout, TABLE_PROPS, Title, Subtitle, Paragraph, Badge, PrimaryButton, Panel, renderEmail } from './layout.mjs'
 
@@ -77,6 +77,29 @@ function ReceiptRows({ ticketLines, subtotal, fee, total }) {
  *   orderId: string, orderDate?: string, orderUrl: string, calendarUrl?: string | null,
  * }} data
  */
+/** QR de cada entrada como imagen inline (cid:...), para mostrarlo en la puerta sin abrir el link. */
+function QrTickets({ qrTickets, moreCount }) {
+  const card = { border: `1px solid ${COLORS.border}`, borderRadius: '12px', padding: '16px', margin: '0 0 12px', textAlign: 'center' }
+  const label = { fontFamily: FONT_FAMILY, fontSize: '14px', lineHeight: '20px', fontWeight: 600, color: COLORS.text, margin: '10px 0 0' }
+  const sub = { fontFamily: FONT_FAMILY, fontSize: '12px', lineHeight: '18px', color: COLORS.subtle, margin: '2px 0 0' }
+  return h(
+    'div',
+    { style: { margin: '8px 0 20px' } },
+    ...qrTickets.map((t) =>
+      h(
+        'div',
+        { key: t.cid, style: card },
+        h(Img, { src: `cid:${t.cid}`, width: 200, height: 200, alt: `Código QR de tu entrada ${str(t.index)}`, style: { display: 'block', margin: '0 auto', width: '200px', height: '200px' } }),
+        h('p', { style: label }, str(t.label)),
+        h('p', { style: sub }, `Entrada ${str(t.index)} de ${str(t.total)}${t.functionLabel ? ` · ${str(t.functionLabel)}` : ''}`)
+      )
+    ),
+    moreCount > 0
+      ? h(Paragraph, { small: true, align: 'center', style: { color: COLORS.subtle } }, `Y ${moreCount} entrada${moreCount === 1 ? '' : 's'} más: ábrelas todas con el botón "Ver mis entradas".`)
+      : null
+  )
+}
+
 export async function renderTicketsEmail(data = {}) {
   const customerName = str(data.customerName).trim() || 'asistente'
   const eventName = str(data.eventName).trim() || 'Tu evento'
@@ -96,7 +119,10 @@ export async function renderTicketsEmail(data = {}) {
     h(Badge, null, 'Compra confirmada'),
     h(Title, null, `¡Hola ${customerName}! Aquí están tus entradas`),
     h(Subtitle, null, eventName),
-    h(PrimaryButton, { href: data.orderUrl, hint: 'Muestra el código QR de cada entrada en la puerta.' }, 'Ver mis entradas (QR)'),
+    Array.isArray(data.qrTickets) && data.qrTickets.length
+      ? h(QrTickets, { qrTickets: data.qrTickets, moreCount: Number(data.qrMoreCount) || 0 })
+      : null,
+    h(PrimaryButton, { href: data.orderUrl, hint: data.qrTickets?.length ? 'Muestra el QR de cada entrada en la puerta (también puedes abrirlas desde aquí).' : 'Muestra el código QR de cada entrada en la puerta.' }, 'Ver mis entradas (QR)'),
     h(
       Panel,
       { label: 'Cuándo y dónde' },
