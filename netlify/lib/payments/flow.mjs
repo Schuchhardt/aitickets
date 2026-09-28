@@ -115,7 +115,7 @@ export async function verifyFlowReturnToken(token) {
 /**
  * Checkout de Flow para una orden pendiente (interfaz común de netlify/lib/payments/index.mjs).
  * @param {{order:{id:string}, eventName:string, ticketQty:number, total:number, buyerEmail:string, siteUrl:string, holdMinutes:number}} args
- * @returns {Promise<{redirectUrl:string, externalId:string|null, sessionId:null}>}
+ * @returns {Promise<{redirectUrl:string, externalId:string|null}>}
  */
 export async function createFlowCheckout({ order, eventName, ticketQty, total, buyerEmail, siteUrl, holdMinutes }) {
   const payment = await createFlowPayment({
@@ -131,6 +131,5 @@ export async function createFlowCheckout({ order, eventName, ticketQty, total, b
   return {
     redirectUrl: `${payment.url}?token=${payment.token}`,
     externalId: payment.flowOrder != null ? String(payment.flowOrder) : null,
-    sessionId: null,
   }
 }

@@ -1,6 +1,5 @@
-// Cumplimiento de órdenes, común a todos los proveedores de pago (Flow, Stripe).
-// Lo usan el webhook de Flow (/api/payment-confirmation), el de Stripe (/api/webhooks/stripe) y la
-// página de retorno /pago/retorno como red de seguridad.
+// Cumplimiento de órdenes pagadas con Flow.
+// Lo usan el webhook de Flow (/api/payment-confirmation) y la conciliación de expire-pending-orders.
 //
 // - Idempotente: una orden ya pagada no se reprocesa (solo se completan entradas/correo si faltaran).
 // - Concurrencia: la orden se reclama de forma atómica (status 'processing') antes de emitir entradas;
@@ -8,22 +7,18 @@
 // - Pagos tardíos: se pueden reclamar órdenes pending/failed/rejected/cancelled/expired, así un pago que
 //   llega después de liberar la reserva se cumple o queda en 'review'. Un pago tardío compite contra las
 //   reservas vigentes de otros compradores (no se las quita): si no alcanza, el tardío queda en 'review'.
-// - Un 'processing' abandonado lo retoma el siguiente reintento del proveedor, el retorno del comprador o el
+// - Un 'processing' abandonado lo retoma el siguiente reintento del proveedor o el
 //   barrido de expire-pending-orders (payments/reconcile.mjs).
 // - Sobreventa o monto/moneda que no coincide: 'review' + Slack, nunca se emite en silencio.
 // - Reintentos: si el correo falla se devuelve httpStatus 503 para que el proveedor reintente.
-// - Stripe en modo prueba (livemode=false, o sin dato y con clave sk_test_): solo se cumplen órdenes del
-//   evento demo o de eventos marcados de prueba (STRIPE_TEST_EVENT_SLUGS). Cualquier otra queda en
-//   'review' + Slack: un pago de prueba nunca emite entradas reales (los previews comparten la base).
 import { ensureOrderAttendees, getSoldCounts } from './tickets.mjs'
 import { sendOrderTicketsEmail } from './tickets-email.mjs'
 import { notifySlack } from './slack.mjs'
 import { SITE_URL } from './mailer.mjs'
-import { isStripeTestKey, isStripeTestEligibleEvent } from './payments/mode.mjs'
 import { computeServiceFeeTax } from './fees.mjs'
 
 const LEGACY_ORDER_COLUMNS = 'id, status, event_id, attendee_id, amount, ticket_fee, total_payment, ticket_details, payment_external_id, processing_started_at, created_at'
-const PROVIDER_ORDER_COLUMNS = `${LEGACY_ORDER_COLUMNS}, payment_provider, currency, provider_session_id, payment_intent_id, hold_expires_at`
+const PROVIDER_ORDER_COLUMNS = `${LEGACY_ORDER_COLUMNS}, payment_provider, currency, hold_expires_at`
 const ORDER_COLUMNS = `${PROVIDER_ORDER_COLUMNS}, service_fee_tax`
 export const PROCESSING_STALE_MINUTES = 5
 /** Reserva por defecto de órdenes sin hold_expires_at (misma regla que aitickets_ticket_availability). */
@@ -165,21 +160,19 @@ export async function notifyFirstSaleIfNeeded(supabase, order, amount) {
   }
 }
 
-const PROVIDER_LABEL = { flow: 'Flow', stripe: 'Stripe' }
+const PROVIDER_LABEL = { flow: 'Flow' }
 
 /**
- * Confirma el pago de una orden y la cumple (entradas + correo). Común a Flow y Stripe.
+ * Confirma el pago de una orden y la cumple (entradas + correo).
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
  * @param {string} orderId  uuid de event_orders
- * @param {{provider:'flow'|'stripe', amount:number, currency?:string, externalId?:string|null,
- *          fee?:number|null, net?:number|null, method?:string|null, paymentIntentId?:string|null,
- *          livemode?:boolean|null}} payment
- *   externalId: flowOrder (Flow) o id de la Checkout Session (Stripe).
- *   livemode: solo Stripe (event.livemode / session.livemode); false = pago de prueba.
+ * @param {{provider:'flow', amount:number, currency?:string, externalId?:string|null,
+ *          fee?:number|null, net?:number|null, method?:string|null}} payment
+ *   externalId: flowOrder de Flow.
  * @returns {Promise<{status:'paid'|'already_paid'|'review'|'retry'|'not_found', httpStatus:number, message:string}>}
  */
 export async function confirmPaidOrder(supabase, orderId, payment) {
-  const { provider, amount, currency, externalId = null, fee = null, net = null, method = null, paymentIntentId = null, livemode = null } = payment || {}
+  const { provider, amount, currency, externalId = null, fee = null, net = null, method = null } = payment || {}
   const label = PROVIDER_LABEL[provider] || provider
   if (!UUID_RE.test(String(orderId || ''))) return { status: 'not_found', httpStatus: 404, message: 'Orden no encontrada' }
 
@@ -198,24 +191,9 @@ export async function confirmPaidOrder(supabase, orderId, payment) {
     return { status: 'review', httpStatus: 200, message: 'Orden reembolsada' }
   }
 
-  // Pago de prueba de Stripe: solo evento demo o marcados de prueba; si no, revisión (nunca entradas reales)
-  const testPayment = provider === 'stripe' && (livemode === false || (livemode == null && isStripeTestKey()))
-  if (testPayment) {
-    const { data: ev, error: evError } = await supabase.from('events').select('slug').eq('id', order.event_id).maybeSingle()
-    if (evError) throw new Error(`Error cargando evento de la orden: ${evError.message}`)
-    if (!isStripeTestEligibleEvent(ev?.slug)) {
-      console.error(`⚠️ Orden ${order.id}: pago de PRUEBA de Stripe (${externalId}) en un evento real (${ev?.slug || order.event_id}). No se emiten entradas.`)
-      await supabase.from('event_orders')
-        .update({ status: 'review', payment_external_id: externalId != null ? String(externalId) : order.payment_external_id })
-        .eq('id', order.id).neq('status', 'paid')
-      await notifySlack(`🚨 Orden ${order.id} en revisión: llegó un pago de PRUEBA de Stripe (livemode=false, ref ${externalId}) para el evento real "${ev?.slug || order.event_id}". No se emitieron entradas. Revisar la configuración de claves de Stripe (sk_test_ no debe usarse con eventos reales).`)
-      return { status: 'review', httpStatus: 200, message: 'Pago de prueba registrado para revisión' }
-    }
-  }
-
   const expectedAmounts = expectedPaymentAmounts(order)
   const expected = expectedAmounts.join(' o ')
-  const storedExternal = provider === 'stripe' ? (order.provider_session_id || order.payment_external_id) : order.payment_external_id
+  const storedExternal = order.payment_external_id
   const externalMatches = !storedExternal || externalId == null || String(storedExternal) === String(externalId)
   const providerMatches = !order.payment_provider || order.payment_provider === provider
   const currencyOk = !currency || String(currency).toUpperCase() === String(order.currency || 'CLP').toUpperCase()
@@ -278,9 +256,6 @@ export async function confirmPaidOrder(supabase, orderId, payment) {
     payment_commerce_id: method || null,
     payment_external_id: paymentFields.payment_external_id,
   }
-  // Columnas nuevas solo cuando hay dato (Flow sigue funcionando contra una base sin migrar)
-  if (paymentIntentId) updateData.payment_intent_id = String(paymentIntentId)
-
   // Emitir entradas antes de marcar pagada; ensureOrderAttendees es idempotente por event_order_id
   try {
     await ensureOrderAttendees(supabase, claimedOrder)
@@ -324,33 +299,6 @@ export async function markOrderFailed(supabase, orderId, status, { from = ['pend
 }
 
 /**
- * Reembolso total: orden 'refunded' + entradas anuladas (checkin rechaza status distinto de active).
- * @returns {Promise<{changed:boolean, voided:number}>}
- */
-export async function markOrderRefunded(supabase, orderId, { refundedAt = new Date().toISOString() } = {}) {
-  if (!UUID_RE.test(String(orderId || ''))) return { changed: false, voided: 0 }
-  let { data, error } = await supabase
-    .from('event_orders')
-    .update({ status: 'refunded', refunded_at: refundedAt })
-    .eq('id', orderId)
-    .neq('status', 'refunded')
-    .select('id')
-  if (error && isMissingSchemaError(error)) {
-    ;({ data, error } = await supabase.from('event_orders').update({ status: 'refunded' }).eq('id', orderId).neq('status', 'refunded').select('id'))
-  }
-  if (error) throw new Error(`Error marcando reembolso: ${error.message}`)
-  // PostgREST 12.2 falla (42703) si un UPDATE con filtro or()/and() pide la fila de vuelta
-  // (return=representation): se usa count exacto y, si hace falta, una lectura aparte.
-  const { count: voided, error: voidError } = await supabase
-    .from('event_attendees')
-    .update({ status: 'cancelled' }, { count: 'exact' })
-    .eq('event_order_id', orderId)
-    .or('status.is.null,status.neq.cancelled')
-  if (voidError) throw new Error(`Error anulando entradas: ${voidError.message}`)
-  return { changed: Boolean(data?.length), voided: voided || 0 }
-}
-
-/**
  * Registra un evento de webhook (idempotencia). Devuelve false si ya se había registrado (duplicado).
  * Si la tabla aún no existe (base sin migrar) devuelve true: el cumplimiento igual es idempotente.
  */
@@ -362,13 +310,4 @@ export async function recordPaymentEvent(supabase, { id, provider, type, orderId
   if (error.code === '23505') return false
   console.error(`No se pudo registrar el evento de pago ${id}:`, error.message)
   return true
-}
-
-/** Olvida un evento registrado para que el reintento del proveedor vuelva a procesarlo. Nunca lanza. */
-export async function forgetPaymentEvent(supabase, id) {
-  try {
-    await supabase.from('aitickets_payment_events').delete().eq('id', String(id))
-  } catch (err) {
-    console.error(`No se pudo borrar el evento de pago ${id}:`, err?.message)
-  }
 }

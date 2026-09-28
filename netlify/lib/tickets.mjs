@@ -6,7 +6,7 @@ import crypto from 'node:crypto'
 // Cargo por servicio (10% + IVA del cargo): fuente única en fees.mjs.
 export { SERVICE_FEE_RATE, IVA_RATE, computeServiceFee, computeBuyerTotal } from './fees.mjs'
 export const DEFAULT_MAX_PER_PURCHASE = 10
-/** Reserva por defecto de una orden pendiente (Flow). Stripe usa 31 min: ver payments/index.mjs holdMinutesFor(). */
+/** Reserva por defecto de una orden pendiente (Flow). */
 export const PENDING_HOLD_MINUTES = 15
 
 export const TICKET_COLUMNS = 'id, event_id, event_date_id, ticket_name, price, max_quantity, is_gift, status, init_date, end_date, total_quantity'

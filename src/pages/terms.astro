@@ -75,7 +75,6 @@ const vatPct = Math.round(LEGAL.serviceFeeVatRate * 100);
         <h2>4. Medios de pago</h2>
         <ul>
           <li><strong>Webpay, a través de Flow:</strong> tarjetas de débito, crédito y prepago emitidas en Chile. En tu estado de cuenta el cobro aparecerá a nombre de <strong>{LEGAL.flowMerchantName}</strong> o de Flow.</li>
-          <li><strong>Tarjetas internacionales, Apple Pay y Google Pay, a través de Stripe</strong> (cuando esté disponible en el checkout): el cobro aparecerá a nombre de <strong>{LEGAL.legalName}</strong> (EE.UU.) con la referencia <strong>{LEGAL.stripeStatementDescriptorSuffix}</strong>, porque es quien procesa estos pagos. Tu banco podría aplicar cargos por compra internacional o conversión de moneda.</li>
           <li>Los precios se expresan en pesos chilenos (CLP). No almacenamos los datos completos de tu tarjeta: los procesa directamente el proveedor de pago.</li>
         </ul>
       </section>

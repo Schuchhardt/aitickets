@@ -9,7 +9,7 @@ test("reserva, datos del comprador, términos y confirmación simulada", async (
   const purchaseCalls: string[] = [];
   page.on("request", (req) => {
     if (req.method() === "POST" && /\/api\/purchase-ticket/.test(req.url())) purchaseCalls.push(req.url());
-    if (/flow\.cl|checkout\.stripe\.com/.test(req.url())) purchaseCalls.push(req.url());
+    if (/flow\.cl/.test(req.url())) purchaseCalls.push(req.url());
   });
 
   const response = await page.goto(`/eventos/${DEMO_EVENT_SLUG}`);
@@ -41,7 +41,6 @@ test("reserva, datos del comprador, términos y confirmación simulada", async (
 
   // Paso 3: pago simulado
   await expect(dialog.getByTestId("resv-step-payment")).toBeVisible();
-  await expect(dialog.getByTestId("resv-provider-stripe")).toHaveCount(0);
   const pay = dialog.getByTestId("resv-pay-button");
   await expect(pay).toContainText("Simular pago");
   await pay.click();

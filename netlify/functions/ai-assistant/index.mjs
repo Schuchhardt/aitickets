@@ -8,7 +8,6 @@ import { getSupabaseAdmin, json } from '../../lib/supabase.mjs'
 import { isValidEmail } from '../../lib/mailer.mjs'
 import { TICKET_COLUMNS, isTicketOnSale, maxPerPurchase, getSoldCounts } from '../../lib/tickets.mjs'
 import { computeBuyerTotal } from '../../lib/fees.mjs'
-import { enabledProviders } from '../../lib/payments/index.mjs'
 import { isDemoEventSlug, getDemoEventDate } from '../../../src/lib/demoEvent.mjs'
 import { EVENT_DATE_COLUMNS, todayInTimeZone, formatDateOnlyLong, formatTimeShort, formatEventLocation } from '../../lib/dates.mjs'
 
@@ -109,9 +108,7 @@ async function loadEventContext(supabase, eventId) {
 }
 
 function paymentMethodsLine() {
-  return enabledProviders().includes('stripe')
-    ? 'El pago se hace con Webpay (tarjetas chilenas) o con tarjeta internacional / Apple Pay / Google Pay (procesado por Chanium LLC, EE.UU.).'
-    : 'El pago se hace con Webpay.'
+  return 'El pago se hace con Webpay.'
 }
 
 function buildSystemPrompt({ event, isDemo, dates, tickets, faqs }) {

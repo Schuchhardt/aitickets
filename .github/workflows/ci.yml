@@ -31,7 +31,6 @@ jobs:
       FLOW_API_KEY: ci-dummy
       FLOW_SECRET_KEY: ci-dummy
       FLOW_BASE_URL: https://sandbox.flow.cl/api
-      PAYMENT_PROVIDERS: flow
       OUTREACH_ENABLED: 'false'
       OUTREACH_DRY_RUN: 'true'
     steps:

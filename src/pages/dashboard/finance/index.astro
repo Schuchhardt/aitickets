@@ -134,7 +134,7 @@ const { data: payout } = await supabaseAdmin
     .maybeSingle();
 const hasBankData = !!(payout?.bank_name && payout?.bank_account_number && payout?.bank_account_holder && payout?.bank_account_rut);
 
-const PROVIDER_LABELS: Record<string, string> = { flow: "Webpay", stripe: "Tarjeta internacional", free: "Gratis", courtesy: "Cortesía", demo: "Demo" };
+const PROVIDER_LABELS: Record<string, string> = { flow: "Webpay", free: "Gratis", courtesy: "Cortesía", demo: "Demo" };
 function providerLabel(p: string | null | undefined): string {
     return p ? PROVIDER_LABELS[p] || p : "Webpay";
 }

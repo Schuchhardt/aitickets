@@ -1,9 +1,8 @@
 // Cumplimiento de órdenes (netlify/lib/orders.mjs) con un Supabase en memoria.
 // Se mockean emisión de entradas, correo y Slack: solo se prueba la máquina de estados del pago.
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createFakeSupabase } from '../fixtures/fake-supabase.mjs'
-import { DEMO_EVENT_SLUG } from '../../src/lib/demoEvent.mjs'
 
 const mocks = vi.hoisted(() => ({
   ensureOrderAttendees: vi.fn(async () => ({ created: 0 })),
@@ -43,8 +42,6 @@ function order(overrides = {}) {
     processing_started_at: null,
     payment_provider: 'flow',
     currency: 'CLP',
-    provider_session_id: null,
-    payment_intent_id: null,
     ...overrides,
   }
 }
@@ -98,20 +95,20 @@ describe('confirmPaidOrder', () => {
   })
 
   it('moneda distinta → review', async () => {
-    const db = createFakeSupabase({ tables: { event_orders: [order({ payment_provider: 'stripe' })] } })
-    const res = await confirmPaidOrder(db, ORDER_ID, { provider: 'stripe', amount: 33000, currency: 'usd' })
+    const db = createFakeSupabase({ tables: { event_orders: [order({ payment_provider: 'flow' })] } })
+    const res = await confirmPaidOrder(db, ORDER_ID, { provider: 'flow', amount: 33000, currency: 'usd' })
     expect(res.status).toBe('review')
     expect(db.tables.event_orders[0].status).toBe('review')
   })
 
   it('pago de un proveedor distinto al de la orden → review', async () => {
-    const db = createFakeSupabase({ tables: { event_orders: [order({ payment_provider: 'flow' })] } })
-    expect((await confirmPaidOrder(db, ORDER_ID, { provider: 'stripe', amount: 33000, currency: 'clp' })).status).toBe('review')
+    const db = createFakeSupabase({ tables: { event_orders: [order({ payment_provider: 'free' })] } })
+    expect((await confirmPaidOrder(db, ORDER_ID, { provider: 'flow', amount: 33000, currency: 'clp' })).status).toBe('review')
   })
 
-  it('sesión de Stripe distinta a la guardada → review', async () => {
-    const db = createFakeSupabase({ tables: { event_orders: [order({ payment_provider: 'stripe', provider_session_id: 'cs_test_A' })] } })
-    const res = await confirmPaidOrder(db, ORDER_ID, { provider: 'stripe', amount: 33000, currency: 'clp', externalId: 'cs_test_B' })
+  it('referencia de Flow distinta a la guardada → review', async () => {
+    const db = createFakeSupabase({ tables: { event_orders: [order({ payment_provider: 'flow', payment_external_id: '556' })] } })
+    const res = await confirmPaidOrder(db, ORDER_ID, { provider: 'flow', amount: 33000, currency: 'CLP', externalId: '557' })
     expect(res.status).toBe('review')
   })
 
@@ -200,58 +197,15 @@ describe('otros helpers de órdenes', () => {
 
   it('recordPaymentEvent deduplica por id', async () => {
     const db = createFakeSupabase({ tables: { aitickets_payment_events: [] } })
-    expect(await recordPaymentEvent(db, { id: 'evt_1', provider: 'stripe', type: 'checkout.session.completed' })).toBe(true)
+    expect(await recordPaymentEvent(db, { id: 'flow-556', provider: 'flow', type: 'payment.confirmed' })).toBe(true)
     db.failOn('aitickets_payment_events', 'insert', { code: '23505', message: 'duplicate key' })
-    expect(await recordPaymentEvent(db, { id: 'evt_1', provider: 'stripe', type: 'checkout.session.completed' })).toBe(false)
+    expect(await recordPaymentEvent(db, { id: 'flow-556', provider: 'flow', type: 'payment.confirmed' })).toBe(false)
   })
 
   it('isMissingSchemaError reconoce columnas/funciones/tablas inexistentes', () => {
     for (const code of ['42703', '42883', 'PGRST202', 'PGRST204', '42P01', 'PGRST205']) expect(isMissingSchemaError({ code })).toBe(true)
     expect(isMissingSchemaError({ code: '23505' })).toBe(false)
     expect(isMissingSchemaError(null)).toBe(false)
-  })
-})
-
-describe('confirmPaidOrder: pagos de prueba de Stripe', () => {
-  afterEach(() => vi.unstubAllEnvs())
-  const stripeOrder = () => order({ payment_provider: 'stripe', provider_session_id: 'cs_test_A' })
-  const pay = (extra = {}) => ({ provider: 'stripe', amount: 33000, currency: 'clp', externalId: 'cs_test_A', ...extra })
-
-  it('livemode=false en un evento real → review + Slack, sin emitir entradas', async () => {
-    const db = createFakeSupabase({ tables: { event_orders: [stripeOrder()], events: [{ id: 7, slug: 'concierto-real' }] } })
-    const res = await confirmPaidOrder(db, ORDER_ID, pay({ livemode: false }))
-    expect(res).toMatchObject({ status: 'review', httpStatus: 200 })
-    expect(db.tables.event_orders[0].status).toBe('review')
-    expect(mocks.notifySlack).toHaveBeenCalledWith(expect.stringMatching(/PRUEBA/))
-    expect(mocks.ensureOrderAttendees).not.toHaveBeenCalled()
-    expect(mocks.sendOrderTicketsEmail).not.toHaveBeenCalled()
-  })
-
-  it('sin livemode y con clave sk_test_ en un evento real → review', async () => {
-    vi.stubEnv('STRIPE_SECRET_KEY', 'sk_test_x')
-    const db = createFakeSupabase({ tables: { event_orders: [stripeOrder()], events: [{ id: 7, slug: 'concierto-real' }] } })
-    expect((await confirmPaidOrder(db, ORDER_ID, pay())).status).toBe('review')
-    expect(mocks.ensureOrderAttendees).not.toHaveBeenCalled()
-  })
-
-  // El fake no soporta el .or() del reclamo atómico: llegar a él demuestra que el filtro de modo prueba dejó pasar la orden
-  const REACHED_CLAIM = /or\(\) no está soportado/
-
-  it('livemode=false en el evento demo o uno marcado de prueba → sigue al reclamo (se cumple)', async () => {
-    const db = createFakeSupabase({ tables: { event_orders: [stripeOrder()], events: [{ id: 7, slug: DEMO_EVENT_SLUG }] } })
-    await expect(confirmPaidOrder(db, ORDER_ID, pay({ livemode: false }))).rejects.toThrow(REACHED_CLAIM)
-    expect(db.tables.event_orders[0].status).toBe('pending')
-    vi.stubEnv('STRIPE_TEST_EVENT_SLUGS', 'mi-prueba')
-    const db2 = createFakeSupabase({ tables: { event_orders: [stripeOrder()], events: [{ id: 7, slug: 'mi-prueba' }] } })
-    await expect(confirmPaidOrder(db2, ORDER_ID, pay({ livemode: false }))).rejects.toThrow(REACHED_CLAIM)
-    expect(mocks.notifySlack).not.toHaveBeenCalled()
-  })
-
-  it('livemode=true en un evento real → sigue al reclamo (se cumple)', async () => {
-    vi.stubEnv('STRIPE_SECRET_KEY', 'sk_test_x')
-    const db = createFakeSupabase({ tables: { event_orders: [stripeOrder()], events: [{ id: 7, slug: 'concierto-real' }] } })
-    await expect(confirmPaidOrder(db, ORDER_ID, pay({ livemode: true }))).rejects.toThrow(REACHED_CLAIM)
-    expect(mocks.notifySlack).not.toHaveBeenCalled()
   })
 })
 

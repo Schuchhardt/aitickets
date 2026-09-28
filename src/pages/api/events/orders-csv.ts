@@ -5,7 +5,7 @@ import { csvCell, slugify } from "../_lib/server-utils";
 
 const BASE_COLUMNS = "id, created_at, status, amount, ticket_fee, payment_fee, total_payment, ticket_qty, ticket_details, attendees ( first_name, last_name, email, phone )";
 
-const PROVIDER_LABELS: Record<string, string> = { flow: "Webpay (Flow)", stripe: "Tarjeta internacional (Stripe)", free: "Gratis", courtesy: "Cortesía", demo: "Demo" };
+const PROVIDER_LABELS: Record<string, string> = { flow: "Webpay (Flow)", free: "Gratis", courtesy: "Cortesía", demo: "Demo" };
 const providerLabel = (p: string | null | undefined) => (p ? PROVIDER_LABELS[p] || p : "");
 
 /** Exporta las órdenes pagadas de un evento de la organización como CSV (separador ;). */
