@@ -34,3 +34,7 @@ REVOKE ALL ON TABLE public.aitickets_auth_link_sends FROM PUBLIC, anon, authenti
 
 CREATE INDEX IF NOT EXISTS aitickets_auth_link_sends_user_idx
   ON public.aitickets_auth_link_sends (auth_user_id, sent_at DESC);
+
+-- La identidad crea una secuencia implícita: sin acceso para anon/authenticated (solo service_role)
+REVOKE ALL ON SEQUENCE public.aitickets_auth_link_sends_id_seq FROM PUBLIC, anon, authenticated;
+GRANT USAGE, SELECT ON SEQUENCE public.aitickets_auth_link_sends_id_seq TO service_role;
