@@ -5,7 +5,7 @@
 // El precio de la entrada es del productor y no cambia; el productor recibe el subtotal.
 // Entradas gratis (subtotal 0): sin cargo.
 //
-// Lo usan el servidor (purchase-tickets, orders.mjs, Stripe, correo, dashboard) y el navegador
+// Lo usan el servidor (purchase-tickets, orders.mjs, correo, dashboard) y el navegador
 // (src/components/Reservation/pricing.js, FeeCalculator): NO debe importar nada de Node.
 
 export const SERVICE_FEE_RATE = 0.1
@@ -14,7 +14,7 @@ export const IVA_RATE = 0.19
 export const SERVICE_FEE_PERCENT_LABEL = `${Math.round(SERVICE_FEE_RATE * 100)}%`
 export const IVA_PERCENT_LABEL = `${Math.round(IVA_RATE * 100)}%`
 
-/** Etiquetas de las líneas del desglose (checkout, correo, Stripe, orden). */
+/** Etiquetas de las líneas del desglose (checkout, correo, orden). */
 export const SERVICE_FEE_LABEL = `Cargo por servicio (${SERVICE_FEE_PERCENT_LABEL})`
 export const SERVICE_FEE_TAX_LABEL = `IVA del cargo (${IVA_PERCENT_LABEL})`
 /** Nota corta junto a un precio: "+ cargo por servicio 10% + IVA". */
@@ -46,7 +46,7 @@ export function computeServiceFee(subtotal) {
  * Desglose completo de una compra.
  * @param {number} subtotal
  * @returns {{subtotal:number, feeNet:number, feeIva:number, fee:number, total:number}}
- *   fee = feeNet + feeIva; total = subtotal + fee (monto que cobra Flow/Stripe).
+ *   fee = feeNet + feeIva; total = subtotal + fee (monto que cobra Flow).
  */
 export function computeBuyerTotal(subtotal) {
   const base = toInt(subtotal)

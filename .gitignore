@@ -21,3 +21,6 @@ node_modules/
 brag-output/
 test-results/
 playwright-report/
+
+# Skills/archivos locales de plugins de agentes (no son parte de la app)
+.agents/

@@ -56,20 +56,14 @@ const resetTurnstile = () => {
 onMounted(async () => {
   if (isDemo.value) return; // sin captcha ni medios de pago en la demo: no hay compra real
   let key = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY || "";
-  // Datos públicos del checkout: site key de Turnstile (si no se inyectó en el build) y medios de pago habilitados
+  // Datos públicos del checkout: site key de Turnstile (si no se inyectó en el build)
   try {
-    const slugQuery = props.event?.slug ? `?event=${encodeURIComponent(props.event.slug)}` : "";
-    const res = await fetch(`/api/purchase-ticket${slugQuery}`, { method: "GET" });
+    const res = await fetch("/api/purchase-ticket", { method: "GET" });
     if (res.ok) {
       const info = await res.json();
       if (!key) key = info?.turnstileSiteKey || "";
-      const providers = Array.isArray(info?.enabledProviders) ? info.enabledProviders.filter((p) => p === "flow" || p === "stripe") : [];
-      if (providers.length) {
-        enabledProviders.value = providers;
-        if (!providers.includes(selectedProvider.value)) selectedProvider.value = providers[0];
-      }
     }
-  } catch { /* sin captcha; solo Flow */ }
+  } catch { /* sin captcha */ }
   if (!key) return;
   turnstileSiteKey.value = key;
   loadTurnstileScript();
@@ -90,15 +84,9 @@ onUnmounted(() => {
   }
 });
 
-// ==== Medio de pago. El servidor informa los habilitados (GET /api/purchase-ticket -> enabledProviders);
-// sin Stripe habilitado el checkout es idéntico al de siempre (solo Webpay vía Flow). ====
-const enabledProviders = ref(["flow"]);
-const selectedProvider = ref("flow");
-const showProviderSelector = computed(() => enabledProviders.value.includes("stripe") && enabledProviders.value.length > 1);
-const PROVIDER_REDIRECT_COPY = {
-  flow: "Serás redirigido a Webpay para pagar de forma segura.",
-  stripe: "Serás redirigido a Stripe para pagar de forma segura con tu tarjeta.",
-};
+// Medio de pago: Webpay vía Flow.
+const PAYMENT_PROVIDER = "flow";
+const REDIRECT_COPY = "Serás redirigido a Webpay para pagar de forma segura.";
 
 const needsCaptcha = computed(() => Boolean(turnstileSiteKey.value) && !turnstileToken.value);
 
@@ -166,7 +154,7 @@ const handlePayment = async () => {
         ref: refCode,
         utm,
         cfToken: turnstileToken.value || undefined,
-        paymentProvider: totals.value.total > 0 ? selectedProvider.value : undefined,
+        paymentProvider: totals.value.total > 0 ? PAYMENT_PROVIDER : undefined,
         termsAccepted: props.buyerInfo.termsAccepted === true,
         termsVersion: LEGAL.termsVersion,
       }),
@@ -180,7 +168,7 @@ const handlePayment = async () => {
     }
 
     if (data.paymentLink) {
-      window.location.href = data.paymentLink; // Pago en Flow (Webpay) o Stripe Checkout
+      window.location.href = data.paymentLink; // Pago en Flow (Webpay)
       return;
     }
     if (data.redirectUrl && data.orderId) {
@@ -261,24 +249,6 @@ const handlePayment = async () => {
       <p v-if="buyerInfo.phone"><strong>Teléfono:</strong> {{ buyerInfo.phone }}</p>
     </div>
 
-    <fieldset v-if="showProviderSelector && totals.total > 0 && !isDemo" class="border p-4 rounded-lg text-left mb-4">
-      <legend class="font-semibold px-1">Medio de pago</legend>
-      <label class="flex items-start gap-3 py-2 cursor-pointer" data-testid="resv-provider-flow">
-        <input v-model="selectedProvider" type="radio" name="payment-provider" value="flow" class="mt-1 accent-black" />
-        <span>
-          <span class="block font-medium">Webpay</span>
-          <span class="block text-xs text-gray-500">Tarjetas de débito y crédito chilenas.</span>
-        </span>
-      </label>
-      <label class="flex items-start gap-3 py-2 cursor-pointer" data-testid="resv-provider-stripe">
-        <input v-model="selectedProvider" type="radio" name="payment-provider" value="stripe" class="mt-1 accent-black" />
-        <span>
-          <span class="block font-medium">Tarjeta internacional / Apple Pay / Google Pay</span>
-          <span class="block text-xs text-gray-500">Tarjeta internacional (procesado por Chanium LLC, EE.UU.; tu banco podría cobrar comisión por compra internacional)</span>
-        </span>
-      </label>
-    </fieldset>
-
     <div v-if="turnstileSiteKey" ref="turnstileEl" class="flex justify-center mb-4 min-h-[65px]"></div>
 
     <p v-if="errorMessage" class="text-red-600 mb-4 text-center" role="alert">{{ errorMessage }}</p>
@@ -292,6 +262,6 @@ const handlePayment = async () => {
       {{ isLoading ? "Procesando..." : isDemo ? `Simular pago de ${formatCLP(totals.total)}` : totals.total > 0 ? `Ir a pagar ${formatCLP(totals.total)}` : "Finalizar registro" }}
     </button>
     <p v-if="isDemo" class="text-xs text-purple-700 text-center mt-2">Demo: no se realizará ningún cobro.</p>
-    <p v-else-if="totals.total > 0" class="text-xs text-gray-500 text-center mt-2">{{ PROVIDER_REDIRECT_COPY[selectedProvider] || PROVIDER_REDIRECT_COPY.flow }}</p>
+    <p v-else-if="totals.total > 0" class="text-xs text-gray-500 text-center mt-2">{{ REDIRECT_COPY }}</p>
   </div>
 </template>

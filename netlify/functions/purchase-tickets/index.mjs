@@ -1,17 +1,15 @@
 // POST /api/purchase-ticket (contrato C5 + WP2)
 // Request: { eventId, buyer:{firstName,lastName,email,phone?}, tickets:[{id, quantity}], ref?, utm?:{source,medium,campaign},
-//            paymentProvider?: 'flow'|'stripe', termsAccepted: true, termsVersion?: string, cfToken? }
+//            paymentProvider?: (ignorado, siempre Flow), termsAccepted: true, termsVersion?: string, cfToken? }
 // El precio se calcula SIEMPRE en el servidor desde event_tickets; se ignora cualquier total/precio/evento del cliente.
 // Respuesta: pagado -> { paymentLink, provider, orderId }; gratis -> { orderId, redirectUrl: '/order/<orderId>', provider: 'free' }
 // Stock: la reserva es ATÓMICA en SQL (aitickets_reserve_order bloquea los tipos de entrada y recuenta);
-// la orden 'pending' reserva stock hasta hold_expires_at (15 min Flow, 31 min Stripe).
+// la orden 'pending' reserva stock hasta hold_expires_at (15 min).
 // Antiabuso: Cloudflare Turnstile (body.cfToken, si está configurado), rate limit en memoria por IP y
 // máximo MAX_PENDING_PER_BUYER órdenes pendientes simultáneas por comprador + evento.
-// GET /api/purchase-ticket[?event=<slug>] -> { turnstileSiteKey, enabledProviders } (datos públicos para el checkout).
-//   Con ?event, Stripe en modo prueba solo aparece para el evento demo o los marcados de prueba (el POST lo exige igual).
+// GET /api/purchase-ticket -> { turnstileSiteKey, enabledProviders } (datos públicos para el checkout).
 import { getSupabaseAdmin, json } from '../../lib/supabase.mjs'
-import { enabledProviders, defaultProvider, createCheckout, holdMinutesFor, isStripeAllowedForEvent } from '../../lib/payments/index.mjs'
-import { stripeMinAmount } from '../../lib/payments/stripe.mjs'
+import { enabledProviders, defaultProvider, createCheckout, holdMinutesFor } from '../../lib/payments/index.mjs'
 import { isMissingSchemaError } from '../../lib/orders.mjs'
 import { TERMS_VERSION } from '../../lib/legal.mjs'
 import { verifyTurnstile, isTurnstileEnabled, turnstileSiteKey } from '../../lib/turnstile.mjs'
@@ -95,11 +93,8 @@ function validateRequest(body) {
   if (body?.termsAccepted !== true) return { error: 'Debes aceptar los Términos y Condiciones para continuar' }
   const termsVersion = cleanText(body?.termsVersion, 20).replace(/[^\w.\-]/g, '') || TERMS_VERSION
 
-  const providers = enabledProviders()
-  const paymentProvider = body?.paymentProvider == null || body.paymentProvider === ''
-    ? defaultProvider()
-    : String(body.paymentProvider).toLowerCase()
-  if (!providers.includes(paymentProvider)) return { error: 'El medio de pago seleccionado no está disponible' }
+  // Flow (Webpay) es el único medio de pago: se ignora body.paymentProvider (clientes antiguos pueden enviarlo).
+  const paymentProvider = defaultProvider()
 
   const utm = body?.utm && typeof body.utm === 'object' ? body.utm : {}
   return {
@@ -244,14 +239,9 @@ async function reserveOrder(supabase, { eventId, lines, order, holdMinutes, base
 
 export default async function handler(req) {
   if (req.method === 'GET') {
-    let eventSlug
-    try {
-      const raw = new URL(req.url).searchParams.get('event')
-      if (raw) eventSlug = raw.slice(0, 200)
-    } catch { /* URL inválida: lista global */ }
     return json({
       turnstileSiteKey: isTurnstileEnabled() ? turnstileSiteKey() : null,
-      enabledProviders: enabledProviders(eventSlug ? { eventSlug } : {}),
+      enabledProviders: enabledProviders(),
     }, 200)
   }
   if (req.method !== 'POST') return json({ message: 'Método no permitido' }, 405)
@@ -289,10 +279,6 @@ export default async function handler(req) {
     if (!event) return json({ message: 'El evento no está disponible para la venta' }, 404)
     if (isDemoEventSlug(event.slug)) return json({ message: 'Este es un evento de demostración: no se venden entradas.' }, 403)
     if (!(await isEventStillOn(supabase, event))) return json({ message: 'Este evento ya finalizó' }, 409)
-    // Stripe en modo prueba: solo evento demo o marcados de prueba (un pago de prueba no emite entradas reales)
-    if (paymentProvider === 'stripe' && !isStripeAllowedForEvent(event.slug)) {
-      return json({ message: 'El pago con tarjeta internacional no está disponible para este evento. Usa Webpay.' }, 400)
-    }
 
     // 2. Tipos de entrada: deben pertenecer al evento y estar a la venta (C2)
     const ticketIds = [...quantities.keys()]
@@ -361,10 +347,6 @@ export default async function handler(req) {
     const ticketQty = ticketDetails.reduce((sum, t) => sum + t.quantity, 0)
     const provider = total === 0 ? 'free' : paymentProvider
     const holdMinutes = total === 0 ? PENDING_HOLD_MINUTES : holdMinutesFor(provider)
-
-    if (provider === 'stripe' && total < stripeMinAmount()) {
-      return json({ message: `El pago con tarjeta internacional requiere un total de al menos $${stripeMinAmount().toLocaleString('es-CL')}. Usa Webpay para este monto.` }, 400)
-    }
 
     // Asistente antes de reservar (event_orders.attendee_id es NOT NULL)
     const attendeeId = await findOrCreateAttendee(supabase, buyer)
@@ -439,7 +421,7 @@ export default async function handler(req) {
     }
 
     // 5b. Orden pagada: pendiente hasta que el proveedor confirme por webhook
-    //     (Flow: /api/payment-confirmation; Stripe: /api/webhooks/stripe)
+    //     (/api/payment-confirmation)
     const siteUrl = (process.env.SITE_URL || new URL(req.url).origin).replace(/\/$/, '')
     let checkout
     try {
@@ -463,9 +445,7 @@ export default async function handler(req) {
       return json({ message: 'No pudimos iniciar el pago. Intenta nuevamente en unos minutos.' }, 502)
     }
 
-    const paymentUpdate = { payment_external_id: checkout.externalId ?? null }
-    if (checkout.sessionId) paymentUpdate.provider_session_id = checkout.sessionId
-    const { error: updateError } = await supabase.from('event_orders').update(paymentUpdate).eq('id', order.id)
+    const { error: updateError } = await supabase.from('event_orders').update({ payment_external_id: checkout.externalId ?? null }).eq('id', order.id)
     if (updateError) console.error(`No se pudo guardar la referencia de pago en la orden ${order.id}:`, updateError.message)
 
     console.log(`💳 Orden ${order.id} evento ${eventId}: ${ticketQty} entrada(s), total ${total}, ${provider}`)

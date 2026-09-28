@@ -14,7 +14,6 @@ import { orderFeeBreakdown } from "../../netlify/lib/fees.mjs";
 export const prerender = false;
 
 // urlReturn de Flow: el navegador llega aquí por POST con el `token` del pago.
-// (Stripe vuelve por GET a /pago/retorno, página común de retorno de pagos.)
 // Esta página SOLO muestra el estado: el webhook /api/payment-confirmation es quien marca la orden
 // como pagada, emite las entradas y envía el correo. Red de seguridad: si la orden está pagada y el correo
 // aún no se envió (p. ej. Resend falló en el webhook), se dispara /api/send-tickets-email (idempotente).

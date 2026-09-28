@@ -108,7 +108,7 @@ const channelRows = [...channelMap.values()].sort((a, b) => b.revenue - a.revenu
 
 // 2c. Ventas por medio de pago (payment_provider, migración 202609270100) y órdenes fuera del saldo.
 // Consultas aparte: si la columna aún no existe, la sección simplemente no se muestra.
-const PROVIDER_LABELS: Record<string, string> = { flow: "Webpay", stripe: "Tarjeta internacional", free: "Gratis", courtesy: "Cortesía", demo: "Demo" };
+const PROVIDER_LABELS: Record<string, string> = { flow: "Webpay", free: "Gratis", courtesy: "Cortesía", demo: "Demo" };
 const { data: providerOrdersRaw, error: providerError } = await supabaseAdmin
     .from("event_orders")
     .select("amount, ticket_qty, payment_provider")

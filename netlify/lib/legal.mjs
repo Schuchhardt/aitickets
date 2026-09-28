@@ -98,8 +98,6 @@ export const LEGAL = Object.freeze({
   effectiveDate: EFFECTIVE_DATE,
   /** Nombre con el que Flow (Webpay) cobra; aparece en el estado de cuenta del comprador. */
   flowMerchantName: env('FLOW_MERCHANT_LEGAL_NAME') || 'AI Tickets',
-  /** Sufijo del descriptor de Stripe en el estado de cuenta (la cuenta de Stripe es compartida por Chanium). */
-  stripeStatementDescriptorSuffix: 'AITICKETS',
   /** 'added' (por defecto: el IVA se suma al cargo) | 'included' | 'exempt' | 'unknown'. */
   serviceFeeTaxMode: TAX_MODE,
   serviceFeeRate: SERVICE_FEE_RATE,

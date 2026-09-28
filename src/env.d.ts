@@ -84,13 +84,6 @@ interface AiticketsEnv {
   readonly ALLOW_MISSING_DB_URL?: string
 
   // Pagos
-  readonly PAYMENT_PROVIDERS?: string
-  readonly STRIPE_SECRET_KEY?: string
-  readonly STRIPE_WEBHOOK_SECRET?: string
-  readonly STRIPE_API_VERSION?: string
-  readonly STRIPE_HOLD_MINUTES?: string
-  readonly STRIPE_LIVE_APPROVED?: string
-  readonly STRIPE_MIN_AMOUNT_CLP?: string
   readonly SERVICE_FEE_TAX_MODE?: string
 
   // Sitios / dominios

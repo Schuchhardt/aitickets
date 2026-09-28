@@ -78,8 +78,9 @@ volver a un deploy anterior (instant rollback de Netlify) no rompe la base. El c
 valores que el código de `main` anterior a `feat/autonomy` no conoce:
 
 - `expired`: lo escribe `expire-pending-orders` cuando vence la reserva de una orden `pending`.
-- `refunded`: lo escribe el webhook de Stripe ante un reembolso total (además anula las entradas con
-  `event_attendees.status = 'cancelled'`).
+- `refunded`: reservado para reembolsos totales (con las entradas anuladas con
+  `event_attendees.status = 'cancelled'`). Hoy ningún código lo escribe automáticamente; puede haber
+  órdenes históricas con este estado.
 
 El código anterior **ignora** esos estados y los trata como no pagados: todas sus lecturas de ventas,
 ingresos, CSV, reenvío de correo y dashboards filtran `status = 'paid'` (`.eq('status','paid')` o
@@ -104,8 +105,7 @@ WHERE status IN ('cancelled', 'review', 'refunded') AND total_payment IS NOT NUL
 ORDER BY created_at DESC LIMIT 50;
 ```
 
-`refunded` no necesita acción: solo lo produce Stripe (que `main` no tiene) y sus entradas ya están
-anuladas. Al volver a desplegar el código nuevo no hay que deshacer nada (`cancelled` también es
+`refunded` no necesita acción: sus entradas ya están anuladas. Al volver a desplegar el código nuevo no hay que deshacer nada (`cancelled` también es
 reclamable por un pago tardío).
 
 ## Línea base

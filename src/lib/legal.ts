@@ -38,7 +38,6 @@ export interface LegalInfo {
   readonly termsVersion: string
   readonly effectiveDate: string
   readonly flowMerchantName: string
-  readonly stripeStatementDescriptorSuffix: string
   readonly serviceFeeTaxMode: ServiceFeeTaxMode
   /** 0.1 = 10% del valor de las entradas. */
   readonly serviceFeeRate: number
