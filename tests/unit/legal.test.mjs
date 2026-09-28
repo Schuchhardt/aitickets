@@ -117,16 +117,13 @@ describe('outreachFooterText', () => {
 })
 
 describe('pie legal de correos transaccionales (mailer)', () => {
-  it('legalFooterHtml incluye operador, soporte, términos, privacidad y la baja', async () => {
+  it('legalFooterHtml es mínimo: marca, operador y la baja cuando corresponde', async () => {
     const { legalFooterHtml } = await loadMailer()
     const html = legalFooterHtml({ reason: 'Recibes este correo porque <compraste>', unsubscribeUrl: 'https://aitickets.cl/baja?t=1&x=2' })
-    expect(html).toContain('Chanium LLC')
-    expect(html).toContain('soporte@aitickets.cl')
-    expect(html).toContain('/terms')
-    expect(html).toContain('/privacy')
+    expect(html).toContain('AI Tickets · Chanium LLC')
     expect(html).toContain('href="https://aitickets.cl/baja?t=1&amp;x=2"')
-    expect(html).toContain('&lt;compraste&gt;')
-    expect(html).not.toContain('<compraste>')
+    expect(html).not.toContain('compraste')
+    expect(legalFooterHtml()).not.toContain('baja')
   })
 
   it('ignora enlaces de baja que no son http(s)', async () => {
@@ -135,10 +132,11 @@ describe('pie legal de correos transaccionales (mailer)', () => {
     expect(legalFooterText({ unsubscribeUrl: 'javascript:alert(1)' })).not.toContain('javascript:')
   })
 
-  it('con dirección configurada, el pie la muestra', async () => {
-    const { legalFooterText } = await loadMailer({ CHANIUM_LEGAL_ADDRESS: '8 The Green, Dover, DE 19901, EE.UU.' })
-    expect(legalFooterText({ unsubscribeUrl: 'https://aitickets.cl/u' })).toContain('8 The Green, Dover')
-    expect(legalFooterText({ unsubscribeUrl: 'https://aitickets.cl/u' })).toContain('Darme de baja: https://aitickets.cl/u')
+  it('el pie de texto incluye la baja cuando corresponde', async () => {
+    const { legalFooterText } = await loadMailer()
+    const text = legalFooterText({ unsubscribeUrl: 'https://aitickets.cl/u' })
+    expect(text).toContain('AI Tickets · Chanium LLC')
+    expect(text).toContain('Darme de baja: https://aitickets.cl/u')
   })
 
   it('el remitente por defecto es no-reply@ y se puede sobrescribir', async () => {
