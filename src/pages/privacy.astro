@@ -11,7 +11,7 @@ const effective = formatLegalDate(LEGAL.effectiveDate);
 const processors = [
   { name: 'Supabase', purpose: 'Base de datos, autenticación y almacenamiento de archivos', where: 'Brasil (servidores en São Paulo)' },
   { name: 'Netlify', purpose: 'Alojamiento del sitio y ejecución del servidor', where: 'EE.UU.' },
-  { name: 'Mailgun', purpose: 'Envío de correos transaccionales (entradas, avisos, verificación)', where: 'EE.UU.' },
+  { name: 'Resend', purpose: 'Envío de correos transaccionales (entradas, avisos, verificación)', where: 'EE.UU. (envío desde São Paulo, Brasil)' },
   { name: 'Flow', purpose: 'Procesamiento de pagos con Webpay', where: 'Chile' },
   { name: 'Stripe', purpose: 'Procesamiento de pagos con tarjetas internacionales, Apple Pay y Google Pay', where: 'EE.UU.' },
   { name: 'Anthropic', purpose: 'Modelos de inteligencia artificial (asistente virtual, textos y clasificación de mensajes)', where: 'EE.UU.' },

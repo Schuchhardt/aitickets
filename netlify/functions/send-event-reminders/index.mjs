@@ -5,9 +5,9 @@
 //   correo por cada fecha.
 // - Dedupe por asistente + evento: notification_log no tiene columna de fecha, así que se considera ya
 //   recordado quien tenga un 'reminder_24h' de ese evento en las últimas 20 horas.
-// - CTA a /order/<order_id> de cada asistente cuando existe (vía recipient-variables de Mailgun).
+// - CTA a /order/<order_id> de cada asistente cuando existe (vía recipientVariables de sendEmail).
 import { getSupabaseAdmin, escapeHtml, fetchAllRows } from '../../lib/supabase.mjs'
-import { getMailgun, MAIL_DOMAIN, MAIL_FROM, SITE_URL, formatRecipient, isValidEmail, legalFooterHtml } from '../../lib/mailer.mjs'
+import { sendEmail, SITE_URL, formatRecipient, isValidEmail, legalFooterHtml } from '../../lib/mailer.mjs'
 import { LEGAL } from '../../lib/legal.mjs'
 import { EVENT_DATE_COLUMNS, todayInTimeZone, addDays, formatDateOnlyLong, formatTimeShort, formatEventLocation } from '../../lib/dates.mjs'
 
@@ -80,7 +80,6 @@ export default async function handler() {
       byEvent.get(ed.event_id).push(ed)
     }
 
-    const mg = getMailgun()
     const since = new Date(Date.now() - DEDUPE_WINDOW_HOURS * 60 * 60 * 1000).toISOString()
     const today = todayInTimeZone()
     let totalSent = 0
@@ -168,13 +167,13 @@ export default async function handler() {
             return formatRecipient(`${r.first_name || ''} ${r.last_name || ''}`, r.email)
           })
           try {
-            await mg.messages.create(MAIL_DOMAIN, {
-              from: MAIL_FROM,
+            await sendEmail({
               to: toList,
               subject,
               html,
-              'h:Reply-To': LEGAL.supportEmail,
-              'recipient-variables': JSON.stringify(recipientVars),
+              replyTo: LEGAL.supportEmail,
+              recipientVariables: recipientVars,
+              tags: ['reminder'],
             })
             sent.push(...batch)
           } catch (error) {

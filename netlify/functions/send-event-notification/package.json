@@ -5,8 +5,6 @@
   "main": "index.mjs",
   "type": "module",
   "dependencies": {
-    "@supabase/supabase-js": "^2.39.0",
-    "form-data": "^4.0.1",
-    "mailgun.js": "^11.1.0"
+    "@supabase/supabase-js": "^2.39.0"
   }
 }

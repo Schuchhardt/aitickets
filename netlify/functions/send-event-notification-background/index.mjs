@@ -1,7 +1,7 @@
 // Background function (hasta 15 min): envía el aviso de cambio de un evento a todos sus asistentes.
 // Solo acepta llamadas internas (x-internal-secret) desde /api/send-event-notification.
 // Body: { eventId, changeType, changeDescription, requestedBy }
-// Envía en lotes de 50 con recipient-variables (Mailgun manda un correo individual a cada destinatario),
+// Envía en lotes de 50 con recipient-variables (sendEmail manda un correo individual a cada destinatario vía el batch de Resend),
 // con el pie legal, registra notification_log y avisa por Slack si algo falla.
 import { getSupabaseAdmin, hasValidInternalSecret, json, escapeHtml, fetchAllRows } from '../../lib/supabase.mjs'
 import { sendEmail, legalFooterHtml, SITE_URL, formatRecipient, isValidEmail } from '../../lib/mailer.mjs'

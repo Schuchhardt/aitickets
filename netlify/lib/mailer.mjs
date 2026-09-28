@@ -1,20 +1,15 @@
-// Mailgun compartido por las funciones que envían correo (solo transaccional: entradas, avisos,
-// verificación, respuestas a quien nos escribió). El correo comercial en frío NUNCA sale por aquí.
-import FormData from 'form-data'
-import Mailgun from 'mailgun.js'
+// Correo transaccional por Resend (entradas, avisos, verificación, respuestas a quien nos escribió),
+// compartido por las funciones y las rutas de Astro. El correo comercial en frío NUNCA sale por aquí.
 import { LEGAL, legalLine } from './legal.mjs'
 
-export const MAIL_DOMAIN = process.env.MAILGUN_DOMAIN || 'mg.aitickets.cl'
-export const MAIL_FROM = process.env.MAIL_FROM || `AI Tickets <no-reply@${MAIL_DOMAIN}>`
-export const SITE_URL = (process.env.SITE_URL || 'https://aitickets.cl').replace(/\/$/, '')
+const env = (name) => globalThis.process?.env?.[name]
+// Dominio verificado en Resend (región sa-east-1)
+export const MAIL_DOMAIN = env('RESEND_DOMAIN') || 'email.aitickets.cl'
+export const MAIL_FROM = env('MAIL_FROM') || `AI Tickets <no-reply@${MAIL_DOMAIN}>`
+export const SITE_URL = (env('SITE_URL') || 'https://aitickets.cl').replace(/\/$/, '')
 
-let client = null
-export function getMailgun() {
-  if (client) return client
-  if (!process.env.MAILGUN_API_KEY) throw new Error('Falta MAILGUN_API_KEY')
-  client = new Mailgun(FormData).client({ username: 'api', key: process.env.MAILGUN_API_KEY })
-  return client
-}
+const RESEND_API = 'https://api.resend.com'
+const BATCH_LIMIT = 100 // máximo de correos por llamada a /emails/batch
 
 /** Nombre seguro para un encabezado To: (sin caracteres que rompan el formato "Nombre <email>"). */
 export function formatRecipient(name, email) {
@@ -104,44 +99,108 @@ function cleanHeaderValue(value) {
   return String(value ?? '').replace(/[\r\n]+/g, ' ').trim()
 }
 
+function resendKey() {
+  const key = env('RESEND_API_KEY')
+  if (!key) throw new Error('Falta RESEND_API_KEY')
+  return key
+}
+
+async function resendRequest(path, payload, idempotencyKey) {
+  const headers = { Authorization: `Bearer ${resendKey()}`, 'Content-Type': 'application/json' }
+  if (idempotencyKey) headers['Idempotency-Key'] = String(idempotencyKey).slice(0, 256)
+  const res = await fetch(`${RESEND_API}${path}`, { method: 'POST', headers, body: JSON.stringify(payload) })
+  const body = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    throw new Error(`Resend ${res.status}: ${body?.message || body?.name || 'error'}`.slice(0, 300))
+  }
+  return body
+}
+
+/** Reemplaza %recipient.clave% (formato heredado) con los valores del destinatario. */
+function applyRecipientVars(value, vars) {
+  if (!value || !vars) return value
+  return String(value).replace(/%recipient\.([A-Za-z0-9_]+)%/g, (_, key) => (vars[key] == null ? '' : String(vars[key])))
+}
+
+const emailOf = (recipient) => {
+  const match = String(recipient).match(/<([^>]+)>\s*$/)
+  return (match ? match[1] : String(recipient)).trim().toLowerCase()
+}
+
 /**
- * Envía un correo transaccional por Mailgun.
+ * Envía un correo transaccional por Resend.
  * No agrega el pie legal automáticamente: inclúyelo en `html` con legalFooterHtml().
+ * Con `recipientVariables` (clave = email) se envía un correo individual por destinatario,
+ * reemplazando %recipient.clave% en asunto y contenido (vía /emails/batch).
  * @param {{
  *   to: string | string[], subject: string, html: string, text?: string,
  *   replyTo?: string, from?: string, bcc?: string | string[],
  *   headers?: Record<string, string>, tags?: string[],
  *   recipientVariables?: Record<string, Record<string, unknown>>,
+ *   attachments?: Array<{ filename: string, content: Buffer | string, contentType?: string }>,
+ *   idempotencyKey?: string,
  * }} opts
- * @returns {Promise<{ id: string | null }>}
+ * @returns {Promise<{ id: string | null, ids?: string[] }>}
  */
-export async function sendEmail({ to, subject, html, text, replyTo, from, bcc, headers, tags, recipientVariables } = {}) {
+export async function sendEmail({ to, subject, html, text, replyTo, from, bcc, headers, tags, recipientVariables, attachments, idempotencyKey } = {}) {
   const recipients = (Array.isArray(to) ? to : [to]).filter(Boolean)
   if (!recipients.length) throw new Error('sendEmail: falta destinatario')
   if (!subject) throw new Error('sendEmail: falta asunto')
   if (!html && !text) throw new Error('sendEmail: falta contenido')
 
-  const data = {
+  const base = {
     from: from || MAIL_FROM,
-    to: recipients,
-    subject: cleanHeaderValue(subject),
-    text: text || stripHtml(html),
-    'h:Reply-To': cleanHeaderValue(replyTo || LEGAL.supportEmail),
+    reply_to: cleanHeaderValue(replyTo || LEGAL.supportEmail),
   }
-  if (html) data.html = html
   const bccList = (Array.isArray(bcc) ? bcc : [bcc]).filter(Boolean)
-  if (bccList.length) data.bcc = bccList
+  const extraHeaders = {}
   for (const [name, value] of Object.entries(headers || {})) {
     const headerName = String(name).replace(/[^A-Za-z0-9-]/g, '')
-    if (!headerName || value == null) continue
-    data[`h:${headerName}`] = cleanHeaderValue(value)
+    if (headerName && value != null) extraHeaders[headerName] = cleanHeaderValue(value)
   }
-  const tagList = (tags || []).map((t) => String(t).slice(0, 128)).filter(Boolean).slice(0, 3)
-  if (tagList.length) data['o:tag'] = tagList
+  if (Object.keys(extraHeaders).length) base.headers = extraHeaders
+  // Resend: etiquetas con nombre/valor [A-Za-z0-9_-]
+  const tagList = (tags || []).map((t) => String(t).replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 256)).filter(Boolean).slice(0, 3)
+  if (tagList.length) base.tags = tagList.map((t, i) => ({ name: `tag${i + 1}`, value: t }))
+  const files = (attachments || []).filter((a) => a?.filename && a?.content != null).map((a) => ({
+    filename: a.filename,
+    content: Buffer.isBuffer(a.content) ? a.content.toString('base64') : Buffer.from(String(a.content), 'utf-8').toString('base64'),
+    ...(a.contentType ? { content_type: a.contentType } : {}),
+  }))
+  if (files.length) base.attachments = files
+
+  const plain = text || stripHtml(html)
+
   if (recipientVariables && Object.keys(recipientVariables).length) {
-    data['recipient-variables'] = JSON.stringify(recipientVariables)
+    // Un correo por destinatario (nadie ve a los demás); /emails/batch no admite adjuntos
+    const ids = []
+    for (let i = 0; i < recipients.length; i += BATCH_LIMIT) {
+      const chunk = recipients.slice(i, i + BATCH_LIMIT)
+      const payload = chunk.map((recipient) => {
+        const vars = recipientVariables[emailOf(recipient)] || recipientVariables[recipient] || {}
+        const { attachments: _omit, ...rest } = base
+        return {
+          ...rest,
+          to: [recipient],
+          subject: cleanHeaderValue(applyRecipientVars(subject, vars)),
+          ...(html ? { html: applyRecipientVars(html, vars) } : {}),
+          text: applyRecipientVars(plain, vars),
+        }
+      })
+      const result = await resendRequest('/emails/batch', payload, idempotencyKey ? `${idempotencyKey}-${i}` : undefined)
+      for (const item of result?.data || []) if (item?.id) ids.push(item.id)
+    }
+    return { id: ids[0] || null, ids }
   }
 
-  const result = await getMailgun().messages.create(MAIL_DOMAIN, data)
+  const payload = {
+    ...base,
+    to: recipients,
+    subject: cleanHeaderValue(subject),
+    text: plain,
+    ...(html ? { html } : {}),
+    ...(bccList.length ? { bcc: bccList } : {}),
+  }
+  const result = await resendRequest('/emails', payload, idempotencyKey)
   return { id: result?.id || null }
 }
