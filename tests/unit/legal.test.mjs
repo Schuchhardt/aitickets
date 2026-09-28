@@ -81,10 +81,10 @@ describe('LEGAL por defecto (Chanium, LLC)', () => {
     expect(LEGAL.serviceFeeTaxMode).toBe('added')
   })
 
-  it('el aviso de retracto dice que el cargo por servicio no es reembolsable, salvando los derechos irrenunciables', async () => {
+  it('el aviso de retracto dice que se devuelve el cargo pero no su IVA, salvando los derechos irrenunciables', async () => {
     const { LEGAL } = await loadLegal()
     expect(LEGAL.retractoNotice).toMatch(/3 bis letra b/)
-    expect(LEGAL.retractoNotice).toMatch(/cargo por servicio no es reembolsable/)
+    expect(LEGAL.retractoNotice).toMatch(/cargo por servicio \(no su IVA\)/)
     expect(LEGAL.retractoNotice).toMatch(/irrenunciables/)
     expect(LEGAL.retractoNotice).not.toMatch(/incluido el cargo por servicio/)
   })
