@@ -12,8 +12,12 @@ concurrency:
 permissions:
   contents: read
 
-# E2E (Playwright) NO corre en CI: nunca se ejecuta contra deploy previews ni producción (comparten la
-# BD de producción). Se corre en local contra `netlify dev` / `npm run dev` con `npm run test:e2e`.
+# E2E (Playwright): el job `e2e` corre en modo SIN BD contra un servidor local (`astro dev` en 127.0.0.1,
+# levantado por playwright.config.ts con SUPABASE_URL apuntando a un puerto cerrado y todas las
+# integraciones apagadas). Nunca contra deploy previews ni producción (comparten la BD de producción) y
+# sin secretos: los specs que necesitan BD (tests/e2e/env.ts, HAS_DB) se omiten. No se usa `astro preview`: el
+# adaptador de Netlify no lo soporta. tests/e2e/global-setup.ts precalienta Vite (evita recargas a mitad de test). El modo con BD
+# (E2E_DB=1) solo se corre en local y playwright.config.ts lo rechaza con CI=true.
 
 jobs:
   build:
@@ -106,3 +110,42 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run test:unit
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Sin secretos: playwright.config.ts define el entorno del servidor (BD falsa, integraciones apagadas).
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Versión de Playwright (clave de caché)
+        id: pw
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Caché de navegadores de Playwright
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}-chromium
+      - name: Instalar Chromium
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+      - name: Dependencias del sistema para Chromium (caché)
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+      - name: Playwright (modo sin BD)
+        run: npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7

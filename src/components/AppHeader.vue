@@ -70,7 +70,7 @@ const toggleMenu = () => {
         </div>
 
         <!-- Mobile Menu Button -->
-        <button type="button" class="md:hidden" @click="toggleMenu" aria-label="Toggle menu">
+        <button type="button" class="md:hidden p-2 -mr-2 cursor-pointer" @click="toggleMenu" :aria-label="mobileMenuOpen ? 'Cerrar menú' : 'Abrir menú'" :aria-expanded="mobileMenuOpen" aria-controls="mobile-menu">
           <template v-if="!mobileMenuOpen">
             <Menu size="24" />
           </template>

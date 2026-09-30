@@ -8,7 +8,10 @@
 // service role) con una etiqueta propia, para no dejar a nadie sin poder verificar su cuenta.
 //
 // La verificación se exige en /api/auth/login leyendo organizations.email_verified_at (no depende de la
-// configuración "Confirm email" del proyecto Supabase, que es compartido con otras apps).
+// configuración "Confirm email" del proyecto Supabase, que es compartido con otras apps). Además la cuenta
+// de Auth se crea SIN confirmar y solo se confirma aquí (confirmProducerEmail) o en /auth/link, cuando el
+// usuario ya probó que el correo es suyo: si no, alguien podría pre-registrar un correo ajeno y este
+// aparecería confirmado para las otras apps del proyecto.
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { getSupabaseAdmin } from "./auth-helpers";
 import { ensureOrgSite, invalidateSiteCache } from "./sites";
@@ -163,12 +166,14 @@ export async function getOrgVerifiedEmail(orgId: number): Promise<string | null>
 }
 
 export type ConfirmResult =
-    | { ok: true; alreadyVerified: boolean; slug: string | null; uid: string; email: string }
+    | { ok: true; alreadyVerified: boolean; slug: string | null; uid: string; email: string; authConfirmed: boolean }
     | { ok: false; error: "invalid" | "expired" | "not_found" | "server" };
 
 /**
- * Procesa un enlace de verificación: confirma el correo en Supabase Auth, marca
- * organizations.email_verified_at y se asegura de que exista el sitio de la organización.
+ * Procesa un enlace de verificación: confirma el correo en Supabase Auth (solo cuentas creadas por
+ * AI Tickets), marca organizations.email_verified_at y se asegura de que exista el sitio de la
+ * organización. `authConfirmed` indica si la cuenta de Auth quedó confirmada: solo entonces se puede
+ * crear la sesión sin contraseña (el magic link de createPasswordlessSession confirmaría el correo).
  */
 export async function confirmProducerEmail(token: string): Promise<ConfirmResult> {
     let parsed: VerifyTokenResult;
@@ -196,14 +201,21 @@ export async function confirmProducerEmail(token: string): Promise<ConfirmResult
         if (!profile?.organization_id) return { ok: false, error: "not_found" };
         const orgId = Number(profile.organization_id);
 
-        // El usuario probó que controla el correo: confirmarlo también en Auth (necesario si el proyecto
-        // exige correos confirmados para iniciar sesión).
-        if (!authUser.email_confirmed_at) {
+        // El usuario probó que controla el correo: recién ahora se confirma en Auth. /api/auth/register crea
+        // la cuenta con email_confirm:false (proyecto Supabase compartido: un correo confirmado vale también
+        // para las otras apps), así que este es el único punto donde una cuenta de AI Tickets pasa a
+        // confirmada. Se confirma ANTES de marcar la organización: si falla, no queda nada a medias.
+        // Identidades de otra app del proyecto (camino de recuperación del registro, contrato R5): no se toca
+        // su estado de confirmación en Auth; la organización igual queda verificada.
+        const isAiticketsAuthUser = (authUser.app_metadata as Record<string, unknown> | undefined)?.app === "aitickets";
+        let authConfirmed = !!authUser.email_confirmed_at;
+        if (!authConfirmed && isAiticketsAuthUser) {
             const { error: confirmError } = await supabase.auth.admin.updateUserById(parsed.uid, { email_confirm: true });
             if (confirmError) {
                 console.error("email-verification: no se pudo confirmar en Auth", confirmError.message);
                 return { ok: false, error: "server" };
             }
+            authConfirmed = true;
         }
 
         const before = await getOrgVerification(orgId);
@@ -220,7 +232,7 @@ export async function confirmProducerEmail(token: string): Promise<ConfirmResult
             console.warn("email-verification: no se pudo asegurar el sitio", err?.message || err);
         }
 
-        return { ok: true, alreadyVerified: before.verified === true, slug, uid: parsed.uid, email: authUser.email };
+        return { ok: true, alreadyVerified: before.verified === true, slug, uid: parsed.uid, email: authUser.email, authConfirmed };
     } catch (err: any) {
         console.error("email-verification: error", err?.message || err);
         return { ok: false, error: "server" };

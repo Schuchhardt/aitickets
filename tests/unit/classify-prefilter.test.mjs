@@ -6,11 +6,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { createFakeSupabase } from '../fixtures/fake-supabase.mjs'
 import { INTENTS, classifyReply, handleIntent, isUnsubscribeReply, stripQuoted } from '../../netlify/lib/outreach/classify.mjs'
+import { composeInterestedReply, validateOutgoing } from '../../netlify/lib/outreach/compose.mjs'
 
 const { replies } = JSON.parse(readFileSync(new URL('../fixtures/replies.json', import.meta.url), 'utf8'))
 
 afterEach(() => {
   vi.unstubAllEnvs()
+  vi.useRealTimers()
 })
 
 describe('fixture de respuestas', () => {
@@ -94,6 +96,9 @@ describe('handleIntent: enrutamiento', () => {
   it('interested con auto-respuesta apagada → borrador para un humano (nunca envía solo)', async () => {
     vi.stubEnv('OUTREACH_UNSUB_SECRET', 'unsub-secret-for-tests')
     vi.stubEnv('LEAD_TOKEN_SECRET', 'lead-secret-for-tests')
+    // Reloj fijo: el token del enlace de registro depende de la hora (exp)
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-09-29T12:00:00Z'))
     const supabase = db()
     expect(await handleIntent({ supabase, lead, inbound, result: { intent: 'interested', confidence: 0.99, via: 'llm' } })).toEqual({ action: 'escalated' })
     expect(supabase.tables.aitickets_leads[0].status).toBe('interested')
@@ -139,5 +144,30 @@ describe('handleIntent: enrutamiento', () => {
     const res = await handleIntent({ supabase, lead, inbound, result: { intent: 'referral', confidence: 0.9, referral_email: 'Pedro@Productora.cl', via: 'llm' } })
     expect(res).toEqual({ action: 'lost' })
     expect(supabase.tables.aitickets_leads).toHaveLength(1)
+  })
+})
+
+describe('validateOutgoing: montos dentro de enlaces', () => {
+  const lead = { id: 'lead-1', email: 'contacto@teatro.cl', org_name: 'Teatro', status: 'contacted' }
+
+  it('un token firmado en la URL nunca se confunde con un monto (el borrador "interested" siempre es válido)', () => {
+    vi.stubEnv('OUTREACH_UNSUB_SECRET', 'unsub-secret-for-tests')
+    vi.stubEnv('LEAD_TOKEN_SECRET', 'lead-secret-for-tests')
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const start = Date.parse('2026-09-29T12:00:00Z')
+    // Con estos secretos, algunos segundos producen tokens con "uf<dígito>" o "<dígito>usd": antes fallaba ~0,7%.
+    for (let i = 0; i < 1500; i++) {
+      vi.setSystemTime(start + i * 1000)
+      const reply = composeInterestedReply({ lead })
+      expect(reply.validation, `t+${i}s`).toEqual({ ok: true, errors: [] })
+    }
+  })
+
+  it('los montos en el texto siguen bloqueados; en un enlace permitido se ignoran', () => {
+    const body = (t) => validateOutgoing(t, { requireFooter: false })
+    expect(body('Cuesta $5.000 al mes').ok).toBe(false)
+    expect(body('Son 3 UF por evento').ok).toBe(false)
+    expect(body('Cobramos 25% por entrada').ok).toBe(false)
+    expect(body('Regístrate en https://aitickets.cl/organizadores/registro?lead=abcUF3xyz.9usd-q').ok).toBe(true)
   })
 })

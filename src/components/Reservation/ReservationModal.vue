@@ -155,7 +155,7 @@ function handleRemoteGoToNextStep() {
       </p>
 
       <div class="flex-1 overflow-y-auto">
-        <div v-if="currentStep === 1 || currentStep === 2" class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 p-2 w-full md:min-w-[732px] md:max-w-[800px] mx-auto">
+        <div v-if="currentStep === 1 || currentStep === 2" class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 p-4 md:p-2 w-full md:min-w-[732px] md:max-w-[800px] mx-auto">
           <div class="w-full">
             <TicketSelection
               v-if="currentStep === 1"
@@ -177,14 +177,14 @@ function handleRemoteGoToNextStep() {
         </div>
       </div>
 
-      <div class="w-full flex justify-between items-center gap-4 p-4 md:p-6 border-t bg-white md:rounded-b-lg">
-        <button v-if="currentStep > 1" @click="prevStep" aria-label="atras" class="cursor-pointer text-gray-600 hover:text-black py-2">Atrás</button>
+      <div class="w-full flex justify-between items-center gap-4 px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:p-6 border-t bg-white md:rounded-b-lg">
+        <button v-if="currentStep > 1" @click="prevStep" aria-label="atras" class="cursor-pointer text-gray-600 hover:text-black py-3 px-2 md:px-0 md:py-2">Atrás</button>
         <span v-else></span>
         <button
           v-if="currentStep < 3"
           @click="nextStep"
           :disabled="!canProceed"
-          class="px-6 py-3 rounded-md"
+          class="flex-1 md:flex-none px-6 py-3 rounded-md font-semibold md:font-normal"
           :class="{
             'bg-lime-500 text-white cursor-pointer': canProceed,
             'bg-gray-300 text-gray-500 cursor-not-allowed': !canProceed

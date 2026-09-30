@@ -27,9 +27,9 @@ defineProps({
         />
         <span v-else class="text-lg font-bold truncate">{{ site.name }}</span>
       </a>
-      <nav class="flex items-center gap-5 text-sm font-medium">
-        <a :href="`${base || '/'}#eventos`" class="hover:opacity-70 transition-opacity">Eventos</a>
-        <a v-if="site.contact_form_enabled" :href="`${base}/contacto`" class="hover:opacity-70 transition-opacity">Contacto</a>
+      <nav class="flex shrink-0 items-center gap-4 sm:gap-5 text-sm font-medium">
+        <a :href="`${base || '/'}#eventos`" class="py-2 hover:opacity-70 transition-opacity">Eventos</a>
+        <a v-if="site.contact_form_enabled" :href="`${base}/contacto`" class="py-2 hover:opacity-70 transition-opacity">Contacto</a>
       </nav>
     </div>
   </header>

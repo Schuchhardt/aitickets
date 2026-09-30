@@ -21,7 +21,7 @@ defineProps({
 
     <main class="max-w-3xl mx-auto px-5 lg:px-8">
       <section class="pt-16 pb-10">
-        <h1 class="text-4xl sm:text-5xl font-semibold tracking-tight">{{ site.name }}</h1>
+        <h1 class="text-4xl sm:text-5xl font-semibold tracking-tight break-words">{{ site.name }}</h1>
         <p v-if="site.content.tagline" class="mt-4 text-lg opacity-70">{{ site.content.tagline }}</p>
       </section>
 

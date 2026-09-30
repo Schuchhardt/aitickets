@@ -44,7 +44,7 @@ const applyDiscount = async () => {
 
     <template v-if="SHOW_DISCOUNT_CODE">
       <div class="flex items-center mb-2" v-if="selectedTicketList.length !== 0 && totals.subtotal > 0">
-        <input v-model="discountCode" type="text" placeholder="Código de descuento" class="border p-2 rounded-md w-full mr-2" />
+        <input v-model="discountCode" type="text" placeholder="Código de descuento" class="border p-2 rounded-md w-full mr-2 text-base" />
         <button class="bg-gray-400 text-white px-4 py-2 rounded-md" :disabled="appliedDiscount || !discountCode" @click="applyDiscount">
           Aplicar
         </button>

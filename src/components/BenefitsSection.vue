@@ -76,21 +76,21 @@
 
         <!-- Métricas -->
         <FadeInSection :delay="300">
-          <div class="mt-16 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            <div class="p-6">
-              <div class="text-4xl font-bold text-lime-500 font-[Unbounded]">0%</div>
+          <div class="mt-16 grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-8 text-center">
+            <div class="p-2 sm:p-6">
+              <div class="text-2xl sm:text-4xl whitespace-nowrap font-bold text-lime-500 font-[Unbounded]">0%</div>
               <div class="text-gray-600 text-sm mt-2">de comisión para el productor</div>
             </div>
-            <div class="p-6">
-              <div class="text-4xl font-bold text-lime-500 font-[Unbounded]">10%</div>
+            <div class="p-2 sm:p-6">
+              <div class="text-2xl sm:text-4xl whitespace-nowrap font-bold text-lime-500 font-[Unbounded]">10%</div>
               <div class="text-gray-600 text-sm mt-2">cargo por servicio + IVA que paga el comprador</div>
             </div>
-            <div class="p-6">
-              <div class="text-4xl font-bold text-lime-500 font-[Unbounded]">48–72 h</div>
+            <div class="p-2 sm:p-6">
+              <div class="text-2xl sm:text-4xl whitespace-nowrap font-bold text-lime-500 font-[Unbounded]">48–72 h</div>
               <div class="text-gray-600 text-sm mt-2">después de cada función te transferimos lo recaudado</div>
             </div>
-            <div class="p-6">
-              <div class="text-4xl font-bold text-lime-500 font-[Unbounded]">24 h</div>
+            <div class="p-2 sm:p-6">
+              <div class="text-2xl sm:text-4xl whitespace-nowrap font-bold text-lime-500 font-[Unbounded]">24 h</div>
               <div class="text-gray-600 text-sm mt-2">antes, tus asistentes reciben un recordatorio por email</div>
             </div>
           </div>

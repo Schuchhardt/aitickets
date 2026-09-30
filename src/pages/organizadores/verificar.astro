@@ -37,7 +37,10 @@ if (Astro.request.method === "POST") {
     slug = result.slug;
     // Primera confirmación: el usuario probó que controla el correo => sesión iniciada sin contraseña.
     // (Un enlace ya usado no vuelve a iniciar sesión: el token de verificación dura 48 h.)
-    if (!result.alreadyVerified) {
+    // confirmProducerEmail ya confirmó la cuenta en Auth (el magic link de un usuario sin confirmar lo
+    // confirmaría por su cuenta); si es una identidad de otra app sin confirmar, no se crea la sesión y se
+    // muestra el acceso al login.
+    if (!result.alreadyVerified && result.authConfirmed) {
       const session = await createPasswordlessSession(result.email);
       if (session) {
         setSessionCookies(Astro, session.accessToken, session.refreshToken);

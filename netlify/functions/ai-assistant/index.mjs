@@ -10,6 +10,7 @@ import { TICKET_COLUMNS, isTicketOnSale, maxPerPurchase, getSoldCounts } from '.
 import { computeBuyerTotal } from '../../lib/fees.mjs'
 import { isDemoEventSlug, getDemoEventDate } from '../../../src/lib/demoEvent.mjs'
 import { EVENT_DATE_COLUMNS, todayInTimeZone, formatDateOnlyLong, formatTimeShort, formatEventLocation } from '../../lib/dates.mjs'
+import { rateLimit } from '../../lib/rate-limit.mjs'
 
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-opus-5'
 const MAX_HISTORY = 10
@@ -33,6 +34,10 @@ function takeToken(ip) {
   buckets.set(ip, bucket)
   return allowed
 }
+
+// Límite durable por IP (compartido entre instancias; cada mensaje es una llamada paga a Claude).
+// El token bucket de arriba frena ráfagas en la instancia; este acota el total aunque haya muchas instancias.
+const DURABLE_IP_LIMIT = { bucket: 'ai-assistant:ip', windowSeconds: 10 * 60, max: 60 }
 
 const TOOLS = [
   {
@@ -161,9 +166,9 @@ export default async function handler(req, context) {
   if (req.method !== 'POST') return json({ message: 'Método no permitido' }, 405)
 
   const ip = context?.ip || req.headers.get('x-nf-client-connection-ip') || 'unknown'
-  if (!takeToken(ip)) {
-    return json({ message: 'Estás enviando mensajes muy rápido. Espera un momento e inténtalo de nuevo. 🙏' }, 429)
-  }
+  const tooFast = () => json({ message: 'Estás enviando mensajes muy rápido. Espera un momento e inténtalo de nuevo. 🙏' }, 429)
+  if (!takeToken(ip)) return tooFast()
+  if (!(await rateLimit(DURABLE_IP_LIMIT.bucket, ip, DURABLE_IP_LIMIT)).allowed) return tooFast()
 
   let body
   try {

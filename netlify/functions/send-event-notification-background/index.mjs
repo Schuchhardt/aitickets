@@ -18,7 +18,9 @@ async function sendNotificationEmails(attendees, eventName, changeType, changeDe
     const batch = attendees.slice(i, i + BATCH_SIZE)
     const recipientVariables = {}
     const to = batch.map((a) => {
-      recipientVariables[a.email] = { name: escapeHtml(a.first_name || 'Asistente') }
+      // HTML con el nombre escapado; texto plano y asunto con el nombre tal cual (sin "O&#39;Brien")
+      const name = a.first_name || 'Asistente'
+      recipientVariables[a.email] = { name: { html: escapeHtml(name), text: name } }
       return formatRecipient(`${a.first_name || ''} ${a.last_name || ''}`, a.email)
     })
     try {

@@ -24,11 +24,16 @@ import {
 } from "../../../lib/sites";
 import { sendEmail, isValidEmail, formatRecipient } from "../../../../netlify/lib/mailer.mjs";
 import { renderSiteContactMessageEmail } from "../../../../netlify/lib/emails/index.mjs";
+import { rateLimit } from "../../../../netlify/lib/rate-limit.mjs";
 
 export const prerender = false;
 
 const RATE_LIMIT_PER_HOUR = 5;
 const SITE_LIMIT_PER_DAY = 20;
+// Intentos (válidos o no, antes de Turnstile y de guardar): límite durable por IP y por IP + sitio en
+// aitickets_rate_limits. Complementa los topes de arriba, que solo cuentan mensajes guardados.
+const ATTEMPTS_PER_IP = { bucket: "site-contact:ip", windowSeconds: 60 * 60, max: 30 };
+const ATTEMPTS_PER_IP_SITE = { bucket: "site-contact:ip-site", windowSeconds: 60 * 60, max: 10 };
 
 function globalHourlyCap(): number {
   const raw = import.meta.env.SITE_CONTACT_GLOBAL_HOURLY_CAP || (globalThis as any).process?.env?.SITE_CONTACT_GLOBAL_HOURLY_CAP;
@@ -96,6 +101,18 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
   const ip = clientIpFrom(request);
   const effectiveHost = locals.effectiveHost || new URL(request.url).host;
+
+  // El sitio demo no toca la BD (tampoco para contar intentos)
+  if (!site.is_demo) {
+    const supabaseForLimits = getSupabaseAdmin();
+    const [ipAttempts, ipSiteAttempts] = await Promise.all([
+      rateLimit(ATTEMPTS_PER_IP.bucket, ip, { ...ATTEMPTS_PER_IP, supabase: supabaseForLimits }),
+      rateLimit(ATTEMPTS_PER_IP_SITE.bucket, ip === "unknown" ? null : `${ip}|${site.id}`, { ...ATTEMPTS_PER_IP_SITE, supabase: supabaseForLimits }),
+    ]);
+    if (!ipAttempts.allowed || !ipSiteAttempts.allowed) {
+      return json({ ok: false, error: "Enviaste demasiados mensajes. Inténtalo en una hora." }, 429);
+    }
+  }
 
   // Turnstile bajo aitickets.cl (en dominios propios no es posible: lista de hostnames del widget)
   if (isUnderRootDomain(effectiveHost)) {

@@ -116,7 +116,7 @@ const formatFullDate = (dateArray) => {
             <p class="font-medium break-words">{{ ticket.ticket_name }}</p>
             <p v-if="ticket.price !== null && ticket.price !== undefined" class="text-gray-700">
               {{ ticket.price > 0 ? formatCLP(ticket.price) : "Gratis" }}
-              <span v-if="ticket.price > 0" class="text-gray-500 text-xs">{{ SERVICE_FEE_NOTE }}</span>
+              <span v-if="ticket.price > 0" class="block sm:inline text-gray-500 text-xs">{{ SERVICE_FEE_NOTE }}</span>
             </p>
             <p v-if="ticket.remaining != null && ticket.remaining > 0 && ticket.remaining <= 10" class="text-orange-600 text-xs mt-1">
               ¡Quedan {{ ticket.remaining }}!
@@ -134,12 +134,12 @@ const formatFullDate = (dateArray) => {
               Añadir
             </button>
             <div v-else class="flex items-center justify-center space-x-1 border rounded-lg px-1 py-1">
-              <button aria-label="Disminuir cantidad de entradas" @click="decreaseTicket(ticket)" class="w-9 h-9 cursor-pointer text-lg">-</button>
+              <button aria-label="Disminuir cantidad de entradas" @click="decreaseTicket(ticket)" class="w-10 h-10 md:w-9 md:h-9 cursor-pointer text-lg">-</button>
               <span class="w-6 text-center">{{ selectedTickets[ticket.id] || 0 }}</span>
               <button
                 aria-label="Aumentar cantidad de entradas"
                 @click="increaseTicket(ticket)"
-                class="w-9 h-9 relative cursor-pointer text-lg"
+                class="w-10 h-10 md:w-9 md:h-9 relative cursor-pointer text-lg"
               >
                 +
                 <transition name="fade">

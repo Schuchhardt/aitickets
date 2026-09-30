@@ -23,7 +23,7 @@ const hasHeroBanner = (props.banners || []).some((b) => b.placement === "hero");
     <section class="bg-[var(--site-primary)] text-white overflow-hidden">
       <div class="max-w-6xl mx-auto px-5 lg:px-8 py-14 sm:py-20 grid gap-8 md:grid-cols-2 md:items-center">
         <div>
-          <h1 class="text-5xl sm:text-7xl font-bold uppercase leading-[0.9]">{{ site.name }}</h1>
+          <h1 class="text-4xl sm:text-7xl font-bold uppercase leading-[0.9] break-words">{{ site.name }}</h1>
           <p v-if="site.content.tagline" class="mt-5 text-lg text-white/90 max-w-xl">{{ site.content.tagline }}</p>
           <a :href="`${base || '/'}#eventos`" class="inline-block mt-8 bg-[var(--site-accent)] text-black px-7 py-3 font-bold uppercase tracking-wide -rotate-1">Ver line-up</a>
         </div>

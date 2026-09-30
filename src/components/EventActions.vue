@@ -332,15 +332,15 @@ const addToCalendar = () => {
     </div>
 
     <!-- Precio Sticky en Mobile -->
-    <div v-if="isEventFinished" class="lg:hidden fixed bottom-0 left-0 w-full bg-gray-300 py-4 px-6 flex flex-col items-center shadow-md z-50">
+    <div v-if="isEventFinished" class="lg:hidden fixed bottom-0 left-0 w-full bg-gray-300 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] px-6 flex flex-col items-center shadow-md z-50">
       <button disabled class="w-full py-3 rounded-full text-gray-600 bg-gray-200 cursor-not-allowed font-bold text-base">
         Evento finalizado
       </button>
       <p class="mt-2 text-gray-600 text-sm">Te vemos en el próximo</p>
     </div>
 
-    <div v-else-if="!hasPurchasedTickets" class="lg:hidden fixed bottom-0 left-0 w-full py-4 px-6 flex justify-between items-center shadow-md z-50" :class="canBuy ? 'bg-lime-400' : 'bg-gray-300'">
-      <div class="flex flex-col">
+    <div v-else-if="!hasPurchasedTickets" class="lg:hidden fixed bottom-0 left-0 w-full pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] px-4 flex justify-between items-center gap-3 shadow-md z-50" :class="canBuy ? 'bg-lime-400' : 'bg-gray-300'">
+      <div class="flex flex-col min-w-0">
         <span class="text-lg text-gray-900">{{ priceLabel }}</span>
         <span v-if="feeNote" class="text-xs font-normal font-['Prompt'] text-gray-800">{{ feeNote }}</span>
         <span v-if="lowStockLabel" class="text-xs text-red-700">{{ lowStockLabel }}</span>
@@ -349,7 +349,7 @@ const addToCalendar = () => {
       <button
         v-if="!canBuy"
         disabled
-        class="bg-gray-200 text-gray-600 py-2 px-6 rounded-full cursor-not-allowed"
+        class="shrink-0 whitespace-nowrap bg-gray-200 text-gray-600 py-3 px-5 rounded-full cursor-not-allowed"
       >
         {{ unavailableLabel }}
       </button>
@@ -357,14 +357,14 @@ const addToCalendar = () => {
         v-else
         @click="openReserveModal" 
         aria-label="Comprar entrada" 
-        class="bg-black text-white py-2 px-6 rounded-full flex items-center cursor-pointer relative z-10 pointer-events-auto"
+        class="shrink-0 whitespace-nowrap bg-black text-white py-3 px-5 rounded-full flex items-center cursor-pointer relative z-10 pointer-events-auto"
       >
         Comprar entrada
       </button>
     </div>
 
     <!-- Sticky con múltiples botones cuando ya compró -->
-    <div v-else-if="!isEventFinished" class="lg:hidden fixed bottom-0 left-0 w-full bg-lime-400 py-3 px-4 shadow-md z-50">
+    <div v-else-if="!isEventFinished" class="lg:hidden fixed bottom-0 left-0 w-full bg-lime-400 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] px-4 shadow-md z-50">
       <div class="flex flex-col gap-2">
         <div class="flex justify-between items-center">
           <span class="text-sm text-gray-900 font-medium">{{ priceLabel }}</span>

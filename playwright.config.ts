@@ -1,5 +1,6 @@
 // E2E con Playwright. SOLO contra un servidor local: nunca producción ni deploy previews
-// (comparten la base de datos de producción). La CI no corre e2e.
+// (comparten la base de datos de producción). La CI (job e2e de .github/workflows/ci.yml) corre el modo
+// sin BD: sin secretos, sin .env y con los specs que necesitan BD omitidos (tests/e2e/env.ts, HAS_DB).
 //
 // Modos:
 //   npm run test:e2e
@@ -32,6 +33,11 @@ if (externalBaseUrl) {
 const port = Number(process.env.E2E_PORT || 4329);
 const baseURL = externalBaseUrl || `http://127.0.0.1:${port}`;
 const useEnvDb = process.env.E2E_DB === "1";
+const isCI = Boolean(process.env.CI);
+// En CI solo el modo sin BD: nunca el .env (apunta a producción) ni un servidor externo.
+if (isCI && (useEnvDb || externalBaseUrl)) {
+  throw new Error("En CI los e2e corren solo en modo sin BD: quita E2E_DB y E2E_BASE_URL.");
+}
 
 // Entorno del servidor de desarrollo en modo sin BD. Un valor definido en process.env tiene prioridad
 // sobre el .env (Astro lee process.env primero), así que el .env local nunca se usa para estas claves.
@@ -41,8 +47,15 @@ const offlineEnv: Record<string, string> = {
   SUPABASE_ANON_KEY: "",
   SITE_URL: baseURL,
   INTERNAL_API_SECRET: "e2e-internal-secret",
+  DATABASE_URL: "",
+  SUPABASE_DB_URL: "",
+  RESEND_API_KEY: "",
   MAILGUN_API_KEY: "",
   MAILGUN_DOMAIN: "",
+  MAILERLITE_API_TOKEN: "",
+  ZERNIO_API_KEY: "",
+  META_APP_SECRET: "",
+  PUBLIC_SERVERLESS_URL: "",
   TURNSTILE_SITE_KEY: "",
   TURNSTILE_SECRET_KEY: "",
   PUBLIC_TURNSTILE_SITE_KEY: "",
@@ -68,10 +81,13 @@ const offlineEnv: Record<string, string> = {
 
 export default defineConfig({
   testDir: "tests/e2e",
+  globalSetup: "./tests/e2e/global-setup.ts",
   fullyParallel: true,
-  forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 1 : 0,
-  reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
+  forbidOnly: isCI,
+  retries: isCI ? 1 : 0,
+  // En CI: 2 workers (el runner tiene 2 CPU y el servidor de desarrollo compila las páginas al vuelo)
+  workers: isCI ? 2 : undefined,
+  reporter: isCI ? [["list"], ["html", { open: "never" }]] : "list",
   timeout: 60_000,
   expect: { timeout: 10_000 },
   use: {

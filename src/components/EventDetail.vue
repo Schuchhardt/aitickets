@@ -82,11 +82,11 @@ function autoOpenReservation() {
     </div>
 
     <!-- Banner de adquisición de productores (no en los sitios de productor) -->
-    <div v-if="siteMode" class="mb-24 lg:mb-8"></div>
-    <aside v-else class="mt-12 mb-24 lg:mb-8 border-t border-gray-200 pt-6 text-center font-['Prompt']">
+    <div v-if="siteMode" class="mb-32 lg:mb-8"></div>
+    <aside v-else class="mt-12 mb-32 lg:mb-8 border-t border-gray-200 pt-6 text-center font-['Prompt']">
       <a
         :href="producerBannerUrl"
-        class="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-black transition-colors"
+        class="inline-flex flex-col sm:flex-row items-center gap-1 sm:gap-2 py-2 text-sm text-gray-600 hover:text-black transition-colors"
       >
         ¿Organizas eventos?
         <span class="font-semibold underline decoration-lime-400 decoration-2 underline-offset-4">

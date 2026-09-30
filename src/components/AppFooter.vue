@@ -150,9 +150,9 @@ const submitForm = async (event) => {
     <div class="mt-4 text-center text-gray-500 text-sm font-['Prompt']">
       <div class="flex flex-wrap justify-center gap-x-4 gap-y-2 px-6">
         <a href="/terms" class="hover:underline">Términos y condiciones</a>
-        <span aria-hidden="true">|</span>
+        <span aria-hidden="true" class="hidden sm:inline">|</span>
         <a href="/terminos-productores" class="hover:underline">Términos para productores</a>
-        <span aria-hidden="true">|</span>
+        <span aria-hidden="true" class="hidden sm:inline">|</span>
         <a href="/privacy" class="hover:underline">Aviso de privacidad</a>
       </div>
       <p class="mt-3 text-xs text-gray-400">© 2026 {{ LEGAL.entity }} · {{ LEGAL.brand }}</p>

@@ -20,8 +20,8 @@
 
       <div>
         <FadeInSection direction="right">
-          <h3 class="text-2xl font-bold mb-8 flex items-center font-[Unbounded]">
-            <span class="bg-black text-white p-1 mr-2">Pensado para</span>
+          <h3 class="text-xl sm:text-2xl font-bold mb-8 flex flex-wrap items-center gap-y-2 font-[Unbounded]">
+            <span class="bg-black text-white p-1 mr-2 whitespace-nowrap">Pensado para</span>
             <span>Productores</span>
           </h3>
         </FadeInSection>
