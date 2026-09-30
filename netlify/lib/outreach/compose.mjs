@@ -119,11 +119,13 @@ export function validateOutgoing(text, { requireFooter = true, maxWords = MAX_WO
     if (!ok) errors.push(`enlace no permitido: ${host}`)
   }
 
-  // Precios/porcentajes: solo los de SALES_KB.
-  if (/(?:\$|US\$|USD|CLP|UF)\s?\d|\d[\d.,]*\s?(?:pesos|clp|usd|dólares|dolares|uf)\b/i.test(body)) {
+  // Precios/porcentajes: solo los de SALES_KB. Se revisan sin los enlaces: un token firmado en la URL
+  // (p. ej. "...uf3..." o "...7usd-...") no es un monto y antes vaciaba el borrador al azar.
+  const prose = body.replace(URL_RE, ' ')
+  if (/(?:\$|US\$|USD|CLP|UF)\s?\d|\d[\d.,]*\s?(?:pesos|clp|usd|dólares|dolares|uf)\b/i.test(prose)) {
     errors.push('menciona montos: solo se permiten los porcentajes de la base comercial')
   }
-  for (const m of body.matchAll(/(\d+(?:[.,]\d+)?)\s?%/g)) {
+  for (const m of prose.matchAll(/(\d+(?:[.,]\d+)?)\s?%/g)) {
     const pct = `${m[1].replace(',', '.')}%`
     if (!SALES_KB.allowedPercentages.includes(pct)) errors.push(`porcentaje no aprobado: ${pct}`)
   }

@@ -4,6 +4,7 @@ import { getSessionContext, getOwnedEvent, hasRole, EVENT_MANAGER_ROLES, jsonRes
 import { callInternalFunction, notifySlack, siteUrl } from "../_lib/server-utils";
 import { syncEventCategory, refreshEventDenorm, normalizeTicket, isClientTempId, isValidDateInput, resolveTicketDateId } from "../_lib/events";
 import { sanitizeRichText } from "../../../lib/sanitize";
+import { listOrgVenues, isVenueAllowed, insertOrgVenue } from "../../../lib/orgVenues";
 
 export const POST: APIRoute = async (context) => {
     const session = await getSessionContext(context);
@@ -84,6 +85,12 @@ export const POST: APIRoute = async (context) => {
                 return jsonResponse({ message: "Revisa las funciones: fecha y hora deben ser válidas" }, 400);
             }
         }
+        // Lugares existentes: solo los de la organización o los que ya usan sus eventos
+        const createsVenue = (loc: any) => Boolean(loc.isNewVenue && String(loc.newVenueName || "").trim());
+        const { venues: allowedVenues, hasOrgColumn } = await listOrgVenues(supabaseAdmin, dbUser.organization_id);
+        if (locations.some((loc: any) => !createsVenue(loc) && loc.venueId && !isVenueAllowed(loc.venueId, allowedVenues))) {
+            return jsonResponse({ message: "El lugar seleccionado no pertenece a tu organización" }, 403);
+        }
         const normalizedTickets = tickets.map((t: any) => ({ raw: t, data: normalizeTicket(t) }));
         if (normalizedTickets.some((t: any) => !t.data)) {
             return jsonResponse({ message: "Revisa las entradas: nombre, precio y cantidad deben ser válidos" }, 400);
@@ -121,20 +128,13 @@ export const POST: APIRoute = async (context) => {
 
         for (const loc of locations) {
             let venueId = loc.venueId;
-            if (loc.isNewVenue && String(loc.newVenueName || "").trim()) {
-                const { data: newVenue, error: venueError } = await supabaseAdmin
-                    .from("venues")
-                    .insert({
-                        name: String(loc.newVenueName).trim(),
-                        address_line1: loc.newVenueAddress || null,
-                        city: loc.newVenueCity || null,
-                        country_code: "CL",
-                        timezone: "America/Santiago",
-                    })
-                    .select("id")
-                    .single();
-                if (venueError) throw venueError;
-                venueId = newVenue.id;
+            if (createsVenue(loc)) {
+                venueId = await insertOrgVenue(
+                    supabaseAdmin,
+                    dbUser.organization_id,
+                    { name: String(loc.newVenueName).trim(), address_line1: loc.newVenueAddress || null, city: loc.newVenueCity || null },
+                    hasOrgColumn,
+                );
             }
 
             let locationId: string | null = null;

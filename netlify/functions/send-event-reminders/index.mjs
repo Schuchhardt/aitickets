@@ -128,8 +128,12 @@ export default async function handler() {
           const batch = recipients.slice(i, i + 50)
           const recipientVars = {}
           const toList = batch.map(r => {
-            // Las variables se insertan tal cual en el HTML: escapar el nombre
-            recipientVars[r.email] = { name: escapeHtml(r.first_name || 'Asistente'), order_url: escapeHtml(r.order_url) }
+            // En el HTML van escapadas; en el texto plano y el asunto, tal cual (sin "O&#39;Brien")
+            const name = r.first_name || 'Asistente'
+            recipientVars[r.email] = {
+              name: { html: escapeHtml(name), text: name },
+              order_url: { html: escapeHtml(r.order_url), text: r.order_url },
+            }
             return formatRecipient(`${r.first_name || ''} ${r.last_name || ''}`, r.email)
           })
           try {

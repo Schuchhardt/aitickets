@@ -2,6 +2,7 @@
 import DashboardLayout from "../../../../layouts/DashboardLayout.astro";
 import EditEventForm from "../../../../components/events/EditEventForm.vue";
 import { getSupabaseAdmin } from "../../../../lib/auth-helpers";
+import { listOrgVenues, type OrgVenue } from "../../../../lib/orgVenues";
 import { EVENT_MANAGER_ROLES } from "../../../../lib/supabaseServer";
 import { requireDashboardSession } from "../../_lib/guard";
 import { decodeBasicEntities } from "../../../../lib/sanitize";
@@ -94,12 +95,13 @@ const initialFormState = {
         })) || [],
 };
 
-// Fetch venues for the dropdown
-const { data: venues } = await supabaseAdmin
-    .from("venues")
-    .select("id, name, city")
-    .order("name", { ascending: true })
-    .limit(1000);
+// Lugares para el selector: solo los de mi organización o los que ya usan mis eventos
+let venues: OrgVenue[] = [];
+try {
+    ({ venues } = await listOrgVenues(supabaseAdmin, dbUser.organization_id));
+} catch (err) {
+    console.error("Venues fetch error", err);
+}
 ---
 
 <DashboardLayout title={`Editar ${event.name}`}>
@@ -117,7 +119,7 @@ const { data: venues } = await supabaseAdmin
             client:load
             eventId={id!}
             initialFormState={initialFormState}
-            initialVenues={venues || []}
+            initialVenues={venues}
             eventStatus={(event as any).status || "draft"}
         />
     </div>

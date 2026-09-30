@@ -23,9 +23,9 @@ import GradientBackground from './Hero/GradientBackground.vue';
             <FadeInSection direction="up" :delay="100">
               <h1 class="text-3xl md:text-2xl lg:text-4xl font-bold text-white leading-tight mb-6 font-[Unbounded]">
                 La ticketera que
-                <span class="relative inline-block">
+                <span class="lg:relative lg:inline-block box-decoration-clone max-lg:bg-[linear-gradient(transparent_62%,rgb(163_230_53/0.3)_62%,rgb(163_230_53/0.3)_88%,transparent_88%)]">
                   llena tus funciones
-                  <span class="absolute bottom-2 left-0 w-full h-3 bg-lime-400/30 -z-10 rounded"></span>
+                  <span class="hidden lg:block absolute bottom-2 left-0 w-full h-3 bg-lime-400/30 -z-10 rounded"></span>
                 </span>
               </h1>
             </FadeInSection>
@@ -51,7 +51,7 @@ import GradientBackground from './Hero/GradientBackground.vue';
               </div>
             </FadeInSection>
   
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 text-left">
               <FadeInSection direction="up" :delay="400">
                 <FeatureCard :icon="Calendar" title="Funciones múltiples" text="Una página de evento con todas tus fechas. Ideal para stand-up y teatro con temporada." />
               </FadeInSection>

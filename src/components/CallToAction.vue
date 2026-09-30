@@ -3,9 +3,9 @@
     <div class="container mx-auto px-4 md:px-8 text-center">
       <FadeInSection>
         <div class="inline-flex items-center justify-center mb-6">
-          <span class="bg-lime-400/10 backdrop-blur-sm rounded-full px-4 py-1 flex items-center border border-lime-400/30">
-            <Shield class="h-4 w-4 text-lime-400 mr-2" />
-            <span class="text-lime-400 text-sm font-medium">Sin mensualidad • Sin permanencia • Sin costos fijos</span>
+          <span class="bg-lime-400/10 backdrop-blur-sm rounded-2xl sm:rounded-full px-4 py-1 flex items-center border border-lime-400/30">
+            <Shield class="h-4 w-4 shrink-0 text-lime-400 mr-2" />
+            <span class="text-lime-400 text-xs sm:text-sm font-medium">Sin mensualidad • Sin permanencia • Sin costos fijos</span>
           </span>
         </div>
       </FadeInSection>

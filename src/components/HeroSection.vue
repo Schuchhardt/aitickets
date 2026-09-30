@@ -50,7 +50,7 @@ import GradientBackground from './Hero/GradientBackground.vue';
             </div>
           </FadeInSection>
 
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 pb-8">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 pb-8 text-left">
             <FadeInSection direction="up" :delay="400">
               <FeatureCard :icon="TrendingUp" title="0% para ti" text="Sin comisión para el productor. El comprador paga un cargo por servicio de 10% + IVA." />
             </FadeInSection>

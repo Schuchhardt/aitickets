@@ -24,7 +24,7 @@ const heroImage = heroBanner?.image_url || props.site.theme.hero_image_url || (p
       <img v-if="heroImage" :src="heroImage" :alt="heroBanner?.alt || site.name" class="absolute inset-0 w-full h-full object-cover" fetchpriority="high" />
       <div class="absolute inset-0 bg-gradient-to-t from-[var(--site-bg)] via-black/60 to-black/30"></div>
       <div class="relative max-w-6xl mx-auto w-full px-5 lg:px-8 pb-14 pt-32">
-        <h1 class="text-4xl sm:text-6xl font-bold leading-none text-white drop-shadow">{{ site.name }}</h1>
+        <h1 class="text-4xl sm:text-6xl font-bold leading-none text-white drop-shadow break-words">{{ site.name }}</h1>
         <p v-if="site.content.tagline" class="mt-4 text-lg text-white/80 max-w-2xl">{{ site.content.tagline }}</p>
         <div class="mt-8 flex flex-wrap gap-3">
           <a :href="`${base || '/'}#eventos`" class="rounded-full bg-[var(--site-primary)] text-black px-6 py-3 font-bold">Ver eventos</a>

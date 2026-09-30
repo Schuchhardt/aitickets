@@ -4,6 +4,7 @@ import { getSessionContext, hasRole, EVENT_MANAGER_ROLES, jsonResponse } from ".
 import { notifySlack, slugify } from "../_lib/server-utils";
 import { syncEventCategory, refreshEventDenorm, normalizeTicket, isValidDateInput, resolveTicketDateId } from "../_lib/events";
 import { sanitizeRichText } from "../../../lib/sanitize";
+import { listOrgVenues, isVenueAllowed, insertOrgVenue } from "../../../lib/orgVenues";
 
 export const POST: APIRoute = async (context) => {
     const session = await getSessionContext(context);
@@ -34,6 +35,11 @@ export const POST: APIRoute = async (context) => {
             if (loc.isNewVenue && !String(loc.newVenueName || "").trim()) {
                 return jsonResponse({ message: "El nuevo lugar debe tener nombre" }, 400);
             }
+        }
+        // Lugares existentes: solo los de la organización o los que ya usan sus eventos
+        const { venues: allowedVenues, hasOrgColumn } = await listOrgVenues(supabaseAdmin, dbUser.organization_id);
+        if (locations.some((loc: any) => !loc.isNewVenue && !isVenueAllowed(loc.venueId, allowedVenues))) {
+            return jsonResponse({ message: "El lugar seleccionado no pertenece a tu organización" }, 403);
         }
         const ticketsPayload = tickets.map(normalizeTicket);
         if (ticketsPayload.some((t: any) => !t)) {
@@ -72,19 +78,12 @@ export const POST: APIRoute = async (context) => {
             let venueId = loc.venueId;
 
             if (loc.isNewVenue) {
-                const { data: newVenue, error: venueError } = await supabaseAdmin
-                    .from("venues")
-                    .insert({
-                        name: String(loc.newVenueName).trim(),
-                        address_line1: loc.newVenueAddress || null,
-                        city: loc.newVenueCity || null,
-                        country_code: "CL",
-                        timezone: "America/Santiago",
-                    })
-                    .select("id")
-                    .single();
-                if (venueError) throw venueError;
-                venueId = newVenue.id;
+                venueId = await insertOrgVenue(
+                    supabaseAdmin,
+                    dbUser.organization_id,
+                    { name: String(loc.newVenueName).trim(), address_line1: loc.newVenueAddress || null, city: loc.newVenueCity || null },
+                    hasOrgColumn,
+                );
             }
 
             const { data: locationData, error: locError } = await supabaseAdmin

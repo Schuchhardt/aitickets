@@ -30,7 +30,7 @@ const hasHeroBanner = (props.banners || []).some((b) => b.placement === "hero");
         fetchpriority="high"
       />
       <div v-else class="max-w-6xl mx-auto px-5 lg:px-8 pt-14 pb-6">
-        <h1 class="text-3xl sm:text-5xl font-bold leading-tight">{{ site.name }}</h1>
+        <h1 class="text-3xl sm:text-5xl font-bold leading-tight break-words">{{ site.name }}</h1>
         <p v-if="site.content.tagline" class="mt-4 text-lg opacity-75 max-w-2xl">{{ site.content.tagline }}</p>
       </div>
     </section>

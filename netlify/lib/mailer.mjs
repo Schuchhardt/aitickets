@@ -98,10 +98,27 @@ async function resendRequest(path, payload, idempotencyKey) {
   return body
 }
 
+/**
+ * Valor de una variable de destinatario para un formato. Acepta un string (se usa igual en HTML y en
+ * texto) o `{ html, text }` para que el HTML lleve el valor escapado y el texto plano el original
+ * (sin "O&#39;Brien" en la versión de texto ni en el asunto).
+ * @param {unknown} value
+ * @param {'html' | 'text'} mode
+ */
+export function recipientVarValue(value, mode) {
+  if (value == null) return ''
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    const v = /** @type {{ html?: unknown, text?: unknown }} */ (value)
+    const picked = mode === 'html' ? (v.html ?? v.text) : (v.text ?? v.html)
+    return picked == null ? '' : String(picked)
+  }
+  return String(value)
+}
+
 /** Reemplaza %recipient.clave% (formato heredado) con los valores del destinatario. */
-function applyRecipientVars(value, vars) {
+export function applyRecipientVars(value, vars, mode = 'text') {
   if (!value || !vars) return value
-  return String(value).replace(/%recipient\.([A-Za-z0-9_]+)%/g, (_, key) => (vars[key] == null ? '' : String(vars[key])))
+  return String(value).replace(/%recipient\.([A-Za-z0-9_]+)%/g, (_, key) => recipientVarValue(vars[key], mode))
 }
 
 const emailOf = (recipient) => {
@@ -113,12 +130,13 @@ const emailOf = (recipient) => {
  * Envía un correo transaccional por Resend.
  * No agrega el pie legal automáticamente: inclúyelo en `html` con legalFooterHtml().
  * Con `recipientVariables` (clave = email) se envía un correo individual por destinatario,
- * reemplazando %recipient.clave% en asunto y contenido (vía /emails/batch).
+ * reemplazando %recipient.clave% en asunto y contenido (vía /emails/batch). Cada valor es un string
+ * (igual en HTML y texto) o `{ html, text }` (HTML ya escapado; texto y asunto con el valor original).
  * @param {{
  *   to: string | string[], subject: string, html: string, text?: string,
  *   replyTo?: string, from?: string, bcc?: string | string[],
  *   headers?: Record<string, string>, tags?: string[],
- *   recipientVariables?: Record<string, Record<string, unknown>>,
+ *   recipientVariables?: Record<string, Record<string, string | { html?: string, text?: string } | null | undefined>>,
  *   attachments?: Array<{ filename: string, content: Buffer | string, contentType?: string, contentId?: string }>,
  *   idempotencyKey?: string,
  * }} opts
@@ -166,9 +184,9 @@ export async function sendEmail({ to, subject, html, text, replyTo, from, bcc, h
         return {
           ...rest,
           to: [recipient],
-          subject: cleanHeaderValue(applyRecipientVars(subject, vars)),
-          ...(html ? { html: applyRecipientVars(html, vars) } : {}),
-          text: applyRecipientVars(plain, vars),
+          subject: cleanHeaderValue(applyRecipientVars(subject, vars, 'text')),
+          ...(html ? { html: applyRecipientVars(html, vars, 'html') } : {}),
+          text: applyRecipientVars(plain, vars, 'text'),
         }
       })
       const result = await resendRequest('/emails/batch', payload, idempotencyKey ? `${idempotencyKey}-${i}` : undefined)

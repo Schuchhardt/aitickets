@@ -259,6 +259,23 @@ onUnmounted(() => {
   }
 }
 
+/* En celular/tablet el botón va abajo, sobre la barra fija de compra, para no tapar el título ni el texto */
+@media (max-width: 1023px) {
+  .assistant-button {
+    right: 0.75rem;
+    top: auto;
+    bottom: calc(env(safe-area-inset-bottom) + 6.5rem);
+    transform: none;
+  }
+  .assistant-button > span {
+    display: none;
+  }
+  .assistant-button > button {
+    width: 3.25rem;
+    height: 3.25rem;
+  }
+}
+
 /* Asegurar que en desktop tenga más z-index que los tabs */
 @media (min-width: 1024px) {
   .assistant-button {

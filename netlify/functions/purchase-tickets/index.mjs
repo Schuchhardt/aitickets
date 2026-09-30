@@ -5,7 +5,8 @@
 // Respuesta: pagado -> { paymentLink, provider, orderId }; gratis -> { orderId, redirectUrl: '/order/<orderId>', provider: 'free' }
 // Stock: la reserva es ATÓMICA en SQL (aitickets_reserve_order bloquea los tipos de entrada y recuenta);
 // la orden 'pending' reserva stock hasta hold_expires_at (15 min).
-// Antiabuso: Cloudflare Turnstile (body.cfToken, si está configurado), rate limit en memoria por IP y
+// Antiabuso: Cloudflare Turnstile (body.cfToken, si está configurado), rate limit por IP (memoria de la
+// instancia + durable en la BD vía netlify/lib/rate-limit.mjs), rate limit durable por email del comprador y
 // máximo MAX_PENDING_PER_BUYER órdenes pendientes simultáneas por comprador + evento.
 // GET /api/purchase-ticket -> { turnstileSiteKey, enabledProviders } (datos públicos para el checkout).
 import { getSupabaseAdmin, json } from '../../lib/supabase.mjs'
@@ -25,6 +26,7 @@ import {
   PENDING_HOLD_MINUTES,
 } from '../../lib/tickets.mjs'
 import { sendOrderTicketsEmail } from '../../lib/tickets-email.mjs'
+import { rateLimit } from '../../lib/rate-limit.mjs'
 import { isDemoEventSlug } from '../../../src/lib/demoEvent.mjs'
 
 const MAX_TICKET_LINES = 20
@@ -35,6 +37,13 @@ const MAX_PENDING_PER_BUYER = 2
 const RATE_WINDOW_MS = 10 * 60 * 1000
 const RATE_MAX_REQUESTS = 20
 const rateBuckets = new Map()
+
+// Límites durables (compartidos entre instancias; fallan abierto si la BD no responde)
+const DURABLE_LIMITS = {
+  ip: { bucket: 'purchase:ip', windowSeconds: 10 * 60, max: 30 },
+  email: { bucket: 'purchase:email', windowSeconds: 60 * 60, max: 15 },
+}
+const TOO_MANY = 'Demasiados intentos. Espera unos minutos e intenta nuevamente.'
 
 function isRateLimited(ip) {
   if (!ip) return false
@@ -248,8 +257,10 @@ export default async function handler(req) {
 
   const ip = clientIp(req)
   if (isRateLimited(ip)) {
-    return json({ message: 'Demasiados intentos. Espera unos minutos e intenta nuevamente.' }, 429)
+    return json({ message: TOO_MANY }, 429)
   }
+  const byIp = await rateLimit(DURABLE_LIMITS.ip.bucket, ip, DURABLE_LIMITS.ip)
+  if (!byIp.allowed) return json({ message: TOO_MANY }, 429)
 
   let body
   try {
@@ -264,6 +275,11 @@ export default async function handler(req) {
 
   const captcha = await verifyTurnstile(cfToken, ip)
   if (!captcha.success) return json({ message: captcha.message, captcha: true }, 403)
+
+  // Solo después del captcha: si no, cualquiera que conozca el correo de un comprador podría agotar
+  // su cupo con solicitudes sin token y bloquearlo durante una venta.
+  const byEmail = await rateLimit(DURABLE_LIMITS.email.bucket, buyer.email, DURABLE_LIMITS.email)
+  if (!byEmail.allowed) return json({ message: TOO_MANY }, 429)
 
   try {
     const supabase = getSupabaseAdmin()
