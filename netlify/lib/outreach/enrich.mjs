@@ -15,7 +15,7 @@ import { lookup as dnsLookup, resolveMx } from 'node:dns/promises'
 
 import { getOutreachConfig } from './config.mjs'
 import {
-  emailDomain, isBlockedLocalPart, isFreeMailDomain, isGovernmentOrEducationDomain, isRoleAddress,
+  emailDomain, isBlockedLocalPart, isFreeMailDomain, isGovernmentOrEducationDomain, isNeverFetchUrl, isRoleAddress,
   normalizeEmail, registrableDomain, ticketingPlatformOf,
 } from './domains.mjs'
 import { isDomainSuppressed, isSuppressed } from './guardrails.mjs'
@@ -133,6 +133,8 @@ async function fetchText(url, { lookup } = {}) {
   let current = url
   let res
   for (let hop = 0; ; hop++) {
+    // passline.com (y cualquier dominio de NEVER_FETCH_HOSTS) nunca se visita, tampoco tras una redirección.
+    if (isNeverFetchUrl(current)) throw new Error('fetch_blocked: dominio que nunca se visita')
     await assertPublicUrl(current, { lookup })
     res = await fetch(current, {
       headers: { 'User-Agent': BOT_USER_AGENT, Accept: 'text/html,text/plain;q=0.9,*/*;q=0.5', 'Accept-Language': 'es-CL,es;q=0.9' },
@@ -285,6 +287,8 @@ export async function crawlSite(website, { lookup } = {}) {
   } catch {
     return { pages: [], error: 'invalid_url' }
   }
+  // Nunca se visitan ticketeras (solo el sitio propio del productor) ni dominios detrás de anti-bots.
+  if (isNeverFetchUrl(origin) || ticketingPlatformOf(origin)) return { pages: [], error: 'not_owned_site' }
   const siteDomain = registrableDomain(origin)
   const robots = await robotsFor(origin, { lookup })
   if (robots.blocked) return { pages: [], error: 'unsafe_website' }
@@ -297,6 +301,8 @@ export async function crawlSite(website, { lookup } = {}) {
   const pages = []
   const emails = []
   const ticketing = new Set()
+  const whatsapp = new Map() // número → URL de la página donde aparece
+  const instagram = new Map() // handle → URL de la página donde aparece
   while (queue.length && pages.length < MAX_PAGES) {
     const path = queue.shift()
     if (seen.has(path)) continue
@@ -317,6 +323,10 @@ export async function crawlSite(website, { lookup } = {}) {
     for (const link of extractLinks(res.text, res.url)) {
       const platform = ticketingPlatformOf(link.url)
       if (platform && platform !== 'aitickets') ticketing.add(platform)
+      const wa = whatsappFromUrl(link.url)
+      if (wa && !whatsapp.has(wa)) whatsapp.set(wa, res.url)
+      const ig = instagramHandleFromUrl(link.url)
+      if (ig && !instagram.has(ig)) instagram.set(ig, res.url)
       // Una página de contacto enlazada que no esté en la lista.
       if (registrableDomain(link.url) === siteDomain && /contact|contacto/i.test(link.url + link.text)) {
         try {
@@ -336,7 +346,44 @@ export async function crawlSite(website, { lookup } = {}) {
     emailSourceUrl: email ? best.url : null,
     ticketing: [...ticketing],
     siteDomain,
+    whatsapp: [...whatsapp].map(([number, url]) => ({ number, url })),
+    instagram: [...instagram].map(([handle, url]) => ({ handle, url })),
   }
+}
+
+/** Número de WhatsApp (solo dígitos, con código de país) de un enlace wa.me / api.whatsapp.com, o null. */
+export function whatsappFromUrl(url) {
+  let u
+  try {
+    u = new URL(url)
+  } catch {
+    return null
+  }
+  const host = u.hostname.toLowerCase().replace(/^www\./, '')
+  let raw = ''
+  if (host === 'wa.me') raw = u.pathname.slice(1)
+  else if (host === 'api.whatsapp.com' || host === 'web.whatsapp.com') raw = u.searchParams.get('phone') || ''
+  else return null
+  const digits = raw.replace(/\D/g, '')
+  return digits.length >= 8 && digits.length <= 15 ? digits : null
+}
+
+const IG_RESERVED = new Set(['p', 'reel', 'reels', 'explore', 'stories', 'accounts', 'tv', 'direct', 'about', 'legal', 'developer', 'web'])
+
+/** Handle de Instagram de una URL instagram.com/<handle> (perfil, no publicación), o null. */
+export function instagramHandleFromUrl(url) {
+  let u
+  try {
+    u = new URL(url)
+  } catch {
+    return null
+  }
+  const host = u.hostname.toLowerCase()
+  if (host !== 'instagram.com' && !host.endsWith('.instagram.com')) return null
+  const first = u.pathname.split('/').filter(Boolean)[0] || ''
+  const handle = first.toLowerCase()
+  if (!/^[a-z0-9._]{1,30}$/.test(handle) || IG_RESERVED.has(handle)) return null
+  return handle
 }
 
 // ---------- evaluación con Claude ----------

@@ -131,6 +131,15 @@ interface AiticketsEnv {
   readonly LEADS_WEBSEARCH_MAX?: string
   readonly SLACK_OUTREACH_WEBHOOK_URL?: string
 
+  // Leads desde Passline (solo resultados de búsqueda; docs/runbooks/passline-leads.md)
+  readonly LEADS_PASSLINE_ENABLED?: string
+  readonly FIRECRAWL_API_KEY?: string
+  readonly LEADS_PASSLINE_QUERIES?: string
+  readonly LEADS_ENRICH_PER_RUN?: string
+  readonly LEADS_FIRECRAWL_CREDITS_PER_RUN?: string
+  readonly LEADS_PASSLINE_TOKENS_PER_RUN?: string
+  readonly LEADS_PASSLINE_RESULTS_PER_QUERY?: string
+
   // Legal (Chanium LLC)
   readonly CHANIUM_LEGAL_STATE?: string
   readonly CHANIUM_LEGAL_ADDRESS?: string

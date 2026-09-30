@@ -4,7 +4,7 @@
 // del mismo deploy que está corriendo) y, si falta, SITE_URL; nunca process.env.URL. Siempre se hace `await` del fetch: la background function responde 202 al
 // instante, y un fetch sin await puede perderse cuando la función que lo lanza termina.
 
-export const BACKGROUND_FUNCTIONS = ['leads-discover-background', 'leads-enrich-background', 'outreach-send-background', 'outreach-classify-background']
+export const BACKGROUND_FUNCTIONS = ['leads-discover-background', 'leads-enrich-background', 'outreach-send-background', 'outreach-classify-background', 'passline-watch-background']
 
 /** Origen confiable para llamar a otras funciones del mismo deploy ("" si no hay ninguno configurado). */
 export function functionsOrigin(req) {

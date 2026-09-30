@@ -19,6 +19,9 @@ export default async (req) => {
       .from('aitickets_leads')
       .select('*')
       .eq('status', 'new')
+      // Leads de seguimiento manual (p. ej. passline_search): el dueño los contacta desde su Gmail; el
+      // outreach automático nunca los enriquece ni los pone en secuencia.
+      .eq('manual_only', false)
       .lt('enrich_attempts', 2)
       .order('created_at', { ascending: true })
       .limit(cfg.enrichBatch)

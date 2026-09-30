@@ -82,6 +82,20 @@ export function ticketingPlatformOf(url) {
   return null
 }
 
+/**
+ * Hosts que NUNCA se visitan (ni fetch, ni Firecrawl scrape/crawl, ni navegador): están detrás de un
+ * desafío anti-bots (Cloudflare "cf-mitigated: challenge") y visitarlos sería evadir esa protección.
+ * De ellos solo se usan títulos/snippets/URLs que devuelve un buscador (ver docs/runbooks/passline-leads.md).
+ */
+export const NEVER_FETCH_HOSTS = ['passline.com']
+
+/** true si la URL (o host) pertenece a un dominio que nunca se visita (passline.com y subdominios). */
+export function isNeverFetchUrl(url) {
+  const host = normalizeHost(url)
+  if (!host) return false
+  return hostMatches(host, NEVER_FETCH_HOSTS)
+}
+
 /** true si el enlace puede ser el sitio propio de un productor (no red social, ticketera ni hosting genérico). */
 export function isOwnedSiteUrl(url) {
   const host = normalizeHost(url)
