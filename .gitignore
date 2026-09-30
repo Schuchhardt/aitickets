@@ -24,3 +24,6 @@ playwright-report/
 
 # Skills/archivos locales de plugins de agentes (no son parte de la app)
 .agents/
+
+# Leads exportados (datos de contacto; nunca al repo)
+/leads/

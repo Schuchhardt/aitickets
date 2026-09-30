@@ -76,7 +76,7 @@ export default async (req) => {
       (!s.last_run_at || Date.now() - new Date(s.last_run_at).getTime() > 20 * 3600_000))
     if (stale) due.push('leads-discover-background')
 
-    const { count: newLeads } = await supabase.from('aitickets_leads').select('id', { count: 'exact', head: true }).eq('status', 'new').lt('enrich_attempts', 2)
+    const { count: newLeads } = await supabase.from('aitickets_leads').select('id', { count: 'exact', head: true }).eq('status', 'new').eq('manual_only', false).lt('enrich_attempts', 2)
     if (newLeads) due.push('leads-enrich-background')
 
     if (isWithinSendWindow(new Date(), cfg)) {
@@ -84,6 +84,7 @@ export default async (req) => {
         .from('aitickets_leads')
         .select('id', { count: 'exact', head: true })
         .in('status', ['enriched', 'contacted'])
+        .eq('manual_only', false)
         .lte('next_action_at', new Date().toISOString())
       if (dueLeads) due.push('outreach-send-background')
     }
