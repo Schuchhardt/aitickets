@@ -16,10 +16,10 @@ import GradientBackground from './Hero/GradientBackground.vue';
       <div class="flex flex-col lg:flex-row items-center justify-between gap-12">
         <div class="w-full text-center lg:text-left">
           <FadeInSection direction="up">
-            <span class="inline-flex border items-center gap-2 text-lime-400 font-semibold sm:text-xs text-sm md:text-base mb-4 bg-lime-400/10 px-4 py-1.5 rounded-full font-[Prompt]">
+            <a href="#ia" class="inline-flex border items-center gap-2 text-lime-400 font-semibold sm:text-xs text-sm md:text-base mb-4 bg-lime-400/10 px-4 py-1.5 rounded-full font-[Prompt] hover:bg-lime-400/20 transition">
               <Sparkles class="h-4 w-4" />
-              Para stand-up, teatro y funciones recurrentes
-            </span>
+              Nuevo: gestiona tus eventos desde Claude o ChatGPT →
+            </a>
           </FadeInSection>
 
           <FadeInSection direction="up" :delay="100">

@@ -77,8 +77,8 @@ const producerFeatures = [
   },
   {
     icon: Lightbulb,
-    title: 'Posts y asistente con IA',
-    description: 'Genera posts para Instagram y Facebook con IA, y un asistente en tu página responde las dudas de los compradores.'
+    title: 'Gestiona todo desde tu IA',
+    description: 'Conecta Claude, ChatGPT o Cursor (MCP) y crea eventos, descuentos y posts conversando. Y un asistente en tu página responde las dudas de los compradores.'
   },
   {
     icon: CreditCard,

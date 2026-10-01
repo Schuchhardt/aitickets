@@ -2,7 +2,7 @@ import type { APIRoute } from "astro";
 import { getSupabaseAdmin, getFriendlyErrorMessage } from "../../../lib/auth-helpers";
 import { getSessionContext, getOwnedEvent, hasRole, EVENT_MANAGER_ROLES, jsonResponse } from "../../../lib/supabaseServer";
 import { callInternalFunction, notifySlack, siteUrl } from "../_lib/server-utils";
-import { syncEventCategory, refreshEventDenorm, normalizeTicket, isClientTempId, isValidDateInput, resolveTicketDateId } from "../_lib/events";
+import { syncEventCategory, refreshEventDenorm, normalizeTicket, isClientTempId, isValidDateInput, resolveTicketDateId, setEventStatus, EventInputError } from "../_lib/events";
 import { sanitizeRichText } from "../../../lib/sanitize";
 import { listOrgVenues, isVenueAllowed, insertOrgVenue } from "../../../lib/orgVenues";
 
@@ -34,35 +34,15 @@ export const POST: APIRoute = async (context) => {
 
         // Cambio de estado (publicar / pausar)
         if (statusOnly && status) {
-            if (!["published", "draft"].includes(status)) {
-                return jsonResponse({ message: "Estado inválido" }, 400);
+            let becamePublished = false;
+            try {
+                ({ becamePublished } = await setEventStatus(event, dbUser.organization_id, status));
+            } catch (err) {
+                if (err instanceof EventInputError) return jsonResponse({ message: err.message }, err.status);
+                throw err;
             }
 
-            const update: Record<string, unknown> = { status };
-
-            if (status === "published") {
-                const [{ count: datesCount }, { count: ticketsCount }] = await Promise.all([
-                    supabaseAdmin.from("event_dates").select("id", { count: "exact", head: true }).eq("event_id", event.id),
-                    supabaseAdmin.from("event_tickets").select("id", { count: "exact", head: true }).eq("event_id", event.id),
-                ]);
-                if (!datesCount && !event.start_date) {
-                    return jsonResponse({ message: "Para publicar, el evento debe tener al menos una función (fecha y hora)." }, 400);
-                }
-                if (!ticketsCount) {
-                    return jsonResponse({ message: "Para publicar, el evento debe tener al menos un tipo de entrada." }, 400);
-                }
-                if (!event.accessibility) update.accessibility = "public";
-                if (datesCount) await refreshEventDenorm(event.id);
-            }
-
-            const { error: statusError } = await supabaseAdmin
-                .from("events")
-                .update(update)
-                .eq("id", event.id)
-                .eq("organization_id", dbUser.organization_id);
-            if (statusError) throw statusError;
-
-            if (status === "published" && event.status !== "published") {
+            if (becamePublished) {
                 const { data: org } = await supabaseAdmin
                     .from("organizations")
                     .select("public_name")
