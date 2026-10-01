@@ -48,7 +48,7 @@ async function main() {
     const raw = JSON.parse(readFileSync(resolve(args.seedJson), 'utf8'))
     seedEvents = seedEventsFromPasslineJson(Array.isArray(raw) ? raw : raw?.data || raw?.events || [])
     console.log(`Semilla: ${seedEvents.length} eventos desde ${args.seedJson}`)
-  } else if (!process.env.FIRECRAWL_API_KEY) {
+  } else if (!process.env.FIRECRAWL_API_KEY && !process.env.FIREBASE_API_KEY) {
     throw new Error('Falta FIRECRAWL_API_KEY (o usa --seed-json)')
   }
   // dryRun controla las escrituras, no las lecturas: el cliente se crea siempre (lista de supresión).

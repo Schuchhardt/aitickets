@@ -1,6 +1,6 @@
 ---
 // /precios — precios públicos de AI Tickets: 0% para el productor, cargo por servicio para el comprador.
-// La calculadora usa la misma regla que el checkout (netlify/lib/fees.mjs): cargo 10% del subtotal + IVA del cargo.
+// La calculadora usa la misma regla que el checkout (netlify/lib/fees.mjs): cargo 8% del subtotal + IVA del cargo.
 export const prerender = true;
 import AppHeader from "../components/AppHeader.vue";
 import AppFooter from "../components/AppFooter.vue";
@@ -14,7 +14,7 @@ const SITE_URL = (import.meta.env.SITE_URL || "https://aitickets.cl").replace(/\
 const feePercent = `${SERVICE_FEE_PERCENT_LABEL} + IVA`;
 const feeText = `cargo por servicio de ${SERVICE_FEE_PERCENT_LABEL} más IVA (${IVA_PERCENT_LABEL} sobre el cargo)`;
 const fmt = (n: number) => `$${n.toLocaleString("es-CL")}`;
-const example = computeBuyerTotal(8000);
+const example = computeBuyerTotal(10000);
 const exampleText = `Ejemplo: entrada de ${fmt(example.subtotal)} → cargo ${fmt(example.feeNet)} + IVA ${fmt(example.feeIva)} = el comprador paga ${fmt(example.total)} y tú recibes ${fmt(example.subtotal)}.`;
 
 const included = [
@@ -56,7 +56,7 @@ const faqs = [
   },
   {
     q: "¿Qué pasa si cancelo el evento?",
-    a: "Con tu autorización, los compradores reciben la devolución del precio de sus entradas y del cargo por servicio (10%). El IVA del cargo no se devuelve, porque ya fue declarado y pagado. El detalle está en los términos para productores y compradores.",
+    a: `Con tu autorización, los compradores reciben la devolución del precio de sus entradas y del cargo por servicio que pagaron. El IVA del cargo no se devuelve, porque ya fue declarado y pagado. El detalle está en los términos para productores y compradores.`,
   },
   {
     q: "¿Tengo que firmar un contrato o pagar una mensualidad?",

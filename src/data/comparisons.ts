@@ -11,10 +11,21 @@
 // Revisión 2026-09-26: ninguna de las tres publica en su sitio una tarifa estándar para productores que
 // se pudiera citar (los sitios de productores respondieron 403 a la revisión automática y los montos
 // que circulan provienen de terceros o de acuerdos puntuales). Por eso las tres quedan sin verificar.
+//
+// Revisión 2026-09-30: el dueño confirmó el cargo al comprador de Passline (15%; 13% en entradas de menos
+// de $15.000) con la tarifa que Passline informa a productores (src/data/competitor-fees.mjs). Passline no
+// la publica: la fila se muestra con su fuente rotulada como "informada" y SIN enlace (isRowReported), y no
+// cuenta como dato público verificable para indexar la página (isRowVerified exige URL https).
+// El resto de las filas de Passline (comisión al productor, pago, etc.) sigue sin verificar.
+
+import { PASSLINE_BUYER_FEE } from "./competitor-fees.mjs";
+
+const pct = (rate: number) => `${Math.round(rate * 100)}%`;
 
 export interface ComparisonSource {
   label: string;
-  url: string;
+  /** URL pública donde se puede revisar el dato. Sin URL = dato informado (no publicado), no se enlaza. */
+  url?: string;
 }
 
 export interface ComparisonRow {
@@ -28,6 +39,8 @@ export interface ComparisonRow {
   source?: ComparisonSource;
   /** Fecha de revisión de la fuente (YYYY-MM-DD) */
   checkedAt?: string;
+  /** Aclaración visible bajo el valor del competidor (p. ej. cómo se trata el IVA) */
+  note?: string;
 }
 
 export interface Comparison {
@@ -43,7 +56,7 @@ export interface Comparison {
 
 const AIT = {
   producerFee: "0% (el productor recibe el 100% del precio)",
-  buyerFee: "Cargo por servicio de 10% + IVA sobre el precio, visible antes de pagar",
+  buyerFee: "Cargo por servicio de 8% + IVA sobre el precio, visible antes de pagar",
   freeEvents: "Sin costo",
   payouts: "Transferencia 48 a 72 horas después de cada función",
   website: "Web de eventos gratis para la productora",
@@ -57,12 +70,19 @@ export const COMPARISONS: Comparison[] = [
     name: "Passline",
     website: "https://www.passline.com",
     summary: "Passline es una ticketera que opera en Chile.",
-    reviewedAt: "2026-09-26",
+    reviewedAt: "2026-09-30",
     rows: [
       // TODO(verificar): comisión estándar al productor publicada por Passline (fuente + fecha)
       { feature: "Comisión para el productor", aitickets: AIT.producerFee, competitor: null },
-      // TODO(verificar): cargo por servicio al comprador publicado por Passline
-      { feature: "Cargo para el comprador", aitickets: AIT.buyerFee, competitor: null },
+      {
+        feature: "Cargo para el comprador",
+        aitickets: AIT.buyerFee,
+        competitor: `${pct(PASSLINE_BUYER_FEE.rate)} sobre el precio; ${pct(PASSLINE_BUYER_FEE.reducedRate)} en entradas de menos de $15.000`,
+        // Sin url: Passline no publica esta tarifa (no enlazar a passline.com como si fuera verificable)
+        source: { label: `Cargo al comprador de Passline: ${PASSLINE_BUYER_FEE.sourceLabel}` },
+        checkedAt: PASSLINE_BUYER_FEE.checkedAt,
+        note: PASSLINE_BUYER_FEE.ivaNote,
+      },
       { feature: "Eventos gratuitos", aitickets: AIT.freeEvents, competitor: null },
       // TODO(verificar): plazo de liquidación al productor
       { feature: "Pago al productor", aitickets: AIT.payouts, competitor: null },
@@ -115,6 +135,21 @@ export function isRowVerified(row: ComparisonRow): boolean {
     row.competitor != null &&
     !!row.source?.url &&
     /^https:\/\//.test(row.source.url) &&
+    !!row.checkedAt &&
+    /^\d{4}-\d{2}-\d{2}$/.test(row.checkedAt)
+  );
+}
+
+/**
+ * Fila con un dato informado (no publicado) por el competidor: tiene valor, fuente rotulada y fecha, pero
+ * sin URL pública. Se muestra con su fuente como texto, sin enlace, y no cuenta para indexar la página.
+ */
+export function isRowReported(row: ComparisonRow): boolean {
+  return (
+    !isRowVerified(row) &&
+    row.competitor != null &&
+    !!row.source?.label &&
+    !row.source?.url &&
     !!row.checkedAt &&
     /^\d{4}-\d{2}-\d{2}$/.test(row.checkedAt)
   );

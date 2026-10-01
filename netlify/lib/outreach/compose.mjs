@@ -165,7 +165,7 @@ function fallbackBody(lead) {
   const opener = eventSeenPhrase(lead) || `Vi que ${lead.org_name || 'tu organización'} organiza eventos con venta de entradas.`
   return [
     `Hola, ${opener}`,
-    'En AI Tickets te damos una web de eventos gratis para tu productora, con plantillas, banner, formulario de contacto y venta de entradas integrada. Para ti es 0% de comisión: el comprador paga un cargo por servicio de 10% + IVA.',
+    'En AI Tickets te damos una web de eventos gratis para tu productora, con plantillas, banner, formulario de contacto y venta de entradas integrada. Para ti es 0% de comisión: el comprador paga un cargo por servicio de 8% + IVA.',
     '¿Te interesa que te cuente más?',
   ].join('\n\n')
 }
@@ -233,7 +233,7 @@ export function composeInterestedReply({ lead, cfg = getOutreachConfig() }) {
     '¡Buenísimo! Gracias por responder.',
     `Con este enlace creas tu cuenta en un par de minutos${ev}; tu web de eventos gratis queda lista al registrarte:`,
     signupUrl(lead, cfg),
-    'Para ti es 0% de comisión: el comprador paga un cargo por servicio de 10% + IVA, y transferimos lo recaudado 48 a 72 horas después de cada función.',
+    'Para ti es 0% de comisión: el comprador paga un cargo por servicio de 8% + IVA, y transferimos lo recaudado 48 a 72 horas después de cada función.',
     'Si prefieres, respóndeme y lo vemos juntos.',
   ].join('\n\n')
   const text = withFooter(`${body}\n\n${signature(cfg)}`, lead, cfg)

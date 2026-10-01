@@ -26,8 +26,10 @@ export const GET: APIRoute = async (context) => {
     const supabase = getSupabaseAdmin();
     // Columnas opcionales según las migraciones aplicadas: proveedor/moneda (202609270100), atribución (ref/utm)
     // e IVA del cargo por servicio (service_fee_tax, 202609290100; sin ella la columna del CSV va en 0).
+    // Descuento (discount_code/discount_amount, 202609300200; sin ellas las columnas van vacías/0).
     // Se intenta de la más completa a la mínima (los deploy previews pueden correr contra una base sin migrar).
     const variants = [
+        { cols: `${BASE_COLUMNS}, ref, utm_source, utm_medium, utm_campaign, payment_provider, currency, service_fee_tax, discount_code, discount_amount`, attribution: true, provider: true },
         { cols: `${BASE_COLUMNS}, ref, utm_source, utm_medium, utm_campaign, payment_provider, currency, service_fee_tax`, attribution: true, provider: true },
         { cols: `${BASE_COLUMNS}, ref, utm_source, utm_medium, utm_campaign, payment_provider, currency`, attribution: true, provider: true },
         { cols: `${BASE_COLUMNS}, ref, utm_source, utm_medium, utm_campaign`, attribution: true, provider: false },
@@ -57,6 +59,7 @@ export const GET: APIRoute = async (context) => {
 
     const header = [
         "Orden", "Fecha (Chile)", "Nombre", "Apellido", "Email", "Teléfono", "Entradas", "Cantidad",
+        "Código de descuento", "Descuento",
         "Monto entradas (a pagar al productor)", "Cargo por servicio neto (comprador)", "IVA cargo por servicio", "Total pagado", "Comisión pasarela", "Cortesía",
         ...(withProvider ? ["Medio de pago", "Moneda"] : []),
         ...(withAttribution ? ["Ref", "UTM source", "UTM medium", "UTM campaign"] : []),
@@ -76,6 +79,8 @@ export const GET: APIRoute = async (context) => {
             attendee?.phone,
             detailText,
             o.ticket_qty ?? details.reduce((s: number, d: any) => s + (Number(d.quantity) || 0), 0),
+            Number(o.discount_amount) > 0 ? o.discount_code || "" : "",
+            Number(o.discount_amount) || 0,
             Number(o.amount) || 0,
             Number(o.ticket_fee) || 0,
             Number(o.service_fee_tax) || 0,

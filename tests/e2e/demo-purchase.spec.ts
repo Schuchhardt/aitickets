@@ -25,6 +25,8 @@ test("reserva, datos del comprador, términos y confirmación simulada", async (
   // Paso 1: entradas
   await expect(dialog.getByTestId("resv-step-tickets")).toBeVisible();
   await dialog.getByRole("button", { name: "Añadir entrada" }).first().click();
+  // La demo no valida códigos de descuento (no hay compra real)
+  await expect(dialog.getByTestId("resv-discount-input")).toHaveCount(0);
   await dialog.getByRole("button", { name: "continuar" }).click();
 
   // Paso 2: comprador + términos (sin términos no se puede continuar)

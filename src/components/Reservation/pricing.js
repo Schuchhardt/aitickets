@@ -1,7 +1,9 @@
 // Cálculo de precios que se MUESTRA al comprador antes de pagar (ley del consumidor).
 // El servidor (/api/purchase-ticket) recalcula todo desde la BD; esto es solo para la vista y usa la misma
-// regla, importada de la fuente única netlify/lib/fees.mjs (cargo 10% del subtotal + IVA 19% del cargo).
+// regla, importada de la fuente única netlify/lib/fees.mjs (cargo 8% del subtotal + IVA 19% del cargo).
 import { computeBuyerTotal } from "../../../netlify/lib/fees.mjs";
+import { computeDiscountedTotals } from "../../../netlify/lib/discounts.mjs";
+export { discountLineLabel, normalizeDiscountCode } from "../../../netlify/lib/discounts.mjs";
 
 export {
   SERVICE_FEE_RATE,
@@ -72,6 +74,19 @@ export const computeTotals = (lines = []) => {
   const quantity = lines.reduce((sum, l) => sum + (Number(l.quantity) || 0), 0);
   const { feeNet, feeIva, fee, total } = computeBuyerTotal(subtotal);
   return { subtotal, feeNet, feeIva, fee, total, quantity };
+};
+
+/**
+ * Totales con un código de descuento aplicado (vista previa; el servidor recalcula y valida el código).
+ * discount: { code, kind:'percent'|'fixed', value } o null. El descuento va sobre el subtotal de entradas y el
+ * cargo por servicio se calcula sobre el subtotal descontado (netlify/lib/discounts.mjs).
+ * @returns {{grossSubtotal:number, discountAmount:number, subtotal:number, feeNet:number, feeIva:number, fee:number, total:number, quantity:number}}
+ *   subtotal = grossSubtotal - discountAmount.
+ */
+export const computeTotalsWithDiscount = (lines = [], discount = null) => {
+  const gross = lines.reduce((sum, l) => sum + (Number(l.total) || 0), 0);
+  const quantity = lines.reduce((sum, l) => sum + (Number(l.quantity) || 0), 0);
+  return { ...computeDiscountedTotals(gross, discount), quantity };
 };
 
 export const formatCLP = (value) => `$${Math.round(Number(value) || 0).toLocaleString("es-CL")}`;

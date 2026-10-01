@@ -6,7 +6,7 @@ export const prerender = true;
 import AppHeader from "../../components/AppHeader.vue";
 import AppFooter from "../../components/AppFooter.vue";
 import Layout from "../../layouts/Layout.astro";
-import { COMPARISONS, isComparisonVerified, isRowVerified, type Comparison } from "../../data/comparisons";
+import { COMPARISONS, isComparisonVerified, isRowReported, isRowVerified, type Comparison } from "../../data/comparisons";
 import { LEGAL, formatLegalDate } from "../../lib/legal";
 import "../../styles/global.css";
 
@@ -20,6 +20,11 @@ const sources = comparison.rows
   .filter((r) => isRowVerified(r) && r.source)
   .map((r) => ({ ...r.source!, checkedAt: r.checkedAt! }))
   .filter((s, i, arr) => arr.findIndex((o) => o.url === s.url) === i);
+// Datos informados por el competidor (no publicados): se citan como texto, sin enlace
+const reportedSources = comparison.rows
+  .filter((r) => isRowReported(r))
+  .map((r) => ({ label: r.source!.label, checkedAt: r.checkedAt! }))
+  .filter((s, i, arr) => arr.findIndex((o) => o.label === s.label) === i);
 const reviewed = formatLegalDate(comparison.reviewedAt);
 ---
 
@@ -39,7 +44,7 @@ const reviewed = formatLegalDate(comparison.reviewedAt);
           AI Tickets vs {comparison.name}
         </h1>
         <p class="mt-4 text-lg text-gray-600">
-          {comparison.summary} Aquí comparamos datos públicos que sirven para elegir dónde vender las entradas de tu evento.
+          {comparison.summary} Aquí comparamos datos que sirven para elegir dónde vender las entradas de tu evento: públicos o, cuando la otra plataforma no los publica, informados por ella a productores (lo indicamos en cada caso).
           Cuando un dato no está publicado por la otra plataforma, lo indicamos como "Por confirmar".
         </p>
       </div>
@@ -66,8 +71,16 @@ const reviewed = formatLegalDate(comparison.reviewedAt);
                       {row.competitor}
                       <a href={row.source!.url} rel="nofollow noopener" target="_blank" class="ml-1 text-xs text-gray-500 underline">fuente</a>
                     </>
+                  ) : isRowReported(row) ? (
+                    <>
+                      {row.competitor}
+                      <span class="ml-1 text-xs text-gray-500">(tarifa informada, no publicada)</span>
+                    </>
                   ) : (
                     <span class="text-gray-500">Por confirmar</span>
+                  )}
+                  {(isRowVerified(row) || isRowReported(row)) && row.note && (
+                    <p class="mt-1 text-xs text-gray-500">{row.note}</p>
                   )}
                 </td>
               </tr>
@@ -91,7 +104,15 @@ const reviewed = formatLegalDate(comparison.reviewedAt);
               </li>
             ))}
           </ul>
-        ) : (
+        ) : null}
+        {reportedSources.length > 0 && (
+          <ul class="mt-2 list-disc pl-5" data-testid="reported-sources">
+            {reportedSources.map((s) => (
+              <li>{s.label}. Sin fuente pública que enlazar (revisado el {formatLegalDate(s.checkedAt)}).</li>
+            ))}
+          </ul>
+        )}
+        {sources.length === 0 && (
           <p class="mt-2">
             {comparison.name} no publica en su sitio una tarifa estándar para productores que podamos citar. Te recomendamos
             pedirle una cotización para tu evento y compararla con nuestros <a href="/precios" class="underline">precios</a>.

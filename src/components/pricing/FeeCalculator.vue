@@ -1,15 +1,18 @@
 <script setup>
 // Calculadora de /precios. Usa exactamente la misma regla que el checkout (netlify/lib/fees.mjs vía
-// Reservation/pricing.js): el comprador paga precio + cargo por servicio (10% del subtotal, redondeado a
+// Reservation/pricing.js): el comprador paga precio + cargo por servicio (8% del subtotal, redondeado a
 // pesos) + IVA del cargo (19% del cargo, redondeado), y el productor recibe el 100% del precio de las
-// entradas (0% de comisión para el productor). Ej.: $8.000 → cargo $800 + IVA $152 = $8.952.
+// entradas (0% de comisión para el productor). Ej.: $10.000 → cargo $800 + IVA $152 = $10.952.
+// "Comparado con Passline": 15% sobre el precio, 13% si la entrada vale menos de $15.000
+// (src/data/competitor-fees.mjs).
 import { computed, ref } from 'vue'
 import { IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL, computeTotals, formatCLP } from '../Reservation/pricing.js'
+import { PASSLINE_BUYER_FEE, passlineBuyerTotal } from '../../data/competitor-fees.mjs'
 
 const MAX_PRICE = 10_000_000
 const MAX_QTY = 100_000
 
-const priceInput = ref('8000')
+const priceInput = ref('10000')
 const quantityInput = ref('100')
 
 const toInt = (value, max) => {
@@ -26,6 +29,12 @@ const perTicket = computed(() => computeTotals([{ total: price.value, quantity: 
 const totals = computed(() => computeTotals([{ total: price.value * quantity.value, quantity: quantity.value }]))
 
 const isFree = computed(() => price.value === 0)
+
+// Comparación por entrada con Passline (mismo precio de entrada)
+const passline = computed(() => passlineBuyerTotal(price.value))
+const passlinePercent = computed(() => `${Math.round(passline.value.rate * 100)}%`)
+const savingsPerTicket = computed(() => Math.max(0, passline.value.total - perTicket.value.total))
+const savingsPer100 = computed(() => savingsPerTicket.value * 100)
 </script>
 
 <template>
@@ -84,6 +93,35 @@ const isFree = computed(() => price.value === 0)
         <p class="mt-1 text-3xl font-extrabold text-gray-900">{{ formatCLP(totals.subtotal) }}</p>
         <p class="mt-1 text-sm text-gray-700">
           {{ quantity.toLocaleString('es-CL') }} × {{ formatCLP(price) }}. 0% de comisión para el productor: recibes el 100% del precio de tus entradas.
+        </p>
+      </div>
+      <div
+        v-if="!isFree"
+        class="rounded-xl border border-gray-200 p-4"
+        data-testid="fee-calc-compare"
+        :data-passline-rate="passline.rate"
+        :data-passline-total="passline.total"
+        :data-savings="savingsPerTicket"
+        :data-savings-100="savingsPer100"
+      >
+        <p class="text-sm font-semibold uppercase tracking-wide text-gray-500">Comparado con Passline</p>
+        <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+          <dt class="text-gray-600">Con Passline ({{ passlinePercent }})</dt>
+          <dd class="text-right font-semibold text-gray-900">{{ formatCLP(passline.total) }}</dd>
+          <dt class="text-gray-600">Con AI Tickets ({{ SERVICE_FEE_PERCENT_LABEL }} + IVA del cargo)</dt>
+          <dd class="text-right font-semibold text-gray-900">{{ formatCLP(perTicket.total) }}</dd>
+        </dl>
+        <p class="mt-3 text-sm text-gray-800">
+          <template v-if="savingsPerTicket > 0">
+            Tu comprador ahorra <strong>{{ formatCLP(savingsPerTicket) }}</strong> por entrada:
+            <strong>{{ formatCLP(savingsPer100) }}</strong> cada 100 entradas.
+          </template>
+          <template v-else>Con este precio, el comprador paga lo mismo o menos con Passline.</template>
+        </p>
+        <p class="mt-2 text-xs text-gray-500">
+          Passline: {{ Math.round(PASSLINE_BUYER_FEE.rate * 100) }}% sobre el precio de la entrada y
+          {{ Math.round(PASSLINE_BUYER_FEE.reducedRate * 100) }}% en entradas de menos de {{ formatCLP(PASSLINE_BUYER_FEE.reducedBelow) }},
+          {{ PASSLINE_BUYER_FEE.sourceLabel }}. Puede variar según el evento. {{ PASSLINE_BUYER_FEE.ivaNote }}
         </p>
       </div>
       <p class="text-xs text-gray-500">
