@@ -7,7 +7,7 @@ import TicketSelection from "./TicketSelection.vue";
 import OrderSummary from "./OrderSummary.vue";
 import BuyerInfo from "./BuyerInfo.vue";
 import PaymentStep from "./PaymentStep.vue";
-import { buildSelectedLines, computeTotals, isValidEmail, maxPerPurchase } from "./pricing.js";
+import { buildSelectedLines, computeTotalsWithDiscount, isValidEmail, maxPerPurchase } from "./pricing.js";
 
 const props = defineProps({ event: Object });
 const emit = defineEmits(["close"]);
@@ -17,6 +17,8 @@ const emptyBuyer = () => ({ firstName: "", lastName: "", email: "", confirmEmail
 const currentStep = ref(1);
 const selectedTickets = ref({});
 const buyerInfo = ref(emptyBuyer());
+// Código de descuento validado en la vista previa: { code, kind, value, label } (el servidor revalida al comprar)
+const discount = ref(null);
 
 const storageKey = (name) => `${name}_event_${props.event.id}`;
 const readStorage = (name) => {
@@ -43,6 +45,11 @@ onMounted(() => {
     selectedTickets.value = valid;
   }
 
+  const storedDiscount = readStorage("discount");
+  if (storedDiscount && typeof storedDiscount.code === "string" && ["percent", "fixed"].includes(storedDiscount.kind)) {
+    discount.value = storedDiscount;
+  }
+
   const storedBuyer = readStorage("buyerInfo");
   if (storedBuyer && typeof storedBuyer === "object") buyerInfo.value = { ...emptyBuyer(), ...storedBuyer, termsAccepted: false };
 
@@ -66,9 +73,10 @@ onUnmounted(() => {
 watch(selectedTickets, () => writeStorage("selectedTickets", selectedTickets.value), { deep: true });
 watch(buyerInfo, () => writeStorage("buyerInfo", { ...buyerInfo.value, termsAccepted: false }), { deep: true });
 watch(currentStep, () => writeStorage("currentStep", currentStep.value));
+watch(discount, () => writeStorage("discount", discount.value));
 
 // ==== CALCULOS (solo para mostrar; el servidor recalcula) ====
-const totals = computed(() => computeTotals(buildSelectedLines(selectedTickets.value, props.event.tickets, props.event.dates)));
+const totals = computed(() => computeTotalsWithDiscount(buildSelectedLines(selectedTickets.value, props.event.tickets, props.event.dates), discount.value));
 
 // ==== NAVEGACIÓN ====
 const buyerIsValid = computed(() => {
@@ -168,12 +176,12 @@ function handleRemoteGoToNextStep() {
           </div>
 
           <div class="bg-gray-50 p-4 md:p-6 w-full rounded-[10px]">
-            <OrderSummary data-testid="resv-step-summary" :selectedTickets="selectedTickets" :event="event" class="w-full" />
+            <OrderSummary data-testid="resv-step-summary" :selectedTickets="selectedTickets" :event="event" v-model:discount="discount" class="w-full" />
           </div>
         </div>
 
         <div v-if="currentStep === 3" class="p-4 md:p-6 w-full" data-testid="resv-step-payment">
-          <PaymentStep :selectedTickets="selectedTickets" :buyerInfo="buyerInfo" :event="event" />
+          <PaymentStep :selectedTickets="selectedTickets" :buyerInfo="buyerInfo" :event="event" :discount="discount" @discount-invalid="discount = null" />
         </div>
       </div>
 

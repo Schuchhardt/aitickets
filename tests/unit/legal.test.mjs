@@ -69,11 +69,11 @@ describe('LEGAL por defecto (Chanium, LLC)', () => {
     expect(Object.isFrozen(LEGAL)).toBe(true)
   })
 
-  it('cargo por servicio: 10% + IVA por defecto; SERVICE_FEE_TAX_MODE lo cambia y un valor inválido cae a added', async () => {
+  it('cargo por servicio: 8% + IVA por defecto; SERVICE_FEE_TAX_MODE lo cambia y un valor inválido cae a added', async () => {
     let { LEGAL } = await loadLegal()
     expect(LEGAL.serviceFeeTaxMode).toBe('added')
-    expect(LEGAL.serviceFeeLabel).toBe('Cargo por servicio (10% + IVA)')
-    expect(LEGAL.serviceFeeRate).toBe(0.1)
+    expect(LEGAL.serviceFeeLabel).toBe('Cargo por servicio (8% + IVA)')
+    expect(LEGAL.serviceFeeRate).toBe(0.08)
     expect(LEGAL.serviceFeeVatRate).toBe(0.19)
     ;({ LEGAL } = await loadLegal({ SERVICE_FEE_TAX_MODE: 'included' }))
     expect(LEGAL.serviceFeeLabel).toBe('Cargo por servicio (IVA incluido)')

@@ -88,6 +88,48 @@ export function hasLiveHold(order, now = Date.now()) {
 }
 
 /**
+ * Pago tardío con código de descuento: devuelve el texto del exceso si, contando esta orden (ya en
+ * 'processing', que aitickets_discount_code_usage cuenta como uso), el código supera max_uses o el
+ * per_buyer_limit del comprador; null si no hay código, no hay exceso o la base no tiene el esquema.
+ * No es atómico frente a otro pago tardío simultáneo del mismo código: en ese caso ambos se cuentan
+ * mutuamente y quedan en 'review' (falla hacia el lado seguro).
+ */
+export async function findDiscountOveruse(supabase, orderId) {
+  const { data: row, error } = await supabase
+    .from('event_orders')
+    .select('discount_code_id, buyer_email')
+    .eq('id', orderId)
+    .maybeSingle()
+  if (error) {
+    if (isMissingSchemaError(error)) return null
+    throw new Error(`Error leyendo el código de descuento de la orden: ${error.message}`)
+  }
+  if (!row?.discount_code_id) return null
+  const { data: code, error: codeError } = await supabase
+    .from('aitickets_discount_codes')
+    .select('code, max_uses, per_buyer_limit')
+    .eq('id', row.discount_code_id)
+    .maybeSingle()
+  if (codeError) throw new Error(`Error leyendo el código de descuento: ${codeError.message}`)
+  // Código borrado (FK ON DELETE SET NULL lo limpiaría) o sin límites: nada que revisar
+  if (!code || (code.max_uses == null && code.per_buyer_limit == null)) return null
+  const { data: usage, error: usageError } = await supabase.rpc('aitickets_discount_code_usage', {
+    p_code_id: row.discount_code_id,
+    p_email: row.buyer_email || null,
+  })
+  if (usageError) throw new Error(`Error contando usos del código: ${usageError.message}`)
+  const counts = Array.isArray(usage) ? usage[0] : usage
+  const uses = Number(counts?.uses) || 0
+  const buyerUses = Number(counts?.buyer_uses) || 0
+  const problems = []
+  if (code.max_uses != null && uses > Number(code.max_uses)) problems.push(`${code.code}: ${uses} usos > máximo ${code.max_uses}`)
+  if (code.per_buyer_limit != null && row.buyer_email && buyerUses > Number(code.per_buyer_limit)) {
+    problems.push(`${code.code}: ${buyerUses} usos del comprador > límite ${code.per_buyer_limit}`)
+  }
+  return problems.length ? problems.join('; ') : null
+}
+
+/**
  * Devuelve el texto de sobreventa si emitir esta orden supera el stock, o null.
  * - Las entradas ya emitidas de ESTA orden (un intento anterior que murió tras insertarlas) no se cuentan dos veces.
  * - includeHolds=false (la orden tenía su reserva vigente): solo cuentan las entradas emitidas; la reserva
@@ -246,6 +288,18 @@ export async function confirmPaidOrder(supabase, orderId, payment) {
     await supabase.from('event_orders').update({ status: 'review', ...paymentFields }).eq('id', order.id).eq('status', 'processing')
     await notifySlack(`🚨 Sobreventa: la orden ${order.id} (evento ${order.event_id}) fue pagada en ${label} (${amount} CLP, ref ${externalId}) pero no hay stock: ${oversell}. Quedó en 'review': reembolsar o ampliar cupo y emitir manualmente.`)
     return { status: 'review', httpStatus: 200, message: 'Pago registrado para revisión (sin stock)' }
+  }
+
+  // Códigos de descuento (pago tardío): la reserva atómica validó max_uses y per_buyer_limit, pero si la
+  // reserva venció su uso quedó libre y otro comprador pudo tomarlo. Se recuentan los usos ahora.
+  if (!hasLiveHold(order, claimStartedAt)) {
+    const overuse = await findDiscountOveruse(supabase, order.id)
+    if (overuse) {
+      console.error(`⚠️ Orden ${order.id}: pagada pero el código de descuento ya no tenía usos (${overuse}). Requiere revisión manual.`)
+      await supabase.from('event_orders').update({ status: 'review', ...paymentFields }).eq('id', order.id).eq('status', 'processing')
+      await notifySlack(`🚨 Código de descuento sobreutilizado: la orden ${order.id} (evento ${order.event_id}) fue pagada en ${label} (${amount} CLP, ref ${externalId}) después de vencer su reserva y el código ya no tenía usos: ${overuse}. Quedó en 'review': emitir manualmente o reembolsar.`)
+      return { status: 'review', httpStatus: 200, message: 'Pago registrado para revisión (código de descuento sin usos)' }
+    }
   }
 
   const updateData = {

@@ -3,7 +3,7 @@
 // (init_date IS NULL OR init_date <= now) AND (end_date IS NULL OR end_date >= now).
 import crypto from 'node:crypto'
 
-// Cargo por servicio (10% + IVA del cargo): fuente única en fees.mjs.
+// Cargo por servicio (8% + IVA del cargo): fuente única en fees.mjs.
 export { SERVICE_FEE_RATE, IVA_RATE, computeServiceFee, computeBuyerTotal } from './fees.mjs'
 export const DEFAULT_MAX_PER_PURCHASE = 10
 /** Reserva por defecto de una orden pendiente (Flow). */

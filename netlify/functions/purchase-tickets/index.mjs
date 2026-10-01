@@ -1,6 +1,11 @@
 // POST /api/purchase-ticket (contrato C5 + WP2)
 // Request: { eventId, buyer:{firstName,lastName,email,phone?}, tickets:[{id, quantity}], ref?, utm?:{source,medium,campaign},
-//            paymentProvider?: (ignorado, siempre Flow), termsAccepted: true, termsVersion?: string, cfToken? }
+//            paymentProvider?: (ignorado, siempre Flow), termsAccepted: true, termsVersion?: string, cfToken?, discountCode?: string }
+// Código de descuento (netlify/lib/discounts.mjs): se valida en el servidor (organización y evento, vigencia, usos y
+// límite por comprador) y se aplica al subtotal de entradas; el cargo por servicio se calcula sobre el subtotal
+// descontado. event_orders.amount guarda el subtotal descontado (lo que recibe el productor) y discount_amount el
+// descuento. El límite de usos definitivo lo aplica aitickets_reserve_order_v2 con la fila del código bloqueada.
+// Errores de código: { message, discountError: true, reason }.
 // El precio se calcula SIEMPRE en el servidor desde event_tickets; se ignora cualquier total/precio/evento del cliente.
 // Respuesta: pagado -> { paymentLink, provider, orderId }; gratis -> { orderId, redirectUrl: '/order/<orderId>', provider: 'free' }
 // Stock: la reserva es ATÓMICA en SQL (aitickets_reserve_order bloquea los tipos de entrada y recuenta);
@@ -20,13 +25,21 @@ import {
   TICKET_COLUMNS,
   isTicketOnSale,
   maxPerPurchase,
-  computeBuyerTotal,
   getSoldCounts,
   ensureOrderAttendees,
   PENDING_HOLD_MINUTES,
 } from '../../lib/tickets.mjs'
 import { sendOrderTicketsEmail } from '../../lib/tickets-email.mjs'
 import { rateLimit } from '../../lib/rate-limit.mjs'
+import {
+  normalizeDiscountCode,
+  resolveDiscount,
+  computeDiscountedTotals,
+  discountReasonFromRpcError,
+  isMissingDiscountSchema,
+  DISCOUNT_MESSAGES,
+  DISCOUNT_STATUS,
+} from '../../lib/discounts.mjs'
 import { isDemoEventSlug } from '../../../src/lib/demoEvent.mjs'
 
 const MAX_TICKET_LINES = 20
@@ -105,9 +118,18 @@ function validateRequest(body) {
   // Flow (Webpay) es el único medio de pago: se ignora body.paymentProvider (clientes antiguos pueden enviarlo).
   const paymentProvider = defaultProvider()
 
+  // Código de descuento opcional: vacío = sin código
+  const rawDiscount = typeof body?.discountCode === 'string' ? body.discountCode.trim() : ''
+  let discountCode = null
+  if (rawDiscount) {
+    discountCode = normalizeDiscountCode(rawDiscount)
+    if (!discountCode) return { error: DISCOUNT_MESSAGES.invalid_format, discountError: 'invalid_format' }
+  }
+
   const utm = body?.utm && typeof body.utm === 'object' ? body.utm : {}
   return {
     eventId,
+    discountCode,
     paymentProvider,
     termsVersion,
     cfToken: typeof body?.cfToken === 'string' ? body.cfToken : '',
@@ -204,18 +226,33 @@ function stockErrorFrom(error) {
  * base sin migrar) usa el camino antiguo: insertar 'pending' y re-contar (chequeo optimista).
  * @returns {Promise<{id:string, event_id:number, attendee_id:number, ticket_details:any}>}
  */
-async function reserveOrder(supabase, { eventId, lines, order, holdMinutes, baseOrder, limited }) {
-  const { data: orderId, error } = await supabase.rpc('aitickets_reserve_order', {
-    p_event_id: eventId,
-    p_lines: lines,
-    p_order: order,
-    p_hold_minutes: holdMinutes,
-  })
+async function reserveOrder(supabase, { eventId, lines, order, holdMinutes, baseOrder, limited, discount = null }) {
+  // Con código: aitickets_reserve_order_v2 bloquea el código, revalida usos y reserva en la misma transacción.
+  const { data: orderId, error } = discount
+    ? await supabase.rpc('aitickets_reserve_order_v2', {
+        p_event_id: eventId,
+        p_lines: lines,
+        p_order: order,
+        p_hold_minutes: holdMinutes,
+        p_discount_code_id: discount.id,
+        p_discount_amount: discount.amount,
+      })
+    : await supabase.rpc('aitickets_reserve_order', {
+        p_event_id: eventId,
+        p_lines: lines,
+        p_order: order,
+        p_hold_minutes: holdMinutes,
+      })
   if (!error && orderId) {
     return { id: orderId, event_id: eventId, attendee_id: order.attendee_id, ticket_details: order.ticket_details }
   }
   const stockErr = stockErrorFrom(error)
   if (stockErr) throw stockErr
+  if (discount) {
+    const reason = discountReasonFromRpcError(error) || (isMissingDiscountSchema(error) ? 'unavailable' : null)
+    if (reason) throw Object.assign(new Error(reason), { discountReason: reason })
+    throw new Error(`Error reservando la orden con descuento: ${error?.message || 'sin id'}`)
+  }
   if (!isMissingSchemaError(error)) throw new Error(`Error reservando la orden: ${error?.message || 'sin id'}`)
 
   console.warn('aitickets_reserve_order no disponible; usando reserva optimista antigua')
@@ -270,8 +307,10 @@ export default async function handler(req) {
   }
 
   const input = validateRequest(body)
-  if (input.error) return json({ message: input.error }, 400)
-  const { eventId, buyer, quantities, attribution, cfToken, paymentProvider, termsVersion } = input
+  if (input.error) {
+    return json(input.discountError ? { message: input.error, discountError: true, reason: input.discountError } : { message: input.error }, 400)
+  }
+  const { eventId, buyer, quantities, attribution, cfToken, paymentProvider, termsVersion, discountCode } = input
 
   const captcha = await verifyTurnstile(cfToken, ip)
   if (!captcha.success) return json({ message: captcha.message, captcha: true }, 403)
@@ -287,7 +326,7 @@ export default async function handler(req) {
     // 1. Evento publicado y vigente
     const { data: event, error: eventError } = await supabase
       .from('events')
-      .select('id, name, slug, status, end_date')
+      .select('id, name, slug, status, end_date, organization_id')
       .eq('id', eventId)
       .eq('status', 'published')
       .maybeSingle()
@@ -357,9 +396,20 @@ export default async function handler(req) {
       const quantity = quantities.get(id)
       return { id, name: ticket.ticket_name, price, quantity, total: price * quantity, event_date_id: ticket.event_date_id ?? null }
     })
-    const subtotal = ticketDetails.reduce((sum, t) => sum + t.total, 0)
-    // Cargo por servicio = 10% del subtotal + IVA (19%) de ese cargo; se cobra el total con IVA.
-    const { feeNet, feeIva, fee, total } = computeBuyerTotal(subtotal)
+    const grossSubtotal = ticketDetails.reduce((sum, t) => sum + t.total, 0)
+
+    // 4a. Código de descuento (validado aquí; el límite de usos definitivo lo aplica la reserva atómica)
+    let discount = null
+    if (discountCode) {
+      const result = await resolveDiscount(supabase, { event, code: discountCode, grossSubtotal, buyerEmail: buyer.email, now })
+      if (!result.ok) return json({ message: result.message, discountError: true, reason: result.reason }, result.status)
+      discount = result.discount
+    }
+
+    // Cargo por servicio (fees.mjs) + IVA de ese cargo, sobre el subtotal YA descontado; se cobra el total con IVA.
+    // subtotal = lo que recibe el productor (event_orders.amount).
+    const { discountAmount, subtotal, feeNet, feeIva, fee, total } = computeDiscountedTotals(grossSubtotal, discount)
+    if (discount) discount.amount = discountAmount
     const ticketQty = ticketDetails.reduce((sum, t) => sum + t.quantity, 0)
     const provider = total === 0 ? 'free' : paymentProvider
     const holdMinutes = total === 0 ? PENDING_HOLD_MINUTES : holdMinutesFor(provider)
@@ -402,8 +452,13 @@ export default async function handler(req) {
         holdMinutes,
         baseOrder,
         limited,
+        discount,
       })
     } catch (err) {
+      if (err?.discountReason) {
+        const reason = err.discountReason
+        return json({ message: DISCOUNT_MESSAGES[reason] || DISCOUNT_MESSAGES.not_found, discountError: true, reason }, DISCOUNT_STATUS[reason] || 409)
+      }
       if (err?.stock) {
         const ticket = err.ticketId != null ? byId.get(Number(err.ticketId)) : null
         if (err.stock === 'SOLD_OUT') {

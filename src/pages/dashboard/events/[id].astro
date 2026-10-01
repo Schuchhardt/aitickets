@@ -3,6 +3,7 @@ import { siteUrl as siteUrlFromEnv } from "../../api/_lib/server-utils";
 import DashboardLayout from "../../../layouts/DashboardLayout.astro";
 import EventFAQManager from "../../../components/dashboard/EventFAQManager.vue";
 import CourtesyTicketsForm from "../../../components/dashboard/CourtesyTicketsForm.vue";
+import DiscountCodesManager from "../../../components/dashboard/DiscountCodesManager.vue";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { EVENT_MANAGER_ROLES } from "../../../lib/supabaseServer";
 import { requireDashboardSession } from "../_lib/guard";
@@ -286,6 +287,9 @@ const publishBlockers = [
 
             <!-- Cortesías -->
             <CourtesyTicketsForm client:visible eventId={Number(event.id)} tickets={courtesyTickets} />
+
+            <!-- Códigos de descuento (del evento + los de toda la organización) -->
+            <DiscountCodesManager client:visible eventId={Number(event.id)} />
 
             <!-- FAQ Section -->
             <EventFAQManager client:load eventId={Number(event.id)} />

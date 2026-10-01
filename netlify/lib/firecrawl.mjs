@@ -70,8 +70,20 @@ export function assertNoForbiddenFetch(path, body = {}) {
  * country/location y con la consulta en español.
  * @param {{limit?: number, country?: string, lang?: string, budget?: ReturnType<typeof createFirecrawlBudget>, fetchImpl?: typeof fetch}} opts
  */
-export async function search(query, { limit = 10, country = 'cl', budget, fetchImpl } = {}) {
-  const apiKey = (process.env.FIRECRAWL_API_KEY || '').trim()
+// Plan gratuito de Firecrawl: ~10 búsquedas por minuto. Se espacian las llamadas dentro del proceso
+// y, si igual responde 429, se espera y se reintenta una vez.
+const MIN_INTERVAL_MS = Math.max(0, Number(process.env.FIRECRAWL_MIN_INTERVAL_MS ?? 6500) || 0)
+const RATE_LIMIT_RETRY_MS = 61_000
+let lastCallAt = 0
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+/** Llave de Firecrawl. Acepta FIREBASE_API_KEY como alias (así quedó configurada en Netlify). */
+export function firecrawlApiKey() {
+  return (process.env.FIRECRAWL_API_KEY || process.env.FIREBASE_API_KEY || '').trim()
+}
+
+export async function search(query, { limit = 10, country = 'cl', budget, fetchImpl, _retried = false } = {}) {
+  const apiKey = firecrawlApiKey()
   if (!apiKey) throw new Error('FIRECRAWL_API_KEY no configurada')
   const q = String(query || '').trim().slice(0, 500)
   if (!q) return []
@@ -90,6 +102,11 @@ export async function search(query, { limit = 10, country = 'cl', budget, fetchI
   assertNoForbiddenFetch(SEARCH_PATH, body)
 
   const doFetch = fetchImpl || fetch
+  if (!fetchImpl && MIN_INTERVAL_MS) {
+    const wait = lastCallAt + MIN_INTERVAL_MS - Date.now()
+    if (wait > 0) await sleep(wait)
+    lastCallAt = Date.now()
+  }
   const res = await doFetch(`${API_BASE}${SEARCH_PATH}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
@@ -103,6 +120,10 @@ export async function search(query, { limit = 10, country = 'cl', budget, fetchI
   if (budget) {
     budget.calls += 1
     budget.used += Number.isFinite(payload?.creditsUsed) ? payload.creditsUsed : estimate
+  }
+  if (res.status === 429 && !_retried && !fetchImpl) {
+    await sleep(RATE_LIMIT_RETRY_MS)
+    return search(query, { limit, country, budget, fetchImpl, _retried: true })
   }
   if (!res.ok || payload?.success === false) {
     const msg = payload?.error || payload?.message || `HTTP ${res.status}`

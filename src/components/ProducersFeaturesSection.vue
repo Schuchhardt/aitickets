@@ -83,7 +83,7 @@ const producerFeatures = [
   {
     icon: CreditCard,
     title: '0% de comisión para ti',
-    description: 'El comprador paga un cargo por servicio de 10% + IVA. Te transferimos lo recaudado 48–72 h después de cada función.'
+    description: 'El comprador paga un cargo por servicio de 8% + IVA. Te transferimos lo recaudado 48–72 h después de cada función.'
   },
   {
     icon: BarChart3,

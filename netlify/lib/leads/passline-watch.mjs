@@ -80,7 +80,7 @@ export function getPasslineConfig() {
 /** Interruptor de la corrida programada: exige LEADS_PASSLINE_ENABLED=true y FIRECRAWL_API_KEY. */
 export function passlineWatchGate(cfg = getPasslineConfig()) {
   if (!cfg.enabled) return { ok: false, reason: 'LEADS_PASSLINE_ENABLED=false' }
-  if (!env('FIRECRAWL_API_KEY')) return { ok: false, reason: 'FIRECRAWL_API_KEY no configurada' }
+  if (!env('FIRECRAWL_API_KEY') && !env('FIREBASE_API_KEY')) return { ok: false, reason: 'FIRECRAWL_API_KEY no configurada' }
   return { ok: true }
 }
 

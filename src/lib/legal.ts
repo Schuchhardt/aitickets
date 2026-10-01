@@ -39,7 +39,7 @@ export interface LegalInfo {
   readonly effectiveDate: string
   readonly flowMerchantName: string
   readonly serviceFeeTaxMode: ServiceFeeTaxMode
-  /** 0.1 = 10% del valor de las entradas. */
+  /** 0.08 = 8% del valor de las entradas. */
   readonly serviceFeeRate: number
   /** 0.19 = IVA sobre el cargo por servicio (cuando serviceFeeTaxMode es 'added'). */
   readonly serviceFeeVatRate: number

@@ -1,14 +1,17 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { trackPurchase } from "../../composables/useGoogleAnalytics.js";
-import { SERVICE_FEE_LABEL, SERVICE_FEE_TAX_LABEL, buildSelectedLines, computeTotals, formatCLP, readAttribution } from "./pricing.js";
+import { SERVICE_FEE_LABEL, SERVICE_FEE_TAX_LABEL, buildSelectedLines, computeTotalsWithDiscount, discountLineLabel, formatCLP, readAttribution } from "./pricing.js";
 import { LEGAL } from "../../lib/legal";
 
 const props = defineProps({
   selectedTickets: Object,
   buyerInfo: Object,
   event: Object,
+  // Código de descuento aplicado en el resumen ({ code, kind, value, label }) o null
+  discount: { type: Object, default: null },
 });
+const emit = defineEmits(["discount-invalid"]);
 
 const isLoading = ref(false);
 const errorMessage = ref("");
@@ -91,13 +94,16 @@ const REDIRECT_COPY = "Serás redirigido a Webpay para pagar de forma segura.";
 const needsCaptcha = computed(() => Boolean(turnstileSiteKey.value) && !turnstileToken.value);
 
 const selectedTicketList = computed(() => buildSelectedLines(props.selectedTickets, props.event?.tickets, props.event?.dates));
-const totals = computed(() => computeTotals(selectedTicketList.value));
+const totals = computed(() => computeTotalsWithDiscount(selectedTicketList.value, props.discount));
+// Solo se envía el código si descuenta algo (con entradas gratis no aplica)
+const discountCodeToSend = computed(() => (props.discount && totals.value.discountAmount > 0 ? props.discount.code : undefined));
 
 const clearReservationStorage = () => {
   try {
     localStorage.removeItem(`selectedTickets_event_${props.event.id}`);
     localStorage.removeItem(`buyerInfo_event_${props.event.id}`);
     localStorage.removeItem(`currentStep_event_${props.event.id}`);
+    localStorage.removeItem(`discount_event_${props.event.id}`);
   } catch { /* storage no disponible */ }
 };
 
@@ -157,6 +163,7 @@ const handlePayment = async () => {
         paymentProvider: totals.value.total > 0 ? PAYMENT_PROVIDER : undefined,
         termsAccepted: props.buyerInfo.termsAccepted === true,
         termsVersion: LEGAL.termsVersion,
+        discountCode: discountCodeToSend.value,
       }),
     });
 
@@ -164,6 +171,11 @@ const handlePayment = async () => {
     try { data = await response.json(); } catch { /* sin cuerpo */ }
 
     if (!response.ok) {
+      if (data.discountError && props.discount) {
+        // El código dejó de servir (agotado, límite por comprador, vencido): se quita y se muestra el total sin descuento
+        emit("discount-invalid");
+        throw new Error(`${data.message || "El código de descuento ya no es válido."} Quitamos el código: revisa el nuevo total e intenta nuevamente.`);
+      }
       throw new Error(data.message || "Ha ocurrido un error. Por favor intenta más tarde.");
     }
 
@@ -223,7 +235,11 @@ const handlePayment = async () => {
       <div class="border-t mt-3 pt-3 space-y-1 text-sm text-gray-600">
         <div class="flex justify-between">
           <span>Subtotal</span>
-          <span>{{ totals.subtotal > 0 ? formatCLP(totals.subtotal) : "Gratis" }}</span>
+          <span>{{ totals.grossSubtotal > 0 ? formatCLP(totals.grossSubtotal) : "Gratis" }}</span>
+        </div>
+        <div v-if="totals.discountAmount > 0" class="flex justify-between text-lime-700" data-testid="resv-pay-discount-line">
+          <span>{{ discountLineLabel(discount?.code) }}</span>
+          <span>-{{ formatCLP(totals.discountAmount) }}</span>
         </div>
         <div v-if="totals.subtotal > 0" class="flex justify-between">
           <span>{{ SERVICE_FEE_LABEL }}</span>

@@ -82,7 +82,7 @@
               <div class="text-gray-600 text-sm mt-2">de comisión para el productor</div>
             </div>
             <div class="p-2 sm:p-6">
-              <div class="text-2xl sm:text-4xl whitespace-nowrap font-bold text-lime-500 font-[Unbounded]">10%</div>
+              <div class="text-2xl sm:text-4xl whitespace-nowrap font-bold text-lime-500 font-[Unbounded]">8%</div>
               <div class="text-gray-600 text-sm mt-2">cargo por servicio + IVA que paga el comprador</div>
             </div>
             <div class="p-2 sm:p-6">

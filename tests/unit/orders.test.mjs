@@ -19,6 +19,7 @@ import {
   CLAIMABLE_STATUSES,
   confirmPaidOrder,
   expectedPaymentAmounts,
+  findDiscountOveruse,
   findOversell,
   hasLiveHold,
   isMissingSchemaError,
@@ -161,6 +162,46 @@ describe('findOversell', () => {
     // 98 emitidas + 2 reservadas por otro + 2 propias: el tardío no cabe
     mocks.getSoldCounts.mockResolvedValueOnce(new Map([[1, 102]]))
     expect(await findOversell(db, order({ status: 'processing' }), { includeHolds: true })).toMatch(/100 emitidas\/reservadas \+ 2 > 100/)
+  })
+})
+
+describe('findDiscountOveruse (pago tardío con código)', () => {
+  const CODE_ID = '3b241101-e2bb-4255-8caf-4136c566a962'
+  const setup = ({ code = {}, usage = { uses: 1, buyer_uses: 1 }, orderRow = {} } = {}) =>
+    createFakeSupabase({
+      tables: {
+        event_orders: [order({ status: 'processing', discount_code_id: CODE_ID, buyer_email: 'Ana@Mail.cl', ...orderRow })],
+        aitickets_discount_codes: [{ id: CODE_ID, code: 'VERANO10', max_uses: 10, per_buyer_limit: 1, ...code }],
+      },
+      rpc: { aitickets_discount_code_usage: () => [usage] },
+    })
+
+  it('sin código en la orden → null, sin consultar usos', async () => {
+    const db = setup({ orderRow: { discount_code_id: null } })
+    expect(await findDiscountOveruse(db, ORDER_ID)).toBeNull()
+    expect(db.calls.some((c) => c.op === 'rpc')).toBe(false)
+  })
+
+  it('dentro de los límites (contando esta orden) → null', async () => {
+    const db = setup({ usage: { uses: 10, buyer_uses: 1 } })
+    expect(await findDiscountOveruse(db, ORDER_ID)).toBeNull()
+    const rpc = db.calls.find((c) => c.op === 'rpc')
+    expect(rpc.values).toEqual({ name: 'aitickets_discount_code_usage', args: { p_code_id: CODE_ID, p_email: 'Ana@Mail.cl' } })
+  })
+
+  it('el uso liberado lo tomó otro comprador → supera max_uses', async () => {
+    const db = setup({ usage: { uses: 11, buyer_uses: 1 } })
+    expect(await findDiscountOveruse(db, ORDER_ID)).toMatch(/VERANO10: 11 usos > máximo 10/)
+  })
+
+  it('el mismo comprador volvió a usarlo → supera per_buyer_limit', async () => {
+    const db = setup({ usage: { uses: 2, buyer_uses: 2 } })
+    expect(await findDiscountOveruse(db, ORDER_ID)).toMatch(/2 usos del comprador > límite 1/)
+  })
+
+  it('código sin límites → null', async () => {
+    const db = setup({ code: { max_uses: null, per_buyer_limit: null }, usage: { uses: 500, buyer_uses: 9 } })
+    expect(await findDiscountOveruse(db, ORDER_ID)).toBeNull()
   })
 })
 

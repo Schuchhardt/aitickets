@@ -1,4 +1,4 @@
-// Fuente única del cargo por servicio (netlify/lib/fees.mjs): 10% del subtotal + IVA (19%) del cargo.
+// Fuente única del cargo por servicio (netlify/lib/fees.mjs): 8% del subtotal + IVA (19%) del cargo.
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -11,22 +11,25 @@ import {
   computeServiceFee,
   computeServiceFeeTax,
   orderFeeBreakdown,
+  serviceFeeLabelFor,
 } from '../../netlify/lib/fees.mjs'
 import * as tickets from '../../netlify/lib/tickets.mjs'
 import * as pricing from '../../src/components/Reservation/pricing.js'
 
 describe('computeServiceFee', () => {
-  it('10% del subtotal + 19% de IVA sobre el cargo, ambos redondeados a pesos', () => {
-    expect(SERVICE_FEE_RATE).toBe(0.1)
+  it('8% del subtotal + 19% de IVA sobre el cargo, ambos redondeados a pesos', () => {
+    expect(SERVICE_FEE_RATE).toBe(0.08)
     expect(IVA_RATE).toBe(0.19)
-    expect(computeServiceFee(8000)).toEqual({ net: 800, iva: 152, total: 952 })
-    expect(computeServiceFee(15000)).toEqual({ net: 1500, iva: 285, total: 1785 })
-    // 10% de 12.345 = 1.234,5 → 1.235; IVA 234,65 → 235
-    expect(computeServiceFee(12345)).toEqual({ net: 1235, iva: 235, total: 1470 })
-    // El IVA se calcula sobre el cargo ya redondeado (no sobre el 11,9% del subtotal)
+    // Ejemplo del dueño: $10.000 → cargo $800 + IVA $152 = $10.952
+    expect(computeServiceFee(10000)).toEqual({ net: 800, iva: 152, total: 952 })
+    expect(computeServiceFee(8000)).toEqual({ net: 640, iva: 122, total: 762 })
+    expect(computeServiceFee(15000)).toEqual({ net: 1200, iva: 228, total: 1428 })
+    // 8% de 12.345 = 987,6 → 988; IVA 187,72 → 188
+    expect(computeServiceFee(12345)).toEqual({ net: 988, iva: 188, total: 1176 })
+    // El IVA se calcula sobre el cargo ya redondeado (no sobre el 9,52% del subtotal)
     expect(computeServiceFee(1)).toEqual({ net: 0, iva: 0, total: 0 })
-    expect(computeServiceFee(5)).toEqual({ net: 1, iva: 0, total: 1 })
-    expect(computeServiceFee(30)).toEqual({ net: 3, iva: 1, total: 4 })
+    expect(computeServiceFee(7)).toEqual({ net: 1, iva: 0, total: 1 })
+    expect(computeServiceFee(40)).toEqual({ net: 3, iva: 1, total: 4 })
   })
 
   it('subtotal 0, negativo o inválido: sin cargo', () => {
@@ -81,8 +84,24 @@ describe('una sola regla en servidor y navegador', () => {
   })
 
   it('etiquetas en español', () => {
-    expect(SERVICE_FEE_LABEL).toBe('Cargo por servicio (10%)')
+    expect(SERVICE_FEE_LABEL).toBe('Cargo por servicio (8%)')
     expect(SERVICE_FEE_TAX_LABEL).toBe('IVA del cargo (19%)')
-    expect(SERVICE_FEE_NOTE).toBe('+ cargo por servicio 10% + IVA')
+    expect(SERVICE_FEE_NOTE).toBe('+ cargo por servicio 8% + IVA')
+  })
+})
+
+describe('serviceFeeLabelFor (comprobantes)', () => {
+  it('usa el porcentaje que se cobró en esa orden, no la tarifa vigente', () => {
+    expect(serviceFeeLabelFor(60000, 4800)).toBe('Cargo por servicio (8%)')
+    // orden anterior al cambio, cobrada al 10%
+    expect(serviceFeeLabelFor(60000, 6000)).toBe('Cargo por servicio (10%)')
+    expect(serviceFeeLabelFor(12345, Math.round(12345 * 0.1))).toBe('Cargo por servicio (10%)')
+    expect(serviceFeeLabelFor(12345, Math.round(12345 * 0.08))).toBe('Cargo por servicio (8%)')
+  })
+
+  it('sin porcentaje cuando el cargo no corresponde a uno entero o no hay cargo', () => {
+    expect(serviceFeeLabelFor(60000, 5000)).toBe('Cargo por servicio')
+    expect(serviceFeeLabelFor(0, 0)).toBe('Cargo por servicio')
+    expect(serviceFeeLabelFor(null, undefined)).toBe('Cargo por servicio')
   })
 })

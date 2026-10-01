@@ -10,7 +10,7 @@
 // - CHANIUM_PRIVACY_EMAIL  correo para derechos de datos personales (alias LEGAL_PRIVACY_EMAIL)
 // - CHANIUM_LEGAL_PHONE    teléfono de la empresa
 // - LEGAL_EFFECTIVE_DATE   fecha de vigencia de los términos (YYYY-MM-DD)
-// - SERVICE_FEE_TAX_MODE   'added' (por defecto: 10% + IVA) | 'included' | 'exempt' | 'unknown'
+// - SERVICE_FEE_TAX_MODE   'added' (por defecto: 8% + IVA) | 'included' | 'exempt' | 'unknown'
 //
 // IMPORTANTE: el EIN de la sociedad NO se publica en ninguna parte (ni aquí, ni en páginas, ni en correos).
 
@@ -47,17 +47,17 @@ const SUPPORT_EMAIL = env('LEGAL_SUPPORT_EMAIL') || 'soporte@aitickets.cl'
 const PHONE = env('CHANIUM_LEGAL_PHONE') || DEFAULT_PHONE
 
 /** Versión de los términos que se guarda al aceptar (órdenes y registro de productores). */
-export const TERMS_VERSION = '2026-09-28'
+export const TERMS_VERSION = '2026-09-30'
 
 const EFFECTIVE_DATE = /^\d{4}-\d{2}-\d{2}$/.test(env('LEGAL_EFFECTIVE_DATE')) ? env('LEGAL_EFFECTIVE_DATE') : TERMS_VERSION
 
-/** Cargo por servicio: 10% del valor de las entradas, más IVA (19%) calculado sobre el cargo (fuente: fees.mjs). */
+/** Cargo por servicio: 8% del valor de las entradas, más IVA (19%) calculado sobre el cargo (fuente: fees.mjs). */
 export { SERVICE_FEE_RATE }
 export const SERVICE_FEE_VAT_RATE = IVA_RATE
 const TAX_MODES = ['added', 'included', 'exempt', 'unknown']
 const TAX_MODE = TAX_MODES.includes(env('SERVICE_FEE_TAX_MODE')) ? env('SERVICE_FEE_TAX_MODE') : 'added'
 const FEE_LABELS = {
-  added: 'Cargo por servicio (10% + IVA)',
+  added: `Cargo por servicio (${Math.round(SERVICE_FEE_RATE * 100)}% + IVA)`,
   included: 'Cargo por servicio (IVA incluido)',
   exempt: 'Cargo por servicio',
   unknown: 'Cargo por servicio',

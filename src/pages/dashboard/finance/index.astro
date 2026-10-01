@@ -3,6 +3,7 @@ import DashboardLayout from "../../../layouts/DashboardLayout.astro";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { ORG_ADMIN_ROLES } from "../../../lib/supabaseServer";
 import { requireDashboardSession } from "../_lib/guard";
+import { SERVICE_FEE_PERCENT_LABEL, IVA_PERCENT_LABEL } from "../../../../netlify/lib/fees.mjs";
 
 const guard = await requireDashboardSession(Astro, ORG_ADMIN_ROLES);
 if (!guard.ok) return guard.response;
@@ -15,6 +16,8 @@ type Tx = {
     ticketFee: number;
     feeTax: number;
     paymentFee: number;
+    discount: number;
+    discountCode: string;
     total: number;
     qty: number;
     date: string;
@@ -25,6 +28,8 @@ type EventSummary = { id: number; name: string; endDate: string | null; qty: num
 let totalRevenue = 0; // ventas de entradas (lo que recibe el productor)
 let totalServiceFees = 0; // cargo por servicio NETO pagado por los compradores (ticket_fee)
 let totalServiceFeeTax = 0; // IVA del cargo por servicio (service_fee_tax)
+let totalDiscounts = 0; // descuentos por códigos (discount_amount); amount ya viene descontado
+let discountedOrders = 0;
 let paidOut = 0;
 let balanceDue = 0;
 let transactions: Tx[] = [];
@@ -51,7 +56,13 @@ if (orgEvents && orgEvents.length > 0) {
     const orders: any[] = [];
     const PAGE_SIZE = 1000;
     const BASE_COLUMNS = "id, event_id, amount, ticket_fee, payment_fee, total_payment, ticket_qty, created_at";
-    const columnSets = [`${BASE_COLUMNS}, payment_provider, service_fee_tax`, `${BASE_COLUMNS}, payment_provider`, BASE_COLUMNS];
+    // discount_amount/discount_code existen desde 202609300200.
+    const columnSets = [
+        `${BASE_COLUMNS}, payment_provider, service_fee_tax, discount_amount, discount_code`,
+        `${BASE_COLUMNS}, payment_provider, service_fee_tax`,
+        `${BASE_COLUMNS}, payment_provider`,
+        BASE_COLUMNS,
+    ];
     let columnIndex = 0;
     for (let from = 0; ; from += PAGE_SIZE) {
         const fetchPage = () => supabaseAdmin
@@ -81,6 +92,11 @@ if (orgEvents && orgEvents.length > 0) {
         totalRevenue += amount;
         totalServiceFees += ticketFee;
         totalServiceFeeTax += Number(o.service_fee_tax) || 0;
+        const discount = Number(o.discount_amount) || 0;
+        if (discount > 0) {
+            totalDiscounts += discount;
+            discountedOrders += 1;
+        }
         const s = byEvent.get(o.event_id);
         if (s) {
             s.qty += o.ticket_qty || 0;
@@ -95,6 +111,8 @@ if (orgEvents && orgEvents.length > 0) {
         ticketFee: Number(o.ticket_fee) || 0,
         feeTax: Number(o.service_fee_tax) || 0,
         paymentFee: Number(o.payment_fee) || 0,
+        discount: Number(o.discount_amount) || 0,
+        discountCode: Number(o.discount_amount) > 0 ? o.discount_code || "" : "",
         total: Number(o.total_payment) || 0,
         qty: o.ticket_qty || 0,
         date: new Date(o.created_at).toLocaleDateString("es-CL", { timeZone: "America/Santiago" }),
@@ -173,6 +191,11 @@ const formatDate = (d: string | null) =>
                 <h3 class="text-gray-500 text-sm font-medium">Ventas de entradas</h3>
                 <p class="text-3xl font-bold mt-2">{formatCLP(totalRevenue)}</p>
                 <p class="text-xs text-gray-400 mt-1">Órdenes pagadas. No incluye el cargo por servicio ({formatCLP(totalServiceFees)}) ni su IVA ({formatCLP(totalServiceFeeTax)}).</p>
+                {totalDiscounts > 0 && (
+                    <p class="text-xs text-gray-400 mt-1" data-testid="finance-discounts">
+                        Ya descontados {formatCLP(totalDiscounts)} en códigos de descuento ({discountedOrders} orden{discountedOrders === 1 ? "" : "es"}). <a href="/dashboard/descuentos" class="underline">Ver códigos</a>
+                    </p>
+                )}
             </div>
             <div class="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
                 <h3 class="text-gray-500 text-sm font-medium">Transferido a la fecha</h3>
@@ -237,7 +260,7 @@ const formatDate = (d: string | null) =>
                 <div class="p-6 border-b border-gray-100">
                     <h3 class="text-lg font-bold text-gray-900">Órdenes pagadas</h3>
                     <p class="text-xs text-gray-500 mt-1">
-                        El cargo por servicio (10%) y su IVA (19% del cargo) los paga el comprador y la comisión de la pasarela de pago la cubre AI Tickets: ninguno se descuenta de tu saldo.
+                        El cargo por servicio ({SERVICE_FEE_PERCENT_LABEL}) y su IVA ({IVA_PERCENT_LABEL} del cargo) los paga el comprador y la comisión de la pasarela de pago la cubre AI Tickets: ninguno se descuenta de tu saldo.
                     </p>
                 </div>
                 <div class="overflow-x-auto">
@@ -247,6 +270,7 @@ const formatDate = (d: string | null) =>
                                 <th class="px-6 py-4">Evento</th>
                                 <th class="px-6 py-4">Entradas</th>
                                 <th class="px-6 py-4">Monto entradas</th>
+                                <th class="px-6 py-4">Descuento</th>
                                 <th class="px-6 py-4">Cargo por servicio</th>
                                 <th class="px-6 py-4">IVA cargo</th>
                                 <th class="px-6 py-4">Total pagado</th>
@@ -261,6 +285,11 @@ const formatDate = (d: string | null) =>
                                     <td class="px-6 py-4 font-medium text-gray-900">{t.event}</td>
                                     <td class="px-6 py-4">{t.qty}</td>
                                     <td class="px-6 py-4 font-medium text-gray-900">{formatCLP(t.amount)}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        {t.discount > 0 ? (
+                                            <span>-{formatCLP(t.discount)}{t.discountCode && <span class="block text-xs text-gray-400 font-mono">{t.discountCode}</span>}</span>
+                                        ) : "—"}
+                                    </td>
                                     <td class="px-6 py-4">{formatCLP(t.ticketFee)}</td>
                                     <td class="px-6 py-4">{formatCLP(t.feeTax)}</td>
                                     <td class="px-6 py-4">{formatCLP(t.total)}</td>

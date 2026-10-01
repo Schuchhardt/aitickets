@@ -110,7 +110,7 @@ const formatPrice = (price) => {
   return price !== null && price !== undefined ? Number(price).toLocaleString("es-CL") : "";
 };
 
-// Cargo por servicio al comprador: 10% del subtotal + IVA del cargo (netlify/lib/fees.mjs)
+// Cargo por servicio al comprador: 8% del subtotal + IVA del cargo (netlify/lib/fees.mjs)
 
 // Entradas a la venta (el servidor ya filtra por ventana de venta y stock)
 const onSaleTickets = computed(() => (props.event?.tickets || []).filter(

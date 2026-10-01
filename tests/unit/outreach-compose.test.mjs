@@ -80,7 +80,11 @@ describe('validateOutgoing', () => {
     }
     expect(validateOutgoing(email('Cobramos solo 5% de comisión.'), { cfg: cfg() }).errors).toContain('porcentaje no aprobado: 5%')
     expect(validateOutgoing(email('Cargo de 7,5 % al comprador.'), { cfg: cfg() }).ok).toBe(false)
-    expect(validateOutgoing(email('Para ti es 0% de comisión y el comprador paga 10%.'), { cfg: cfg() }).ok).toBe(true)
+    expect(validateOutgoing(email('Para ti es 0% de comisión y el comprador paga 8% + IVA.'), { cfg: cfg() }).ok).toBe(true)
+    // El cargo anterior (10%) ya no es un porcentaje aprobado
+    expect(validateOutgoing(email('El comprador paga 10%.'), { cfg: cfg() }).errors).toContain('porcentaje no aprobado: 10%')
+    // Comparación con Passline (15% / 13%): permitida en borradores revisados
+    expect(validateOutgoing(email('Passline cobra 15% (13% en entradas de menos de 15 mil); aquí 8% + IVA.'), { cfg: cfg() }).ok).toBe(true)
   })
 
   it('rechaza cuerpos demasiado largos (el pie no cuenta)', () => {

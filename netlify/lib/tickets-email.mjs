@@ -6,6 +6,7 @@ import { sendEmail, SITE_URL, formatRecipient, isValidEmail } from './mailer.mjs
 import { renderTicketsEmail } from './emails/index.mjs'
 import { LEGAL } from './legal.mjs'
 import { orderFeeBreakdown } from './fees.mjs'
+import { orderDiscount } from './discounts.mjs'
 import {
   EVENT_DATE_COLUMNS,
   zonedDateTimeToUtc,
@@ -113,10 +114,12 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
     `)
     .eq('id', orderId)
     .maybeSingle()
-  let { data: order, error: orderError } = await selectOrder(' service_fee_tax,')
-  // Base sin la columna service_fee_tax (202609290100): órdenes sin IVA separado
-  if (orderError && ['42703', 'PGRST204'].includes(String(orderError.code || ''))) {
-    ;({ data: order, error: orderError } = await selectOrder(''))
+  // Columnas opcionales, de la más completa a la mínima: descuento (202609300200) e IVA del cargo (202609290100)
+  let order = null
+  let orderError = null
+  for (const extra of [' service_fee_tax, discount_amount, discount_code,', ' service_fee_tax,', '']) {
+    ;({ data: order, error: orderError } = await selectOrder(extra))
+    if (!orderError || !['42703', 'PGRST204'].includes(String(orderError.code || ''))) break
   }
 
   if (orderError) return { ok: false, status: 'error', message: orderError.message }
@@ -184,9 +187,11 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
     }
     const ticketLines = [...grouped.values()]
 
-    // amount = subtotal; ticket_fee = cargo neto (10%); service_fee_tax = IVA del cargo (0 en órdenes antiguas)
+    // amount = subtotal; ticket_fee = cargo neto (8%); service_fee_tax = IVA del cargo (0 en órdenes antiguas)
     const { subtotal, feeNet, feeIva, fee, total: computedTotal } = orderFeeBreakdown(order)
     const total = order.total_payment != null ? Number(order.total_payment) : computedTotal
+    // Descuento (amount ya viene descontado): se muestra como línea entre las entradas y el subtotal
+    const { code: discountCode, amount: discountAmount } = orderDiscount(order)
 
     // Fechas y lugar desde event_dates / venues (fallback: columnas denormalizadas de events)
     const { data: eventDates } = await supabase
@@ -273,6 +278,8 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
       secretLocation: event.secret_location || '',
       ticketLines,
       subtotal,
+      discountCode,
+      discountAmount,
       fee,
       feeNet,
       feeIva,

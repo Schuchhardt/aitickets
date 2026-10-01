@@ -34,7 +34,7 @@ import GradientBackground from './Hero/GradientBackground.vue';
 
           <FadeInSection direction="up" :delay="200">
             <p class="text-lg text-white/80 mb-8 max-w-2xl mx-auto lg:mx-0 font-[Prompt]">
-              La ticketera que llena tus funciones: 0% de comisión para ti, el comprador paga un cargo por servicio de 10% + IVA, te transferimos lo recaudado 48–72 h después de cada función y te ayudamos a armar el evento y los posts con IA.
+              La ticketera que llena tus funciones: 0% de comisión para ti, el comprador paga un cargo por servicio de 8% + IVA, te transferimos lo recaudado 48–72 h después de cada función y te ayudamos a armar el evento y los posts con IA.
             </p>
           </FadeInSection>
 
@@ -52,7 +52,7 @@ import GradientBackground from './Hero/GradientBackground.vue';
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 pb-8 text-left">
             <FadeInSection direction="up" :delay="400">
-              <FeatureCard :icon="TrendingUp" title="0% para ti" text="Sin comisión para el productor. El comprador paga un cargo por servicio de 10% + IVA." />
+              <FeatureCard :icon="TrendingUp" title="0% para ti" text="Sin comisión para el productor. El comprador paga un cargo por servicio de 8% + IVA." />
             </FadeInSection>
             <FadeInSection direction="up" :delay="500">
               <FeatureCard :icon="Clock" title="Pago en 48–72 h" text="Te transferimos lo recaudado 48–72 h después de cada función." />

@@ -128,8 +128,10 @@ Para el productor, Passline y AI Tickets se ven iguales: ninguno le cobra comisi
 2. **Plata antes**: transferencia 48 a 72 horas después de cada función. Antes de usarlo como comparación,
    confirmar a mano el plazo de liquidación de Passline (en `src/data/comparisons.ts` está marcado como
    `TODO(verificar)`).
-3. **Cargo al público transparente**: 10% + IVA sobre la entrada. Comparar solo con el cargo que Passline
-   publique para ese evento, citando la fuente.
+3. **Cargo al público más bajo y transparente**: 8% + IVA sobre la entrada (≈ 9,5% en total). Según tarifas
+   vigentes de Passline informadas a productores (sep 2026), Passline cobra al comprador 15%, y 13% en entradas
+   de menos de $15.000 (`src/data/competitor-fees.mjs`). Ej.: entrada de $10.000 → Passline $11.300,
+   AI Tickets $10.952. Cita siempre la fuente y la fecha; si el productor tiene otra tarifa negociada, usa la suya.
 4. **QR y check-in desde el celular**, sin equipos extra.
 
 Personaliza con el dato del CSV: "vi que tienes *<último evento>* el *<fecha>*".

@@ -17,7 +17,7 @@ Tiempo estimado: 8-10 minutos de presentación + preguntas.
 1) ELEVATOR PITCH (30 segundos)
 
 "AI Tickets es la ticketera que llena tus funciones: 0% de comisión para ti,
-el comprador paga un cargo por servicio de 10%, te transferimos lo recaudado
+el comprador paga un cargo por servicio de 8% + IVA, te transferimos lo recaudado
 48–72 h después de cada función, y te ayudamos a armar el evento y los posts con IA.
 
 Estamos en piloto con productores de stand-up y teatro independiente.
@@ -332,7 +332,7 @@ Texto:
 	
 	┌─────────────────────────────────────────────────────────────┐
 	│  0% DE COMISIÓN PARA EL PRODUCTOR                           │
-	│  El comprador paga un cargo por servicio de 10%.            │
+	│  El comprador paga un cargo por servicio de 8% + IVA.            │
 	│                                                             │
 	│  ✓ Venta online con Webpay y tarjetas                       │
 	│  ✓ Web de eventos gratis con tu dominio                     │
@@ -369,7 +369,7 @@ Texto:
 	Posts con IA            ✅ Sí               ❌ No
 	Saber qué canal vende   ✅ UTM por evento   ❌ No
 	Soporte en español      ✅ Directo          —
-	Costo para el productor 0% (10% comprador)  Tu tiempo
+	Costo para el productor 0% (8% + IVA comprador)  Tu tiempo
 
 💡 NOTA: No comparar con ticketeras por nombre ni citar sus comisiones sin
    fuente pública y fecha (riesgo de publicidad comparativa). Si preguntan,
@@ -384,7 +384,7 @@ Texto:
 
 OBJECIÓN: "Es muy caro / la comisión es alta"
 RESPUESTA: "Tú no pagas comisión: 0% para el productor. El comprador paga
-un cargo por servicio de 10%, y te transferimos lo recaudado 48–72 h
+un cargo por servicio de 8% + IVA, y te transferimos lo recaudado 48–72 h
 después de cada función."
 
 OBJECIÓN: "Ya tenemos un sistema"
@@ -417,7 +417,7 @@ Texto:
 	Empieza sin riesgo
 	
 	💸  0% de comisión para ti
-	    El comprador paga un cargo por servicio de 10%
+	    El comprador paga un cargo por servicio de 8% + IVA
 	
 	🤝  Te acompañamos
 	    Te ayudamos a armar tu primer evento
@@ -564,7 +564,7 @@ configuro tu evento real y ves exactamente cómo funcionaría.
 Solo datos verificables del producto (no hay métricas de resultados aún):
 
 💸  0% de comisión para el productor
-🧾  10% de cargo por servicio al comprador
+🧾  8% + IVA de cargo por servicio al comprador
 🏦  Transferencia 48–72 h después de cada función
 ⏰  Recordatorio automático por email 24 h antes de la función
 

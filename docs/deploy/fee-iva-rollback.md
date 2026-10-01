@@ -3,7 +3,7 @@
 ## Qué cambia en el cobro
 
 Desde este deploy, Flow cobra `amount + ticket_fee + service_fee_tax`
-(subtotal + cargo neto del 10% + IVA 19% del cargo). La migración
+(subtotal + cargo neto (10% en ese momento; 8% desde 2026-09-30) + IVA 19% del cargo). La migración
 `db/migrations/202609290100_service_fee_tax.sql` es compatible con el código anterior
 (la columna tiene default 0 y el RPC guarda 0 si no se envía).
 

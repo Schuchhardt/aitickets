@@ -1,0 +1,33 @@
+---
+// Códigos de descuento de la organización (todos los eventos). Cada evento también tiene su sección
+// en /dashboard/events/[id]. Los datos los carga DiscountCodesManager vía /api/discount-codes.
+import DashboardLayout from "../../layouts/DashboardLayout.astro";
+import DiscountCodesManager from "../../components/dashboard/DiscountCodesManager.vue";
+import { getSupabaseAdmin } from "../../lib/auth-helpers";
+import { EVENT_MANAGER_ROLES } from "../../lib/supabaseServer";
+import { requireDashboardSession } from "./_lib/guard";
+
+const guard = await requireDashboardSession(Astro, EVENT_MANAGER_ROLES);
+if (!guard.ok) return guard.response;
+const { dbUser } = guard.session;
+
+const { data: orgEvents } = await getSupabaseAdmin()
+    .from("events")
+    .select("id, name")
+    .eq("organization_id", dbUser.organization_id)
+    .order("start_date", { ascending: false })
+    .limit(200);
+const events = (orgEvents || []).map((e: any) => ({ id: Number(e.id), name: e.name || `Evento ${e.id}` }));
+---
+
+<DashboardLayout title="Códigos de descuento">
+    <div class="space-y-6">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Códigos de descuento</h1>
+            <p class="text-sm text-gray-500 mt-1">
+                Crea códigos para preventas, promotores o invitados. Un código puede aplicar a un evento o a todos tus eventos.
+            </p>
+        </div>
+        <DiscountCodesManager client:load events={events} />
+    </div>
+</DashboardLayout>
