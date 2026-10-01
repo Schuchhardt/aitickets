@@ -27,10 +27,12 @@ function tokenExpiresSoon(token: string, marginSeconds = 60): boolean {
 const STATE_CHANGING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 /**
- * API de productores (MCP + REST): se autentica SOLO con la llave del header Authorization y nunca lee
- * cookies, así que no hay CSRF que prevenir; debe aceptar clientes de otros orígenes (inspectores MCP, apps web).
+ * API de productores (MCP + REST) y endpoints OAuth máquina-a-máquina (token, registro, revocación): se
+ * autentican SOLO con credenciales en el header/cuerpo y nunca leen cookies, así que no hay CSRF que prevenir;
+ * deben aceptar clientes de otros orígenes. /api/oauth/authorize NO está aquí: usa la sesión del productor.
  */
-const isTokenOnlyApi = (pathname: string) => pathname === "/api/mcp" || pathname === "/api/v1" || pathname.startsWith("/api/v1/");
+const TOKEN_ONLY_APIS = new Set(["/api/mcp", "/api/v1", "/api/oauth/token", "/api/oauth/register", "/api/oauth/revoke"]);
+const isTokenOnlyApi = (pathname: string) => TOKEN_ONLY_APIS.has(pathname) || pathname.startsWith("/api/v1/");
 
 /**
  * Host real de la petición: el Host que fija la plataforma (Netlify lo toma de la conexión/SNI; el adapter
@@ -80,7 +82,7 @@ function isCrossSiteRequest(request: Request, url: URL): boolean {
 const EDGE_TENANT_PREFIX = "/o/_host";
 
 /** En un host de tenant estas rutas viven en aitickets.cl. */
-const MAIN_ONLY_PREFIXES = ["/dashboard", "/organizadores", "/auth", "/api/auth", "/qr", "/order", "/ticket", "/payment-confirmation", "/pago"];
+const MAIN_ONLY_PREFIXES = ["/dashboard", "/organizadores", "/auth", "/api/auth", "/oauth", "/qr", "/order", "/ticket", "/payment-confirmation", "/pago"];
 
 /** APIs de Astro permitidas en un host de tenant. */
 const TENANT_API_ALLOWLIST = new Set(["/api/sites/contact"]);
@@ -187,6 +189,8 @@ export const onRequest = defineMiddleware(async (context, next) => {
     const isQrValidator = pathname.startsWith("/qr/");
     // /o/<slug>: la vista previa de un sitio no publicado necesita la sesión del dueño vigente
     const isSitePreviewable = pathname.startsWith("/o/");
+    // Consentimiento OAuth: necesita la sesión vigente del productor
+    const isOAuthPage = pathname.startsWith("/oauth/");
 
     if (isApi && !isTokenOnlyApi(pathname) && STATE_CHANGING_METHODS.has(request.method.toUpperCase()) && isCrossSiteRequest(request, url)) {
         return new Response(JSON.stringify({ error: "Origen no permitido" }), {
@@ -195,7 +199,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
         });
     }
 
-    if ((isDashboard || isApi || isQrValidator || isSitePreviewable) && !isTokenOnlyApi(pathname)) {
+    if ((isDashboard || isApi || isQrValidator || isSitePreviewable || isOAuthPage) && !isTokenOnlyApi(pathname)) {
         const accessToken = context.cookies.get("sb-access-token")?.value;
         const refreshToken = context.cookies.get("sb-refresh-token")?.value;
 
@@ -217,7 +221,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
     const response = await next();
 
     // Nada del dashboard ni de las APIs debe indexarse
-    if (isDashboard || isApi || isQrValidator) {
+    if (isDashboard || isApi || isQrValidator || isOAuthPage) {
         response.headers.set("X-Robots-Tag", "noindex, nofollow");
     }
     return response;

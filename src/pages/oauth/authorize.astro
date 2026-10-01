@@ -1,0 +1,109 @@
+---
+// Pantalla de consentimiento OAuth: el productor autoriza a una app (claude.ai, ChatGPT, Cursor…) a usar
+// AI Tickets en su nombre. Sin sesión → login con ?next= de vuelta aquí. La decisión se envía a
+// /api/oauth/authorize, que vuelve a validar todo (los campos ocultos no son de confianza).
+import Layout from "../../layouts/Layout.astro";
+import "../../styles/global.css";
+import { getSupabaseAdmin } from "../../lib/auth-helpers";
+import { getSessionContext, hasRole, EVENT_MANAGER_ROLES } from "../../lib/supabaseServer";
+import { siteUrl } from "../api/_lib/server-utils";
+import { buildRedirect, validateAuthorizeParams } from "../../lib/producer-api/oauth";
+import { SCOPE_LABELS, API_SCOPES } from "../../lib/producer-api/keys";
+
+export const prerender = false;
+
+Astro.response.headers.set("X-Frame-Options", "DENY");
+Astro.response.headers.set("Content-Security-Policy", "frame-ancestors 'none'");
+Astro.response.headers.set("Cache-Control", "no-store");
+
+const origin = siteUrl() || Astro.url.origin;
+const supabase = getSupabaseAdmin();
+const query = Astro.url.searchParams;
+
+let fatal: string | null = null;
+let req: any = null;
+try {
+    const result = await validateAuthorizeParams(supabase, query, origin);
+    if (result.ok) req = result.req;
+    else if ("fatal" in result) fatal = result.fatal;
+    else {
+        const e = result.redirectError;
+        return Astro.redirect(buildRedirect(e.redirectUri, { error: e.error, error_description: e.description, state: e.state, iss: origin }), 303);
+    }
+} catch (err: any) {
+    console.error("oauth authorize:", err?.message);
+    fatal = "No pudimos procesar la solicitud de conexión. Intenta nuevamente.";
+}
+
+const session = fatal ? null : await getSessionContext(Astro);
+if (!fatal && !session) {
+    return Astro.redirect(`/organizadores/login?next=${encodeURIComponent(Astro.url.pathname + Astro.url.search)}`);
+}
+if (session && !hasRole(session.dbUser, EVENT_MANAGER_ROLES)) {
+    fatal = "Tu rol en la organización no permite conectar asistentes de IA (se requiere admin, productor o editor).";
+}
+
+let orgName = "";
+if (session && !fatal) {
+    const { data: org } = await supabase.from("organizations").select("public_name").eq("id", session.dbUser.organization_id).maybeSingle();
+    orgName = org?.public_name || "";
+}
+const redirectHost = req ? (() => { try { const u = new URL(req.redirectUri); return u.host || u.protocol; } catch { return ""; } })() : "";
+const requested: string[] = req?.scopes || [];
+---
+
+<Layout title="Conectar asistente | AI Tickets" description="Autoriza a tu asistente de IA a gestionar tus eventos en AI Tickets." noindex={true}>
+    <main class="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-16">
+        <div class="w-full max-w-lg bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
+            <a href="/" class="block mb-6"><img src="/logo-dark.png" alt="AI Tickets" class="h-8" /></a>
+            {fatal ? (
+                <>
+                    <h1 class="text-xl font-bold text-gray-900 mb-2">No se pudo conectar</h1>
+                    <p class="text-sm text-gray-600">{fatal}</p>
+                    <a href="/dashboard/ia" class="inline-block mt-6 text-sm font-medium underline">Ir a Conecta tu IA</a>
+                </>
+            ) : (
+                <form method="POST" action="/api/oauth/authorize" class="space-y-6">
+                    <div>
+                        <h1 class="text-xl font-bold text-gray-900">
+                            <span class="text-lime-700">{req.client.client_name}</span> quiere acceder a tu cuenta
+                        </h1>
+                        <p class="text-sm text-gray-600 mt-2">
+                            Podrá actuar como <strong>{session!.dbUser.name || session!.dbUser.email}</strong> en
+                            {orgName ? <strong> {orgName}</strong> : " tu organización"}, con los permisos que elijas.
+                            Volverás a <span class="font-mono text-xs bg-gray-100 px-1 rounded">{redirectHost}</span>.
+                        </p>
+                        {req.client.source === "registered" && (
+                            <p class="text-xs text-amber-700 bg-amber-50 rounded-lg p-2 mt-3">
+                                Conecta solo apps que tú iniciaste (Claude, ChatGPT, Cursor…). Si no reconoces esta solicitud, cancela.
+                            </p>
+                        )}
+                    </div>
+
+                    <fieldset class="space-y-2">
+                        <legend class="text-xs font-bold text-gray-500 uppercase mb-2">Permisos</legend>
+                        {API_SCOPES.map((s) => (
+                            <label class="flex items-start gap-3 p-3 rounded-lg border border-gray-200 cursor-pointer has-[:checked]:border-black has-[:checked]:bg-gray-50">
+                                <input type="checkbox" name="scope" value={s} class="mt-1" checked={s === "read" || requested.includes(s)} disabled={s === "read"} />
+                                <span>
+                                    <span class="block text-sm font-semibold text-gray-900">
+                                        {{ read: "Ver", write: "Crear y editar", publish: "Publicar", attendees: "Compradores" }[s]}
+                                    </span>
+                                    <span class="block text-xs text-gray-500">{SCOPE_LABELS[s]}</span>
+                                </span>
+                            </label>
+                        ))}
+                        <input type="hidden" name="scope" value="read" />
+                    </fieldset>
+
+                    <input type="hidden" name="params" value={query.toString()} />
+                    <div class="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
+                        <button type="submit" name="decision" value="deny" class="px-4 py-2 rounded-lg border border-gray-300 font-medium hover:bg-gray-50">Cancelar</button>
+                        <button type="submit" name="decision" value="allow" class="px-4 py-2 rounded-lg bg-black text-white font-medium hover:bg-gray-900">Autorizar</button>
+                    </div>
+                    <p class="text-xs text-gray-400">Puedes desconectar esta app cuando quieras desde Panel → Conecta tu IA.</p>
+                </form>
+            )}
+        </div>
+    </main>
+</Layout>

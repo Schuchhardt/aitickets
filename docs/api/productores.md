@@ -1,7 +1,7 @@
 # API de productores (MCP + REST)
 
-Permite a los productores gestionar AI Tickets desde su LLM (Claude, Cursor, VS Code, cualquier cliente MCP)
-o desde automatizaciones (n8n, Make, Zapier).
+Permite a los productores gestionar AI Tickets desde su LLM (Claude, ChatGPT, Cursor, VS Code, cualquier
+cliente MCP) o desde automatizaciones (n8n, Make, Zapier).
 
 | Superficie | URL | Formato |
 | --- | --- | --- |
@@ -13,6 +13,34 @@ Ambas superficies ejecutan **las mismas herramientas** (`src/lib/producer-api/to
 validación (`validateArgs` sobre el JSON Schema publicado), permisos y bitácora (`runTool`).
 
 ## Autenticación
+
+Dos formas, ambas terminan en el mismo actor (usuario + organización + scopes):
+
+### OAuth 2.1 (claude.ai, ChatGPT, Claude Code)
+
+El productor pega `https://aitickets.cl/api/mcp` como conector; el cliente descubre todo solo:
+
+1. `POST /api/mcp` sin token → `401` con `WWW-Authenticate: Bearer resource_metadata=".../.well-known/oauth-protected-resource/api/mcp"`.
+2. `GET /.well-known/oauth-protected-resource/api/mcp` (RFC 9728) → servidor de autorización.
+3. `GET /.well-known/oauth-authorization-server` (RFC 8414) → endpoints.
+4. Registro: `POST /api/oauth/register` (RFC 7591, público, 30/h por IP) o Client ID Metadata Document
+   (client_id = URL https; se lee con `src/lib/safe-fetch.ts`, anti-SSRF).
+5. `/oauth/authorize` → login (`?next=`) → pantalla de consentimiento (el productor elige scopes) →
+   `POST /api/oauth/authorize` (sesión + CSRF por origen) → redirect con `code`, `state`, `iss`.
+6. `POST /api/oauth/token`: `authorization_code` con PKCE S256 obligatorio (código de un solo uso, 10 min)
+   y `refresh_token` rotativo (90 días; se valida antes de rotar y se rota con compare-and-swap).
+7. `POST /api/oauth/revoke` (RFC 7009).
+
+Access token = fila de `aitickets_api_keys` con `oauth_grant_id` y vencimiento de 1 h, así `/api/mcp` y
+`/api/v1` lo autentican igual que una llave. Cada autorización es un `aitickets_oauth_grants` ("app
+conectada" en el panel); desconectarla revoca el grant y sus access tokens vivos. Si el usuario se
+desactiva o pierde el rol, el siguiente refresh revoca la conexión.
+
+redirect_uri: https, `http://localhost|127.0.0.1|[::1]` (cualquier puerto, RFC 8252) o esquema de app
+nativa (`cursor://…`); nunca `javascript:`/`data:`/`file:`. La pantalla de consentimiento no se puede
+embeber (`frame-ancestors 'none'`).
+
+### Llaves personales
 
 - Llaves personales `aitk_…` creadas en **/dashboard/ia** ("Conecta tu IA"). Header
   `Authorization: Bearer aitk_…` (o `X-API-Key`).
@@ -58,7 +86,4 @@ Decisiones:
 
 ## Pendiente (siguiente fase)
 
-- **OAuth 2.1** (con registro dinámico de clientes) para conectar desde claude.ai y ChatGPT como
-  "conector" sin copiar llaves. Hoy funciona con clientes que permiten headers (Claude Code, Claude
-  Desktop vía `mcp-remote`, Cursor, VS Code, n8n…).
 - Herramientas de cortesías, reenvío de entradas y edición de funciones vía API.

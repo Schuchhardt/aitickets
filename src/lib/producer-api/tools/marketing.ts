@@ -1,8 +1,6 @@
 // Herramientas: piezas de marketing (imágenes, posts, links con seguimiento).
 // El copy lo escribe el LLM del productor (para eso get_marketing_kit le da el contexto); el servidor guarda
 // imágenes, genera imágenes con IA (opcional) y publica en las redes conectadas.
-import { lookup } from "node:dns/promises";
-import { isIP } from "node:net";
 import { ToolError, type ToolDef, type ToolContext } from "../registry";
 import { eventIdSchema, loadOwnedEvent, eventPublicUrl, eventDashboardUrl } from "./common";
 import {
@@ -11,98 +9,29 @@ import {
 } from "../../marketing";
 import { rateLimit } from "../../../../netlify/lib/rate-limit.mjs";
 import { serverEnv } from "../../../pages/api/_lib/server-utils";
+import { fetchPublic, isPublicIp, SafeFetchError } from "../../safe-fetch";
 
 const PLATFORMS = ["instagram", "facebook"] as const;
 const IMAGE_GENERATIONS_PER_DAY = 20;
 
 // ---------------------------------------------------------------------------
-// Descarga segura de imágenes por URL (anti-SSRF)
+// Imágenes por URL (anti-SSRF en src/lib/safe-fetch.ts) o base64
 // ---------------------------------------------------------------------------
 
-/** true si la IP es pública (no loopback, privada, link-local, CGNAT, multicast ni reservada). */
-export function isPublicIp(ip: string): boolean {
-    const v = isIP(ip);
-    if (v === 4) {
-        const [a, b] = ip.split(".").map(Number);
-        if (a === 0 || a === 10 || a === 127 || a >= 224) return false;
-        if (a === 100 && b >= 64 && b <= 127) return false; // CGNAT
-        if (a === 169 && b === 254) return false; // link-local / metadata
-        if (a === 172 && b >= 16 && b <= 31) return false;
-        if (a === 192 && b === 168) return false;
-        if (a === 192 && b === 0) return false;
-        if (a === 198 && (b === 18 || b === 19)) return false;
-        return true;
-    }
-    if (v === 6) {
-        const s = ip.toLowerCase();
-        const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(s);
-        if (mapped) return isPublicIp(mapped[1]);
-        if (s === "::" || s === "::1") return false;
-        if (/^f[cd]/.test(s)) return false; // ULA
-        if (/^fe[89ab]/.test(s)) return false; // link-local
-        if (/^ff/.test(s)) return false; // multicast
-        if (s.startsWith("64:ff9b:") || s.startsWith("2001:db8")) return false;
-        return true;
-    }
-    return false;
-}
+export { isPublicIp };
 
-async function assertPublicHost(url: URL) {
-    if (url.protocol !== "https:") throw new ToolError("invalid_input", "Solo se aceptan URLs https.");
-    if (url.username || url.password) throw new ToolError("invalid_input", "URL inválida.");
-    if (url.port && url.port !== "443") throw new ToolError("invalid_input", "Puerto no permitido.");
-    const host = url.hostname.replace(/^\[|\]$/g, "");
-    const addresses = isIP(host) ? [{ address: host }] : await lookup(host, { all: true }).catch(() => []);
-    if (!addresses.length) throw new ToolError("invalid_input", "No se pudo resolver el dominio de la imagen.");
-    if (addresses.some((a: any) => !isPublicIp(a.address))) throw new ToolError("invalid_input", "La URL apunta a una dirección no permitida.");
-}
-
-/** Descarga una imagen pública (https, máx. 5 MB, máx. 3 redirecciones verificadas). */
+/** Descarga una imagen pública (https, máx. 5 MB, redirecciones verificadas); el tipo se detecta por bytes. */
 export async function fetchPublicImage(rawUrl: string, fetchImpl: typeof fetch = fetch): Promise<{ buffer: Buffer; contentType: string }> {
-    let url: URL;
+    let buffer: Buffer;
     try {
-        url = new URL(rawUrl);
-    } catch {
-        throw new ToolError("invalid_input", "URL de imagen inválida.");
+        ({ buffer } = await fetchPublic(rawUrl, { maxBytes: MAX_IMAGE_BYTES, accept: "image/*", fetchImpl }));
+    } catch (err: any) {
+        if (err instanceof SafeFetchError) throw new ToolError(err.kind === "invalid" ? "invalid_input" : "upstream", `Imagen: ${err.message}`);
+        throw err;
     }
-    for (let hop = 0; hop <= 3; hop++) {
-        await assertPublicHost(url);
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 10_000);
-        try {
-            const res = await fetchImpl(url, { redirect: "manual", signal: controller.signal, headers: { Accept: "image/*" } });
-            if (res.status >= 300 && res.status < 400 && res.headers.get("location")) {
-                url = new URL(res.headers.get("location")!, url);
-                continue;
-            }
-            if (!res.ok || !res.body) throw new ToolError("upstream", `No se pudo descargar la imagen (HTTP ${res.status}).`);
-            const declared = Number(res.headers.get("content-length") || 0);
-            if (declared > MAX_IMAGE_BYTES) throw new ToolError("invalid_input", "La imagen supera 5 MB.");
-            const chunks: Uint8Array[] = [];
-            let size = 0;
-            const reader = res.body.getReader();
-            for (;;) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                size += value.byteLength;
-                if (size > MAX_IMAGE_BYTES) {
-                    await reader.cancel().catch(() => {});
-                    throw new ToolError("invalid_input", "La imagen supera 5 MB.");
-                }
-                chunks.push(value);
-            }
-            const buffer = Buffer.concat(chunks);
-            const contentType = sniffImageType(buffer);
-            if (!contentType) throw new ToolError("invalid_input", "El archivo no es una imagen JPG, PNG, WEBP o GIF.");
-            return { buffer, contentType };
-        } catch (err: any) {
-            if (err instanceof ToolError) throw err;
-            throw new ToolError("upstream", err?.name === "AbortError" ? "La descarga de la imagen tardó demasiado." : "No se pudo descargar la imagen.");
-        } finally {
-            clearTimeout(timer);
-        }
-    }
-    throw new ToolError("upstream", "Demasiadas redirecciones al descargar la imagen.");
+    const contentType = sniffImageType(buffer);
+    if (!contentType) throw new ToolError("invalid_input", "El archivo no es una imagen JPG, PNG, WEBP o GIF.");
+    return { buffer, contentType };
 }
 
 export function decodeBase64Image(data: string): { buffer: Buffer; contentType: string } {

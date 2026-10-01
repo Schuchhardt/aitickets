@@ -1,5 +1,5 @@
 <script setup>
-import { ArrowRight, Sparkles, Calendar, BarChart3 } from 'lucide-vue-next';
+import { ArrowRight, Sparkles, Calendar, BarChart3, Bot } from 'lucide-vue-next';
 import FadeInSection from './Hero/FadeInSection.vue';
 import FeatureCard from './Hero/FeatureCard.vue';
 import GradientBackground from './Hero/GradientBackground.vue';
@@ -14,10 +14,10 @@ import GradientBackground from './Hero/GradientBackground.vue';
         <div class="flex flex-col lg:flex-row items-center justify-between gap-12">
           <div class="w-full text-center lg:text-left">
             <FadeInSection direction="up">
-              <span class="inline-flex border items-center gap-2 text-lime-400 font-semibold sm:text-xs text-sm md:text-base mb-4 bg-lime-400/10 px-4 py-1.5 rounded-full font-[Prompt]">
+              <a href="#ia" class="inline-flex border items-center gap-2 text-lime-400 font-semibold sm:text-xs text-sm md:text-base mb-4 bg-lime-400/10 px-4 py-1.5 rounded-full font-[Prompt] hover:bg-lime-400/20 transition">
                 <Sparkles class="h-4 w-4" />
-                Pensado para productores de eventos
-              </span>
+                Nuevo: gestiona tus eventos desde Claude o ChatGPT →
+              </a>
             </FadeInSection>
   
             <FadeInSection direction="up" :delay="100">
@@ -56,7 +56,7 @@ import GradientBackground from './Hero/GradientBackground.vue';
                 <FeatureCard :icon="Calendar" title="Funciones múltiples" text="Una página de evento con todas tus fechas. Ideal para stand-up y teatro con temporada." />
               </FadeInSection>
               <FadeInSection direction="up" :delay="500">
-                <FeatureCard :icon="Sparkles" title="Posts con IA" text="Genera publicaciones para Instagram y Facebook a partir de la info de tu evento." />
+                <FeatureCard :icon="Bot" title="Tu IA, tu ticketera" text="Crea eventos, descuentos y campañas conversando con Claude o ChatGPT." />
               </FadeInSection>
               <FadeInSection direction="up" :delay="600">
                 <FeatureCard :icon="BarChart3" title="Sabe qué canal vende" text="Visitas, ventas y canal de origen (UTM) de cada evento en tu panel." />

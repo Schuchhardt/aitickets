@@ -58,3 +58,23 @@ export async function readJsonBody(request: Request): Promise<{ ok: true; body: 
         return { ok: false, status: 400, error: "JSON inválido." };
     }
 }
+
+/** IP del cliente (Netlify) para límites de tasa. */
+export function clientIp(request: Request): string {
+    return request.headers.get("x-nf-client-connection-ip") || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+}
+
+/** Lee un cuerpo application/x-www-form-urlencoded o JSON como diccionario de strings. */
+export async function readFormOrJson(request: Request): Promise<Record<string, string>> {
+    const text = (await request.text()).slice(0, 64 * 1024);
+    const type = request.headers.get("content-type") || "";
+    if (type.includes("application/json")) {
+        try {
+            const obj = JSON.parse(text || "{}");
+            return Object.fromEntries(Object.entries(obj || {}).map(([k, v]) => [k, typeof v === "string" ? v : String(v ?? "")]));
+        } catch {
+            return {};
+        }
+    }
+    return Object.fromEntries(new URLSearchParams(text));
+}

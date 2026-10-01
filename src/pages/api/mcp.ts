@@ -1,8 +1,9 @@
 // Servidor MCP de AI Tickets para productores (Streamable HTTP, sin estado, respuestas JSON).
-// Conexión: URL https://aitickets.cl/api/mcp + header "Authorization: Bearer aitk_..." (llave creada en
-// /dashboard/ia). Las herramientas viven en src/lib/producer-api/tools y son las mismas que /api/v1.
+// Conexión: URL https://aitickets.cl/api/mcp con OAuth 2.1 (claude.ai, ChatGPT: el cliente lo descubre por
+// WWW-Authenticate) o header "Authorization: Bearer aitk_..." (llave de /dashboard/ia). Las herramientas viven en src/lib/producer-api/tools y son las mismas que /api/v1.
 import type { APIRoute } from "astro";
 import { handleMcpPayload } from "../../lib/producer-api/mcp";
+import { resourceMetadataUrl } from "../../lib/producer-api/oauth";
 import { apiJson, authorizeApiRequest, preflight, publicOrigin, readJsonBody } from "../../lib/producer-api/http";
 
 export const prerender = false;
@@ -20,7 +21,8 @@ export const POST: APIRoute = async ({ request }) => {
         const headers: Record<string, string> = {};
         if (auth.status === 401) {
             const origin = publicOrigin(new URL(request.url));
-            headers["WWW-Authenticate"] = `Bearer realm="aitickets", error="invalid_token", error_description="Crea una llave en ${origin}/dashboard/ia"`;
+            // resource_metadata: los clientes MCP (claude.ai, ChatGPT…) descubren desde aquí el flujo OAuth
+            headers["WWW-Authenticate"] = `Bearer realm="aitickets", resource_metadata="${resourceMetadataUrl(origin)}", error="invalid_token", error_description="Conecta tu cuenta o usa una llave de ${origin}/dashboard/ia"`;
         }
         if (auth.status === 429) headers["Retry-After"] = "60";
         return apiJson({ jsonrpc: "2.0", id: null, error: { code: -32001, message: auth.error } }, auth.status, headers);

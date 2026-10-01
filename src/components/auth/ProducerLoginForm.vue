@@ -12,11 +12,17 @@ const needsVerification = ref(false)
 const resendLoading = ref(false)
 const resendMsg = ref('')
 const infoMsg = ref('')
+// Destino tras iniciar sesión (?next=). Solo rutas internas del panel o de autorización OAuth: nunca otro
+// sitio (evita redirecciones abiertas).
+const nextPath = ref('/dashboard')
+const safeNext = (raw) => (typeof raw === 'string' && /^\/(dashboard|oauth\/)/.test(raw) && !raw.startsWith('//') && !raw.includes('\\') ? raw : '/dashboard')
 
 onMounted(() => {
   try {
     const params = new URLSearchParams(window.location.search)
     if (params.get('verificado') === '1') infoMsg.value = '¡Correo confirmado! Ya puedes iniciar sesión.'
+    nextPath.value = safeNext(params.get('next'))
+    if (nextPath.value.startsWith('/oauth/')) infoMsg.value = 'Inicia sesión para conectar tu asistente de IA con AI Tickets.'
   } catch (e) { /* sin URL */ }
 })
 
@@ -71,7 +77,7 @@ const handleLogin = async () => {
       throw new Error(data.message || 'Error al iniciar sesión')
     }
 
-    window.location.href = '/dashboard'
+    window.location.href = nextPath.value
   } catch (err) {
     errorMsg.value = err.message || 'Error al iniciar sesión'
   } finally {

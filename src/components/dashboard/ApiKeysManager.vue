@@ -17,6 +17,7 @@ const SCOPES = [
 ]
 
 const keys = ref([])
+const connections = ref([])
 const loading = ref(true)
 const unavailable = ref(false)
 const listError = ref('')
@@ -28,7 +29,7 @@ const isError = ref(false)
 const newKey = ref('')
 const copied = ref('')
 const busyId = ref(null)
-const client = ref('claude-code')
+const client = ref('claude-ai')
 
 const mcpUrl = computed(() => `${props.origin}/api/mcp`)
 const keyForSnippet = computed(() => newKey.value || 'aitk_TU_LLAVE')
@@ -37,9 +38,23 @@ const snippets = computed(() => {
   const k = keyForSnippet.value
   const url = mcpUrl.value
   return {
+    'claude-ai': {
+      label: 'Claude (web y app)',
+      oauth: true,
+      hint: 'En claude.ai: Ajustes → Conectores → Agregar conector personalizado. Nombre: AI Tickets. URL:',
+      code: url,
+      after: 'Al conectar te pedirá iniciar sesión en AI Tickets y elegir los permisos. No necesitas llave.',
+    },
+    chatgpt: {
+      label: 'ChatGPT',
+      oauth: true,
+      hint: 'En ChatGPT: Ajustes → Apps y conectores → Avanzado → Modo desarrollador → Crear. Autenticación: OAuth. URL:',
+      code: url,
+      after: 'ChatGPT abrirá AI Tickets para que autorices la conexión. No necesitas llave.',
+    },
     'claude-code': {
       label: 'Claude Code',
-      hint: 'Ejecuta en tu terminal:',
+      hint: 'Ejecuta en tu terminal (o sin --header y autoriza con /mcp en Claude Code):',
       code: `claude mcp add --transport http aitickets ${url} \\\n  --header "Authorization: Bearer ${k}"`,
     },
     'claude-desktop': {
@@ -84,6 +99,7 @@ const load = async () => {
     const data = await res.json().catch(() => ({}))
     if (!res.ok) throw new Error(data.message || 'No se pudieron cargar las llaves')
     keys.value = data.keys || []
+    connections.value = data.connections || []
     unavailable.value = Boolean(data.unavailable)
   } catch (e) {
     listError.value = e.message
@@ -146,6 +162,21 @@ const revoke = async (k) => {
   }
 }
 
+const disconnect = async (c) => {
+  if (!confirm(`¿Desconectar "${c.name}"? Dejará de tener acceso a AI Tickets de inmediato.`)) return
+  busyId.value = c.id
+  try {
+    const res = await fetch(`/api/api-keys?grant=${encodeURIComponent(c.id)}`, { method: 'DELETE' })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data.message || 'No se pudo desconectar la app')
+    connections.value = connections.value.filter((x) => x.id !== c.id)
+  } catch (e) {
+    alert(e.message)
+  } finally {
+    busyId.value = null
+  }
+}
+
 const copy = async (text, tag) => {
   try {
     await navigator.clipboard.writeText(text)
@@ -157,13 +188,71 @@ const copy = async (text, tag) => {
 
 <template>
   <div class="space-y-6">
-    <!-- Crear llave -->
+    <!-- Conectar -->
+    <section class="bg-white rounded-xl border border-gray-100 shadow-sm">
+      <div class="p-6 border-b border-gray-100">
+        <h2 class="font-bold text-gray-900">Conecta tu asistente</h2>
+        <p class="text-sm text-gray-500">
+          Servidor MCP: <code class="font-mono text-gray-800">{{ mcpUrl }}</code>
+        </p>
+      </div>
+      <div class="px-6 pt-4 flex flex-wrap gap-2">
+        <button v-for="(s, id) in snippets" :key="id" type="button" @click="client = id"
+          class="px-3 py-1.5 rounded-full text-sm border transition"
+          :class="client === id ? 'bg-black text-white border-black' : 'border-gray-200 text-gray-700 hover:border-gray-400'">
+          {{ s.label }}<span v-if="s.oauth" class="ml-1 text-[10px] uppercase tracking-wide opacity-70">sin llave</span>
+        </button>
+      </div>
+      <div class="p-6 space-y-2">
+        <p class="text-sm text-gray-600">{{ snippets[client].hint }}</p>
+        <div class="relative">
+          <pre class="p-4 pr-24 rounded-lg bg-gray-900 text-gray-100 text-xs overflow-x-auto"><code>{{ snippets[client].code }}</code></pre>
+          <button type="button" @click="copy(snippets[client].code, client)"
+            class="absolute top-2 right-2 px-2 py-1 rounded bg-white/10 text-white text-xs hover:bg-white/20 flex items-center gap-1">
+            <component :is="copied === client ? Check : Copy" :size="12" /> {{ copied === client ? 'Copiado' : 'Copiar' }}
+          </button>
+        </div>
+        <p v-if="snippets[client].after" class="text-sm text-gray-600">{{ snippets[client].after }}</p>
+        <p v-else-if="!newKey" class="text-sm text-amber-700">Este cliente usa una llave de API: créala más abajo y la configuración se completará sola.</p>
+        <p class="text-xs text-gray-400 pt-2">
+          Prueba pidiéndole: "¿Cómo van las ventas de mi próximo evento?", "Crea un código PREVENTA20 de 20% hasta el viernes"
+          o "Arma una campaña de 3 posts para Instagram".
+        </p>
+      </div>
+    </section>
+
+    <!-- Apps conectadas (OAuth) -->
+    <section class="bg-white rounded-xl border border-gray-100 shadow-sm">
+      <div class="p-6 border-b border-gray-100">
+        <h2 class="font-bold text-gray-900">Apps conectadas</h2>
+        <p class="text-sm text-gray-500">Asistentes que autorizaste iniciando sesión (Claude, ChatGPT…).</p>
+      </div>
+      <div v-if="loading" class="p-6 text-sm text-gray-500">Cargando...</div>
+      <div v-else-if="!connections.length" class="p-6 text-sm text-gray-500">Aún no conectas ninguna app.</div>
+      <ul v-else class="divide-y divide-gray-50">
+        <li v-for="c in connections" :key="c.id" class="p-4 px-6 flex flex-col sm:flex-row sm:items-center gap-2 justify-between">
+          <div>
+            <p class="font-medium text-gray-900">{{ c.name }} <span v-if="!c.mine && c.owner" class="text-xs text-gray-400 font-normal">de {{ c.owner }}</span></p>
+            <p class="text-xs text-gray-500">
+              Conectada {{ fmtDate(c.createdAt) }} · Último uso {{ c.lastUsedAt ? fmtDate(c.lastUsedAt) : 'nunca' }}
+            </p>
+            <div class="mt-1">
+              <span v-for="s in c.scopes" :key="s" class="inline-block mr-1 px-2 py-0.5 rounded bg-gray-100 text-xs">{{ scopeLabel(s) }}</span>
+            </div>
+          </div>
+          <button type="button" :disabled="busyId === c.id" @click="disconnect(c)"
+            class="text-sm font-medium text-red-600 hover:underline disabled:opacity-50 self-start sm:self-auto">Desconectar</button>
+        </li>
+      </ul>
+    </section>
+
+    <!-- Llaves de API -->
     <section class="bg-white rounded-xl border border-gray-100 shadow-sm">
       <div class="p-6 border-b border-gray-100 flex items-center gap-3">
         <KeyRound :size="20" class="text-gray-700" />
         <div>
-          <h2 class="font-bold text-gray-900">1. Crea una llave</h2>
-          <p class="text-sm text-gray-500">La llave actúa como tú, solo dentro de tu organización y con los permisos que elijas.</p>
+          <h2 class="font-bold text-gray-900">Llaves de API</h2>
+          <p class="text-sm text-gray-500">Para Claude Code, Claude Desktop, Cursor, VS Code o automatizaciones (n8n, Make, Zapier). La llave actúa como tú, solo en tu organización y con los permisos que elijas.</p>
         </div>
       </div>
 
@@ -180,14 +269,14 @@ const copy = async (text, tag) => {
             <component :is="copied === 'key' ? Check : Copy" :size="16" /> {{ copied === 'key' ? 'Copiada' : 'Copiar' }}
           </button>
         </div>
-        <p class="text-xs text-green-700">Trátala como una contraseña. Si se filtra, revócala abajo y crea otra. Las instrucciones de conexión ya la incluyen.</p>
+        <p class="text-xs text-green-700">Trátala como una contraseña. Si se filtra, revócala abajo y crea otra. Las instrucciones de conexión de arriba ya la incluyen.</p>
         <button type="button" class="text-sm underline text-green-800" @click="newKey = ''">Crear otra llave</button>
       </div>
 
-      <form v-else @submit.prevent="create" class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <form v-else @submit.prevent="create" class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4 border-b border-gray-100">
         <div>
           <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Nombre</label>
-          <input v-model="form.name" type="text" maxlength="80" placeholder="Ej: Claude de Sebastián" autocomplete="off"
+          <input v-model="form.name" type="text" maxlength="80" placeholder="Ej: Cursor de Sebastián" autocomplete="off"
             class="w-full px-3 py-2 rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-black" />
         </div>
         <div>
@@ -221,44 +310,7 @@ const copy = async (text, tag) => {
           <p v-if="message" class="text-sm" :class="isError ? 'text-red-600' : 'text-green-700'" role="status">{{ message }}</p>
         </div>
       </form>
-    </section>
 
-    <!-- Conectar -->
-    <section class="bg-white rounded-xl border border-gray-100 shadow-sm">
-      <div class="p-6 border-b border-gray-100">
-        <h2 class="font-bold text-gray-900">2. Conecta tu IA</h2>
-        <p class="text-sm text-gray-500">
-          Servidor MCP: <code class="font-mono text-gray-800">{{ mcpUrl }}</code>
-        </p>
-      </div>
-      <div class="px-6 pt-4 flex flex-wrap gap-2">
-        <button v-for="(s, id) in snippets" :key="id" type="button" @click="client = id"
-          class="px-3 py-1.5 rounded-full text-sm border transition"
-          :class="client === id ? 'bg-black text-white border-black' : 'border-gray-200 text-gray-700 hover:border-gray-400'">
-          {{ s.label }}
-        </button>
-      </div>
-      <div class="p-6 space-y-2">
-        <p class="text-sm text-gray-600">{{ snippets[client].hint }}</p>
-        <div class="relative">
-          <pre class="p-4 rounded-lg bg-gray-900 text-gray-100 text-xs overflow-x-auto"><code>{{ snippets[client].code }}</code></pre>
-          <button type="button" @click="copy(snippets[client].code, client)"
-            class="absolute top-2 right-2 px-2 py-1 rounded bg-white/10 text-white text-xs hover:bg-white/20 flex items-center gap-1">
-            <component :is="copied === client ? Check : Copy" :size="12" /> {{ copied === client ? 'Copiado' : 'Copiar' }}
-          </button>
-        </div>
-        <p class="text-xs text-gray-400">
-          Prueba pidiéndole: "¿Cómo van las ventas de mi próximo evento?", "Crea un código PREVENTA20 de 20% hasta el viernes"
-          o "Arma una campaña de 3 posts para Instagram".
-        </p>
-      </div>
-    </section>
-
-    <!-- Llaves activas -->
-    <section class="bg-white rounded-xl border border-gray-100 shadow-sm">
-      <div class="p-6 border-b border-gray-100">
-        <h2 class="font-bold text-gray-900">Llaves activas</h2>
-      </div>
       <div v-if="loading" class="p-6 text-sm text-gray-500">Cargando llaves...</div>
       <div v-else-if="listError" class="p-6 text-sm text-red-600">{{ listError }}</div>
       <div v-else-if="!keys.length" class="p-6 text-sm text-gray-500">Aún no tienes llaves.</div>
