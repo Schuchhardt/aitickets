@@ -1,0 +1,28 @@
+---
+// "Conecta tu IA": llaves de API para usar AI Tickets desde Claude, ChatGPT, Cursor, etc. (MCP) o desde
+// integraciones (REST /api/v1). Los datos los carga ApiKeysManager vía /api/api-keys.
+import DashboardLayout from "../../layouts/DashboardLayout.astro";
+import ApiKeysManager from "../../components/dashboard/ApiKeysManager.vue";
+import { EVENT_MANAGER_ROLES } from "../../lib/supabaseServer";
+import { siteUrl } from "../api/_lib/server-utils";
+import { requireDashboardSession } from "./_lib/guard";
+
+const guard = await requireDashboardSession(Astro, EVENT_MANAGER_ROLES);
+if (!guard.ok) return guard.response;
+
+const origin = siteUrl() || Astro.url.origin;
+---
+
+<DashboardLayout title="Conecta tu IA">
+    <div class="space-y-6">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Conecta tu IA</h1>
+            <p class="text-sm text-gray-500 mt-1 max-w-3xl">
+                Gestiona tus eventos conversando con tu asistente favorito (Claude, Cursor, VS Code y cualquier cliente MCP):
+                crear eventos y entradas, códigos de descuento, ver cómo van las ventas y crear piezas de marketing.
+                Para automatizaciones (n8n, Make, Zapier) usa la API REST con la misma llave.
+            </p>
+        </div>
+        <ApiKeysManager client:load origin={origin} />
+    </div>
+</DashboardLayout>

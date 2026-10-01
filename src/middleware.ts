@@ -27,6 +27,12 @@ function tokenExpiresSoon(token: string, marginSeconds = 60): boolean {
 const STATE_CHANGING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 /**
+ * API de productores (MCP + REST): se autentica SOLO con la llave del header Authorization y nunca lee
+ * cookies, así que no hay CSRF que prevenir; debe aceptar clientes de otros orígenes (inspectores MCP, apps web).
+ */
+const isTokenOnlyApi = (pathname: string) => pathname === "/api/mcp" || pathname === "/api/v1" || pathname.startsWith("/api/v1/");
+
+/**
  * Host real de la petición: el Host que fija la plataforma (Netlify lo toma de la conexión/SNI; el adapter
  * arma context.url con ese mismo host). Nunca X-Forwarded-Host: lo puede mandar el cliente, y confiar en él
  * permitiría que una URL de aitickets.cl se resolviera como el tenant que el atacante elija (y que el CDN
@@ -182,14 +188,14 @@ export const onRequest = defineMiddleware(async (context, next) => {
     // /o/<slug>: la vista previa de un sitio no publicado necesita la sesión del dueño vigente
     const isSitePreviewable = pathname.startsWith("/o/");
 
-    if (isApi && STATE_CHANGING_METHODS.has(request.method.toUpperCase()) && isCrossSiteRequest(request, url)) {
+    if (isApi && !isTokenOnlyApi(pathname) && STATE_CHANGING_METHODS.has(request.method.toUpperCase()) && isCrossSiteRequest(request, url)) {
         return new Response(JSON.stringify({ error: "Origen no permitido" }), {
             status: 403,
             headers: { "Content-Type": "application/json", "X-Robots-Tag": "noindex, nofollow" },
         });
     }
 
-    if (isDashboard || isApi || isQrValidator || isSitePreviewable) {
+    if ((isDashboard || isApi || isQrValidator || isSitePreviewable) && !isTokenOnlyApi(pathname)) {
         const accessToken = context.cookies.get("sb-access-token")?.value;
         const refreshToken = context.cookies.get("sb-refresh-token")?.value;
 

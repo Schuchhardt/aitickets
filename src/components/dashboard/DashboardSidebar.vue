@@ -10,6 +10,7 @@ import {
   UserCog,
   Settings,
   Globe,
+  Bot,
   LogOut,
   ChevronLeft,
   ChevronRight
@@ -44,6 +45,7 @@ const allMenuItems = [
   { name: 'Descuentos', path: '/dashboard/descuentos', icon: Tag, roles: EVENT_MANAGER_ROLES },
   { name: 'Ingresos', path: '/dashboard/finance', icon: DollarSign, roles: ORG_ADMIN_ROLES },
   { name: 'Promocionar', path: '/dashboard/promote', icon: Megaphone, roles: EVENT_MANAGER_ROLES },
+  { name: 'Conecta tu IA', path: '/dashboard/ia', icon: Bot, roles: EVENT_MANAGER_ROLES },
   { name: 'Mi sitio web', path: '/dashboard/sitio', icon: Globe, roles: ORG_ADMIN_ROLES },
   { name: 'Equipo', path: '/dashboard/team', icon: UserCog, roles: ORG_ADMIN_ROLES },
   { name: 'Configuración', path: '/dashboard/settings', icon: Settings, roles: ORG_ADMIN_ROLES },
