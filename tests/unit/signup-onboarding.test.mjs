@@ -75,6 +75,16 @@ describe('ensureGoogleProducer', () => {
     expect(db.tables.organizations).toHaveLength(1)
   })
 
+  it('perfil antiguo sin auth_user_id: lo liga a la identidad de Google y entra a su organización', async () => {
+    db.tables.organizations.push({ id: 9, email_verified_at: null, onboarding_pending: false })
+    db.tables.users.push({ id: 22, auth_user_id: null, organization_id: 9, email: 'ana@gmail.com', role: null, active: true })
+    const res = await google.ensureGoogleProducer(googleUser())
+    expect(res).toEqual({ ok: true, created: false, orgId: 9, onboardingPending: false })
+    expect(db.tables.users[0]).toMatchObject({ id: 22, auth_user_id: 'auth-g1', role: 'admin' })
+    expect(db.tables.organizations).toHaveLength(1)
+    expect(db.tables.organizations[0].email_verified_at).toBeTruthy()
+  })
+
   it('el correo ya es de otra cuenta de AI Tickets: no se fusiona', async () => {
     db.tables.users.push({ id: 9, auth_user_id: 'otra-identidad', organization_id: 5, email: 'ana@gmail.com' })
     expect(await google.ensureGoogleProducer(googleUser())).toEqual({ ok: false, error: 'email_in_use' })

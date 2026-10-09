@@ -134,7 +134,31 @@ export async function ensureGoogleProducer(
         return { ok: true, created: false, orgId, onboardingPending: Boolean((org as any)?.onboarding_pending) };
     }
 
-    const { data: sameEmail } = await supabase.from("users").select("id, auth_user_id").eq("email", email).maybeSingle();
+    const { data: sameEmail } = await supabase.from("users").select("id, auth_user_id, organization_id, role, active").ilike("email", email.replace(/[\\%_]/g, (c) => `\\${c}`)).maybeSingle();
+    // Perfil antiguo sin auth_user_id (anterior a la columna / nunca ligado): Google probó que el correo es de
+    // esta persona => se liga a esta identidad. role NULL (cuentas antiguas) => 'admin', el default de la columna.
+    if (sameEmail && !sameEmail.auth_user_id) {
+        const { data: linked, error: linkError } = await supabase
+            .from("users")
+            .update({ auth_user_id: user.id, ...(sameEmail.role ? {} : { role: "admin" }) })
+            .eq("id", sameEmail.id)
+            .is("auth_user_id", null)
+            .select("id");
+        if (linkError || !linked?.length) {
+            console.error("google-auth: no se pudo ligar el perfil antiguo", linkError?.message);
+            return { ok: false, error: "server" };
+        }
+        sameEmail.auth_user_id = user.id;
+        if (sameEmail.organization_id) {
+            if (sameEmail.active === false) return { ok: false, error: "inactive" };
+            const orgId = Number(sameEmail.organization_id);
+            const { data: org } = await supabase.from("organizations").select("email_verified_at, onboarding_pending").eq("id", orgId).maybeSingle();
+            if (org && !org.email_verified_at) {
+                await supabase.from("organizations").update({ email_verified_at: new Date().toISOString(), email_verified_for: email }).eq("id", orgId).is("email_verified_at", null);
+            }
+            return { ok: true, created: false, orgId, onboardingPending: Boolean((org as any)?.onboarding_pending) };
+        }
+    }
     if (sameEmail && sameEmail.auth_user_id !== user.id) return { ok: false, error: "email_in_use" };
 
     const meta = (user.user_metadata || {}) as Record<string, any>;
