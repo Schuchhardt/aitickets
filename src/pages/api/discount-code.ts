@@ -118,12 +118,10 @@ export const POST: APIRoute = async ({ request }) => {
   if (!byIp.allowed || !byIpEvent.allowed) return fail(TOO_MANY, "rate_limited", 429);
 
   try {
-    const { data: event, error: eventError } = await supabase
-      .from("events")
-      .select("id, slug, status, organization_id")
-      .eq("id", eventId)
-      .eq("status", "published")
-      .maybeSingle();
+    const loadEvent = (cols: string) => supabase.from("events").select(cols).eq("id", eventId).eq("status", "published").maybeSingle();
+    let { data: event, error: eventError }: { data: any; error: any } = await loadEvent("id, slug, status, organization_id, fee_absorbed");
+    // Base sin events.fee_absorbed (202610090200)
+    if (eventError && ["42703", "PGRST204"].includes(String(eventError.code || ""))) ({ data: event, error: eventError } = await loadEvent("id, slug, status, organization_id"));
     if (eventError) throw new Error(eventError.message);
     if (!event || isDemoEventSlug(event.slug)) return fail("El evento no está disponible para la venta", "event", 404);
 
@@ -160,7 +158,7 @@ export const POST: APIRoute = async ({ request }) => {
     }
 
     const { discount } = result;
-    const totals = computeDiscountedTotals(grossSubtotal, discount);
+    const totals = computeDiscountedTotals(grossSubtotal, discount, { feeAbsorbed: event.fee_absorbed === true });
     return jsonResponse({
       valid: true,
       code: discount.code,

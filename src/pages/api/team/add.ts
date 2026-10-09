@@ -2,7 +2,7 @@ import type { APIRoute } from "astro";
 import { randomBytes } from "node:crypto";
 import { getSupabaseAdmin, getFriendlyErrorMessage } from "../../../lib/auth-helpers";
 import { getSessionContext, hasRole, ORG_ADMIN_ROLES } from "../../../lib/supabaseServer";
-import { AITICKETS_APP_METADATA, ASSIGNABLE_ROLES, EMAIL_RE, json } from "./_team";
+import { AITICKETS_APP_METADATA, ASSIGNABLE_ROLES, EMAIL_RE, OWNER_ONLY_ROLES, json } from "./_team";
 
 export const POST: APIRoute = async (context) => {
     const session = await getSessionContext(context);
@@ -28,6 +28,9 @@ export const POST: APIRoute = async (context) => {
         }
         if (!ASSIGNABLE_ROLES.includes(role)) {
             return json({ error: "Rol no válido" }, 400);
+        }
+        if (OWNER_ONLY_ROLES.includes(role) && currentUser.role !== "producer") {
+            return json({ error: "Solo el dueño de la cuenta puede agregar miembros de finanzas" }, 403);
         }
 
         const supabaseAdmin = getSupabaseAdmin();

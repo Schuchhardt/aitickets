@@ -3,6 +3,7 @@
 // ahora exige sesión de un usuario de la organización dueña del evento con rol de check-in.
 import { getSupabaseAdmin, createEphemeralAuthClient } from "../../lib/auth-helpers";
 import { getSessionContext, setSessionCookies, clearSessionCookies } from "../../lib/supabaseServer";
+import { canAccessEventByStaff } from "../../../netlify/lib/event-staff.mjs";
 import AppFooter from "../../components/AppFooter.vue";
 import Layout from '../../layouts/Layout.astro';
 import ValidateQR from "../../components/ValidateQR.vue";
@@ -45,6 +46,10 @@ const { data: event } = await supabase
 
 if (!event) {
   return Astro.redirect('/404');
+}
+// Acceso por evento (aitickets_event_staff)
+if (!(await canAccessEventByStaff(supabase, session.dbUser.id, event.id))) {
+  return Astro.redirect('/dashboard/events');
 }
 
 // Paginado con .range(): PostgREST devuelve como máximo 1000 filas por consulta.

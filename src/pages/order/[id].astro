@@ -6,7 +6,7 @@
 import { getSupabaseAdmin } from "../../lib/auth-helpers";
 import { descriptionToHtml } from "../../lib/sanitize";
 import { LEGAL } from "../../lib/legal";
-import { SERVICE_FEE_TAX_LABEL, orderFeeBreakdown, serviceFeeLabelFor } from "../../../netlify/lib/fees.mjs";
+import { FEE_INCLUDED_NOTE, SERVICE_FEE_TAX_LABEL, orderBuyerBreakdown, serviceFeeLabelFor } from "../../../netlify/lib/fees.mjs";
 import { orderDiscount, discountLineLabel } from "../../../netlify/lib/discounts.mjs";
 import Layout from "../../layouts/Layout.astro";
 import AppHeader from "../../components/AppHeader.vue";
@@ -49,7 +49,7 @@ if (!id || !UUID_RE.test(id)) {
     const ORDER_COLS = "id, created_at, status, event_id, attendee_id, amount, ticket_fee, total_payment, ticket_qty, buyer_first_name, buyer_last_name, buyer_email";
     // Columnas opcionales, de la más completa a la mínima: descuento (202609300200) e IVA del cargo (202609290100)
     let orderData: any = null;
-    for (const cols of [`${ORDER_COLS}, service_fee_tax, discount_amount, discount_code`, `${ORDER_COLS}, service_fee_tax`, ORDER_COLS]) {
+    for (const cols of [`${ORDER_COLS}, service_fee_tax, discount_amount, discount_code, fee_absorbed`, `${ORDER_COLS}, service_fee_tax, discount_amount, discount_code`, `${ORDER_COLS}, service_fee_tax`, ORDER_COLS]) {
       const { data, error: orderError } = await supabase.from("event_orders").select(cols).eq("id", id).maybeSingle();
       orderData = data;
       if (!orderError || !["42703", "PGRST204"].includes(String(orderError.code || ""))) break;
@@ -158,8 +158,9 @@ if (!id || !UUID_RE.test(id)) {
   }
 }
 
-// amount = subtotal; ticket_fee = cargo por servicio neto; service_fee_tax = IVA del cargo
-const breakdown = orderInfo ? orderFeeBreakdown(orderInfo) : null;
+// amount = subtotal; ticket_fee = cargo por servicio neto; service_fee_tax = IVA del cargo.
+// Cargo absorbido (fee_absorbed): subtotal = total pagado y no se muestra cargo encima.
+const breakdown = orderInfo ? orderBuyerBreakdown(orderInfo) : null;
 // Descuento: amount ya viene descontado; el subtotal a precio de lista es amount + descuento
 const discount = orderInfo ? orderDiscount(orderInfo) : { code: "", amount: 0 };
 const totalPaid = orderInfo
@@ -209,10 +210,13 @@ const clp = (n: number) => `$${Math.round(Number(n) || 0).toLocaleString("es-CL"
                       </>
                     )}
                     <div class="flex justify-between gap-2"><dt>Subtotal</dt><dd>{clp(breakdown.subtotal)}</dd></div>
-                    {breakdown.feeNet > 0 && (
+                    {breakdown.feeIncluded && (
+                      <div class="flex justify-between gap-2" data-testid="order-fee-included"><dt>{FEE_INCLUDED_NOTE}</dt><dd>Incluido</dd></div>
+                    )}
+                    {!breakdown.feeIncluded && breakdown.feeNet > 0 && (
                       <div class="flex justify-between gap-2"><dt>{serviceFeeLabelFor(breakdown.subtotal, breakdown.feeNet)}</dt><dd>{clp(breakdown.feeNet)}</dd></div>
                     )}
-                    {breakdown.feeIva > 0 && (
+                    {!breakdown.feeIncluded && breakdown.feeIva > 0 && (
                       <div class="flex justify-between gap-2"><dt>{SERVICE_FEE_TAX_LABEL}</dt><dd>{clp(breakdown.feeIva)}</dd></div>
                     )}
                   </dl>

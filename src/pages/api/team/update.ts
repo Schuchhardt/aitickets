@@ -1,7 +1,7 @@
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin, getFriendlyErrorMessage } from "../../../lib/auth-helpers";
 import { getSessionContext, hasRole, ORG_ADMIN_ROLES } from "../../../lib/supabaseServer";
-import { ASSIGNABLE_ROLES, EMAIL_RE, countActiveOrgAdmins, isAiticketsAuthUser, json } from "./_team";
+import { ASSIGNABLE_ROLES, EMAIL_RE, OWNER_ONLY_ROLES, countActiveOrgAdmins, isAiticketsAuthUser, json } from "./_team";
 
 export const POST: APIRoute = async (context) => {
     const session = await getSessionContext(context);
@@ -50,6 +50,9 @@ export const POST: APIRoute = async (context) => {
             }
         } else if (!ASSIGNABLE_ROLES.includes(role)) {
             return json({ error: "Rol no válido" }, 400);
+        }
+        if ((OWNER_ONLY_ROLES.includes(role) || OWNER_ONLY_ROLES.includes(targetUser.role || "")) && role !== targetUser.role && currentUser.role !== "producer") {
+            return json({ error: "Solo el dueño de la cuenta puede dar o quitar el rol de finanzas" }, 403);
         }
         // Si el formulario no ofrece 'producer', mantenerlo cuando el producer se edita a sí mismo como admin
         if (targetUser.role === "producer" && role === "admin" && targetUser.id === currentUser.id) {

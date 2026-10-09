@@ -127,8 +127,8 @@ describe('/api/api-keys', () => {
     expect(db.tables.aitickets_api_keys[0].revoked_at).not.toBeNull()
   })
 
-  it('un validador no puede crear llaves', async () => {
-    session = { dbUser: { id: 5, organization_id: 7, role: 'validator' } }
+  it('un rol sin acceso a la API no puede crear llaves', async () => {
+    session = { dbUser: { id: 5, organization_id: 7, role: 'guest' } }
     expect((await apiKeys.POST(ctx('POST', { name: 'x' }))).status).toBe(403)
   })
 })

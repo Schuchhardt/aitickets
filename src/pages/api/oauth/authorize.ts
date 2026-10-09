@@ -3,7 +3,8 @@
 // Protección CSRF: el middleware exige mismo origen para los POST a /api con cookie.
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
-import { getSessionContext, hasRole, EVENT_MANAGER_ROLES, jsonResponse } from "../../../lib/supabaseServer";
+import { getSessionContext, hasRole, jsonResponse } from "../../../lib/supabaseServer";
+import { API_ROLES } from "../../../lib/producer-api/permissions";
 import { siteUrl } from "../_lib/server-utils";
 import { buildRedirect, createAuthorizationCode, validateAuthorizeParams } from "../../../lib/producer-api/oauth";
 import { normalizeScopes } from "../../../lib/producer-api/keys";
@@ -14,7 +15,7 @@ export const POST: APIRoute = async (context) => {
     const origin = siteUrl() || context.url.origin;
     const session = await getSessionContext(context);
     if (!session) return jsonResponse({ error: "Unauthorized" }, 401);
-    if (!hasRole(session.dbUser, EVENT_MANAGER_ROLES)) return jsonResponse({ message: "Tu rol no permite conectar asistentes de IA" }, 403);
+    if (!hasRole(session.dbUser, API_ROLES)) return jsonResponse({ message: "Tu rol no permite conectar asistentes de IA" }, 403);
 
     const form = await context.request.formData();
     const params = new URLSearchParams(String(form.get("params") || ""));

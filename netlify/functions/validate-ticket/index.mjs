@@ -2,6 +2,7 @@
 // Body: { qr_code, event_id }. Requiere sesión con rol de check-in y evento de la organización del usuario.
 // status NULL (entradas antiguas) se devuelve como 'active'. R1: incluye function_mismatch/function_label.
 import { getSupabaseAdmin, getOwnedEvent } from '../../lib/supabase.mjs'
+import { canAccessEventByStaff } from '../../lib/event-staff.mjs'
 import { getSessionContextWithRefresh, jsonWithCookies, CHECKIN_ROLES } from '../../lib/session.mjs'
 import { getFunctionCheck } from '../../lib/checkin.mjs'
 
@@ -28,6 +29,8 @@ export default async function handler(req) {
 
     const event = await getOwnedEvent(eventId, ctx.dbUser.organization_id, 'id')
     if (!event) return respond({ message: 'Evento no encontrado o sin permisos' }, 403)
+    // Acceso por evento (aitickets_event_staff)
+    if (!(await canAccessEventByStaff(getSupabaseAdmin(), ctx.dbUser.id, eventId))) return respond({ message: 'Evento no encontrado o sin permisos' }, 403)
 
     const supabase = getSupabaseAdmin()
     const { data, error } = await supabase

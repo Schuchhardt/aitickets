@@ -7,7 +7,7 @@ import TicketSelection from "./TicketSelection.vue";
 import OrderSummary from "./OrderSummary.vue";
 import BuyerInfo from "./BuyerInfo.vue";
 import PaymentStep from "./PaymentStep.vue";
-import { buildSelectedLines, computeTotalsWithDiscount, isValidEmail, maxPerPurchase } from "./pricing.js";
+import { buildSelectedLines, computeTotalsWithDiscount, isFeeAbsorbed, isValidEmail, maxPerPurchase } from "./pricing.js";
 
 const props = defineProps({ event: Object });
 const emit = defineEmits(["close"]);
@@ -76,7 +76,7 @@ watch(currentStep, () => writeStorage("currentStep", currentStep.value));
 watch(discount, () => writeStorage("discount", discount.value));
 
 // ==== CALCULOS (solo para mostrar; el servidor recalcula) ====
-const totals = computed(() => computeTotalsWithDiscount(buildSelectedLines(selectedTickets.value, props.event.tickets, props.event.dates), discount.value));
+const totals = computed(() => computeTotalsWithDiscount(buildSelectedLines(selectedTickets.value, props.event.tickets, props.event.dates), discount.value, { feeAbsorbed: isFeeAbsorbed(props.event) }));
 
 // ==== NAVEGACIÓN ====
 const buyerIsValid = computed(() => {

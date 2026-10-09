@@ -1,7 +1,7 @@
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin, getFriendlyErrorMessage } from "../../../lib/auth-helpers";
 import { getSessionContext, hasRole, ORG_ADMIN_ROLES } from "../../../lib/supabaseServer";
-import { countActiveOrgAdmins, isAiticketsAuthUser, json } from "./_team";
+import { OWNER_ONLY_ROLES, countActiveOrgAdmins, isAiticketsAuthUser, json } from "./_team";
 
 export const POST: APIRoute = async (context) => {
     const session = await getSessionContext(context);
@@ -41,6 +41,10 @@ export const POST: APIRoute = async (context) => {
             return json({ error: "No puedes cambiar el estado del dueño de la cuenta" }, 403);
         }
 
+        if (OWNER_ONLY_ROLES.includes(targetUser.role || "") && currentUser.role !== "producer") {
+            return json({ error: "Solo el dueño de la cuenta puede cambiar el estado de un miembro de finanzas" }, 403);
+        }
+
         if (!active && ORG_ADMIN_ROLES.includes(targetUser.role || "")) {
             if ((await countActiveOrgAdmins(currentUser.organization_id, targetUser.id)) < 1) {
                 return json({ error: "No puedes desactivar al último administrador activo" }, 400);
@@ -56,6 +60,17 @@ export const POST: APIRoute = async (context) => {
         if (updateDbError) {
             console.error("Database update error:", updateDbError);
             return json({ error: getFriendlyErrorMessage(updateDbError) }, 500);
+        }
+
+        // Sus links de escáner de puerta (aitickets_checkin_links) dejan de funcionar al desactivarlo
+        if (!active) {
+            const { error: linksError } = await supabaseAdmin
+                .from("aitickets_checkin_links")
+                .update({ revoked_at: new Date().toISOString() })
+                .eq("created_by", targetUser.id)
+                .eq("organization_id", currentUser.organization_id)
+                .is("revoked_at", null);
+            if (linksError) console.warn("toggle-status checkin links:", linksError.message);
         }
 
         // Bloquear / desbloquear el login en Auth solo si la cuenta la creó AI Tickets (Auth es compartido con otras apps).

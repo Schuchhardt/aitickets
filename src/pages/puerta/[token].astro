@@ -1,0 +1,71 @@
+---
+// Escáner de puerta SIN cuenta: /puerta/<token> (link creado con create_checkin_link). Solo valida
+// entradas del evento del link mientras esté vigente; muestra nombre y tipo de entrada (sin emails).
+import Layout from "../../layouts/Layout.astro";
+import ValidateQR from "../../components/ValidateQR.vue";
+import { getSupabaseAdmin } from "../../lib/auth-helpers";
+import { DOOR_TICKET_SELECT, presentDoorTicket, resolveCheckinToken, touchCheckinLink } from "../../lib/checkinAccess";
+
+export const prerender = false;
+
+Astro.response.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+Astro.response.headers.set("Referrer-Policy", "no-referrer");
+Astro.response.headers.set("Cache-Control", "no-store");
+
+const token = String(Astro.params.token || "");
+const supabase = getSupabaseAdmin();
+const resolved = await resolveCheckinToken(supabase, token);
+
+let event: any = null;
+if (resolved) {
+    await touchCheckinLink(supabase, resolved.link, false);
+    const attendees: any[] = [];
+    for (let from = 0; from < 50_000; from += 1000) {
+        const { data, error } = await supabase
+            .from("event_attendees")
+            .select(DOOR_TICKET_SELECT)
+            .eq("event_id", resolved.event.id)
+            .order("id", { ascending: true })
+            .range(from, from + 999);
+        if (error) {
+            console.error("puerta: error cargando asistentes", error.message);
+            break;
+        }
+        attendees.push(...(data || []));
+        if (!data || data.length < 1000) break;
+    }
+    const { data: dates } = await supabase
+        .from("event_dates")
+        .select("id, date, start_time")
+        .eq("event_id", resolved.event.id)
+        .order("date", { ascending: true })
+        .order("start_time", { ascending: true });
+    event = { ...resolved.event, dates: dates || [], attendees: attendees.map(presentDoorTicket) };
+} else {
+    Astro.response.status = 404;
+}
+
+const base = `/api/door/${token}`;
+if (event) event = { ...event, doorMode: true, endpoints: { attendees: `${base}/attendees`, validate: `${base}/validate`, confirm: `${base}/confirm` } };
+const expiresLabel = resolved
+    ? new Date(resolved.link.expires_at).toLocaleString("es-CL", { timeZone: "America/Santiago", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+    : "";
+---
+
+<Layout title={event ? `Puerta · ${event.name} | AI Tickets` : "Escáner de puerta | AI Tickets"} noindex={true} analytics={false}>
+    <main class="min-h-screen bg-gray-50 py-6">
+        {event ? (
+            <>
+                <div class="max-w-4xl mx-auto px-4 sm:px-6 mb-4 text-xs text-gray-500 font-[Prompt]">
+                    Escáner de puerta{resolved?.link.label ? ` · ${resolved.link.label}` : ""} · vigente hasta {expiresLabel}
+                </div>
+                <ValidateQR event={event} client:load />
+            </>
+        ) : (
+            <div class="max-w-md mx-auto px-6 py-16 text-center font-[Prompt]">
+                <h1 class="text-2xl font-bold font-[Unbounded] mb-3">Link no disponible</h1>
+                <p class="text-gray-600">Este link de escáner no existe, venció o fue revocado. Pide uno nuevo al organizador del evento.</p>
+            </div>
+        )}
+    </main>
+</Layout>

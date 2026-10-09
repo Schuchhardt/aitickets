@@ -1,9 +1,10 @@
 // Herramientas: cuenta, eventos y lugares.
 import { ToolError, type ToolDef } from "../registry";
 import { SCOPE_LABELS } from "../keys";
+import { PERMISSION_LABELS, ROLE_LABELS, ROLE_PERMISSIONS } from "../permissions";
 import {
     eventIdSchema, loadOwnedEvent, eventPublicUrl, eventDashboardUrl, eventUrls, ticketAvailability, presentTicket, TICKET_SELECT,
-    DATE_PATTERN, TIME_PATTERN, fetchAll, DRAFT_URL_NOTE,
+    DATE_PATTERN, TIME_PATTERN, fetchAll, DRAFT_URL_NOTE, scopeToEvents,
 } from "./common";
 import { createPreviewLink, listPreviewLinks, revokePreviewLink, PreviewLinkError, PREVIEW_DEFAULT_HOURS } from "../../eventPreview";
 import { createEventGraph, setEventStatus, syncEventCategory, EventInputError, type EventGraphInput } from "../../../pages/api/_lib/events";
@@ -22,7 +23,8 @@ const getAccount: ToolDef = {
     name: "get_account",
     title: "Mi cuenta",
     description:
-        "Devuelve la organización, el usuario dueño de la llave, los permisos (scopes) de la llave y las redes sociales conectadas. " +
+        "Devuelve la organización, el usuario dueño de la llave con su rol, los permisos (scopes) de la conexión, lo que su rol le permite, " +
+        "los eventos a los que tiene acceso y las redes sociales conectadas. " +
         "Úsala al inicio para saber qué puedes hacer.",
     scope: "read",
     annotations: { readOnlyHint: true },
@@ -34,8 +36,10 @@ const getAccount: ToolDef = {
         ]);
         return {
             organization: org ? { id: Number(org.id), name: org.public_name, email: org.email, website: org.website, instagram: org.instagram, facebook: org.facebook, tiktok: org.tiktok } : { id: ctx.actor.orgId },
-            user: { id: ctx.actor.userId, name: ctx.actor.name, email: ctx.actor.email, role: ctx.actor.role },
+            user: { id: ctx.actor.userId, name: ctx.actor.name, email: ctx.actor.email, role: ctx.actor.role, role_label: ROLE_LABELS[ctx.actor.role] || ctx.actor.role },
             scopes: ctx.actor.scopes.map((s) => ({ scope: s, allows: SCOPE_LABELS[s] })),
+            role_permissions: (ROLE_PERMISSIONS[ctx.actor.role] || []).map((p) => ({ permission: p, allows: PERMISSION_LABELS[p] })),
+            event_access: ctx.actor.eventIds ? { restricted_to_event_ids: ctx.actor.eventIds } : "all",
             connected_social_accounts: (accounts || []).map((a: any) => ({ platform: a.platform, account: a.account_name })),
             conventions: {
                 currency: "CLP (pesos chilenos, enteros sin decimales)",
@@ -52,7 +56,7 @@ const listEvents: ToolDef = {
     description:
         "Lista los eventos de la organización con estado, fecha, lugar, link público, entradas vendidas e ingresos (órdenes pagadas). " +
         "Ordenados del más próximo/reciente al más antiguo. Los borradores NO tienen link público activo (public_url = null): " +
-        "para mostrarlos usa create_preview_link.",
+        "para mostrarlos usa create_preview_link. Los eventos archivados (archive_event) se omiten salvo include_archived=true.",
     scope: "read",
     annotations: { readOnlyHint: true },
     inputSchema: {
@@ -61,20 +65,28 @@ const listEvents: ToolDef = {
         properties: {
             status: { type: "string", enum: ["published", "draft", "all"], default: "all", description: "Filtrar por estado." },
             when: { type: "string", enum: ["upcoming", "past", "all"], default: "all", description: "upcoming = terminan en el futuro (o sin fecha)." },
+            include_archived: { type: "boolean", default: false, description: "true = incluir eventos archivados." },
             limit: { type: "integer", minimum: 1, maximum: 100, default: 30 },
         },
     },
     async handler(args, ctx) {
-        let query = ctx.supabase
-            .from("events")
-            .select(EVENT_LIST_COLUMNS)
-            .eq("organization_id", ctx.actor.orgId)
-            .order("start_date", { ascending: false, nullsFirst: true })
-            .limit(args.limit);
-        if (args.status !== "all") query = query.eq("status", args.status);
         const nowIso = new Date().toISOString();
-        if (args.when === "past") query = query.lt("end_date", nowIso);
-        const { data, error } = await query;
+        const build = (withArchive: boolean) => {
+            let query = ctx.supabase
+                .from("events")
+                .select(withArchive ? `${EVENT_LIST_COLUMNS}, archived_at` : EVENT_LIST_COLUMNS)
+                .eq("organization_id", ctx.actor.orgId)
+                .order("start_date", { ascending: false, nullsFirst: true })
+                .limit(args.limit);
+            if (args.status !== "all") query = query.eq("status", args.status);
+            if (withArchive && !args.include_archived) query = query.is("archived_at", null);
+            query = scopeToEvents(ctx, query, "id");
+            if (args.when === "past") query = query.lt("end_date", nowIso);
+            return query;
+        };
+        let { data, error } = await build(true);
+        // Sin la columna archived_at (deploy preview sin migrar): sin filtro de archivados
+        if (error && /archived_at/.test(String(error.message || ""))) ({ data, error } = await build(false));
         if (error) throw error;
         let events: any[] = data || [];
         if (args.when === "upcoming") events = events.filter((e) => !e.end_date || e.end_date >= nowIso);
@@ -104,6 +116,7 @@ const listEvents: ToolDef = {
                 end_date: e.end_date,
                 location: e.location,
                 is_published: e.status === "published",
+                ...(e.archived_at ? { archived: true } : {}),
                 public_url: e.status === "published" ? eventPublicUrl(ctx, e.slug) : null,
                 ...(e.status === "published" ? {} : { public_url_after_publish: eventPublicUrl(ctx, e.slug) }),
                 tickets_sold: totals.get(Number(e.id))?.tickets || 0,
@@ -342,8 +355,21 @@ const setStatus: ToolDef = {
     title: "Publicar o pausar evento",
     description:
         "Publica un evento (queda visible y a la venta) o lo vuelve a borrador (deja de venderse). " +
-        "Acción visible al público: confirma con el productor antes de publicar.",
+        "Acción visible al público: el servidor devuelve primero un resumen y solo la ejecuta al repetir la llamada con confirmation_token.",
     scope: "publish",
+    async confirm(args, ctx) {
+        const event = await loadOwnedEvent<any>(ctx, args.event_id, "id, name, slug, status, start_date");
+        if (event.status === args.status) {
+            return { message: `"${event.name}" ya está ${args.status === "published" ? "publicado" : "en borrador"}: no habrá cambios.` };
+        }
+        return args.status === "published"
+            ? {
+                  message: `Publicar "${event.name}": quedará visible y a la venta en ${eventPublicUrl(ctx, event.slug)}.`,
+                  details: { event_id: Number(event.id), start_date: event.start_date },
+              }
+            : { message: `Volver "${event.name}" a borrador: la página deja de verse y se detiene la venta (las entradas vendidas siguen válidas).`, details: { event_id: Number(event.id) } };
+    },
+    audit: (args) => ({ summary: args.status === "published" ? "Publicó el evento" : "Volvió el evento a borrador", target: `event:${args.event_id}` }),
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
     inputSchema: {
         type: "object",

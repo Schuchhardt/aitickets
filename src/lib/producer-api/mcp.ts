@@ -2,23 +2,32 @@
 // (o un lote) y se responde con JSON (sin SSE ni sesiones). Implementa initialize, ping, tools/*, prompts/*.
 // Spec: https://modelcontextprotocol.io/specification
 import { TOOLS, getTool } from "./tools";
-import { publicSchema, runTool, type ToolContext } from "./registry";
+import { effectiveSchema, publicSchema, runTool, toolPermission, type ToolContext } from "./registry";
+import type { ApiActor } from "./keys";
+import { roleAllows, ROLE_LABELS } from "./permissions";
 
 export const SUPPORTED_PROTOCOL_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
-export const SERVER_INFO = { name: "aitickets", title: "AI Tickets", version: "1.0.0", websiteUrl: "https://aitickets.cl" };
+export const SERVER_INFO = { name: "aitickets", title: "AI Tickets", version: "2.0.0", websiteUrl: "https://aitickets.cl" };
 
 export const SERVER_INSTRUCTIONS = `Eres el asistente de un productor de eventos en AI Tickets (ticketera chilena).
-Con estas herramientas puedes crear y gestionar eventos, entradas y códigos de descuento, analizar ventas y crear piezas de marketing.
+Con estas herramientas puedes cerrar el ciclo completo de un evento: crearlo y publicarlo, vender (entradas, descuentos, marketing), atender a compradores, controlar el acceso, comunicarte con asistentes y manejar la plata (comisiones, saldo, retiros, reembolsos), además del equipo y la bitácora.
 
 Reglas:
 - Montos en CLP (pesos chilenos, enteros). Fechas/horas de funciones en hora de Chile (America/Santiago).
-- Empieza con get_account para conocer la organización y los permisos de la llave. Usa list_events para obtener IDs.
-- create_event deja el evento en BORRADOR. Publicar (set_event_status) y publicar en redes (publish_social_post) son acciones públicas: muestra un resumen y pide confirmación explícita antes.
-- Borradores: su link público NO funciona (public_url = null, is_published = false). Para que el productor (o un socio/artista) vea la página sin publicarla, entrega el preview_url de create_event o crea uno con create_preview_link (privado, no indexado; por defecto 7 días; configurable con expires_in_hours, no_expiration=true o single_use=true). La página muestra "Vista previa · Evento NO publicado". Dile siempre al productor si el evento está publicado o en borrador.
+- Empieza con get_account: muestra la organización, el ROL del usuario, lo que ese rol permite, los permisos de la conexión y a qué eventos tiene acceso. Si una herramienta responde forbidden, explica qué rol o permiso falta; no insistas.
+- Usa list_events para obtener IDs.
+- CONFIRMACIÓN EN EL SERVIDOR: publicar un evento, publicar en redes, retiros, reembolsos, cancelar un evento, mensajes masivos, invitaciones, eliminar cuenta bancaria o eventos, y cambiar quién paga el cargo responden primero { status: "confirmation_required", summary, confirmation_token } SIN ejecutar nada. Muestra el resumen al productor y pregunta. Solo si confirma explícitamente, repite la llamada con los MISMOS argumentos + confirmation_token. Nunca envíes el token sin esa confirmación ni lo reutilices.
+- Para crear o mover dinero (retiros, reembolsos, cortesías) agrega idempotency_key (p. ej. un uuid) y reutilízala si reintentas: así un reintento no duplica la operación.
+- Datos bancarios: NUNCA los pidas ni los escribas en el chat. Usa create_payout_account_link y que el productor los ingrese en el panel. Solo se muestran banco y últimos 4 dígitos. Los retiros exigen cuenta verificada por AI Tickets y 72 h de espera tras cambiarla (get_verification_status explica qué falta).
+- "¿Cuánto me cobran?": get_fee_schedule y quote_fees. "¿Cuánta plata tengo?": get_balance; detalle con list_balance_transactions y get_settlement_report (para el contador). Retiros: request_payout → list_payouts/get_payout; AI Tickets transfiere manualmente.
+- create_event deja el evento en BORRADOR. Borradores: su link público NO funciona (public_url = null, is_published = false). Para que el productor (o un socio/artista) vea la página sin publicarla, entrega el preview_url de create_event o crea uno con create_preview_link (privado, no indexado; por defecto 7 días; configurable con expires_in_hours, no_expiration=true o single_use=true). La página muestra "Vista previa · Evento NO publicado". Dile siempre al productor si el evento está publicado o en borrador.
 - Para "¿cómo va mi evento?" usa get_event_performance y responde con diagnóstico + 2-3 acciones concretas (p. ej. código de descuento con fecha límite, reforzar el canal que más convierte, nueva preventa).
-- Para marketing: get_marketing_kit → redacta tú el copy → imagen con upload_image o generate_image → create_social_post (borrador) → confirmación → publish_social_post. Usa create_tracking_link para medir cada canal.
+- Para marketing: get_marketing_kit → redacta tú el copy → imagen con upload_image o generate_image → create_social_post (borrador) → publish_social_post (con confirmación). Usa create_tracking_link para medir cada canal.
 - Imágenes: si el productor comparte una imagen por URL (flyer, logo, foto), súbela con upload_image (image_url); si la adjuntó en el chat sin URL pública, usa image_base64. Para crear una pieza nueva usa generate_image con prompt; para mantener su identidad visual pasa reference_image_urls (hasta 4, incluidas URLs de upload_image) o use_event_cover_as_reference=true; para adaptar/editar una referencia (p. ej. el flyer a formato story) dilo en prompt. set_as_cover=true la deja como portada. Muéstrala al productor antes de usarla en un post.
-- list_orders entrega datos personales de compradores: úsalos solo para gestionar el evento y no los repitas innecesariamente.
+- Postventa: get_order para un reclamo; resend_tickets si "no le llegó"; transfer_ticket para cambiar el titular; refund_order (total o parcial) y cancel_event (reembolso masivo y aviso) mueven plata: explica el monto y que AI Tickets procesa la devolución.
+- Puerta: create_checkin_link entrega un link de escáner sin cuenta para quien controla el acceso; get_checkin_stats da el aforo en vivo; check_in_attendee marca ingreso manual.
+- Equipo: invite_member envía la invitación por correo (nunca contraseñas en el chat); assign_event_staff limita a una persona a ciertos eventos.
+- list_orders, get_order, list_attendees, list_guests y export_orders entregan datos personales: úsalos solo para gestionar el evento y no los repitas innecesariamente.
 - No inventes datos (artistas, precios, horarios): si falta información, pregúntala.`;
 
 type JsonRpcId = string | number | null;
@@ -73,13 +82,21 @@ const PROMPTS = [
 // Despacho
 // ---------------------------------------------------------------------------
 
-export function toolsListPayload(scopes: string[]) {
+function describeFor(t: (typeof TOOLS)[number], actor: Pick<ApiActor, "scopes" | "role">) {
+    let text = t.description;
+    if (t.confirm) text += " Requiere confirmación: la primera llamada solo devuelve un resumen y un confirmation_token; nada se ejecuta hasta repetirla con el token.";
+    if (!actor.scopes.includes(t.scope)) text += ` (Requiere el permiso "${t.scope}", que esta conexión no tiene.)`;
+    else if (!roleAllows(actor.role, toolPermission(t))) text += ` (Tu rol, ${ROLE_LABELS[actor.role] || actor.role}, no permite usarla.)`;
+    return text;
+}
+
+export function toolsListPayload(actor: Pick<ApiActor, "scopes" | "role">) {
     return {
         tools: TOOLS.map((t) => ({
             name: t.name,
             title: t.title,
-            description: scopes.includes(t.scope) ? t.description : `${t.description} (Requiere el permiso "${t.scope}", que esta llave no tiene.)`,
-            inputSchema: publicSchema(t.inputSchema),
+            description: describeFor(t, actor),
+            inputSchema: publicSchema(effectiveSchema(t)),
             annotations: { title: t.title, ...(t.annotations || {}) },
         })),
     };
@@ -111,7 +128,7 @@ async function handleOne(msg: any, ctx: ToolContext): Promise<JsonRpcResponse | 
         case "ping":
             return rpcResult(id, {});
         case "tools/list":
-            return rpcResult(id, toolsListPayload(ctx.actor.scopes));
+            return rpcResult(id, toolsListPayload(ctx.actor));
         case "tools/call": {
             const name = String(req.params?.name || "");
             const tool = getTool(name);

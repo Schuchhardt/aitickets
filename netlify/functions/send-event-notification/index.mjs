@@ -60,7 +60,7 @@ export default async function handler(req) {
       setCookies = session.setCookies
       if (!session.ctx) return respond({ message: 'No autorizado' }, 401)
       if (!EVENT_MANAGER_ROLES.includes(session.ctx.dbUser.role || '')) return respond({ message: 'No autorizado' }, 403)
-      event = await getOwnedEvent(eventId, session.ctx.dbUser.organization_id, 'id, name')
+      event = await getOwnedEvent(eventId, session.ctx.dbUser.organization_id, 'id, name', session.ctx.dbUser.id)
       requestedBy = { type: 'user', userId: session.ctx.dbUser.id, organizationId: session.ctx.dbUser.organization_id }
     }
     if (!event) return respond({ message: 'Evento no encontrado' }, 404)

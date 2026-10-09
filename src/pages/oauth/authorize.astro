@@ -5,7 +5,8 @@
 import Layout from "../../layouts/Layout.astro";
 import "../../styles/global.css";
 import { getSupabaseAdmin } from "../../lib/auth-helpers";
-import { getSessionContext, hasRole, EVENT_MANAGER_ROLES } from "../../lib/supabaseServer";
+import { getSessionContext, hasRole } from "../../lib/supabaseServer";
+import { API_ROLES } from "../../lib/producer-api/permissions";
 import { siteUrl } from "../api/_lib/server-utils";
 import { buildRedirect, validateAuthorizeParams } from "../../lib/producer-api/oauth";
 import { SCOPE_LABELS, API_SCOPES } from "../../lib/producer-api/keys";
@@ -44,7 +45,7 @@ if (!fatal && !session) {
 if (session && !fatal && (await isOnboardingPending(Number(session.dbUser.organization_id)))) {
     return Astro.redirect(onboardingUrl(Astro.url.pathname + Astro.url.search));
 }
-if (session && !hasRole(session.dbUser, EVENT_MANAGER_ROLES)) {
+if (session && !hasRole(session.dbUser, API_ROLES)) {
     fatal = "Tu rol en la organización no permite conectar asistentes de IA (se requiere admin, productor o editor).";
 }
 
@@ -55,6 +56,7 @@ if (session && !fatal) {
 }
 const redirectHost = req ? (() => { try { const u = new URL(req.redirectUri); return u.host || u.protocol; } catch { return ""; } })() : "";
 const requested: string[] = req?.scopes || [];
+const SCOPE_SHORT: Record<string, string> = { read: "Ver", write: "Crear y editar", publish: "Publicar", attendees: "Compradores", finance: "Finanzas", team: "Equipo" };
 ---
 
 <Layout title="Conectar asistente | AI Tickets" description="Autoriza a tu asistente de IA a gestionar tus eventos en AI Tickets." noindex={true}>
@@ -92,7 +94,7 @@ const requested: string[] = req?.scopes || [];
                                 <input type="checkbox" name="scope" value={s} class="mt-1" checked={s === "read" || requested.includes(s)} disabled={s === "read"} />
                                 <span>
                                     <span class="block text-sm font-semibold text-gray-900">
-                                        {{ read: "Ver", write: "Crear y editar", publish: "Publicar", attendees: "Compradores" }[s]}
+                                        {SCOPE_SHORT[s]}
                                     </span>
                                     <span class="block text-xs text-gray-500">{SCOPE_LABELS[s]}</span>
                                 </span>

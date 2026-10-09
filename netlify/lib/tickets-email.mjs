@@ -5,7 +5,7 @@ import { getSupabaseAdmin } from './supabase.mjs'
 import { sendEmail, SITE_URL, formatRecipient, isValidEmail } from './mailer.mjs'
 import { renderTicketsEmail } from './emails/index.mjs'
 import { LEGAL } from './legal.mjs'
-import { orderFeeBreakdown } from './fees.mjs'
+import { orderBuyerBreakdown } from './fees.mjs'
 import { orderDiscount } from './discounts.mjs'
 import {
   EVENT_DATE_COLUMNS,
@@ -114,10 +114,11 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
     `)
     .eq('id', orderId)
     .maybeSingle()
-  // Columnas opcionales, de la más completa a la mínima: descuento (202609300200) e IVA del cargo (202609290100)
+  // Columnas opcionales, de la más completa a la mínima: cargo absorbido (202610090200), descuento (202609300200)
+  // e IVA del cargo (202609290100)
   let order = null
   let orderError = null
-  for (const extra of [' service_fee_tax, discount_amount, discount_code,', ' service_fee_tax,', '']) {
+  for (const extra of [' service_fee_tax, discount_amount, discount_code, fee_absorbed,', ' service_fee_tax, discount_amount, discount_code,', ' service_fee_tax,', '']) {
     ;({ data: order, error: orderError } = await selectOrder(extra))
     if (!orderError || !['42703', 'PGRST204'].includes(String(orderError.code || ''))) break
   }
@@ -187,8 +188,9 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
     }
     const ticketLines = [...grouped.values()]
 
-    // amount = subtotal; ticket_fee = cargo neto (8%); service_fee_tax = IVA del cargo (0 en órdenes antiguas)
-    const { subtotal, feeNet, feeIva, fee, total: computedTotal } = orderFeeBreakdown(order)
+    // amount = subtotal; ticket_fee = cargo neto (8%); service_fee_tax = IVA del cargo (0 en órdenes antiguas).
+    // Cargo absorbido por el productor: subtotal = total pagado y feeIncluded (no se suma cargo encima).
+    const { subtotal, feeNet, feeIva, fee, total: computedTotal, feeIncluded } = orderBuyerBreakdown(order)
     const total = order.total_payment != null ? Number(order.total_payment) : computedTotal
     // Descuento (amount ya viene descontado): se muestra como línea entre las entradas y el subtotal
     const { code: discountCode, amount: discountAmount } = orderDiscount(order)
@@ -283,6 +285,7 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
       fee,
       feeNet,
       feeIva,
+      feeIncluded,
       total,
       orderId: order.id,
       orderDate: formatInstantLong(order.created_at),

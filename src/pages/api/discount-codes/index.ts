@@ -87,7 +87,7 @@ export const GET: APIRoute = async (context) => {
   const eventParam = context.url.searchParams.get("event_id");
   let eventId: number | null = null;
   if (eventParam) {
-    const event = await getOwnedEvent<{ id: number }>(eventParam, auth.orgId, "id");
+    const event = await getOwnedEvent<{ id: number }>(eventParam, auth.orgId, "id", auth.userId);
     if (!event) return jsonResponse({ message: "Evento no encontrado o no autorizado" }, 404);
     eventId = Number(event.id);
   }
@@ -126,7 +126,7 @@ export const POST: APIRoute = async (context) => {
   const values: any = parsed.values;
 
   if (values.event_id != null) {
-    const event = await getOwnedEvent<{ id: number }>(values.event_id, auth.orgId, "id");
+    const event = await getOwnedEvent<{ id: number }>(values.event_id, auth.orgId, "id", auth.userId);
     if (!event) return jsonResponse({ message: "Evento no encontrado o no autorizado" }, 404);
   }
 

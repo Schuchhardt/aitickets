@@ -101,7 +101,7 @@ describe('llaves de API', () => {
     expect((await keys.authenticateApiKey(db, expired, NOW)).ok).toBe(false)
   })
 
-  it('rechaza si el usuario está inactivo, cambió de organización o no gestiona eventos', async () => {
+  it('rechaza si el usuario está inactivo, cambió de organización o su rol no usa la API', async () => {
     const inactive = addKey({ user_id: 3 })
     expect((await keys.authenticateApiKey(db, inactive, NOW)).status).toBe(401)
     seed()
@@ -109,6 +109,10 @@ describe('llaves de API', () => {
     expect((await keys.authenticateApiKey(db, moved, NOW)).status).toBe(401)
     seed()
     const validator = addKey({ user_id: 2 })
+    const auth = await keys.authenticateApiKey(db, validator, NOW)
+    expect(auth.ok).toBe(true)
+    expect(auth.actor.role).toBe('validator')
+    db.tables.users.find((u) => u.id === 2).role = 'guest'
     expect((await keys.authenticateApiKey(db, validator, NOW)).status).toBe(403)
   })
 

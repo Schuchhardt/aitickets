@@ -239,8 +239,9 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
       : baseQuery.eq("slug", slug!).eq("status", "published")
     ).maybeSingle();
   };
-  let { data: event, error }: { data: any; error: any } = await loadEvent(`${EVENT_PUBLIC_COLUMNS}, cover_settings`);
-  // Deploy previews comparten la BD de producción: tolerar que la migración de cover_settings no esté aplicada
+  let { data: event, error }: { data: any; error: any } = await loadEvent(`${EVENT_PUBLIC_COLUMNS}, cover_settings, fee_absorbed`);
+  // Deploy previews comparten la BD de producción: tolerar que las migraciones de cover_settings/fee_absorbed no estén aplicadas
+  if (error?.code === "42703") ({ data: event, error } = await loadEvent(`${EVENT_PUBLIC_COLUMNS}, cover_settings`));
   if (error?.code === "42703") ({ data: event, error } = await loadEvent(EVENT_PUBLIC_COLUMNS));
 
   if (error) {
@@ -435,6 +436,8 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
     organization,
     venue: primaryVenue,
     cover_settings: normalizeCoverSettings(event.cover_settings),
+    // El productor absorbe el cargo por servicio: el precio de la entrada es el total (src/components/Reservation/pricing.js)
+    fee_absorbed: event.fee_absorbed === true,
     is_demo: isDemo,
     // Vista previa privada: la página muestra el aviso y no permite comprar si no está publicado
     is_preview: isPreview,

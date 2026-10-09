@@ -1,6 +1,7 @@
 import type { AstroGlobal } from 'astro';
 import type { User } from "@supabase/supabase-js";
 import { getSupabaseAdmin } from "./auth-helpers";
+import { canAccessEventByStaff } from "../../netlify/lib/event-staff.mjs";
 
 type CookieContext = Pick<AstroGlobal, 'cookies'>;
 
@@ -117,14 +118,19 @@ export const hasRole = (dbUser: DbUser, roles: string[]) => roles.includes(dbUse
 
 /**
  * Carga un evento solo si pertenece a la organización del usuario. Devuelve null si no.
+ * Con userId, además exige que el usuario tenga acceso a ese evento (aitickets_event_staff: equipo asignado
+ * a ciertos eventos). Las rutas del panel deben pasarlo siempre.
  */
-export async function getOwnedEvent<T = any>(eventId: number | string, organizationId: number, columns = "*"): Promise<T | null> {
-    const { data } = await getSupabaseAdmin()
+export async function getOwnedEvent<T = any>(eventId: number | string, organizationId: number, columns = "*", userId: number | null = null): Promise<T | null> {
+    const supabase = getSupabaseAdmin();
+    const { data } = await supabase
         .from("events")
         .select(columns)
         .eq("id", eventId)
         .eq("organization_id", organizationId)
         .single();
+    if (!data) return null;
+    if (userId != null && !(await canAccessEventByStaff(supabase, userId, eventId))) return null;
     return (data as T) || null;
 }
 

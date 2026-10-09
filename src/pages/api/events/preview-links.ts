@@ -33,7 +33,7 @@ export const GET: APIRoute = async (context) => {
     if (!auth.ok) return auth.response;
     const eventId = Number(context.url.searchParams.get("event_id"));
     if (!Number.isInteger(eventId) || eventId <= 0) return jsonResponse({ message: "event_id inválido" }, 400);
-    if (!(await getOwnedEvent(eventId, auth.orgId, "id"))) return jsonResponse({ message: "Evento no encontrado" }, 404);
+    if (!(await getOwnedEvent(eventId, auth.orgId, "id", auth.userId))) return jsonResponse({ message: "Evento no encontrado" }, 404);
     try {
         return jsonResponse({ links: await listPreviewLinks(eventId, auth.orgId) });
     } catch (err) {
@@ -47,7 +47,7 @@ export const POST: APIRoute = async (context) => {
     const body = await context.request.json().catch(() => null);
     const eventId = Number(body?.eventId);
     if (!Number.isInteger(eventId) || eventId <= 0) return jsonResponse({ message: "eventId inválido" }, 400);
-    if (!(await getOwnedEvent(eventId, auth.orgId, "id"))) return jsonResponse({ message: "Evento no encontrado" }, 404);
+    if (!(await getOwnedEvent(eventId, auth.orgId, "id", auth.userId))) return jsonResponse({ message: "Evento no encontrado" }, 404);
     const expiresInHours = body?.expiresInHours === null ? null : body?.expiresInHours === undefined ? undefined : Number(body.expiresInHours);
     try {
         const created = await createPreviewLink({

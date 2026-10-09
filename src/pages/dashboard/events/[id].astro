@@ -8,6 +8,7 @@ import PreviewLinksManager from "../../../components/dashboard/PreviewLinksManag
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { EVENT_MANAGER_ROLES } from "../../../lib/supabaseServer";
 import { requireDashboardSession } from "../_lib/guard";
+import { canAccessEventByStaff } from "../../../../netlify/lib/event-staff.mjs";
 import {
     Calendar,
     MapPin,
@@ -27,6 +28,8 @@ const { id } = Astro.params;
 const guard = await requireDashboardSession(Astro, EVENT_MANAGER_ROLES);
 if (!guard.ok) return guard.response;
 const { dbUser } = guard.session;
+// Acceso por evento (aitickets_event_staff): un miembro con eventos asignados solo opera esos
+if (!(await canAccessEventByStaff(getSupabaseAdmin(), dbUser.id, Astro.params.id))) return Astro.redirect("/dashboard/events");
 const supabaseAdmin = getSupabaseAdmin();
 
 // Detalle del evento (solo si pertenece a la organización)

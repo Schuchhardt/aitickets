@@ -2,6 +2,7 @@
 import DashboardLayout from "../../layouts/DashboardLayout.astro";
 import { getSupabaseAdmin } from "../../lib/auth-helpers";
 import { requireDashboardSession, VALIDATOR_HOME } from "./_lib/guard";
+import { getStaffEventIds } from "../../../netlify/lib/event-staff.mjs";
 import {
   LayoutDashboard,
   CalendarDays,
@@ -19,6 +20,9 @@ if (dbUser.role === "validator") {
 }
 
 const supabaseAdmin = getSupabaseAdmin();
+// Equipo asignado a ciertos eventos (aitickets_event_staff): todo el resumen se limita a esos eventos
+const staffEventIds = await getStaffEventIds(supabaseAdmin, dbUser.id);
+const onlyStaffEvents = <Q,>(query: Q): Q => (staffEventIds ? (query as any).in("id", staffEventIds) : query);
 
 // Fetch real stats
 let activeEvents = 0;
@@ -27,18 +31,18 @@ let totalRevenue = 0;
 
 if (dbUser?.organization_id) {
   // Count active (published) events
-  const { count: eventsCount } = await supabaseAdmin
+  const { count: eventsCount } = await onlyStaffEvents(supabaseAdmin
     .from("events")
     .select("id", { count: "exact", head: true })
     .eq("organization_id", dbUser.organization_id)
-    .eq("status", "published");
+    .eq("status", "published"));
   activeEvents = eventsCount || 0;
 
   // Get all event IDs for this organization
-  const { data: orgEvents } = await supabaseAdmin
+  const { data: orgEvents } = await onlyStaffEvents(supabaseAdmin
     .from("events")
     .select("id")
-    .eq("organization_id", dbUser.organization_id);
+    .eq("organization_id", dbUser.organization_id));
 
   if (orgEvents && orgEvents.length > 0) {
     const eventIds = orgEvents.map((e) => e.id);
@@ -70,18 +74,18 @@ const eventSelect = `
 `;
 if (dbUser?.organization_id) {
   const [pubResult, draftResult] = await Promise.all([
-    supabaseAdmin
+    onlyStaffEvents(supabaseAdmin
       .from("events")
       .select(eventSelect)
       .eq("organization_id", dbUser.organization_id)
-      .eq("status", "published")
+      .eq("status", "published"))
       .order("created_at", { ascending: false })
       .limit(3),
-    supabaseAdmin
+    onlyStaffEvents(supabaseAdmin
       .from("events")
       .select(eventSelect)
       .eq("organization_id", dbUser.organization_id)
-      .eq("status", "draft")
+      .eq("status", "draft"))
       .order("created_at", { ascending: false })
       .limit(3),
   ]);

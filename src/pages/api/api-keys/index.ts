@@ -5,10 +5,11 @@
 //   DELETE /api/api-keys?grant=… desconecta una app OAuth (misma regla) e invalida sus tokens
 // GET también devuelve `connections`: apps conectadas por OAuth (claude.ai, ChatGPT…). Sus access tokens
 // (filas con oauth_grant_id) no se listan como llaves.
-// Roles: EVENT_MANAGER_ROLES (la llave actúa como el usuario que la crea). Todo filtra por organization_id.
+// Roles: API_ROLES (la llave actúa como el usuario que la crea). Todo filtra por organization_id.
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
-import { getSessionContext, hasRole, EVENT_MANAGER_ROLES, ORG_ADMIN_ROLES, jsonResponse } from "../../../lib/supabaseServer";
+import { getSessionContext, hasRole, ORG_ADMIN_ROLES, jsonResponse } from "../../../lib/supabaseServer";
+import { API_ROLES } from "../../../lib/producer-api/permissions";
 import { generateApiKey, normalizeScopes, isMissingApiSchema, MAX_KEYS_PER_USER, API_KEY_COLUMNS } from "../../../lib/producer-api/keys";
 import { revokeGrantTokens } from "../../../lib/producer-api/oauth";
 import { notifySlack } from "../_lib/server-utils";
@@ -20,7 +21,7 @@ const UNAVAILABLE = "Las llaves de API aún no están disponibles. Intenta nueva
 async function requireManager(context: Parameters<APIRoute>[0]) {
     const session = await getSessionContext(context);
     if (!session) return { ok: false as const, response: jsonResponse({ error: "Unauthorized" }, 401) };
-    if (!hasRole(session.dbUser, EVENT_MANAGER_ROLES)) {
+    if (!hasRole(session.dbUser, API_ROLES)) {
         return { ok: false as const, response: jsonResponse({ message: "No tienes permisos para gestionar llaves de API" }, 403) };
     }
     return { ok: true as const, user: session.dbUser, isOrgAdmin: hasRole(session.dbUser, ORG_ADMIN_ROLES) };

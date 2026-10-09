@@ -1,9 +1,11 @@
 <script setup>
 import { ref, computed } from "vue";
 import {
+  FEE_INCLUDED_NOTE,
   SERVICE_FEE_LABEL,
   SERVICE_FEE_TAX_LABEL,
   buildSelectedLines,
+  isFeeAbsorbed,
   computeTotalsWithDiscount,
   discountLineLabel,
   formatCLP,
@@ -23,7 +25,7 @@ const errorMessage = ref("");
 const applying = ref(false);
 
 const selectedTicketList = computed(() => buildSelectedLines(props.selectedTickets, props.event?.tickets, props.event?.dates));
-const totals = computed(() => computeTotalsWithDiscount(selectedTicketList.value, props.discount));
+const totals = computed(() => computeTotalsWithDiscount(selectedTicketList.value, props.discount, { feeAbsorbed: isFeeAbsorbed(props.event) }));
 // La demo no valida códigos (no hay compra real)
 const canUseDiscount = computed(() => !props.event?.is_demo && selectedTicketList.value.length > 0 && totals.value.grossSubtotal > 0);
 
@@ -125,14 +127,20 @@ const removeDiscount = () => {
         <span>{{ discountLineLabel(discount?.code) }}</span>
         <span>-{{ formatCLP(totals.discountAmount) }}</span>
       </div>
-      <div v-if="totals.subtotal > 0" class="flex justify-between">
-        <span>{{ SERVICE_FEE_LABEL }}</span>
-        <span>{{ formatCLP(totals.feeNet) }}</span>
+      <div v-if="totals.feeAbsorbed && totals.subtotal > 0" class="flex justify-between" data-testid="resv-fee-included">
+        <span>{{ FEE_INCLUDED_NOTE }}</span>
+        <span>Incluido</span>
       </div>
-      <div v-if="totals.feeIva > 0" class="flex justify-between">
-        <span>{{ SERVICE_FEE_TAX_LABEL }}</span>
-        <span>{{ formatCLP(totals.feeIva) }}</span>
-      </div>
+      <template v-else>
+        <div v-if="totals.subtotal > 0" class="flex justify-between">
+          <span>{{ SERVICE_FEE_LABEL }}</span>
+          <span>{{ formatCLP(totals.feeNet) }}</span>
+        </div>
+        <div v-if="totals.feeIva > 0" class="flex justify-between">
+          <span>{{ SERVICE_FEE_TAX_LABEL }}</span>
+          <span>{{ formatCLP(totals.feeIva) }}</span>
+        </div>
+      </template>
     </div>
     <div v-if="selectedTicketList.length" class="flex justify-between font-bold border-t pt-2 mt-2">
       <span>Total ({{ totals.quantity }} entrada<span v-if="totals.quantity > 1">s</span>)</span>

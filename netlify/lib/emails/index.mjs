@@ -3,7 +3,7 @@
 // Se importan tanto desde funciones de Netlify como desde rutas de Astro. Solo servidor.
 export { renderVerifyEmail, renderMagicLinkEmail } from './auth.mjs'
 export { renderTicketsEmail } from './tickets.mjs'
-export { renderReminderEmail, renderEventNotificationEmail, CHANGE_TYPES, NAME_PLACEHOLDER, ORDER_URL_PLACEHOLDER } from './attendees.mjs'
+export { renderReminderEmail, renderEventNotificationEmail, renderProducerMessageEmail, CHANGE_TYPES, NAME_PLACEHOLDER, ORDER_URL_PLACEHOLDER } from './attendees.mjs'
 export {
   renderSiteContactMessageEmail,
   renderContactEmailConfirmEmail,

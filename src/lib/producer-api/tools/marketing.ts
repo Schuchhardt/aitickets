@@ -341,8 +341,24 @@ const publishPost: ToolDef = {
     title: "Publicar post en redes",
     description:
         "Publica AHORA (o programa, si el post tiene scheduled_for) un post en las cuentas conectadas de la organización. " +
-        "Acción pública e irreversible: confirma el texto y la imagen con el productor antes.",
+        "Acción pública e irreversible: el servidor devuelve primero un resumen y solo publica al repetir la llamada con confirmation_token.",
     scope: "publish",
+    async confirm(args, ctx) {
+        const { data: post } = await ctx.supabase
+            .from("social_posts")
+            .select("id, event_id, status, content, platforms, image_urls, scheduled_for")
+            .eq("id", args.post_id)
+            .eq("organization_id", ctx.actor.orgId)
+            .maybeSingle();
+        if (!post) throw new ToolError("not_found", "Post no encontrado en tu organización.");
+        if (post.status === "published") throw new ToolError("conflict", "Este post ya fue publicado.");
+        const text = String(post.content || "");
+        return {
+            message: `${post.scheduled_for ? `Programar para ${post.scheduled_for}` : "Publicar AHORA"} el post ${post.id} en ${Array.isArray(post.platforms) ? post.platforms.join(", ") : "las redes conectadas"}.`,
+            details: { post_id: Number(post.id), text: text.length > 400 ? `${text.slice(0, 400)}…` : text, image_urls: post.image_urls || [] },
+        };
+    },
+    audit: (args) => ({ summary: "Publicó un post en redes", target: `social_post:${args.post_id}` }),
     annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
     inputSchema: {
         type: "object",

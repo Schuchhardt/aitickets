@@ -2,7 +2,7 @@
 // genera el adjunto .ics); aquí solo se presenta.
 import { Link, Img } from '@react-email/components'
 import { LEGAL } from '../legal.mjs'
-import { SERVICE_FEE_TAX_LABEL, serviceFeeLabelFor } from '../fees.mjs'
+import { FEE_INCLUDED_NOTE, SERVICE_FEE_TAX_LABEL, serviceFeeLabelFor } from '../fees.mjs'
 import { discountLineLabel } from '../discounts.mjs'
 import { h, str, safeHref, COLORS, FONT_FAMILY, EmailLayout, TABLE_PROPS, Title, Subtitle, Paragraph, Badge, PrimaryButton, Panel, renderEmail } from './layout.mjs'
 
@@ -38,7 +38,7 @@ function DateRows({ dateLines }) {
   )
 }
 
-function ReceiptRows({ ticketLines, subtotal, discountCode, discountAmount, fee, feeNet, feeIva, total }) {
+function ReceiptRows({ ticketLines, subtotal, discountCode, discountAmount, fee, feeNet, feeIva, feeIncluded = false, total }) {
   const rows = ticketLines.map((t, i) => {
     const qty = Number(t.quantity) || 0
     const unit = Number(t.unitPrice) || 0
@@ -67,7 +67,13 @@ function ReceiptRows({ ticketLines, subtotal, discountCode, discountAmount, fee,
       h('tr', { key: 'disc' }, h('td', { style: { ...small, paddingTop: '10px' } }, discountLineLabel(str(discountCode))), h('td', { style: { ...small, paddingTop: '10px', textAlign: 'right' } }, `-${clp(discount)}`))
     )
   }
-  if (Number(total) > 0) {
+  if (Number(total) > 0 && feeIncluded) {
+    // Cargo absorbido por el productor: el comprador pagó el precio de las entradas, sin cargo encima
+    rows.push(
+      h('tr', { key: 'tot' }, h('td', { style: strong }, 'Total pagado'), h('td', { style: { ...strong, textAlign: 'right' } }, clp(total))),
+      h('tr', { key: 'incl' }, h('td', { style: small, colSpan: 2 }, FEE_INCLUDED_NOTE))
+    )
+  } else if (Number(total) > 0) {
     rows.push(
       h('tr', { key: 'sub' }, h('td', { style: { ...small, paddingTop: discount > 0 ? '4px' : '10px' } }, 'Subtotal'), h('td', { style: { ...small, paddingTop: discount > 0 ? '4px' : '10px', textAlign: 'right' } }, clp(subtotal))),
       h('tr', { key: 'fee' }, h('td', { style: small }, serviceFeeLabelFor(subtotal, net)), h('td', { style: { ...small, textAlign: 'right' } }, clp(net))),
@@ -86,7 +92,7 @@ function ReceiptRows({ ticketLines, subtotal, discountCode, discountAmount, fee,
  *   dateLines?: Array<{ date: string, time?: string, place?: string }>,
  *   secretLocation?: string,
  *   ticketLines?: Array<{ name: string, quantity: number, unitPrice: number, url?: string }>,
- *   subtotal?: number, discountCode?: string, discountAmount?: number, fee?: number, feeNet?: number, feeIva?: number, total?: number,
+ *   subtotal?: number, discountCode?: string, discountAmount?: number, fee?: number, feeNet?: number, feeIva?: number, feeIncluded?: boolean, total?: number,
  *   orderId: string, orderDate?: string, orderUrl: string, calendarUrl?: string | null,
  * }} data
  */
@@ -159,7 +165,7 @@ export async function renderTicketsEmail(data = {}) {
     h(
       Panel,
       { label: LEGAL.receiptLabel, tone: 'outline' },
-      h(ReceiptRows, { ticketLines, subtotal: data.subtotal, discountCode: data.discountCode, discountAmount: data.discountAmount, fee: data.fee, feeNet: data.feeNet, feeIva: data.feeIva, total: data.total }),
+      h(ReceiptRows, { ticketLines, subtotal: data.subtotal, discountCode: data.discountCode, discountAmount: data.discountAmount, fee: data.fee, feeNet: data.feeNet, feeIva: data.feeIva, feeIncluded: data.feeIncluded === true, total: data.total }),
       h(Paragraph, { small: true, style: { margin: '12px 0 0', color: COLORS.subtle, fontSize: '12px' } }, `Orden ${str(data.orderId)}${data.orderDate ? ` · ${str(data.orderDate)}` : ''}`)
     )
   )

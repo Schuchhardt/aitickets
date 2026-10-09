@@ -256,8 +256,8 @@ describe('rutas HTTP', () => {
     expect(db.tables.aitickets_oauth_codes).toHaveLength(0)
   })
 
-  it('un validador no puede autorizar apps', async () => {
-    session = { dbUser: { id: 2, organization_id: 7, role: 'validator' } }
+  it('un rol sin acceso a la API no puede autorizar apps', async () => {
+    session = { dbUser: { id: 2, organization_id: 7, role: 'guest' } }
     const form = new FormData()
     form.set('params', '')
     const res = await authorizeRoute.POST({ request: new Request(`${ORIGIN}/api/oauth/authorize`, { method: 'POST', body: form }), url: new URL(`${ORIGIN}/api/oauth/authorize`), redirect: () => null })

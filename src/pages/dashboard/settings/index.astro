@@ -1,12 +1,15 @@
 ---
 import DashboardLayout from "../../../layouts/DashboardLayout.astro";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
-import { ORG_ADMIN_ROLES } from "../../../lib/supabaseServer";
+import { ORG_ADMIN_ROLES, hasRole } from "../../../lib/supabaseServer";
 import { requireDashboardSession } from "../_lib/guard";
 
-const guard = await requireDashboardSession(Astro, ORG_ADMIN_ROLES);
+// Finanzas entra solo para los datos de pago (el perfil de la organización lo editan dueño y administradores)
+const guard = await requireDashboardSession(Astro, [...ORG_ADMIN_ROLES, "finance"]);
 if (!guard.ok) return guard.response;
 const { dbUser } = guard.session;
+const canEditOrg = hasRole(dbUser, ORG_ADMIN_ROLES);
+const BANK_CHANGE_HOLD_HOURS = 72;
 const supabaseAdmin = getSupabaseAdmin();
 
 type OrgSettings = {
@@ -16,6 +19,8 @@ type OrgSettings = {
 };
 
 type PayoutAccount = {
+    verified_at?: string | null;
+    bank_changed_at?: string | null;
     legal_name: string | null;
     legal_rut: string | null;
     bank_name: string | null;
@@ -35,14 +40,17 @@ const org = orgData as OrgSettings | null;
 // Datos bancarios: tabla aparte (organization_payout_accounts, migración 20260926_C_dashboard)
 let payout: PayoutAccount | null = null;
 {
-    const { data, error } = await supabaseAdmin
-        .from("organization_payout_accounts")
-        .select("legal_name, legal_rut, bank_name, bank_account_type, bank_account_number, bank_account_holder, bank_account_rut")
-        .eq("organization_id", dbUser.organization_id)
-        .maybeSingle();
+    const BASE = "legal_name, legal_rut, bank_name, bank_account_type, bank_account_number, bank_account_holder, bank_account_rut";
+    const load = (cols: string) => supabaseAdmin.from("organization_payout_accounts").select(cols).eq("organization_id", dbUser.organization_id).maybeSingle();
+    // verified_at/bank_changed_at existen desde la migración 202610090200
+    let { data, error } = await load(`${BASE}, verified_at, bank_changed_at`);
+    if (error) ({ data, error } = await load(BASE));
     if (error) console.error("Error cargando datos de pago:", error.message);
     payout = (data as PayoutAccount | null) || null;
 }
+const bankComplete = Boolean(payout?.bank_name && payout?.bank_account_number && payout?.bank_account_holder && payout?.bank_account_rut);
+const holdUntil = payout?.bank_changed_at ? new Date(new Date(payout.bank_changed_at).getTime() + BANK_CHANGE_HOLD_HOURS * 3600000) : null;
+const holdActive = Boolean(holdUntil && holdUntil.getTime() > Date.now());
 
 const BANKS = [
     "BancoEstado", "Banco de Chile / Edwards", "Santander", "BCI / MACH", "Scotiabank", "Itaú", "Banco Security",
@@ -54,6 +62,7 @@ const ACCOUNT_TYPES = ["Cuenta Corriente", "Cuenta Vista / CuentaRUT", "Cuenta d
 
 <DashboardLayout title="Configuración">
     <div class="max-w-4xl mx-auto space-y-8">
+        {canEditOrg && (
         <!-- Profile Section -->
         <section class="space-y-6">
             <div
@@ -116,9 +125,10 @@ const ACCOUNT_TYPES = ["Cuenta Corriente", "Cuenta Vista / CuentaRUT", "Cuenta d
                 </div>
             </div>
         </section>
+        )}
 
         <!-- Bank / Payout Section -->
-        <section class="space-y-6 pt-6">
+        <section id="datos-bancarios" class="space-y-6 pt-6 scroll-mt-24">
             <div class="flex items-center justify-between border-b border-gray-100 pb-4">
                 <div>
                     <h2 class="text-xl font-bold text-gray-900">Datos para pagos</h2>
@@ -132,6 +142,18 @@ const ACCOUNT_TYPES = ["Cuenta Corriente", "Cuenta Vista / CuentaRUT", "Cuenta d
             </div>
 
             <div id="bankMsg" class="hidden rounded-lg px-4 py-3 text-sm font-medium"></div>
+
+            <div class="rounded-lg border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-900" data-testid="bank-verification-note">
+                {bankComplete && payout?.verified_at && !holdActive && <p class="font-medium">✓ Cuenta verificada: puedes solicitar retiros.</p>}
+                {bankComplete && !payout?.verified_at && <p class="font-medium">Cuenta en verificación por AI Tickets (normalmente 1 día hábil).</p>}
+                {holdActive && holdUntil && (
+                    <p class="font-medium">Por seguridad, los retiros quedan habilitados desde el {holdUntil.toLocaleString("es-CL", { timeZone: "America/Santiago", dateStyle: "medium", timeStyle: "short" })}.</p>
+                )}
+                <p class="mt-1">
+                    Cambiar los datos bancarios requiere una nueva verificación de AI Tickets y bloquea los retiros durante {BANK_CHANGE_HOLD_HOURS} horas.
+                    Nunca compartas tu número de cuenta por chat: ingrésalo solo aquí.
+                </p>
+            </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div class="space-y-2">

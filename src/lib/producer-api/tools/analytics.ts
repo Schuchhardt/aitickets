@@ -1,6 +1,6 @@
 // Herramientas: rendimiento de eventos (ventas, tráfico, conversión, canales). Agrupa por día en hora de Chile.
 import type { ToolDef, ToolContext } from "../registry";
-import { eventIdSchema, loadOwnedEvent, eventPublicUrl, ticketAvailability, presentTicket, TICKET_SELECT, fetchAll, localDay, eventUrls } from "./common";
+import { eventIdSchema, loadOwnedEvent, eventPublicUrl, ticketAvailability, presentTicket, TICKET_SELECT, fetchAll, localDay, eventUrls, scopeToEvents } from "./common";
 
 const MAX_VISITS = 50000;
 
@@ -199,10 +199,11 @@ const getSalesOverview: ToolDef = {
         properties: { days: { type: "integer", minimum: 1, maximum: 365, default: 30, description: "Período hacia atrás desde hoy." } },
     },
     async handler(args, ctx) {
-        const { data: events, error } = await ctx.supabase
-            .from("events")
-            .select("id, name, slug, status, start_date")
-            .eq("organization_id", ctx.actor.orgId)
+        const { data: events, error } = await scopeToEvents(
+            ctx,
+            ctx.supabase.from("events").select("id, name, slug, status, start_date").eq("organization_id", ctx.actor.orgId),
+            "id",
+        )
             .order("start_date", { ascending: false })
             .limit(300);
         if (error) throw error;

@@ -7,6 +7,7 @@
 // - redirect_uri: coincidencia exacta; loopback http (localhost/127.0.0.1/[::1]) con cualquier puerto (RFC 8252).
 // - Access token = fila de aitickets_api_keys (1 h) ligada al grant; refresh token rotativo (90 días).
 // - Todos los tokens/códigos se guardan como sha256.
+import { API_ROLES } from "./permissions";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { generateApiKey, hashApiKey, normalizeScopes, API_SCOPES, type ApiScope } from "./keys";
 import { fetchPublic, SafeFetchError } from "../safe-fetch";
@@ -401,7 +402,7 @@ export async function refreshAccessToken(supabase: any, client: OAuthClient, ref
 
     // El usuario debe seguir activo, en la organización y con rol de gestión (si no, se revoca la conexión)
     const { data: user } = await supabase.from("users").select("id, organization_id, role, active").eq("id", grant.user_id).maybeSingle();
-    if (!user || user.active === false || Number(user.organization_id) !== Number(grant.organization_id) || !["admin", "producer", "editor"].includes(user.role || "")) {
+    if (!user || user.active === false || Number(user.organization_id) !== Number(grant.organization_id) || !API_ROLES.includes(user.role || "")) {
         await supabase.from("aitickets_oauth_grants").update({ revoked_at: new Date().toISOString() }).eq("id", grant.id);
         await revokeGrantTokens(supabase, grant.id);
         throw new OAuthError("invalid_grant", "El usuario ya no tiene acceso a la organización.");

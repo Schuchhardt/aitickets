@@ -3,6 +3,7 @@
 // explícitamente (sesión + organización) antes de tocar datos de un productor.
 // El proyecto de Supabase es compartido con otras apps: filtrar siempre por event_id / organization_id.
 import { createClient } from '@supabase/supabase-js'
+import { canAccessEventByStaff } from './event-staff.mjs'
 
 let adminClient = null
 
@@ -57,15 +58,21 @@ export async function getSessionContext(req) {
   return { authUser: user, dbUser }
 }
 
-/** Carga el evento solo si pertenece a la organización indicada. */
-export async function getOwnedEvent(eventId, organizationId, columns = '*') {
-  const { data } = await getSupabaseAdmin()
+/**
+ * Carga el evento solo si pertenece a la organización indicada. Con userId, además exige que el usuario
+ * tenga acceso a ese evento (aitickets_event_staff: equipo asignado a ciertos eventos).
+ */
+export async function getOwnedEvent(eventId, organizationId, columns = '*', userId = null) {
+  const supabase = getSupabaseAdmin()
+  const { data } = await supabase
     .from('events')
     .select(columns)
     .eq('id', eventId)
     .eq('organization_id', organizationId)
     .single()
-  return data || null
+  if (!data) return null
+  if (userId != null && !(await canAccessEventByStaff(supabase, userId, eventId))) return null
+  return data
 }
 
 /** Compara un secreto compartido en tiempo constante (para llamadas servidor→servidor). */

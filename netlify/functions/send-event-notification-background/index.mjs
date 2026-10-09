@@ -1,6 +1,8 @@
 // Background function (hasta 15 min): envía el aviso de cambio de un evento a todos sus asistentes.
 // Solo acepta llamadas internas (x-internal-secret) desde /api/send-event-notification.
-// Body: { eventId, changeType, changeDescription, requestedBy }
+// Body: { eventId, changeType, changeDescription, requestedBy, includeCancelled?, excludeOrderIds? }
+// (includeCancelled y excludeOrderIds solo con 'cancellation': excludeOrderIds = órdenes ya reembolsadas antes de
+// cancelar, cuyos titulares no deben recibir el aviso)
 // Envía en lotes de 50 con recipient-variables (sendEmail manda un correo individual a cada destinatario vía el batch de Resend),
 // con el pie legal, registra notification_log y avisa por Slack si algo falla.
 import { getSupabaseAdmin, hasValidInternalSecret, json, escapeHtml, fetchAllRows } from '../../lib/supabase.mjs'
@@ -48,6 +50,10 @@ export default async function handler(req) {
   const changeType = String(body?.changeType || '')
   const changeDescription = typeof body?.changeDescription === 'string' ? body.changeDescription.trim().slice(0, 2000) : ''
   const requestedBy = body?.requestedBy && typeof body.requestedBy === 'object' ? body.requestedBy : null
+  const includeCancelled = body?.includeCancelled === true && changeType === 'cancellation'
+  const excludeOrderIds = new Set(
+    includeCancelled && Array.isArray(body?.excludeOrderIds) ? body.excludeOrderIds.slice(0, 5000).map((id) => String(id)) : []
+  )
   if (!Number.isInteger(eventId) || !CHANGE_TYPES[changeType] || !changeDescription) {
     return json({ message: 'eventId, changeType y changeDescription son requeridos' }, 400)
   }
@@ -63,17 +69,21 @@ export default async function handler(req) {
     }
 
     // Paginado: PostgREST devuelve como máximo 1000 filas por consulta
-    const eventAttendees = await fetchAllRows(() => supabase
-      .from('event_attendees')
-      .select('id, attendee_id, attendees ( id, first_name, last_name, email )')
-      .eq('event_id', event.id)
-      .or('status.is.null,status.neq.cancelled')
-      .order('id', { ascending: true }))
+    // includeCancelled (cancel_event de la API): las entradas ya se anularon al cancelar, pero sus titulares
+    // deben recibir el aviso de cancelación.
+    const eventAttendees = await fetchAllRows(() => {
+      const query = supabase
+        .from('event_attendees')
+        .select('id, attendee_id, event_order_id, attendees ( id, first_name, last_name, email )')
+        .eq('event_id', event.id)
+      return (includeCancelled ? query : query.or('status.is.null,status.neq.cancelled')).order('id', { ascending: true })
+    })
 
     // Un correo por email
     const uniqueAttendees = []
     const seen = new Set()
     for (const ea of eventAttendees || []) {
+      if (ea.event_order_id && excludeOrderIds.has(String(ea.event_order_id))) continue
       const email = ea.attendees?.email?.toLowerCase()
       if (email && isValidEmail(email) && !seen.has(email)) {
         seen.add(email)

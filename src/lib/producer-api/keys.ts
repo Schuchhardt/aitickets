@@ -4,17 +4,19 @@
 // entropía no hace falta un hash lento ni pimienta. Cada llave actúa como el usuario que la creó y la
 // autorización se re-evalúa en CADA petición (usuario activo, misma organización, rol de gestión de eventos).
 import { createHash, randomBytes } from "node:crypto";
-import { EVENT_MANAGER_ROLES } from "../supabaseServer";
+import { API_ROLES } from "./permissions";
 
 export const API_KEY_PREFIX = "aitk_";
-export const API_SCOPES = ["read", "write", "publish", "attendees"] as const;
+export const API_SCOPES = ["read", "write", "publish", "attendees", "finance", "team"] as const;
 export type ApiScope = (typeof API_SCOPES)[number];
 
 export const SCOPE_LABELS: Record<ApiScope, string> = {
     read: "Ver eventos, entradas, descuentos y estadísticas",
     write: "Crear y editar eventos, entradas, descuentos e imágenes",
     publish: "Publicar/pausar eventos y publicar en redes sociales",
-    attendees: "Ver compradores (nombre, email, teléfono)",
+    attendees: "Ver compradores y asistentes, check-in y atención postventa (reenviar/transferir entradas)",
+    finance: "Comisiones, saldo, retiros, reembolsos y cuenta bancaria (según tu rol)",
+    team: "Ver y gestionar el equipo (invitar, roles, acceso por evento)",
 };
 
 export const MAX_KEYS_PER_USER = 10;
@@ -30,6 +32,8 @@ export type ApiActor = {
     name: string | null;
     email: string | null;
     scopes: ApiScope[];
+    /** Si no es null, el usuario solo accede a estos eventos (aitickets_event_staff). */
+    eventIds?: number[] | null;
 };
 
 export type AuthResult =
@@ -95,9 +99,10 @@ export async function authenticateApiKey(supabase: any, rawKey: string | null, n
     if (!user || user.active === false || Number(user.organization_id) !== Number(key.organization_id)) {
         return { ok: false, status: 401, error: "El usuario de esta llave ya no tiene acceso a la organización." };
     }
-    if (!EVENT_MANAGER_ROLES.includes(user.role || "")) {
-        return { ok: false, status: 403, error: "Tu rol no permite usar la API (requiere admin, productor o editor)." };
+    if (!API_ROLES.includes(user.role || "")) {
+        return { ok: false, status: 403, error: "Tu rol no permite usar la API." };
     }
+    const eventIds = await loadStaffEventIds(supabase, Number(user.id));
 
     if (!key.last_used_at || now.getTime() - new Date(key.last_used_at).getTime() > LAST_USED_THROTTLE_MS) {
         const { error: touchError } = await supabase
@@ -117,6 +122,27 @@ export async function authenticateApiKey(supabase: any, rawKey: string | null, n
             name: user.name ?? null,
             email: user.email ?? null,
             scopes: normalizeScopes(key.scopes),
+            eventIds,
         },
     };
+}
+
+/**
+ * Eventos asignados al usuario (acceso solo a esos). null = sin restricción (o tabla aún inexistente).
+ * Cualquier otro error falla cerrado: [] = ningún evento.
+ */
+export async function loadStaffEventIds(supabase: any, userId: number): Promise<number[] | null> {
+    try {
+        const { data, error } = await supabase.from("aitickets_event_staff").select("event_id").eq("user_id", userId);
+        if (error) {
+            if (["42P01", "PGRST205"].includes(String(error.code || ""))) return null;
+            console.error("aitickets_event_staff:", error.message);
+            return [];
+        }
+        if (!data?.length) return null;
+        return data.map((r: any) => Number(r.event_id));
+    } catch (err: any) {
+        console.error("aitickets_event_staff:", err?.message || err);
+        return [];
+    }
 }

@@ -1,7 +1,7 @@
 // Cálculo de precios que se MUESTRA al comprador antes de pagar (ley del consumidor).
 // El servidor (/api/purchase-ticket) recalcula todo desde la BD; esto es solo para la vista y usa la misma
 // regla, importada de la fuente única netlify/lib/fees.mjs (cargo 8% del subtotal + IVA 19% del cargo).
-import { computeBuyerTotal } from "../../../netlify/lib/fees.mjs";
+import { computeFeeSplit, FEE_INCLUDED_NOTE, SERVICE_FEE_NOTE } from "../../../netlify/lib/fees.mjs";
 import { computeDiscountedTotals } from "../../../netlify/lib/discounts.mjs";
 export { discountLineLabel, normalizeDiscountCode } from "../../../netlify/lib/discounts.mjs";
 
@@ -13,9 +13,16 @@ export {
   SERVICE_FEE_NOTE,
   SERVICE_FEE_PERCENT_LABEL,
   IVA_PERCENT_LABEL,
+  FEE_INCLUDED_NOTE,
   computeServiceFee,
   computeBuyerTotal,
 } from "../../../netlify/lib/fees.mjs";
+
+/** El productor absorbe el cargo por servicio en este evento (events.fee_absorbed). */
+export const isFeeAbsorbed = (event) => event?.fee_absorbed === true;
+
+/** Nota junto al precio de una entrada pagada: "+ cargo por servicio 8% + IVA" o "Cargo por servicio incluido". */
+export const feeNoteFor = (event) => (isFeeAbsorbed(event) ? FEE_INCLUDED_NOTE : SERVICE_FEE_NOTE);
 export const DEFAULT_MAX_PER_PURCHASE = 10;
 
 export const maxPerPurchase = (ticket) => {
@@ -69,10 +76,10 @@ export const buildSelectedLines = (selectedTickets = {}, tickets = [], dates = [
  * Totales de la selección: { subtotal, feeNet, feeIva, fee, total, quantity }.
  * fee = feeNet + feeIva (cargo por servicio con IVA); total = subtotal + fee (lo que se cobra).
  */
-export const computeTotals = (lines = []) => {
+export const computeTotals = (lines = [], { feeAbsorbed = false } = {}) => {
   const subtotal = lines.reduce((sum, l) => sum + (Number(l.total) || 0), 0);
   const quantity = lines.reduce((sum, l) => sum + (Number(l.quantity) || 0), 0);
-  const { feeNet, feeIva, fee, total } = computeBuyerTotal(subtotal);
+  const { feeNet, feeIva, fee, total } = computeFeeSplit(subtotal, { absorbed: feeAbsorbed });
   return { subtotal, feeNet, feeIva, fee, total, quantity };
 };
 
@@ -83,10 +90,10 @@ export const computeTotals = (lines = []) => {
  * @returns {{grossSubtotal:number, discountAmount:number, subtotal:number, feeNet:number, feeIva:number, fee:number, total:number, quantity:number}}
  *   subtotal = grossSubtotal - discountAmount.
  */
-export const computeTotalsWithDiscount = (lines = [], discount = null) => {
+export const computeTotalsWithDiscount = (lines = [], discount = null, { feeAbsorbed = false } = {}) => {
   const gross = lines.reduce((sum, l) => sum + (Number(l.total) || 0), 0);
   const quantity = lines.reduce((sum, l) => sum + (Number(l.quantity) || 0), 0);
-  return { ...computeDiscountedTotals(gross, discount), quantity };
+  return { ...computeDiscountedTotals(gross, discount, { feeAbsorbed }), quantity };
 };
 
 export const formatCLP = (value) => `$${Math.round(Number(value) || 0).toLocaleString("es-CL")}`;

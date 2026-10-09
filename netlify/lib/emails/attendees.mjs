@@ -69,3 +69,29 @@ export async function renderEventNotificationEmail({ eventName, changeType, chan
   )
   return renderEmail(subject, element)
 }
+
+/**
+ * Mensaje del productor a quienes tienen entradas (send_attendee_message / schedule_reminder de la API).
+ * El texto del productor es texto plano: React lo escapa y multiline() respeta los saltos de línea.
+ * @param {{ eventName?: string, organizerName?: string, subject?: string, message?: string, reminder?: boolean, details?: Array<{label:string, value:string}> }} opts
+ */
+export async function renderProducerMessageEmail({ eventName, organizerName, subject, message, reminder = false, details = [] } = {}) {
+  const name = str(eventName).trim() || 'Tu evento'
+  const from = str(organizerName).trim()
+  const finalSubject = str(subject).trim() || (reminder ? `🎪 Recordatorio: ${name}` : `📢 ${name}`)
+  const rows = (details || []).filter((r) => r && str(r.value).trim())
+  const element = h(
+    EmailLayout,
+    {
+      preview: reminder ? `${name}: ten a mano tus entradas.` : `Mensaje de ${from || 'la productora'} sobre ${name}.`,
+      footer: { reason: `Recibiste este correo porque tienes entradas para este evento.${from ? ` El mensaje lo escribió ${from}, que organiza el evento.` : ''}` },
+    },
+    h(Badge, null, reminder ? 'Recordatorio' : 'Mensaje del organizador'),
+    h(Title, null, name),
+    h(Paragraph, { align: 'center', muted: true }, `Hola ${NAME_PLACEHOLDER}${from ? `, ${from} te escribe sobre tu evento.` : ', hay un mensaje sobre tu evento.'}`),
+    h(Panel, null, h(Paragraph, { style: { margin: 0 } }, multiline(message))),
+    rows.length ? h(Panel, null, h(KeyValueTable, { rows: rows.map((r) => ({ label: str(r.label), value: str(r.value) })) })) : null,
+    h(PrimaryButton, { href: ORDER_URL_PLACEHOLDER, hint: 'Muestra el código QR de cada entrada en la puerta.' }, 'Ver mis entradas')
+  )
+  return renderEmail(finalSubject, element)
+}

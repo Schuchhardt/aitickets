@@ -2,6 +2,7 @@
 // Requiere sesión con rol de check-in y que el evento sea de la organización del usuario.
 // Pagina con .range() (sin el tope de 1000 filas). Incluye `dates` (funciones) para el aviso de función (R1).
 import { getSupabaseAdmin, getOwnedEvent, fetchAllRows } from '../../lib/supabase.mjs'
+import { canAccessEventByStaff } from '../../lib/event-staff.mjs'
 import { getSessionContextWithRefresh, jsonWithCookies, CHECKIN_ROLES } from '../../lib/session.mjs'
 
 export default async function handler(req) {
@@ -18,6 +19,8 @@ export default async function handler(req) {
 
     const event = await getOwnedEvent(eventId, ctx.dbUser.organization_id, 'id')
     if (!event) return respond({ message: 'Evento no encontrado o sin permisos' }, 403)
+    // Acceso por evento (aitickets_event_staff)
+    if (!(await canAccessEventByStaff(getSupabaseAdmin(), ctx.dbUser.id, eventId))) return respond({ message: 'Evento no encontrado o sin permisos' }, 403)
 
     const supabase = getSupabaseAdmin()
     let attendees

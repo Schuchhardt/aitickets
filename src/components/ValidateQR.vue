@@ -10,6 +10,19 @@ const props = defineProps({
   }
 })
 
+// event.endpoints (opcional): por defecto los del check-in del panel con sesión. El escáner de puerta sin
+// cuenta (/puerta/<token>) pasa los suyos (/api/door/<token>/...) y event.doorMode = true (sin emails ni
+// reenvío de entradas).
+const doorMode = Boolean(props.event.doorMode)
+const api = {
+  attendees: props.event.endpoints?.attendees || `/api/get-event-attendees?event_id=${props.event.id}`,
+  validate: props.event.endpoints?.validate || '/api/validate-ticket',
+  confirm: props.event.endpoints?.confirm || '/api/confirm-ticket'
+}
+const sessionExpiredMessage = doorMode
+  ? 'Este link de escáner venció o fue revocado. Pide uno nuevo al organizador.'
+  : 'Tu sesión expiró. Vuelve a iniciar sesión.'
+
 
 // Estado local
 const scannedCode = ref('')
@@ -105,8 +118,8 @@ const applyServerList = (attendees, dates) => {
 
 /** Descarga la lista completa del servidor (paginada en la API) y la combina con el estado local. */
 const refreshFromServer = async () => {
-  const response = await fetch(`/api/get-event-attendees?event_id=${props.event.id}`)
-  if (response.status === 401) throw new Error('Tu sesión expiró. Vuelve a iniciar sesión para sincronizar.')
+  const response = await fetch(api.attendees)
+  if (response.status === 401) throw new Error(doorMode ? sessionExpiredMessage : 'Tu sesión expiró. Vuelve a iniciar sesión para sincronizar.')
   if (!response.ok) throw new Error('Error al obtener datos del servidor')
   const data = await response.json()
   applyServerList(data.attendees || [], data.dates)
@@ -219,7 +232,7 @@ const toTicketData = (ticket, fnCheck) => ({
 
 /** Busca en el servidor un QR que no está en la lista local (entrada vendida después de la última carga). */
 const lookupTicketOnServer = async (qrCode) => {
-  const res = await fetch('/api/validate-ticket', {
+  const res = await fetch(api.validate, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ qr_code: qrCode, event_id: props.event.id })
@@ -249,6 +262,20 @@ const lookupTicketOnServer = async (qrCode) => {
   return { attendee, fnCheck: { function_mismatch: ticket.function_mismatch, function_label: ticket.function_label } }
 }
 
+/** sha256 hex (modo puerta: la lista descargada trae qr_hash en vez del QR en claro). */
+const sha256Hex = async (text) => {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))
+  return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('')
+}
+
+const findLocalTicket = async (code) => {
+  const list = localEvent.value?.attendees || []
+  const direct = list.find(a => a.qr_code && a.qr_code === code)
+  if (direct || !doorMode) return direct
+  const hash = await sha256Hex(code)
+  return list.find(a => a.qr_hash === hash)
+}
+
 // Validar QR (lista local; si no está y hay conexión, se consulta al servidor)
 const onDetect = async ([result]) => {
   if (!result?.rawValue) return
@@ -259,7 +286,7 @@ const onDetect = async ([result]) => {
   loading.value = true
 
   try {
-    let ticket = (localEvent.value?.attendees || []).find(a => a.qr_code === scannedCode.value)
+    let ticket = await findLocalTicket(scannedCode.value)
     let fnCheck = ticket ? localFunctionCheck(ticket) : null
 
     if (!ticket && isOnline.value) {
@@ -332,7 +359,7 @@ const isAlreadyValidated = (data) => data?.code === 'already_validated' || (!dat
 const validateTicket = async (ticketId) => {
   if (isOnline.value) {
     try {
-      const res = await fetch('/api/confirm-ticket', {
+      const res = await fetch(api.confirm, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ticket_id: ticketId, event_id: props.event.id })
@@ -344,7 +371,7 @@ const validateTicket = async (ticketId) => {
         return { ok: true, function_mismatch: data.function_mismatch, function_label: data.function_label }
       }
       if (res.status === 401) {
-        return { ok: false, message: 'Tu sesión expiró. Vuelve a iniciar sesión.' }
+        return { ok: false, message: sessionExpiredMessage }
       }
       if (res.status >= 400 && res.status < 500) {
         if (res.status === 409) {
@@ -412,7 +439,7 @@ const syncWithServer = async () => {
     let authError = false
     for (const validation of [...pendingValidations.value]) {
       try {
-        const res = await fetch('/api/confirm-ticket', {
+        const res = await fetch(api.confirm, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ticket_id: validation.ticket_id, event_id: props.event.id, validated_at: validation.validated_at })
@@ -439,7 +466,7 @@ const syncWithServer = async () => {
     setPendingValidations(pendingValidations.value.filter(p => !resolved.has(p.ticket_id)))
 
     if (authError) {
-      throw new Error('Tu sesión expiró. Vuelve a iniciar sesión para sincronizar.')
+      throw new Error(doorMode ? sessionExpiredMessage : 'Tu sesión expiró. Vuelve a iniciar sesión para sincronizar.')
     }
 
     // 2. Obtener datos actualizados del servidor y combinarlos con lo pendiente
@@ -621,7 +648,7 @@ const resendTickets = async (attendee) => {
       <h3 class="text-base sm:text-lg font-bold mb-3">Confirmar validación</h3>
       <div class="space-y-1 text-sm sm:text-base">
         <p class="break-words"><strong>Nombre:</strong> {{ ticketData.full_name }}</p>
-        <p class="break-all"><strong>Email:</strong> {{ ticketData.email }}</p>
+        <p v-if="!doorMode && ticketData.email" class="break-all"><strong>Email:</strong> {{ ticketData.email }}</p>
         <p><strong>Ticket:</strong> {{ ticketData.ticket_name }}</p>
       </div>
       <div v-if="ticketData.function_mismatch" class="mt-3 p-2 bg-yellow-100 border border-yellow-400 rounded text-xs sm:text-sm text-yellow-900" role="alert">
@@ -725,14 +752,14 @@ const resendTickets = async (attendee) => {
                   Pendiente
                 </span>
               </div>
-              <p class="text-xs sm:text-sm text-gray-600 break-all">{{ attendee.attendees?.email }}</p>
+              <p v-if="!doorMode" class="text-xs sm:text-sm text-gray-600 break-all">{{ attendee.attendees?.email }}</p>
               <p class="text-xs sm:text-sm text-gray-700 mt-1">
                 <strong>Ticket:</strong> {{ attendee.event_tickets?.ticket_name }}
                 <span v-if="localFunctionCheck(attendee).function_label" class="ml-1 text-xs text-gray-500">({{ localFunctionCheck(attendee).function_label }})</span>
                 <span v-if="attendee.is_complimentary" class="ml-1 text-xs text-purple-600">(cortesía)</span>
               </p>
               <button
-                v-if="attendee.event_order_id"
+                v-if="!doorMode && attendee.event_order_id"
                 @click="resendTickets(attendee)"
                 :disabled="resendingOrderId === attendee.event_order_id"
                 class="mt-2 text-xs text-blue-600 hover:underline disabled:text-gray-400"

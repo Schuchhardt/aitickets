@@ -26,7 +26,7 @@ export const POST: APIRoute = async (context) => {
 
         // 1. Verificar que el evento pertenece a la organización del usuario (cualquier miembro del equipo con rol de gestión)
         const event = await getOwnedEvent<{ id: number; name: string; slug: string; status: string; accessibility: string | null; start_date: string | null }>(
-            eventId, dbUser.organization_id, "id, name, slug, status, accessibility, start_date",
+            eventId, dbUser.organization_id, "id, name, slug, status, accessibility, start_date", dbUser.id,
         );
         if (!event) {
             return jsonResponse({ message: "Evento no encontrado o no autorizado" }, 403);

@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { getSessionContext, hasRole, ORG_ADMIN_ROLES, jsonResponse } from "../../../lib/supabaseServer";
+import { notifySlack } from "../_lib/server-utils";
 
 // Campos editables de la organización (public.organizations) y su largo máximo
 const ORG_FIELDS: Record<string, number> = {
@@ -37,7 +38,9 @@ export const POST: APIRoute = async (context) => {
     const session = await getSessionContext(context);
     if (!session) return jsonResponse({ error: "Unauthorized" }, 401);
     const { dbUser } = session;
-    if (!hasRole(dbUser, ORG_ADMIN_ROLES)) {
+    // Finanzas puede editar solo los datos de pago; el perfil de la organización, dueño y administradores
+    const isOrgAdmin = hasRole(dbUser, ORG_ADMIN_ROLES);
+    if (!isOrgAdmin && !hasRole(dbUser, ["finance"])) {
         return jsonResponse({ message: "Solo los administradores pueden editar la organización" }, 403);
     }
 
@@ -49,6 +52,9 @@ export const POST: APIRoute = async (context) => {
         const orgData = pickFields(body, ORG_FIELDS);
         const payoutData = pickFields(body, PAYOUT_FIELDS);
 
+        if (!isOrgAdmin && Object.keys(orgData).length) {
+            return jsonResponse({ message: "Tu rol solo permite editar los datos para pagos" }, 403);
+        }
         if ("public_name" in orgData && !orgData.public_name) {
             return jsonResponse({ message: "El nombre de la organización es obligatorio" }, 400);
         }
@@ -85,6 +91,9 @@ export const POST: APIRoute = async (context) => {
                     { onConflict: "organization_id" }
                 );
             if (error) throw error;
+            const bankChanged = ["bank_name", "bank_account_type", "bank_account_number", "bank_account_holder", "bank_account_rut"].some((f) => f in payoutData);
+            // El trigger de la BD anula la verificación solo si los datos cambiaron; se avisa a AI Tickets para revisarlos
+            if (bankChanged) await notifySlack(`🏦 *Datos bancarios guardados* (org ${dbUser.organization_id}, usuario ${dbUser.id}, banco ${payoutData.bank_name || "—"}). Si cambiaron, verificar la cuenta (organization_payout_accounts.verified_at).`);
         }
 
         return jsonResponse({ message: "Organización actualizada" }, 200);

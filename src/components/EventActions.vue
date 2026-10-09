@@ -8,7 +8,7 @@ import ShareEventModal from "./ShareEventModal.vue";
 import ReservationModal from "./Reservation/ReservationModal.vue";
 import PurchasedTicketsModal from "./PurchasedTicketsModal.vue";
 import { eventBus } from '../utils/eventbus.js';
-import { SERVICE_FEE_NOTE } from "./Reservation/pricing.js";
+import { feeNoteFor } from "./Reservation/pricing.js";
 
 const props = defineProps({
   event: Object,
@@ -155,7 +155,7 @@ const priceLabel = computed(() => {
 
 const feeNote = computed(() =>
   canBuy.value && hasPaidTickets.value
-    ? SERVICE_FEE_NOTE
+    ? feeNoteFor(props.event)
     : ""
 );
 

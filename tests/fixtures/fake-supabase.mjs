@@ -13,6 +13,7 @@
 //   db.tables.aitickets_suppressions  // filas actuales
 //   db.calls                          // [{ table, op, values, filters }] para asserts
 //   db.failOn('organizations', 'select', { code: '42P01', message: 'no existe' })  // inyectar errores
+//   createFakeSupabase({ unique: { aitickets_api_idempotency: [['organization_id', 'tool', 'idem_key']] } })  // 23505 en INSERT
 
 function likeToRegex(pattern) {
   let re = ''
@@ -55,7 +56,7 @@ function matches(row, f) {
   }
 }
 
-export function createFakeSupabase({ tables = {}, rpc = {} } = {}) {
+export function createFakeSupabase({ tables = {}, rpc = {}, unique = {} } = {}) {
   const state = Object.fromEntries(Object.entries(tables).map(([k, rows]) => [k, rows.map((r) => ({ ...r }))]))
   const calls = []
   const failures = []
@@ -81,9 +82,9 @@ export function createFakeSupabase({ tables = {}, rpc = {} } = {}) {
         return api
       },
       insert(values) { q.op = 'insert'; q.values = values; return api },
-      update(values) { q.op = 'update'; q.values = values; return api },
+      update(values, opts = {}) { q.op = 'update'; q.values = values; if (opts.count) q.count = opts.count; return api },
       upsert(values, opts = {}) { q.op = 'upsert'; q.values = values; q.onConflict = opts.onConflict || 'id'; return api },
-      delete() { q.op = 'delete'; return api },
+      delete(opts = {}) { q.op = 'delete'; if (opts.count) q.count = opts.count; return api },
       eq(col, value) { q.filters.push({ col, op: 'eq', value }); return api },
       neq(col, value) { q.filters.push({ col, op: 'neq', value }); return api },
       is(col, value) { q.filters.push({ col, op: 'is', value }); return api },
@@ -128,6 +129,16 @@ export function createFakeSupabase({ tables = {}, rpc = {} } = {}) {
     }
     if (q.op === 'insert' || q.op === 'upsert') {
       const list = (Array.isArray(q.values) ? q.values : [q.values]).map((v) => ({ id: v.id ?? nextId++, ...v }))
+      // unique: { tabla: [[col, ...], ...] } => un INSERT que repite esas columnas falla con 23505
+      if (q.op === 'insert') {
+        for (const cols of unique[q.table] || []) {
+          for (const v of list) {
+            if (rows.some((r) => cols.every((c) => loose(r[c], v[c])))) {
+              return { data: null, error: { code: '23505', message: `duplicate key value violates unique constraint (${cols.join(', ')})` }, count: null }
+            }
+          }
+        }
+      }
       const out = []
       for (const v of list) {
         const key = q.op === 'upsert' ? q.onConflict : null

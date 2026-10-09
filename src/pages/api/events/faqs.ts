@@ -10,7 +10,7 @@ async function authorize(context: Parameters<typeof getSessionContext>[0], event
         return new Response(JSON.stringify({ error: "No autorizado" }), { status: 403 });
     }
     if (!eventId) return new Response(JSON.stringify({ error: "eventId is required" }), { status: 400 });
-    const event = await getOwnedEvent(eventId, session.dbUser.organization_id, "id");
+    const event = await getOwnedEvent(eventId, session.dbUser.organization_id, "id", session.dbUser.id);
     if (!event) return new Response(JSON.stringify({ error: "No autorizado" }), { status: 403 });
     return { session };
 }

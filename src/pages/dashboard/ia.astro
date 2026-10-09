@@ -4,11 +4,11 @@
 // Los datos los carga ApiKeysManager vía /api/api-keys.
 import DashboardLayout from "../../layouts/DashboardLayout.astro";
 import ApiKeysManager from "../../components/dashboard/ApiKeysManager.vue";
-import { EVENT_MANAGER_ROLES } from "../../lib/supabaseServer";
+import { API_ROLES } from "../../lib/producer-api/permissions";
 import { siteUrl } from "../api/_lib/server-utils";
 import { requireDashboardSession } from "./_lib/guard";
 
-const guard = await requireDashboardSession(Astro, EVENT_MANAGER_ROLES);
+const guard = await requireDashboardSession(Astro, API_ROLES);
 if (!guard.ok) return guard.response;
 
 const origin = siteUrl() || Astro.url.origin;

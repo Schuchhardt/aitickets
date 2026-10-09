@@ -324,12 +324,17 @@ export default async function handler(req) {
     const supabase = getSupabaseAdmin()
 
     // 1. Evento publicado y vigente
-    const { data: event, error: eventError } = await supabase
+    const loadEvent = cols => supabase
       .from('events')
-      .select('id, name, slug, status, end_date, organization_id')
+      .select(cols)
       .eq('id', eventId)
       .eq('status', 'published')
       .maybeSingle()
+    let { data: event, error: eventError } = await loadEvent('id, name, slug, status, end_date, organization_id, fee_absorbed')
+    if (eventError && isMissingSchemaError(eventError)) {
+      // Base sin events.fee_absorbed (202610090200): el comprador paga el cargo, como siempre
+      ;({ data: event, error: eventError } = await loadEvent('id, name, slug, status, end_date, organization_id'))
+    }
     if (eventError) throw new Error(`Error cargando evento: ${eventError.message}`)
     if (!event) return json({ message: 'El evento no está disponible para la venta' }, 404)
     if (isDemoEventSlug(event.slug)) return json({ message: 'Este es un evento de demostración: no se venden entradas.' }, 403)
@@ -408,7 +413,9 @@ export default async function handler(req) {
 
     // Cargo por servicio (fees.mjs) + IVA de ese cargo, sobre el subtotal YA descontado; se cobra el total con IVA.
     // subtotal = lo que recibe el productor (event_orders.amount).
-    const { discountAmount, subtotal, feeNet, feeIva, fee, total } = computeDiscountedTotals(grossSubtotal, discount)
+    // Cargo absorbido por el productor (events.fee_absorbed): se cobra solo el subtotal y amount = subtotal - cargo - IVA.
+    const feeAbsorbed = event.fee_absorbed === true
+    const { discountAmount, subtotal, feeNet, feeIva, fee, total, producerNet } = computeDiscountedTotals(grossSubtotal, discount, { feeAbsorbed })
     if (discount) discount.amount = discountAmount
     const ticketQty = ticketDetails.reduce((sum, t) => sum + t.quantity, 0)
     const provider = total === 0 ? 'free' : paymentProvider
@@ -428,7 +435,7 @@ export default async function handler(req) {
     const baseOrder = {
       event_id: eventId,
       attendee_id: attendeeId,
-      amount: subtotal,
+      amount: feeAbsorbed ? producerNet : subtotal,
       ticket_fee: feeNet,
       service_fee_tax: feeIva,
       ticket_qty: ticketQty,
@@ -471,6 +478,12 @@ export default async function handler(req) {
         return json({ message: 'Una de las entradas seleccionadas ya no está a la venta' }, 409)
       }
       throw err
+    }
+
+    // Cargo absorbido: la reserva atómica no conoce la columna; se marca la orden aparte (antes del pago).
+    if (feeAbsorbed && total > 0) {
+      const { error: absorbedError } = await supabase.from('event_orders').update({ fee_absorbed: true }).eq('id', order.id)
+      if (absorbedError) console.error(`No se pudo marcar fee_absorbed en la orden ${order.id}:`, absorbedError.message)
     }
 
     // 5a. Orden gratis: pagada por $0 + una entrada por unidad + correo

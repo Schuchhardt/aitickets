@@ -13,7 +13,7 @@
 // Lo usan el servidor (purchase-tickets, /api/discount-code, /api/discount-codes, correo, orden, CSV) y el
 // navegador (src/components/Reservation): NO debe importar nada de Node. Las funciones con BD reciben
 // el cliente de Supabase (service role) como parámetro.
-import { computeBuyerTotal } from './fees.mjs'
+import { computeFeeSplit } from './fees.mjs'
 
 export const DISCOUNT_CODE_RE = /^[A-Z0-9_-]{3,30}$/
 export const DISCOUNT_KINDS = ['percent', 'fixed']
@@ -82,14 +82,18 @@ export function computeDiscountAmount(discount, subtotal) {
  * Desglose de una compra con descuento.
  * @param {number} grossSubtotal subtotal de entradas a precio de lista
  * @param {{kind, value}|null} discount
- * @returns {{grossSubtotal:number, discountAmount:number, subtotal:number, feeNet:number, feeIva:number, fee:number, total:number}}
- *   subtotal = grossSubtotal - discountAmount (lo que recibe el productor); fee sobre ese subtotal.
+ * @param {{feeAbsorbed?: boolean}} [options] cargo absorbido por el productor (events.fee_absorbed): total = subtotal
+ * @returns {{grossSubtotal:number, discountAmount:number, subtotal:number, feeNet:number, feeIva:number, fee:number, total:number, producerNet?:number, feeAbsorbed?:boolean}}
+ *   subtotal = grossSubtotal - discountAmount; fee sobre ese subtotal. Sin absorción el productor recibe el
+ *   subtotal; con absorción recibe producerNet = subtotal - fee y el comprador paga total = subtotal.
  */
-export function computeDiscountedTotals(grossSubtotal, discount = null) {
+export function computeDiscountedTotals(grossSubtotal, discount = null, { feeAbsorbed = false } = {}) {
   const gross = toInt(grossSubtotal)
   const discountAmount = discount ? computeDiscountAmount(discount, gross) : 0
-  const { subtotal, feeNet, feeIva, fee, total } = computeBuyerTotal(gross - discountAmount)
-  return { grossSubtotal: gross, discountAmount, subtotal, feeNet, feeIva, fee, total }
+  const { subtotal, feeNet, feeIva, fee, total, producerNet } = computeFeeSplit(gross - discountAmount, { absorbed: feeAbsorbed })
+  // Sin absorción, la forma del resultado no cambia (producerNet = subtotal).
+  if (!feeAbsorbed) return { grossSubtotal: gross, discountAmount, subtotal, feeNet, feeIva, fee, total }
+  return { grossSubtotal: gross, discountAmount, subtotal, feeNet, feeIva, fee, total, producerNet, feeAbsorbed: true }
 }
 
 /** Etiqueta de la línea de descuento: "Descuento (CODIGO)". */

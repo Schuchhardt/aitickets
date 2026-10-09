@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { getSessionContext, hasRole, EVENT_MANAGER_ROLES } from "../../../lib/supabaseServer";
 import { buildEventContext, generateEventImage, isImageGenerationConfigured, EVENT_CONTEXT_SELECT } from "../../../lib/marketing";
+import { canAccessEventByStaff } from "../../../../netlify/lib/event-staff.mjs";
 
 export const POST: APIRoute = async (context) => {
     const session = await getSessionContext(context);
@@ -40,7 +41,7 @@ export const POST: APIRoute = async (context) => {
             .eq("organization_id", dbUser.organization_id)
             .single();
 
-        if (!event) {
+        if (!event || !(await canAccessEventByStaff(getSupabaseAdmin(), dbUser.id, eventId))) {
             return new Response(JSON.stringify({ message: "Evento no encontrado" }), { status: 404 });
         }
 

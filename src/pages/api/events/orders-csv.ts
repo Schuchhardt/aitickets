@@ -20,7 +20,7 @@ export const GET: APIRoute = async (context) => {
     const eventId = context.url.searchParams.get("event_id");
     if (!eventId) return jsonResponse({ message: "event_id es obligatorio" }, 400);
 
-    const event = await getOwnedEvent<{ id: number; name: string; slug: string }>(eventId, dbUser.organization_id, "id, name, slug");
+    const event = await getOwnedEvent<{ id: number; name: string; slug: string }>(eventId, dbUser.organization_id, "id, name, slug", dbUser.id);
     if (!event) return jsonResponse({ message: "Evento no encontrado o no autorizado" }, 404);
 
     const supabase = getSupabaseAdmin();

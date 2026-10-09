@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { trackPurchase } from "../../composables/useGoogleAnalytics.js";
-import { SERVICE_FEE_LABEL, SERVICE_FEE_TAX_LABEL, buildSelectedLines, computeTotalsWithDiscount, discountLineLabel, formatCLP, readAttribution } from "./pricing.js";
+import { FEE_INCLUDED_NOTE, SERVICE_FEE_LABEL, SERVICE_FEE_TAX_LABEL, isFeeAbsorbed, buildSelectedLines, computeTotalsWithDiscount, discountLineLabel, formatCLP, readAttribution } from "./pricing.js";
 import { LEGAL } from "../../lib/legal";
 
 const props = defineProps({
@@ -94,7 +94,7 @@ const REDIRECT_COPY = "Serás redirigido a Webpay para pagar de forma segura.";
 const needsCaptcha = computed(() => Boolean(turnstileSiteKey.value) && !turnstileToken.value);
 
 const selectedTicketList = computed(() => buildSelectedLines(props.selectedTickets, props.event?.tickets, props.event?.dates));
-const totals = computed(() => computeTotalsWithDiscount(selectedTicketList.value, props.discount));
+const totals = computed(() => computeTotalsWithDiscount(selectedTicketList.value, props.discount, { feeAbsorbed: isFeeAbsorbed(props.event) }));
 // Solo se envía el código si descuenta algo (con entradas gratis no aplica)
 const discountCodeToSend = computed(() => (props.discount && totals.value.discountAmount > 0 ? props.discount.code : undefined));
 
@@ -241,14 +241,20 @@ const handlePayment = async () => {
           <span>{{ discountLineLabel(discount?.code) }}</span>
           <span>-{{ formatCLP(totals.discountAmount) }}</span>
         </div>
-        <div v-if="totals.subtotal > 0" class="flex justify-between">
-          <span>{{ SERVICE_FEE_LABEL }}</span>
-          <span>{{ formatCLP(totals.feeNet) }}</span>
+        <div v-if="totals.feeAbsorbed && totals.subtotal > 0" class="flex justify-between" data-testid="resv-pay-fee-included">
+          <span>{{ FEE_INCLUDED_NOTE }}</span>
+          <span>Incluido</span>
         </div>
-        <div v-if="totals.feeIva > 0" class="flex justify-between">
-          <span>{{ SERVICE_FEE_TAX_LABEL }}</span>
-          <span>{{ formatCLP(totals.feeIva) }}</span>
-        </div>
+        <template v-else>
+          <div v-if="totals.subtotal > 0" class="flex justify-between">
+            <span>{{ SERVICE_FEE_LABEL }}</span>
+            <span>{{ formatCLP(totals.feeNet) }}</span>
+          </div>
+          <div v-if="totals.feeIva > 0" class="flex justify-between">
+            <span>{{ SERVICE_FEE_TAX_LABEL }}</span>
+            <span>{{ formatCLP(totals.feeIva) }}</span>
+          </div>
+        </template>
       </div>
       <div class="flex justify-between border-t mt-3 pt-3 text-lg font-bold">
         <span>Total a pagar</span>

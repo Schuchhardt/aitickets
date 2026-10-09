@@ -9,6 +9,9 @@ export const eventIdSchema: JsonSchema = { type: "integer", minimum: 1, descript
 
 /** Carga un evento de la organización del actor o lanza not_found. */
 export async function loadOwnedEvent<T = any>(ctx: ToolContext, eventId: number, columns = "*"): Promise<T> {
+    if (!canAccessEvent(ctx, eventId)) {
+        throw new ToolError("forbidden", `Tu acceso está limitado a ciertos eventos y el evento ${eventId} no es uno de ellos.`);
+    }
     const { data, error } = await ctx.supabase
         .from("events")
         .select(columns)
@@ -18,6 +21,14 @@ export async function loadOwnedEvent<T = any>(ctx: ToolContext, eventId: number,
     if (error) console.error("loadOwnedEvent:", error.message);
     if (!data) throw new ToolError("not_found", `No existe el evento ${eventId} en tu organización. Usa list_events para ver los IDs.`);
     return data as T;
+}
+
+/** Acceso por evento (aitickets_event_staff): null = todos los eventos de la organización. */
+export const canAccessEvent = (ctx: ToolContext, eventId: number) => !ctx.actor.eventIds || ctx.actor.eventIds.includes(Number(eventId));
+
+/** Aplica la restricción por evento a una consulta sobre events (columna id) u otra tabla (event_id). */
+export function scopeToEvents<Q>(ctx: ToolContext, query: Q, column = "event_id"): Q {
+    return ctx.actor.eventIds ? (query as any).in(column, ctx.actor.eventIds) : query;
 }
 
 export const eventPublicUrl = (ctx: ToolContext, slug: string | null | undefined) => (slug ? `${ctx.origin}/eventos/${slug}` : null);

@@ -35,20 +35,23 @@ const handleLogout = async () => {
 
 const EVENT_MANAGER_ROLES = ['admin', 'producer', 'editor']
 const ORG_ADMIN_ROLES = ['admin', 'producer']
+// finance: ingresos y configuración (datos bancarios); viewer: solo lectura
+const OVERVIEW_ROLES = [...EVENT_MANAGER_ROLES, 'finance', 'viewer']
+const API_ROLES = [...EVENT_MANAGER_ROLES, 'finance', 'validator', 'viewer']
 
 // roles: quién ve cada ítem (el servidor también valida en cada página/API)
 const allMenuItems = [
-  { name: 'Resumen', path: '/dashboard', icon: LayoutDashboard, roles: EVENT_MANAGER_ROLES },
+  { name: 'Resumen', path: '/dashboard', icon: LayoutDashboard, roles: OVERVIEW_ROLES },
   { name: 'Mis Eventos', path: '/dashboard/events', icon: CalendarDays, roles: null },
   { name: 'Entradas', path: '/dashboard/tickets', icon: Ticket, roles: EVENT_MANAGER_ROLES },
   { name: 'Comunidad', path: '/dashboard/community', icon: Users, roles: EVENT_MANAGER_ROLES },
   { name: 'Descuentos', path: '/dashboard/descuentos', icon: Tag, roles: EVENT_MANAGER_ROLES },
-  { name: 'Ingresos', path: '/dashboard/finance', icon: DollarSign, roles: ORG_ADMIN_ROLES },
+  { name: 'Ingresos', path: '/dashboard/finance', icon: DollarSign, roles: [...ORG_ADMIN_ROLES, 'finance'] },
   { name: 'Promocionar', path: '/dashboard/promote', icon: Megaphone, roles: EVENT_MANAGER_ROLES },
-  { name: 'Conecta tu IA', path: '/dashboard/ia', icon: Bot, roles: EVENT_MANAGER_ROLES },
+  { name: 'Conecta tu IA', path: '/dashboard/ia', icon: Bot, roles: API_ROLES },
   { name: 'Mi sitio web', path: '/dashboard/sitio', icon: Globe, roles: ORG_ADMIN_ROLES },
   { name: 'Equipo', path: '/dashboard/team', icon: UserCog, roles: ORG_ADMIN_ROLES },
-  { name: 'Configuración', path: '/dashboard/settings', icon: Settings, roles: ORG_ADMIN_ROLES },
+  { name: 'Configuración', path: '/dashboard/settings', icon: Settings, roles: [...ORG_ADMIN_ROLES, 'finance'] },
 ]
 const menuItems = allMenuItems.filter(item => !item.roles || item.roles.includes(user.value?.role || ''))
 </script>

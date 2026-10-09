@@ -87,3 +87,34 @@ export function orderFeeBreakdown(order) {
   }
   return { subtotal, feeNet, feeIva, fee: feeNet + feeIva, total: subtotal + feeNet + feeIva }
 }
+
+/**
+ * Reparto de una compra según quién paga el cargo por servicio (events.fee_absorbed).
+ * - Comprador (por defecto): paga subtotal + cargo + IVA; el productor recibe el subtotal.
+ * - Absorbido por el productor: el comprador paga solo el subtotal (precio de lista); el cargo y su IVA se
+ *   calculan igual sobre ese subtotal y se descuentan de lo que recibe el productor.
+ * @param {number} subtotal subtotal de entradas (ya descontado si hay código)
+ * @param {{absorbed?: boolean}} [options]
+ * @returns {{subtotal:number, feeNet:number, feeIva:number, fee:number, total:number, producerNet:number, absorbed:boolean}}
+ *   total = lo que paga el comprador; producerNet = lo que recibe el productor (event_orders.amount).
+ */
+export function computeFeeSplit(subtotal, { absorbed = false } = {}) {
+  const { subtotal: base, feeNet, feeIva, fee, total } = computeBuyerTotal(subtotal)
+  if (!absorbed) return { subtotal: base, feeNet, feeIva, fee, total, producerNet: base, absorbed: false }
+  return { subtotal: base, feeNet, feeIva, fee, total: base, producerNet: base - fee, absorbed: true }
+}
+
+/** Nota junto a un precio cuando el productor absorbe el cargo. */
+export const FEE_INCLUDED_NOTE = 'Cargo por servicio incluido'
+
+/**
+ * Desglose de una orden tal como lo ve el COMPRADOR (comprobantes, correo, /order).
+ * - Orden normal: igual que orderFeeBreakdown (subtotal + cargo + IVA = total) y feeIncluded = false.
+ * - Orden con cargo absorbido (event_orders.fee_absorbed): el comprador pagó el precio de lista; subtotal = total =
+ *   amount + cargo + IVA y feeIncluded = true (no se suma cargo encima). feeNet/feeIva quedan como referencia.
+ */
+export function orderBuyerBreakdown(order) {
+  const b = orderFeeBreakdown(order)
+  if (order?.fee_absorbed === true) return { ...b, subtotal: b.total, feeIncluded: true }
+  return { ...b, feeIncluded: false }
+}

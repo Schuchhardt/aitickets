@@ -5,6 +5,7 @@
 // 409 incluye `code`: 'already_validated' (ya validada) | 'invalid_status' (anulada u otro estado).
 // R1: la respuesta incluye function_mismatch/function_label si la entrada es de otra función (solo aviso).
 import { getSupabaseAdmin, getOwnedEvent } from '../../lib/supabase.mjs'
+import { canAccessEventByStaff } from '../../lib/event-staff.mjs'
 import { getSessionContextWithRefresh, jsonWithCookies, CHECKIN_ROLES } from '../../lib/session.mjs'
 import { getFunctionCheck } from '../../lib/checkin.mjs'
 
@@ -41,6 +42,8 @@ export default async function handler(req) {
 
     const event = await getOwnedEvent(eventId, ctx.dbUser.organization_id, 'id')
     if (!event) return respond({ message: 'Evento no encontrado o sin permisos' }, 403)
+    // Acceso por evento (aitickets_event_staff)
+    if (!(await canAccessEventByStaff(getSupabaseAdmin(), ctx.dbUser.id, eventId))) return respond({ message: 'Evento no encontrado o sin permisos' }, 403)
 
     const supabase = getSupabaseAdmin()
     const { data: ticket, error: ticketError } = await supabase

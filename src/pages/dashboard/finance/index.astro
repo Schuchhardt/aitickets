@@ -4,8 +4,9 @@ import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { ORG_ADMIN_ROLES } from "../../../lib/supabaseServer";
 import { requireDashboardSession } from "../_lib/guard";
 import { SERVICE_FEE_PERCENT_LABEL, IVA_PERCENT_LABEL } from "../../../../netlify/lib/fees.mjs";
+import { getStaffEventIds } from "../../../../netlify/lib/event-staff.mjs";
 
-const guard = await requireDashboardSession(Astro, ORG_ADMIN_ROLES);
+const guard = await requireDashboardSession(Astro, [...ORG_ADMIN_ROLES, "finance"]);
 if (!guard.ok) return guard.response;
 const { dbUser } = guard.session;
 const supabaseAdmin = getSupabaseAdmin();
@@ -30,6 +31,8 @@ let totalServiceFees = 0; // cargo por servicio NETO pagado por los compradores 
 let totalServiceFeeTax = 0; // IVA del cargo por servicio (service_fee_tax)
 let totalDiscounts = 0; // descuentos por códigos (discount_amount); amount ya viene descontado
 let discountedOrders = 0;
+let totalAbsorbedFees = 0; // cargo + IVA absorbidos por el productor (ya descontados de amount)
+let absorbedOrders = 0;
 let paidOut = 0;
 let balanceDue = 0;
 let transactions: Tx[] = [];
@@ -37,11 +40,14 @@ let refundedCount = 0; // órdenes reembolsadas (no suman al saldo)
 let reviewCount = 0; // pagos en revisión manual (monto no coincide o sin stock)
 const summaries: EventSummary[] = [];
 
-const { data: orgEvents } = await supabaseAdmin
+// Equipo asignado a ciertos eventos (aitickets_event_staff): solo ve las finanzas de esos eventos
+const staffEventIds = await getStaffEventIds(supabaseAdmin, dbUser.id);
+let orgEventsQuery = supabaseAdmin
     .from("events")
     .select("id, name, end_date, start_date")
-    .eq("organization_id", dbUser.organization_id)
-    .order("start_date", { ascending: false });
+    .eq("organization_id", dbUser.organization_id);
+if (staffEventIds) orgEventsQuery = orgEventsQuery.in("id", staffEventIds);
+const { data: orgEvents } = await orgEventsQuery.order("start_date", { ascending: false });
 
 if (orgEvents && orgEvents.length > 0) {
     const eventIds = orgEvents.map((e) => e.id);
@@ -57,7 +63,9 @@ if (orgEvents && orgEvents.length > 0) {
     const PAGE_SIZE = 1000;
     const BASE_COLUMNS = "id, event_id, amount, ticket_fee, payment_fee, total_payment, ticket_qty, created_at";
     // discount_amount/discount_code existen desde 202609300200.
+    // fee_absorbed existe desde 202610090200.
     const columnSets = [
+        `${BASE_COLUMNS}, payment_provider, service_fee_tax, discount_amount, discount_code, fee_absorbed`,
         `${BASE_COLUMNS}, payment_provider, service_fee_tax, discount_amount, discount_code`,
         `${BASE_COLUMNS}, payment_provider, service_fee_tax`,
         `${BASE_COLUMNS}, payment_provider`,
@@ -92,6 +100,10 @@ if (orgEvents && orgEvents.length > 0) {
         totalRevenue += amount;
         totalServiceFees += ticketFee;
         totalServiceFeeTax += Number(o.service_fee_tax) || 0;
+        if (o.fee_absorbed === true) {
+            totalAbsorbedFees += ticketFee + (Number(o.service_fee_tax) || 0);
+            absorbedOrders += 1;
+        }
         const discount = Number(o.discount_amount) || 0;
         if (discount > 0) {
             totalDiscounts += discount;
@@ -191,6 +203,11 @@ const formatDate = (d: string | null) =>
                 <h3 class="text-gray-500 text-sm font-medium">Ventas de entradas</h3>
                 <p class="text-3xl font-bold mt-2">{formatCLP(totalRevenue)}</p>
                 <p class="text-xs text-gray-400 mt-1">Órdenes pagadas. No incluye el cargo por servicio ({formatCLP(totalServiceFees)}) ni su IVA ({formatCLP(totalServiceFeeTax)}).</p>
+                {totalAbsorbedFees > 0 && (
+                    <p class="text-xs text-gray-400 mt-1" data-testid="finance-absorbed-fees">
+                        Neto de {formatCLP(totalAbsorbedFees)} en cargo por servicio que absorbiste ({absorbedOrders} orden{absorbedOrders === 1 ? "" : "es"} con cargo incluido en el precio).
+                    </p>
+                )}
                 {totalDiscounts > 0 && (
                     <p class="text-xs text-gray-400 mt-1" data-testid="finance-discounts">
                         Ya descontados {formatCLP(totalDiscounts)} en códigos de descuento ({discountedOrders} orden{discountedOrders === 1 ? "" : "es"}). <a href="/dashboard/descuentos" class="underline">Ver códigos</a>
