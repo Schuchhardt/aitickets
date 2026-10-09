@@ -24,3 +24,13 @@
 # Recordatorios 24h antes: el schedule vive en netlify/functions/send-event-reminders (config.schedule).
 # Funciones programadas y background: su configuración va en el código de cada función
 # (export const config = { schedule } / sufijo -background), no aquí.
+
+# "Continuar con Google": si Supabase Auth vuelve a la raíz (/?code=…) en vez de /auth/google/callback
+# (pasa cuando el callback no está en Auth > URL Configuration > Redirect URLs y usa el Site URL), se reenvía
+# el código al callback. La portada es estática: force = true para que la regla gane sobre index.html.
+[[redirects]]
+  from = "/"
+  query = { code = ":code" }
+  to = "/auth/google/callback?code=:code"
+  status = 302
+  force = true
