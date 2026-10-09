@@ -14,11 +14,11 @@ const { dbUser } = guard.session;
 const supabaseAdmin = getSupabaseAdmin();
 
 // Fetch Full Event Data
-const { data: event, error } = await supabaseAdmin
+const loadEvent = (coverColumn: string) => supabaseAdmin
     .from("events")
     .select(
         `
-        id, name, description, image_url, accessibility, status,
+        id, name, description, image_url, accessibility, status,${coverColumn}
         event_tags ( category_tags ( name ) ),
         event_tickets (
           id,
@@ -49,6 +49,9 @@ const { data: event, error } = await supabaseAdmin
     .eq("id", id)
     .eq("organization_id", dbUser.organization_id)
     .single();
+let { data: event, error }: { data: any; error: any } = await loadEvent(" cover_settings,");
+// Deploy previews: la migración de cover_settings puede no estar aplicada todavía
+if (error?.code === "42703") ({ data: event, error } = await loadEvent(""));
 
 if (error || !event) {
     console.error("Edit fetch error", error);
@@ -62,6 +65,7 @@ const initialFormState = {
         // Descripción guardada como texto plano sanitizado: mostrar sin entidades HTML en el textarea
         description: /<\/?[a-z][^>]*>/i.test(event.description || "") ? event.description : decodeBasicEntities(event.description || ""),
         imageUrl: event.image_url || "",
+        coverSettings: event.cover_settings || null,
         category: (event as any).event_tags?.[0]?.category_tags?.name || "",
         isPrivate: event.accessibility === "private",
     },

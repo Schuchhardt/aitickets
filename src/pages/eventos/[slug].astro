@@ -1,5 +1,4 @@
 ---
-import AppHeader from "../../components/AppHeader.vue";
 import AppFooter from "../../components/AppFooter.vue";
 import EventDetail from "../../components/EventDetail.vue";
 import EventAssistant from "../../components/EventAssistant.vue";
@@ -77,8 +76,8 @@ const canonicalPath = seo.canonicalPath;
       } catch (e) { /* sessionStorage no disponible */ }
     })();
   </script>
-  <AppHeader client:idle/>
-  <main class="pt-16">
+  <!-- Sin navbar: la página parte con la portada (link de vuelta a /eventos sobre la imagen) -->
+  <main>
     <EventDetail event={eventData} siteMode={false} client:idle/>
   </main>
   <EventAssistant event={eventData} client:idle/>

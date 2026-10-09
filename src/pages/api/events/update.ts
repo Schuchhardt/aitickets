@@ -2,7 +2,7 @@ import type { APIRoute } from "astro";
 import { getSupabaseAdmin, getFriendlyErrorMessage } from "../../../lib/auth-helpers";
 import { getSessionContext, getOwnedEvent, hasRole, EVENT_MANAGER_ROLES, jsonResponse } from "../../../lib/supabaseServer";
 import { callInternalFunction, notifySlack, siteUrl } from "../_lib/server-utils";
-import { syncEventCategory, refreshEventDenorm, normalizeTicket, isClientTempId, isValidDateInput, resolveTicketDateId, setEventStatus, EventInputError } from "../_lib/events";
+import { syncEventCategory, refreshEventDenorm, normalizeTicket, isClientTempId, isValidDateInput, resolveTicketDateId, setEventStatus, EventInputError, saveCoverSettings } from "../_lib/events";
 import { sanitizeRichText } from "../../../lib/sanitize";
 import { listOrgVenues, isVenueAllowed, insertOrgVenue } from "../../../lib/orgVenues";
 
@@ -97,6 +97,10 @@ export const POST: APIRoute = async (context) => {
         if (updateError) throw updateError;
 
         await syncEventCategory(event.id, general.category);
+        // Ajuste de portada (solo si el formulario lo envía: clientes antiguos no lo conocen)
+        if (general.coverSettings !== undefined) {
+            await saveCoverSettings(event.id, dbUser.organization_id, general.imageUrl ? general.coverSettings : null);
+        }
 
         // 3. Ubicaciones y funciones (antes que las entradas: las entradas pueden apuntar a una función nueva — R1)
         const existingLocationIds = new Set(before.locations.map((l) => String(l.id)));

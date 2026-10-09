@@ -65,8 +65,8 @@ const message = reason ? messages[reason] : null;
       noindex={true}
     />
   )}
-  <AppHeader client:idle />
-  <main class="pt-16">
+  {!eventData && <AppHeader client:idle />}
+  <main class={eventData ? undefined : "pt-16"}>
     {eventData ? (
       <EventDetail event={eventData} siteMode={false} client:idle />
     ) : (

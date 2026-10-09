@@ -2,7 +2,7 @@
 // o del mes siguiente si la función de ese día ya terminó (22:30 hora de Chile).
 import { describe, expect, it } from 'vitest'
 
-import { DEMO_EVENT_SLUG, getDemoEventDate, isDemoEventSlug } from '../../src/lib/demoEvent.mjs'
+import { DEMO_EVENT_SLUG, DEMO_EVENT_SLUGS, getDemoEventDate, isDemoEventSlug } from '../../src/lib/demoEvent.mjs'
 
 describe('getDemoEventDate', () => {
   it('a mitad de mes devuelve el último día del mes en curso', () => {
@@ -45,5 +45,29 @@ describe('isDemoEventSlug', () => {
     expect(isDemoEventSlug('evento-demo-aitickets')).toBe(true)
     expect(isDemoEventSlug('evento-demo-aitickets-2')).toBe(false)
     expect(isDemoEventSlug(undefined)).toBe(false)
+  })
+})
+
+describe('getDemoEventDate (varios eventos demo)', () => {
+  it('lista tres eventos demo', () => {
+    expect(DEMO_EVENT_SLUGS).toEqual(['evento-demo-aitickets', 'evento-demo-concierto', 'evento-demo-feria'])
+    expect(isDemoEventSlug('evento-demo-concierto')).toBe(true)
+    expect(isDemoEventSlug('evento-demo-feria')).toBe(true)
+  })
+
+  it('concierto: el próximo sábado (el mismo sábado hasta las 23:30 de Chile)', () => {
+    // 2026-10-09 es viernes
+    expect(getDemoEventDate(new Date('2026-10-09T15:00:00Z'), 'evento-demo-concierto')).toBe('2026-10-10')
+    // sábado 10 a las 20:00 de Chile => ese mismo día
+    expect(getDemoEventDate(new Date('2026-10-10T23:00:00Z'), 'evento-demo-concierto')).toBe('2026-10-10')
+    // sábado 10 a las 23:45 de Chile => el sábado siguiente
+    expect(getDemoEventDate(new Date('2026-10-11T02:45:00Z'), 'evento-demo-concierto')).toBe('2026-10-17')
+  })
+
+  it('feria: el día 15 del mes, o del siguiente si ya pasó', () => {
+    expect(getDemoEventDate(new Date('2026-10-09T15:00:00Z'), 'evento-demo-feria')).toBe('2026-10-15')
+    expect(getDemoEventDate(new Date('2026-10-15T22:00:00Z'), 'evento-demo-feria')).toBe('2026-10-15')
+    expect(getDemoEventDate(new Date('2026-10-16T12:00:00Z'), 'evento-demo-feria')).toBe('2026-11-15')
+    expect(getDemoEventDate(new Date('2026-12-20T12:00:00Z'), 'evento-demo-feria')).toBe('2027-01-15')
   })
 })

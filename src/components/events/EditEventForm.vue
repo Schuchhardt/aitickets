@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { Calendar, MapPin, Ticket, CheckCircle, Image as ImageIcon, Plus, Trash2, ChevronRight, ChevronLeft, UploadCloud } from 'lucide-vue-next'
+import CoverAdjuster from './CoverAdjuster.vue'
 
 const props = defineProps({
   initialVenues: {
@@ -382,6 +383,13 @@ const submitEvent = async () => {
                 <p class="text-xs text-gray-500">Soporta JPG, PNG, WEBP (Max 5MB)</p>
               </div>
             </div>
+
+            <CoverAdjuster
+              v-if="form.general.imageUrl"
+              v-model="form.general.coverSettings"
+              :imageUrl="form.general.imageUrl"
+              :eventName="form.general.name"
+            />
 
             <p v-if="uploadError" class="mt-2 text-sm text-red-600 flex items-center gap-1">
               <span class="w-1 h-1 bg-red-600 rounded-full"></span> {{ uploadError }}

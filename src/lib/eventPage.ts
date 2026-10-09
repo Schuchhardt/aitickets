@@ -12,6 +12,7 @@ import {
 } from "../utils/dateHelpers.js";
 import { descriptionToHtml } from "./sanitize";
 import { isDemoEventSlug, getDemoEventDate } from "./demoEvent.mjs";
+import { normalizeCoverSettings } from "./eventCover";
 
 // Columnas públicas del evento. NUNCA incluir secret_location (C4).
 export const EVENT_PUBLIC_COLUMNS =
@@ -231,11 +232,16 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
   const supabase = getSupabaseAdmin();
   const now = new Date();
 
-  const baseQuery = supabase.from("events").select(EVENT_PUBLIC_COLUMNS);
-  const { data: event, error } = await (isPreview
-    ? baseQuery.eq("id", Number(opts.previewEventId))
-    : baseQuery.eq("slug", slug!).eq("status", "published")
-  ).maybeSingle();
+  const loadEvent = (columns: string) => {
+    const baseQuery = supabase.from("events").select(columns);
+    return (isPreview
+      ? baseQuery.eq("id", Number(opts.previewEventId))
+      : baseQuery.eq("slug", slug!).eq("status", "published")
+    ).maybeSingle();
+  };
+  let { data: event, error }: { data: any; error: any } = await loadEvent(`${EVENT_PUBLIC_COLUMNS}, cover_settings`);
+  // Deploy previews comparten la BD de producción: tolerar que la migración de cover_settings no esté aplicada
+  if (error?.code === "42703") ({ data: event, error } = await loadEvent(EVENT_PUBLIC_COLUMNS));
 
   if (error) {
     console.error("Error al obtener el evento:", error);
@@ -245,7 +251,7 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
   if (opts.organizationId !== undefined && Number(event.organization_id) !== Number(opts.organizationId)) return null;
 
   const isPrivate = !!event.accessibility && event.accessibility !== "public";
-  // Evento demo: fecha dinámica (último día del mes), sin indexar y sin venta real
+  // Evento demo: fecha dinámica (src/lib/demoEvent.mjs), sin indexar y sin venta real
   const isDemo = isDemoEventSlug(event.slug);
   if (isDemo) {
     event.start_date = null;
@@ -345,7 +351,7 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
   // Funciones (event_dates + recinto), con horas en la zona horaria del recinto
   if (datesRes.error) console.error("Error al obtener las fechas:", datesRes.error);
 
-  const demoDate = isDemo ? getDemoEventDate(now) : null;
+  const demoDate = isDemo ? getDemoEventDate(now, event.slug) : null;
   let dates: any[] = (datesRes.data || [])
     .map((d: any) => (demoDate ? { ...d, date: demoDate } : d))
     .map((d: any) => {
@@ -428,6 +434,7 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
     has_secret_location: hasSecretLocation,
     organization,
     venue: primaryVenue,
+    cover_settings: normalizeCoverSettings(event.cover_settings),
     is_demo: isDemo,
     // Vista previa privada: la página muestra el aviso y no permite comprar si no está publicado
     is_preview: isPreview,

@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { computeEventRange, formatLocation, slugify } from "./server-utils";
 import { listOrgVenues, isVenueAllowed, insertOrgVenue } from "../../../lib/orgVenues";
 import { sanitizeRichText } from "../../../lib/sanitize";
+import { isDefaultCoverSettings, normalizeCoverSettings } from "../../../lib/eventCover";
 
 /** Guarda la categoría del evento vía category_tags(name) + event_tags (reemplaza las anteriores). */
 export async function syncEventCategory(eventId: number, category: string | null | undefined) {
@@ -130,8 +131,30 @@ export class EventInputError extends Error {
     }
 }
 
+/**
+ * Guarda el ajuste de portada (events.cover_settings) normalizado; los valores por defecto se guardan como NULL.
+ * No falla si la columna todavía no existe (deploy previews sobre la BD de producción antes de migrar).
+ */
+export async function saveCoverSettings(eventId: number, orgId: number, raw: unknown): Promise<void> {
+    const settings = normalizeCoverSettings(raw);
+    const { error } = await getSupabaseAdmin()
+        .from("events")
+        .update({ cover_settings: isDefaultCoverSettings(settings) ? null : settings })
+        .eq("id", eventId)
+        .eq("organization_id", orgId);
+    if (error && error.code !== "42703" && error.code !== "PGRST204") throw error;
+    if (error) console.warn("cover_settings no disponible todavía:", error.message);
+}
+
 export type EventGraphInput = {
-    general: { name?: string; description?: string; imageUrl?: string | null; isPrivate?: boolean; category?: string | null };
+    general: {
+        name?: string;
+        description?: string;
+        imageUrl?: string | null;
+        isPrivate?: boolean;
+        category?: string | null;
+        coverSettings?: unknown;
+    };
     locations: Array<{
         venueId?: string | null;
         isNewVenue?: boolean;
@@ -199,6 +222,7 @@ export async function createEventGraph(
     }
     const eventId = eventData.id as number;
     state.eventId = eventId;
+    if (general.coverSettings) await saveCoverSettings(eventId, actor.orgId, general.coverSettings);
 
     // 2. Ubicaciones y funciones (antes que las entradas, para mapear la función de cada entrada — R1)
     const dateIdMap = new Map<string, number>();

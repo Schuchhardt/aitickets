@@ -45,6 +45,13 @@ function autoOpenReservation() {
 </script>
 
 <template>
+  <!-- La página parte con la portada a todo el ancho (sin navbar) -->
+  <EventHeader
+    :event="event"
+    hero
+    :backHref="siteMode || event.is_preview ? null : '/eventos'"
+  />
+
   <div class="max-w-6xl mx-auto px-6 lg:px-12 py-8 relative">
     <!-- Aviso de evento de demostración -->
     <div
@@ -86,11 +93,8 @@ function autoOpenReservation() {
       >Ver página pública →</a>
     </div>
 
-    <!-- Header -->
-    <EventHeader :event="event" />
-
     <!-- Contenedor de Tabs + Tarjeta de Reserva -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8 relative">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 relative">
       <!-- Columna Derecha en Mobile (Botones arriba) -->
       <div class="lg:hidden relative z-10">
         <EventActions :event="event" :siteMode="siteMode" />

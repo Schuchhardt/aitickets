@@ -11,7 +11,13 @@ defineProps({
 </script>
 
 <template>
-  <div class="bg-white rounded-xl shadow-md overflow-hidden transition-transform duration-200 hover:scale-[1.02]">
+  <div class="relative bg-white rounded-xl shadow-md overflow-hidden transition-transform duration-200 hover:scale-[1.02]">
+
+    <!-- Evento de demostración: se muestra para enseñar cómo se ve un evento real -->
+    <span
+      v-if="event.is_demo"
+      class="absolute top-3 left-3 z-10 rounded-full bg-purple-600/90 px-3 py-1 text-xs font-semibold text-white font-['Prompt']"
+    >Evento de ejemplo</span>
 
     <!-- Imagen del evento -->
     <a :href="`/eventos/${event.slug}`" tabindex="-1" aria-hidden="true">

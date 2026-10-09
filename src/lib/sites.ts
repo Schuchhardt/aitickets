@@ -14,7 +14,7 @@
 // si la tabla no existe, todo degrada a "sitio no encontrado" (404) sin romper el resto del sitio.
 import { createHash, timingSafeEqual } from "node:crypto";
 import { getSupabaseAdmin } from "./auth-helpers";
-import { DEMO_EVENT_SLUG, getDemoEventDate } from "./demoEvent.mjs";
+import { DEMO_EVENT_SLUGS, getDemoEventDate } from "./demoEvent.mjs";
 import { getZonedParts, zonedDateTimeToDate } from "../utils/dateHelpers.js";
 
 // ---------------------------------------------------------------------------
@@ -260,7 +260,7 @@ export const DEMO_SITE: SiteRecord = Object.freeze({
     about:
       "<p>Este es un <strong>sitio de demostración</strong>. Cada productora que usa AI Tickets recibe un sitio como este, " +
       "con sus próximos eventos, banners, formulario de contacto y, si quiere, su propio dominio.</p>" +
-      "<p>Las compras en el evento de demostración son simuladas: no se cobra nada.</p>",
+      "<p>Las compras en los eventos de demostración son simuladas: no se cobra nada.</p>",
     socials: { instagram: "https://www.instagram.com/aitickets.cl", website: "https://aitickets.cl" },
   },
   seo: {
@@ -285,8 +285,8 @@ export const DEMO_SITE: SiteRecord = Object.freeze({
     verified_email: null,
   },
   is_demo: true,
-  /** Slug del evento de demostración que lista este sitio (src/lib/demoEvent.mjs). */
-  demo_event_slug: DEMO_EVENT_SLUG,
+  /** Slugs de los eventos de demostración que lista este sitio (src/lib/demoEvent.mjs). */
+  demo_event_slugs: DEMO_EVENT_SLUGS,
 }) as SiteRecord;
 
 // ---------------------------------------------------------------------------
@@ -730,7 +730,7 @@ export async function getSiteEvents(site: SiteRecord, limit = 60): Promise<SiteE
     .eq("status", "published")
     .not("slug", "is", null);
   if (site.is_demo) {
-    query = query.eq("slug", String(site.demo_event_slug || DEMO_EVENT_SLUG));
+    query = query.in("slug", [...DEMO_EVENT_SLUGS]);
   } else {
     query = query.eq("organization_id", site.organization_id).or("accessibility.is.null,accessibility.eq.public");
   }
@@ -751,10 +751,11 @@ export async function getSiteEvents(site: SiteRecord, limit = 60): Promise<SiteE
     : { data: [], error: null };
   if (datesError) console.error("sites: error al obtener fechas", datesError);
 
-  const demoDate = site.is_demo ? getDemoEventDate(now) : null;
+  const slugById = new Map((events || []).map((e: any) => [e.id, e.slug]));
   const datesByEvent = new Map<number, SiteEventCard["dates"]>();
   for (const d of (dates || []) as any[]) {
     const list = datesByEvent.get(d.event_id) || [];
+    const demoDate = site.is_demo ? getDemoEventDate(now, slugById.get(d.event_id)) : null;
     list.push({ date: demoDate || String(d.date).slice(0, 10), start_time: d.start_time, end_time: d.end_time });
     datesByEvent.set(d.event_id, list);
   }
@@ -764,8 +765,8 @@ export async function getSiteEvents(site: SiteRecord, limit = 60): Promise<SiteE
       const eventDates = datesByEvent.get(e.id) || [];
       const upcomingDates = eventDates.filter((d) => d.date >= todaySantiago);
       const lastDate = eventDates.length ? eventDates[eventDates.length - 1].date : null;
-      const endDate = demoDate ? null : e.end_date;
-      const startDate = demoDate ? null : e.start_date;
+      const endDate = site.is_demo ? null : e.end_date;
+      const startDate = site.is_demo ? null : e.start_date;
       // Misma regla que /eventos (C3)
       const isUpcoming = !endDate || new Date(endDate) >= now || (lastDate !== null && lastDate >= todaySantiago);
       const nextStart = upcomingDates.length

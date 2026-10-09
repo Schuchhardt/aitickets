@@ -106,8 +106,8 @@ async function loadEventContext(supabase, eventId) {
     soldOut: t.total_quantity != null && Number(t.total_quantity) - (sold.get(Number(t.id)) || 0) <= 0,
   }))
 
-  // Evento demo: la función siempre es el último día del mes (misma fecha que muestra la página)
-  const demoDate = isDemo ? getDemoEventDate(now) : null
+  // Evento demo: fecha dinámica (misma fecha que muestra la página)
+  const demoDate = isDemo ? getDemoEventDate(now, event.slug) : null
   const eventDates = (dates || []).map(d => (demoDate ? { ...d, date: demoDate } : d))
   return { event, isDemo, dates: eventDates, tickets: saleTickets, faqs: faqs || [] }
 }
