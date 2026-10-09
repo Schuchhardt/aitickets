@@ -59,6 +59,14 @@ describe('ensureGoogleProducer', () => {
     expect(db.auth.admin.updateUserById).toHaveBeenCalledWith('auth-g1', { app_metadata: { provider: 'google', app: 'aitickets' } })
   })
 
+  it('fila creada por el trigger handle_new_user (sin organización): la completa en vez de duplicarla', async () => {
+    db.tables.users.push({ id: 9, auth_user_id: 'auth-g1', organization_id: null, email: 'ana@gmail.com', role: 'admin' })
+    const res = await google.ensureGoogleProducer(googleUser())
+    expect(res).toMatchObject({ ok: true, created: true, onboardingPending: true })
+    expect(db.tables.users).toHaveLength(1)
+    expect(db.tables.users[0]).toMatchObject({ id: 9, organization_id: db.tables.organizations[0].id, name: 'Ana Pérez' })
+  })
+
   it('usuario existente: inicia sesión sin crear nada', async () => {
     db.tables.organizations.push({ id: 5, email_verified_at: '2026-01-01', onboarding_pending: false })
     db.tables.users.push({ id: 9, auth_user_id: 'auth-g1', organization_id: 5, active: true, email: 'ana@gmail.com' })

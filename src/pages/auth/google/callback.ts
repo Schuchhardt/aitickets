@@ -23,6 +23,8 @@ export const GET: APIRoute = async (context) => {
     const fail = (code: string) =>
         redirect(`/organizadores/${code === "google_email_in_use" ? "login" : "registro"}?error=${code}${next ? `&next=${encodeURIComponent(next)}` : ""}`, 303);
 
+    const providerError = url.searchParams.get("error_description") || url.searchParams.get("error");
+    if (providerError) console.error("google auth callback (Supabase):", providerError.slice(0, 300));
     const code = url.searchParams.get("code");
     if (!state || !code || code.length > 512) return fail("google");
 

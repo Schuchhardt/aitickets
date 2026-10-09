@@ -4,7 +4,6 @@ import type { APIRoute } from "astro";
 import { GOOGLE_STATE_COOKIE, encodeGoogleState, isGoogleAuthEnabled, startGoogleAuth } from "../../../lib/google-auth";
 import { safeNextPath } from "../../../lib/onboarding";
 import { verifyLeadToken } from "../../../lib/lead-token";
-import { siteUrl } from "../_lib/server-utils";
 
 export const prerender = false;
 
@@ -22,7 +21,9 @@ export const GET: APIRoute = async ({ url, cookies, redirect }) => {
     const lead = leadToken && leadToken.length <= 2048 ? verifyLeadToken(leadToken) : null;
 
     try {
-        const { url: authUrl, state } = await startGoogleAuth(siteUrl() || url.origin, { next, attribution, lead: lead ? String(lead.leadId) : null });
+        // Origen de ESTA petición (no SITE_URL): la cookie con el verifier vive en este host, y en local
+        // SITE_URL apunta a producción. Supabase solo acepta orígenes de su lista "Redirect URLs".
+        const { url: authUrl, state } = await startGoogleAuth(url.origin, { next, attribution, lead: lead ? String(lead.leadId) : null });
         cookies.set(GOOGLE_STATE_COOKIE, encodeGoogleState(state), {
             path: "/auth/google",
             httpOnly: true,
