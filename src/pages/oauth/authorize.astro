@@ -9,6 +9,7 @@ import { getSessionContext, hasRole, EVENT_MANAGER_ROLES } from "../../lib/supab
 import { siteUrl } from "../api/_lib/server-utils";
 import { buildRedirect, validateAuthorizeParams } from "../../lib/producer-api/oauth";
 import { SCOPE_LABELS, API_SCOPES } from "../../lib/producer-api/keys";
+import { isOnboardingPending, onboardingUrl } from "../../lib/onboarding";
 
 export const prerender = false;
 
@@ -38,6 +39,10 @@ try {
 const session = fatal ? null : await getSessionContext(Astro);
 if (!fatal && !session) {
     return Astro.redirect(`/organizadores/login?next=${encodeURIComponent(Astro.url.pathname + Astro.url.search)}`);
+}
+// Cuenta recién creada desde el conector (Claude/ChatGPT): primero el nombre de la productora, luego vuelve aquí
+if (session && !fatal && (await isOnboardingPending(Number(session.dbUser.organization_id)))) {
+    return Astro.redirect(onboardingUrl(Astro.url.pathname + Astro.url.search));
 }
 if (session && !hasRole(session.dbUser, EVENT_MANAGER_ROLES)) {
     fatal = "Tu rol en la organización no permite conectar asistentes de IA (se requiere admin, productor o editor).";

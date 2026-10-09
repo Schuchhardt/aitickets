@@ -6,6 +6,7 @@ import type { APIRoute } from "astro";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { jsonResponse } from "../../../lib/supabaseServer";
 import { getOrgVerification, sendVerificationEmail } from "../../../lib/email-verification";
+import { isOnboardingPending, safeNextPath } from "../../../lib/onboarding";
 
 export const prerender = false;
 
@@ -44,9 +45,11 @@ function clientIp(request: Request): string {
 
 export const POST: APIRoute = async ({ request }) => {
     let email = "";
+    let next: string | null = null;
     try {
         const body = await request.json();
         email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
+        next = safeNextPath(body?.next);
     } catch {
         return jsonResponse({ message: "Solicitud inválida" }, 400);
     }
@@ -85,7 +88,8 @@ export const POST: APIRoute = async ({ request }) => {
             .select("public_name")
             .eq("id", profile.organization_id)
             .maybeSingle();
-        await sendVerificationEmail({ uid: authUser.id, email: authUser.email, name: profile.name, orgName: org?.public_name || null });
+        const pending = await isOnboardingPending(Number(profile.organization_id));
+        await sendVerificationEmail({ uid: authUser.id, email: authUser.email, name: profile.name, orgName: pending ? null : org?.public_name || null, next });
         if (isAitickets) {
             await supabase.auth.admin
                 .updateUserById(authUser.id, { app_metadata: { ...appMeta, email_verify_sent_at: new Date(now).toISOString() } })

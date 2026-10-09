@@ -134,7 +134,18 @@ describe('token de verificación de correo del productor', () => {
   it('ida y vuelta con hash del correo', () => {
     const now = Date.parse('2026-09-26T12:00:00Z')
     const t = signEmailVerifyToken('uid-1', 'Ana@Teatro.cl', now)
-    expect(verifyEmailVerifyToken(t, now)).toEqual({ ok: true, uid: 'uid-1', eh: emailHash('ana@teatro.cl') })
+    expect(verifyEmailVerifyToken(t, now)).toEqual({ ok: true, uid: 'uid-1', eh: emailHash('ana@teatro.cl'), next: null })
+  })
+
+  it('lleva el destino (next) firmado y descarta destinos externos', () => {
+    const now = Date.parse('2026-09-26T12:00:00Z')
+    const ok = signEmailVerifyToken('uid-1', 'ana@teatro.cl', now, '/dashboard/ia')
+    expect(verifyEmailVerifyToken(ok, now)).toMatchObject({ ok: true, next: '/dashboard/ia' })
+    const oauth = signEmailVerifyToken('uid-1', 'ana@teatro.cl', now, '/oauth/authorize?client_id=x&state=y')
+    expect(verifyEmailVerifyToken(oauth, now)).toMatchObject({ ok: true, next: '/oauth/authorize?client_id=x&state=y' })
+    for (const bad of ['https://evil.com', '//evil.com', '/\\evil.com', '/organizadores', '/dashboard\\..']) {
+      expect(verifyEmailVerifyToken(signEmailVerifyToken('uid-1', 'ana@teatro.cl', now, bad), now)).toMatchObject({ ok: true, next: null })
+    }
   })
 
   it('vence a las 48 horas', () => {

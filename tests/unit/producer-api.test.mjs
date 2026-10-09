@@ -37,6 +37,7 @@ function seed(extra = {}) {
       aitickets_api_keys: [],
       aitickets_api_audit: [],
       aitickets_discount_codes: [],
+      aitickets_event_preview_links: [],
       social_posts: [],
       social_accounts: [],
       ...extra.tables,
@@ -222,7 +223,9 @@ describe('aislamiento por organización y scopes', () => {
     )
     const res = await run('list_events', {})
     expect(res.result.events.map((e) => e.id)).toEqual([10])
-    expect(res.result.events[0]).toMatchObject({ tickets_sold: 2, revenue_clp: 20000, public_url: 'https://aitickets.cl/eventos/fiesta-1234' })
+    // Borrador: el link público no funciona todavía
+    expect(res.result.events[0]).toMatchObject({ tickets_sold: 2, revenue_clp: 20000, is_published: false, public_url: null, public_url_after_publish: 'https://aitickets.cl/eventos/fiesta-1234' })
+    expect(res.result.drafts_note).toMatch(/BORRADOR/)
   })
 
   it('una llave sin el scope necesario no puede escribir, publicar ni ver compradores', async () => {

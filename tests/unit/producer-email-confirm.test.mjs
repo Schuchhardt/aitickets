@@ -239,6 +239,48 @@ describe('/api/auth/register', () => {
   })
 })
 
+describe('/api/auth/register — registro en dos pasos', () => {
+  it('solo correo y contraseña: organización con nombre provisorio, onboarding pendiente y next firmado en el enlace', async () => {
+    const admin = fakeAdmin({
+      tables: {
+        organizations: () => ({ data: { id: 42 }, error: null }),
+        users: () => ({ data: null, error: null }),
+      },
+    })
+    state.admin = admin
+    state.ephemeral = { auth: { signInWithPassword: vi.fn() } }
+    const { sendEmail } = await import('../../netlify/lib/mailer.mjs')
+    const { renderVerifyEmail } = await import('../../netlify/lib/emails/index.mjs')
+    renderVerifyEmail.mockClear()
+    const res = await register(apiContext(jsonRequest('https://aitickets.cl/api/auth/register', {
+      email: 'nueva@prod.cl', password: 'Secreta123', acceptedTerms: true, cfToken: 'ok', next: '/dashboard/ia',
+    })))
+    expect(res.status).toBe(200)
+    const orgInsert = admin.log.find((o) => o.table === 'organizations' && o.action === 'insert')
+    expect(orgInsert.payload).toMatchObject({ public_name: 'Mi productora', onboarding_pending: true, email: 'nueva@prod.cl' })
+    const userInsert = admin.log.find((o) => o.table === 'users' && o.action === 'insert')
+    expect(userInsert.payload).toMatchObject({ name: null, organization_id: 42 })
+    // El sitio se crea al completar el onboarding (con el nombre real)
+    const { ensureOrgSite } = await import('../../src/lib/sites')
+    expect(ensureOrgSite).not.toHaveBeenCalledWith(42, 'Mi productora')
+    // El enlace del correo lleva el destino firmado
+    const url = renderVerifyEmail.mock.calls.at(-1)[0].url
+    const token = new URL(url).searchParams.get('t')
+    const { verifyEmailVerifyToken } = await import('../../src/lib/email-verification.ts')
+    expect(verifyEmailVerifyToken(token)).toMatchObject({ ok: true, next: '/dashboard/ia' })
+    expect(sendEmail).toHaveBeenCalled()
+  })
+
+  it('rechaza correo inválido o contraseña corta', async () => {
+    state.admin = fakeAdmin()
+    const bad = await register(apiContext(jsonRequest('https://aitickets.cl/api/auth/register', { email: 'x', password: 'Secreta123', acceptedTerms: true, cfToken: 'ok' })))
+    expect(bad.status).toBe(400)
+    const short = await register(apiContext(jsonRequest('https://aitickets.cl/api/auth/register', { email: 'a@b.cl', password: '123', acceptedTerms: true, cfToken: 'ok' })))
+    expect(short.status).toBe(400)
+    expect(state.admin.auth.admin.createUser).not.toHaveBeenCalled()
+  })
+})
+
 describe('/api/auth/login', () => {
   it('"Email not confirmed" de Supabase => 403 email_not_verified con reenvío', async () => {
     state.admin = fakeAdmin()

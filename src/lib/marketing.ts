@@ -35,32 +35,71 @@ export const EVENT_CONTEXT_SELECT = `
 
 export const isImageGenerationConfigured = () => Boolean(serverEnv("OPENAI_API_KEY"));
 
+export type ReferenceImage = { buffer: Buffer; contentType: string };
+
+/** Tipos que acepta /v1/images/edits como imagen de referencia (GIF no). */
+export const REFERENCE_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
+export const MAX_REFERENCE_IMAGES = 4;
+
 /**
  * Genera una imagen con OpenAI (gpt-image-1) y la guarda en Supabase Storage (las URLs de OpenAI expiran).
  * `extraPrompt` permite al productor dirigir el estilo (se agrega a las instrucciones base).
+ * Con `referenceImages` usa /v1/images/edits (multipart, campo `image[]`): las referencias guían estilo,
+ * paleta y elementos (o son la base a editar). Sin referencias usa /v1/images/generations.
  */
 export async function generateEventImage(
     eventContext: string,
     organizationId: number,
-    { extraPrompt, size = "1024x1024" }: { extraPrompt?: string; size?: "1024x1024" | "1024x1536" | "1536x1024" } = {},
+    {
+        extraPrompt,
+        size = "1024x1024",
+        referenceImages = [],
+    }: { extraPrompt?: string; size?: "1024x1024" | "1024x1536" | "1536x1024"; referenceImages?: ReferenceImage[] } = {},
 ): Promise<string> {
     const apiKey = serverEnv("OPENAI_API_KEY");
     if (!apiKey) throw new Error("OPENAI_API_KEY no configurada");
+    const model = serverEnv("OPENAI_IMAGE_MODEL") || "gpt-image-1";
     const direction = extraPrompt ? `\n\nCreative direction from the organizer: ${extraPrompt}` : "";
-    const response = await fetch("https://api.openai.com/v1/images/generations", {
-        method: "POST",
-        headers: {
-            "Authorization": `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-            model: serverEnv("OPENAI_IMAGE_MODEL") || "gpt-image-1",
-            prompt: `Create a visually striking, photographic social media promotional image for this event. Vibrant, modern and eye-catching. NO TEXT, no letters, no logos in the image.\n\nEvent details: ${eventContext}${direction}`,
-            n: 1,
-            size,
-            quality: "medium",
-        }),
-    });
+    const textRule = "NO TEXT, no letters, no logos in the image (unless the organizer's creative direction explicitly asks for text).";
+    const refs = referenceImages.slice(0, MAX_REFERENCE_IMAGES);
+
+    let response: Response;
+    if (refs.length) {
+        const prompt =
+            `Create a visually striking social media promotional image for this event. Use the attached reference image${refs.length > 1 ? "s" : ""} ` +
+            "as a guide for style, color palette, mood and key visual elements (or as the base to edit if the organizer asks for that). " +
+            `Vibrant, modern and eye-catching. ${textRule}\n\nEvent details: ${eventContext}${direction}`;
+        const form = new FormData();
+        form.append("model", model);
+        form.append("prompt", prompt);
+        form.append("n", "1");
+        form.append("size", size);
+        form.append("quality", "medium");
+        refs.forEach((ref, i) => {
+            const ext = ALLOWED_IMAGE_TYPES[ref.contentType] || "png";
+            form.append("image[]", new Blob([new Uint8Array(ref.buffer)], { type: ref.contentType }), `reference-${i + 1}.${ext}`);
+        });
+        response = await fetch("https://api.openai.com/v1/images/edits", {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${apiKey}` },
+            body: form,
+        });
+    } else {
+        response = await fetch("https://api.openai.com/v1/images/generations", {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${apiKey}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                model,
+                prompt: `Create a visually striking, photographic social media promotional image for this event. Vibrant, modern and eye-catching. ${textRule}\n\nEvent details: ${eventContext}${direction}`,
+                n: 1,
+                size,
+                quality: "medium",
+            }),
+        });
+    }
 
     if (!response.ok) {
         console.error("OpenAI image error:", response.status, (await response.text()).slice(0, 300));

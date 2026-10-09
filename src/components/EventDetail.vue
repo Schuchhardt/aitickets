@@ -62,6 +62,30 @@ function autoOpenReservation() {
       >Crea tu evento gratis →</a>
     </div>
 
+    <!-- Vista previa privada (link con token o dueño del evento con sesión) -->
+    <div
+      v-if="event.is_preview"
+      data-testid="event-preview-banner"
+      :data-status="event.status"
+      class="mb-6 rounded-xl border px-4 py-3 text-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
+      :class="event.status === 'published' ? 'border-sky-200 bg-sky-50 text-sky-900' : 'border-amber-300 bg-amber-50 text-amber-900'"
+      role="status"
+    >
+      <p v-if="event.status === 'published'">
+        <strong>Vista previa.</strong>
+        Este evento ya está publicado: esta es la misma página que ve el público.
+      </p>
+      <p v-else>
+        <strong>Vista previa · Evento NO publicado (borrador).</strong>
+        Solo quien tiene este link privado puede verlo. No aparece en búsquedas y la compra se habilita al publicarlo.
+      </p>
+      <a
+        v-if="event.status === 'published'"
+        :href="`/eventos/${event.slug}`"
+        class="shrink-0 font-semibold underline hover:no-underline"
+      >Ver página pública →</a>
+    </div>
+
     <!-- Header -->
     <EventHeader :event="event" />
 
@@ -83,6 +107,7 @@ function autoOpenReservation() {
 
     <!-- Banner de adquisición de productores (no en los sitios de productor) -->
     <div v-if="siteMode" class="mb-32 lg:mb-8"></div>
+    <div v-else-if="event.is_preview" class="mb-32 lg:mb-8"></div>
     <aside v-else class="mt-12 mb-32 lg:mb-8 border-t border-gray-200 pt-6 text-center font-['Prompt']">
       <a
         :href="producerBannerUrl"

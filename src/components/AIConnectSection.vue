@@ -22,7 +22,7 @@
           </FadeInSection>
           <FadeInSection :delay="200">
             <p class="text-white/80 text-lg max-w-xl mx-auto lg:mx-0">
-              Conecta AI Tickets a Claude, ChatGPT o Cursor y gestiona tus eventos conversando: crea funciones y entradas,
+              Conecta AI Tickets a Claude o ChatGPT y gestiona tus eventos conversando: crea funciones y entradas,
               lanza códigos de descuento, pregunta cómo van las ventas y arma tu campaña en redes. Sin abrir el panel.
             </p>
           </FadeInSection>
@@ -39,17 +39,49 @@
             </FadeInSection>
           </div>
 
+          <!-- Claude y ChatGPT: los dos principales -->
+          <FadeInSection :delay="550">
+            <div class="grid grid-cols-2 gap-3 mt-8 text-left">
+              <div v-for="b in brands" :key="b.id" class="flex items-center gap-3 p-3 sm:p-4 rounded-xl bg-white/5 border border-white/15">
+                <span class="shrink-0 w-10 h-10 rounded-lg flex items-center justify-center" :class="b.bg">
+                  <AiBrandIcon :brand="b.id" :colored="b.id === 'claude'" class="w-6 h-6" :class="b.fg" />
+                </span>
+                <div class="min-w-0">
+                  <p class="font-semibold text-sm">{{ b.name }}</p>
+                  <p class="text-white/50 text-xs">{{ b.note }}</p>
+                </div>
+              </div>
+            </div>
+          </FadeInSection>
+
+          <!-- 3 pasos -->
           <FadeInSection :delay="600">
+            <ol class="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3 text-left">
+              <li v-for="(s, i) in steps" :key="s.title" class="flex sm:flex-col gap-3 sm:gap-2 p-3 rounded-xl border border-white/10">
+                <span class="shrink-0 w-7 h-7 rounded-full bg-lime-400 text-black text-sm font-bold flex items-center justify-center">{{ i + 1 }}</span>
+                <div>
+                  <p class="font-semibold text-sm">{{ s.title }}</p>
+                  <p class="text-white/60 text-xs mt-0.5">{{ s.text }}</p>
+                </div>
+              </li>
+            </ol>
+          </FadeInSection>
+
+          <FadeInSection :delay="650">
             <div class="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 mt-8">
-              <a href="/organizadores/registro?utm_source=aitickets&utm_medium=landing&utm_campaign=ia"
-                class="px-6 py-3 font-bold font-[Unbounded] bg-lime-400 text-black rounded-lg hover:bg-lime-300 transition w-full sm:w-auto group">
+              <a :href="signupUrl"
+                class="px-6 py-3 font-bold font-[Unbounded] bg-lime-400 text-black rounded-lg hover:bg-lime-300 transition w-full sm:w-auto text-center group">
                 Conecta tu IA gratis
                 <ArrowRight class="ml-2 inline-block h-4 w-4 transition-transform group-hover:translate-x-1" />
               </a>
-              <span class="text-white/50 text-sm">En 1 minuto. Sin código.</span>
+              <span class="text-white/50 text-sm">En 2 minutos. Sin código.</span>
             </div>
+            <p class="mt-4 text-sm text-white/60 text-center lg:text-left">
+              ¿Ya tienes cuenta?
+              <a :href="loginUrl" class="font-medium text-lime-400 hover:underline">Conecta tu IA</a>
+            </p>
             <div class="flex flex-wrap items-center justify-center lg:justify-start gap-2 mt-6 text-xs text-white/60">
-              <span>Funciona con</span>
+              <span>También funciona con</span>
               <span v-for="c in clients" :key="c" class="px-2.5 py-1 rounded-full border border-white/15 bg-white/5 text-white/80">{{ c }}</span>
             </div>
           </FadeInSection>
@@ -97,6 +129,22 @@
 <script setup>
 import { ArrowRight, Bot, Sparkles, CalendarPlus, Tag, LineChart, Megaphone } from 'lucide-vue-next'
 import FadeInSection from './Hero/FadeInSection.vue'
+import AiBrandIcon from './ai/AiBrandIcon.vue'
+
+// Funnel: registro → verificar correo → nombre de la productora → /dashboard/ia (paso a paso para conectar).
+const signupUrl = '/organizadores/registro?next=%2Fdashboard%2Fia&utm_source=aitickets&utm_medium=landing&utm_campaign=ia'
+const loginUrl = '/organizadores/login?next=%2Fdashboard%2Fia'
+
+const brands = [
+  { id: 'claude', name: 'Claude', note: 'Web, escritorio y app', bg: 'bg-[#F5F0E8]', fg: '' },
+  { id: 'chatgpt', name: 'ChatGPT', note: 'Con modo desarrollador', bg: 'bg-white', fg: 'text-black' },
+]
+
+const steps = [
+  { title: 'Crea tu cuenta gratis', text: 'Con Google o tu correo.' },
+  { title: 'Copia la URL del conector', text: 'Te la damos lista en tu panel.' },
+  { title: 'Pégala en Claude o ChatGPT', text: 'Inicia sesión, autoriza y listo.' },
+]
 
 const items = [
   { icon: CalendarPlus, title: 'Crea eventos y entradas', text: 'Funciones, precios, preventas y cupos con una frase.' },
@@ -105,5 +153,5 @@ const items = [
   { icon: Megaphone, title: 'Marketing con IA', text: 'Posts, imágenes y links con seguimiento, listos para publicar.' },
 ]
 
-const clients = ['Claude', 'ChatGPT', 'Cursor', 'VS Code', 'n8n / Zapier']
+const clients = ['Claude Code', 'Cursor', 'VS Code', 'n8n / Zapier']
 </script>

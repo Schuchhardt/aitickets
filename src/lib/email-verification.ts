@@ -4,6 +4,7 @@
 //   - uid: id del usuario de Supabase Auth
 //   - eh:  hash corto del correo al que se envió (si el correo cambia, el enlace deja de servir)
 //   - exp: vencimiento en segundos (48 h)
+//   - n:   (opcional) destino tras verificar (p. ej. /dashboard/ia o /oauth/authorize?...), validado con safeNextPath
 // Clave: EMAIL_VERIFY_SECRET. Si falta, se deriva de INTERNAL_API_SECRET (y como último recurso de la
 // service role) con una etiqueta propia, para no dejar a nadie sin poder verificar su cuenta.
 //
@@ -17,6 +18,7 @@ import { getSupabaseAdmin } from "./auth-helpers";
 import { ensureOrgSite, invalidateSiteCache } from "./sites";
 import { sendEmail } from "../../netlify/lib/mailer.mjs";
 import { renderVerifyEmail } from "../../netlify/lib/emails/index.mjs";
+import { isOnboardingPending, safeNextPath } from "./onboarding";
 
 export const EMAIL_VERIFY_TTL_SECONDS = 48 * 3600;
 const PURPOSE = "email_verify";
@@ -46,25 +48,27 @@ export function siteOrigin(): string {
 }
 
 /** Firma un token de verificación para el usuario de Auth `uid` y su correo actual. */
-export function signEmailVerifyToken(uid: string, email: string, now = Date.now()): string {
+export function signEmailVerifyToken(uid: string, email: string, now = Date.now(), next?: string | null): string {
+    const safeNext = safeNextPath(next);
     const payload = b64url(JSON.stringify({
         p: PURPOSE,
         uid,
         eh: emailHash(email),
         exp: Math.floor(now / 1000) + EMAIL_VERIFY_TTL_SECONDS,
+        ...(safeNext ? { n: safeNext } : {}),
     }));
     const sig = b64url(createHmac("sha256", signingKey()).update(payload).digest());
     return `${payload}.${sig}`;
 }
 
 export type VerifyTokenResult =
-    | { ok: true; uid: string; eh: string }
+    | { ok: true; uid: string; eh: string; next: string | null }
     | { ok: false; error: "invalid" | "expired" };
 
 /** Valida firma (comparación en tiempo constante), propósito y vencimiento. */
 export function verifyEmailVerifyToken(token: string, now = Date.now()): VerifyTokenResult {
     try {
-        if (typeof token !== "string" || token.length > 2048) return { ok: false, error: "invalid" };
+        if (typeof token !== "string" || token.length > 4096) return { ok: false, error: "invalid" };
         const [payload, sig] = token.split(".");
         if (!payload || !sig) return { ok: false, error: "invalid" };
         const expected = createHmac("sha256", signingKey()).update(payload).digest();
@@ -73,7 +77,7 @@ export function verifyEmailVerifyToken(token: string, now = Date.now()): VerifyT
         const data = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
         if (data?.p !== PURPOSE || typeof data.uid !== "string" || typeof data.eh !== "string") return { ok: false, error: "invalid" };
         if (!Number.isFinite(data.exp) || data.exp * 1000 < now) return { ok: false, error: "expired" };
-        return { ok: true, uid: data.uid, eh: data.eh };
+        return { ok: true, uid: data.uid, eh: data.eh, next: safeNextPath(data.n) };
     } catch {
         return { ok: false, error: "invalid" };
     }
@@ -84,8 +88,8 @@ export function verifyEmailVerifyToken(token: string, now = Date.now()): VerifyT
  * El botón "Confirmar mi correo" lleva a /organizadores/verificar, que al confirmar deja la sesión
  * iniciada. Lanza si Resend falla.
  */
-export async function sendVerificationEmail({ uid, email, name, orgName }: { uid: string; email: string; name?: string | null; orgName?: string | null }) {
-    const url = `${siteOrigin()}/organizadores/verificar?t=${encodeURIComponent(signEmailVerifyToken(uid, email))}`;
+export async function sendVerificationEmail({ uid, email, name, orgName, next }: { uid: string; email: string; name?: string | null; orgName?: string | null; next?: string | null }) {
+    const url = `${siteOrigin()}/organizadores/verificar?t=${encodeURIComponent(signEmailVerifyToken(uid, email, Date.now(), next))}`;
     const { subject, html, text } = await renderVerifyEmail({ name: name || "", orgName: orgName || "", url });
     return sendEmail({
         to: email,
@@ -166,7 +170,13 @@ export async function getOrgVerifiedEmail(orgId: number): Promise<string | null>
 }
 
 export type ConfirmResult =
-    | { ok: true; alreadyVerified: boolean; slug: string | null; uid: string; email: string; authConfirmed: boolean }
+    | {
+          ok: true; alreadyVerified: boolean; slug: string | null; uid: string; email: string; authConfirmed: boolean;
+          /** Destino pedido al registrarse (validado). */
+          next: string | null;
+          /** Falta el nombre de la productora (/organizadores/bienvenida). */
+          onboardingPending: boolean;
+      }
     | { ok: false; error: "invalid" | "expired" | "not_found" | "server" };
 
 /**
@@ -223,16 +233,24 @@ export async function confirmProducerEmail(token: string): Promise<ConfirmResult
         // El enlace llegó a authUser.email (eh coincide): esa es la dirección probada de la organización
         await setOrgVerifiedEmail(orgId, authUser.email);
 
+        // Sin el nombre real de la productora todavía, el sitio se crea al completar el onboarding (el slug
+        // sale del nombre)
+        const onboardingPending = await isOnboardingPending(orgId);
         let slug: string | null = null;
-        try {
-            const { data: org } = await supabase.from("organizations").select("public_name").eq("id", orgId).maybeSingle();
-            slug = (await ensureOrgSite(orgId, org?.public_name || "")).slug;
-            invalidateSiteCache(slug);
-        } catch (err: any) {
-            console.warn("email-verification: no se pudo asegurar el sitio", err?.message || err);
+        if (!onboardingPending) {
+            try {
+                const { data: org } = await supabase.from("organizations").select("public_name").eq("id", orgId).maybeSingle();
+                slug = (await ensureOrgSite(orgId, org?.public_name || "")).slug;
+                invalidateSiteCache(slug);
+            } catch (err: any) {
+                console.warn("email-verification: no se pudo asegurar el sitio", err?.message || err);
+            }
         }
 
-        return { ok: true, alreadyVerified: before.verified === true, slug, uid: parsed.uid, email: authUser.email, authConfirmed };
+        return {
+            ok: true, alreadyVerified: before.verified === true, slug, uid: parsed.uid, email: authUser.email, authConfirmed,
+            next: parsed.next, onboardingPending,
+        };
     } catch (err: any) {
         console.error("email-verification: error", err?.message || err);
         return { ok: false, error: "server" };

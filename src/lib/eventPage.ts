@@ -41,6 +41,11 @@ export interface PublicEventOptions {
   request?: Request;
   url?: URL;
   locals?: any;
+  /**
+   * Vista previa privada (link con token o dueño con sesión): carga el evento por id aunque NO esté
+   * publicado, no registra la visita y siempre es noindex. `slug` se ignora.
+   */
+  previewEventId?: number;
 }
 
 export interface PublicEventSeo {
@@ -221,16 +226,16 @@ export const truncate = (text: string, max: number) => {
  * Devuelve null si no existe, no está publicado o (con organizationId) pertenece a otra organización.
  */
 export async function getPublicEventData(slug: string | undefined, opts: PublicEventOptions = {}): Promise<PublicEventResult | null> {
-  if (!slug) return null;
+  const isPreview = opts.previewEventId !== undefined;
+  if (!slug && !isPreview) return null;
   const supabase = getSupabaseAdmin();
   const now = new Date();
 
-  const { data: event, error } = await supabase
-    .from("events")
-    .select(EVENT_PUBLIC_COLUMNS)
-    .eq("slug", slug)
-    .eq("status", "published")
-    .maybeSingle();
+  const baseQuery = supabase.from("events").select(EVENT_PUBLIC_COLUMNS);
+  const { data: event, error } = await (isPreview
+    ? baseQuery.eq("id", Number(opts.previewEventId))
+    : baseQuery.eq("slug", slug!).eq("status", "published")
+  ).maybeSingle();
 
   if (error) {
     console.error("Error al obtener el evento:", error);
@@ -247,8 +252,8 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
     event.end_date = null;
   }
 
-  // Tracking de visita (server-side, no bloqueante). Solo se guarda el hash de la IP.
-  if (opts.request) {
+  // Tracking de visita (server-side, no bloqueante). Solo se guarda el hash de la IP. Las vistas previas no cuentan.
+  if (opts.request && !isPreview) {
     await trackVisit(supabase, event.id, opts.request, opts.url, opts.locals);
   }
 
@@ -424,6 +429,8 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
     organization,
     venue: primaryVenue,
     is_demo: isDemo,
+    // Vista previa privada: la página muestra el aviso y no permite comprar si no está publicado
+    is_preview: isPreview,
   };
 
   // SEO
@@ -454,7 +461,7 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
       title: pageTitle,
       description: metaDescription,
       canonicalPath,
-      noindex: isPrivate || isDemo,
+      noindex: isPrivate || isDemo || isPreview,
       pageUrl: opts.siteOrigin ? `${opts.siteOrigin.replace(/\/$/, "")}/eventos/${event.slug}` : `${mainUrl}${canonicalPath}`,
     },
     org: event.organization_id && organization ? { id: Number(event.organization_id), ...organization } : null,

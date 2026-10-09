@@ -23,6 +23,20 @@ export async function loadOwnedEvent<T = any>(ctx: ToolContext, eventId: number,
 export const eventPublicUrl = (ctx: ToolContext, slug: string | null | undefined) => (slug ? `${ctx.origin}/eventos/${slug}` : null);
 export const eventDashboardUrl = (ctx: ToolContext, id: number) => `${ctx.origin}/dashboard/events/${id}`;
 
+export const DRAFT_URL_NOTE =
+    "BORRADOR: el evento NO está publicado; su link público da 404 a cualquier persona. Para mostrarlo sin publicar usa " +
+    "un link privado de vista previa (create_preview_link): la página indica 'Vista previa · Evento NO publicado'.";
+
+/**
+ * Links de un evento según su estado. Publicado: public_url. Borrador: public_url = null (no funciona para el
+ * público), public_url_after_publish (la URL que tendrá) y una nota explícita para el asistente.
+ */
+export function eventUrls(ctx: ToolContext, event: { slug?: string | null; status?: string | null }) {
+    const url = eventPublicUrl(ctx, event.slug);
+    if (event.status === "published") return { is_published: true, public_url: url };
+    return { is_published: false, public_url: null, public_url_after_publish: url, visibility_note: DRAFT_URL_NOTE };
+}
+
 export const clp = (n: number) => `$${Math.round(Number(n) || 0).toLocaleString("es-CL")} CLP`;
 
 const dayFmt = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" });

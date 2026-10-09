@@ -119,6 +119,8 @@ const onSaleTickets = computed(() => (props.event?.tickets || []).filter(
 
 // Estado de venta: on_sale | sold_out | upcoming | closed
 const saleState = computed(() => {
+  // Vista previa de un evento no publicado: se muestran precios, pero no se puede comprar
+  if (props.event?.is_preview && props.event?.status !== "published") return "preview";
   if (onSaleTickets.value.length > 0) return "on_sale";
   return props.event?.sale_state && props.event.sale_state !== "on_sale" ? props.event.sale_state : "closed";
 });
@@ -136,6 +138,8 @@ const priceLabel = computed(() => {
       return "Próximamente";
     case "closed":
       return "Venta cerrada";
+    case "preview":
+      if (!onSaleTickets.value.length) return "Sin entradas a la venta";
   }
   const prices = onSaleTickets.value.map((t) => Number(t.price) || 0);
   const minPrice = Math.min(...prices);
@@ -189,6 +193,8 @@ const unavailableLabel = computed(() => {
       return "Entradas agotadas";
     case "upcoming":
       return "Venta próximamente";
+    case "preview":
+      return "Vista previa · compra al publicar";
     default:
       return "Venta cerrada";
   }

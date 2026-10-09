@@ -5,6 +5,8 @@ import EventDetail from "../../components/EventDetail.vue";
 import EventAssistant from "../../components/EventAssistant.vue";
 import EventMetaTags from "../../components/EventMetaTags.astro";
 import { getPublicEventData } from "../../lib/eventPage";
+import { getSupabaseAdmin } from "../../lib/auth-helpers";
+import { getSessionContext } from "../../lib/supabaseServer";
 import Layout from '../../layouts/Layout.astro';
 import "../../styles/global.css";
 
@@ -12,13 +14,32 @@ export const prerender = false;
 
 // Toda la carga (evento, visitas, entradas/stock, funciones, SEO) vive en src/lib/eventPage.ts,
 // compartida con los sitios de productor (/o/[site]/eventos/[slug]).
-const result = await getPublicEventData(Astro.params.slug, {
+let result = await getPublicEventData(Astro.params.slug, {
   request: Astro.request,
   url: Astro.url,
   locals: Astro.locals,
 });
 
-// Borradores, eventos inexistentes o slugs inválidos => 404 real (Astro renderiza src/pages/404.astro)
+// Borrador: el equipo de la productora (con sesión) lo ve en modo vista previa. Para compartirlo con
+// alguien sin cuenta se usa un link privado (/eventos/vista-previa/<token>, ver src/lib/eventPreview.ts).
+if (!result && Astro.params.slug && Astro.cookies.get("sb-access-token")) {
+  const session = await getSessionContext(Astro);
+  if (session) {
+    const { data: own } = await getSupabaseAdmin()
+      .from("events")
+      .select("id")
+      .eq("slug", Astro.params.slug)
+      .eq("organization_id", session.dbUser.organization_id)
+      .maybeSingle();
+    if (own) {
+      result = await getPublicEventData(undefined, { previewEventId: Number(own.id) });
+      Astro.response.headers.set("Cache-Control", "private, no-store");
+      Astro.response.headers.set("X-Robots-Tag", "noindex, nofollow");
+    }
+  }
+}
+
+// Borradores (para el público), eventos inexistentes o slugs inválidos => 404 real (src/pages/404.astro)
 if (!result) {
   return new Response(null, { status: 404 });
 }

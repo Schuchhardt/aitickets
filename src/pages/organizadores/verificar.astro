@@ -11,6 +11,7 @@ import GradientBackground from "../../components/Hero/GradientBackground.vue";
 import { confirmProducerEmail, verifyEmailVerifyToken } from "../../lib/email-verification";
 import { createPasswordlessSession, isSameSitePost } from "../../lib/magic-link";
 import { setSessionCookies } from "../../lib/supabaseServer";
+import { afterSignupPath, onboardingUrl } from "../../lib/onboarding";
 import "../../styles/global.css";
 
 export const prerender = false;
@@ -20,6 +21,7 @@ type State = "ok" | "already" | "expired" | "invalid" | "not_found" | "server" |
 let state: State = "missing";
 let slug: string | null = null;
 let pendingToken = "";
+let loginHref = "/organizadores/login?verificado=1";
 
 if (Astro.request.method === "POST") {
   let token = "";
@@ -35,6 +37,7 @@ if (Astro.request.method === "POST") {
   } else if (result.ok) {
     state = result.alreadyVerified ? "already" : "ok";
     slug = result.slug;
+    if (result.next) loginHref += `&next=${encodeURIComponent(result.next)}`;
     // Primera confirmación: el usuario probó que controla el correo => sesión iniciada sin contraseña.
     // (Un enlace ya usado no vuelve a iniciar sesión: el token de verificación dura 48 h.)
     // confirmProducerEmail ya confirmó la cuenta en Auth (el magic link de un usuario sin confirmar lo
@@ -45,7 +48,8 @@ if (Astro.request.method === "POST") {
       if (session) {
         setSessionCookies(Astro, session.accessToken, session.refreshToken);
         Astro.response.headers.set("Cache-Control", "private, no-store");
-        return Astro.redirect("/dashboard?bienvenida=1", 303);
+        // Registro en dos pasos: falta el nombre de la productora => /organizadores/bienvenida; luego `next`
+        return Astro.redirect(result.onboardingPending ? onboardingUrl(result.next) : afterSignupPath(result.next), 303);
       }
     }
   } else {
@@ -125,7 +129,7 @@ const showResend = state === "expired" || state === "invalid" || state === "serv
 
         {success && (
           <>
-            <a href="/organizadores/login?verificado=1" class="block w-full bg-white text-gray-900 font-medium py-3 rounded-lg hover:bg-white/90 transition">
+            <a href={loginHref} class="block w-full bg-white text-gray-900 font-medium py-3 rounded-lg hover:bg-white/90 transition">
               Iniciar sesión
             </a>
             {slug && (

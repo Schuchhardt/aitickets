@@ -4,6 +4,7 @@ import AppHeader from "../../components/AppHeader.vue";
 import AppFooter from "../../components/AppFooter.vue";
 import ProducerLoginForm from "../../components/auth/ProducerLoginForm.vue";
 import GradientBackground from "../../components/Hero/GradientBackground.vue";
+import { isGoogleAuthEnabled } from "../../lib/google-auth";
 import "../../styles/global.css";
 ---
 
@@ -19,7 +20,7 @@ import "../../styles/global.css";
   >
     <GradientBackground variant="soft" client:idle />
     <div class="relative z-10 w-full">
-      <ProducerLoginForm client:load />
+      <ProducerLoginForm client:load googleEnabled={isGoogleAuthEnabled()} />
     </div>
   </main>
 

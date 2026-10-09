@@ -4,9 +4,13 @@ import AppHeader from "../../components/AppHeader.vue";
 import AppFooter from "../../components/AppFooter.vue";
 import ProducerRegisterForm from "../../components/auth/ProducerRegisterForm.vue";
 import GradientBackground from "../../components/Hero/GradientBackground.vue";
+import { isGoogleAuthEnabled } from "../../lib/google-auth";
 import "../../styles/global.css";
 
+export const prerender = false;
+
 const turnstileSiteKey = import.meta.env.TURNSTILE_SITE_KEY;
+const googleEnabled = isGoogleAuthEnabled();
 
 // Registro desde un enlace de lead (?lead=<token>): el token no debe filtrarse por Referer a terceros
 // (Turnstile, analítica) ni indexarse.
@@ -34,7 +38,7 @@ if (hasLead) {
   >
     <GradientBackground variant="soft" client:idle />
     <div class="relative z-10 w-full">
-      <ProducerRegisterForm client:load turnstileSiteKey={turnstileSiteKey} />
+      <ProducerRegisterForm client:load turnstileSiteKey={turnstileSiteKey} googleEnabled={googleEnabled} />
     </div>
   </main>
 

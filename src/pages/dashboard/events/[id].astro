@@ -4,6 +4,7 @@ import DashboardLayout from "../../../layouts/DashboardLayout.astro";
 import EventFAQManager from "../../../components/dashboard/EventFAQManager.vue";
 import CourtesyTicketsForm from "../../../components/dashboard/CourtesyTicketsForm.vue";
 import DiscountCodesManager from "../../../components/dashboard/DiscountCodesManager.vue";
+import PreviewLinksManager from "../../../components/dashboard/PreviewLinksManager.vue";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { EVENT_MANAGER_ROLES } from "../../../lib/supabaseServer";
 import { requireDashboardSession } from "../_lib/guard";
@@ -160,7 +161,7 @@ const publishBlockers = [
                 target="_blank"
                 class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
             >
-                <Eye size={18} /> Ver Página
+                <Eye size={18} /> {event.status === "published" ? "Ver Página" : "Vista previa"}
             </a>
             <a
                 href={`/dashboard/events/${event.id}/checkin`}
@@ -342,6 +343,8 @@ const publishBlockers = [
                     </button>
                 </div>
             </div>
+
+            <PreviewLinksManager client:visible eventId={Number(event.id)} status={event.status} />
 
             <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
                 <h3 class="font-bold text-lg mb-2">Órdenes</h3>

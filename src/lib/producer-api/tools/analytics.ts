@@ -1,6 +1,6 @@
 // Herramientas: rendimiento de eventos (ventas, tráfico, conversión, canales). Agrupa por día en hora de Chile.
 import type { ToolDef, ToolContext } from "../registry";
-import { eventIdSchema, loadOwnedEvent, eventPublicUrl, ticketAvailability, presentTicket, TICKET_SELECT, fetchAll, localDay } from "./common";
+import { eventIdSchema, loadOwnedEvent, eventPublicUrl, ticketAvailability, presentTicket, TICKET_SELECT, fetchAll, localDay, eventUrls } from "./common";
 
 const MAX_VISITS = 50000;
 
@@ -123,7 +123,7 @@ export async function eventPerformance(ctx: ToolContext, eventId: number, days: 
         event_id: Number(event.id),
         name: event.name,
         status: event.status,
-        public_url: eventPublicUrl(ctx, event.slug),
+        ...eventUrls(ctx, event),
         start_date: event.start_date,
         days_until_event: daysUntil,
         sales: {
@@ -232,7 +232,7 @@ const getSalesOverview: ToolDef = {
                     name: e.name,
                     status: e.status,
                     start_date: e.start_date,
-                    public_url: eventPublicUrl(ctx, e.slug),
+                    public_url: e.status === "published" ? eventPublicUrl(ctx, e.slug) : null,
                     tickets_sold: per.get(Number(e.id))?.tickets || 0,
                     revenue_clp: per.get(Number(e.id))?.revenue || 0,
                 }))

@@ -3,6 +3,7 @@
 // filtrar TODAS sus consultas por dbUser.organization_id.
 import type { AstroGlobal } from "astro";
 import { getSessionContext, hasRole, type SessionContext } from "../../../lib/supabaseServer";
+import { isOnboardingPending, onboardingUrl } from "../../../lib/onboarding";
 
 export const VALIDATOR_HOME = "/dashboard/events";
 
@@ -17,7 +18,12 @@ type GuardResult =
 export async function requireDashboardSession(Astro: AstroGlobal, roles?: string[]): Promise<GuardResult> {
     const session = await getSessionContext(Astro);
     if (!session) {
-        return { ok: false, response: Astro.redirect("/organizadores/login") };
+        const here = Astro.url.pathname + Astro.url.search;
+        return { ok: false, response: Astro.redirect(`/organizadores/login?next=${encodeURIComponent(here)}`) };
+    }
+    // Registro en dos pasos: sin nombre de productora todavía => /organizadores/bienvenida (y luego de vuelta aquí)
+    if (await isOnboardingPending(Number(session.dbUser.organization_id))) {
+        return { ok: false, response: Astro.redirect(onboardingUrl(Astro.url.pathname + Astro.url.search)) };
     }
     (Astro.locals as any).sessionContext = session;
     if (roles && !hasRole(session.dbUser, roles)) {

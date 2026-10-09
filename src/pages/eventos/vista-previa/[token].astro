@@ -1,0 +1,81 @@
+---
+// /eventos/vista-previa/<token> — vista previa PRIVADA de un evento (también borradores).
+// El token lo crean el panel o la API de productores (src/lib/eventPreview.ts). Nunca se indexa ni se cachea,
+// no envía Referer (el token va en la URL) y no registra visitas en las analíticas del evento.
+// Los bots de vista previa de links (WhatsApp, Slack…) reciben una página genérica sin datos del evento.
+import AppHeader from "../../../components/AppHeader.vue";
+import AppFooter from "../../../components/AppFooter.vue";
+import EventDetail from "../../../components/EventDetail.vue";
+import EventMetaTags from "../../../components/EventMetaTags.astro";
+import { getPublicEventData } from "../../../lib/eventPage";
+import { previewCookieName, resolvePreviewToken, isPreviewToken, PREVIEW_PATH } from "../../../lib/eventPreview";
+import Layout from "../../../layouts/Layout.astro";
+import "../../../styles/global.css";
+
+export const prerender = false;
+
+Astro.response.headers.set("Cache-Control", "private, no-store");
+Astro.response.headers.set("Referrer-Policy", "no-referrer");
+Astro.response.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+
+const token = Astro.params.token || "";
+const cookieName = isPreviewToken(token) ? previewCookieName(token) : null;
+const resolved = await resolvePreviewToken(token, {
+  userAgent: Astro.request.headers.get("user-agent"),
+  cookieNonce: cookieName ? Astro.cookies.get(cookieName)?.value || null : null,
+});
+
+let result = null as Awaited<ReturnType<typeof getPublicEventData>>;
+if (resolved.ok) {
+  if (resolved.setCookie) {
+    Astro.cookies.set(resolved.setCookie.name, resolved.setCookie.value, {
+      path: PREVIEW_PATH,
+      httpOnly: true,
+      secure: import.meta.env.PROD,
+      sameSite: "lax",
+      ...(resolved.setCookie.maxAge ? { maxAge: resolved.setCookie.maxAge } : { maxAge: 60 * 60 * 24 * 365 }),
+    });
+  }
+  result = await getPublicEventData(undefined, { previewEventId: resolved.eventId });
+  // El evento debe seguir perteneciendo a la organización que creó el link
+  if (result && Number(result.eventData.organization_id) !== resolved.orgId) result = null;
+}
+
+const reason = resolved.ok ? (result ? null : "not_found") : resolved.reason;
+if (reason && reason !== "bot") Astro.response.status = reason === "not_found" ? 404 : 410;
+
+const messages: Record<string, { title: string; text: string }> = {
+  not_found: { title: "Vista previa no disponible", text: "El link no existe o el evento fue eliminado. Pide un link nuevo a quien te lo envió." },
+  expired: { title: "Este link de vista previa venció", text: "Pide un link nuevo a la productora del evento." },
+  revoked: { title: "Este link de vista previa fue desactivado", text: "Pide un link nuevo a la productora del evento." },
+  used: { title: "Este link ya fue usado", text: "Era un link de vista previa de un solo uso y ya se abrió en otro navegador. Pide uno nuevo a la productora." },
+  bot: { title: "Vista previa privada de un evento", text: "Abre este link en tu navegador para ver el evento." },
+};
+const eventData = result?.eventData;
+const message = reason ? messages[reason] : null;
+---
+<Layout title={eventData ? `Vista previa: ${eventData.name} | AI Tickets` : "Vista previa privada | AI Tickets"} noindex={true} analytics={false}>
+  {eventData && result && (
+    <EventMetaTags
+      slot="head"
+      event={eventData}
+      title={`Vista previa: ${eventData.name}`}
+      description={result.seo.description}
+      canonicalPath={result.seo.canonicalPath}
+      noindex={true}
+    />
+  )}
+  <AppHeader client:idle />
+  <main class="pt-16">
+    {eventData ? (
+      <EventDetail event={eventData} siteMode={false} client:idle />
+    ) : (
+      <section class="max-w-xl mx-auto px-6 py-24 text-center font-[Prompt]" data-testid="event-preview-unavailable" data-reason={reason}>
+        <h1 class="text-2xl font-bold font-[Unbounded] mb-3">{message?.title}</h1>
+        <p class="text-gray-600">{message?.text}</p>
+        <a href="/eventos" class="inline-block mt-8 px-5 py-2 rounded-full bg-black text-white font-medium">Ver eventos publicados</a>
+      </section>
+    )}
+  </main>
+  <AppFooter client:idle />
+</Layout>

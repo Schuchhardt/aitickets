@@ -1,8 +1,10 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { KeyRound, Copy, Check } from 'lucide-vue-next'
+import { KeyRound, Copy, Check, ChevronDown } from 'lucide-vue-next'
+import AiConnectGuide from './AiConnectGuide.vue'
 
-// Llaves de API para conectar el LLM del productor (MCP) o integraciones (REST). Datos vía /api/api-keys.
+// Conecta tu IA: guía de Claude/ChatGPT (OAuth, AiConnectGuide), otros clientes MCP, apps conectadas y llaves
+// de API para integraciones (REST). Datos vía /api/api-keys.
 // La llave en claro solo se muestra una vez, justo después de crearla.
 
 const props = defineProps({
@@ -29,7 +31,7 @@ const isError = ref(false)
 const newKey = ref('')
 const copied = ref('')
 const busyId = ref(null)
-const client = ref('claude-ai')
+const client = ref('claude-code')
 
 const mcpUrl = computed(() => `${props.origin}/api/mcp`)
 const keyForSnippet = computed(() => newKey.value || 'aitk_TU_LLAVE')
@@ -38,20 +40,6 @@ const snippets = computed(() => {
   const k = keyForSnippet.value
   const url = mcpUrl.value
   return {
-    'claude-ai': {
-      label: 'Claude (web y app)',
-      oauth: true,
-      hint: 'En claude.ai: Ajustes → Conectores → Agregar conector personalizado. Nombre: AI Tickets. URL:',
-      code: url,
-      after: 'Al conectar te pedirá iniciar sesión en AI Tickets y elegir los permisos. No necesitas llave.',
-    },
-    chatgpt: {
-      label: 'ChatGPT',
-      oauth: true,
-      hint: 'En ChatGPT: Ajustes → Apps y conectores → Avanzado → Modo desarrollador → Crear. Autenticación: OAuth. URL:',
-      code: url,
-      after: 'ChatGPT abrirá AI Tickets para que autorices la conexión. No necesitas llave.',
-    },
     'claude-code': {
       label: 'Claude Code',
       hint: 'Ejecuta en tu terminal (o sin --header y autoriza con /mcp en Claude Code):',
@@ -188,38 +176,42 @@ const copy = async (text, tag) => {
 
 <template>
   <div class="space-y-6">
-    <!-- Conectar -->
-    <section class="bg-white rounded-xl border border-gray-100 shadow-sm">
-      <div class="p-6 border-b border-gray-100">
-        <h2 class="font-bold text-gray-900">Conecta tu asistente</h2>
-        <p class="text-sm text-gray-500">
+    <!-- Claude y ChatGPT (OAuth, sin llave) -->
+    <AiConnectGuide :mcp-url="mcpUrl" :connections="connections" />
+
+    <!-- Otros clientes (llave de API) -->
+    <details class="group bg-white rounded-xl border border-gray-100 shadow-sm">
+      <summary class="p-6 cursor-pointer list-none flex items-center justify-between gap-4">
+        <div class="min-w-0">
+          <h2 class="font-bold text-gray-900">Otros clientes</h2>
+          <p class="text-sm text-gray-500">Claude Code, Claude Desktop, Cursor, VS Code y automatizaciones (n8n, Make, Zapier).</p>
+        </div>
+        <ChevronDown :size="20" class="shrink-0 text-gray-400 transition-transform group-open:rotate-180" />
+      </summary>
+      <div class="border-t border-gray-100">
+        <p class="px-6 pt-4 text-sm text-gray-500 break-all">
           Servidor MCP: <code class="font-mono text-gray-800">{{ mcpUrl }}</code>
         </p>
-      </div>
-      <div class="px-6 pt-4 flex flex-wrap gap-2">
-        <button v-for="(s, id) in snippets" :key="id" type="button" @click="client = id"
-          class="px-3 py-1.5 rounded-full text-sm border transition"
-          :class="client === id ? 'bg-black text-white border-black' : 'border-gray-200 text-gray-700 hover:border-gray-400'">
-          {{ s.label }}<span v-if="s.oauth" class="ml-1 text-[10px] uppercase tracking-wide opacity-70">sin llave</span>
-        </button>
-      </div>
-      <div class="p-6 space-y-2">
-        <p class="text-sm text-gray-600">{{ snippets[client].hint }}</p>
-        <div class="relative">
-          <pre class="p-4 pr-24 rounded-lg bg-gray-900 text-gray-100 text-xs overflow-x-auto"><code>{{ snippets[client].code }}</code></pre>
-          <button type="button" @click="copy(snippets[client].code, client)"
-            class="absolute top-2 right-2 px-2 py-1 rounded bg-white/10 text-white text-xs hover:bg-white/20 flex items-center gap-1">
-            <component :is="copied === client ? Check : Copy" :size="12" /> {{ copied === client ? 'Copiado' : 'Copiar' }}
+        <div class="px-6 pt-4 flex flex-wrap gap-2">
+          <button v-for="(s, id) in snippets" :key="id" type="button" @click="client = id"
+            class="px-3 py-1.5 rounded-full text-sm border transition"
+            :class="client === id ? 'bg-black text-white border-black' : 'border-gray-200 text-gray-700 hover:border-gray-400'">
+            {{ s.label }}
           </button>
         </div>
-        <p v-if="snippets[client].after" class="text-sm text-gray-600">{{ snippets[client].after }}</p>
-        <p v-else-if="!newKey" class="text-sm text-amber-700">Este cliente usa una llave de API: créala más abajo y la configuración se completará sola.</p>
-        <p class="text-xs text-gray-400 pt-2">
-          Prueba pidiéndole: "¿Cómo van las ventas de mi próximo evento?", "Crea un código PREVENTA20 de 20% hasta el viernes"
-          o "Arma una campaña de 3 posts para Instagram".
-        </p>
+        <div class="p-6 space-y-2">
+          <p class="text-sm text-gray-600">{{ snippets[client].hint }}</p>
+          <div class="relative">
+            <pre class="p-4 pr-24 rounded-lg bg-gray-900 text-gray-100 text-xs overflow-x-auto"><code>{{ snippets[client].code }}</code></pre>
+            <button type="button" @click="copy(snippets[client].code, client)"
+              class="absolute top-2 right-2 px-2 py-1 rounded bg-white/10 text-white text-xs hover:bg-white/20 flex items-center gap-1">
+              <component :is="copied === client ? Check : Copy" :size="12" /> {{ copied === client ? 'Copiado' : 'Copiar' }}
+            </button>
+          </div>
+          <p v-if="!newKey" class="text-sm text-amber-700">Estos clientes usan una llave de API: créala más abajo y la configuración se completará sola.</p>
+        </div>
       </div>
-    </section>
+    </details>
 
     <!-- Apps conectadas (OAuth) -->
     <section class="bg-white rounded-xl border border-gray-100 shadow-sm">

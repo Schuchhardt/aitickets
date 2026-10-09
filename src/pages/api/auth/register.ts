@@ -5,6 +5,7 @@ import { ensureOrgSite } from "../../../lib/sites";
 import { sendVerificationEmail } from "../../../lib/email-verification";
 import { TERMS_VERSION } from "../../../lib/legal";
 import { createEphemeralAuthClient, notifySlack as sendSlack } from "../_lib/server-utils";
+import { ONBOARDING_PLACEHOLDER_NAME, safeNextPath } from "../../../lib/onboarding";
 import type { APIRoute } from "astro";
 
 /** Recorta y limpia un parámetro de atribución (utm/ref). */
@@ -16,7 +17,11 @@ const cleanAttr = (v: unknown, max = 200): string | null => {
 
 export const prerender = false; // Ensure this endpoint is server-rendered
 
-// Registro de productores (WP7):
+// Registro de productores (WP7 + registro en dos pasos):
+// - Solo pide correo y contraseña (+ términos y CAPTCHA). El nombre de la productora se pide DESPUÉS de verificar
+//   el correo (/organizadores/bienvenida): la organización se crea con un nombre provisorio y
+//   onboarding_pending = true. name / organizationName / phone siguen aceptándose (opcionales).
+// - `next` (opcional, p. ej. /dashboard/ia u /oauth/authorize?...) viaja firmado en el enlace de verificación.
 // - Exige aceptar los Términos para productores (acceptedTerms === true); se guarda la versión aceptada.
 // - La cuenta de Auth se crea SIN confirmar y NO se inicia sesión: se envía un enlace firmado
 //   (EMAIL_VERIFY_SECRET, 48 h) y /api/auth/login rechaza el ingreso hasta verificar.
@@ -29,7 +34,13 @@ export const POST: APIRoute = async (context) => {
     const { request } = context;
     try {
         const data = await request.json();
-        const { password, name, organizationName, phone, cfToken } = data;
+        const { password, cfToken } = data;
+        const clean = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+        const name = clean(data.name, 120) || null;
+        const phone = clean(data.phone, 40) || null;
+        const providedOrgName = clean(data.organizationName, 120);
+        const organizationName = providedOrgName || ONBOARDING_PLACEHOLDER_NAME;
+        const next = safeNextPath(data.next);
         const acceptedTerms = data.acceptedTerms === true;
         const email = typeof data.email === "string" ? data.email.trim().toLowerCase() : data.email;
         const attribution = (data.attribution && typeof data.attribution === "object") ? data.attribution : {};
@@ -42,8 +53,11 @@ export const POST: APIRoute = async (context) => {
         };
 
         // Validate input (basic)
-        if (!email || !password || !name || !organizationName) {
-            return new Response(JSON.stringify({ message: "Faltan campos obligatorios" }), { status: 400 });
+        if (!email || typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email) || email.length > 254) {
+            return new Response(JSON.stringify({ message: "Ingresa un correo válido." }), { status: 400 });
+        }
+        if (typeof password !== "string" || password.length < 8) {
+            return new Response(JSON.stringify({ message: "La contraseña debe tener al menos 8 caracteres." }), { status: 400 });
         }
         if (!acceptedTerms) {
             return new Response(JSON.stringify({ message: "Debes aceptar los Términos para productores y la Política de Privacidad." }), { status: 400 });
@@ -78,7 +92,7 @@ export const POST: APIRoute = async (context) => {
             password,
             email_confirm: false,
             user_metadata: {
-                full_name: name,
+                ...(name ? { full_name: name } : {}),
                 role: 'producer'
             },
             // Marca de cuenta creada por AI Tickets (solo estas se pueden bloquear/cambiar de email desde el dashboard)
@@ -131,9 +145,19 @@ export const POST: APIRoute = async (context) => {
             const termsFields = { terms_version: TERMS_VERSION, terms_accepted_at: new Date().toISOString() };
             let { data: orgData, error: orgError } = await supabaseAdmin
                 .from('organizations')
-                .insert({ ...orgBase, ...signupAttribution, ...termsFields })
+                .insert({ ...orgBase, ...signupAttribution, ...termsFields, onboarding_pending: true })
                 .select('id')
                 .single();
+
+            // Preview sin la migración 202610080200: sin onboarding (el nombre provisorio queda hasta editarlo)
+            if (orgError && /onboarding_pending/.test(orgError.message || '')) {
+                console.warn("Columna onboarding_pending no existe; se crea la organización sin onboarding");
+                ({ data: orgData, error: orgError } = await supabaseAdmin
+                    .from('organizations')
+                    .insert({ ...orgBase, ...signupAttribution, ...termsFields })
+                    .select('id')
+                    .single());
+            }
 
             // Preview sin la migración 202609270400: crear sin las columnas de términos
             if (orgError && /terms_/.test(orgError.message || '')) {
@@ -197,7 +221,7 @@ export const POST: APIRoute = async (context) => {
             // Perfil existe pero sin organización (registro parcial previo), actualizar
             const { error: updateError } = await supabaseAdmin
                 .from('users')
-                .update({ organization_id: orgId, name, phone })
+                .update({ organization_id: orgId, ...(name ? { name } : {}), ...(phone ? { phone } : {}) })
                 .eq('id', existingProfile.id);
 
             if (updateError) {
@@ -207,11 +231,14 @@ export const POST: APIRoute = async (context) => {
             }
         }
 
-        // 4. Sitio gratis de la organización (/o/<slug>). Se muestra recién cuando verifique el correo.
-        try {
-            await ensureOrgSite(orgId, organizationName);
-        } catch (err: any) {
-            console.error("No se pudo crear el sitio de la organización:", err?.message || err);
+        // 4. Sitio gratis de la organización (/o/<slug>): se crea al completar el onboarding, con el nombre real
+        // (el slug sale del nombre). Solo si ya vino el nombre (p. ej. enlace de lead) se crea ahora.
+        if (providedOrgName) {
+            try {
+                await ensureOrgSite(orgId, organizationName);
+            } catch (err: any) {
+                console.error("No se pudo crear el sitio de la organización:", err?.message || err);
+            }
         }
 
         // 5. Lead convertido (outreach / formulario web gratis)
@@ -224,14 +251,14 @@ export const POST: APIRoute = async (context) => {
         // 6. Correo de verificación. Si falla, la cuenta queda creada y se puede reenviar desde el login.
         let emailSent = false;
         try {
-            await sendVerificationEmail({ uid: userId, email, name, orgName: organizationName });
+            await sendVerificationEmail({ uid: userId, email, name, orgName: providedOrgName || null, next });
             emailSent = true;
         } catch (err: any) {
             console.error("No se pudo enviar el correo de verificación:", err?.message || err);
         }
 
         // Notificar en Slack sobre nuevo productor
-        await notifySlack({ name, email, phone, organizationName, attribution: signupAttribution, emailSent }).catch(err =>
+        await notifySlack({ name, email, phone, organizationName: providedOrgName || "(la pide después de verificar)", attribution: signupAttribution, emailSent }).catch(err =>
             console.error("Error al notificar a Slack:", err.message)
         );
 
@@ -269,14 +296,14 @@ async function convertLead(leadId: string, orgId: number) {
 }
 
 async function notifySlack({ name, email, phone, organizationName, attribution, emailSent }: {
-    name: string; email: string; phone?: string; organizationName: string;
+    name: string | null; email: string; phone?: string | null; organizationName: string;
     attribution: Record<string, string | null>; emailSent: boolean;
 }) {
     const source = [attribution.signup_utm_source, attribution.signup_utm_medium, attribution.signup_utm_campaign]
         .filter(Boolean).join(" / ");
     const lines = [
         `🎉 *Nuevo productor registrado*`,
-        `• *Nombre:* ${name}`,
+        `• *Nombre:* ${name || "No proporcionado"}`,
         `• *Email:* ${email}`,
         `• *Teléfono:* ${phone || "No proporcionado"}`,
         `• *Organización:* ${organizationName || "No proporcionada"}`,

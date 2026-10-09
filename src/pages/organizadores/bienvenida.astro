@@ -1,0 +1,125 @@
+---
+// /organizadores/bienvenida — paso 2 del registro: con el correo ya verificado (o Google), solo se pide el
+// nombre de la productora. Luego se crea su web gratis y se sigue a ?next= (p. ej. /dashboard/ia para
+// "Conecta tu IA" o la autorización OAuth de Claude/ChatGPT). Ver src/lib/onboarding.ts.
+import Layout from "../../layouts/Layout.astro";
+import AppHeader from "../../components/AppHeader.vue";
+import GradientBackground from "../../components/Hero/GradientBackground.vue";
+import { getSupabaseAdmin } from "../../lib/auth-helpers";
+import { getSessionContext } from "../../lib/supabaseServer";
+import { isSameSitePost } from "../../lib/magic-link";
+import { ensureOrgSite, invalidateSiteCache } from "../../lib/sites";
+import { afterSignupPath, isOnboardingPending, markOnboardingDone, ONBOARDING_PATH, ONBOARDING_PLACEHOLDER_NAME, safeNextPath } from "../../lib/onboarding";
+import { notifySlack } from "../api/_lib/server-utils";
+import "../../styles/global.css";
+
+export const prerender = false;
+
+Astro.response.headers.set("Cache-Control", "private, no-store");
+
+const next = safeNextPath(Astro.url.searchParams.get("next"));
+const selfPath = next ? `${ONBOARDING_PATH}?next=${encodeURIComponent(next)}` : ONBOARDING_PATH;
+
+const session = await getSessionContext(Astro);
+if (!session) {
+  return Astro.redirect(`/organizadores/login?next=${encodeURIComponent(selfPath)}`);
+}
+const orgId = Number(session.dbUser.organization_id);
+if (!(await isOnboardingPending(orgId))) {
+  return Astro.redirect(afterSignupPath(next));
+}
+
+const supabase = getSupabaseAdmin();
+const { data: org } = await supabase.from("organizations").select("public_name").eq("id", orgId).maybeSingle();
+let orgName = org?.public_name && org.public_name !== ONBOARDING_PLACEHOLDER_NAME ? org.public_name : "";
+let error = "";
+
+if (Astro.request.method === "POST") {
+  let submitted = "";
+  try {
+    const form = await Astro.request.formData();
+    submitted = String(form.get("organizationName") || "").replace(/\s+/g, " ").trim();
+  } catch {
+    submitted = "";
+  }
+  orgName = submitted.slice(0, 120);
+  if (!isSameSitePost(Astro.request, Astro.url)) {
+    error = "No pudimos validar el formulario. Recarga la página e intenta de nuevo.";
+  } else if (orgName.length < 2) {
+    error = "Escribe el nombre de tu productora (al menos 2 caracteres).";
+  } else {
+    const { error: updateError } = await supabase
+      .from("organizations")
+      .update({ public_name: orgName, onboarding_pending: false })
+      .eq("id", orgId);
+    if (updateError) {
+      console.error("onboarding: no se pudo guardar el nombre", updateError.message);
+      error = "No pudimos guardar el nombre. Intenta nuevamente.";
+    } else {
+      markOnboardingDone(orgId);
+      let slug: string | null = null;
+      try {
+        slug = (await ensureOrgSite(orgId, orgName)).slug;
+        invalidateSiteCache(slug);
+      } catch (err: any) {
+        console.error("onboarding: no se pudo crear el sitio", err?.message || err);
+      }
+      await notifySlack(
+        `✅ *Productor completó su registro*\n• *Organización:* ${orgName}\n• *Email:* ${session.dbUser.email || session.authUser.email}` +
+          (slug ? `\n• *Web:* /o/${slug}` : "") +
+          (next ? `\n• *Sigue a:* ${next.split("?")[0]}` : ""),
+      ).catch(() => {});
+      return Astro.redirect(afterSignupPath(next), 303);
+    }
+  }
+}
+
+const goingToAi = !!next && (next.startsWith("/dashboard/ia") || next.startsWith("/oauth/"));
+---
+
+<Layout title="Bienvenido | AI Tickets" description="Completa tu cuenta de productor en AI Tickets." noindex={true}>
+  <AppHeader client:idle />
+  <main class="relative min-h-screen flex items-center justify-center py-20 px-4 overflow-hidden">
+    <GradientBackground variant="soft" client:idle />
+    <div class="relative z-10 w-full">
+      <div class="w-full max-w-md mx-auto bg-white/10 backdrop-blur-xl p-8 rounded-xl shadow-2xl border border-white/20 font-[Prompt]" data-testid="onboarding">
+        <ol class="flex items-center justify-center gap-2 text-xs text-white/60 mb-6" aria-label="Pasos">
+          <li class="flex items-center gap-1"><span class="w-5 h-5 rounded-full bg-lime-400 text-black flex items-center justify-center font-bold">✓</span> Correo</li>
+          <li class="w-6 h-px bg-white/30"></li>
+          <li class="flex items-center gap-1 text-white"><span class="w-5 h-5 rounded-full bg-white text-black flex items-center justify-center font-bold">2</span> Tu productora</li>
+          {goingToAi && (<>
+            <li class="w-6 h-px bg-white/30"></li>
+            <li class="flex items-center gap-1"><span class="w-5 h-5 rounded-full border border-white/40 flex items-center justify-center">3</span> Conecta tu IA</li>
+          </>)}
+        </ol>
+        <h1 class="text-2xl font-bold mb-2 text-center font-[Unbounded] text-white">¡Correo confirmado!</h1>
+        <p class="text-center text-white/70 text-sm mb-6">Último dato: ¿cómo se llama tu productora? Así aparecerá en tus eventos y en tu web gratis.</p>
+
+        <form method="post" action={selfPath} class="space-y-4">
+          <div>
+            <label for="organizationName" class="block text-sm font-medium text-white/80 mb-1">Nombre de la productora</label>
+            <input
+              id="organizationName"
+              name="organizationName"
+              type="text"
+              required
+              minlength="2"
+              maxlength="120"
+              autocomplete="organization"
+              autofocus
+              value={orgName}
+              placeholder="Ej: Productora Sonido Sur"
+              class="w-full px-4 py-3 border border-white/20 bg-white/10 text-white placeholder-white/40 rounded-lg focus:ring-2 focus:ring-white/50 outline-none"
+              data-testid="onboarding-org-name"
+            />
+            <p class="text-white/50 text-xs mt-1">Puedes cambiarlo cuando quieras en Configuración.</p>
+          </div>
+          {error && <p class="p-3 bg-red-500/20 text-red-200 rounded-lg border border-red-400/30 text-sm" role="alert">{error}</p>}
+          <button type="submit" class="w-full bg-lime-400 text-black font-bold font-[Unbounded] py-3 rounded-lg hover:bg-lime-300 transition" data-testid="onboarding-submit">
+            {goingToAi ? "Continuar a Conecta tu IA →" : "Entrar a mi panel →"}
+          </button>
+        </form>
+      </div>
+    </div>
+  </main>
+</Layout>

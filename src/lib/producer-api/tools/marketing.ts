@@ -2,10 +2,10 @@
 // El copy lo escribe el LLM del productor (para eso get_marketing_kit le da el contexto); el servidor guarda
 // imágenes, genera imágenes con IA (opcional) y publica en las redes conectadas.
 import { ToolError, type ToolDef, type ToolContext } from "../registry";
-import { eventIdSchema, loadOwnedEvent, eventPublicUrl, eventDashboardUrl } from "./common";
+import { eventIdSchema, loadOwnedEvent, eventPublicUrl, eventDashboardUrl, DRAFT_URL_NOTE } from "./common";
 import {
     buildEventContext, EVENT_CONTEXT_SELECT, generateEventImage, isImageGenerationConfigured, publishSocialPost,
-    storeImage, sniffImageType, MAX_IMAGE_BYTES,
+    storeImage, sniffImageType, MAX_IMAGE_BYTES, MAX_REFERENCE_IMAGES, REFERENCE_IMAGE_TYPES, type ReferenceImage,
 } from "../../marketing";
 import { rateLimit } from "../../../../netlify/lib/rate-limit.mjs";
 import { serverEnv } from "../../../pages/api/_lib/server-utils";
@@ -22,6 +22,9 @@ export { isPublicIp };
 
 /** Descarga una imagen pública (https, máx. 5 MB, redirecciones verificadas); el tipo se detecta por bytes. */
 export async function fetchPublicImage(rawUrl: string, fetchImpl: typeof fetch = fetch): Promise<{ buffer: Buffer; contentType: string }> {
+    if (!/^https:\/\//i.test(String(rawUrl || "").trim())) {
+        throw new ToolError("invalid_input", "Imagen: solo se aceptan URLs https públicas (ej: https://…/flyer.jpg).");
+    }
     let buffer: Buffer;
     try {
         ({ buffer } = await fetchPublic(rawUrl, { maxBytes: MAX_IMAGE_BYTES, accept: "image/*", fetchImpl }));
@@ -32,6 +35,28 @@ export async function fetchPublicImage(rawUrl: string, fetchImpl: typeof fetch =
     const contentType = sniffImageType(buffer);
     if (!contentType) throw new ToolError("invalid_input", "El archivo no es una imagen JPG, PNG, WEBP o GIF.");
     return { buffer, contentType };
+}
+
+/**
+ * Descarga las imágenes de referencia para generate_image. Los errores dicen cuál falló (número y URL).
+ * GIF no sirve como referencia (OpenAI acepta PNG, JPG o WEBP).
+ */
+export async function loadReferenceImages(urls: string[], fetchImpl: typeof fetch = fetch): Promise<ReferenceImage[]> {
+    const out: ReferenceImage[] = [];
+    for (const [i, url] of urls.entries()) {
+        let img: { buffer: Buffer; contentType: string };
+        try {
+            img = await fetchPublicImage(url, fetchImpl);
+        } catch (err: any) {
+            if (err instanceof ToolError) throw new ToolError(err.code, `Referencia ${i + 1} (${url.slice(0, 120)}): ${err.message.replace(/^Imagen: /, "")}`);
+            throw err;
+        }
+        if (!REFERENCE_IMAGE_TYPES.includes(img.contentType)) {
+            throw new ToolError("invalid_input", `Referencia ${i + 1}: usa una imagen JPG, PNG o WEBP (los GIF no sirven como referencia).`);
+        }
+        out.push(img);
+    }
+    return out;
 }
 
 export function decodeBase64Image(data: string): { buffer: Buffer; contentType: string } {
@@ -72,6 +97,7 @@ const getMarketingKit: ToolDef = {
         return {
             event_id: Number(event.id),
             status: event.status,
+            ...(event.status === "published" ? {} : { draft_warning: `${DRAFT_URL_NOTE} No publiques posts ni compartas el link hasta publicar el evento.` }),
             brief: buildEventContext(event),
             public_url: url,
             image_url: event.image_url || null,
@@ -114,10 +140,14 @@ const createTrackingLink: ToolDef = {
         },
     },
     async handler(args, ctx) {
-        const event = await loadOwnedEvent<any>(ctx, args.event_id, "id, slug");
+        const event = await loadOwnedEvent<any>(ctx, args.event_id, "id, slug, status");
         const url = new URL(eventPublicUrl(ctx, event.slug)!);
         for (const k of ["ref", "utm_source", "utm_medium", "utm_campaign"]) if (args[k]) url.searchParams.set(k, args[k]);
-        return { event_id: Number(event.id), url: url.toString() };
+        return {
+            event_id: Number(event.id),
+            url: url.toString(),
+            ...(event.status === "published" ? {} : { draft_warning: `${DRAFT_URL_NOTE} Este link funcionará recién cuando se publique el evento.` }),
+        };
     },
 };
 
@@ -125,15 +155,17 @@ const uploadImage: ToolDef = {
     name: "upload_image",
     title: "Subir imagen",
     description:
-        "Sube una imagen (JPG, PNG, WEBP o GIF, máx. 5 MB) desde una URL https pública o en base64 y devuelve su URL alojada en AI Tickets. " +
-        "Con event_id + set_as_cover=true queda como portada del evento. La URL sirve también para create_social_post.",
+        "Sube una imagen (JPG, PNG, WEBP o GIF, máx. 5 MB) desde una URL https pública (p. ej. un flyer, logo o foto que el productor compartió " +
+        "por link) o en base64, y devuelve su URL alojada en AI Tickets. Esa URL sirve como portada (event_id + set_as_cover=true), " +
+        "para create_social_post o como referencia en generate_image (reference_image_urls). Si el productor adjuntó la imagen en el chat " +
+        "y no tienes una URL pública, envíala en image_base64.",
     scope: "write",
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     inputSchema: {
         type: "object",
         additionalProperties: false,
         properties: {
-            image_url: { type: "string", maxLength: 2000, pattern: "^https://", description: "URL https pública de la imagen." },
+            image_url: { type: "string", maxLength: 2000, description: "URL https pública de la imagen (debe ser accesible sin iniciar sesión)." },
             image_base64: { type: "string", maxLength: 7_100_000, description: "Imagen en base64 (o data URL)." },
             event_id: eventIdSchema,
             set_as_cover: { type: "boolean", default: false },
@@ -154,9 +186,12 @@ const generateImage: ToolDef = {
     name: "generate_image",
     title: "Generar imagen con IA",
     description:
-        `Genera una imagen promocional del evento con IA (sin texto en la imagen) y la aloja en AI Tickets. ` +
-        `Puedes dar dirección creativa en prompt. Máximo ${IMAGE_GENERATIONS_PER_DAY} por día por organización. ` +
-        "Formatos: square (feed), portrait (stories/reels), landscape (portada/web).",
+        `Genera una imagen promocional del evento con IA (sin texto en la imagen, salvo que lo pidas en prompt) y la aloja en AI Tickets. ` +
+        `Puedes dar dirección creativa en prompt y pasar hasta ${MAX_REFERENCE_IMAGES} imágenes de referencia por URL https ` +
+        "(reference_image_urls: flyer anterior, logo, foto del artista o del lugar; también URLs devueltas por upload_image) " +
+        "o usar la portada actual del evento (use_event_cover_as_reference). Las referencias guían estilo, colores y elementos; " +
+        "si quieres editar la referencia (p. ej. adaptar el flyer a formato story), dilo en prompt. " +
+        `Máximo ${IMAGE_GENERATIONS_PER_DAY} por día por organización. Formatos: square (feed), portrait (stories/reels), landscape (portada/web).`,
     scope: "write",
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     inputSchema: {
@@ -165,8 +200,16 @@ const generateImage: ToolDef = {
         additionalProperties: false,
         properties: {
             event_id: eventIdSchema,
-            prompt: { type: "string", maxLength: 1000, description: "Dirección creativa: estilo, colores, ambiente, elementos." },
+            prompt: { type: "string", maxLength: 1000, description: "Dirección creativa: estilo, colores, ambiente, elementos, qué tomar de las referencias." },
             format: { type: "string", enum: ["square", "portrait", "landscape"], default: "square" },
+            reference_image_urls: {
+                type: "array",
+                minItems: 1,
+                maxItems: MAX_REFERENCE_IMAGES,
+                items: { type: "string", maxLength: 2000 },
+                description: "Imágenes de referencia (URLs https públicas, JPG/PNG/WEBP, máx. 5 MB c/u).",
+            },
+            use_event_cover_as_reference: { type: "boolean", default: false, description: "Usa la imagen de portada actual del evento como referencia." },
             set_as_cover: { type: "boolean", default: false },
         },
     },
@@ -175,18 +218,26 @@ const generateImage: ToolDef = {
             throw new ToolError("unavailable", "La generación de imágenes no está habilitada. Sube una imagen con upload_image.");
         }
         const event = await loadOwnedEvent<any>(ctx, args.event_id, EVENT_CONTEXT_SELECT);
+        const referenceUrls: string[] = [...(args.reference_image_urls || [])];
+        if (args.use_event_cover_as_reference) {
+            if (!event.image_url) throw new ToolError("invalid_input", "El evento no tiene portada: sube una con upload_image o pasa reference_image_urls.");
+            referenceUrls.unshift(event.image_url);
+        }
+        if (referenceUrls.length > MAX_REFERENCE_IMAGES) throw new ToolError("invalid_input", `Máximo ${MAX_REFERENCE_IMAGES} imágenes de referencia (incluida la portada).`);
+        // Se descargan antes de gastar el cupo diario: una URL mala no consume una generación
+        const referenceImages = await loadReferenceImages(referenceUrls);
         const limit = await rateLimit("api:genimg", `org:${ctx.actor.orgId}`, { windowSeconds: 86400, max: IMAGE_GENERATIONS_PER_DAY, supabase: ctx.supabase });
         if (!limit.allowed) throw new ToolError("rate_limited", `Alcanzaste el máximo de ${IMAGE_GENERATIONS_PER_DAY} imágenes generadas por día.`);
         const size = ({ square: "1024x1024", portrait: "1024x1536", landscape: "1536x1024" } as const)[args.format as "square"];
         let url: string;
         try {
-            url = await generateEventImage(buildEventContext(event), ctx.actor.orgId, { extraPrompt: args.prompt, size });
+            url = await generateEventImage(buildEventContext(event), ctx.actor.orgId, { extraPrompt: args.prompt, size, referenceImages });
         } catch (err: any) {
             console.error("generate_image:", err?.message);
             throw new ToolError("upstream", "No se pudo generar la imagen. Intenta con otra dirección creativa o sube una propia.");
         }
         if (args.set_as_cover) await setCover(ctx, Number(event.id), url);
-        return { event_id: Number(event.id), url, format: args.format, set_as_cover: Boolean(args.set_as_cover) };
+        return { event_id: Number(event.id), url, format: args.format, reference_images_used: referenceImages.length, set_as_cover: Boolean(args.set_as_cover) };
     },
 };
 
