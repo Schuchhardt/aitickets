@@ -1,5 +1,5 @@
 import { getFriendlyErrorMessage, getSupabaseAdmin } from "../../../lib/auth-helpers";
-import { setSessionCookies, jsonResponse } from "../../../lib/supabaseServer";
+import { setSessionCookies, jsonResponse, recordLogin } from "../../../lib/supabaseServer";
 import { createEphemeralAuthClient } from "../_lib/server-utils";
 import { getOrgVerification, markOrgVerified } from "../../../lib/email-verification";
 import type { APIRoute } from "astro";
@@ -68,6 +68,7 @@ export const POST: APIRoute = async (context) => {
         }
 
         setSessionCookies(context, authData.session.access_token, authData.session.refresh_token);
+        await recordLogin({ auth_user_id: authData.user.id });
 
         return jsonResponse({ message: "Login exitoso" }, 200);
     } catch (error) {

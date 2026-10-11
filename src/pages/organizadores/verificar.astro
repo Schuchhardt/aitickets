@@ -10,7 +10,7 @@ import AppFooter from "../../components/AppFooter.vue";
 import GradientBackground from "../../components/Hero/GradientBackground.vue";
 import { confirmProducerEmail, verifyEmailVerifyToken } from "../../lib/email-verification";
 import { createPasswordlessSession, isSameSitePost } from "../../lib/magic-link";
-import { setSessionCookies } from "../../lib/supabaseServer";
+import { recordLogin, setSessionCookies } from "../../lib/supabaseServer";
 import { afterSignupPath, onboardingUrl } from "../../lib/onboarding";
 import "../../styles/global.css";
 
@@ -47,6 +47,7 @@ if (Astro.request.method === "POST") {
       const session = await createPasswordlessSession(result.email);
       if (session) {
         setSessionCookies(Astro, session.accessToken, session.refreshToken);
+        await recordLogin({ auth_user_id: result.uid });
         Astro.response.headers.set("Cache-Control", "private, no-store");
         // Registro en dos pasos: falta el nombre de la productora => /organizadores/bienvenida; luego `next`
         return Astro.redirect(result.onboardingPending ? onboardingUrl(result.next) : afterSignupPath(result.next), 303);

@@ -18,6 +18,26 @@ export function setSessionCookies(context: CookieContext, accessToken: string, r
     context.cookies.set("sb-refresh-token", refreshToken, SESSION_COOKIE_OPTIONS);
 }
 
+/**
+ * Registra un inicio de sesión en public.users (last_access_at + login_count). Llamar en cada ruta que
+ * crea una sesión nueva (contraseña, Google, magic link, verificación, invitación), no en los refrescos.
+ * Best effort: nunca bloquea el ingreso.
+ */
+export async function recordLogin(match: { id: number } | { auth_user_id: string } | { email: string }) {
+    try {
+        const [column, value] = Object.entries(match)[0];
+        const admin = getSupabaseAdmin();
+        const { data: row } = await admin.from("users").select("id, login_count").eq(column, value).maybeSingle();
+        if (!row) return;
+        await admin
+            .from("users")
+            .update({ last_access_at: new Date().toISOString(), login_count: (row.login_count || 0) + 1 })
+            .eq("id", row.id);
+    } catch (err: any) {
+        console.warn("recordLogin:", err?.message || err);
+    }
+}
+
 export function clearSessionCookies(context: CookieContext) {
     context.cookies.delete("sb-access-token", { path: "/" });
     context.cookies.delete("sb-refresh-token", { path: "/" });

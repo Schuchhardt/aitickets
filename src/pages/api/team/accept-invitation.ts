@@ -3,7 +3,7 @@
 // de un solo uso y con vencimiento) con límite de intentos por IP. CSRF: el middleware exige mismo origen.
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
-import { jsonResponse, setSessionCookies } from "../../../lib/supabaseServer";
+import { jsonResponse, recordLogin, setSessionCookies } from "../../../lib/supabaseServer";
 import { createEphemeralAuthClient } from "../_lib/server-utils";
 import { loadInvitationByToken } from "../../../lib/team-invitations";
 import { acceptTeamInvitation } from "../../../lib/team-accept";
@@ -29,6 +29,7 @@ export const POST: APIRoute = async (context) => {
         const result = await acceptTeamInvitation(supabase, createEphemeralAuthClient(), invitation, { name: body?.name, password: body?.password });
         if (!result.ok) return jsonResponse({ code: result.code, message: result.message }, result.status);
         setSessionCookies(context, result.session.access_token, result.session.refresh_token);
+        await recordLogin({ id: result.userId });
         return jsonResponse({ ok: true, redirectTo: result.redirectTo }, 200);
     } catch (error: any) {
         console.error("accept-invitation:", error?.message || error);

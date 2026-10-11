@@ -23,7 +23,7 @@ import {
   verifyAuthLinkToken,
   type AuthLinkPurpose,
 } from "../../lib/magic-link";
-import { setSessionCookies } from "../../lib/supabaseServer";
+import { recordLogin, setSessionCookies } from "../../lib/supabaseServer";
 import "../../styles/global.css";
 
 export const prerender = false;
@@ -94,6 +94,7 @@ if (Astro.request.method === "POST") {
           state = "server";
         } else {
           setSessionCookies(Astro, session.accessToken, session.refreshToken);
+          await recordLogin({ auth_user_id: authUser.id });
           if (purpose === "login") return Astro.redirect("/dashboard", 303);
           Astro.cookies.set(PW_RESET_COOKIE, signPwResetCookie(authUser.id), PW_RESET_COOKIE_OPTIONS);
           return Astro.redirect("/dashboard?set_password=1", 303);

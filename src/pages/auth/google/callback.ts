@@ -3,7 +3,7 @@
 import type { APIRoute } from "astro";
 import { GOOGLE_STATE_COOKIE, decodeGoogleState, ensureGoogleProducer, finishGoogleAuth } from "../../../lib/google-auth";
 import { onboardingUrl, safeNextPath } from "../../../lib/onboarding";
-import { setSessionCookies } from "../../../lib/supabaseServer";
+import { recordLogin, setSessionCookies } from "../../../lib/supabaseServer";
 import { notifySlack } from "../../api/_lib/server-utils";
 
 export const prerender = false;
@@ -40,6 +40,7 @@ export const GET: APIRoute = async (context) => {
     if (!account.ok) return fail(ERRORS[account.error] || "google");
 
     setSessionCookies(context, session.access_token, session.refresh_token);
+    await recordLogin({ auth_user_id: user.id });
 
     if (account.created) {
         const a = state.attribution || {};
