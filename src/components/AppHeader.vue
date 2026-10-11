@@ -34,7 +34,7 @@ const toggleMenu = () => {
     <div class="w-full max-w-screen-xl mx-auto px-4 md:px-8 overflow-hidden">
       <div class="flex items-center justify-between">
         <a href="/" class="flex items-center space-x-2">
-          <img :src="logoLight.src" alt="AI Tickets" class="h-8" width="128" height="32" />
+          <img :src="logoLight.src" alt="AI Tickets" class="h-8 w-auto" width="152" height="32" />
         </a>
 
         <!-- Desktop Menu -->
