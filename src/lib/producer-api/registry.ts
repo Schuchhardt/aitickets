@@ -354,9 +354,33 @@ function rawEventId(rawArgs: unknown): number | null {
     return v != null && v !== "" && Number.isInteger(n) && n > 0 ? n : null;
 }
 
+/** Tabla con event_id de cada id que identifica un objeto de un evento (para la bitácora de herramientas sin event_id). */
+const EVENT_OF: Array<[string, string]> = [["ticket_type_id", "event_tickets"], ["order_id", "event_orders"], ["post_id", "social_posts"]];
+
+/**
+ * Evento de una llamada sin event_id (update_ticket_type, refund_order, publish_social_post…), para que la bitácora
+ * filtrada por evento incluya también sus rechazos. Solo si el evento es de la organización.
+ */
+async function resolveEventId(ctx: ToolContext, args: Record<string, unknown> | undefined): Promise<number | null> {
+    try {
+        for (const [key, table] of EVENT_OF) {
+            const id = args?.[key];
+            if (id == null || id === "") continue;
+            const { data } = await ctx.supabase.from(table).select("event_id").eq("id", id).maybeSingle();
+            const eventId = Number(data?.event_id);
+            if (!Number.isInteger(eventId) || eventId <= 0) return null;
+            const { data: event } = await ctx.supabase.from("events").select("id").eq("id", eventId).eq("organization_id", ctx.actor.orgId).maybeSingle();
+            return event ? eventId : null;
+        }
+    } catch {
+        // la bitácora nunca hace fallar la petición
+    }
+    return null;
+}
+
 /** Objetivo por defecto para la bitácora: el primer id conocido de los argumentos. */
 function defaultTarget(args: Record<string, unknown> | undefined, eventId: number | null): string | undefined {
-    for (const key of ["ticket_type_id", "order_id", "ticket_id", "discount_id", "venue_id", "guest_id", "link_id", "post_id", "member_id", "payout_id"]) {
+    for (const key of ["ticket_type_id", "order_id", "ticket_id", "discount_id", "venue_id", "guest_id", "link_id", "post_id", "member_id", "user_id", "invitation_id", "payout_id"]) {
         const v = args?.[key];
         if (v != null && v !== "") return `${key.replace(/_id$/, "")}:${v}`;
     }
@@ -417,10 +441,9 @@ export async function runTool(tool: ToolDef, rawArgs: unknown, ctx: ToolContext)
     }
     if (auditable) {
         if (!auditInfo.summary) auditInfo.summary = outcome.ok ? tool.title : `${tool.title}: rechazado (${outcome.code})`;
-        if (!auditInfo.target) {
-            const source = parsedArgs || (rawArgs && typeof rawArgs === "object" ? (rawArgs as Record<string, unknown>) : undefined);
-            auditInfo.target = defaultTarget(source, eventId);
-        }
+        const source = parsedArgs || (rawArgs && typeof rawArgs === "object" ? (rawArgs as Record<string, unknown>) : undefined);
+        if (!eventId) eventId = await resolveEventId(ctx, source);
+        if (!auditInfo.target) auditInfo.target = defaultTarget(source, eventId);
         await audit(ctx, tool.name, outcome, eventId, auditInfo);
     }
     return outcome;

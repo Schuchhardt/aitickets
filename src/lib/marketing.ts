@@ -1,6 +1,6 @@
 // Marketing de eventos compartido por el dashboard (/api/promote/*) y la API de productores (/api/v1, /api/mcp).
 import { getSupabaseAdmin } from "./auth-helpers";
-import { serverEnv } from "../pages/api/_lib/server-utils";
+import { dedupeLocation, serverEnv } from "../pages/api/_lib/server-utils";
 
 /** HTML de la descripción a texto plano (párrafos y viñetas como saltos de línea). */
 export function htmlToPlainText(html: string | null | undefined): string {
@@ -38,7 +38,7 @@ export function buildEventContext(event: any, now = new Date()): string {
     const venues = event.event_locations?.map((loc: any) => {
         if (!loc.venues) return "Ubicación por definir";
         const parts = [loc.venues.name, loc.venues.address_line1, loc.venues.city].map((p: unknown) => String(p || "").trim()).filter(Boolean);
-        return [...new Set(parts)].join(", ");
+        return dedupeLocation(parts.join(", ")) || "Ubicación por definir";
     }).join("; ") || "Sin ubicación";
 
     const dates = [...(event.event_dates || [])]

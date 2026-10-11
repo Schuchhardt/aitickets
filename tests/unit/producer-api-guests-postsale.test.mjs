@@ -271,6 +271,8 @@ describe('postventa', () => {
   it('refund_order exige rol de finanzas o dueño', async () => {
     actor.role = 'admin'
     expect((await call('refund_order', { order_id: ORDER_A, ticket_ids: [T1] })).code).toBe('forbidden')
+    // El rechazo queda en la bitácora con el evento de la orden (aparece al filtrar por evento)
+    expect(db.tables.aitickets_api_audit.at(-1)).toMatchObject({ tool: 'refund_order', ok: false, event_id: 10, target: `order:${ORDER_A}` })
     actor.role = 'finance'
     expect((await call('refund_order', { order_id: ORDER_A, ticket_ids: [T1] })).result.status).toBe('confirmation_required')
   })

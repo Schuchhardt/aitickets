@@ -428,8 +428,9 @@ describe('correcciones tras la prueba del MCP (11 oct 2026)', () => {
         { ticket_name: 'VIP', price: 30000, status: 'unavailable', is_gift: false },
         { ticket_name: 'Cortesía', price: 0, status: 'available', is_gift: true },
       ],
-      event_locations: [],
+      event_locations: [{ venues: { name: 'Lican Ray 6742', address_line1: 'Lican Ray 6742, Vitacura', city: 'Santiago' } }],
     })
+    expect(brief).toContain('Lugar: Lican Ray 6742, Vitacura, Santiago')
     expect(brief).toContain('Gran noche')
     expect(brief).not.toContain('<p>')
     expect(brief).toContain('21:00 a 02:00')
