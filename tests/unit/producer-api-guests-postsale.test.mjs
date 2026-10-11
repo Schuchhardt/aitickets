@@ -19,8 +19,9 @@ vi.mock('../../netlify/lib/mailer.mjs', async (importOriginal) => ({ ...(await i
 const { runTool } = await import('../../src/lib/producer-api/registry.ts')
 const { guestTools, normalizePhone } = await import('../../src/lib/producer-api/tools/guests.ts')
 const { postsaleTools } = await import('../../src/lib/producer-api/tools/postsale.ts')
+const { analyticsTools } = await import('../../src/lib/producer-api/tools/analytics.ts')
 
-const tool = (name) => [...guestTools, ...postsaleTools].find((t) => t.name === name)
+const tool = (name) => [...guestTools, ...postsaleTools, ...analyticsTools].find((t) => t.name === name)
 const ORDER_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 const ORDER_FREE = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
 const T1 = '11111111-1111-4111-8111-111111111111'
@@ -106,7 +107,7 @@ describe('invitados', () => {
     const again = await call('add_guests', { event_id: 10, guests: [{ name: 'Pepe 2', phone: '+56987654321' }] })
     expect(again.result.added_count).toBe(0)
     const list = await call('list_guests', { event_id: 10 })
-    expect(list.result.summary).toEqual({ pending: 2, invited: 0, people_including_plus_ones: 3 })
+    expect(list.result.summary).toEqual({ pending: 2, link_ready: 0, invited: 0, removed: 0, people_including_plus_ones: 3 })
   })
 
   it('no accede a eventos de otra organización', async () => {
@@ -146,6 +147,25 @@ describe('invitados', () => {
     expect(r.result.links[0].whatsapp_url).toMatch(/^https:\/\/wa\.me\/56987654321\?text=/)
     expect(decodeURIComponent(r.result.links[0].whatsapp_url)).toContain('https://aitickets.test/eventos/fiesta')
     expect(mocks.sendEmail).not.toHaveBeenCalled()
+    // Solo se preparó el link: no cuenta como enviado
+    expect(r.result).toMatchObject({ links_prepared: 1, sent_count: 0 })
+    const guest = db.tables.aitickets_guests[0]
+    expect(guest.status).toBe('link_ready')
+    expect(guest.invite_count ?? 0).toBe(0)
+    expect(guest.invited_at ?? null).toBeNull()
+  })
+
+  it('mark_guests_invited pasa a invited los links ya enviados por el productor', async () => {
+    await call('add_guests', { event_id: 10, guests: [{ name: 'Pepe', phone: '987654321' }] })
+    await confirmAndRun('send_invitations', { event_id: 10, channel: 'whatsapp' })
+    const id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+    db.tables.aitickets_guests[0].id = id
+    const r = await call('mark_guests_invited', { event_id: 10, guest_ids: [id] })
+    expect(r).toMatchObject({ ok: true })
+    expect(r.result.marked_count).toBe(1)
+    expect(db.tables.aitickets_guests[0]).toMatchObject({ status: 'invited', invite_channel: 'whatsapp', invite_count: 1 })
+    const list = await call('list_guests', { event_id: 10 })
+    expect(list.result.summary).toMatchObject({ link_ready: 0, invited: 1 })
   })
 
   it('issue_complimentary_tickets crea orden de cortesía y envía las entradas', async () => {
@@ -190,6 +210,31 @@ describe('postventa', () => {
     expect(db.tables.event_orders.find((o) => o.id === ORDER_A).ticket_qty).toBe(1)
     expect(db.tables.event_orders.find((o) => o.id === r.result.new_order_id)).toMatchObject({ amount: 0, buyer_email: 'carla@x.cl', status: 'paid' })
     expect(mocks.sendTicketsEmail).toHaveBeenCalledWith(expect.any(URL), r.result.new_order_id)
+  })
+
+  it('transfer_ticket baja la línea de la orden de origen y la orden nueva hereda el medio de pago', async () => {
+    const r = await call('transfer_ticket', { ticket_id: T1, new_holder_name: 'Carla', new_holder_email: 'carla@x.cl' })
+    const source = db.tables.event_orders.find((o) => o.id === ORDER_A)
+    expect(source.ticket_details[0]).toMatchObject({ quantity: 1, transferred_out: 1, total: 20000 })
+    expect(source.amount).toBe(20000)
+    expect(db.tables.event_orders.find((o) => o.id === r.result.new_order_id).payment_provider).toBe('flow')
+    const c = await call('transfer_ticket', { ticket_id: T3, new_holder_name: 'Dani', new_holder_email: 'dani@x.cl' })
+    expect(db.tables.event_orders.find((o) => o.id === c.result.new_order_id)).toMatchObject({ payment_provider: 'courtesy', amount: 0 })
+    expect(db.tables.event_orders.find((o) => o.id === ORDER_FREE).ticket_details[0]).toMatchObject({ quantity: 0, transferred_out: 1, complimentary: true })
+  })
+
+  it('cortesías y transferencias no cuentan como ventas en get_event_performance', async () => {
+    await call('transfer_ticket', { ticket_id: T1, new_holder_name: 'Carla', new_holder_email: 'carla@x.cl' })
+    await call('transfer_ticket', { ticket_id: T3, new_holder_name: 'Dani', new_holder_email: 'dani@x.cl' })
+    db.tables.event_visits = []
+    db.rpc = async () => ({ data: [], error: null }) // aitickets_ticket_availability
+    const out = await call('get_event_performance', { event_id: 10 })
+    expect(out).toMatchObject({ ok: true })
+    const r = out.result
+    expect(r.sales).toMatchObject({ paid_orders: 1, tickets_sold: 2, courtesy_tickets: 1, revenue_clp: 20000 })
+    expect(r.sales.last_sale_at).toBe('2026-10-01')
+    expect(r.sales_by_ticket_type).toEqual([{ name: 'General', tickets: 2, gross_revenue_clp: 20000 }])
+    expect(r.sales_channels).toHaveLength(1)
   })
 
   it('transfer_ticket acepta entradas antiguas (status NULL) y rechaza las ya usadas', async () => {

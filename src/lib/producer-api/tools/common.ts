@@ -48,11 +48,42 @@ export function eventUrls(ctx: ToolContext, event: { slug?: string | null; statu
     return { is_published: false, public_url: null, public_url_after_publish: url, visibility_note: DRAFT_URL_NOTE };
 }
 
+/** Nombre reservado del tipo de cortesía del sistema (comparación sin mayúsculas ni tildes). */
+export const isCourtesyName = (name: unknown) =>
+    String(name || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase().replace(/s$/, "") === "cortesia";
+
+/** El tipo "Cortesía" lo crea el sistema con cada evento: un tipo de venta con ese nombre lo duplicaría. */
+export function rejectCourtesyName(name: unknown) {
+    if (isCourtesyName(name)) {
+        throw new ToolError(
+            "invalid_input",
+            `"${name}" es el nombre del tipo de cortesía que AI Tickets crea con cada evento (is_system = true en get_event). ` +
+                "Para entradas gratis nominadas usa issue_complimentary_tickets; para un tipo de venta usa otro nombre (ej: Invitado, Liberada).",
+        );
+    }
+}
+
 export const clp = (n: number) => `$${Math.round(Number(n) || 0).toLocaleString("es-CL")} CLP`;
 
 const dayFmt = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" });
 /** YYYY-MM-DD en hora de Chile. */
 export const localDay = (iso: string | Date) => dayFmt.format(new Date(iso));
+
+const localFmt = new Intl.DateTimeFormat("sv-SE", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+/** "YYYY-MM-DDTHH:MM" en hora de Chile (sin zona), o null. */
+export const localDateTime = (iso: string | Date | null | undefined) => (iso ? localFmt.format(new Date(iso)).replace(" ", "T") : null);
+
+export const DATES_NOTE =
+    "start_date/end_date están en UTC (ISO 8601); start_local/end_local son la misma hora en Chile (America/Santiago). " +
+    "Si una función no tiene hora de término, end_date se estima en inicio + 3 horas.";
+
+/** Fechas de un evento: UTC (start_date/end_date) y hora de Chile (start_local/end_local). */
+export const eventDateFields = (e: { start_date?: string | null; end_date?: string | null }) => ({
+    start_date: e.start_date ?? null,
+    end_date: e.end_date ?? null,
+    start_local: localDateTime(e.start_date),
+    end_local: localDateTime(e.end_date),
+});
 
 /** Entradas emitidas (sold) y reservadas en checkout (pending) por tipo de entrada. */
 export async function ticketAvailability(ctx: ToolContext, eventId: number, ticketIds: number[]): Promise<Map<number, { sold: number; pending: number }>> {
@@ -74,20 +105,29 @@ export async function ticketAvailability(ctx: ToolContext, eventId: number, tick
     return out;
 }
 
-export function presentTicket(t: any, availability?: { sold: number; pending: number }) {
+/**
+ * Tipo de entrada para la API. El tipo "Cortesía" lo crea la base de datos con cada evento (is_gift = true):
+ * es del sistema, nunca se vende y solo sirve para emitir cortesías (issue_complimentary_tickets).
+ * on_sale_now exige además que el evento esté publicado (si se pasa `event`).
+ */
+export function presentTicket(t: any, availability?: { sold: number; pending: number }, event?: { status?: string | null }) {
     const sold = availability?.sold ?? 0;
     const pending = availability?.pending ?? 0;
     const capacity = t.total_quantity ?? null;
+    const isSystem = t.is_gift === true;
     return {
         id: Number(t.id),
         name: t.ticket_name,
+        kind: isSystem ? "courtesy" : "sale",
+        is_system: isSystem,
         price: Number(t.price),
-        quantity: capacity,
+        quantity: isSystem ? null : capacity,
+        // En el tipo de cortesía son las cortesías emitidas
         sold,
         reserved_in_checkout: pending,
-        remaining: capacity == null ? null : Math.max(0, capacity - sold - pending),
-        on_sale_now: isTicketOnSale(t),
-        status: t.status,
+        remaining: isSystem || capacity == null ? null : Math.max(0, capacity - sold - pending),
+        on_sale_now: !isSystem && isTicketOnSale(t) && (!event || event.status === "published"),
+        status: isSystem ? "system" : t.status,
         sales_start: t.init_date ?? null,
         sales_end: t.end_date ?? null,
         event_date_id: t.event_date_id ?? null,
@@ -121,4 +161,25 @@ export async function fetchAll<T = any>(build: () => any, { pageSize = 1000, max
         if (!data || data.length < pageSize) break;
     }
     return out;
+}
+
+const MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+const DAY_MONTH_RE = /\b(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\b/g;
+
+/**
+ * Fechas ("10 de octubre") que menciona la descripción y que no coinciden con ninguna función (YYYY-MM-DD).
+ * Sirve para advertir cuando se cambió la fecha de una función y la descripción quedó con la anterior.
+ */
+export function descriptionDateWarning(description: string | null | undefined, functionDates: string[]): string | null {
+    if (!description || !functionDates.length) return null;
+    const text = String(description).replace(/<[^>]*>/g, " ").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const fnKeys = new Set(functionDates.map((d) => `${Number(d.slice(8, 10))}-${Number(d.slice(5, 7))}`));
+    const stale = new Set<string>();
+    for (const m of text.matchAll(DAY_MONTH_RE)) {
+        const month = m[2] === "setiembre" ? 9 : MONTHS.indexOf(m[2]) + 1;
+        if (!fnKeys.has(`${Number(m[1])}-${month}`)) stale.add(`${Number(m[1])} de ${MONTHS[month - 1]}`);
+    }
+    if (!stale.size) return null;
+    const fnLabels = functionDates.map((d) => `${Number(d.slice(8, 10))} de ${MONTHS[Number(d.slice(5, 7)) - 1]}`);
+    return `La descripción menciona ${[...stale].join(", ")}, pero las funciones son el ${[...new Set(fnLabels)].join(", ")}. Corrige la descripción con update_event.`;
 }

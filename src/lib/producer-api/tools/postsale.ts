@@ -18,6 +18,7 @@ import { ToolError, type ToolDef, type ToolContext } from "../registry";
 import { eventIdSchema, loadOwnedEvent, fetchAll, clp } from "./common";
 import { isActiveRefund } from "../ledger";
 import { findOrCreateAttendee, newQrCode } from "../../courtesy";
+import { orderLines, lineSoldQty } from "../../orderKinds";
 import { sendTicketsEmail, notifySlack, callInternalFunction } from "../../../pages/api/_lib/server-utils";
 import { sendEmail, formatRecipient, isValidEmail, legalFooterHtml, legalFooterText } from "../../../../netlify/lib/mailer.mjs";
 
@@ -260,9 +261,10 @@ const transferTicket: ToolDef = {
                 },
             ],
         };
+        // Hereda el medio de pago de la orden de origen (una cortesía transferida sigue siendo cortesía)
         let { data: newOrder, error: orderError } = await ctx.supabase
             .from("event_orders")
-            .insert({ ...orderRow, payment_provider: "free", currency: "CLP" })
+            .insert({ ...orderRow, payment_provider: order.payment_provider || "free", currency: order.currency || "CLP" })
             .select("id")
             .single();
         if (orderError && ["42703", "PGRST204"].includes(String(orderError.code || ""))) {
@@ -282,10 +284,17 @@ const transferTicket: ToolDef = {
             if (moveError) throw moveError;
             throw new ToolError("conflict", "La entrada cambió mientras se transfería (¿se validó?). Revisa get_order e intenta de nuevo.");
         }
-        // La entrada ya no cuenta en la orden original (las ventas e ingresos no cambian: la orden nueva es de monto 0)
+        // La entrada ya no está en la orden original: baja su cantidad y su línea (transferred_out guarda lo que salió;
+        // total y amount no cambian, es lo que se pagó). Ventas e ingresos no cambian (src/lib/orderKinds.ts).
+        const sourceLines = orderLines(order).map((l) => ({ ...l }));
+        const line = sourceLines.find((l) => Number(l?.id) === Number(ticket.event_ticket_id) && Number(l?.quantity) > 0);
+        if (line) {
+            line.quantity = Number(line.quantity) - 1;
+            line.transferred_out = (Number(line.transferred_out) || 0) + 1;
+        }
         await ctx.supabase
             .from("event_orders")
-            .update({ ticket_qty: Math.max(0, (Number(order.ticket_qty) || 1) - 1) })
+            .update({ ticket_qty: Math.max(0, (Number(order.ticket_qty) || 1) - 1), ...(line ? { ticket_details: sourceLines } : {}) })
             .eq("id", order.id);
 
         let emailSent = false;
@@ -366,10 +375,11 @@ async function planRefund(args: any, ctx: ToolContext): Promise<RefundPlan> {
 
     const amount = Number(order.amount) || 0;
     const feeTotal = (Number(order.ticket_fee) || 0) + (Number(order.service_fee_tax) || 0);
-    const lines: any[] = Array.isArray(order.ticket_details) ? order.ticket_details : [];
+    const lines = orderLines(order);
     const priceByType = new Map(lines.map((l) => [Number(l?.id), Number(l?.price) || 0]));
-    const gross = lines.reduce((n, l) => n + (Number(l?.total) || (Number(l?.price) || 0) * (Number(l?.quantity) || 0)), 0);
-    const qtyInDetails = lines.reduce((n, l) => n + (Number(l?.quantity) || 0), 0);
+    // Cantidades de la venta original: las líneas bajan `quantity` al transferir, pero guardan transferred_out
+    const gross = lines.reduce((n, l) => n + (Number(l?.total) || (Number(l?.price) || 0) * lineSoldQty(l)), 0);
+    const qtyInDetails = lines.reduce((n, l) => n + lineSoldQty(l), 0);
     const prior = (await loadRefunds(ctx, { orderId: order.id })).filter(ACTIVE_REFUND);
     const priorTickets = prior.reduce((n, r) => n + (Number(r.ticket_amount) || 0), 0);
     const priorFee = prior.reduce((n, r) => n + (Number(r.fee_amount) || 0), 0);

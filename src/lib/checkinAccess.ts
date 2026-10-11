@@ -20,7 +20,10 @@ export type CheckinLinkRow = {
     label: string | null;
     expires_at: string;
     revoked_at: string | null;
+    /** Último escaneo (validación). Antes de 202610110200 también se movía al abrir el escáner. */
     last_used_at: string | null;
+    /** Última vez que se abrió el escáner o se consultó sin validar (columna de 202610110200). */
+    last_opened_at?: string | null;
     scan_count: number | null;
     created_at: string;
 };
@@ -41,7 +44,9 @@ export function presentCheckinLink(link: CheckinLinkRow) {
         label: link.label,
         status: linkStatus(link),
         expires_at: link.expires_at,
-        last_used_at: link.last_used_at,
+        // Sin escaneos, last_used_at de links antiguos es solo una apertura
+        last_scan_at: Number(link.scan_count) > 0 ? link.last_used_at : null,
+        last_opened_at: link.last_opened_at ?? null,
         scans: Number(link.scan_count) || 0,
         created_at: link.created_at,
     };
@@ -87,13 +92,17 @@ export async function createCheckinLink(
 }
 
 export async function listCheckinLinks(supabase: any, eventId: number, orgId: number) {
-    const { data, error } = await supabase
-        .from("aitickets_checkin_links")
-        .select(LINK_COLUMNS)
-        .eq("event_id", eventId)
-        .eq("organization_id", orgId)
-        .order("created_at", { ascending: false })
-        .limit(100);
+    const run = (columns: string) =>
+        supabase
+            .from("aitickets_checkin_links")
+            .select(columns)
+            .eq("event_id", eventId)
+            .eq("organization_id", orgId)
+            .order("created_at", { ascending: false })
+            .limit(100);
+    let { data, error } = await run(`${LINK_COLUMNS}, last_opened_at`);
+    // Base sin la migración 202610110200 (deploy preview): sin last_opened_at
+    if (error && ["42703", "PGRST204"].includes(String(error.code || ""))) ({ data, error } = await run(LINK_COLUMNS));
     if (error) throw error;
     return (data || []).map(presentCheckinLink);
 }
@@ -125,14 +134,17 @@ export async function resolveCheckinToken(supabase: any, token: string): Promise
     return { link, event: { id: Number(event.id), name: event.name, slug: event.slug } };
 }
 
-/** Registra el uso del link (best effort; nunca falla la petición). */
+/**
+ * Registra el uso del link (best effort; nunca falla la petición). Un escaneo mueve last_used_at y scan_count;
+ * abrir el escáner o consultar sin validar solo mueve last_opened_at.
+ */
 export async function touchCheckinLink(supabase: any, link: CheckinLinkRow, scanned: boolean) {
     try {
-        const patch: Record<string, unknown> = { last_used_at: new Date().toISOString() };
-        if (scanned) patch.scan_count = (Number(link.scan_count) || 0) + 1;
+        const now = new Date().toISOString();
+        const patch: Record<string, unknown> = scanned ? { last_used_at: now, scan_count: (Number(link.scan_count) || 0) + 1 } : { last_opened_at: now };
         await supabase.from("aitickets_checkin_links").update(patch).eq("id", link.id);
     } catch {
-        /* ignorar */
+        /* ignorar (p. ej. last_opened_at aún no existe) */
     }
 }
 

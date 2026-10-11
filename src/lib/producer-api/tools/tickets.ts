@@ -1,15 +1,25 @@
 // Herramientas: tipos de entrada y órdenes (compradores).
 import { ToolError, type ToolDef } from "../registry";
-import { eventIdSchema, loadOwnedEvent, ticketAvailability, presentTicket, TICKET_SELECT, isoOrNull } from "./common";
+import { eventIdSchema, loadOwnedEvent, ticketAvailability, presentTicket, TICKET_SELECT, isoOrNull, rejectCourtesyName, clp } from "./common";
 import { normalizeTicket } from "../../../pages/api/_lib/events";
+import { isTransferOrder } from "../../orderKinds";
 
 const ticketIdSchema = { type: "integer" as const, minimum: 1, description: "ID del tipo de entrada (ver get_event → ticket_types)." };
 
-async function loadTicket(ctx: any, eventId: number, ticketId: number) {
+async function loadTicket(ctx: any, eventId: number, ticketId: number, { allowSystem = false } = {}) {
     const { data } = await ctx.supabase.from("event_tickets").select(TICKET_SELECT).eq("id", ticketId).eq("event_id", eventId).maybeSingle();
     if (!data) throw new ToolError("not_found", `El tipo de entrada ${ticketId} no existe en el evento ${eventId}.`);
+    if (data.is_gift === true && !allowSystem) {
+        throw new ToolError("invalid_input", `El tipo ${ticketId} (${data.ticket_name}) es el de cortesías del sistema: no se edita ni se vende. Para cortesías usa issue_complimentary_tickets.`);
+    }
     return data;
 }
+
+const FIELD_LABELS: Record<string, string> = {
+    ticket_name: "Nombre", price: "Precio", total_quantity: "Capacidad", max_quantity: "Máximo por compra", status: "Venta", init_date: "Inicio de venta", end_date: "Fin de venta",
+};
+const fmtField = (field: string, v: unknown) =>
+    v == null ? "—" : field === "price" ? clp(Number(v)).replace(" CLP", "") : field === "status" ? (v === "available" ? "activa" : "pausada") : String(v);
 
 async function resolveFunctionId(ctx: any, eventId: number, functionId: number | null | undefined) {
     if (functionId === undefined) return undefined;
@@ -26,8 +36,9 @@ function checkWindow(start: string | null, end: string | null) {
 const createTicketType: ToolDef = {
     name: "create_ticket_type",
     title: "Crear tipo de entrada",
-    description: "Agrega un tipo de entrada a un evento (ej: Preventa 2, VIP). Precio en CLP.",
+    description: "Agrega un tipo de entrada a un evento (ej: Preventa 2, VIP). Precio en CLP. No uses el nombre \"Cortesía\": ese tipo ya lo crea el sistema.",
     scope: "write",
+    audit: (args, result) => ({ summary: `Nuevo tipo ${args.name}: ${clp(args.price).replace(" CLP", "")}`, target: `ticket_type:${(result as any).ticket_type?.id ?? ""}` }),
     annotations: { readOnlyHint: false, destructiveHint: false },
     inputSchema: {
         type: "object",
@@ -45,7 +56,8 @@ const createTicketType: ToolDef = {
         },
     },
     async handler(args, ctx) {
-        const event = await loadOwnedEvent<any>(ctx, args.event_id, "id");
+        rejectCourtesyName(args.name);
+        const event = await loadOwnedEvent<any>(ctx, args.event_id, "id, status");
         const normalized = normalizeTicket({ name: args.name, price: args.price, quantity: args.quantity ?? null, initDate: args.sales_start, endDate: args.sales_end });
         if (!normalized) throw new ToolError("invalid_input", "Revisa nombre, precio y cantidad.");
         checkWindow(normalized.init_date, normalized.end_date);
@@ -56,7 +68,7 @@ const createTicketType: ToolDef = {
             .select(TICKET_SELECT)
             .single();
         if (error) throw error;
-        return { event_id: Number(event.id), ticket_type: presentTicket(data) };
+        return { event_id: Number(event.id), ticket_type: presentTicket(data, undefined, event) };
     },
 };
 
@@ -67,6 +79,14 @@ const updateTicketType: ToolDef = {
         "Cambia nombre, precio, capacidad, ventana de venta o pausa/reanuda la venta (on_sale) de un tipo de entrada. " +
         "La capacidad no puede quedar bajo lo ya vendido. Un cambio de precio aplica solo a compras nuevas.",
     scope: "write",
+    audit: (args, result) => {
+        const changes: any[] = (result as any).changes || [];
+        const name = (result as any).ticket_type?.name || `tipo ${args.ticket_type_id}`;
+        return {
+            summary: changes.length ? `${name}: ${changes.map((c) => `${FIELD_LABELS[c.field] || c.field} ${fmtField(c.field, c.from)} → ${fmtField(c.field, c.to)}`).join("; ")}` : `${name}: sin cambios`,
+            target: `ticket_type:${args.ticket_type_id}`,
+        };
+    },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     inputSchema: {
         type: "object",
@@ -85,10 +105,13 @@ const updateTicketType: ToolDef = {
         },
     },
     async handler(args, ctx) {
-        const event = await loadOwnedEvent<any>(ctx, args.event_id, "id");
+        const event = await loadOwnedEvent<any>(ctx, args.event_id, "id, status");
         const ticket = await loadTicket(ctx, event.id, args.ticket_type_id);
         const patch: Record<string, unknown> = {};
-        if (args.name !== undefined) patch.ticket_name = args.name.slice(0, 120);
+        if (args.name !== undefined) {
+            rejectCourtesyName(args.name);
+            patch.ticket_name = args.name.slice(0, 120);
+        }
         if (args.price !== undefined) patch.price = Math.round(args.price);
         if (args.max_per_order !== undefined) patch.max_quantity = args.max_per_order;
         if (args.on_sale !== undefined) patch.status = args.on_sale ? "available" : "unavailable";
@@ -115,7 +138,10 @@ const updateTicketType: ToolDef = {
             .select(TICKET_SELECT)
             .single();
         if (error) throw error;
-        return { event_id: Number(event.id), ticket_type: presentTicket(data, availability.get(Number(ticket.id))) };
+        const changes = Object.keys(patch)
+            .filter((k) => String((ticket as any)[k] ?? "") !== String(patch[k] ?? ""))
+            .map((k) => ({ field: k, from: (ticket as any)[k] ?? null, to: patch[k] ?? null }));
+        return { event_id: Number(event.id), ticket_type: presentTicket(data, availability.get(Number(ticket.id)), event), changes };
     },
 };
 
@@ -132,6 +158,10 @@ const deleteTicketType: ToolDef = {
         additionalProperties: false,
         properties: { event_id: eventIdSchema, ticket_type_id: ticketIdSchema },
     },
+    audit: (args, result) => ({
+        summary: `${(result as any).ticket_type_name || `Tipo ${args.ticket_type_id}`}: ${(result as any).result === "deleted" ? "eliminado" : "retirado de la venta (tenía entradas emitidas)"}`,
+        target: `ticket_type:${args.ticket_type_id}`,
+    }),
     async handler(args, ctx) {
         const event = await loadOwnedEvent<any>(ctx, args.event_id, "id");
         const ticket = await loadTicket(ctx, event.id, args.ticket_type_id);
@@ -142,12 +172,12 @@ const deleteTicketType: ToolDef = {
         const retire = async () => {
             const { error } = await ctx.supabase.from("event_tickets").update({ status: "unavailable" }).eq("id", ticket.id).eq("event_id", event.id);
             if (error) throw error;
-            return { event_id: Number(event.id), ticket_type_id: Number(ticket.id), result: "retired_from_sale", reason: "Tiene entradas emitidas u órdenes asociadas." };
+            return { event_id: Number(event.id), ticket_type_id: Number(ticket.id), ticket_type_name: ticket.ticket_name, result: "retired_from_sale", reason: "Tiene entradas emitidas u órdenes asociadas." };
         };
         if (sold) return retire();
         const { error } = await ctx.supabase.from("event_tickets").delete().eq("id", ticket.id).eq("event_id", event.id);
         if (error) return retire(); // p. ej. referenciada por una orden
-        return { event_id: Number(event.id), ticket_type_id: Number(ticket.id), result: "deleted" };
+        return { event_id: Number(event.id), ticket_type_id: Number(ticket.id), ticket_type_name: ticket.ticket_name, result: "deleted" };
     },
 };
 
@@ -196,7 +226,17 @@ const listOrders: ToolDef = {
                 status: o.status,
                 buyer: { name: [o.buyer_first_name, o.buyer_last_name].filter(Boolean).join(" ") || null, email: o.buyer_email, phone: o.buyer_phone },
                 tickets: o.ticket_qty,
-                lines: Array.isArray(o.ticket_details) ? o.ticket_details.map((l: any) => ({ name: l.name || l.ticket_name, quantity: l.quantity, price: l.price })) : null,
+                // quantity = entradas que la orden tiene hoy; transferred_out = las que salieron a otro titular
+                lines: Array.isArray(o.ticket_details)
+                    ? o.ticket_details.map((l: any) => ({
+                          name: l.name || l.ticket_name,
+                          quantity: l.quantity,
+                          price: l.price,
+                          ...(Number(l.transferred_out) ? { transferred_out: Number(l.transferred_out) } : {}),
+                          ...(l.complimentary ? { complimentary: true } : {}),
+                      }))
+                    : null,
+                ...(isTransferOrder(o) ? { transferred_from_order_id: o.ticket_details[0].transferred_from_order } : {}),
                 amount_clp: Number(o.amount) || 0,
                 discount_code: o.discount_code || null,
                 discount_clp: Number(o.discount_amount) || 0,

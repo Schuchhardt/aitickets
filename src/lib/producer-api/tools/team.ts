@@ -106,9 +106,17 @@ const listMembers: ToolDef = {
         if (error) throw error;
         const rows = (data || []).filter((u: any) => args.include_inactive || isActive(u));
         const staff = await staffByUser(ctx, rows.map((u: any) => Number(u.id)));
+        const hasOwner = (data || []).some((u: any) => u.role === "producer");
         return {
             count: rows.length,
             members: rows.map((u: any) => presentMember(u, staff.get(Number(u.id)), ctx.actor.userId)),
+            ...(hasOwner
+                ? {}
+                : {
+                      owner_note:
+                          "La organización no tiene dueño asignado: las acciones solo del dueño (retiros, reembolsos, cuenta bancaria, cancelar eventos) " +
+                          "no están disponibles. Escríbenos a soporte de AI Tickets para asignarlo.",
+                  }),
         };
     },
 };

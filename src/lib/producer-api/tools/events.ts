@@ -1,16 +1,18 @@
 // Herramientas: cuenta, eventos y lugares.
-import { ToolError, type ToolDef } from "../registry";
+import { ToolError, type ToolDef, type ToolContext } from "../registry";
 import { SCOPE_LABELS } from "../keys";
 import { PERMISSION_LABELS, ROLE_LABELS, ROLE_PERMISSIONS } from "../permissions";
 import {
     eventIdSchema, loadOwnedEvent, eventPublicUrl, eventDashboardUrl, eventUrls, ticketAvailability, presentTicket, TICKET_SELECT,
-    DATE_PATTERN, TIME_PATTERN, fetchAll, DRAFT_URL_NOTE, scopeToEvents,
+    DATE_PATTERN, TIME_PATTERN, fetchAll, DRAFT_URL_NOTE, scopeToEvents, eventDateFields, DATES_NOTE, descriptionDateWarning,
+    rejectCourtesyName, clp, localDateTime,
 } from "./common";
+import { isCourtesyOrder, isTransferOrder, orderSoldQty } from "../../orderKinds";
 import { createPreviewLink, listPreviewLinks, revokePreviewLink, PreviewLinkError, PREVIEW_DEFAULT_HOURS } from "../../eventPreview";
 import { createEventGraph, setEventStatus, syncEventCategory, EventInputError, type EventGraphInput } from "../../../pages/api/_lib/events";
 import { listOrgVenues } from "../../orgVenues";
 import { sanitizeRichText } from "../../sanitize";
-import { notifySlack } from "../../../pages/api/_lib/server-utils";
+import { notifySlack, dedupeLocation } from "../../../pages/api/_lib/server-utils";
 
 const EVENT_LIST_COLUMNS = "id, name, slug, status, accessibility, start_date, end_date, location, image_url, created_at";
 
@@ -43,7 +45,9 @@ const getAccount: ToolDef = {
             connected_social_accounts: (accounts || []).map((a: any) => ({ platform: a.platform, account: a.account_name })),
             conventions: {
                 currency: "CLP (pesos chilenos, enteros sin decimales)",
-                timezone: "America/Santiago (fechas y horas de funciones son hora local de Chile)",
+                timezone:
+                    "America/Santiago. Las funciones (functions[].date/start_time/end_time) y los campos *_local están en hora de Chile; " +
+                    "start_date, end_date y demás timestamps ISO están en UTC. Sin hora de término, una función se estima de 3 horas.",
                 dashboard: `${ctx.origin}/dashboard`,
             },
         };
@@ -54,7 +58,8 @@ const listEvents: ToolDef = {
     name: "list_events",
     title: "Listar eventos",
     description:
-        "Lista los eventos de la organización con estado, fecha, lugar, link público, entradas vendidas e ingresos (órdenes pagadas). " +
+        "Lista los eventos de la organización con estado, fecha, lugar, link público, entradas vendidas e ingresos (órdenes pagadas; " +
+        "sin cortesías ni transferencias). " +
         "Ordenados del más próximo/reciente al más antiguo. Los borradores NO tienen link público activo (public_url = null): " +
         "para mostrarlos usa create_preview_link. Los eventos archivados (archive_event) se omiten salvo include_archived=true.",
     scope: "read",
@@ -93,12 +98,14 @@ const listEvents: ToolDef = {
 
         const ids = events.map((e) => Number(e.id));
         const orders = ids.length
-            ? await fetchAll<any>(() => ctx.supabase.from("event_orders").select("event_id, amount, ticket_qty").in("event_id", ids).eq("status", "paid"))
+            ? await fetchAll<any>(() => ctx.supabase.from("event_orders").select("event_id, amount, ticket_qty, ticket_details, payment_provider").in("event_id", ids).eq("status", "paid"))
             : [];
         const totals = new Map<number, { tickets: number; revenue: number; orders: number }>();
         for (const o of orders) {
+            // Ventas: sin cortesías ni transferencias (src/lib/orderKinds.ts)
+            if (isCourtesyOrder(o) || isTransferOrder(o)) continue;
             const t = totals.get(Number(o.event_id)) || { tickets: 0, revenue: 0, orders: 0 };
-            t.tickets += Number(o.ticket_qty) || 1;
+            t.tickets += orderSoldQty(o);
             t.revenue += Number(o.amount) || 0;
             t.orders += 1;
             totals.set(Number(o.event_id), t);
@@ -106,15 +113,15 @@ const listEvents: ToolDef = {
 
         return {
             count: events.length,
+            dates_note: DATES_NOTE,
             ...(events.some((e) => e.status !== "published") ? { drafts_note: DRAFT_URL_NOTE } : {}),
             events: events.map((e) => ({
                 id: Number(e.id),
                 name: e.name,
                 status: e.status,
                 visibility: e.accessibility === "private" ? "private" : "public",
-                start_date: e.start_date,
-                end_date: e.end_date,
-                location: e.location,
+                ...eventDateFields(e),
+                location: dedupeLocation(e.location),
                 is_published: e.status === "published",
                 ...(e.archived_at ? { archived: true } : {}),
                 public_url: e.status === "published" ? eventPublicUrl(ctx, e.slug) : null,
@@ -137,46 +144,55 @@ const getEvent: ToolDef = {
     scope: "read",
     annotations: { readOnlyHint: true },
     inputSchema: { type: "object", required: ["event_id"], additionalProperties: false, properties: { event_id: eventIdSchema } },
-    async handler(args, ctx) {
-        const event = await loadOwnedEvent<any>(ctx, args.event_id, `${EVENT_LIST_COLUMNS}, description`);
-        const [{ data: tickets }, { data: dates }, { data: locations }, { data: tags }] = await Promise.all([
-            ctx.supabase.from("event_tickets").select(TICKET_SELECT).eq("event_id", event.id).order("price", { ascending: true }),
-            ctx.supabase.from("event_dates").select("id, date, start_time, end_time, event_location_id").eq("event_id", event.id).order("date", { ascending: true }),
-            ctx.supabase.from("event_locations").select("id, venue_id, venues ( id, name, address_line1, city )").eq("event_id", event.id),
-            ctx.supabase.from("event_tags").select("category_tags ( name )").eq("event_id", event.id),
-        ]);
-        const availability = await ticketAvailability(ctx, event.id, (tickets || []).map((t: any) => Number(t.id)));
-        const previewLinks = await listPreviewLinks(Number(event.id), ctx.actor.orgId, ctx.supabase).catch(() => []);
-        const venueOf = new Map<string, any>();
-        for (const l of locations || []) {
-            const v = Array.isArray((l as any).venues) ? (l as any).venues[0] : (l as any).venues;
-            venueOf.set(String(l.id), v ? { id: v.id, name: v.name, address: v.address_line1, city: v.city } : null);
-        }
-        const tag: any = (tags || [])[0]?.category_tags;
-        return {
-            event_id: Number(event.id),
-            name: event.name,
-            status: event.status,
-            visibility: event.accessibility === "private" ? "private" : "public",
-            category: (Array.isArray(tag) ? tag[0]?.name : tag?.name) || null,
-            description_html: event.description,
-            image_url: event.image_url,
-            start_date: event.start_date,
-            end_date: event.end_date,
-            ...eventUrls(ctx, event),
-            dashboard_url: eventDashboardUrl(ctx, Number(event.id)),
-            preview_links: previewLinks.filter((l) => l.status === "active").map(({ event_id, ...l }) => l),
-            functions: (dates || []).map((d: any) => ({
-                id: Number(d.id),
-                date: String(d.date).slice(0, 10),
-                start_time: String(d.start_time || "").slice(0, 5),
-                end_time: d.end_time ? String(d.end_time).slice(0, 5) : null,
-                venue: d.event_location_id ? venueOf.get(String(d.event_location_id)) || null : null,
-            })),
-            ticket_types: (tickets || []).map((t: any) => presentTicket(t, availability.get(Number(t.id)))),
-        };
-    },
+    handler: (args, ctx) => eventDetail(ctx, args.event_id),
 };
+
+/** Detalle de un evento (get_event; también la respuesta de create_event). */
+async function eventDetail(ctx: ToolContext, eventId: number) {
+    const event = await loadOwnedEvent<any>(ctx, eventId, `${EVENT_LIST_COLUMNS}, description`);
+    const [{ data: tickets }, { data: dates }, { data: locations }, { data: tags }] = await Promise.all([
+        ctx.supabase.from("event_tickets").select(TICKET_SELECT).eq("event_id", event.id).order("price", { ascending: true }),
+        ctx.supabase.from("event_dates").select("id, date, start_time, end_time, event_location_id").eq("event_id", event.id).order("date", { ascending: true }),
+        ctx.supabase.from("event_locations").select("id, venue_id, venues ( id, name, address_line1, city )").eq("event_id", event.id),
+        ctx.supabase.from("event_tags").select("category_tags ( name )").eq("event_id", event.id),
+    ]);
+    const availability = await ticketAvailability(ctx, event.id, (tickets || []).map((t: any) => Number(t.id)));
+    const previewLinks = await listPreviewLinks(Number(event.id), ctx.actor.orgId, ctx.supabase).catch(() => []);
+    const venueOf = new Map<string, any>();
+    for (const l of locations || []) {
+        const v = Array.isArray((l as any).venues) ? (l as any).venues[0] : (l as any).venues;
+        venueOf.set(String(l.id), v ? { id: v.id, name: v.name, address: v.address_line1, city: v.city } : null);
+    }
+    const tag: any = (tags || [])[0]?.category_tags;
+    const functions = (dates || []).map((d: any) => ({
+        id: Number(d.id),
+        date: String(d.date).slice(0, 10),
+        start_time: String(d.start_time || "").slice(0, 5),
+        end_time: d.end_time ? String(d.end_time).slice(0, 5) : null,
+        ...(d.end_time ? {} : { end_time_note: "Sin hora de término: se estima de 3 horas (end_date)." }),
+        venue: d.event_location_id ? venueOf.get(String(d.event_location_id)) || null : null,
+    }));
+    const warnings = [descriptionDateWarning(event.description, functions.map((f: any) => f.date))].filter(Boolean) as string[];
+    return {
+        event_id: Number(event.id),
+        name: event.name,
+        status: event.status,
+        visibility: event.accessibility === "private" ? "private" : "public",
+        category: (Array.isArray(tag) ? tag[0]?.name : tag?.name) || null,
+        description_html: event.description,
+        image_url: event.image_url,
+        ...eventDateFields(event),
+        dates_note: DATES_NOTE,
+        ...eventUrls(ctx, event),
+        dashboard_url: eventDashboardUrl(ctx, Number(event.id)),
+        preview_links: previewLinks.filter((l) => l.status === "active").map(({ event_id, ...l }) => l),
+        functions,
+        ticket_types: (tickets || []).map((t: any) => presentTicket(t, availability.get(Number(t.id)), event)),
+        courtesy_note:
+            "El tipo con is_system = true (Cortesía) lo crea AI Tickets con cada evento: no se vende y sirve para emitir cortesías (issue_complimentary_tickets).",
+        ...(warnings.length ? { warnings } : {}),
+    };
+}
 
 const listVenues: ToolDef = {
     name: "list_venues",
@@ -202,6 +218,7 @@ const ticketInputSchema = {
         sales_start: { type: "string" as const, format: "date-time", nullable: true, description: "Inicio de venta (ISO 8601). Omitir = desde que se publica." },
         sales_end: { type: "string" as const, format: "date-time", nullable: true, description: "Fin de venta (ISO 8601). Omitir = hasta el evento." },
         function_index: { type: "integer" as const, minimum: 0, nullable: true, description: "Índice (desde 0) en `functions` si la entrada es solo para esa función. Omitir = todas." },
+        max_per_order: { type: "integer" as const, minimum: 1, maximum: 50, default: 10, description: "Máximo de entradas de este tipo por compra." },
     },
 };
 
@@ -213,8 +230,12 @@ const createEvent: ToolDef = {
         "La respuesta incluye preview_url: un link PRIVADO de vista previa (7 días, varios usos) para que el productor vea la página " +
         "tal como quedará; el link público no funciona hasta publicar. " +
         "Después revisa con get_event y publica con set_event_status solo cuando el productor lo confirme. " +
-        "Para el lugar usa venue_id (de list_venues) o new_venue. Fechas en hora de Chile.",
+        "Para el lugar usa venue_id (de list_venues) o new_venue. Fechas en hora de Chile. AI Tickets agrega solo un tipo \"Cortesía\" " +
+        "(is_system) para emitir cortesías: no lo incluyas en ticket_types. Usa idempotency_key para que un reintento no cree el evento dos veces. " +
+        "La respuesta trae el evento completo (igual que get_event).",
     scope: "write",
+    idempotent: true,
+    audit: (args, result) => ({ summary: `Creó "${args.name}" (${args.ticket_types.length} tipo(s) de entrada, ${args.functions.length} función(es))`, target: `event:${(result as any).event_id}` }),
     annotations: { readOnlyHint: false, destructiveHint: false },
     inputSchema: {
         type: "object",
@@ -260,6 +281,7 @@ const createEvent: ToolDef = {
         if (!args.venue_id && !args.new_venue) throw new ToolError("invalid_input", "Indica venue_id (list_venues) o new_venue.");
         const fnCount = args.functions.length;
         for (const t of args.ticket_types) {
+            rejectCourtesyName(t.name);
             if (t.function_index != null && t.function_index >= fnCount) {
                 throw new ToolError("invalid_input", `function_index ${t.function_index} no existe (hay ${fnCount} funciones).`);
             }
@@ -281,6 +303,7 @@ const createEvent: ToolDef = {
                 initDate: t.sales_start || null,
                 endDate: t.sales_end || null,
                 eventDateId: t.function_index != null ? `f${t.function_index}` : null,
+                maxPerOrder: t.max_per_order,
             })),
         };
         const created = await createEventGraph({ userId: ctx.actor.userId, orgId: ctx.actor.orgId }, input).catch(rethrowEventInput);
@@ -296,12 +319,9 @@ const createEvent: ToolDef = {
             console.warn("create_event preview link:", err?.message);
         }
         return {
-            event_id: created.id,
-            status: "draft",
-            ...eventUrls(ctx, { slug: created.slug, status: "draft" }),
+            ...(await eventDetail(ctx, Number(created.id))),
             preview_url: preview?.url ?? null,
             preview_expires_at: preview?.expires_at ?? null,
-            dashboard_url: eventDashboardUrl(ctx, created.id),
             next_steps:
                 "El evento quedó en BORRADOR (no visible al público). Muestra al productor el preview_url (vista previa privada; la página " +
                 "dice 'Vista previa · Evento NO publicado'). Revisa con get_event y publícalo con set_event_status cuando lo apruebe.",
@@ -314,8 +334,10 @@ const updateEvent: ToolDef = {
     title: "Editar evento",
     description:
         "Edita datos generales de un evento (nombre, descripción, categoría, imagen, privacidad). Solo cambia los campos enviados. " +
-        "Fechas y lugares se cambian desde el panel (allí se avisa a los asistentes). Para entradas usa las herramientas de ticket_type.",
+        "Fechas y lugares se cambian desde el panel (allí se avisa a los asistentes). Si cambias una fecha, revisa que la descripción no " +
+        "mencione la anterior (get_event la advierte en warnings). Para entradas usa las herramientas de ticket_type.",
     scope: "write",
+    audit: (args, result) => ({ summary: `Editó ${((result as any).updated || []).join(", ") || "el evento"}`, target: `event:${args.event_id}` }),
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     inputSchema: {
         type: "object",
@@ -346,7 +368,17 @@ const updateEvent: ToolDef = {
             if (error) throw error;
         }
         if (args.category !== undefined) await syncEventCategory(Number(event.id), args.category);
-        return { event_id: Number(event.id), updated: [...Object.keys(patch).filter((k) => k !== "title"), ...(args.category !== undefined ? ["category"] : [])], ...eventUrls(ctx, event) };
+        let warnings: string[] = [];
+        if (args.description !== undefined) {
+            const { data: dates } = await ctx.supabase.from("event_dates").select("date").eq("event_id", event.id);
+            warnings = [descriptionDateWarning(patch.description as string, (dates || []).map((d: any) => String(d.date).slice(0, 10)))].filter(Boolean) as string[];
+        }
+        return {
+            event_id: Number(event.id),
+            updated: [...Object.keys(patch).filter((k) => k !== "title"), ...(args.category !== undefined ? ["category"] : [])],
+            ...eventUrls(ctx, event),
+            ...(warnings.length ? { warnings } : {}),
+        };
     },
 };
 
@@ -354,20 +386,46 @@ const setStatus: ToolDef = {
     name: "set_event_status",
     title: "Publicar o pausar evento",
     description:
-        "Publica un evento (queda visible y a la venta) o lo vuelve a borrador (deja de venderse). " +
+        "Publica un evento (queda a la venta; si es privado solo con el link) o lo vuelve a borrador (deja de venderse). " +
         "Acción visible al público: el servidor devuelve primero un resumen y solo la ejecuta al repetir la llamada con confirmation_token.",
     scope: "publish",
     async confirm(args, ctx) {
-        const event = await loadOwnedEvent<any>(ctx, args.event_id, "id, name, slug, status, start_date");
+        const event = await loadOwnedEvent<any>(ctx, args.event_id, "id, name, slug, status, accessibility, start_date, end_date");
         if (event.status === args.status) {
             return { message: `"${event.name}" ya está ${args.status === "published" ? "publicado" : "en borrador"}: no habrá cambios.` };
         }
-        return args.status === "published"
-            ? {
-                  message: `Publicar "${event.name}": quedará visible y a la venta en ${eventPublicUrl(ctx, event.slug)}.`,
-                  details: { event_id: Number(event.id), start_date: event.start_date },
-              }
-            : { message: `Volver "${event.name}" a borrador: la página deja de verse y se detiene la venta (las entradas vendidas siguen válidas).`, details: { event_id: Number(event.id) } };
+        if (args.status !== "published") {
+            return { message: `Volver "${event.name}" a borrador: la página deja de verse y se detiene la venta (las entradas vendidas siguen válidas).`, details: { event_id: Number(event.id) } };
+        }
+        const { data: tickets } = await ctx.supabase.from("event_tickets").select(TICKET_SELECT).eq("event_id", event.id).order("price", { ascending: true });
+        const types = (tickets || []).map((t: any) => presentTicket(t, undefined, { status: "published" })).filter((t: any) => !t.is_system);
+        const onSale = types.filter((t: any) => t.on_sale_now);
+        const paused = types.filter((t: any) => t.status === "unavailable");
+        const scheduled = types.filter((t: any) => !t.on_sale_now && t.status !== "unavailable");
+        const isPrivate = event.accessibility === "private";
+        const url = eventPublicUrl(ctx, event.slug);
+        const label = (t: any) => `${t.name} ${clp(t.price)}${t.quantity != null ? ` (${t.quantity} cupos)` : ""}`;
+        const warnings: string[] = [];
+        if (!onSale.length) warnings.push("Ningún tipo de entrada queda a la venta al publicar: revisa pausas y ventanas de venta.");
+        if (isPrivate) warnings.push("Evento PRIVADO: no aparece en el listado de AI Tickets ni en buscadores; solo entra quien tenga el link.");
+        return {
+            message:
+                `Publicar "${event.name}" (${localDateTime(event.start_date)?.replace("T", " ") || "sin fecha"}, hora de Chile). ` +
+                (isPrivate ? `Quedará PRIVADO: solo accesible con el link ${url}. ` : `Quedará PÚBLICO en ${url} y en el listado de eventos. `) +
+                (onSale.length ? `A la venta: ${onSale.map(label).join(", ")}.` : "Sin entradas a la venta.") +
+                (paused.length ? ` Pausados (no se venden): ${paused.map((t: any) => t.name).join(", ")}.` : "") +
+                (scheduled.length ? ` Fuera de su ventana de venta: ${scheduled.map((t: any) => t.name).join(", ")}.` : ""),
+            details: {
+                event_id: Number(event.id),
+                visibility: isPrivate ? "private" : "public",
+                public_url: url,
+                ...eventDateFields(event),
+                on_sale: onSale.map((t: any) => ({ id: t.id, name: t.name, price: t.price, quantity: t.quantity })),
+                paused: paused.map((t: any) => ({ id: t.id, name: t.name, price: t.price })),
+                not_in_sales_window: scheduled.map((t: any) => ({ id: t.id, name: t.name, sales_start: t.sales_start, sales_end: t.sales_end })),
+            },
+            warnings,
+        };
     },
     audit: (args) => ({ summary: args.status === "published" ? "Publicó el evento" : "Volvió el evento a borrador", target: `event:${args.event_id}` }),
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
@@ -405,6 +463,10 @@ const createPreviewLinkTool: ToolDef = {
         "Configurable: expires_in_hours (por defecto 168 = 7 días), no_expiration=true (sin vencimiento, hasta revocarlo) y " +
         "single_use=true (solo funciona en el primer navegador que lo abre). La URL se entrega solo esta vez: muéstrala al productor.",
     scope: "write",
+    audit: (args, result) => ({
+        summary: `Link de vista previa${args.label ? ` para ${args.label}` : ""} (${args.no_expiration ? "sin vencimiento" : `${args.expires_in_hours} h`}${args.single_use ? ", un uso" : ""})`,
+        target: `preview_link:${(result as any).link?.id ?? ""}`,
+    }),
     annotations: { readOnlyHint: false, destructiveHint: false },
     inputSchema: {
         type: "object",
@@ -473,10 +535,13 @@ const revokePreviewLinkTool: ToolDef = {
         additionalProperties: false,
         properties: { link_id: { type: "string", pattern: "^[0-9a-fA-F-]{36}$", description: "ID del link (uuid)." } },
     },
+    audit: (args) => ({ summary: "Revocó un link de vista previa", target: `preview_link:${args.link_id}` }),
     async handler(args, ctx) {
         const ok = await revokePreviewLink(args.link_id, ctx.actor.orgId, ctx.supabase);
         if (!ok) throw new ToolError("not_found", "Link de vista previa no encontrado en tu organización.");
-        return { link_id: args.link_id, status: "revoked" };
+        // event_id para la bitácora (filtro por evento en list_audit_log)
+        const { data: link } = await ctx.supabase.from("aitickets_event_preview_links").select("event_id").eq("id", args.link_id).eq("organization_id", ctx.actor.orgId).maybeSingle();
+        return { link_id: args.link_id, status: "revoked", ...(link?.event_id ? { event_id: Number(link.event_id) } : {}) };
     },
 };
 

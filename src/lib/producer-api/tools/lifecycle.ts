@@ -82,7 +82,7 @@ const duplicateEvent: ToolDef = {
                 : "Falta la fecha: agrégala en el panel (o duplica de nuevo con date + start_time) antes de publicar.",
         };
     },
-    audit: (_args, result: any) => ({ summary: `Duplicado del evento ${result.source_event_id}`, target: String(result.event_id) }),
+    audit: (_args, result: any) => ({ summary: `Duplicado del evento ${result.source_event_id}`, target: `event:${result.event_id}` }),
 };
 
 // ---------------------------------------------------------------------------
@@ -263,10 +263,14 @@ const updateVenue: ToolDef = {
             venue_id: String(venue.id),
             updated: Object.keys(patch).filter((k) => k !== "updated_at"),
             events_affected: eventIds.length,
+            event_ids: eventIds,
             note: eventIds.length ? "Si el cambio afecta a asistentes (dirección), avísales con send_attendee_message." : undefined,
         };
     },
-    audit: (args) => ({ summary: `Lugar editado`, target: args.venue_id }),
+    audit: (args, result: any) => ({
+        summary: `Lugar editado (${(result.updated || []).join(", ")}); ${result.events_affected} evento(s) lo usan`,
+        target: `venue:${args.venue_id}`,
+    }),
 };
 
 export const lifecycleTools: ToolDef[] = [duplicateEvent, archiveEvent, deleteEvent, updateVenue];

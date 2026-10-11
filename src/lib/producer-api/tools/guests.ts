@@ -1,7 +1,7 @@
 // Herramientas: lista de invitados y cortesías.
 // Invitados (aitickets_guests): una lista por evento con nombre, contacto y acompañantes. send_invitations les
 // manda el link del evento por correo o arma los links de WhatsApp (no hay proveedor de WhatsApp: el productor
-// los envía). issue_complimentary_tickets emite entradas gratis nominadas (src/lib/courtesy.ts).
+// los envía; el invitado queda 'link_ready' hasta que se confirma con mark_guests_invited). issue_complimentary_tickets emite entradas gratis nominadas (src/lib/courtesy.ts).
 import { ToolError, type ToolDef, type ToolContext } from "../registry";
 import { eventIdSchema, loadOwnedEvent, eventPublicUrl } from "./common";
 import { issueCourtesyTickets, MAX_COURTESY_PER_REQUEST } from "../../courtesy";
@@ -164,7 +164,12 @@ const listGuests: ToolDef = {
         additionalProperties: false,
         properties: {
             event_id: eventIdSchema,
-            status: { type: "string", enum: ["active", "pending", "invited", "removed", "all"], default: "active", description: "active = pendientes + invitados." },
+            status: {
+                type: "string",
+                enum: ["active", "pending", "link_ready", "invited", "removed", "all"],
+                default: "active",
+                description: "active = todos menos los quitados. link_ready = link de WhatsApp preparado, falta confirmar el envío (mark_guests_invited).",
+            },
             search: { type: "string", maxLength: 120, description: "Filtra por nombre, email o teléfono (contiene)." },
             limit: { type: "integer", minimum: 1, maximum: 500, default: 200 },
             offset: { type: "integer", minimum: 0, maximum: 100000, default: 0 },
@@ -184,9 +189,12 @@ const listGuests: ToolDef = {
             event_id: Number(event.id),
             total: guests.length,
             offset: args.offset,
+            // Cuenta lo filtrado (total = pending + link_ready + invited + removed)
             summary: {
                 pending: active.filter((g) => g.status === "pending").length,
+                link_ready: active.filter((g) => g.status === "link_ready").length,
                 invited: active.filter((g) => g.status === "invited").length,
+                removed: guests.length - active.length,
                 people_including_plus_ones: active.reduce((n, g) => n + 1 + (Number(g.plus_ones) || 0), 0),
             },
             guests: guests.slice(args.offset, args.offset + args.limit).map(presentGuest),
@@ -256,7 +264,8 @@ async function planInvitations(args: any, ctx: ToolContext): Promise<InvitePlan>
         const wanted = new Set(args.guest_ids.map((id: string) => id.toLowerCase()));
         guests = guests.filter((g) => wanted.has(String(g.id).toLowerCase()));
     } else if (!args.include_already_invited) {
-        guests = guests.filter((g) => g.status === "pending");
+        // Sin enviar todavía: pendientes y los que solo tienen el link de WhatsApp preparado
+        guests = guests.filter((g) => g.status === "pending" || g.status === "link_ready");
     }
     const targets: any[] = [];
     const skipped: InvitePlan["skipped"] = [];
@@ -281,7 +290,8 @@ const sendInvitations: ToolDef = {
     title: "Enviar invitaciones",
     description:
         "Envía el link del evento a la lista de invitados por email (desde AI Tickets, un correo individual por persona) o prepara los links de WhatsApp " +
-        "(wa.me con el mensaje listo: AI Tickets no envía WhatsApp; el productor los abre y envía). Por defecto va a los invitados pendientes; " +
+        "(wa.me con el mensaje listo: AI Tickets NO envía WhatsApp; el productor los abre y envía). Con WhatsApp los invitados quedan " +
+        "'link_ready' (no 'invited'): cuando el productor confirme que los envió, márcalos con mark_guests_invited. Por defecto va a los invitados pendientes; " +
         "guest_ids limita a algunos. El evento debe estar publicado (puede ser privado). Es un envío masivo: requiere confirmación.",
     scope: "write",
     permission: "guests.manage",
@@ -310,7 +320,10 @@ const sendInvitations: ToolDef = {
             warnings: plan.skipped.length ? [`${plan.skipped.length} invitado(s) quedan fuera por no tener ${args.channel === "email" ? "email" : "teléfono"}.`] : undefined,
         };
     },
-    audit: (args, result) => ({ summary: `Invitaciones por ${args.channel}: ${(result as any).sent_count}`, target: `event:${args.event_id}` }),
+    audit: (args, result) => ({
+        summary: args.channel === "whatsapp" ? `Links de WhatsApp preparados (sin enviar): ${(result as any).links_prepared}` : `Invitaciones por email: ${(result as any).sent_count}`,
+        target: `event:${args.event_id}`,
+    }),
     async handler(args, ctx) {
         const plan = await planInvitations(args, ctx);
         const now = new Date().toISOString();
@@ -329,14 +342,27 @@ const sendInvitations: ToolDef = {
                 const phone = normalizePhone(g.phone)!;
                 return { guest_id: g.id, name: g.name, phone, whatsapp_url: whatsappLink(phone, invitationText(plan, g.name, args.message)) };
             });
-            await markInvited(plan.targets.map((g) => g.id));
+            // Solo se preparó el link: queda 'link_ready' hasta que el productor confirme el envío (mark_guests_invited)
+            const ready = plan.targets.filter((g) => g.status === "pending").map((g) => g.id);
+            if (ready.length) {
+                const { error } = await ctx.supabase
+                    .from("aitickets_guests")
+                    .update({ status: "link_ready", invite_channel: "whatsapp" })
+                    .in("id", ready)
+                    .eq("event_id", plan.event.id);
+                // Base sin la migración 202610110200 (deploy preview): siguen 'pending'
+                if (error && String(error.code) !== "23514") throw error;
+            }
             return {
                 event_id: Number(plan.event.id),
                 channel: "whatsapp",
-                sent_count: links.length,
+                links_prepared: links.length,
+                sent_count: 0,
                 links,
                 skipped: plan.skipped,
-                note: "AI Tickets no envía WhatsApp: entrega estos links al productor; cada uno abre WhatsApp con el mensaje listo para enviar.",
+                note:
+                    "AI Tickets NO envió nada: entrega estos links al productor; cada uno abre WhatsApp con el mensaje listo. Los invitados quedan " +
+                    "'link_ready'. Cuando el productor confirme que los envió, llama a mark_guests_invited con sus guest_id.",
             };
         }
 
@@ -369,6 +395,50 @@ const sendInvitations: ToolDef = {
     },
 };
 
+const markGuestsInvited: ToolDef = {
+    name: "mark_guests_invited",
+    title: "Marcar invitaciones enviadas",
+    description:
+        "Marca como invitados ('invited') a quienes el productor ya les envió la invitación por su cuenta, por ejemplo los links de WhatsApp " +
+        "de send_invitations (quedan 'link_ready' hasta confirmarlo). Úsala SOLO cuando el productor confirme que los envió.",
+    scope: "write",
+    permission: "guests.manage",
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    inputSchema: {
+        type: "object",
+        required: ["event_id", "guest_ids"],
+        additionalProperties: false,
+        properties: {
+            event_id: eventIdSchema,
+            guest_ids: { type: "array", minItems: 1, maxItems: 500, items: { type: "string", pattern: UUID_PATTERN } },
+            channel: { type: "string", enum: ["whatsapp", "email"], default: "whatsapp", description: "Por dónde se envió." },
+        },
+    },
+    audit: (args, result) => ({ summary: `Invitaciones confirmadas como enviadas (${args.channel}): ${(result as any).marked_count}`, target: `event:${args.event_id}` }),
+    async handler(args, ctx) {
+        const event = await loadOwnedEvent<any>(ctx, args.event_id, "id");
+        const wanted = new Set(args.guest_ids.map((id: string) => id.toLowerCase()));
+        const guests = (await loadGuests(ctx, Number(event.id))).filter((g) => wanted.has(String(g.id).toLowerCase()));
+        const targets = guests.filter((g) => g.status !== "removed");
+        const now = new Date().toISOString();
+        for (const g of targets) {
+            const { error } = await ctx.supabase
+                .from("aitickets_guests")
+                .update({ status: "invited", invited_at: now, invite_channel: args.channel, invite_count: (Number(g.invite_count) || 0) + 1 })
+                .eq("id", g.id)
+                .eq("event_id", event.id);
+            if (error) throw error;
+        }
+        const found = new Set(guests.map((g) => String(g.id).toLowerCase()));
+        return {
+            event_id: Number(event.id),
+            marked_count: targets.length,
+            not_found: args.guest_ids.filter((id: string) => !found.has(id.toLowerCase())),
+            skipped_removed: guests.filter((g) => g.status === "removed").map((g) => g.id),
+        };
+    },
+};
+
 // ---------------------------------------------------------------------------
 // Cortesías
 // ---------------------------------------------------------------------------
@@ -377,7 +447,8 @@ const issueComplimentary: ToolDef = {
     name: "issue_complimentary_tickets",
     title: "Emitir cortesías",
     description:
-        "Emite entradas GRATIS nominadas (DJ, staff, prensa) de un tipo de entrada y las envía por correo a cada destinatario. Pueden superar el cupo " +
+        "Emite entradas GRATIS nominadas (DJ, staff, prensa) y las envía por correo a cada destinatario. Por defecto usa el tipo \"Cortesía\" " +
+        "del sistema (no cuenta como venta ni ocupa cupo de otros tipos); ticket_type_id permite usar otro tipo. Pueden superar el cupo " +
         `del tipo de entrada (las decide el productor). Hasta 50 destinatarios y ${MAX_COURTESY_PER_REQUEST} entradas por destinatario. ` +
         "Usa idempotency_key para que un reintento no duplique entradas.",
     scope: "write",
@@ -386,11 +457,11 @@ const issueComplimentary: ToolDef = {
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     inputSchema: {
         type: "object",
-        required: ["event_id", "ticket_type_id", "recipients"],
+        required: ["event_id", "recipients"],
         additionalProperties: false,
         properties: {
             event_id: eventIdSchema,
-            ticket_type_id: { type: "integer", minimum: 1, description: "Tipo de entrada (get_event → ticket_types)." },
+            ticket_type_id: { type: "integer", minimum: 1, description: "Tipo de entrada (get_event → ticket_types). Omitir = el tipo Cortesía del sistema." },
             recipients: {
                 type: "array",
                 minItems: 1,
@@ -412,13 +483,17 @@ const issueComplimentary: ToolDef = {
     async handler(args, ctx) {
         const event = await loadOwnedEvent<any>(ctx, args.event_id, "id, name, cancelled_at");
         if (event.cancelled_at) throw new ToolError("conflict", "El evento está cancelado.");
-        const { data: ticket } = await ctx.supabase
-            .from("event_tickets")
-            .select("id, ticket_name")
-            .eq("id", args.ticket_type_id)
-            .eq("event_id", event.id)
-            .maybeSingle();
-        if (!ticket) throw new ToolError("not_found", `El tipo de entrada ${args.ticket_type_id} no existe en el evento ${event.id}.`);
+        let ticketQuery = ctx.supabase.from("event_tickets").select("id, ticket_name").eq("event_id", event.id);
+        ticketQuery = args.ticket_type_id ? ticketQuery.eq("id", args.ticket_type_id) : ticketQuery.eq("is_gift", true).order("id", { ascending: true }).limit(1);
+        const { data: ticket } = await ticketQuery.maybeSingle();
+        if (!ticket) {
+            throw new ToolError(
+                "not_found",
+                args.ticket_type_id
+                    ? `El tipo de entrada ${args.ticket_type_id} no existe en el evento ${event.id}.`
+                    : `El evento ${event.id} no tiene tipo de cortesía: indica ticket_type_id (get_event → ticket_types).`,
+            );
+        }
         for (const r of args.recipients) {
             if (!isValidEmail(String(r.email).toLowerCase())) throw new ToolError("invalid_input", `Email inválido para ${r.name}.`);
         }
@@ -457,4 +532,4 @@ const issueComplimentary: ToolDef = {
     },
 };
 
-export const guestTools: ToolDef[] = [addGuests, listGuests, removeGuest, sendInvitations, issueComplimentary];
+export const guestTools: ToolDef[] = [addGuests, listGuests, removeGuest, sendInvitations, markGuestsInvited, issueComplimentary];

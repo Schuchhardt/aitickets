@@ -9,6 +9,8 @@ import { getSessionContext } from "../../lib/supabaseServer";
 import Layout from '../../layouts/Layout.astro';
 import "../../styles/global.css";
 
+import { notFound } from "../../lib/notFound";
+
 export const prerender = false;
 
 // Toda la carga (evento, visitas, entradas/stock, funciones, SEO) vive en src/lib/eventPage.ts,
@@ -40,7 +42,7 @@ if (!result && Astro.params.slug && Astro.cookies.get("sb-access-token")) {
 
 // Borradores (para el público), eventos inexistentes o slugs inválidos => 404 real (src/pages/404.astro)
 if (!result) {
-  return new Response(null, { status: 404 });
+  return notFound();
 }
 
 const { eventData, seo } = result;

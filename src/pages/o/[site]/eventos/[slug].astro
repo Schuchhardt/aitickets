@@ -13,18 +13,20 @@ import { publicSiteProps, purchaseUrlFor, siteCanonicalOrigin } from "../../../.
 import { isDemoEventSlug } from "../../../../lib/demoEvent.mjs";
 import { loadSiteForPage } from "../../_site";
 
+import { notFound } from "../../../../lib/notFound";
+
 export const prerender = false;
 
 const loaded = await loadSiteForPage(Astro);
 if (!loaded) {
-  return new Response(null, { status: 404 });
+  return notFound();
 }
 const { site, preview, base, template } = loaded;
 const eventSlug = Astro.params.slug;
 
 // El sitio demo solo muestra el evento demo; los demás, solo eventos de su organización
 if (site.is_demo && !isDemoEventSlug(eventSlug)) {
-  return new Response(null, { status: 404 });
+  return notFound();
 }
 
 const result = await getPublicEventData(eventSlug, {
@@ -35,7 +37,7 @@ const result = await getPublicEventData(eventSlug, {
   locals: Astro.locals,
 });
 if (!result) {
-  return new Response(null, { status: 404 });
+  return notFound();
 }
 
 const { seo } = result;

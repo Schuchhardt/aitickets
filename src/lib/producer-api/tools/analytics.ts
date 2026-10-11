@@ -1,6 +1,7 @@
 // Herramientas: rendimiento de eventos (ventas, tráfico, conversión, canales). Agrupa por día en hora de Chile.
 import type { ToolDef, ToolContext } from "../registry";
-import { eventIdSchema, loadOwnedEvent, eventPublicUrl, ticketAvailability, presentTicket, TICKET_SELECT, fetchAll, localDay, eventUrls, scopeToEvents } from "./common";
+import { eventIdSchema, loadOwnedEvent, eventPublicUrl, ticketAvailability, presentTicket, TICKET_SELECT, fetchAll, localDay, eventUrls, scopeToEvents, eventDateFields, DATES_NOTE } from "./common";
+import { isCourtesyOrder, isTransferOrder, lineSoldQty, orderLines, orderSoldQty } from "../../orderKinds";
 
 const MAX_VISITS = 50000;
 
@@ -47,25 +48,24 @@ export async function eventPerformance(ctx: ToolContext, eventId: number, days: 
         ctx.supabase.from("event_tickets").select(TICKET_SELECT).eq("event_id", event.id),
     ]);
 
-    // Ventas
-    let revenue = 0, ticketsSold = 0, discountTotal = 0, courtesyTickets = 0;
+    // Ventas: sin cortesías ni transferencias (src/lib/orderKinds.ts). Las entradas transferidas siguen contando
+    // como vendidas en su orden de origen (transferred_out).
+    const sales = orders.filter((o) => !isCourtesyOrder(o) && !isTransferOrder(o));
+    const courtesyTickets = orders.filter((o) => isCourtesyOrder(o) && !isTransferOrder(o)).reduce((n, o) => n + orderSoldQty(o), 0);
+    let revenue = 0, ticketsSold = 0, discountTotal = 0;
     const byType = new Map<string, { name: string; tickets: number; gross_revenue_clp: number }>();
     const channels = new Map<string, { channel: string; orders: number; tickets: number; revenue_clp: number }>();
     const codes = new Map<string, { code: string; orders: number; discount_clp: number }>();
-    for (const o of orders) {
-        const qty = Number(o.ticket_qty) || 1;
-        if (o.payment_provider === "courtesy") {
-            courtesyTickets += qty;
-            continue;
-        }
+    for (const o of sales) {
+        const qty = orderSoldQty(o);
         revenue += Number(o.amount) || 0;
         ticketsSold += qty;
         discountTotal += Number(o.discount_amount) || 0;
-        for (const l of Array.isArray(o.ticket_details) ? o.ticket_details : []) {
+        for (const l of orderLines(o)) {
             const name = l?.name || "Entrada";
             const row = byType.get(name) || { name, tickets: 0, gross_revenue_clp: 0 };
-            row.tickets += Number(l?.quantity) || 0;
-            row.gross_revenue_clp += (Number(l?.price) || 0) * (Number(l?.quantity) || 0);
+            row.tickets += lineSoldQty(l);
+            row.gross_revenue_clp += (Number(l?.price) || 0) * lineSoldQty(l);
             byType.set(name, row);
         }
         const channel = o.ref ? `ref:${o.ref}` : [o.utm_source, o.utm_medium, o.utm_campaign].filter(Boolean).join(" / ") || "Directo / sin seguimiento";
@@ -78,14 +78,16 @@ export async function eventPerformance(ctx: ToolContext, eventId: number, days: 
             codes.set(o.discount_code, c);
         }
     }
-    const paidOrders = orders.filter((o) => o.payment_provider !== "courtesy").length;
+    const paidOrders = sales.length;
 
     // Capacidad (stock real: emitidas + en checkout)
     const availability = await ticketAvailability(ctx, event.id, (tickets || []).map((t: any) => Number(t.id)));
-    const ticketTypes = (tickets || []).map((t: any) => presentTicket(t, availability.get(Number(t.id))));
-    const unlimited = ticketTypes.some((t: any) => t.quantity == null);
-    const capacity = unlimited ? null : ticketTypes.reduce((s: number, t: any) => s + (t.quantity || 0), 0);
-    const issued = ticketTypes.reduce((s: number, t: any) => s + t.sold, 0);
+    const ticketTypes = (tickets || []).map((t: any) => presentTicket(t, availability.get(Number(t.id)), event));
+    // El tipo de cortesía del sistema no es capacidad a la venta
+    const forSale = ticketTypes.filter((t: any) => !t.is_system);
+    const unlimited = forSale.some((t: any) => t.quantity == null);
+    const capacity = unlimited ? null : forSale.reduce((s: number, t: any) => s + (t.quantity || 0), 0);
+    const issued = forSale.reduce((s: number, t: any) => s + t.sold, 0);
 
     // Tráfico
     const unique = new Set(visits.map((v) => v.ip_hash)).size;
@@ -103,20 +105,18 @@ export async function eventPerformance(ctx: ToolContext, eventId: number, days: 
         const row = series.get(localDay(v.created_at));
         if (row) row.visits += 1;
     }
-    for (const o of orders) {
-        if (o.payment_provider === "courtesy") continue;
+    for (const o of sales) {
         const row = series.get(localDay(o.created_at));
-        if (row) { row.tickets += Number(o.ticket_qty) || 1; row.revenue_clp += Number(o.amount) || 0; }
+        if (row) { row.tickets += orderSoldQty(o); row.revenue_clp += Number(o.amount) || 0; }
     }
 
     // Ritmo: últimos 7 días vs 7 anteriores
     const since = (d: number) => now.getTime() - d * 86400000;
     const inRange = (o: any, from: number, to: number) => { const t = new Date(o.created_at).getTime(); return t >= from && t < to; };
-    const paid = orders.filter((o) => o.payment_provider !== "courtesy");
-    const sum = (list: any[]) => list.reduce((s, o) => s + (Number(o.ticket_qty) || 1), 0);
-    const last7 = sum(paid.filter((o) => inRange(o, since(7), now.getTime() + 1)));
-    const prev7 = sum(paid.filter((o) => inRange(o, since(14), since(7))));
-    const lastSale = paid.length ? paid[paid.length - 1].created_at : null;
+    const sum = (list: any[]) => list.reduce((s, o) => s + orderSoldQty(o), 0);
+    const last7 = sum(sales.filter((o) => inRange(o, since(7), now.getTime() + 1)));
+    const prev7 = sum(sales.filter((o) => inRange(o, since(14), since(7))));
+    const lastSale = sales.length ? sales[sales.length - 1].created_at : null;
     const daysUntil = event.start_date ? Math.ceil((new Date(event.start_date).getTime() - now.getTime()) / 86400000) : null;
 
     return {
@@ -124,7 +124,8 @@ export async function eventPerformance(ctx: ToolContext, eventId: number, days: 
         name: event.name,
         status: event.status,
         ...eventUrls(ctx, event),
-        start_date: event.start_date,
+        ...eventDateFields(event),
+        dates_note: DATES_NOTE,
         days_until_event: daysUntil,
         sales: {
             paid_orders: paidOrders,
@@ -136,12 +137,13 @@ export async function eventPerformance(ctx: ToolContext, eventId: number, days: 
             average_ticket_clp: ticketsSold ? Math.round(revenue / ticketsSold) : 0,
             refunded_orders: refunded || 0,
             last_sale_at: lastSale,
-            note: "revenue_clp = monto de entradas para el productor (ya con descuentos, sin cargo por servicio).",
+            note: "revenue_clp = monto de entradas para el productor (ya con descuentos, sin cargo por servicio). Las cortesías (courtesy_tickets) y las transferencias de titular no cuentan como ventas.",
         },
         capacity: {
             total: capacity,
             unlimited_ticket_types: unlimited,
             issued_tickets: issued,
+            courtesy_tickets_issued: courtesyTickets,
             sell_through_pct: capacity ? pct(issued, capacity) : null,
         },
         pace: {
@@ -201,7 +203,7 @@ const getSalesOverview: ToolDef = {
     async handler(args, ctx) {
         const { data: events, error } = await scopeToEvents(
             ctx,
-            ctx.supabase.from("events").select("id, name, slug, status, start_date").eq("organization_id", ctx.actor.orgId),
+            ctx.supabase.from("events").select("id, name, slug, status, start_date, end_date").eq("organization_id", ctx.actor.orgId),
             "id",
         )
             .order("start_date", { ascending: false })
@@ -211,20 +213,22 @@ const getSalesOverview: ToolDef = {
         const sinceIso = new Date(Date.now() - args.days * 86400000).toISOString();
         const orders = ids.length
             ? await fetchAll<any>(() =>
-                ctx.supabase.from("event_orders").select("event_id, amount, ticket_qty, payment_provider, created_at")
+                ctx.supabase.from("event_orders").select("event_id, amount, ticket_qty, ticket_details, payment_provider, created_at")
                     .in("event_id", ids).eq("status", "paid").gte("created_at", sinceIso))
             : [];
         const per = new Map<number, { tickets: number; revenue: number; orders: number }>();
         let tickets = 0, revenue = 0, count = 0;
         for (const o of orders) {
-            if (o.payment_provider === "courtesy") continue;
+            if (isCourtesyOrder(o) || isTransferOrder(o)) continue;
+            const qty = orderSoldQty(o);
             const row = per.get(Number(o.event_id)) || { tickets: 0, revenue: 0, orders: 0 };
-            row.tickets += Number(o.ticket_qty) || 1; row.revenue += Number(o.amount) || 0; row.orders += 1;
+            row.tickets += qty; row.revenue += Number(o.amount) || 0; row.orders += 1;
             per.set(Number(o.event_id), row);
-            tickets += Number(o.ticket_qty) || 1; revenue += Number(o.amount) || 0; count += 1;
+            tickets += qty; revenue += Number(o.amount) || 0; count += 1;
         }
         return {
             period_days: args.days,
+            dates_note: DATES_NOTE,
             since: sinceIso,
             totals: { paid_orders: count, tickets_sold: tickets, revenue_clp: revenue },
             events: (events || [])
@@ -232,7 +236,7 @@ const getSalesOverview: ToolDef = {
                     event_id: Number(e.id),
                     name: e.name,
                     status: e.status,
-                    start_date: e.start_date,
+                    ...eventDateFields(e),
                     public_url: e.status === "published" ? eventPublicUrl(ctx, e.slug) : null,
                     tickets_sold: per.get(Number(e.id))?.tickets || 0,
                     revenue_clp: per.get(Number(e.id))?.revenue || 0,

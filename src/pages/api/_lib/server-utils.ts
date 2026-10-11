@@ -137,7 +137,20 @@ export function computeEventRange(dates: EventDateInput[]): { start_date: string
 export function formatLocation(venue: { name?: string | null; address?: string | null; city?: string | null } | null | undefined): string | null {
     if (!venue) return null;
     const parts = [venue.name, venue.address, venue.city].map(p => (p || "").trim()).filter(Boolean);
-    return parts.length ? parts.join(", ") : null;
+    return parts.length ? dedupeLocation(parts.join(", ")) : null;
+}
+
+/** Quita segmentos repetidos ("Lican Ray 6742, Lican Ray 6742, Vitacura" cuando el nombre del lugar es su dirección). */
+export function dedupeLocation(location: string | null | undefined): string | null {
+    if (!location) return location ?? null;
+    const seen = new Set<string>();
+    const parts = String(location).split(",").map(p => p.trim()).filter(Boolean).filter(p => {
+        const key = p.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+    return parts.join(", ") || null;
 }
 
 /** Slug simple sin acentos. */

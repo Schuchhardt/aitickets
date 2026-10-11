@@ -76,6 +76,8 @@ export type TicketInput = {
     endDate?: string | null;
     /** R1: id de la función (event_dates.id real o id temporal del cliente). ""/null = todas las funciones. */
     eventDateId?: number | string | null;
+    /** Máximo de entradas de este tipo por compra (por defecto 10). */
+    maxPerOrder?: number | null;
 };
 
 /** Normaliza un ticket del formulario. Devuelve null si es inválido. */
@@ -267,7 +269,7 @@ export async function createEventGraph(
             ...t,
             event_date_id: resolveTicketDateId(tickets[i]?.eventDateId, dateIdMap),
             event_id: eventId,
-            max_quantity: 10,
+            max_quantity: Number(tickets[i]?.maxPerOrder) > 0 ? Math.floor(Number(tickets[i]?.maxPerOrder)) : 10,
             is_gift: false,
             status: "available",
         })),

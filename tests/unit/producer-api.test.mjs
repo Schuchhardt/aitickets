@@ -355,3 +355,85 @@ describe('marketing', () => {
     expect(await run('publish_social_post', { post_id: 5 })).toMatchObject({ ok: false, code: 'not_found' })
   })
 })
+
+describe('correcciones tras la prueba del MCP (11 oct 2026)', () => {
+  const run = (name, args, scopes = ['read', 'write', 'publish', 'attendees'], extra = {}) =>
+    runTool(getTool(name), args, { ...ctx(scopes), actor: { ...actor(scopes), ...extra } })
+
+  it('el tipo Cortesía del sistema viene marcado y no está a la venta; en borrador nada está on_sale_now', async () => {
+    db.tables.event_tickets.push({ id: 101, event_id: 10, ticket_name: 'Cortesía', price: 0, total_quantity: 0, status: 'available', is_gift: true })
+    const r = (await run('get_event', { event_id: 10 })).result
+    const courtesy = r.ticket_types.find((t) => t.id === 101)
+    expect(courtesy).toMatchObject({ kind: 'courtesy', is_system: true, on_sale_now: false, status: 'system', remaining: null })
+    expect(r.ticket_types.find((t) => t.id === 100)).toMatchObject({ kind: 'sale', is_system: false, on_sale_now: false })
+    db.tables.events.find((e) => e.id === 10).status = 'published'
+    const pub = (await run('get_event', { event_id: 10 })).result
+    expect(pub.ticket_types.find((t) => t.id === 100).on_sale_now).toBe(true)
+  })
+
+  it('no se puede crear ni renombrar un tipo con el nombre reservado Cortesía', async () => {
+    expect(await run('create_ticket_type', { event_id: 10, name: 'cortesias', price: 0 })).toMatchObject({ ok: false, code: 'invalid_input' })
+    expect(await run('update_ticket_type', { event_id: 10, ticket_type_id: 100, name: 'CORTESÍA' })).toMatchObject({ ok: false, code: 'invalid_input' })
+  })
+
+  it('update_ticket_type deja en la bitácora el cambio de precio', async () => {
+    await run('update_ticket_type', { event_id: 10, ticket_type_id: 100, price: 12000 })
+    expect(db.tables.aitickets_api_audit.at(-1)).toMatchObject({ tool: 'update_ticket_type', ok: true, event_id: 10, target: 'ticket_type:100', summary: 'General: Precio $10.000 → $12.000' })
+  })
+
+  it('un rechazo por rol queda en la bitácora con su evento', async () => {
+    const r = await run('set_fee_absorption', { event_id: 10, absorbed: true }, ['read', 'write', 'publish', 'attendees', 'finance'], { role: 'admin' })
+    expect(r).toMatchObject({ ok: false, code: 'forbidden' })
+    expect(db.tables.aitickets_api_audit.at(-1)).toMatchObject({ tool: 'set_fee_absorption', ok: false, error_code: 'forbidden', event_id: 10, target: 'event:10' })
+  })
+
+  it('publish_social_post sin cuentas conectadas falla en el primer paso (sin token)', async () => {
+    db.tables.events.find((e) => e.id === 10).status = 'published'
+    db.tables.social_posts.push({ id: 5, organization_id: 7, event_id: 10, status: 'draft', content: 'Hola', platforms: ['instagram'], image_urls: ['https://x/img.jpg'] })
+    const r = await run('publish_social_post', { post_id: 5 })
+    expect(r).toMatchObject({ ok: false, code: 'conflict' })
+    expect(r.message).toMatch(/No hay cuentas conectadas/)
+  })
+
+  it('publish_social_post de un evento en borrador falla en el primer paso', async () => {
+    db.tables.social_accounts.push({ organization_id: 7, platform: 'instagram', account_name: '@prod', status: 'active' })
+    db.tables.social_posts.push({ id: 6, organization_id: 7, event_id: 10, status: 'draft', content: 'Hola', platforms: ['instagram'], image_urls: ['https://x/img.jpg'] })
+    expect(await run('publish_social_post', { post_id: 6 })).toMatchObject({ ok: false, code: 'conflict' })
+  })
+
+  it('las fechas traen su versión en hora de Chile', async () => {
+    const r = (await run('get_event', { event_id: 10 })).result
+    expect(r).toMatchObject({ start_date: '2026-11-01T01:00:00Z', start_local: '2026-10-31T22:00' })
+  })
+
+  it('advierte cuando la descripción menciona una fecha que no es de ninguna función', async () => {
+    const { descriptionDateWarning } = await import('../../src/lib/producer-api/tools/common.ts')
+    expect(descriptionDateWarning('<p>Te esperamos el sábado 10 de octubre</p>', ['2026-10-17'])).toMatch(/10 de octubre.*17 de octubre/)
+    expect(descriptionDateWarning('Sábado 17 de Octubre', ['2026-10-17'])).toBeNull()
+  })
+
+  it('no repite el nombre del lugar cuando es igual a la dirección', async () => {
+    const { dedupeLocation } = await import('../../src/pages/api/_lib/server-utils.ts')
+    expect(dedupeLocation('Lican Ray 6742, Lican Ray 6742, Vitacura, Santiago')).toBe('Lican Ray 6742, Vitacura, Santiago')
+  })
+
+  it('el kit de marketing en borrador no entrega public_url y su brief es texto plano con precios chilenos', async () => {
+    const { buildEventContext } = await import('../../src/lib/marketing.ts')
+    const brief = buildEventContext({
+      name: 'Fiesta',
+      description: '<p>Gran <strong>noche</strong></p>',
+      event_dates: [{ date: '2026-11-28', start_time: '21:00:00', end_time: '02:00:00' }],
+      event_tickets: [
+        { ticket_name: 'General', price: 10000, status: 'available', is_gift: false },
+        { ticket_name: 'VIP', price: 30000, status: 'unavailable', is_gift: false },
+        { ticket_name: 'Cortesía', price: 0, status: 'available', is_gift: true },
+      ],
+      event_locations: [],
+    })
+    expect(brief).toContain('Gran noche')
+    expect(brief).not.toContain('<p>')
+    expect(brief).toContain('21:00 a 02:00')
+    expect(brief).toContain('General: $10.000')
+    expect(brief).not.toMatch(/VIP|Cortesía/)
+  })
+})

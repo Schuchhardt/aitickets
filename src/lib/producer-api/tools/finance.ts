@@ -4,11 +4,12 @@
 // Saldo: ver src/lib/producer-api/ledger.ts.
 import { randomUUID } from "node:crypto";
 import { ToolError, type ToolDef, type ToolContext } from "../registry";
-import { eventIdSchema, loadOwnedEvent, clp, fetchAll } from "./common";
+import { eventIdSchema, loadOwnedEvent, clp, fetchAll, localDateTime } from "./common";
 import { computeOrgLedger, addBusinessDays, loadOrgEvents, RELEASE_HOURS, WITHDRAWN_STATUSES, isActiveRefund } from "../ledger";
 import { computeFeeSplit, SERVICE_FEE_RATE, IVA_RATE, SERVICE_FEE_PERCENT_LABEL, IVA_PERCENT_LABEL } from "../../../../netlify/lib/fees.mjs";
 import { computeDiscountAmount } from "../../../../netlify/lib/discounts.mjs";
 import { notifySlack } from "../../../pages/api/_lib/server-utils";
+import { isTransferOrder } from "../../orderKinds";
 
 export const BANK_CHANGE_HOLD_HOURS = 72;
 const PAYOUT_BUSINESS_DAYS = 2;
@@ -359,7 +360,9 @@ const presentLedgerEvent = (l: any) => ({
     name: l.name,
     cancelled: l.cancelled,
     last_function_end: l.last_function_end,
+    last_function_end_local: localDateTime(l.last_function_end),
     available_from: l.releases_at,
+    available_from_local: localDateTime(l.releases_at),
     sales_net: l.sales_net,
     partial_refunds: l.partial_refunds,
     withdrawn: l.withdrawn,
@@ -777,10 +780,10 @@ const getSettlementReport: ToolDef = {
         let orders: any[] = [];
         if (ids.length) {
             try {
-                orders = await run("id, event_id, status, amount, ticket_qty, ticket_fee, service_fee_tax, discount_amount, fee_absorbed, payment_provider");
+                orders = await run("id, event_id, status, amount, ticket_qty, ticket_fee, service_fee_tax, discount_amount, fee_absorbed, payment_provider, ticket_details");
             } catch (err: any) {
                 if (!isMissing(err)) throw err;
-                orders = await run("id, event_id, status, amount, ticket_qty, ticket_fee");
+                orders = await run("id, event_id, status, amount, ticket_qty, ticket_fee, ticket_details");
             }
         }
         let refunds: any[] = [];
@@ -815,9 +818,12 @@ const getSettlementReport: ToolDef = {
                 const fee = Math.round((Number(o.ticket_fee) || 0) + (Number(o.service_fee_tax) || 0));
                 const discount = Math.round(Number(o.discount_amount) || 0);
                 if (o.status === "paid") {
-                    r.paid_orders += 1;
+                    // Las entradas transferidas pasan a una orden nueva de $0: suman entradas, no órdenes
                     r.tickets += Number(o.ticket_qty) || 0;
-                    if (amount === 0 && !o.fee_absorbed) r.complimentary_or_free_orders += 1;
+                    if (!isTransferOrder(o)) {
+                        r.paid_orders += 1;
+                        if (amount === 0 && !o.fee_absorbed) r.complimentary_or_free_orders += 1;
+                    }
                 }
                 // Venta original (también de órdenes luego reembolsadas: el reembolso va en su propia columna)
                 r.gross_ticket_sales += amount + discount + (o.fee_absorbed ? fee : 0);

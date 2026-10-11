@@ -4,6 +4,8 @@
 // propios) coincida con una página y pase por src/middleware.ts, que redirige /dashboard,
 // /organizadores, etc. a aitickets.cl y reescribe las rutas permitidas del sitio. Sin una ruta que
 // coincida, Astro sirve el 404 estático sin ejecutar el middleware.
+import { notFound } from "../../../lib/notFound";
+
 export const prerender = false;
-return new Response(null, { status: 404 });
+return notFound();
 ---

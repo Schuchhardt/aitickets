@@ -77,6 +77,11 @@ const createCode: ToolDef = {
         "Crea un código de descuento (porcentaje o monto fijo en CLP) para un evento o para todos los eventos de la organización. " +
         "Útil para preventas, promotores, influencers o campañas. El código queda activo de inmediato (salvo que starts_at sea futuro).",
     scope: "write",
+    audit: (args, result) => ({
+        // Sin el texto del código: quien lo lee en la bitácora podría usarlo
+        summary: `Código de descuento: ${(result as any).code?.label ?? ""}${args.event_id ? "" : " (todos los eventos)"}`,
+        target: `discount_code:${(result as any).code?.id ?? ""}`,
+    }),
     annotations: { readOnlyHint: false, destructiveHint: false },
     inputSchema: {
         type: "object",
@@ -131,6 +136,10 @@ const updateCode: ToolDef = {
         "Activa/desactiva un código o cambia sus límites y vigencia. El código, tipo, valor y evento NO se editan " +
         "(las órdenes ya emitidas los referencian): para eso desactívalo y crea otro.",
     scope: "write",
+    audit: (args, result) => ({
+        summary: `Código de descuento: ${["active", "max_uses", "per_buyer_limit", "starts_at", "ends_at"].filter((k) => args[k] !== undefined).map((k) => (k === "active" ? (args.active ? "activado" : "desactivado") : `${k} = ${args[k] ?? "sin límite"}`)).join(", ")}`,
+        target: `discount_code:${args.id}`,
+    }),
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     inputSchema: {
         type: "object",
@@ -181,4 +190,42 @@ const updateCode: ToolDef = {
     },
 };
 
-export const discountTools: ToolDef[] = [listCodes, createCode, updateCode];
+const deleteCode: ToolDef = {
+    name: "delete_discount_code",
+    title: "Eliminar código de descuento",
+    description:
+        "Elimina un código de descuento que NUNCA se usó (ninguna orden lo aplicó, ni siquiera pendiente o vencida). " +
+        "Si ya se usó no se elimina: desactívalo con update_discount_code active=false.",
+    scope: "write",
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+    inputSchema: {
+        type: "object",
+        required: ["id"],
+        additionalProperties: false,
+        properties: { id: { type: "string", pattern: "^[0-9a-fA-F-]{36}$", description: "ID del código (list_discount_codes)." } },
+    },
+    audit: (args) => ({ summary: "Eliminó un código de descuento sin uso", target: `discount_code:${args.id}` }),
+    async handler(args, ctx) {
+        const { data: existing, error: loadError } = await ctx.supabase
+            .from("aitickets_discount_codes")
+            .select("id, code, event_id")
+            .eq("id", args.id)
+            .eq("organization_id", ctx.actor.orgId)
+            .maybeSingle();
+        if (loadError && isMissingDiscountSchema(loadError)) throw new ToolError("unavailable", UNAVAILABLE);
+        if (!existing) throw new ToolError("not_found", "Código no encontrado en tu organización.");
+        if (existing.event_id != null) await loadOwnedEvent(ctx, Number(existing.event_id), "id");
+        // La FK de event_orders es ON DELETE SET NULL: borrar un código usado perdería de qué código vino la orden
+        const { count, error: countError } = await ctx.supabase
+            .from("event_orders")
+            .select("id", { count: "exact", head: true })
+            .eq("discount_code_id", existing.id);
+        if (countError) throw countError;
+        if (count) throw new ToolError("conflict", `El código ${existing.code} ya se usó en ${count} orden(es): desactívalo con update_discount_code (active=false).`);
+        const { error } = await ctx.supabase.from("aitickets_discount_codes").delete().eq("id", existing.id).eq("organization_id", ctx.actor.orgId);
+        if (error) throw error;
+        return { id: existing.id, code: existing.code, ...(existing.event_id != null ? { event_id: Number(existing.event_id) } : {}), result: "deleted" };
+    },
+};
+
+export const discountTools: ToolDef[] = [listCodes, createCode, updateCode, deleteCode];

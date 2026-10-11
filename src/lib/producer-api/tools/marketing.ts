@@ -2,7 +2,7 @@
 // El copy lo escribe el LLM del productor (para eso get_marketing_kit le da el contexto); el servidor guarda
 // imágenes, genera imágenes con IA (opcional) y publica en las redes conectadas.
 import { ToolError, type ToolDef, type ToolContext } from "../registry";
-import { eventIdSchema, loadOwnedEvent, eventPublicUrl, eventDashboardUrl, DRAFT_URL_NOTE } from "./common";
+import { eventIdSchema, loadOwnedEvent, eventPublicUrl, eventDashboardUrl, eventUrls, DRAFT_URL_NOTE, localDateTime } from "./common";
 import {
     buildEventContext, EVENT_CONTEXT_SELECT, generateEventImage, isImageGenerationConfigured, publishSocialPost,
     storeImage, sniffImageType, MAX_IMAGE_BYTES, MAX_REFERENCE_IMAGES, REFERENCE_IMAGE_TYPES, type ReferenceImage,
@@ -93,18 +93,21 @@ const getMarketingKit: ToolDef = {
             ctx.supabase.from("organizations").select("public_name, instagram, facebook, tiktok, website").eq("id", ctx.actor.orgId).maybeSingle(),
             ctx.supabase.from("social_accounts").select("platform, account_name").eq("organization_id", ctx.actor.orgId).eq("status", "active"),
         ]);
+        const published = event.status === "published";
+        // Borrador: public_url = null (igual que las demás herramientas); los links de ejemplo usan la URL futura
         const url = eventPublicUrl(ctx, event.slug);
         return {
             event_id: Number(event.id),
             status: event.status,
-            ...(event.status === "published" ? {} : { draft_warning: `${DRAFT_URL_NOTE} No publiques posts ni compartas el link hasta publicar el evento.` }),
+            ...(published ? {} : { draft_warning: `${DRAFT_URL_NOTE} No publiques posts ni compartas el link hasta publicar el evento.` }),
             brief: buildEventContext(event),
-            public_url: url,
+            brief_note: "Texto plano. Solo incluye las entradas que el público puede comprar (sin la de cortesía ni las pausadas o ya cerradas).",
+            ...eventUrls(ctx, event),
             image_url: event.image_url || null,
             organization: org ? { name: org.public_name, instagram: org.instagram, facebook: org.facebook, tiktok: org.tiktok, website: org.website } : null,
             can_publish_to: (accounts || []).map((a: any) => ({ platform: a.platform, account: a.account_name })),
             image_generation_available: isImageGenerationConfigured(),
-            tracking_link_examples: url ? {
+            [published ? "tracking_link_examples" : "tracking_link_examples_after_publish"]: url ? {
                 instagram_bio: `${url}?utm_source=instagram&utm_medium=social&utm_campaign=bio`,
                 whatsapp: `${url}?utm_source=whatsapp&utm_medium=social`,
                 promoter: `${url}?ref=NOMBRE_PROMOTOR`,
@@ -160,6 +163,7 @@ const uploadImage: ToolDef = {
         "para create_social_post o como referencia en generate_image (reference_image_urls). Si el productor adjuntó la imagen en el chat " +
         "y no tienes una URL pública, envíala en image_base64.",
     scope: "write",
+    audit: (args) => ({ summary: `Subió una imagen${args.set_as_cover ? " (portada)" : ""}`, ...(args.event_id ? { target: `event:${args.event_id}` } : {}) }),
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     inputSchema: {
         type: "object",
@@ -193,6 +197,10 @@ const generateImage: ToolDef = {
         "si quieres editar la referencia (p. ej. adaptar el flyer a formato story), dilo en prompt. " +
         `Máximo ${IMAGE_GENERATIONS_PER_DAY} por día por organización. Formatos: square (feed), portrait (stories/reels), landscape (portada/web).`,
     scope: "write",
+    audit: (args, result) => ({
+        summary: `Generó una imagen ${args.format}${(result as any).reference_images_used ? ` con ${(result as any).reference_images_used} referencia(s)` : ""}${args.set_as_cover ? " (portada)" : ""}`,
+        target: `event:${args.event_id}`,
+    }),
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     inputSchema: {
         type: "object",
@@ -261,6 +269,10 @@ const createSocialPost: ToolDef = {
         "Guarda un post para Instagram/Facebook como borrador (o programado si envías scheduled_for). NO lo publica: " +
         "para eso usa publish_social_post tras la aprobación del productor. Instagram exige al menos una imagen.",
     scope: "write",
+    audit: (args, result) => ({
+        summary: `Post ${(result as any).post?.status === "scheduled" ? "programado" : "en borrador"} para ${[...new Set(args.platforms)].join(", ")}`,
+        target: `social_post:${(result as any).post?.id ?? ""}`,
+    }),
     annotations: { readOnlyHint: false, destructiveHint: false },
     inputSchema: {
         type: "object",
@@ -336,6 +348,54 @@ const listSocialPosts: ToolDef = {
     },
 };
 
+/** Lo que impide publicar un post: sin cuentas conectadas, evento en borrador/cancelado o Instagram sin imagen. */
+async function checkPublishable(ctx: ToolContext, post: any) {
+    const platforms: string[] = Array.isArray(post.platforms) ? post.platforms : [];
+    const event = await loadOwnedEvent<any>(ctx, Number(post.event_id), "id, name, slug, status, cancelled_at");
+    if (event.cancelled_at) throw new ToolError("conflict", "El evento está cancelado: no publiques posts de él.");
+    if (event.status !== "published") {
+        throw new ToolError("conflict", `"${event.name}" está en BORRADOR: su link da 404. Publica el evento (set_event_status) antes de publicar posts.`);
+    }
+    const { data: accounts } = await ctx.supabase
+        .from("social_accounts")
+        .select("platform, account_name")
+        .eq("organization_id", ctx.actor.orgId)
+        .eq("status", "active")
+        .in("platform", platforms.length ? platforms : ["-"]);
+    if (!accounts?.length) {
+        throw new ToolError(
+            "conflict",
+            `No hay cuentas conectadas de ${platforms.join(" ni ") || "redes"} (get_account → connected_social_accounts). ` +
+                `Conéctalas en ${ctx.origin}/dashboard/promote o publica el texto a mano.`,
+        );
+    }
+    if (accounts.some((a: any) => a.platform === "instagram") && !(post.image_urls || []).length) {
+        throw new ToolError("invalid_input", "Instagram requiere al menos una imagen: agrégala al post.");
+    }
+    return { accounts, platforms, event };
+}
+
+const deleteSocialPost: ToolDef = {
+    name: "delete_social_post",
+    title: "Eliminar post",
+    description: "Elimina un post en borrador (o fallido) que no se publicó. Los publicados o programados no se eliminan desde aquí.",
+    scope: "write",
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+    inputSchema: { type: "object", required: ["post_id"], additionalProperties: false, properties: { post_id: { type: "integer", minimum: 1 } } },
+    audit: (args) => ({ summary: "Eliminó un post en borrador", target: `social_post:${args.post_id}` }),
+    async handler(args, ctx) {
+        const { data: post } = await ctx.supabase.from("social_posts").select("id, event_id, status").eq("id", args.post_id).eq("organization_id", ctx.actor.orgId).maybeSingle();
+        if (!post) throw new ToolError("not_found", "Post no encontrado en tu organización (ver list_social_posts).");
+        await loadOwnedEvent(ctx, Number(post.event_id), "id");
+        if (!["draft", "failed"].includes(post.status)) {
+            throw new ToolError("conflict", `El post está ${post.status === "published" ? "publicado" : "programado"}: solo se eliminan borradores o fallidos.`);
+        }
+        const { error } = await ctx.supabase.from("social_posts").delete().eq("id", post.id).eq("organization_id", ctx.actor.orgId).in("status", ["draft", "failed"]);
+        if (error) throw error;
+        return { post_id: Number(post.id), event_id: Number(post.event_id), result: "deleted" };
+    },
+};
+
 const publishPost: ToolDef = {
     name: "publish_social_post",
     title: "Publicar post en redes",
@@ -352,13 +412,27 @@ const publishPost: ToolDef = {
             .maybeSingle();
         if (!post) throw new ToolError("not_found", "Post no encontrado en tu organización.");
         if (post.status === "published") throw new ToolError("conflict", "Este post ya fue publicado.");
+        // Se valida aquí (antes de pedir confirmación) todo lo que haría fallar la publicación
+        const { accounts, platforms, event } = await checkPublishable(ctx, post);
         const text = String(post.content || "");
+        const where = accounts.map((a: any) => `${a.platform} (${a.account_name || "cuenta conectada"})`).join(", ");
+        const missing = platforms.filter((p: string) => !accounts.some((a: any) => a.platform === p));
         return {
-            message: `${post.scheduled_for ? `Programar para ${post.scheduled_for}` : "Publicar AHORA"} el post ${post.id} en ${Array.isArray(post.platforms) ? post.platforms.join(", ") : "las redes conectadas"}.`,
-            details: { post_id: Number(post.id), text: text.length > 400 ? `${text.slice(0, 400)}…` : text, image_urls: post.image_urls || [] },
+            message:
+                `${post.scheduled_for ? `Programar para ${localDateTime(post.scheduled_for)?.replace("T", " ")} (hora de Chile)` : "Publicar AHORA"} el post ${post.id} ` +
+                `de "${event.name}" en ${where}. Es público y no se puede deshacer desde AI Tickets.`,
+            details: {
+                post_id: Number(post.id),
+                event_id: Number(event.id),
+                accounts: accounts.map((a: any) => ({ platform: a.platform, account: a.account_name })),
+                text: text.length > 400 ? `${text.slice(0, 400)}…` : text,
+                image_urls: post.image_urls || [],
+                event_url: eventPublicUrl(ctx, event.slug),
+            },
+            warnings: missing.length ? [`No hay cuenta conectada de ${missing.join(", ")}: el post solo saldrá en ${accounts.map((a: any) => a.platform).join(", ")}.`] : undefined,
         };
     },
-    audit: (args) => ({ summary: "Publicó un post en redes", target: `social_post:${args.post_id}` }),
+    audit: (args, result) => ({ summary: (result as any).status === "scheduled" ? "Programó un post en redes" : "Publicó un post en redes", target: `social_post:${args.post_id}` }),
     annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
     inputSchema: {
         type: "object",
@@ -367,9 +441,10 @@ const publishPost: ToolDef = {
         properties: { post_id: { type: "integer", minimum: 1 } },
     },
     async handler(args, ctx) {
-        const { data: post } = await ctx.supabase.from("social_posts").select("id, event_id, status").eq("id", args.post_id).eq("organization_id", ctx.actor.orgId).maybeSingle();
+        const { data: post } = await ctx.supabase.from("social_posts").select("id, event_id, status, platforms, image_urls").eq("id", args.post_id).eq("organization_id", ctx.actor.orgId).maybeSingle();
         if (!post) throw new ToolError("not_found", "Post no encontrado en tu organización.");
         if (post.status === "published") throw new ToolError("conflict", "Este post ya fue publicado.");
+        await checkPublishable(ctx, post);
         const result = await publishSocialPost(ctx.actor.orgId, post.id);
         if (!result.ok) {
             const code = result.httpStatus === 404 ? "not_found" : result.httpStatus === 400 ? "invalid_input" : result.httpStatus === 502 ? "upstream" : "unavailable";
@@ -379,4 +454,4 @@ const publishPost: ToolDef = {
     },
 };
 
-export const marketingTools: ToolDef[] = [getMarketingKit, createTrackingLink, uploadImage, generateImage, createSocialPost, listSocialPosts, publishPost];
+export const marketingTools: ToolDef[] = [getMarketingKit, createTrackingLink, uploadImage, generateImage, createSocialPost, listSocialPosts, deleteSocialPost, publishPost];

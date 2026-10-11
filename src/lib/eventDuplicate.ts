@@ -1,5 +1,5 @@
 // Duplicar un evento como borrador. Lo usan /api/events/duplicate (panel) y duplicate_event (API de productores).
-// Copia datos generales, ubicaciones, tipos de entrada a la venta, categoría y FAQs. NO copia las funciones
+// Copia datos generales, ubicaciones, tipos de entrada a la venta (no el de cortesía), categoría y FAQs. NO copia las funciones
 // (fechas): el productor (o la API) agrega las nuevas.
 import { slugify } from "../pages/api/_lib/server-utils";
 import { sanitizeRichText } from "./sanitize";
@@ -44,7 +44,9 @@ export async function duplicateEventAsDraft(
                 .from("event_tickets")
                 .select("ticket_name, price, max_quantity, is_gift, status, total_quantity")
                 .eq("event_id", source.id)
-                .or("status.is.null,status.neq.unavailable"),
+                .or("status.is.null,status.neq.unavailable")
+                // El tipo "Cortesía" (is_gift) lo crea la base de datos con cada evento: copiarlo lo duplicaría
+                .not("is_gift", "is", true),
             supabase.from("event_tags").select("tag_id").eq("event_id", source.id),
             supabase.from("event_faqs").select("question, answer").eq("event_id", source.id),
         ]);

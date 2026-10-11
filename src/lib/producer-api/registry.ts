@@ -338,17 +338,42 @@ async function claimIdempotency(tool: ToolDef, key: string, argsHash: string, ct
     if (!existing) throw new ToolError("conflict", "La operación con esta clave de idempotencia está en curso. Intenta de nuevo en unos segundos.");
     if (existing.args_hash !== argsHash) throw new ToolError("conflict", "Esta idempotency_key ya se usó con otros argumentos. Usa una clave nueva para una operación distinta.");
     if (existing.status !== "done") throw new ToolError("conflict", "La operación con esta clave de idempotencia está en curso. Consulta su estado antes de reintentar.");
-    return { replay: { ...(existing.response || {}), idempotent_replay: true } };
+    return {
+        replay: {
+            ...(existing.response || {}),
+            idempotent_replay: true,
+            replay_note: "Repetición con la misma idempotency_key: se devuelve la respuesta de la primera llamada. No se repitió la acción ni se reenviaron correos (email_sent se refiere a la primera llamada).",
+        },
+    };
+}
+
+/** event_id de los argumentos crudos: un intento rechazado (por rol o validación) también se asocia a su evento. */
+function rawEventId(rawArgs: unknown): number | null {
+    const v = rawArgs && typeof rawArgs === "object" ? (rawArgs as any).event_id : undefined;
+    const n = Number(v);
+    return v != null && v !== "" && Number.isInteger(n) && n > 0 ? n : null;
+}
+
+/** Objetivo por defecto para la bitácora: el primer id conocido de los argumentos. */
+function defaultTarget(args: Record<string, unknown> | undefined, eventId: number | null): string | undefined {
+    for (const key of ["ticket_type_id", "order_id", "ticket_id", "discount_id", "venue_id", "guest_id", "link_id", "post_id", "member_id", "payout_id"]) {
+        const v = args?.[key];
+        if (v != null && v !== "") return `${key.replace(/_id$/, "")}:${v}`;
+    }
+    return eventId ? `event:${eventId}` : undefined;
 }
 
 export async function runTool(tool: ToolDef, rawArgs: unknown, ctx: ToolContext): Promise<ToolOutcome> {
     let outcome: ToolOutcome;
-    let eventId: number | null = null;
+    let eventId: number | null = rawEventId(rawArgs);
     const auditable = tool.annotations?.readOnlyHint !== true;
     let auditInfo: { summary?: string; target?: string } = {};
+    let parsedArgs: Record<string, unknown> | undefined;
     try {
+        // Se registra en la bitácora también si lo rechaza el rol o la conexión (ver catch)
         checkAccess(tool, ctx);
         const { confirmation_token: confirmationToken, idempotency_key: idempotencyKey, ...args } = validateArgs(effectiveSchema(tool), rawArgs) || {};
+        parsedArgs = args;
         if (args && Number.isFinite(Number(args.event_id))) eventId = Number(args.event_id);
         const argsHash = sha256(`${tool.name}:${stableStringify(args)}`);
 
@@ -390,7 +415,14 @@ export async function runTool(tool: ToolDef, rawArgs: unknown, ctx: ToolContext)
             outcome = { ok: false, code: "internal", message: "Error interno al ejecutar la acción. Intenta nuevamente." };
         }
     }
-    if (auditable) await audit(ctx, tool.name, outcome, eventId, auditInfo);
+    if (auditable) {
+        if (!auditInfo.summary) auditInfo.summary = outcome.ok ? tool.title : `${tool.title}: rechazado (${outcome.code})`;
+        if (!auditInfo.target) {
+            const source = parsedArgs || (rawArgs && typeof rawArgs === "object" ? (rawArgs as Record<string, unknown>) : undefined);
+            auditInfo.target = defaultTarget(source, eventId);
+        }
+        await audit(ctx, tool.name, outcome, eventId, auditInfo);
+    }
     return outcome;
 }
 

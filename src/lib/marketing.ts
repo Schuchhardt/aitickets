@@ -2,24 +2,57 @@
 import { getSupabaseAdmin } from "./auth-helpers";
 import { serverEnv } from "../pages/api/_lib/server-utils";
 
-/** Texto con los datos del evento para dar contexto a un modelo (copy o imagen). */
-export function buildEventContext(event: any): string {
-    const venues = event.event_locations?.map((loc: any) =>
-        loc.venues ? `${loc.venues.name}, ${loc.venues.city}` : "Ubicación por definir"
-    ).join("; ") || "Sin ubicación";
+/** HTML de la descripción a texto plano (párrafos y viñetas como saltos de línea). */
+export function htmlToPlainText(html: string | null | undefined): string {
+    return String(html || "")
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<li[^>]*>/gi, "\n• ")
+        .replace(/<\/(p|div|h[1-6]|li|ul|ol)>/gi, "\n")
+        .replace(/<[^>]+>/g, "")
+        .replace(/&nbsp;/gi, " ")
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;/gi, "'")
+        .replace(/&lt;/gi, "<")
+        .replace(/&gt;/gi, ">")
+        .replace(/&amp;/gi, "&")
+        .replace(/[ \t]+/g, " ")
+        .replace(/ *\n */g, "\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+}
 
-    const dates = event.event_dates?.map((d: any) =>
-        `${d.date} ${d.start_time}${d.end_time ? ' - ' + d.end_time : ''}`
-    ).join("; ") || "Sin fecha";
+const pesos = (n: unknown) => `$${Math.round(Number(n) || 0).toLocaleString("es-CL")}`;
+const hhmm = (t: unknown) => String(t || "").slice(0, 5);
+const dayLabel = (date: string) =>
+    new Intl.DateTimeFormat("es-CL", { timeZone: "UTC", weekday: "long", day: "numeric", month: "long" }).format(new Date(`${String(date).slice(0, 10)}T12:00:00Z`));
 
-    const tickets = event.event_tickets?.map((t: any) =>
-        `${t.ticket_name}: $${t.price}`
-    ).join(", ") || "Sin entradas";
+/** Entrada a la venta para el público: no es el tipo de cortesía del sistema, no está pausada y su ventana sigue abierta. */
+const isPublicTicket = (t: any, now: Date) =>
+    t.is_gift !== true && (t.status ?? "available") === "available" && (!t.end_date || new Date(t.end_date) >= now);
+
+/**
+ * Texto con los datos del evento para dar contexto a un modelo (copy o imagen): texto plano, precios en
+ * pesos chilenos ("$10.000"), horas "21:00 a 02:00" y solo las entradas que el público puede comprar.
+ */
+export function buildEventContext(event: any, now = new Date()): string {
+    const venues = event.event_locations?.map((loc: any) => {
+        if (!loc.venues) return "Ubicación por definir";
+        const parts = [loc.venues.name, loc.venues.address_line1, loc.venues.city].map((p: unknown) => String(p || "").trim()).filter(Boolean);
+        return [...new Set(parts)].join(", ");
+    }).join("; ") || "Sin ubicación";
+
+    const dates = [...(event.event_dates || [])]
+        .sort((a: any, b: any) => `${a.date} ${a.start_time}`.localeCompare(`${b.date} ${b.start_time}`))
+        .map((d: any) => `${dayLabel(d.date)}, ${hhmm(d.start_time)}${d.end_time ? ` a ${hhmm(d.end_time)}` : ""}`)
+        .join("; ") || "Sin fecha";
+
+    const onSale = (event.event_tickets || []).filter((t: any) => isPublicTicket(t, now)).sort((a: any, b: any) => Number(a.price) - Number(b.price));
+    const tickets = onSale.map((t: any) => `${t.ticket_name}: ${Number(t.price) > 0 ? pesos(t.price) : "gratis"}`).join(", ") || "Sin entradas a la venta";
 
     return `
 Evento: ${event.title || event.name}
-Descripción: ${event.description || "Sin descripción"}
-Fecha(s): ${dates}
+Descripción: ${htmlToPlainText(event.description) || "Sin descripción"}
+Fecha(s): ${dates} (hora de Chile)
 Lugar: ${venues}
 Entradas: ${tickets}
     `.trim();
@@ -28,7 +61,7 @@ Entradas: ${tickets}
 /** Columnas para buildEventContext. */
 export const EVENT_CONTEXT_SELECT = `
     *,
-    event_tickets(ticket_name, price),
+    event_tickets(ticket_name, price, is_gift, status, end_date),
     event_dates(date, start_time, end_time),
     event_locations(*, venues(name, city, address_line1))
 `;

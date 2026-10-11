@@ -10,11 +10,13 @@ import ContactForm from "../../../components/sites/ContactForm.vue";
 import { getSiteEvents, isUnderRootDomain, publicSiteProps, siteUrl } from "../../../lib/sites";
 import { loadSiteForPage } from "../_site";
 
+import { notFound } from "../../../lib/notFound";
+
 export const prerender = false;
 
 const loaded = await loadSiteForPage(Astro);
 if (!loaded || !loaded.site.contact_form_enabled) {
-  return new Response(null, { status: 404 });
+  return notFound();
 }
 const { site, preview, base, template } = loaded;
 const props = publicSiteProps(site, template);
