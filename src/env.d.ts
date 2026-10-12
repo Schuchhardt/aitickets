@@ -44,6 +44,7 @@ interface AiticketsEnv {
   readonly TURNSTILE_SECRET_KEY: string
   readonly PUBLIC_TURNSTILE_SITE_KEY: string
   readonly PUBLIC_GOOGLE_MAPS_API_KEY: string
+  readonly PUBLIC_WHATSAPP_NUMBER?: string
 
   // Flow
   readonly FLOW_API_KEY: string

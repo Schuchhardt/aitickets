@@ -55,7 +55,9 @@ UPDATE public.aitickets_wa_conversations SET bot_paused_until = NULL WHERE id = 
 3. **Variables en Netlify** (Site settings → Environment variables, contexto Production):
    `KAPSO_API_KEY`, `KAPSO_PHONE_NUMBER_ID`, `KAPSO_WEBHOOK_SECRET` (un secreto largo aleatorio, p. ej.
    `openssl rand -hex 32`). Opcionales: `WHATSAPP_BOT_MODEL` (por defecto `claude-opus-5-5`),
-   `WHATSAPP_HUMAN_PAUSE_HOURS`. Ya deben existir `ANTHROPIC_API_KEY`, `INTERNAL_API_SECRET`, `SITE_URL` y
+   `WHATSAPP_HUMAN_PAUSE_HOURS`. `PUBLIC_WHATSAPP_NUMBER` (número del bot, solo dígitos) muestra el link
+   "¿Prefieres WhatsApp?" en el asistente de cada evento y lo usa la sección de contacto de `/organizadores`;
+   como es `PUBLIC_`, se fija en el build. Ya deben existir `ANTHROPIC_API_KEY`, `INTERNAL_API_SECRET`, `SITE_URL` y
    `SLACK_WEBHOOK_URL`.
 4. **Deploy** a producción (la migración corre en el build de producción).
 5. **Webhook de WhatsApp** en Kapso (kind `kapso`, payload v2), con el mismo secreto:
