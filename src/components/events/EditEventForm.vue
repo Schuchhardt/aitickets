@@ -1,7 +1,8 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { Calendar, MapPin, Ticket, CheckCircle, Image as ImageIcon, Plus, Trash2, ChevronRight, ChevronLeft, UploadCloud } from 'lucide-vue-next'
-import CoverAdjuster from './CoverAdjuster.vue'
+import RichTextEditor from './RichTextEditor.vue'
+import { plainTextLength, sanitizeClient } from '../../lib/richTextClient'
 
 const props = defineProps({
   initialVenues: {
@@ -38,9 +39,20 @@ const steps = [
 // Form Data State - Init from Prop
 const form = ref(JSON.parse(JSON.stringify(props.initialFormState)));
 
+// IA de la descripción: contexto del evento guardado + lo que hay sin guardar en el formulario
+const descriptionAi = {
+  eventId: props.eventId,
+  draft: () => ({ name: form.value.general.name, category: form.value.general.category, description: form.value.general.description }),
+}
+
+// La vista previa sanitiza con DOMPurify (solo en el navegador)
+const mounted = ref(false)
+onMounted(() => { mounted.value = true })
+const descriptionPreview = computed(() => (mounted.value ? sanitizeClient(form.value.general.description) : ''))
+
 // Validation per step
 const isStep1Valid = computed(() => {
-  return form.value.general.name.length > 3 && form.value.general.description.length > 10
+  return form.value.general.name.length > 3 && plainTextLength(form.value.general.description) > 10
 })
 
 const isStep2Valid = computed(() => {
@@ -334,7 +346,7 @@ const submitEvent = async () => {
 
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
-            <textarea v-model="form.general.description" rows="4" placeholder="¿De qué trata tu evento?" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black focus:border-black outline-none"></textarea>
+            <RichTextEditor v-model="form.general.description" :aiContext="descriptionAi" />
           </div>
 
            <div>
@@ -384,12 +396,10 @@ const submitEvent = async () => {
               </div>
             </div>
 
-            <CoverAdjuster
-              v-if="form.general.imageUrl"
-              v-model="form.general.coverSettings"
-              :imageUrl="form.general.imageUrl"
-              :eventName="form.general.name"
-            />
+            <p v-if="form.general.imageUrl" class="mt-2 text-xs text-gray-500">
+              Para ajustar el encuadre en desktop y mobile o generar la portada con IA, usa la sección Portada en
+              <a :href="`/dashboard/events/${props.eventId}`" class="underline hover:text-black">el detalle del evento</a>.
+            </p>
 
             <p v-if="uploadError" class="mt-2 text-sm text-red-600 flex items-center gap-1">
               <span class="w-1 h-1 bg-red-600 rounded-full"></span> {{ uploadError }}
@@ -515,8 +525,9 @@ const submitEvent = async () => {
         <!-- Step 4: Review -->
         <div v-show="currentStep === 4" class="space-y-6">
            <div class="bg-gray-50 p-6 rounded-xl border border-gray-200">
+             <img v-if="form.general.imageUrl" :src="form.general.imageUrl" alt="" class="w-full h-40 object-cover rounded-lg mb-4" />
              <h3 class="font-bold text-lg mb-2">{{ form.general.name }}</h3>
-             <p class="text-gray-600 text-sm mb-4">{{ form.general.description }}</p>
+             <div class="rich-text text-gray-600 text-sm mb-4" v-html="descriptionPreview"></div>
              
              <div class="grid grid-cols-2 gap-8 pt-4 border-t border-gray-200">
                <div>

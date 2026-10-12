@@ -1,5 +1,6 @@
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, computed, onMounted } from "vue";
+import { Sparkles } from "lucide-vue-next";
 
 const props = defineProps({
   eventId: { type: Number, required: true },
@@ -97,6 +98,58 @@ function resetForm() {
   showForm.value = false;
 }
 
+// Sugerencias con IA (no se guardan hasta que el productor las agrega)
+const aiOpen = ref(false);
+const aiGuide = ref("");
+const aiBusy = ref(false);
+const aiError = ref("");
+const suggestions = ref([]);
+const selectedCount = computed(() => suggestions.value.filter((s) => s.selected).length);
+
+async function generateFaqs() {
+  aiBusy.value = true;
+  aiError.value = "";
+  try {
+    const res = await fetch("/api/events/ai", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "faqs", eventId: props.eventId, guide: aiGuide.value }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || "No se pudieron generar las preguntas");
+    suggestions.value = (data.faqs || []).map((f) => ({ ...f, selected: true }));
+    if (!suggestions.value.length) aiError.value = "La IA no propuso preguntas nuevas.";
+  } catch (e) {
+    aiError.value = e.message;
+  } finally {
+    aiBusy.value = false;
+  }
+}
+
+async function addSuggestions() {
+  aiBusy.value = true;
+  aiError.value = "";
+  try {
+    for (const s of suggestions.value.filter((x) => x.selected)) {
+      const res = await fetch("/api/events/faqs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId: props.eventId, question: s.question, answer: s.answer }),
+      });
+      if (!res.ok) throw new Error("No se pudieron guardar todas las preguntas");
+      s.saved = true;
+    }
+    suggestions.value = [];
+    aiOpen.value = false;
+  } catch (e) {
+    aiError.value = e.message;
+    suggestions.value = suggestions.value.filter((s) => !s.saved);
+  } finally {
+    aiBusy.value = false;
+    await fetchFaqs();
+  }
+}
+
 onMounted(fetchFaqs);
 </script>
 
@@ -104,12 +157,70 @@ onMounted(fetchFaqs);
   <section class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
     <div class="p-6 border-b border-gray-100 flex justify-between items-center">
       <h3 class="font-bold text-lg">Preguntas Frecuentes</h3>
-      <button
-        @click="showForm = !showForm; editingId = null; form = { question: '', answer: '' }"
-        class="text-sm text-black font-medium hover:underline cursor-pointer"
-      >
-        {{ showForm ? "Cancelar" : "+ Agregar" }}
-      </button>
+      <div class="flex items-center gap-3">
+        <button
+          type="button"
+          @click="aiOpen = !aiOpen"
+          class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg"
+          :class="aiOpen ? 'bg-black text-white' : 'bg-purple-50 text-purple-700 hover:bg-purple-100'"
+        >
+          <Sparkles size="15" /> Generar con IA
+        </button>
+        <button
+          @click="showForm = !showForm; editingId = null; form = { question: '', answer: '' }"
+          class="text-sm text-black font-medium hover:underline cursor-pointer"
+        >
+          {{ showForm ? "Cancelar" : "+ Agregar" }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Sugerencias con IA -->
+    <div v-if="aiOpen" class="p-6 bg-purple-50/40 border-b border-purple-100 space-y-3">
+      <div class="flex flex-col sm:flex-row gap-2">
+        <input
+          v-model="aiGuide"
+          type="text"
+          maxlength="1000"
+          @keydown.enter.prevent="generateFaqs"
+          placeholder="Guía opcional (ej: es para mayores de 18, hay guardarropía, no se permite ingresar comida)"
+          class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-black"
+        />
+        <button
+          type="button"
+          :disabled="aiBusy"
+          @click="generateFaqs"
+          class="flex items-center justify-center gap-2 px-4 py-2 bg-black text-white text-sm font-medium rounded-lg hover:bg-gray-900 disabled:opacity-60"
+        >
+          <span v-if="aiBusy && !suggestions.length" class="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></span>
+          {{ aiBusy && !suggestions.length ? "Generando..." : suggestions.length ? "Generar otras" : "Generar preguntas" }}
+        </button>
+      </div>
+      <p class="text-xs text-gray-500">Usa los datos del evento y evita repetir las preguntas que ya tienes. Revisa las respuestas antes de agregarlas.</p>
+
+      <div v-if="suggestions.length" class="space-y-2">
+        <label
+          v-for="(s, i) in suggestions"
+          :key="i"
+          class="flex gap-3 p-3 bg-white rounded-lg border cursor-pointer"
+          :class="s.selected ? 'border-black' : 'border-gray-200 opacity-60'"
+        >
+          <input v-model="s.selected" type="checkbox" class="mt-1 w-4 h-4 rounded border-gray-300" />
+          <span class="min-w-0">
+            <span class="block font-medium text-gray-900 text-sm">{{ s.question }}</span>
+            <span class="block text-sm text-gray-500 mt-0.5">{{ s.answer }}</span>
+          </span>
+        </label>
+        <button
+          type="button"
+          :disabled="aiBusy || !selectedCount"
+          @click="addSuggestions"
+          class="px-4 py-2 bg-black text-white text-sm font-medium rounded-lg hover:bg-gray-900 disabled:opacity-50"
+        >
+          {{ aiBusy ? "Agregando..." : `Agregar ${selectedCount} pregunta${selectedCount === 1 ? "" : "s"}` }}
+        </button>
+      </div>
+      <p v-if="aiError" class="text-sm text-red-600">{{ aiError }}</p>
     </div>
 
     <!-- Add/Edit Form -->

@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { Tag } from 'lucide-vue-next'
+import { Tag, Shuffle, ChevronDown } from 'lucide-vue-next'
 
 // Códigos de descuento (dashboard). Con eventId: códigos del evento + los de toda la organización;
 // sin eventId (página /dashboard/descuentos): todos, y al crear se elige el evento o "Todos mis eventos".
@@ -30,6 +30,21 @@ const saving = ref(false)
 const message = ref('')
 const isError = ref(false)
 const busyId = ref(null)
+const showOptions = ref(false)
+
+const randomCode = () => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  form.value.code = Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+}
+const optionsSummary = computed(() => {
+  const f = form.value
+  return [
+    f.maxUses ? `${f.maxUses} usos` : '',
+    f.perBuyerLimit ? `${f.perBuyerLimit} por comprador` : '',
+    f.startsAt || f.endsAt ? 'con fechas' : '',
+    !props.eventId && f.eventId ? 'un evento' : '',
+  ].filter(Boolean).join(', ')
+})
 
 const clp = (n) => `$${Math.round(Number(n) || 0).toLocaleString('es-CL')}`
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleString('es-CL', { timeZone: 'America/Santiago', dateStyle: 'short', timeStyle: 'short' }) : '')
@@ -138,8 +153,7 @@ const copy = async (code) => {
     <div class="p-6 border-b border-gray-100">
       <h3 class="font-bold text-lg flex items-center gap-2"><Tag size="18" /> Códigos de descuento</h3>
       <p class="text-sm text-gray-500 mt-1">
-        El descuento se aplica al valor de las entradas; el cargo por servicio se calcula sobre el monto con descuento.
-        Recibes el valor de las entradas ya descontado.
+        Se descuenta del valor de las entradas (el cargo por servicio se calcula sobre el monto con descuento).
       </p>
     </div>
 
@@ -147,67 +161,76 @@ const copy = async (code) => {
       Los códigos de descuento se están activando. Vuelve a intentarlo en unos minutos.
     </div>
 
-    <form v-else @submit.prevent="create" class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4 border-b border-gray-100">
-      <div>
-        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Código</label>
-        <input v-model="form.code" type="text" maxlength="30" placeholder="EJ: PREVENTA10" autocomplete="off"
-          class="w-full px-3 py-2 rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-black uppercase" />
-        <p class="text-xs text-gray-400 mt-1">3 a 30 caracteres: letras, números, - o _.</p>
-      </div>
-      <div class="grid grid-cols-2 gap-2">
+    <form v-else @submit.prevent="create" class="p-6 space-y-3 border-b border-gray-100">
+      <div class="flex flex-col md:flex-row gap-3 md:items-end">
+        <div class="flex-1 min-w-0">
+          <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Código</label>
+          <div class="flex gap-2">
+            <input v-model="form.code" type="text" maxlength="30" placeholder="PREVENTA10" autocomplete="off"
+              class="w-full px-3 py-2 rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-black uppercase font-mono" />
+            <button type="button" @click="randomCode" title="Generar un código al azar"
+              class="shrink-0 px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">
+              <Shuffle size="16" />
+            </button>
+          </div>
+        </div>
         <div>
-          <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Tipo</label>
-          <select v-model="form.kind" class="w-full px-3 py-2 rounded-lg border border-gray-300 bg-white outline-none focus:ring-2 focus:ring-black">
-            <option value="percent">Porcentaje</option>
-            <option value="fixed">Monto fijo (CLP)</option>
+          <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Descuento</label>
+          <div class="flex">
+            <div class="inline-flex rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 p-0.5">
+              <button type="button" @click="form.kind = 'percent'" class="px-3 rounded-md text-sm font-semibold"
+                :class="form.kind === 'percent' ? 'bg-black text-white' : 'text-gray-500'">%</button>
+              <button type="button" @click="form.kind = 'fixed'" class="px-3 rounded-md text-sm font-semibold"
+                :class="form.kind === 'fixed' ? 'bg-black text-white' : 'text-gray-500'">$</button>
+            </div>
+            <input v-model="form.value" type="number" :min="1" :max="form.kind === 'percent' ? 100 : undefined" :step="form.kind === 'percent' ? 0.01 : 1"
+              :placeholder="form.kind === 'percent' ? '10' : '5000'"
+              class="w-28 px-3 py-2 rounded-r-lg border border-gray-300 outline-none focus:ring-2 focus:ring-black" />
+          </div>
+        </div>
+        <button type="submit" :disabled="saving"
+          class="px-4 py-2 bg-black text-white rounded-lg font-medium hover:bg-gray-900 transition disabled:opacity-60 whitespace-nowrap">
+          {{ saving ? 'Creando...' : 'Crear código' }}
+        </button>
+      </div>
+
+      <button type="button" @click="showOptions = !showOptions" class="flex items-center gap-1 text-xs text-gray-500 hover:text-black">
+        <ChevronDown size="14" class="transition" :class="showOptions ? 'rotate-180' : ''" />
+        Límites y vigencia <span class="text-gray-400">(opcional{{ optionsSummary ? `: ${optionsSummary}` : '' }})</span>
+      </button>
+      <div v-if="showOptions" class="grid grid-cols-2 md:grid-cols-4 gap-3 rounded-lg bg-gray-50 p-3">
+        <div v-if="!eventId" class="col-span-2 md:col-span-4">
+          <label class="block text-xs text-gray-500 mb-1">Aplica a</label>
+          <select v-model="form.eventId" class="w-full px-3 py-2 rounded-lg border border-gray-300 bg-white outline-none focus:ring-2 focus:ring-black">
+            <option value="">Todos mis eventos</option>
+            <option v-for="e in events || []" :key="e.id" :value="e.id">{{ e.name }}</option>
           </select>
         </div>
         <div>
-          <label class="block text-xs font-bold text-gray-500 uppercase mb-1">{{ form.kind === 'percent' ? 'Porcentaje' : 'Monto' }}</label>
-          <input v-model="form.value" type="number" :min="1" :max="form.kind === 'percent' ? 100 : undefined" :step="form.kind === 'percent' ? 0.01 : 1"
-            :placeholder="form.kind === 'percent' ? '10' : '5000'"
-            class="w-full px-3 py-2 rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-black" />
-        </div>
-      </div>
-      <div v-if="!eventId">
-        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Aplica a</label>
-        <select v-model="form.eventId" class="w-full px-3 py-2 rounded-lg border border-gray-300 bg-white outline-none focus:ring-2 focus:ring-black">
-          <option value="">Todos mis eventos</option>
-          <option v-for="e in events || []" :key="e.id" :value="e.id">{{ e.name }}</option>
-        </select>
-      </div>
-      <div class="grid grid-cols-2 gap-2">
-        <div>
-          <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Usos máximos</label>
+          <label class="block text-xs text-gray-500 mb-1">Usos máximos</label>
           <input v-model="form.maxUses" type="number" min="1" placeholder="Sin límite"
-            class="w-full px-3 py-2 rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-black" />
+            class="w-full px-3 py-2 rounded-lg border border-gray-300 bg-white outline-none focus:ring-2 focus:ring-black" />
         </div>
         <div>
-          <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Por comprador</label>
+          <label class="block text-xs text-gray-500 mb-1">Por comprador</label>
           <input v-model="form.perBuyerLimit" type="number" min="1" placeholder="Sin límite"
-            class="w-full px-3 py-2 rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-black" />
+            class="w-full px-3 py-2 rounded-lg border border-gray-300 bg-white outline-none focus:ring-2 focus:ring-black" />
         </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Desde</label>
+          <input v-model="form.startsAt" type="datetime-local"
+            class="w-full px-3 py-2 rounded-lg border border-gray-300 bg-white outline-none focus:ring-2 focus:ring-black" />
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Hasta</label>
+          <input v-model="form.endsAt" type="datetime-local"
+            class="w-full px-3 py-2 rounded-lg border border-gray-300 bg-white outline-none focus:ring-2 focus:ring-black" />
+        </div>
+        <p class="col-span-2 md:col-span-4 text-xs text-gray-400">
+          Un uso es una compra. Las compras pendientes de pago reservan su uso hasta que vencen.
+        </p>
       </div>
-      <div>
-        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Desde (opcional)</label>
-        <input v-model="form.startsAt" type="datetime-local"
-          class="w-full px-3 py-2 rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-black" />
-      </div>
-      <div>
-        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Hasta (opcional)</label>
-        <input v-model="form.endsAt" type="datetime-local"
-          class="w-full px-3 py-2 rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-black" />
-      </div>
-      <div class="md:col-span-2 flex flex-col sm:flex-row sm:items-center gap-3">
-        <button type="submit" :disabled="saving"
-          class="px-4 py-2 bg-black text-white rounded-lg font-medium hover:bg-gray-900 transition disabled:opacity-60">
-          {{ saving ? 'Creando...' : 'Crear código' }}
-        </button>
-        <p v-if="message" class="text-sm" :class="isError ? 'text-red-600' : 'text-green-700'" role="status">{{ message }}</p>
-      </div>
-      <p class="md:col-span-2 text-xs text-gray-400">
-        Un uso es una compra. Las compras pendientes de pago reservan su uso hasta que vencen.
-      </p>
+      <p v-if="message" class="text-sm" :class="isError ? 'text-red-600' : 'text-green-700'" role="status">{{ message }}</p>
     </form>
 
     <div v-if="loading" class="p-6 text-sm text-gray-500">Cargando códigos...</div>

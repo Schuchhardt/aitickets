@@ -1,6 +1,6 @@
 ---
 import DashboardLayout from "../../../layouts/DashboardLayout.astro";
-import { Plus, Calendar, MapPin, Eye, Edit, ListFilter, Globe, FileText, QrCode } from "lucide-vue-next";
+import { Plus, Calendar, MapPin, Eye, Edit, ListFilter, Globe, FileText, QrCode, Copy } from "lucide-vue-next";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { hasRole, EVENT_MANAGER_ROLES } from "../../../lib/supabaseServer";
 import { requireDashboardSession } from "../_lib/guard";
@@ -170,6 +170,16 @@ const cardStatus = (e: any) => (e.archived_at ? "archived" : e.status === "publi
                     >
                       <Edit size={16} /> Editar
                     </a>
+                    <button
+                      type="button"
+                      data-duplicate-event={event.id}
+                      data-event-name={event.name}
+                      title="Duplicar: crea una copia en borrador con las mismas entradas y lugar, sin fechas"
+                      aria-label={`Duplicar ${event.name}`}
+                      class="duplicate-event-btn flex items-center justify-center px-3 py-2 text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-black transition disabled:opacity-50"
+                    >
+                      <Copy size={16} />
+                    </button>
                   </>
                 ) : (
                   <a
@@ -190,6 +200,30 @@ const cardStatus = (e: any) => (e.archived_at ? "archived" : e.status === "publi
 </DashboardLayout>
 
 <script>
+  document.querySelectorAll<HTMLButtonElement>('.duplicate-event-btn').forEach((dupBtn) => {
+    dupBtn.addEventListener('click', async () => {
+      if (!confirm(`Se creará una copia en borrador de "${dupBtn.dataset.eventName}" con las mismas entradas y lugar, sin fechas. ¿Continuar?`)) return;
+      dupBtn.disabled = true;
+      try {
+        const res = await fetch('/api/events/duplicate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ eventId: Number(dupBtn.dataset.duplicateEvent) })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.id) {
+          window.location.href = `/dashboard/events/${data.id}/edit`;
+        } else {
+          alert(data.message || 'No se pudo duplicar el evento');
+          dupBtn.disabled = false;
+        }
+      } catch {
+        alert('Error de conexión');
+        dupBtn.disabled = false;
+      }
+    });
+  });
+
   const statusFilterBtns = document.querySelectorAll('.status-filter-btn');
   const eventCards = document.querySelectorAll('.event-card');
 

@@ -5,6 +5,8 @@ import EventFAQManager from "../../../components/dashboard/EventFAQManager.vue";
 import CourtesyTicketsForm from "../../../components/dashboard/CourtesyTicketsForm.vue";
 import DiscountCodesManager from "../../../components/dashboard/DiscountCodesManager.vue";
 import PreviewLinksManager from "../../../components/dashboard/PreviewLinksManager.vue";
+import EventCoverManager from "../../../components/dashboard/EventCoverManager.vue";
+import TrackingLinkBuilder from "../../../components/dashboard/TrackingLinkBuilder.vue";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { EVENT_MANAGER_ROLES } from "../../../lib/supabaseServer";
 import { requireDashboardSession } from "../_lib/guard";
@@ -19,9 +21,8 @@ import {
     Edit,
     Share2,
     BarChart3,
-    Users,
-    Copy,
-    Download,
+    Pause,
+    Rocket,
 } from "lucide-vue-next";
 
 const { id } = Astro.params;
@@ -33,11 +34,11 @@ if (!(await canAccessEventByStaff(getSupabaseAdmin(), dbUser.id, Astro.params.id
 const supabaseAdmin = getSupabaseAdmin();
 
 // Detalle del evento (solo si pertenece a la organización)
-const { data: event, error } = await supabaseAdmin
+const loadEvent = (coverColumn: string) => supabaseAdmin
     .from("events")
     .select(
         `
-    id, name, slug, status, start_date, end_date, location, accessibility,
+    id, name, slug, status, start_date, end_date, location, accessibility, image_url,${coverColumn}
     event_tickets (
       id,
       ticket_name,
@@ -58,6 +59,9 @@ const { data: event, error } = await supabaseAdmin
     .eq("id", id)
     .eq("organization_id", dbUser.organization_id)
     .single();
+let { data: event, error }: { data: any; error: any } = await loadEvent(" cover_settings,");
+// Deploy previews: la migración de cover_settings puede no estar aplicada todavía
+if (error?.code === "42703") ({ data: event, error } = await loadEvent(""));
 
 if (error || !event) {
     return Astro.redirect("/dashboard/events");
@@ -125,7 +129,7 @@ const publishBlockers = [
 <DashboardLayout title={event.name}>
     <!-- Header -->
     <div
-        class="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8"
+        class="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-4"
     >
         <div>
             <div class="flex items-center gap-3 mb-2">
@@ -142,11 +146,6 @@ const publishBlockers = [
                 {event.name}
             </h1>
             <div class="flex items-center gap-4 text-sm text-gray-600">
-                <span
-                    class={`px-3 py-1 rounded-full text-xs font-bold ${event.status === "published" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}
-                >
-                    {event.status === "published" ? "Publicado" : "Borrador"}
-                </span>
                 <span class="flex items-center gap-1">
                     <Calendar size={16} />
                     {
@@ -178,15 +177,6 @@ const publishBlockers = [
             >
                 <BarChart3 size={18} /> Analytics
             </a>
-            <button
-                id="duplicateEventBtn"
-                type="button"
-                data-event-id={event.id}
-                class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
-                title="Crea una copia en borrador con las mismas entradas y lugar, sin fechas"
-            >
-                <Copy size={18} /> Duplicar
-            </button>
             <a
                 href={`/dashboard/events/${event.id}/edit`}
                 class="flex items-center gap-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-900 transition font-medium"
@@ -194,6 +184,41 @@ const publishBlockers = [
                 <Edit size={18} /> Editar
             </a>
         </div>
+    </div>
+
+    <!-- Estado del evento (publicar / pausar) -->
+    <div
+        class={`mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl border p-4 ${event.status === "published" ? "bg-green-50 border-green-200" : "bg-yellow-50 border-yellow-200"}`}
+        data-testid="event-status"
+    >
+        <div class="flex items-start gap-3">
+            <span class={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${event.status === "published" ? "bg-green-500" : "bg-yellow-500"}`}></span>
+            <div>
+                <p class="font-semibold text-gray-900">
+                    {event.status === "published" ? "Publicado: las entradas están a la venta" : "Borrador: el evento no está a la venta"}
+                </p>
+                {event.status !== "published" && publishBlockers.length > 0 ? (
+                    <ul class="mt-1 text-sm text-yellow-800 list-disc pl-5">
+                        {publishBlockers.map((b) => <li>{b}</li>)}
+                    </ul>
+                ) : (
+                    <p class="text-sm text-gray-600">
+                        {event.status === "published"
+                            ? "Si pausas las ventas, el evento vuelve a borrador y deja de aparecer en la cartelera."
+                            : "Cuando esté listo, publícalo para empezar a vender."}
+                    </p>
+                )}
+            </div>
+        </div>
+        <button
+            id="toggleStatusBtn"
+            data-event-id={event.id}
+            data-current-status={event.status}
+            class={`shrink-0 flex items-center justify-center gap-2 px-5 py-2 rounded-lg font-bold transition ${event.status === "published" ? "bg-white border border-gray-300 text-gray-800 hover:bg-gray-50" : "bg-black text-white hover:bg-gray-900"}`}
+        >
+            {event.status === "published" ? <Pause size={16} /> : <Rocket size={16} />}
+            <span>{event.status === "published" ? "Pausar Ventas" : "Publicar Evento"}</span>
+        </button>
     </div>
 
     <!-- Stats Grid -->
@@ -243,6 +268,15 @@ const publishBlockers = [
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <!-- Left Column: Details -->
         <div class="lg:col-span-2 space-y-8">
+            <!-- Portada (vista Desktop / Mobile, ajuste y generación con IA) -->
+            <EventCoverManager
+                client:load
+                eventId={Number(event.id)}
+                eventName={event.name}
+                imageUrl={event.image_url || ""}
+                coverSettings={event.cover_settings || null}
+            />
+
             <!-- Tickets Section -->
             <section
                 class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
@@ -299,7 +333,7 @@ const publishBlockers = [
             <EventFAQManager client:load eventId={Number(event.id)} />
         </div>
 
-        <!-- Right Column: Quick Actions & Public Link -->
+        <!-- Right Column: Public Link & sharing -->
         <div class="space-y-6">
             <div
                 class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm"
@@ -328,71 +362,13 @@ const publishBlockers = [
                 </div>
             </div>
 
-            <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm" id="trackingBuilder" data-base={`${siteUrl}${publicLink}`}>
-                <h3 class="font-bold text-lg mb-2">Link con seguimiento</h3>
-                <p class="text-sm text-gray-500 mb-4">
-                    Crea un link por canal (Instagram, un promotor, un afiche) y mira sus visitas y ventas en Analíticas &rarr; "Ventas por canal".
-                </p>
-                <div class="space-y-2">
-                    <input data-param="utm_source" type="text" maxlength="64" placeholder="Fuente (ej: instagram)" class="w-full bg-gray-50 border border-gray-200 text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-black" />
-                    <input data-param="utm_medium" type="text" maxlength="64" placeholder="Medio (ej: historia, bio, afiche)" class="w-full bg-gray-50 border border-gray-200 text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-black" />
-                    <input data-param="utm_campaign" type="text" maxlength="64" placeholder="Campaña (ej: preventa)" class="w-full bg-gray-50 border border-gray-200 text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-black" />
-                    <input data-param="ref" type="text" maxlength="64" placeholder="Código de promotor / ref (opcional)" class="w-full bg-gray-50 border border-gray-200 text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-black" />
-                </div>
-                <div class="flex gap-2 mt-3">
-                    <input id="trackingLinkOutput" type="text" readonly value={`${siteUrl}${publicLink}`} class="bg-gray-50 border border-gray-200 text-gray-600 text-xs rounded-lg px-3 py-2 w-full outline-none" />
-                    <button id="copyTrackingLinkBtn" type="button" title="Copiar link con seguimiento" class="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition text-gray-700">
-                        <Share2 size={18} />
-                    </button>
-                </div>
-            </div>
+            <TrackingLinkBuilder
+                client:visible
+                baseUrl={`${siteUrl}${publicLink}`}
+                analyticsUrl={`/dashboard/events/${event.id}/analytics`}
+            />
 
             <PreviewLinksManager client:visible eventId={Number(event.id)} status={event.status} />
-
-            <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                <h3 class="font-bold text-lg mb-2">Órdenes</h3>
-                <p class="text-sm text-gray-500 mb-4">Descarga las órdenes pagadas del evento (CSV compatible con Excel).</p>
-                <a
-                    href={`/api/events/orders-csv?event_id=${event.id}`}
-                    class="flex items-center justify-center gap-2 w-full py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition text-gray-800 font-medium text-sm"
-                >
-                    <Download size={16} /> Exportar CSV
-                </a>
-            </div>
-
-            <div
-                class="bg-gradient-to-br from-gray-900 to-black p-6 rounded-xl text-white shadow-lg"
-            >
-                <h3 class="font-bold text-lg mb-2">Estado del Evento</h3>
-                <p class="text-gray-400 text-sm mb-6">
-                    Tu evento está actualmente en modo <strong
-                        >{
-                            event.status === "published"
-                                ? "Público"
-                                : "Borrador"
-                        }</strong
-                    >.
-                </p>
-
-                {event.status !== "published" && publishBlockers.length > 0 && (
-                    <ul class="text-sm text-yellow-300 mb-4 list-disc pl-5">
-                        {publishBlockers.map((b) => <li>{b}</li>)}
-                    </ul>
-                )}
-
-                <button
-                    id="toggleStatusBtn"
-                    data-event-id={event.id}
-                    data-current-status={event.status}
-                    class="w-full py-2 bg-white text-black font-bold rounded-lg hover:bg-gray-100 transition"
-                >
-                    {
-                        event.status === "published"
-                            ? "Pausar Ventas"
-                            : "Publicar Evento"
-                    }
-                </button>
-            </div>
         </div>
     </div>
 </DashboardLayout>
@@ -409,61 +385,17 @@ const publishBlockers = [
     }
   });
 
-  // Constructor de link con seguimiento (utm_* / ref)
-  const builder = document.getElementById('trackingBuilder');
-  const trackingOutput = document.getElementById('trackingLinkOutput') as HTMLInputElement | null;
-  const buildTrackingLink = () => {
-    if (!builder || !trackingOutput) return;
-    const url = new URL(builder.dataset.base || window.location.origin);
-    builder.querySelectorAll<HTMLInputElement>('input[data-param]').forEach((input) => {
-      const value = input.value.trim().toLowerCase().replace(/\s+/g, '-');
-      if (value) url.searchParams.set(input.dataset.param!, value);
-    });
-    trackingOutput.value = url.toString();
-  };
-  builder?.querySelectorAll('input[data-param]').forEach((input) => input.addEventListener('input', buildTrackingLink));
-  document.getElementById('copyTrackingLinkBtn')?.addEventListener('click', async () => {
-    const link = trackingOutput?.value || '';
-    try {
-      await navigator.clipboard.writeText(link);
-      alert('Link copiado');
-    } catch {
-      prompt('Copia el link:', link);
-    }
-  });
-
-  const dupBtn = document.getElementById('duplicateEventBtn') as HTMLButtonElement | null;
-  dupBtn?.addEventListener('click', async () => {
-    if (!confirm('Se creará una copia en borrador con las mismas entradas y lugar, sin fechas. ¿Continuar?')) return;
-    dupBtn.disabled = true;
-    try {
-      const res = await fetch('/api/events/duplicate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ eventId: Number(dupBtn.dataset.eventId) })
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok && data.id) {
-        window.location.href = `/dashboard/events/${data.id}/edit`;
-      } else {
-        alert(data.message || 'No se pudo duplicar el evento');
-        dupBtn.disabled = false;
-      }
-    } catch {
-      alert('Error de conexión');
-      dupBtn.disabled = false;
-    }
-  });
-
-  const btn = document.getElementById('toggleStatusBtn');
+  const btn = document.getElementById('toggleStatusBtn') as HTMLButtonElement | null;
   if (btn) {
+    const label = btn.querySelector('span');
     btn.addEventListener('click', async () => {
       const eventId = btn.dataset.eventId;
       const currentStatus = btn.dataset.currentStatus;
       const newStatus = currentStatus === 'published' ? 'draft' : 'published';
-      
-      (btn as HTMLButtonElement).disabled = true;
-      btn.textContent = 'Actualizando...';
+      const idleText = currentStatus === 'published' ? 'Pausar Ventas' : 'Publicar Evento';
+
+      btn.disabled = true;
+      if (label) label.textContent = 'Actualizando...';
 
       try {
         const res = await fetch('/api/events/update', {
@@ -484,13 +416,13 @@ const publishBlockers = [
         } else {
           const data = await res.json();
           alert(data.message || 'Error al actualizar estado');
-          (btn as HTMLButtonElement).disabled = false;
-          btn.textContent = currentStatus === 'published' ? 'Pausar Ventas' : 'Publicar Evento';
+          btn.disabled = false;
+          if (label) label.textContent = idleText;
         }
       } catch (e) {
         alert('Error de conexión');
-        (btn as HTMLButtonElement).disabled = false;
-        btn.textContent = currentStatus === 'published' ? 'Pausar Ventas' : 'Publicar Evento';
+        btn.disabled = false;
+        if (label) label.textContent = idleText;
       }
     });
   }

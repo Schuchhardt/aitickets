@@ -14,6 +14,7 @@ import {
     CheckCircle,
     XCircle,
     Search,
+    Download,
 } from "lucide-vue-next";
 
 const guard = await requireDashboardSession(Astro, EVENT_MANAGER_ROLES);
@@ -499,6 +500,14 @@ function formatDate(dateString: string | null): string {
                                                         Listado de Entradas (
                                                         {attendees.length})
                                                     </h4>
+                                                    <div class="flex items-center gap-2">
+                                                    <a
+                                                        href={`/api/events/orders-csv?event_id=${event.id}`}
+                                                        title="Descarga las órdenes pagadas del evento (CSV compatible con Excel)"
+                                                        class="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition whitespace-nowrap"
+                                                    >
+                                                        <Download class="w-4 h-4" /> Exportar CSV
+                                                    </a>
                                                     <div class="relative">
                                                         <input
                                                             type="text"
@@ -509,6 +518,7 @@ function formatDate(dateString: string | null): string {
                                                             }
                                                         />
                                                         <Search class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                                                    </div>
                                                     </div>
                                                 </div>
 
@@ -855,6 +865,14 @@ function formatDate(dateString: string | null): string {
                                                         Listado de Entradas (
                                                         {attendees.length})
                                                     </h4>
+                                                    <div class="flex items-center gap-2">
+                                                    <a
+                                                        href={`/api/events/orders-csv?event_id=${event.id}`}
+                                                        title="Descarga las órdenes pagadas del evento (CSV compatible con Excel)"
+                                                        class="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition whitespace-nowrap"
+                                                    >
+                                                        <Download class="w-4 h-4" /> Exportar CSV
+                                                    </a>
                                                     <div class="relative">
                                                         <input
                                                             type="text"
@@ -865,6 +883,7 @@ function formatDate(dateString: string | null): string {
                                                             }
                                                         />
                                                         <Search class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                                                    </div>
                                                     </div>
                                                 </div>
 
