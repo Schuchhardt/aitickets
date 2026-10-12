@@ -102,6 +102,13 @@ const initialFormState = {
         })) || [],
 };
 
+// Asistentes confirmados (entradas no anuladas): el aviso por correo solo se ofrece si hay
+const { count: attendeeCount } = await supabaseAdmin
+    .from("event_attendees")
+    .select("id", { count: "exact", head: true })
+    .eq("event_id", event.id)
+    .or("status.is.null,status.neq.cancelled");
+
 // Lugares para el selector: solo los de mi organización o los que ya usan mis eventos
 let venues: OrgVenue[] = [];
 try {
@@ -128,6 +135,7 @@ try {
             initialFormState={initialFormState}
             initialVenues={venues}
             eventStatus={(event as any).status || "draft"}
+            attendeeCount={attendeeCount || 0}
         />
     </div>
 </DashboardLayout>

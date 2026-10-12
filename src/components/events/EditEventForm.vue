@@ -20,13 +20,20 @@ const props = defineProps({
   eventStatus: {
     type: String,
     default: 'draft'
+  },
+  // Entradas confirmadas (no anuladas) del evento
+  attendeeCount: {
+    type: Number,
+    default: 0
   }
 })
 
-// Aviso a los asistentes (solo eventos publicados). Los cambios de fecha/horario o lugar se avisan
-// automáticamente; para otros cambios el productor decide explícitamente.
+// Aviso a los asistentes (solo eventos publicados con asistentes). Los cambios de fecha/horario o lugar
+// se avisan automáticamente; para otros cambios el productor decide explícitamente al guardar en Revisión.
+const canNotify = props.eventStatus === 'published' && props.attendeeCount > 0
 const notifyAttendees = ref(false)
 const notifyMessage = ref('')
+const attendeeLabel = `${props.attendeeCount.toLocaleString('es-CL')} ${props.attendeeCount === 1 ? 'asistente' : 'asistentes'}`
 
 const currentStep = ref(1)
 const steps = [
@@ -45,9 +52,33 @@ const descriptionAi = {
   draft: () => ({ name: form.value.general.name, category: form.value.general.category, description: form.value.general.description }),
 }
 
+// Cambios sin guardar: se compara con la última versión guardada
+const savedSnapshot = ref(JSON.stringify(form.value))
+const isDirty = computed(() => JSON.stringify(form.value) !== savedSnapshot.value)
+let leavingAfterSave = false
+
 // La vista previa sanitiza con DOMPurify (solo en el navegador)
 const mounted = ref(false)
-onMounted(() => { mounted.value = true })
+onMounted(() => {
+  mounted.value = true
+  // Tras guardar se recarga la página en el mismo paso (?step=N&saved=1)
+  const params = new URLSearchParams(window.location.search)
+  const step = Number(params.get('step'))
+  if (step >= 1 && step <= 4) currentStep.value = step
+  if (params.get('saved') === '1') {
+    savedNotice.value = true
+    setTimeout(() => { savedNotice.value = false }, 4000)
+  }
+  if (params.has('step') || params.has('saved')) {
+    window.history.replaceState(null, '', window.location.pathname)
+  }
+  window.addEventListener('beforeunload', (e) => {
+    if (isDirty.value && !leavingAfterSave) {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+  })
+})
 const descriptionPreview = computed(() => (mounted.value ? sanitizeClient(form.value.general.description) : ''))
 
 // Validation per step
@@ -74,9 +105,17 @@ const canNext = computed(() => {
   return true
 })
 
+const stepValidity = computed(() => ({ 1: isStep1Valid.value, 2: isStep2Valid.value, 3: isStep3Valid.value, 4: true }))
+
 // Actions
 const nextStep = () => {
   if (canNext.value && currentStep.value < 4) currentStep.value++
+}
+
+// Navegación libre entre pasos: el formulario es uno solo, la validación se hace al guardar
+const goToStep = (n) => {
+  currentStep.value = n
+  submitError.value = ''
 }
 
 const prevStep = () => {
@@ -238,18 +277,35 @@ const removeImage = () => {
 const isSubmitting = ref(false)
 const submitError = ref('')
 const submitSuccess = ref(false)
+const savedNotice = ref(false)
 
-const submitEvent = async () => {
+const STEP_ERRORS = {
+  1: 'Revisa la información: el nombre debe tener más de 3 caracteres y la descripción más de 10.',
+  2: 'Revisa ubicación y fechas: cada ubicación necesita un lugar y al menos una función con fecha y hora.',
+  3: 'Revisa las entradas: cada una necesita nombre, precio válido y cantidad mayor a 0 (o sin límite).',
+}
+
+// Guarda desde cualquier paso. exit=true vuelve al panel del evento; si no, recarga en el mismo paso
+// (así las ubicaciones, funciones y entradas nuevas quedan con su id real y no se duplican al volver a guardar).
+const submitEvent = async ({ exit = false } = {}) => {
+  const invalidStep = [1, 2, 3].find(n => !stepValidity.value[n])
+  if (invalidStep) {
+    currentStep.value = invalidStep
+    submitError.value = STEP_ERRORS[invalidStep]
+    return
+  }
+
   isSubmitting.value = true
   submitError.value = ''
-  
+  savedNotice.value = false
+
   try {
     // Add eventId to payload
     const payload = {
       ...form.value,
       eventId: props.eventId,
-      notifyAttendees: props.eventStatus === 'published' && notifyAttendees.value,
-      notifyMessage: props.eventStatus === 'published' ? notifyMessage.value.trim() : '',
+      notifyAttendees: canNotify && exit && notifyAttendees.value,
+      notifyMessage: canNotify && exit && notifyAttendees.value ? notifyMessage.value.trim() : '',
     }
 
     const response = await fetch('/api/events/update', {
@@ -262,10 +318,15 @@ const submitEvent = async () => {
     
     if (!response.ok) throw new Error(result.message || 'Error al actualizar evento')
     
-    submitSuccess.value = true
-    setTimeout(() => {
-      window.location.href = `/dashboard/events/${props.eventId}`
-    }, 1500)
+    leavingAfterSave = true
+    if (exit) {
+      submitSuccess.value = true
+      setTimeout(() => {
+        window.location.href = `/dashboard/events/${props.eventId}`
+      }, 1500)
+    } else {
+      window.location.href = `${window.location.pathname}?step=${currentStep.value}&saved=1`
+    }
     
   } catch (e) {
     submitError.value = e.message
@@ -281,23 +342,35 @@ const submitEvent = async () => {
     <!-- Steps Header -->
     <div class="border-b border-gray-100 p-6">
       <div class="flex items-center justify-between max-w-2xl mx-auto">
-        <div v-for="(step, index) in steps" :key="step.number" class="flex flex-col items-center relative z-10">
+        <button
+          v-for="(step, index) in steps"
+          :key="step.number"
+          type="button"
+          @click="goToStep(step.number)"
+          :disabled="isSubmitting"
+          :aria-current="currentStep === step.number ? 'step' : undefined"
+          class="flex flex-col items-center relative z-10 group"
+        >
           <div 
-            class="w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all duration-300"
+            class="relative w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all duration-300"
             :class="[
-              currentStep >= step.number ? 'bg-black text-white' : 'bg-gray-100 text-gray-400',
-              currentStep === step.number ? 'ring-4 ring-black/10' : ''
+              currentStep === step.number ? 'bg-black text-white ring-4 ring-black/10' : 'bg-gray-100 text-gray-500 group-hover:bg-gray-200 group-hover:text-black',
             ]"
           >
             <component :is="step.icon" size="18" />
+            <span
+              v-if="!stepValidity[step.number]"
+              class="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-red-500 border-2 border-white"
+              title="Este paso tiene datos por completar"
+            ></span>
           </div>
           <span 
             class="text-xs font-medium mt-2 absolute -bottom-6 w-32 text-center"
-            :class="currentStep >= step.number ? 'text-black' : 'text-gray-400'"
+            :class="currentStep === step.number ? 'text-black' : 'text-gray-500 group-hover:text-black'"
           >
             {{ step.title }}
           </span>
-        </div>
+        </button>
         
         <!-- Progress Bar Background (Simple visual hack) -->
         <div class="absolute top-10 left-0 w-full h-0.5 bg-gray-100 -z-0 hidden md:block"></div> 
@@ -307,6 +380,13 @@ const submitEvent = async () => {
     <!-- Content -->
     <div class="flex-1 p-8 overflow-y-auto">
       <div class="max-w-3xl mx-auto">
+
+        <div v-if="submitError" class="mb-6 p-4 bg-red-50 text-red-600 rounded-lg text-sm border border-red-100">
+          {{ submitError }}
+        </div>
+        <div v-if="savedNotice" class="mb-6 p-4 bg-green-50 text-green-700 rounded-lg text-sm border border-green-100 font-medium">
+          Cambios guardados.
+        </div>
         
         <!-- Step 1: Info -->
         <div v-show="currentStep === 1" class="space-y-6">
@@ -552,21 +632,12 @@ const submitEvent = async () => {
              </div>
            </div>
 
-           <div v-if="props.eventStatus === 'published'" class="p-4 rounded-xl border border-gray-200 space-y-3">
-             <label class="flex items-start gap-2 text-sm text-gray-800 cursor-pointer">
-               <input v-model="notifyAttendees" type="checkbox" class="w-4 h-4 mt-0.5 rounded border-gray-300" />
-               <span>
-                 <span class="font-medium">Avisar a los asistentes</span>
-                 <span class="block text-gray-500 text-xs">Envía un correo a quienes ya tienen entradas. Si cambiaste fechas, horarios o el lugar, se les avisa automáticamente aunque no marques esta opción.</span>
-               </span>
-             </label>
+           <div v-if="canNotify && notifyAttendees" class="p-4 rounded-xl border border-gray-200 space-y-2">
+             <p class="text-sm font-medium text-gray-800">Aviso a {{ attendeeLabel }}</p>
+             <p class="text-xs text-gray-500">Se enviará un correo al guardar. Si cambiaste fechas, horarios o el lugar, se les avisa automáticamente aunque no marques la opción.</p>
              <textarea v-model="notifyMessage" rows="2" maxlength="1500" placeholder="Mensaje opcional para los asistentes (ej: se agregó un nuevo artista)" class="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black outline-none text-sm"></textarea>
            </div>
 
-           <div v-if="submitError" class="p-4 bg-red-50 text-red-600 rounded-lg text-sm border border-red-100">
-             {{ submitError }}
-           </div>
-           
            <div v-if="submitSuccess" class="p-4 bg-green-50 text-green-600 rounded-lg text-sm border border-green-100 font-bold text-center">
              ¡Evento actualizado exitosamente! Redirigiendo...
            </div>
@@ -589,24 +660,47 @@ const submitEvent = async () => {
         <a :href="`/dashboard/events/${props.eventId}`" class="text-sm text-gray-500 hover:text-black">Cancelar</a>
       </div>
 
-      <button 
-        v-if="currentStep < 4" 
-        @click="nextStep"
-        class="px-8 py-2 rounded-lg bg-black text-white font-medium hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-        :disabled="!canNext"
-      >
-        Siguiente <ChevronRight size="18" />
-      </button>
+      <div class="flex items-center gap-3">
+        <span v-if="isDirty && !isSubmitting" class="hidden sm:inline text-xs text-gray-500">Cambios sin guardar</span>
 
-      <button 
-        v-if="currentStep === 4" 
-        @click="submitEvent"
-        class="px-8 py-2 rounded-lg bg-black text-white font-medium hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-        :disabled="isSubmitting"
-      >
-        <span v-if="isSubmitting" class="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></span>
-        {{ isSubmitting ? 'Guardando...' : 'Guardar Cambios' }}
-      </button>
+        <button
+          v-if="currentStep < 4"
+          @click="submitEvent()"
+          class="px-5 py-2 rounded-lg border border-gray-300 bg-white text-gray-800 font-medium hover:bg-gray-100 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          :disabled="isSubmitting || !isDirty"
+        >
+          <span v-if="isSubmitting" class="animate-spin w-4 h-4 border-2 border-gray-300 border-t-gray-800 rounded-full"></span>
+          {{ isSubmitting ? 'Guardando...' : 'Guardar' }}
+        </button>
+
+        <button 
+          v-if="currentStep < 4" 
+          @click="nextStep"
+          class="px-8 py-2 rounded-lg bg-black text-white font-medium hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          :disabled="!canNext || isSubmitting"
+        >
+          Siguiente <ChevronRight size="18" />
+        </button>
+
+        <label
+          v-if="currentStep === 4 && canNotify"
+          class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none"
+          title="Envía un correo a quienes ya tienen entradas"
+        >
+          <input v-model="notifyAttendees" type="checkbox" class="w-4 h-4 rounded border-gray-300" :disabled="isSubmitting" />
+          Avisar a {{ attendeeLabel }}
+        </label>
+
+        <button 
+          v-if="currentStep === 4" 
+          @click="submitEvent({ exit: true })"
+          class="px-8 py-2 rounded-lg bg-black text-white font-medium hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          :disabled="isSubmitting"
+        >
+          <span v-if="isSubmitting" class="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></span>
+          {{ isSubmitting ? 'Guardando...' : 'Guardar Cambios' }}
+        </button>
+      </div>
     </div>
   </div>
 </template>
