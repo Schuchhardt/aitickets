@@ -15,7 +15,8 @@
     "test": "vitest run --passWithNoTests",
     "test:unit": "vitest run --passWithNoTests",
     "test:e2e": "playwright test",
-    "test:e2e:install": "playwright install chromium"
+    "test:e2e:install": "playwright install chromium",
+    "lint:tdz": "node scripts/lint-tdz.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",

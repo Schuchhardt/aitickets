@@ -11,6 +11,12 @@ if (!guard.ok) return guard.response;
 const { dbUser } = guard.session;
 const supabaseAdmin = getSupabaseAdmin();
 
+// Antes de cualquier uso: providerLabel() se llama al armar las transacciones (TDZ si va después)
+const PROVIDER_LABELS: Record<string, string> = { flow: "Webpay", free: "Gratis", courtesy: "Cortesía", demo: "Demo" };
+function providerLabel(p: string | null | undefined): string {
+    return p ? PROVIDER_LABELS[p] || p : "Webpay";
+}
+
 type Tx = {
     event: string;
     amount: number;
@@ -163,11 +169,6 @@ const { data: payout } = await supabaseAdmin
     .eq("organization_id", dbUser.organization_id)
     .maybeSingle();
 const hasBankData = !!(payout?.bank_name && payout?.bank_account_number && payout?.bank_account_holder && payout?.bank_account_rut);
-
-const PROVIDER_LABELS: Record<string, string> = { flow: "Webpay", free: "Gratis", courtesy: "Cortesía", demo: "Demo" };
-function providerLabel(p: string | null | undefined): string {
-    return p ? PROVIDER_LABELS[p] || p : "Webpay";
-}
 
 const formatCLP = (amount: number) => `$${Math.round(Number(amount) || 0).toLocaleString("es-CL")}`;
 const formatDate = (d: string | null) =>

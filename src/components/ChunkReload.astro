@@ -1,0 +1,38 @@
+---
+// Si falla la carga de un módulo JS (islas de Vue, imports dinámicos), recarga la página UNA vez.
+// Pasa sobre todo después de un deploy: el HTML que tenía abierto el usuario (o el de caché) pide chunks
+// con hash que ya no existen. Mensajes por navegador:
+//   Safari:  "Importing a module script failed."
+//   Chrome:  "Failed to fetch dynamically imported module"
+//   Firefox: "error loading dynamically imported module"
+// La marca en sessionStorage (por ruta) evita un bucle de recargas si el problema persiste.
+---
+<script is:inline>
+	(function () {
+		var KEY = "chunk-reload:" + location.pathname;
+		var RE = /Importing a module script failed|Failed to fetch dynamically imported module|error loading dynamically imported module/i;
+		function reloadOnce() {
+			try {
+				if (sessionStorage.getItem(KEY)) return false;
+				sessionStorage.setItem(KEY, "1");
+			} catch (e) {
+				return false;
+			}
+			location.reload();
+			return true;
+		}
+		window.addEventListener("vite:preloadError", function (e) {
+			if (reloadOnce()) e.preventDefault();
+		});
+		window.addEventListener("unhandledrejection", function (e) {
+			var msg = (e.reason && (e.reason.message || String(e.reason))) || "";
+			if (RE.test(msg) && reloadOnce()) e.preventDefault();
+		});
+		// Si la página cargó bien, se limpia la marca para permitir una recarga en el próximo deploy
+		window.addEventListener("load", function () {
+			setTimeout(function () {
+				try { sessionStorage.removeItem(KEY); } catch (e) {}
+			}, 10000);
+		});
+	})();
+</script>

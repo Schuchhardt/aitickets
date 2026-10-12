@@ -1,5 +1,6 @@
 ---
 import DashboardSidebar from "../components/dashboard/DashboardSidebar.vue";
+import ChunkReload from "../components/ChunkReload.astro";
 import "../styles/global.css";
 import { getSessionContext, type SessionContext } from "../lib/supabaseServer";
 import SetPasswordModal from "../components/auth/SetPasswordModal.vue";
@@ -36,6 +37,7 @@ const showWelcome = !!session && Astro.url.searchParams.get("bienvenida") === "1
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width" />
+    <ChunkReload />
     <meta name="robots" content="noindex, nofollow" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />

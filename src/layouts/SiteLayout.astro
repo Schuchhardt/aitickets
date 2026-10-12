@@ -6,6 +6,7 @@
  * - Slot "head" para meta tags (SiteMetaTags o EventMetaTags).
  */
 import ToastContainer from "../components/ui/ToastContainer.vue";
+import ChunkReload from "../components/ChunkReload.astro";
 import type { SiteTheme } from "../lib/sites";
 import "../styles/global.css";
 
@@ -43,6 +44,7 @@ const cssVars = [
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <ChunkReload />
     <meta name="generator" content={Astro.generator} />
     <meta name="theme-color" content={theme.primary} />
     {favicon ? <link rel="icon" href={favicon} /> : (
