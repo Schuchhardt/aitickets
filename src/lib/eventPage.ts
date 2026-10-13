@@ -11,7 +11,7 @@ import {
   formatLocalDate,
 } from "../utils/dateHelpers.js";
 import { descriptionToHtml } from "./sanitize";
-import { isDemoEventSlug, getDemoEventDate } from "./demoEvent.mjs";
+import { isDemoEventSlug, getDemoFunctionDate } from "./demoEvent.mjs";
 import { normalizeCoverSettings } from "./eventCover";
 import { loadEventGallery } from "./eventGallery";
 import { resolveCoverMeta, eventThemeFrom } from "./eventCoverMeta";
@@ -364,9 +364,9 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
   // Funciones (event_dates + recinto), con horas en la zona horaria del recinto
   if (datesRes.error) console.error("Error al obtener las fechas:", datesRes.error);
 
-  const demoDate = isDemo ? getDemoEventDate(now, event.slug) : null;
+  
   let dates: any[] = (datesRes.data || [])
-    .map((d: any) => (demoDate ? { ...d, date: demoDate } : d))
+    .map((d: any) => (isDemo ? { ...d, date: getDemoFunctionDate(d.date, now, event.slug) } : d))
     .map((d: any) => {
       const venue = buildVenue(pickOne(d.event_locations));
       const tz = venue?.timezone || DEFAULT_EVENT_TIMEZONE;

@@ -14,7 +14,7 @@
 // si la tabla no existe, todo degrada a "sitio no encontrado" (404) sin romper el resto del sitio.
 import { createHash, timingSafeEqual } from "node:crypto";
 import { getSupabaseAdmin } from "./auth-helpers";
-import { DEMO_EVENT_SLUGS, getDemoEventDate } from "./demoEvent.mjs";
+import { DEMO_EVENT_SLUGS, getDemoFunctionDate } from "./demoEvent.mjs";
 import { getZonedParts, zonedDateTimeToDate } from "../utils/dateHelpers.js";
 
 // ---------------------------------------------------------------------------
@@ -755,7 +755,7 @@ export async function getSiteEvents(site: SiteRecord, limit = 60): Promise<SiteE
   const datesByEvent = new Map<number, SiteEventCard["dates"]>();
   for (const d of (dates || []) as any[]) {
     const list = datesByEvent.get(d.event_id) || [];
-    const demoDate = site.is_demo ? getDemoEventDate(now, slugById.get(d.event_id)) : null;
+    const demoDate = site.is_demo ? getDemoFunctionDate(d.date, now, slugById.get(d.event_id)) : null;
     list.push({ date: demoDate || String(d.date).slice(0, 10), start_time: d.start_time, end_time: d.end_time });
     datesByEvent.set(d.event_id, list);
   }

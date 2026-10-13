@@ -49,8 +49,8 @@ describe('isDemoEventSlug', () => {
 })
 
 describe('getDemoEventDate (varios eventos demo)', () => {
-  it('lista tres eventos demo', () => {
-    expect(DEMO_EVENT_SLUGS).toEqual(['evento-demo-aitickets', 'evento-demo-concierto', 'evento-demo-feria'])
+  it('lista cinco eventos demo (incluye uno gratis y una gira)', () => {
+    expect(DEMO_EVENT_SLUGS).toEqual(['evento-demo-aitickets', 'evento-demo-concierto', 'evento-demo-feria', 'evento-demo-gratis', 'evento-demo-gira'])
     expect(isDemoEventSlug('evento-demo-concierto')).toBe(true)
     expect(isDemoEventSlug('evento-demo-feria')).toBe(true)
   })
@@ -69,5 +69,23 @@ describe('getDemoEventDate (varios eventos demo)', () => {
     expect(getDemoEventDate(new Date('2026-10-15T22:00:00Z'), 'evento-demo-feria')).toBe('2026-10-15')
     expect(getDemoEventDate(new Date('2026-10-16T12:00:00Z'), 'evento-demo-feria')).toBe('2026-11-15')
     expect(getDemoEventDate(new Date('2026-12-20T12:00:00Z'), 'evento-demo-feria')).toBe('2027-01-15')
+  })
+})
+
+describe('getDemoFunctionDate (demos con varias funciones)', async () => {
+  const { getDemoFunctionDate } = await import('../../src/lib/demoEvent.mjs')
+
+  it('la gira parte el próximo viernes y mantiene la separación (y el día de la semana) entre funciones', () => {
+    const now = new Date('2026-11-10T15:00:00Z') // martes 10-nov en Chile
+    const stored = ['2026-10-23', '2026-10-24', '2026-10-30', '2026-10-31', '2026-11-06']
+    const shown = stored.map((d) => getDemoFunctionDate(d, now, 'evento-demo-gira'))
+    expect(shown).toEqual(['2026-11-13', '2026-11-14', '2026-11-20', '2026-11-21', '2026-11-27'])
+    expect(shown.map((d) => new Date(`${d}T12:00:00Z`).getUTCDay())).toEqual([5, 6, 5, 6, 5])
+  })
+
+  it('sin ancla todas las funciones caen en la fecha dinámica del demo', () => {
+    const now = new Date('2026-11-10T15:00:00Z')
+    expect(getDemoFunctionDate('2020-01-01', now, 'evento-demo-gratis')).toBe('2026-11-12') // jueves
+    expect(isDemoEventSlug('evento-demo-gira')).toBe(true)
   })
 })
