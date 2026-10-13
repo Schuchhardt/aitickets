@@ -1,5 +1,5 @@
 // POST /api/purchase-ticket (contrato C5 + WP2)
-// Request: { eventId, buyer:{firstName,lastName,email,phone?}, tickets:[{id, quantity}], ref?, utm?:{source,medium,campaign},
+// Request: { eventId, buyer:{fullName | firstName,lastName?, email, phone?}, tickets:[{id, quantity}], ref?, utm?:{source,medium,campaign},
 //            paymentProvider?: (ignorado, siempre Flow), termsAccepted: true, termsVersion?: string, cfToken?, discountCode?: string }
 // Código de descuento (netlify/lib/discounts.mjs): se valida en el servidor (organización y evento, vigencia, usos y
 // límite por comprador) y se aplica al subtotal de entradas; el cargo por servicio se calcula sobre el subtotal
@@ -7,7 +7,11 @@
 // descuento. El límite de usos definitivo lo aplica aitickets_reserve_order_v2 con la fila del código bloqueada.
 // Errores de código: { message, discountError: true, reason }.
 // El precio se calcula SIEMPRE en el servidor desde event_tickets; se ignora cualquier total/precio/evento del cliente.
+// buyer.fullName (checkout rediseñado, un solo campo "Nombre y apellido"): se divide en el servidor (primer token =>
+// nombre, resto => apellido, que puede quedar vacío). Clientes antiguos siguen enviando firstName/lastName.
 // Respuesta: pagado -> { paymentLink, provider, orderId }; gratis -> { orderId, redirectUrl: '/order/<orderId>', provider: 'free' }
+// Orden gratis de un email que ya tiene una orden gratis pagada para el evento: 409 { code: 'ALREADY_REGISTERED' }
+// (no se crea un duplicado; la página ofrece reenviar la entrada). Agotado: 409 { code: 'SOLD_OUT' }.
 // Stock: la reserva es ATÓMICA en SQL (aitickets_reserve_order bloquea los tipos de entrada y recuenta);
 // la orden 'pending' reserva stock hasta hold_expires_at (15 min).
 // Antiabuso: Cloudflare Turnstile (body.cfToken, si está configurado), rate limit por IP (memoria de la
@@ -41,6 +45,7 @@ import {
   DISCOUNT_STATUS,
 } from '../../lib/discounts.mjs'
 import { isDemoEventSlug } from '../../../src/lib/demoEvent.mjs'
+import { splitFullName } from '../../lib/buyer-name.mjs'
 
 const MAX_TICKET_LINES = 20
 const MAX_PENDING_PER_BUYER = 2
@@ -89,12 +94,13 @@ function validateRequest(body) {
   if (!Number.isInteger(eventId) || eventId <= 0) return { error: 'Evento inválido' }
 
   const buyer = body?.buyer || {}
-  const firstName = cleanText(buyer.firstName, 80)
-  const lastName = cleanText(buyer.lastName, 80)
+  const fullName = cleanText(buyer.fullName, 160)
+  const split = fullName ? splitFullName(fullName) : null
+  const firstName = split ? split.firstName.slice(0, 80) : cleanText(buyer.firstName, 80)
+  const lastName = split ? split.lastName.slice(0, 80) : cleanText(buyer.lastName, 80)
   const email = cleanText(buyer.email, 254).toLowerCase()
   const phone = cleanText(buyer.phone, 30).replace(/[^\d+\s()-]/g, '')
-  if (firstName.length < 1) return { error: 'Ingresa tu nombre' }
-  if (lastName.length < 1) return { error: 'Ingresa tu apellido' }
+  if (firstName.length < 1 || (fullName && fullName.length < 2)) return { error: 'Escribe tu nombre.' }
   if (!isValidEmail(email)) return { error: 'Ingresa un correo electrónico válido' }
 
   if (!Array.isArray(body?.tickets) || body.tickets.length === 0 || body.tickets.length > MAX_TICKET_LINES) {
@@ -184,6 +190,23 @@ async function isEventStillOn(supabase, event) {
     .eq('event_id', event.id)
     .gte('date', todayInTimeZone())
   return (count || 0) > 0
+}
+
+/** ¿El email ya tiene una orden gratis pagada (con entradas vigentes) para este evento? */
+async function hasFreeRegistration(supabase, eventId, email) {
+  const { data, error } = await supabase
+    .from('event_orders')
+    .select('id')
+    .eq('event_id', eventId)
+    .eq('buyer_email', email)
+    .eq('status', 'paid')
+    .eq('total_payment', 0)
+    .limit(1)
+  if (error) {
+    console.error('No se pudo revisar si el email ya está inscrito:', error.message)
+    return false
+  }
+  return (data || []).length > 0
 }
 
 /** Órdenes pendientes con reserva vigente de un comprador en un evento. */
@@ -386,6 +409,7 @@ export default async function handler(req) {
         const available = Number(ticket.total_quantity) - (sold.get(id) || 0)
         if (quantities.get(id) > available) {
           return json({
+            code: available > 0 ? 'LOW_STOCK' : 'SOLD_OUT',
             message: available > 0
               ? `Solo quedan ${available} entrada(s) de "${ticket.ticket_name}"`
               : `"${ticket.ticket_name}" está agotada`,
@@ -419,6 +443,11 @@ export default async function handler(req) {
     if (discount) discount.amount = discountAmount
     const ticketQty = ticketDetails.reduce((sum, t) => sum + t.quantity, 0)
     const provider = total === 0 ? 'free' : paymentProvider
+
+    // Inscripción gratis repetida: no se duplica (la página ofrece reenviar la entrada)
+    if (total === 0 && grossSubtotal === 0 && (await hasFreeRegistration(supabase, eventId, buyer.email))) {
+      return json({ code: 'ALREADY_REGISTERED', message: 'Ya estás inscrito con este email.' }, 409)
+    }
     const holdMinutes = total === 0 ? PENDING_HOLD_MINUTES : holdMinutesFor(provider)
 
     // Asistente antes de reservar (event_orders.attendee_id es NOT NULL)
@@ -470,6 +499,7 @@ export default async function handler(req) {
         const ticket = err.ticketId != null ? byId.get(Number(err.ticketId)) : null
         if (err.stock === 'SOLD_OUT') {
           return json({
+            code: 'SOLD_OUT',
             message: ticket
               ? `"${ticket.ticket_name}" se agotó mientras completabas tu compra. Revisa la disponibilidad e intenta nuevamente.`
               : 'Se agotaron las entradas mientras completabas tu compra. Revisa la disponibilidad e intenta nuevamente.',

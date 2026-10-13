@@ -1,6 +1,282 @@
 @import "tailwindcss";
 @import "@fontsource/unbounded/300.css";
 @import "@fontsource/unbounded/500.css";
+@import "@fontsource/unbounded/700.css";
 @import "@fontsource/prompt/300.css";
 @import "@fontsource/prompt/400.css";
 @import "@fontsource/prompt/500.css";
+@import "@fontsource/prompt/600.css";
+
+/* ------------------------------------------------------------------------------------------------
+ * Tokens de la página del evento y del checkout (rediseño). Interfaz monocromo; el verde lima de marca
+ * solo para éxito, el badge "Gratis", el foco de inputs y el punto de "últimas".
+ * ---------------------------------------------------------------------------------------------- */
+:root {
+  /* Superficies */
+  --surface-0: #ffffff;
+  --surface-1: #f6f6f7;
+  --surface-2: #ededef;
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.16);
+
+  /* Texto */
+  --text-1: #0a0a0b;
+  --text-2: #5b5b63;
+  --text-3: #6e6e76; /* legales: #8E8E96 no cumple AA sobre blanco en 12 px */
+
+  /* Marca */
+  --brand-ink: #0a0a0b;
+  --brand-lime: var(--color-lime-400);
+  --danger: #d92d20;
+  --danger-text: #b42318;
+  --warning: #b54708;
+  --warning-text: #8a3a06;
+
+  /* Tinte del evento (HSL sin función; lo fija la página según el póster) */
+  --event-tint: 240 10% 96%;
+
+  /* Radios */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 24px;
+  --r-pill: 999px;
+
+  /* Sombras (sutiles, nunca de color) */
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06);
+  --shadow-sheet: 0 -8px 40px rgba(0, 0, 0, 0.12);
+
+  /* Movimiento */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-1: 120ms;
+  --dur-2: 200ms;
+  --dur-3: 320ms;
+  --dur-4: 480ms;
+}
+
+/* ---------- Piezas compartidas (prefijo ev-) ---------- */
+
+.ev-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 20px;
+  border-radius: var(--r-md);
+  font-family: "Prompt", system-ui, sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color var(--dur-1) var(--ease-out), transform var(--dur-1) var(--ease-out), border-color var(--dur-1) var(--ease-out), opacity var(--dur-2);
+  -webkit-tap-highlight-color: transparent;
+}
+.ev-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px #fff, 0 0 0 6px var(--brand-lime);
+}
+.ev-btn-primary {
+  background: var(--brand-ink);
+  color: #fff;
+  border: 0;
+}
+.ev-btn-primary:hover:not(:disabled) {
+  background: #222;
+  transform: translateY(-1px);
+}
+.ev-btn-primary:active:not(:disabled) {
+  transform: scale(0.98);
+  transition-duration: 80ms;
+}
+.ev-btn-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.ev-btn-primary[aria-busy="true"] {
+  opacity: 1;
+  cursor: progress;
+}
+.ev-btn-secondary {
+  background: var(--surface-0);
+  color: var(--text-1);
+  border: 1px solid var(--border-strong);
+}
+.ev-btn-secondary:hover:not(:disabled) {
+  border-color: var(--text-1);
+}
+.ev-btn-secondary:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.ev-field {
+  width: 100%;
+  height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  background: var(--surface-0);
+  color: var(--text-1);
+  font-family: "Prompt", system-ui, sans-serif;
+  font-size: 16px; /* 16 px: iOS no hace zoom al enfocar */
+  transition: border-color var(--dur-2), box-shadow var(--dur-2), opacity var(--dur-2);
+}
+.ev-field::placeholder {
+  color: #9a9aa2;
+}
+.ev-field:focus {
+  outline: none;
+  border-color: var(--text-1);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand-lime) 55%, transparent);
+}
+.ev-field[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+.ev-field[readonly] {
+  opacity: 0.6;
+}
+.ev-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-1);
+}
+.ev-error {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--danger-text);
+}
+.ev-link {
+  color: var(--text-1);
+  font-weight: 500;
+  text-decoration: none;
+  border-radius: 4px;
+}
+.ev-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.ev-link:focus-visible {
+  outline: 2px solid var(--text-1);
+  outline-offset: 2px;
+}
+.ev-tabular {
+  font-variant-numeric: tabular-nums;
+}
+.ev-spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  animation: ev-spin 700ms linear infinite;
+  flex: 0 0 auto;
+}
+.ev-spinner-dark {
+  border-color: rgba(0, 0, 0, 0.15);
+  border-top-color: var(--text-1);
+}
+
+/* Altura animada 0 → auto con grid-rows (A16, A21, A24) */
+.ev-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--dur-2) var(--ease-out), opacity var(--dur-2) var(--ease-out);
+  opacity: 0;
+}
+.ev-collapse > * {
+  overflow: hidden;
+  min-height: 0;
+}
+.ev-collapse.is-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+/* A15: shake de un campo con error (dos nombres para poder repetirla) */
+.ev-shake-a {
+  animation: ev-shake-a 280ms ease;
+}
+.ev-shake-b {
+  animation: ev-shake-b 280ms ease;
+}
+
+@keyframes ev-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes ev-shake-a {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+@keyframes ev-shake-b {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+@keyframes ev-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes ev-fade-up-12 {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes ev-poster-in {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes ev-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes ev-bar-up {
+  from { transform: translateY(100%); }
+  to { transform: none; }
+}
+@keyframes ev-pulse {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+@keyframes ev-pop {
+  from { transform: scale(0); }
+  to { transform: scale(1); }
+}
+@keyframes ev-draw {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes ev-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+.ev-skeleton {
+  border-radius: var(--r-sm);
+  background: linear-gradient(90deg, var(--surface-1) 25%, var(--surface-2) 50%, var(--surface-1) 75%);
+  background-size: 200% 100%;
+  animation: ev-shimmer 1.2s linear infinite;
+}
+
+/* Todo el movimiento se reduce a un cambio inmediato con prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  .ev-motion,
+  .ev-motion *,
+  .ev-motion *::before,
+  .ev-motion *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    transition-delay: 0ms !important;
+  }
+}

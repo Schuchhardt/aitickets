@@ -1,6 +1,7 @@
 <script setup>
-import iconCalendarLight from "../images/icon-calendar-light.png";
-import iconPinLight from "../images/icon-pin-light.png";
+// Los archivos "light" tienen los nombres cruzados: icon-pin-light.png es el calendario e icon-calendar-light.png el pin
+import iconCalendarLight from "../images/icon-pin-light.png";
+import iconPinLight from "../images/icon-calendar-light.png";
 import iconCalendarDark from "../images/icon-calendar-dark.png";
 import iconPinDark from "../images/icon-pin-dark.png";
 import { formatEventDateRange } from "../utils/dateHelpers.js";

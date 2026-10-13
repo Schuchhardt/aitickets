@@ -14,6 +14,8 @@ import { descriptionToHtml } from "./sanitize";
 import { isDemoEventSlug, getDemoEventDate } from "./demoEvent.mjs";
 import { normalizeCoverSettings } from "./eventCover";
 import { loadEventGallery } from "./eventGallery";
+import { resolveCoverMeta, eventThemeFrom } from "./eventCoverMeta";
+import { computeFeeSplit } from "../../netlify/lib/fees.mjs";
 
 // Columnas públicas del evento. NUNCA incluir secret_location (C4).
 export const EVENT_PUBLIC_COLUMNS =
@@ -240,8 +242,9 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
       : baseQuery.eq("slug", slug!).eq("status", "published")
     ).maybeSingle();
   };
-  let { data: event, error }: { data: any; error: any } = await loadEvent(`${EVENT_PUBLIC_COLUMNS}, cover_settings, fee_absorbed`);
-  // Deploy previews comparten la BD de producción: tolerar que las migraciones de cover_settings/fee_absorbed no estén aplicadas
+  let { data: event, error }: { data: any; error: any } = await loadEvent(`${EVENT_PUBLIC_COLUMNS}, cover_settings, fee_absorbed, cover_meta`);
+  // Deploy previews comparten la BD de producción: tolerar que las migraciones de cover_meta/cover_settings/fee_absorbed no estén aplicadas
+  if (error?.code === "42703") ({ data: event, error } = await loadEvent(`${EVENT_PUBLIC_COLUMNS}, cover_settings, fee_absorbed`));
   if (error?.code === "42703") ({ data: event, error } = await loadEvent(`${EVENT_PUBLIC_COLUMNS}, cover_settings`));
   if (error?.code === "42703") ({ data: event, error } = await loadEvent(EVENT_PUBLIC_COLUMNS));
 
@@ -316,6 +319,7 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
   if (ticketsRes.error) console.error("Error al obtener las entradas:", ticketsRes.error);
   const allTickets: any[] = ticketsRes.data || [];
 
+  const feeAbsorbed = event.fee_absorbed === true;
   const inWindow = (t: any) => (!t.init_date || new Date(t.init_date) <= now) && (!t.end_date || new Date(t.end_date) >= now);
   const windowTickets = allTickets.filter(inWindow);
 
@@ -331,12 +335,17 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
       id: t.id,
       ticket_name: t.ticket_name,
       price: Number(t.price) || 0,
+      // Precio final por entrada (con cargo e IVA del cargo, o el de lista si el productor lo absorbe): misma
+      // regla que el resumen del checkout y /api/purchase-ticket (netlify/lib/fees.mjs)
+      final_price: computeFeeSplit(Number(t.price) || 0, { absorbed: feeAbsorbed }).total,
       max_quantity: remaining === null ? maxPerPurchase : Math.min(maxPerPurchase, remaining),
       init_date: t.init_date,
       end_date: t.end_date,
       // R1: null = válida para cualquier función; si no, id de event.dates[]
       event_date_id: t.event_date_id ?? null,
       remaining,
+      // Para "Quedan N cupos" (≤ 15 % del total o ≤ 10)
+      total_quantity: unlimited ? null : Number(t.total_quantity),
     };
   });
 
@@ -421,8 +430,36 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
     });
   if (saleState === "on_sale" && publicTickets.length === 0) saleState = "closed";
 
+  // Entradas que se muestran atenuadas en el checkout: agotadas o con venta que aún no abre (§6.3)
+  const liveFunction = (dateId: any) => dateId === null || dateId === undefined || !dateEndById.has(String(dateId)) || new Date(dateEndById.get(String(dateId))!) >= now;
+  const unavailableTickets = [
+    ...ticketsWithStock
+      .filter((t) => t.remaining !== null && t.remaining <= 0)
+      .map((t) => ({ id: t.id, ticket_name: t.ticket_name, price: t.price, final_price: t.final_price, event_date_id: t.event_date_id, reason: "sold_out", sales_start: null })),
+    ...allTickets
+      .filter((t: any) => t.init_date && new Date(t.init_date) > now && (!t.end_date || new Date(t.end_date) >= now))
+      .map((t: any) => ({
+        id: t.id,
+        ticket_name: t.ticket_name,
+        price: Number(t.price) || 0,
+        final_price: computeFeeSplit(Number(t.price) || 0, { absorbed: feeAbsorbed }).total,
+        event_date_id: t.event_date_id ?? null,
+        reason: "upcoming",
+        sales_start: t.init_date,
+      })),
+  ].filter((t) => liveFunction(t.event_date_id));
+
+  // Póster: proporción real y tinte de la página (events.cover_meta, src/lib/eventCoverMeta.ts)
+  const coverMeta = await resolveCoverMeta(event, {
+        waitUntil: (() => {
+          const ctx = opts.locals?.netlify?.context;
+          return typeof ctx?.waitUntil === "function" ? (p: Promise<unknown>) => ctx.waitUntil(p) : undefined;
+        })(),
+  });
+
+  const { cover_meta: _coverMeta, ...eventRow } = event;
   const eventData = {
-    ...event,
+    ...eventRow,
     // R3: la descripción se renderiza con v-html => siempre sanitizada
     description: descriptionToHtml(event.description),
     location,
@@ -434,6 +471,8 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
     gallery,
     dates,
     tickets: publicTickets,
+    unavailable_tickets: unavailableTickets,
+    theme: eventThemeFrom(coverMeta),
     sale_state: saleState,
     sale_starts_at: upcomingSaleDates[0] || null,
     has_secret_location: hasSecretLocation,
