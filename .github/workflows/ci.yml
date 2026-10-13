@@ -93,14 +93,14 @@ jobs:
           node scripts/migrate.mjs --no-baseline | tee second-run.log
           grep -q "0 pendientes" second-run.log
           node scripts/migrate.mjs --status --fail-on-pending
-      - name: Eventos demo sembrados (gratis, pagado y gira)
+      - name: Eventos demo sembrados (stand-up, concierto, feria, gratis y gira)
         run: |
           psql -v ON_ERROR_STOP=1 -At -c "
             DO \$\$
             DECLARE missing text;
             BEGIN
               SELECT string_agg(s, ', ') INTO missing
-              FROM unnest(ARRAY['evento-demo-concierto', 'evento-demo-feria', 'evento-demo-gratis', 'evento-demo-gira']) AS s
+              FROM unnest(ARRAY['evento-demo-aitickets', 'evento-demo-concierto', 'evento-demo-feria', 'evento-demo-gratis', 'evento-demo-gira']) AS s
               WHERE NOT EXISTS (SELECT 1 FROM public.events e WHERE e.slug = s);
               IF missing IS NOT NULL THEN RAISE EXCEPTION 'Faltan eventos demo: %', missing; END IF;
               IF (SELECT count(*) FROM public.event_dates d JOIN public.events e ON e.id = d.event_id WHERE e.slug = 'evento-demo-gira') <> 5 THEN
