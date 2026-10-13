@@ -1,4 +1,5 @@
 <script setup>
+import { prepareImageForUpload } from '../../../lib/clientImage'
 import { ref, computed, watch } from 'vue'
 import {
   ArrowLeft, ArrowRight, Check, Image, Instagram, Facebook,
@@ -95,7 +96,7 @@ const handleFileUpload = async (e) => {
   isUploading.value = true
   try {
     const formData = new FormData()
-    formData.append('file', file)
+    formData.append('file', await prepareImageForUpload(file))
     const res = await fetch('/api/promote/upload-image', { method: 'POST', body: formData })
     const data = await res.json()
     if (res.ok && data.url) {

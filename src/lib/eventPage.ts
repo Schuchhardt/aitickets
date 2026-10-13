@@ -13,6 +13,7 @@ import {
 import { descriptionToHtml } from "./sanitize";
 import { isDemoEventSlug, getDemoEventDate } from "./demoEvent.mjs";
 import { normalizeCoverSettings } from "./eventCover";
+import { loadEventGallery } from "./eventGallery";
 
 // Columnas públicas del evento. NUNCA incluir secret_location (C4).
 export const EVENT_PUBLIC_COLUMNS =
@@ -265,7 +266,7 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
   }
 
   // Datos relacionados (en paralelo)
-  const [categoriesRes, ticketsRes, faqsRes, datesRes, orgRes, secretRes] = await Promise.all([
+  const [categoriesRes, ticketsRes, faqsRes, datesRes, orgRes, secretRes, gallery] = await Promise.all([
     supabase.from("event_tags").select("category_tags(name)").eq("event_id", event.id),
     supabase
       .from("event_tickets")
@@ -291,6 +292,8 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
       .eq("id", event.id)
       .not("secret_location", "is", null)
       .neq("secret_location", ""),
+    // Galería al final de la página (tolera que la tabla aún no exista)
+    loadEventGallery(Number(event.id)),
   ]);
 
   // Categorías
@@ -428,6 +431,7 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
     timezone: eventTimezone,
     tags,
     faqs,
+    gallery,
     dates,
     tickets: publicTickets,
     sale_state: saleState,

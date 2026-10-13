@@ -5,6 +5,7 @@ import { eventBus } from "../utils/eventbus.js";
 import EventHeader from "./EventHeader.vue";
 import EventTabs from "./EventTabs.vue";
 import EventActions from "./EventActions.vue";
+import EventGallery from "./EventGallery.vue";
 
 const props = defineProps({
   event: Object,
@@ -104,6 +105,9 @@ function autoOpenReservation() {
         <EventActions :event="event" :siteMode="siteMode" />
       </div>
     </div>
+
+    <!-- Galería de fotos al final del detalle (panel: EventGalleryManager.vue) -->
+    <EventGallery v-if="event.gallery?.length" :images="event.gallery" :eventName="event.name" />
 
     <!-- Banner de adquisición de productores (no en los sitios de productor) -->
     <div v-if="siteMode" class="mb-32 lg:mb-8"></div>

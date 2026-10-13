@@ -4,6 +4,7 @@
 import { computed, ref } from 'vue'
 import { Sparkles, UploadCloud, SlidersHorizontal, Trash2, Image as ImageIcon } from 'lucide-vue-next'
 import CoverAdjuster from '../events/CoverAdjuster.vue'
+import { prepareImageForUpload, MAX_UPLOAD_BYTES, MAX_SOURCE_BYTES } from '../../lib/clientImage'
 
 const props = defineProps({
   eventId: { type: Number, required: true },
@@ -71,10 +72,13 @@ const onFile = async (e) => {
   e.target.value = ''
   if (!file) return
   if (!file.type.startsWith('image/')) { error.value = 'Solo se permiten imágenes.'; return }
-  if (file.size > 5 * 1024 * 1024) { error.value = 'La imagen no debe superar los 5MB.'; return }
+  if (file.size > MAX_SOURCE_BYTES) { error.value = 'La imagen es demasiado pesada (máx. 30MB).'; return }
   await run('upload', async () => {
+    // Fotos de celular: se achican en el navegador (el servidor igual optimiza la imagen)
+    const prepared = await prepareImageForUpload(file)
+    if (prepared.size > MAX_UPLOAD_BYTES) throw new Error('La imagen no debe superar los 5MB.')
     const fd = new FormData()
-    fd.append('file', file)
+    fd.append('file', prepared)
     const res = await fetch('/api/events/upload-image', { method: 'POST', body: fd })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) throw new Error(data.message || 'Error al subir la imagen')
@@ -169,7 +173,7 @@ const remove = () => {
         class="w-full border-2 border-dashed border-gray-300 rounded-xl p-6 sm:p-10 flex flex-col items-center text-center hover:border-gray-400 hover:bg-gray-50 transition">
         <UploadCloud size="28" class="text-gray-400 mb-3" />
         <span class="font-medium text-gray-900">Este evento no tiene portada</span>
-        <span class="text-xs text-gray-500 mt-1">Sube una imagen (JPG, PNG o WEBP, máx. 5MB) o genérala con IA.</span>
+        <span class="text-xs text-gray-500 mt-1">Sube una imagen (JPG, PNG o WEBP; se optimiza automáticamente) o genérala con IA.</span>
       </button>
 
       <div v-if="adjusting && !candidate" class="flex flex-wrap items-center gap-2">

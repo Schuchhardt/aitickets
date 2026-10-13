@@ -6,6 +6,7 @@ import CourtesyTicketsForm from "../../../components/dashboard/CourtesyTicketsFo
 import DiscountCodesManager from "../../../components/dashboard/DiscountCodesManager.vue";
 import PreviewLinksManager from "../../../components/dashboard/PreviewLinksManager.vue";
 import EventCoverManager from "../../../components/dashboard/EventCoverManager.vue";
+import EventGalleryManager from "../../../components/dashboard/EventGalleryManager.vue";
 import TrackingLinkBuilder from "../../../components/dashboard/TrackingLinkBuilder.vue";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { EVENT_MANAGER_ROLES } from "../../../lib/supabaseServer";
@@ -331,6 +332,9 @@ const publishBlockers = [
 
             <!-- FAQ Section -->
             <EventFAQManager client:load eventId={Number(event.id)} />
+
+            <!-- Galería (al final de la página pública del evento) -->
+            <EventGalleryManager client:visible eventId={Number(event.id)} publicUrl={publicLink} />
         </div>
 
         <!-- Right Column: Public Link & sharing -->
