@@ -335,9 +335,9 @@ const updateEvent: ToolDef = {
     title: "Editar evento",
     description:
         "Edita datos generales de un evento (nombre, descripción, categoría, imagen, privacidad, slug de la URL). Solo cambia los campos enviados. " +
-        "slug cambia el link público (/eventos/<slug>); cambiar el nombre NO cambia el slug. Si el evento ya tiene registrados " +
+        "slug cambia el link público (/eventos/<slug>); cambiar el nombre NO cambia el slug. Si el evento está publicado o ya tiene registrados " +
         "(órdenes pagadas, entradas o invitados), el link anterior queda redirigiendo (301) al nuevo, así no se rompen los links ya " +
-        "compartidos ni los QR; si no tiene registrados, el link anterior deja de funcionar. " +
+        "compartidos ni los QR; en un borrador sin registrados, el link anterior se libera. " +
         "Fechas y horarios de las funciones se cambian con update_event_functions (avisa a los asistentes); el lugar, desde el panel o " +
         "update_venue. Para entradas usa las herramientas de ticket_type.",
     scope: "write",
@@ -377,7 +377,7 @@ const updateEvent: ToolDef = {
         let slugChange: Awaited<ReturnType<typeof changeEventSlug>> | null = null;
         if (args.slug !== undefined) {
             try {
-                slugChange = await changeEventSlug(ctx.supabase, { id: Number(event.id), slug: event.slug, organization_id: ctx.actor.orgId }, args.slug, { userId: ctx.actor.userId });
+                slugChange = await changeEventSlug(ctx.supabase, { id: Number(event.id), slug: event.slug, organization_id: ctx.actor.orgId, status: event.status }, args.slug, { userId: ctx.actor.userId });
             } catch (err) {
                 if (err instanceof EventSlugError) throw new ToolError(err.code, err.message);
                 throw err;
@@ -420,8 +420,8 @@ function slugChangeSummary(ctx: ToolContext, change: Awaited<ReturnType<typeof c
         new_url: newUrl,
         redirect_created: change.redirect_created,
         note: change.redirect_created
-            ? `El evento ya tiene registrados: ${oldUrl} redirige (301) a ${newUrl}. Los links y QR ya compartidos siguen funcionando.`
-            : `El evento no tiene registrados: ${oldUrl} deja de funcionar. Actualiza los links que hayas compartido (bio, posts, tracking links).`,
+            ? `${change.was_published ? "El evento está publicado" : "El evento ya tiene registrados"}: ${oldUrl} redirige (301) a ${newUrl}. Los links y QR ya compartidos siguen funcionando.`
+            : `El evento es un borrador sin registrados: ${oldUrl} se libera (no redirige). Si lo compartiste, actualiza esos links.`,
     };
 }
 

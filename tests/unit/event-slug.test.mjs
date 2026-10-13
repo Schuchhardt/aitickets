@@ -15,7 +15,7 @@ beforeEach(() => {
     tables: {
       organizations: [{ id: 7, public_name: 'Mi Productora' }, { id: 8, public_name: 'Otra' }],
       events: [
-        { id: 10, name: 'Fiesta', slug: 'fiesta-1234', status: 'published', accessibility: 'public', organization_id: 7 },
+        { id: 10, name: 'Fiesta', slug: 'fiesta-1234', status: 'draft', accessibility: 'public', organization_id: 7 },
         { id: 11, name: 'Otra fiesta', slug: 'otra-fiesta-1', status: 'draft', accessibility: 'public', organization_id: 7 },
         { id: 20, name: 'Ajeno', slug: 'ajeno-1', status: 'published', organization_id: 8 },
       ],
@@ -40,16 +40,31 @@ const run = (args) => runTool(getTool('update_event'), args, ctx())
 const slugOf = (id) => db.tables.events.find((e) => e.id === id).slug
 
 describe('update_event: slug', () => {
-  it('sin registrados cambia el slug y no deja redirect', async () => {
+  it('borrador sin registrados cambia el slug y no deja redirect', async () => {
     const res = await run({ event_id: 10, slug: 'fiesta-verano-2026' })
     expect(res.ok).toBe(true)
     expect(slugOf(10)).toBe('fiesta-verano-2026')
     expect(res.result).toMatchObject({
       updated: ['slug'],
-      public_url: 'https://aitickets.cl/eventos/fiesta-verano-2026',
+      public_url_after_publish: 'https://aitickets.cl/eventos/fiesta-verano-2026',
       slug_change: { changed: true, old_slug: 'fiesta-1234', new_slug: 'fiesta-verano-2026', redirect_created: false },
     })
     expect(db.tables.aitickets_event_slug_redirects).toHaveLength(0)
+  })
+
+  it('publicado sin registrados también deja el slug anterior redirigiendo', async () => {
+    db.tables.events.find((e) => e.id === 10).status = 'published'
+    const res = await run({ event_id: 10, slug: 'fiesta-publicada' })
+    expect(res.result.slug_change).toMatchObject({ redirect_created: true })
+    expect(res.result.slug_change.note).toMatch(/está publicado/)
+    expect(await resolveEventSlugRedirect('fiesta-1234')).toBe('fiesta-publicada')
+  })
+
+  it('publicado sin la tabla de redirects (BD sin migrar) rechaza el cambio', async () => {
+    db.tables.events.find((e) => e.id === 10).status = 'published'
+    db.failOn('aitickets_event_slug_redirects', 'select', { code: '42P01', message: 'relation "aitickets_event_slug_redirects" does not exist' })
+    expect(await run({ event_id: 10, slug: 'otro-link' })).toMatchObject({ ok: false, code: 'conflict' })
+    expect(slugOf(10)).toBe('fiesta-1234')
   })
 
   it('normaliza tildes, espacios y mayúsculas', async () => {

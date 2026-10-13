@@ -41,7 +41,7 @@ if (!result && Astro.params.slug && Astro.cookies.get("sb-access-token")) {
   }
 }
 
-// Slug anterior de un evento con registrados (src/lib/eventSlug.ts) => 301 al slug vigente
+// Slug anterior de un evento publicado o con registrados (src/lib/eventSlug.ts) => 301 al slug vigente
 if (!result) {
   const currentSlug = await resolveEventSlugRedirect(Astro.params.slug);
   if (currentSlug) return slugRedirectResponse(`/eventos/${currentSlug}${Astro.url.search}`);

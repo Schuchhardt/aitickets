@@ -1,6 +1,6 @@
 -- Redirects de slugs antiguos de eventos. Idempotente.
 --
--- Al cambiar el slug de un evento que ya tiene registrados (órdenes pagadas, entradas o invitados), el slug
+-- Al cambiar el slug de un evento publicado o que ya tiene registrados (órdenes pagadas, entradas o invitados), el slug
 -- anterior se guarda aquí: /eventos/<old_slug> (y /o/<sitio>/eventos/<old_slug>, /qr/<old_slug>) redirige con
 -- 301 al slug actual del evento. Se guarda event_id (no el slug nuevo), así una cadena de cambios
 -- (a -> b -> c) sigue apuntando al slug vigente sin saltos intermedios.

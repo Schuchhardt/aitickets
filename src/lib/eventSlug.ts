@@ -1,13 +1,13 @@
 // Cambio del slug (URL pública /eventos/<slug>) de un evento y redirects de slugs anteriores.
 //
-// Si el evento ya tiene registrados (órdenes pagadas, entradas emitidas o invitados), sus links ya circulan
-// (correos, WhatsApp, redes, QR impresos): el slug anterior se guarda en aitickets_event_slug_redirects y
-// las páginas públicas responden 301 al slug vigente (resolveEventSlugRedirect). Sin registrados el slug
-// anterior simplemente se libera.
+// Si el evento está publicado o ya tiene registrados (órdenes pagadas, entradas emitidas o invitados), sus
+// links ya circulan (correos, WhatsApp, redes, QR impresos): el slug anterior se guarda en
+// aitickets_event_slug_redirects y las páginas públicas responden 301 al slug vigente
+// (resolveEventSlugRedirect). En un borrador sin registrados el slug anterior simplemente se libera.
 //
 // La tabla guarda event_id (no el slug destino): una cadena a -> b -> c redirige siempre al slug actual.
 // Deploy previews comparten la BD de producción: si la tabla aún no existe, el lookup devuelve null y el
-// cambio con registrados se rechaza (nunca se rompen links ya compartidos).
+// cambio que necesita redirect se rechaza (nunca se rompen links ya compartidos).
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseAdmin } from "./auth-helpers";
 import { isDemoEventSlug } from "./demoEvent.mjs";
@@ -70,15 +70,16 @@ export type SlugChangeResult = {
     changed: boolean;
     redirect_created: boolean;
     has_registrations: boolean;
+    was_published: boolean;
 };
 
 /**
  * Cambia el slug de un evento de la organización. Valida formato y unicidad (contra otros eventos y contra
- * slugs antiguos de otros eventos, que siguen redirigiendo). Con registrados crea el redirect old -> evento.
+ * slugs antiguos de otros eventos, que siguen redirigiendo). Publicado o con registrados crea el redirect old -> evento.
  */
 export async function changeEventSlug(
     supabase: SupabaseClient,
-    event: { id: number; slug: string | null; organization_id: number },
+    event: { id: number; slug: string | null; organization_id: number; status?: string | null },
     requested: string,
     opts: { userId?: number | null } = {},
 ): Promise<SlugChangeResult> {
@@ -86,7 +87,7 @@ export async function changeEventSlug(
     validateSlug(newSlug);
     const oldSlug = event.slug || "";
     if (isDemoEventSlug(oldSlug)) throw new EventSlugError("invalid_input", "El slug de un evento demo no se puede cambiar.");
-    if (newSlug === oldSlug) return { old_slug: oldSlug, new_slug: newSlug, changed: false, redirect_created: false, has_registrations: false };
+    if (newSlug === oldSlug) return { old_slug: oldSlug, new_slug: newSlug, changed: false, redirect_created: false, has_registrations: false, was_published: event.status === "published" };
 
     const { data: taken, error: takenError } = await supabase.from("events").select("id").eq("slug", newSlug).neq("id", event.id).limit(1);
     if (takenError) throw takenError;
@@ -100,9 +101,10 @@ export async function changeEventSlug(
     }
 
     const registrations = await eventHasRegistrations(supabase, event.id);
-    const needsRedirect = registrations.has && !!oldSlug && SLUG_PATTERN.test(oldSlug);
+    const wasPublished = event.status === "published";
+    const needsRedirect = (wasPublished || registrations.has) && !!oldSlug && SLUG_PATTERN.test(oldSlug);
     if (needsRedirect && tableMissing) {
-        throw new EventSlugError("conflict", "No se puede cambiar el slug de un evento con registrados todavía (falta la migración de redirects). Intenta más tarde.");
+        throw new EventSlugError("conflict", "No se puede cambiar el slug de un evento publicado o con registrados todavía (falta la migración de redirects). Intenta más tarde.");
     }
 
     // Volver a un slug anterior propio: ese redirect deja de hacer falta (el evento lo usa de nuevo)
@@ -122,7 +124,7 @@ export async function changeEventSlug(
         if (updateError.code === "23505") throw new EventSlugError("conflict", `El slug "${newSlug}" ya lo usa otro evento. Elige otro.`);
         throw updateError;
     }
-    return { old_slug: oldSlug, new_slug: newSlug, changed: true, redirect_created: needsRedirect, has_registrations: registrations.has };
+    return { old_slug: oldSlug, new_slug: newSlug, changed: true, redirect_created: needsRedirect, has_registrations: registrations.has, was_published: wasPublished };
 }
 
 /**
