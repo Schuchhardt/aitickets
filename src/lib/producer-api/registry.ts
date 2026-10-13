@@ -50,8 +50,9 @@ export type ToolDef = {
      * Confirmación en el servidor: la primera llamada (sin confirmation_token) ejecuta `confirm`, que valida y
      * arma el resumen, y devuelve un token de un solo uso. La acción solo se ejecuta en una segunda llamada con
      * los MISMOS argumentos y ese token. Lo usan las acciones que mueven plata o son públicas.
+     * Si devuelve null, esta llamada no necesita confirmación (p. ej. un cambio que no avisa a nadie) y se ejecuta directo.
      */
-    confirm?: (args: any, ctx: ToolContext) => Promise<ConfirmationSummary>;
+    confirm?: (args: any, ctx: ToolContext) => Promise<ConfirmationSummary | null>;
     /** Acepta idempotency_key: un reintento con la misma clave devuelve la misma respuesta sin repetir la acción. */
     idempotent?: boolean;
     /** Resumen sin datos personales para la bitácora (list_audit_log). */
@@ -248,8 +249,7 @@ function checkAccess(tool: ToolDef, ctx: ToolContext) {
 }
 
 /** Primera llamada de una acción con confirmación: valida, arma el resumen y emite un token de un solo uso. */
-async function requestConfirmation(tool: ToolDef, args: any, argsHash: string, ctx: ToolContext) {
-    const summary = await tool.confirm!(args, ctx);
+async function requestConfirmation(tool: ToolDef, summary: ConfirmationSummary, argsHash: string, ctx: ToolContext) {
     const token = `aitconf_${randomBytes(24).toString("base64url")}`;
     const expiresAt = new Date(Date.now() + CONFIRMATION_TTL_MINUTES * 60_000).toISOString();
     const { error } = await ctx.supabase.from("aitickets_api_confirmations").insert({
@@ -402,8 +402,9 @@ export async function runTool(tool: ToolDef, rawArgs: unknown, ctx: ToolContext)
         const argsHash = sha256(`${tool.name}:${stableStringify(args)}`);
 
         if (tool.confirm && !confirmationToken) {
+            const summary = await tool.confirm(args, ctx);
             // Nada cambió todavía: no va a la bitácora
-            return { ok: true, result: await requestConfirmation(tool, args, argsHash, ctx) };
+            if (summary) return { ok: true, result: await requestConfirmation(tool, summary, argsHash, ctx) };
         }
 
         const idemKey: string | null = idempotencyKey || (confirmationToken ? `confirm:${sha256(confirmationToken)}` : null);
@@ -414,7 +415,7 @@ export async function runTool(tool: ToolDef, rawArgs: unknown, ctx: ToolContext)
         };
         let result: Record<string, unknown>;
         try {
-            const confirmed = tool.confirm ? await consumeConfirmation(tool, confirmationToken, argsHash, ctx) : undefined;
+            const confirmed = tool.confirm && confirmationToken ? await consumeConfirmation(tool, confirmationToken, argsHash, ctx) : undefined;
             result = await tool.handler(args, confirmed ? { ...ctx, confirmed } : ctx);
         } catch (err) {
             await releaseClaim();

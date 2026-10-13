@@ -338,8 +338,8 @@ const updateEvent: ToolDef = {
         "slug cambia el link público (/eventos/<slug>); cambiar el nombre NO cambia el slug. Si el evento ya tiene registrados " +
         "(órdenes pagadas, entradas o invitados), el link anterior queda redirigiendo (301) al nuevo, así no se rompen los links ya " +
         "compartidos ni los QR; si no tiene registrados, el link anterior deja de funcionar. " +
-        "Fechas y lugares se cambian desde el panel (allí se avisa a los asistentes). Si cambias una fecha, revisa que la descripción no " +
-        "mencione la anterior (get_event la advierte en warnings). Para entradas usa las herramientas de ticket_type.",
+        "Fechas y horarios de las funciones se cambian con update_event_functions (avisa a los asistentes); el lugar, desde el panel o " +
+        "update_venue. Para entradas usa las herramientas de ticket_type.",
     scope: "write",
     audit: (args, result) => ({ summary: `Editó ${((result as any).updated || []).join(", ") || "el evento"}`, target: `event:${args.event_id}` }),
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
