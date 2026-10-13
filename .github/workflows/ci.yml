@@ -84,6 +84,8 @@ jobs:
         run: |
           psql -v ON_ERROR_STOP=1 -q -f db/ci/stubs.sql
           psql -v ON_ERROR_STOP=1 -q -f db/schema.sql
+      - name: Organización 1 (AI Tickets), para que corran los seeds de eventos demo
+        run: psql -v ON_ERROR_STOP=1 -q -c "INSERT INTO public.organizations (id, public_name) OVERRIDING SYSTEM VALUE VALUES (1, 'AI Tickets')"
       - name: Aplicar migraciones (primera pasada)
         run: node scripts/migrate.mjs --no-baseline
       - name: Aplicar migraciones (segunda pasada, debe aplicar 0)
@@ -91,6 +93,20 @@ jobs:
           node scripts/migrate.mjs --no-baseline | tee second-run.log
           grep -q "0 pendientes" second-run.log
           node scripts/migrate.mjs --status --fail-on-pending
+      - name: Eventos demo sembrados (gratis, pagado y gira)
+        run: |
+          psql -v ON_ERROR_STOP=1 -At -c "
+            DO \$\$
+            DECLARE missing text;
+            BEGIN
+              SELECT string_agg(s, ', ') INTO missing
+              FROM unnest(ARRAY['evento-demo-concierto', 'evento-demo-feria', 'evento-demo-gratis', 'evento-demo-gira']) AS s
+              WHERE NOT EXISTS (SELECT 1 FROM public.events e WHERE e.slug = s);
+              IF missing IS NOT NULL THEN RAISE EXCEPTION 'Faltan eventos demo: %', missing; END IF;
+              IF (SELECT count(*) FROM public.event_dates d JOIN public.events e ON e.id = d.event_id WHERE e.slug = 'evento-demo-gira') <> 5 THEN
+                RAISE EXCEPTION 'La gira demo debe tener 5 funciones';
+              END IF;
+            END \$\$;"
       - name: Permisos (anon/authenticated sin acceso; RLS activo)
         run: psql -v ON_ERROR_STOP=1 -f db/ci/assert-grants.sql
       - name: Rechazo del transaction pooler (6543)
