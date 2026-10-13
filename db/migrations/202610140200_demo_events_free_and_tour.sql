@@ -8,7 +8,7 @@
 -- Igual que los demos de 202610090100: organización 1 (AI Tickets), privados (fuera del sitemap) pero listados en
 -- /eventos, fechas dinámicas (src/lib/demoEvent.mjs; la gira mantiene la separación entre funciones con su ancla
 -- 2026-10-23) y la compra se rechaza en el servidor. Solo se siembran si existe la organización 1 y no existe el slug.
--- Las portadas reutilizan las imágenes demo existentes del bucket Events/demo/.
+-- Portadas propias en el bucket público Events/demo/ (evento-demo-gratis.jpg y evento-demo-gira.jpg, 1200×1500).
 
 DO $$
 DECLARE
@@ -44,7 +44,7 @@ BEGIN
       '<p><strong>Este es un evento de demostración de AI Tickets.</strong> Muestra cómo se ve un evento gratuito: la asistencia se confirma en la misma página, con nombre y email, sin pasos ni pagos. No se crea ninguna entrada real.</p>'
         || '<p>Imagina una tarde con 25 emprendimientos locales, café de especialidad y música en vivo. La entrada es liberada, pero los cupos son limitados.</p>'
         || '<p>¿Organizas eventos gratuitos? Crea el tuyo gratis en aitickets.cl/organizadores.</p>',
-      'https://bgsmqjrdryafvlyxywud.supabase.co/storage/v1/object/public/Events/demo/evento-demo-feria.jpg',
+      'https://bgsmqjrdryafvlyxywud.supabase.co/storage/v1/object/public/Events/demo/evento-demo-gratis.jpg',
       'Galpón de ejemplo AI Tickets, Av. Italia 1450, Providencia',
       60, 'published', 'private', 1
     )
@@ -83,7 +83,7 @@ BEGIN
       '<p><strong>Este es un evento de demostración de AI Tickets.</strong> Muestra cómo se ve una gira: varias funciones en distintas ciudades y recintos, cada una con sus propias entradas. Primero eliges el lugar, después la fecha y al final las entradas. No se crea ninguna orden ni se cobra nada.</p>'
         || '<p>Imagina una banda indie presentando su nuevo disco en Santiago y Viña del Mar, con funciones viernes y sábado.</p>'
         || '<p>¿Organizas giras? Crea la tuya gratis en aitickets.cl/organizadores.</p>',
-      'https://bgsmqjrdryafvlyxywud.supabase.co/storage/v1/object/public/Events/demo/evento-demo-concierto.jpg',
+      'https://bgsmqjrdryafvlyxywud.supabase.co/storage/v1/object/public/Events/demo/evento-demo-gira.jpg',
       'Providencia, Ñuñoa y Viña del Mar',
       900, 'published', 'private', 1
     )
