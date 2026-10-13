@@ -13,9 +13,10 @@ import { postsaleTools } from "./postsale";
 import { messagingTools } from "./messaging";
 import { lifecycleTools } from "./lifecycle";
 import { auditTools } from "./audit";
+import { scheduleTools } from "./schedule";
 
 export const TOOLS: ToolDef[] = [
-    ...eventTools, ...ticketTools, ...discountTools, ...analyticsTools, ...marketingTools,
+    ...eventTools, ...scheduleTools, ...ticketTools, ...discountTools, ...analyticsTools, ...marketingTools,
     ...financeTools, ...teamTools, ...guestTools, ...accessTools, ...postsaleTools,
     ...messagingTools, ...lifecycleTools, ...auditTools,
 ];

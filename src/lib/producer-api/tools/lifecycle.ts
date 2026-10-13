@@ -15,7 +15,7 @@ const duplicateEvent: ToolDef = {
     title: "Duplicar evento",
     description:
         "Repite un evento (p. ej. uno recurrente) como BORRADOR nuevo: copia descripción, imagen, lugar, tipos de entrada a la venta, categoría y FAQs. " +
-        "No copia funciones, ventas ni códigos. Con date + start_time crea la nueva función; si no, agrégala desde el panel antes de publicar. " +
+        "No copia funciones, ventas ni códigos. Con date + start_time crea la nueva función; si no, agrégala con update_event_functions (add) antes de publicar. " +
         "Devuelve un link privado de vista previa.",
     scope: "write",
     annotations: { readOnlyHint: false, destructiveHint: false },

@@ -12,6 +12,7 @@ import { getPublicEventData } from "../../../../lib/eventPage";
 import { publicSiteProps, purchaseUrlFor, siteCanonicalOrigin } from "../../../../lib/sites";
 import { isDemoEventSlug } from "../../../../lib/demoEvent.mjs";
 import { loadSiteForPage } from "../../_site";
+import { resolveEventSlugRedirect, slugRedirectResponse } from "../../../../lib/eventSlug";
 
 import { notFound } from "../../../../lib/notFound";
 
@@ -37,6 +38,11 @@ const result = await getPublicEventData(eventSlug, {
   locals: Astro.locals,
 });
 if (!result) {
+  // Slug anterior de un evento de esta organización (src/lib/eventSlug.ts) => 301 al slug vigente
+  const currentSlug = site.is_demo ? null : await resolveEventSlugRedirect(eventSlug, { organizationId: site.organization_id });
+  if (currentSlug) {
+    return slugRedirectResponse(`${base}/eventos/${encodeURIComponent(currentSlug)}${Astro.url.search}`);
+  }
   return notFound();
 }
 

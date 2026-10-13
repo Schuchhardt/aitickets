@@ -4,6 +4,7 @@ import EventDetail from "../../components/EventDetail.vue";
 import EventAssistant from "../../components/EventAssistant.vue";
 import EventMetaTags from "../../components/EventMetaTags.astro";
 import { getPublicEventData } from "../../lib/eventPage";
+import { resolveEventSlugRedirect, slugRedirectResponse } from "../../lib/eventSlug";
 import { getSupabaseAdmin } from "../../lib/auth-helpers";
 import { getSessionContext } from "../../lib/supabaseServer";
 import Layout from '../../layouts/Layout.astro';
@@ -38,6 +39,12 @@ if (!result && Astro.params.slug && Astro.cookies.get("sb-access-token")) {
       Astro.response.headers.set("X-Robots-Tag", "noindex, nofollow");
     }
   }
+}
+
+// Slug anterior de un evento publicado o con registrados (src/lib/eventSlug.ts) => 301 al slug vigente
+if (!result) {
+  const currentSlug = await resolveEventSlugRedirect(Astro.params.slug);
+  if (currentSlug) return slugRedirectResponse(`/eventos/${currentSlug}${Astro.url.search}`);
 }
 
 // Borradores (para el público), eventos inexistentes o slugs inválidos => 404 real (src/pages/404.astro)
