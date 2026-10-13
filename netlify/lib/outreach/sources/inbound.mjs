@@ -79,9 +79,10 @@ export async function confirmInboundPending(supabase, { pendingId, email }) {
  * - El dominio solo se asigna al lead nuevo si coincide con el dominio corporativo del correo (o si no se
  *   indicó sitio). Si otro lead ya tiene ese dominio se crea un lead separado sin dominio y se marca
  *   domainConflict para revisión humana.
+ * source: 'inbound_form' (formulario /web-gratis) o 'whatsapp' (bot de WhatsApp, la persona pidió el contacto en el chat).
  * Devuelve {leadId, created, domainConflict}. leadId siempre corresponde a un lead con email === el enviado.
  */
-export async function createInboundLead(supabase, { orgName, contactName, email, phone, website, city, eventName, message, ip }) {
+export async function createInboundLead(supabase, { orgName, contactName, email, phone, website, city, eventName, message, ip, source = 'inbound_form' }) {
   const e = normalizeEmail(email)
   if (!e) throw new Error('email_invalid')
   const site = website && isOwnedSiteUrl(website) ? String(website).trim() : null
@@ -91,12 +92,12 @@ export async function createInboundLead(supabase, { orgName, contactName, email,
   // Dominio "respaldado" por el correo: el del correo corporativo, y solo si el sitio (si lo hay) coincide.
   const claimedDomain = corporateMail && (!siteDomain || siteDomain === corporateMail) ? corporateMail : null
   const now = new Date().toISOString()
-  const ref = { source: 'inbound_form', seen_at: now, contact_name: clip(contactName, 120), phone: clip(phone, 40), message: clip(message, 1000), ip_hash: ip || null, website: site ? clip(site, 300) : null }
+  const ref = { source, seen_at: now, contact_name: clip(contactName, 120), phone: clip(phone, 40), message: clip(message, 1000), ip_hash: ip || null, website: site ? clip(site, 300) : null }
   const info = {
     org_name: clip(orgName, 200),
     website: site ? (/^https?:\/\//i.test(site) ? site : `https://${site}`) : null,
     city: clip(city, 120),
-    upcoming_event: clip(eventName, 200) ? { name: clip(eventName, 200), source: 'inbound_form' } : null,
+    upcoming_event: clip(eventName, 200) ? { name: clip(eventName, 200), source } : null,
   }
   const consent = { consent_at: now, lawful_basis: 'consent', status: 'interested', next_action_at: null, updated_at: now }
 
@@ -130,7 +131,7 @@ export async function createInboundLead(supabase, { orgName, contactName, email,
   }
   const { data, error } = await supabase
     .from('aitickets_leads')
-    .insert({ ...info, ...consent, email: e, email_type: 'personal', email_source_url: 'inbound_form', email_found_at: now, domain, source: 'inbound_form', source_refs: [ref] })
+    .insert({ ...info, ...consent, email: e, email_type: 'personal', email_source_url: source, email_found_at: now, domain, source, source_refs: [ref] })
     .select('id')
     .single()
   if (error) throw new Error(`lead insert: ${error.message}`)

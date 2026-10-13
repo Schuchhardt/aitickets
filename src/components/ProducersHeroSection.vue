@@ -1,8 +1,11 @@
 <script setup>
+import { SALES_WHATSAPP_NUMBER, whatsappUrl } from "../lib/whatsapp.js";
 import { ArrowRight, Sparkles, Calendar, BarChart3, Bot } from 'lucide-vue-next';
 import FadeInSection from './Hero/FadeInSection.vue';
 import FeatureCard from './Hero/FeatureCard.vue';
 import GradientBackground from './Hero/GradientBackground.vue';
+
+const salesWhatsappLink = whatsappUrl(SALES_WHATSAPP_NUMBER, "Hola, quiero vender entradas con AI Tickets");
 </script>
 
 <template>
@@ -42,7 +45,7 @@ import GradientBackground from './Hero/GradientBackground.vue';
                   Crear mi cuenta gratis
                   <ArrowRight class="ml-2 inline-block h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </a>
-                <a href="https://wa.me/56982347140?text=Hola%2C%20quiero%20vender%20entradas%20con%20AI%20Tickets" target="_blank" rel="noopener noreferrer" class="px-6 py-3 text-lg font-[Prompt] text-white/90 underline underline-offset-4 hover:text-lime-400 transition w-full sm:w-auto">
+                <a :href="salesWhatsappLink" target="_blank" rel="noopener noreferrer" class="px-6 py-3 text-lg font-[Prompt] text-white/90 underline underline-offset-4 hover:text-lime-400 transition w-full sm:w-auto">
                   Hablar por WhatsApp
                 </a>
                 <a href="/eventos/evento-demo-aitickets?utm_source=aitickets&utm_medium=organizadores&utm_campaign=demo" class="px-6 py-3 text-lg font-[Prompt] text-white/90 underline underline-offset-4 hover:text-lime-400 transition w-full sm:w-auto">

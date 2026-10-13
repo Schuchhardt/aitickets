@@ -1,5 +1,7 @@
 <script setup>
-const whatsappLink = "https://wa.me/56982347140?text=Hola%2C%20quiero%20saber%20m%C3%A1s%20sobre%20AI%20Tickets";
+import { SALES_WHATSAPP_NUMBER, whatsappUrl } from "../lib/whatsapp.js";
+
+const whatsappLink = whatsappUrl(SALES_WHATSAPP_NUMBER, "Hola, soy productor y quiero saber más sobre AI Tickets");
 </script>
 
 <template>

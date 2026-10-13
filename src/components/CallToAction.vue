@@ -78,6 +78,7 @@
 <script setup>
 import { Shield, ArrowRight, MessageCircle, Gift, Wrench, Clock } from 'lucide-vue-next';
 import FadeInSection from './Hero/FadeInSection.vue';
+import { SALES_WHATSAPP_NUMBER, whatsappUrl } from "../lib/whatsapp.js";
 
-const whatsappLink = "https://wa.me/56982347140?text=Hola%2C%20quiero%20vender%20entradas%20con%20AI%20Tickets";
+const whatsappLink = whatsappUrl(SALES_WHATSAPP_NUMBER, "Hola, quiero vender entradas con AI Tickets");
 </script>
