@@ -12,6 +12,7 @@ import { createPreviewLink, listPreviewLinks, revokePreviewLink, PreviewLinkErro
 import { createEventGraph, setEventStatus, syncEventCategory, EventInputError, type EventGraphInput } from "../../../pages/api/_lib/events";
 import { listOrgVenues } from "../../orgVenues";
 import { sanitizeRichText } from "../../sanitize";
+import { changeEventSlug, EventSlugError, SLUG_MAX, SLUG_MIN } from "../../eventSlug";
 import { notifySlack, dedupeLocation } from "../../../pages/api/_lib/server-utils";
 
 const EVENT_LIST_COLUMNS = "id, name, slug, status, accessibility, start_date, end_date, location, image_url, created_at";
@@ -333,7 +334,10 @@ const updateEvent: ToolDef = {
     name: "update_event",
     title: "Editar evento",
     description:
-        "Edita datos generales de un evento (nombre, descripción, categoría, imagen, privacidad). Solo cambia los campos enviados. " +
+        "Edita datos generales de un evento (nombre, descripción, categoría, imagen, privacidad, slug de la URL). Solo cambia los campos enviados. " +
+        "slug cambia el link público (/eventos/<slug>); cambiar el nombre NO cambia el slug. Si el evento ya tiene registrados " +
+        "(órdenes pagadas, entradas o invitados), el link anterior queda redirigiendo (301) al nuevo, así no se rompen los links ya " +
+        "compartidos ni los QR; si no tiene registrados, el link anterior deja de funcionar. " +
         "Fechas y lugares se cambian desde el panel (allí se avisa a los asistentes). Si cambias una fecha, revisa que la descripción no " +
         "mencione la anterior (get_event la advierte en warnings). Para entradas usa las herramientas de ticket_type.",
     scope: "write",
@@ -350,10 +354,16 @@ const updateEvent: ToolDef = {
             category: { type: "string", maxLength: 80 },
             image_url: { type: "string", maxLength: 1000, pattern: "^https://" },
             is_private: { type: "boolean" },
+            slug: {
+                type: "string",
+                minLength: SLUG_MIN,
+                maxLength: SLUG_MAX,
+                description: "Nuevo slug de la URL pública (/eventos/<slug>): minúsculas, números y guiones. Se normaliza (tildes y espacios → guiones).",
+            },
         },
     },
     async handler(args, ctx) {
-        const event = await loadOwnedEvent<any>(ctx, args.event_id, "id, slug, status");
+        const event = await loadOwnedEvent<any>(ctx, args.event_id, "id, slug, status, organization_id");
         const patch: Record<string, unknown> = {};
         if (args.name !== undefined) {
             patch.name = args.name;
@@ -362,7 +372,18 @@ const updateEvent: ToolDef = {
         if (args.description !== undefined) patch.description = sanitizeRichText(args.description);
         if (args.image_url !== undefined) patch.image_url = args.image_url;
         if (args.is_private !== undefined) patch.accessibility = args.is_private ? "private" : "public";
-        if (!Object.keys(patch).length && args.category === undefined) throw new ToolError("invalid_input", "No enviaste cambios.");
+        if (!Object.keys(patch).length && args.category === undefined && args.slug === undefined) throw new ToolError("invalid_input", "No enviaste cambios.");
+        // El slug primero: si choca con otro evento, no se aplica nada
+        let slugChange: Awaited<ReturnType<typeof changeEventSlug>> | null = null;
+        if (args.slug !== undefined) {
+            try {
+                slugChange = await changeEventSlug(ctx.supabase, { id: Number(event.id), slug: event.slug, organization_id: ctx.actor.orgId }, args.slug, { userId: ctx.actor.userId });
+            } catch (err) {
+                if (err instanceof EventSlugError) throw new ToolError(err.code, err.message);
+                throw err;
+            }
+            event.slug = slugChange.new_slug;
+        }
         if (Object.keys(patch).length) {
             const { error } = await ctx.supabase.from("events").update(patch).eq("id", event.id).eq("organization_id", ctx.actor.orgId);
             if (error) throw error;
@@ -375,12 +396,34 @@ const updateEvent: ToolDef = {
         }
         return {
             event_id: Number(event.id),
-            updated: [...Object.keys(patch).filter((k) => k !== "title"), ...(args.category !== undefined ? ["category"] : [])],
+            updated: [
+                ...Object.keys(patch).filter((k) => k !== "title"),
+                ...(args.category !== undefined ? ["category"] : []),
+                ...(slugChange?.changed ? ["slug"] : []),
+            ],
             ...eventUrls(ctx, event),
+            ...(slugChange ? { slug_change: slugChangeSummary(ctx, slugChange) } : {}),
             ...(warnings.length ? { warnings } : {}),
         };
     },
 };
+
+function slugChangeSummary(ctx: ToolContext, change: Awaited<ReturnType<typeof changeEventSlug>>) {
+    const oldUrl = eventPublicUrl(ctx, change.old_slug);
+    const newUrl = eventPublicUrl(ctx, change.new_slug);
+    if (!change.changed) return { changed: false, slug: change.new_slug, note: "El evento ya tenía ese slug: sin cambios." };
+    return {
+        changed: true,
+        old_slug: change.old_slug,
+        new_slug: change.new_slug,
+        old_url: oldUrl,
+        new_url: newUrl,
+        redirect_created: change.redirect_created,
+        note: change.redirect_created
+            ? `El evento ya tiene registrados: ${oldUrl} redirige (301) a ${newUrl}. Los links y QR ya compartidos siguen funcionando.`
+            : `El evento no tiene registrados: ${oldUrl} deja de funcionar. Actualiza los links que hayas compartido (bio, posts, tracking links).`,
+    };
+}
 
 const setStatus: ToolDef = {
     name: "set_event_status",
