@@ -26,6 +26,8 @@ const applying = ref(false);
 
 const selectedTicketList = computed(() => buildSelectedLines(props.selectedTickets, props.event?.tickets, props.event?.dates));
 const totals = computed(() => computeTotalsWithDiscount(selectedTicketList.value, props.discount, { feeAbsorbed: isFeeAbsorbed(props.event) }));
+// Selección sin costo (evento gratis): sin subtotal, cargos ni "total"; solo se confirma asistencia
+const isFreeOrder = computed(() => selectedTicketList.value.length > 0 && totals.value.grossSubtotal === 0);
 // La demo no valida códigos (no hay compra real)
 const canUseDiscount = computed(() => !props.event?.is_demo && selectedTicketList.value.length > 0 && totals.value.grossSubtotal > 0);
 
@@ -69,7 +71,7 @@ const removeDiscount = () => {
 
 <template>
   <div class="border p-4 rounded-lg bg-gray-50 font-[Prompt]">
-    <h3 class="font-semibold text-lg mb-2 text-center" v-if="selectedTicketList.length !== 0">Tu pedido</h3>
+    <h3 class="font-semibold text-lg mb-2 text-center" v-if="selectedTicketList.length !== 0">{{ isFreeOrder ? "Tu asistencia" : "Tu pedido" }}</h3>
 
     <p v-if="selectedTicketList.length === 0" class="text-gray-500 text-sm mb-4">
       Elige un tipo de entrada para continuar.
@@ -118,7 +120,10 @@ const removeDiscount = () => {
       <p v-if="errorMessage" class="text-red-600 text-sm mt-1" role="alert">{{ errorMessage }}</p>
     </div>
 
-    <div v-if="selectedTicketList.length" class="text-sm text-gray-600 border-t pt-2 space-y-1">
+    <p v-if="isFreeOrder" class="text-sm text-gray-600 border-t pt-2" data-testid="resv-free-note">
+      Evento gratuito: no tienes que pagar nada, solo confirmar tu asistencia.
+    </p>
+    <div v-if="selectedTicketList.length && !isFreeOrder" class="text-sm text-gray-600 border-t pt-2 space-y-1">
       <div class="flex justify-between">
         <span>Subtotal</span>
         <span>{{ totals.grossSubtotal > 0 ? formatCLP(totals.grossSubtotal) : "Gratis" }}</span>
@@ -142,7 +147,7 @@ const removeDiscount = () => {
         </div>
       </template>
     </div>
-    <div v-if="selectedTicketList.length" class="flex justify-between font-bold border-t pt-2 mt-2">
+    <div v-if="selectedTicketList.length && !isFreeOrder" class="flex justify-between font-bold border-t pt-2 mt-2">
       <span>Total ({{ totals.quantity }} entrada<span v-if="totals.quantity > 1">s</span>)</span>
       <span>{{ totals.total > 0 ? `${formatCLP(totals.total)} CLP` : "Gratis" }}</span>
     </div>

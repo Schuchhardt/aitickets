@@ -221,7 +221,7 @@ function formatDate(dateString: string | null): string {
             class="flex flex-col md:flex-row md:items-center justify-between gap-4"
         >
             <div>
-                <h1 class="text-3xl font-bold font-[Unbounded] mb-2">
+                <h1 class="text-2xl md:text-3xl font-bold font-[Unbounded] mb-2">
                     Entradas
                 </h1>
                 <p class="text-gray-600">
@@ -235,10 +235,10 @@ function formatDate(dateString: string | null): string {
             class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden"
         >
             <div class="border-b border-gray-100">
-                <nav class="flex" id="tabs-nav">
+                <nav class="flex overflow-x-auto" id="tabs-nav">
                     <button
                         type="button"
-                        class="tab-btn active px-6 py-4 text-sm font-medium border-b-2 border-black text-black transition-colors"
+                        class="tab-btn active shrink-0 whitespace-nowrap px-4 md:px-6 py-4 text-sm font-medium border-b-2 border-black text-black transition-colors"
                         data-tab="current"
                     >
                         <span class="flex items-center gap-2">
@@ -253,7 +253,7 @@ function formatDate(dateString: string | null): string {
                     </button>
                     <button
                         type="button"
-                        class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 transition-colors"
+                        class="tab-btn shrink-0 whitespace-nowrap px-4 md:px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 transition-colors"
                         data-tab="past"
                     >
                         <span class="flex items-center gap-2">
@@ -273,7 +273,7 @@ function formatDate(dateString: string | null): string {
             <div id="tab-current" class="tab-content">
                 {
                     !currentEvents || currentEvents.length === 0 ? (
-                        <div class="p-12 text-center">
+                        <div class="p-8 md:p-12 text-center">
                             <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-400">
                                 <Ticket size={32} />
                             </div>
@@ -317,9 +317,9 @@ function formatDate(dateString: string | null): string {
                                         {/* Event Header - Clickable */}
                                         <button
                                             type="button"
-                                            class="accordion-trigger w-full p-6 flex items-center gap-4 hover:bg-gray-50 transition text-left"
+                                            class="accordion-trigger w-full p-4 md:p-6 flex items-center gap-3 md:gap-4 hover:bg-gray-50 transition text-left"
                                         >
-                                            <div class="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                                            <div class="w-12 h-12 md:w-16 md:h-16 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
                                                 {event.image_url ? (
                                                     <img
                                                         src={event.image_url}
@@ -339,7 +339,7 @@ function formatDate(dateString: string | null): string {
                                                             event.name}
                                                     </h3>
                                                     <span
-                                                        class={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                                                        class={`shrink-0 px-2 py-0.5 text-xs font-medium rounded-full ${
                                                             event.status ===
                                                             "published"
                                                                 ? "bg-green-100 text-green-700"
@@ -360,18 +360,18 @@ function formatDate(dateString: string | null): string {
                                                         : "Fecha por definir"}
                                                 </p>
                                             </div>
-                                            <div class="flex items-center gap-6">
+                                            <div class="flex items-center gap-3 md:gap-6 shrink-0">
                                                 <div class="text-right">
-                                                    <p class="text-2xl font-bold">
+                                                    <p class="text-xl md:text-2xl font-bold">
                                                         {stats.totalSold}
                                                     </p>
                                                     <p class="text-xs text-gray-500">
                                                         vendidas
                                                     </p>
                                                 </div>
-                                                <div class="w-24">
-                                                    <div class="flex justify-between text-xs mb-1">
-                                                        <span class="text-gray-500">
+                                                <div class="w-12 sm:w-24">
+                                                    <div class="flex justify-end sm:justify-between text-xs mb-1">
+                                                        <span class="text-gray-500 hidden sm:inline">
                                                             Ocupación
                                                         </span>
                                                         <span class="font-medium">
@@ -392,7 +392,7 @@ function formatDate(dateString: string | null): string {
                                         {/* Accordion Content */}
                                         <div class="accordion-content hidden border-t border-gray-100 bg-gray-50/50">
                                             {/* Ticket Types Summary */}
-                                            <div class="p-6 border-b border-gray-100">
+                                            <div class="p-4 md:p-6 border-b border-gray-100">
                                                 <h4 class="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
                                                     <Ticket class="w-4 h-4" />
                                                     Resumen por Tipo de Entrada
@@ -493,14 +493,14 @@ function formatDate(dateString: string | null): string {
                                             </div>
 
                                             {/* Attendees Table */}
-                                            <div class="p-6">
-                                                <div class="flex items-center justify-between mb-4">
+                                            <div class="p-4 md:p-6">
+                                                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                                                     <h4 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
                                                         <Users class="w-4 h-4" />
                                                         Listado de Entradas (
                                                         {attendees.length})
                                                     </h4>
-                                                    <div class="flex items-center gap-2">
+                                                    <div class="flex items-center gap-2 w-full sm:w-auto">
                                                     <a
                                                         href={`/api/events/orders-csv?event_id=${event.id}`}
                                                         title="Descarga las órdenes pagadas del evento (CSV compatible con Excel)"
@@ -508,11 +508,11 @@ function formatDate(dateString: string | null): string {
                                                     >
                                                         <Download class="w-4 h-4" /> Exportar CSV
                                                     </a>
-                                                    <div class="relative">
+                                                    <div class="relative flex-1 sm:flex-none min-w-0">
                                                         <input
                                                             type="text"
                                                             placeholder="Buscar..."
-                                                            class="search-input pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-gray-300"
+                                                            class="search-input w-full sm:w-auto pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-gray-300"
                                                             data-event-id={
                                                                 event.id
                                                             }
@@ -528,19 +528,19 @@ function formatDate(dateString: string | null): string {
                                                             <table class="w-full text-sm">
                                                                 <thead class="bg-gray-50 text-gray-600">
                                                                     <tr>
-                                                                        <th class="px-4 py-3 text-left font-medium">
+                                                                        <th class="px-4 py-3 text-left font-medium whitespace-nowrap">
                                                                             Asistente
                                                                         </th>
-                                                                        <th class="px-4 py-3 text-left font-medium">
+                                                                        <th class="px-4 py-3 text-left font-medium whitespace-nowrap">
                                                                             Tipo
                                                                         </th>
-                                                                        <th class="px-4 py-3 text-left font-medium">
+                                                                        <th class="px-4 py-3 text-left font-medium whitespace-nowrap">
                                                                             Precio
                                                                         </th>
-                                                                        <th class="px-4 py-3 text-left font-medium">
+                                                                        <th class="px-4 py-3 text-left font-medium whitespace-nowrap">
                                                                             Fecha
                                                                         </th>
-                                                                        <th class="px-4 py-3 text-left font-medium">
+                                                                        <th class="px-4 py-3 text-left font-medium whitespace-nowrap">
                                                                             Estado
                                                                         </th>
                                                                     </tr>
@@ -602,7 +602,7 @@ function formatDate(dateString: string | null): string {
                                                                                               )}
                                                                                     </span>
                                                                                 </td>
-                                                                                <td class="px-4 py-3 text-gray-500">
+                                                                                <td class="px-4 py-3 text-gray-500 whitespace-nowrap">
                                                                                     {formatDate(
                                                                                         attendee.purchaseDate,
                                                                                     )}
@@ -632,7 +632,7 @@ function formatDate(dateString: string | null): string {
                                                         </div>
                                                     </div>
                                                 ) : (
-                                                    <div class="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-500">
+                                                    <div class="bg-white rounded-lg border border-gray-200 p-6 md:p-8 text-center text-gray-500">
                                                         <Ticket class="w-8 h-8 mx-auto mb-2 text-gray-300" />
                                                         <p>
                                                             No hay entradas
@@ -655,7 +655,7 @@ function formatDate(dateString: string | null): string {
             <div id="tab-past" class="tab-content hidden">
                 {
                     !pastEvents || pastEvents.length === 0 ? (
-                        <div class="p-12 text-center">
+                        <div class="p-8 md:p-12 text-center">
                             <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-400">
                                 <Clock size={32} />
                             </div>
@@ -693,9 +693,9 @@ function formatDate(dateString: string | null): string {
                                         {/* Event Header - Clickable */}
                                         <button
                                             type="button"
-                                            class="accordion-trigger w-full p-6 flex items-center gap-4 hover:bg-gray-50 transition text-left opacity-80"
+                                            class="accordion-trigger w-full p-4 md:p-6 flex items-center gap-3 md:gap-4 hover:bg-gray-50 transition text-left opacity-80"
                                         >
-                                            <div class="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 grayscale">
+                                            <div class="w-12 h-12 md:w-16 md:h-16 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 grayscale">
                                                 {event.image_url ? (
                                                     <img
                                                         src={event.image_url}
@@ -714,7 +714,7 @@ function formatDate(dateString: string | null): string {
                                                         {event.title ||
                                                             event.name}
                                                     </h3>
-                                                    <span class="px-2 py-0.5 text-xs font-medium rounded-full bg-gray-200 text-gray-600">
+                                                    <span class="shrink-0 px-2 py-0.5 text-xs font-medium rounded-full bg-gray-200 text-gray-600">
                                                         Finalizado
                                                     </span>
                                                 </div>
@@ -726,18 +726,18 @@ function formatDate(dateString: string | null): string {
                                                         : "Sin fecha"}
                                                 </p>
                                             </div>
-                                            <div class="flex items-center gap-6">
+                                            <div class="flex items-center gap-3 md:gap-6 shrink-0">
                                                 <div class="text-right">
-                                                    <p class="text-2xl font-bold">
+                                                    <p class="text-xl md:text-2xl font-bold">
                                                         {stats.totalSold}
                                                     </p>
                                                     <p class="text-xs text-gray-500">
                                                         vendidas
                                                     </p>
                                                 </div>
-                                                <div class="w-24">
-                                                    <div class="flex justify-between text-xs mb-1">
-                                                        <span class="text-gray-500">
+                                                <div class="w-12 sm:w-24">
+                                                    <div class="flex justify-end sm:justify-between text-xs mb-1">
+                                                        <span class="text-gray-500 hidden sm:inline">
                                                             Ocupación
                                                         </span>
                                                         <span class="font-medium">
@@ -758,7 +758,7 @@ function formatDate(dateString: string | null): string {
                                         {/* Accordion Content - Same structure as current events */}
                                         <div class="accordion-content hidden border-t border-gray-100 bg-gray-50/50">
                                             {/* Ticket Types Summary */}
-                                            <div class="p-6 border-b border-gray-100">
+                                            <div class="p-4 md:p-6 border-b border-gray-100">
                                                 <h4 class="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
                                                     <Ticket class="w-4 h-4" />
                                                     Resumen por Tipo de Entrada
@@ -858,14 +858,14 @@ function formatDate(dateString: string | null): string {
                                             </div>
 
                                             {/* Attendees Table */}
-                                            <div class="p-6">
-                                                <div class="flex items-center justify-between mb-4">
+                                            <div class="p-4 md:p-6">
+                                                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                                                     <h4 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
                                                         <Users class="w-4 h-4" />
                                                         Listado de Entradas (
                                                         {attendees.length})
                                                     </h4>
-                                                    <div class="flex items-center gap-2">
+                                                    <div class="flex items-center gap-2 w-full sm:w-auto">
                                                     <a
                                                         href={`/api/events/orders-csv?event_id=${event.id}`}
                                                         title="Descarga las órdenes pagadas del evento (CSV compatible con Excel)"
@@ -873,11 +873,11 @@ function formatDate(dateString: string | null): string {
                                                     >
                                                         <Download class="w-4 h-4" /> Exportar CSV
                                                     </a>
-                                                    <div class="relative">
+                                                    <div class="relative flex-1 sm:flex-none min-w-0">
                                                         <input
                                                             type="text"
                                                             placeholder="Buscar..."
-                                                            class="search-input pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-gray-300"
+                                                            class="search-input w-full sm:w-auto pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-gray-300"
                                                             data-event-id={
                                                                 event.id
                                                             }
@@ -893,19 +893,19 @@ function formatDate(dateString: string | null): string {
                                                             <table class="w-full text-sm">
                                                                 <thead class="bg-gray-50 text-gray-600">
                                                                     <tr>
-                                                                        <th class="px-4 py-3 text-left font-medium">
+                                                                        <th class="px-4 py-3 text-left font-medium whitespace-nowrap">
                                                                             Asistente
                                                                         </th>
-                                                                        <th class="px-4 py-3 text-left font-medium">
+                                                                        <th class="px-4 py-3 text-left font-medium whitespace-nowrap">
                                                                             Tipo
                                                                         </th>
-                                                                        <th class="px-4 py-3 text-left font-medium">
+                                                                        <th class="px-4 py-3 text-left font-medium whitespace-nowrap">
                                                                             Precio
                                                                         </th>
-                                                                        <th class="px-4 py-3 text-left font-medium">
+                                                                        <th class="px-4 py-3 text-left font-medium whitespace-nowrap">
                                                                             Fecha
                                                                         </th>
-                                                                        <th class="px-4 py-3 text-left font-medium">
+                                                                        <th class="px-4 py-3 text-left font-medium whitespace-nowrap">
                                                                             Estado
                                                                         </th>
                                                                     </tr>
@@ -967,7 +967,7 @@ function formatDate(dateString: string | null): string {
                                                                                               )}
                                                                                     </span>
                                                                                 </td>
-                                                                                <td class="px-4 py-3 text-gray-500">
+                                                                                <td class="px-4 py-3 text-gray-500 whitespace-nowrap">
                                                                                     {formatDate(
                                                                                         attendee.purchaseDate,
                                                                                     )}
@@ -997,7 +997,7 @@ function formatDate(dateString: string | null): string {
                                                         </div>
                                                     </div>
                                                 ) : (
-                                                    <div class="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-500">
+                                                    <div class="bg-white rounded-lg border border-gray-200 p-6 md:p-8 text-center text-gray-500">
                                                         <Ticket class="w-8 h-8 mx-auto mb-2 text-gray-300" />
                                                         <p>
                                                             No hay entradas

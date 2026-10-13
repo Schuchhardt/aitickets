@@ -65,11 +65,11 @@ onMounted(() => {
 
 <template>
   <section class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-    <div class="p-6 border-b border-gray-100">
+    <div class="p-4 md:p-6 border-b border-gray-100">
       <h3 class="font-bold text-lg flex items-center gap-2"><Mail size="18" /> Formulario de contacto</h3>
       <p class="text-sm text-gray-500 mt-1">Los mensajes que te escriban desde tu sitio llegan a este correo. Puedes responderles directamente.</p>
     </div>
-    <form class="p-6 space-y-4" @submit.prevent="save">
+    <form class="p-4 md:p-6 space-y-4" @submit.prevent="save">
       <label class="flex items-center gap-2 text-sm text-gray-800">
         <input v-model="enabled" type="checkbox" class="rounded" />
         Mostrar el formulario de contacto en mi sitio
@@ -83,10 +83,10 @@ onMounted(() => {
           :placeholder="orgEmail || 'contacto@tuproductora.cl'"
           class="w-full px-3 py-2 rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-black"
         />
-        <span v-if="orgEmail" class="block text-xs text-gray-500 mt-1">Si lo dejas vacío, usamos el correo verificado de tu cuenta ({{ orgEmail }}). Si escribes otro correo, te enviaremos un enlace para confirmarlo.</span>
+        <span v-if="orgEmail" class="block text-xs text-gray-500 mt-1 break-words">Si lo dejas vacío, usamos el correo verificado de tu cuenta ({{ orgEmail }}). Si escribes otro correo, te enviaremos un enlace para confirmarlo.</span>
         <span v-else class="block text-xs text-gray-500 mt-1">Escribe el correo donde quieres recibir los mensajes: te enviaremos un enlace para confirmarlo. Hasta entonces no se envían mensajes.</span>
       </label>
-      <div class="flex items-center gap-3">
+      <div class="flex flex-wrap items-center gap-3">
         <button type="submit" class="px-4 py-2 text-sm bg-black text-white rounded-lg hover:bg-gray-800 disabled:opacity-40" :disabled="saving || !dirty">
           {{ saving ? 'Guardando…' : 'Guardar' }}
         </button>

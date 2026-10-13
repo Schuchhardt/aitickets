@@ -248,10 +248,10 @@ const visibleToPublic = computed(() => site.value.published && org.emailVerified
 <template>
   <div class="space-y-6">
     <!-- Estado y URLs -->
-    <section class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+    <section class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6">
       <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-        <div class="space-y-2">
-          <div class="flex items-center gap-2">
+        <div class="space-y-2 min-w-0">
+          <div class="flex flex-wrap items-center gap-2">
             <Globe size="18" />
             <h2 class="font-bold text-lg">Tu sitio web</h2>
             <span
@@ -262,18 +262,18 @@ const visibleToPublic = computed(() => site.value.published && org.emailVerified
             </span>
           </div>
           <div v-for="(url, key) in { free: urls.free, subdomain: urls.subdomain, custom: urls.custom }" :key="key">
-            <div v-if="url" class="flex items-center gap-2 text-sm">
-              <a :href="url" target="_blank" rel="noopener" class="font-medium text-gray-900 underline break-all">{{ url }}</a>
-              <button type="button" class="p-1 text-gray-500 hover:text-black" :title="'Copiar enlace'" @click="copy(url)">
+            <div v-if="url" class="flex items-center gap-2 text-sm min-w-0">
+              <a :href="url" target="_blank" rel="noopener" class="font-medium text-gray-900 underline break-all min-w-0">{{ url }}</a>
+              <button type="button" class="p-1 shrink-0 text-gray-500 hover:text-black" :title="'Copiar enlace'" @click="copy(url)">
                 <component :is="copied === url ? Check : Copy" size="14" />
               </button>
-              <a :href="url" target="_blank" rel="noopener" class="p-1 text-gray-500 hover:text-black" title="Abrir"><ExternalLink size="14" /></a>
+              <a :href="url" target="_blank" rel="noopener" class="p-1 shrink-0 text-gray-500 hover:text-black" title="Abrir"><ExternalLink size="14" /></a>
             </div>
           </div>
         </div>
         <button
           type="button"
-          class="inline-flex items-center gap-2 px-4 py-2 text-sm rounded-lg border"
+          class="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm rounded-lg border shrink-0"
           :class="site.published ? 'border-gray-300 text-gray-700 hover:bg-gray-50' : 'bg-black text-white border-black hover:bg-gray-800'"
           :disabled="publishing"
           @click="togglePublished"
@@ -295,12 +295,12 @@ const visibleToPublic = computed(() => site.value.published && org.emailVerified
     <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
       <div class="space-y-6">
         <!-- Dirección -->
-        <section class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-3">
+        <section class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6 space-y-3">
           <h3 class="font-bold">Dirección de tu sitio</h3>
           <div class="flex flex-col sm:flex-row gap-2">
             <div class="flex flex-1 items-center rounded-lg border border-gray-300 focus-within:ring-2 focus-within:ring-black overflow-hidden">
               <span class="px-3 py-2 text-sm text-gray-500 bg-gray-50 border-r border-gray-200 whitespace-nowrap">aitickets.cl/o/</span>
-              <input v-model="slugInput" type="text" maxlength="40" class="flex-1 px-3 py-2 text-sm outline-none" aria-label="Dirección del sitio" />
+              <input v-model="slugInput" type="text" maxlength="40" class="flex-1 min-w-0 px-3 py-2 text-sm outline-none" aria-label="Dirección del sitio" />
             </div>
             <button
               type="button"
@@ -315,7 +315,7 @@ const visibleToPublic = computed(() => site.value.published && org.emailVerified
         </section>
 
         <!-- Plantilla -->
-        <section class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
+        <section class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6 space-y-4">
           <h3 class="font-bold">Plantilla</h3>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <button
@@ -343,22 +343,22 @@ const visibleToPublic = computed(() => site.value.published && org.emailVerified
         </section>
 
         <!-- Colores, tipografía e imágenes -->
-        <section class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
-          <div class="flex items-center justify-between">
+        <section class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6 space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
             <h3 class="font-bold">Colores y tipografía</h3>
             <button type="button" class="text-xs text-gray-500 underline" @click="resetColors">Usar los de la plantilla</button>
           </div>
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <label v-for="field in COLOR_FIELDS" :key="field.key" class="block">
+            <label v-for="field in COLOR_FIELDS" :key="field.key" class="block min-w-0">
               <span class="block text-xs font-bold text-gray-500 uppercase mb-1">{{ field.label }}</span>
-              <span class="flex items-center gap-2 rounded-lg border border-gray-300 px-2 py-1.5">
+              <span class="flex items-center gap-2 rounded-lg border border-gray-300 px-2 py-1.5 min-w-0">
                 <input
                   type="color"
-                  class="h-7 w-9 cursor-pointer bg-transparent"
+                  class="h-7 w-9 shrink-0 cursor-pointer bg-transparent"
                   :value="colorValue(field.key)"
                   @input="setColor(field.key, $event.target.value)"
                 />
-                <span class="text-xs text-gray-600 font-mono">{{ colorValue(field.key) }}</span>
+                <span class="text-xs text-gray-600 font-mono truncate">{{ colorValue(field.key) }}</span>
               </span>
             </label>
           </div>
@@ -374,7 +374,7 @@ const visibleToPublic = computed(() => site.value.published && org.emailVerified
             <div v-for="img in [{ kind: 'logo', key: 'logo_url', label: 'Logo' }, { kind: 'hero', key: 'hero_image_url', label: 'Imagen de portada' }]" :key="img.kind">
               <span class="block text-xs font-bold text-gray-500 uppercase mb-1">{{ img.label }}</span>
               <div class="flex items-center gap-3">
-                <div class="h-16 w-16 rounded-lg border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center">
+                <div class="h-16 w-16 shrink-0 rounded-lg border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center">
                   <img v-if="form.theme[img.key]" :src="form.theme[img.key]" alt="" class="h-full w-full object-cover" />
                   <Upload v-else size="16" class="text-gray-400" />
                 </div>
@@ -391,7 +391,7 @@ const visibleToPublic = computed(() => site.value.published && org.emailVerified
         </section>
 
         <!-- Contenido -->
-        <section class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
+        <section class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6 space-y-4">
           <h3 class="font-bold">Contenido</h3>
           <label class="block">
             <span class="block text-xs font-bold text-gray-500 uppercase mb-1">Nombre a mostrar</span>
@@ -418,7 +418,7 @@ const visibleToPublic = computed(() => site.value.published && org.emailVerified
         </section>
 
         <!-- SEO -->
-        <section class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
+        <section class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6 space-y-4">
           <div>
             <h3 class="font-bold">Google y redes sociales</h3>
             <p class="text-sm text-gray-500">Cómo se ve tu sitio al compartirlo o en los resultados de búsqueda.</p>
@@ -431,8 +431,8 @@ const visibleToPublic = computed(() => site.value.published && org.emailVerified
             <span class="block text-xs font-bold text-gray-500 uppercase mb-1">Descripción ({{ form.seo.description.length }}/170)</span>
             <textarea v-model="form.seo.description" rows="2" maxlength="170" class="w-full px-3 py-2 rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-black"></textarea>
           </label>
-          <div class="flex items-center gap-3">
-            <div class="h-16 w-28 rounded-lg border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center">
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="h-16 w-28 shrink-0 rounded-lg border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center">
               <img v-if="form.seo.og_image" :src="form.seo.og_image" alt="" class="h-full w-full object-cover" />
               <Upload v-else size="16" class="text-gray-400" />
             </div>
@@ -450,7 +450,7 @@ const visibleToPublic = computed(() => site.value.published && org.emailVerified
           </p>
           <button
             type="button"
-            class="px-5 py-2 text-sm bg-black text-white rounded-lg hover:bg-gray-800 disabled:opacity-40"
+            class="px-5 py-2 text-sm bg-black text-white rounded-lg hover:bg-gray-800 disabled:opacity-40 shrink-0 whitespace-nowrap"
             :disabled="saving || !dirty"
             @click="save"
           >
@@ -461,14 +461,14 @@ const visibleToPublic = computed(() => site.value.published && org.emailVerified
 
       <!-- Vista previa -->
       <section class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden xl:sticky xl:top-4">
-        <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-          <p class="text-sm font-semibold">Vista previa <span class="font-normal text-gray-500">(cambios guardados)</span></p>
+        <div class="flex items-center justify-between gap-2 px-4 py-3 border-b border-gray-100">
+          <p class="text-sm font-semibold min-w-0">Vista previa <span class="font-normal text-gray-500">(cambios guardados)</span></p>
           <div class="flex items-center gap-2">
             <button type="button" class="p-1.5 text-gray-500 hover:text-black" title="Recargar" @click="reloadPreview"><RefreshCw size="16" /></button>
             <a :href="`/o/${site.slug}`" target="_blank" rel="noopener" class="p-1.5 text-gray-500 hover:text-black" title="Abrir en otra pestaña"><ExternalLink size="16" /></a>
           </div>
         </div>
-        <iframe :key="previewKey" :src="previewUrl" title="Vista previa del sitio" class="w-full h-[720px] bg-gray-50" loading="lazy"></iframe>
+        <iframe :key="previewKey" :src="previewUrl" title="Vista previa del sitio" class="w-full h-[560px] md:h-[720px] bg-gray-50" loading="lazy"></iframe>
       </section>
     </div>
   </div>

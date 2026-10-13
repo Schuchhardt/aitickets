@@ -7,7 +7,7 @@ import TicketSelection from "./TicketSelection.vue";
 import OrderSummary from "./OrderSummary.vue";
 import BuyerInfo from "./BuyerInfo.vue";
 import PaymentStep from "./PaymentStep.vue";
-import { buildSelectedLines, computeTotalsWithDiscount, isFeeAbsorbed, isValidEmail, maxPerPurchase } from "./pricing.js";
+import { buildSelectedLines, computeTotalsWithDiscount, isFeeAbsorbed, isFreeEvent, isValidEmail, maxPerPurchase } from "./pricing.js";
 
 const props = defineProps({ event: Object });
 const emit = defineEmits(["close"]);
@@ -77,6 +77,9 @@ watch(discount, () => writeStorage("discount", discount.value));
 
 // ==== CALCULOS (solo para mostrar; el servidor recalcula) ====
 const totals = computed(() => computeTotalsWithDiscount(buildSelectedLines(selectedTickets.value, props.event.tickets, props.event.dates), discount.value, { feeAbsorbed: isFeeAbsorbed(props.event) }));
+
+// Evento gratis: se confirma asistencia, sin hablar de compra ni de pago
+const isFree = computed(() => isFreeEvent(props.event));
 
 // ==== NAVEGACIÓN ====
 const buyerIsValid = computed(() => {
@@ -157,7 +160,7 @@ function handleRemoteGoToNextStep() {
       aria-modal="true"
       @click.stop
     >
-      <HeaderSteps :eventName="event.name" :currentStep="currentStep" @close="handleClose" />
+      <HeaderSteps :eventName="event.name" :currentStep="currentStep" :free="isFree" @close="handleClose" />
       <p v-if="event.is_demo" class="bg-purple-50 text-purple-900 text-xs sm:text-sm text-center px-4 py-2 border-b border-purple-100">
         Modo demostración: el flujo es real, pero al final no se crea ninguna orden ni se cobra nada.
       </p>
@@ -172,7 +175,7 @@ function handleRemoteGoToNextStep() {
               v-model:selectedTickets="selectedTickets"
               class="w-full"
             />
-            <BuyerInfo v-if="currentStep === 2" data-testid="resv-step-buyer" v-model:buyerInfo="buyerInfo" class="w-full" />
+            <BuyerInfo v-if="currentStep === 2" data-testid="resv-step-buyer" v-model:buyerInfo="buyerInfo" :free="isFree" class="w-full" />
           </div>
 
           <div class="bg-gray-50 p-4 md:p-6 w-full rounded-[10px]">

@@ -218,7 +218,7 @@ const syncStats = async () => {
     <Transition name="slide-down">
       <div
         v-if="notification.show"
-        class="fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg text-sm font-medium"
+        class="fixed top-4 left-4 right-4 sm:left-auto z-50 flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg text-sm font-medium"
         :class="notification.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'"
       >
         <CheckCircle v-if="notification.type === 'success'" :size="16" />
@@ -229,18 +229,18 @@ const syncStats = async () => {
     </Transition>
 
     <!-- Header -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 md:mb-8">
       <div class="flex items-center gap-3">
-        <a href="/dashboard/promote" class="text-gray-400 hover:text-gray-600 transition">
+        <a href="/dashboard/promote" class="shrink-0 text-gray-400 hover:text-gray-600 transition">
           <ArrowLeft :size="20" />
         </a>
-        <div>
-          <h1 class="text-3xl font-bold font-[Unbounded] mb-1">Meta Ads</h1>
+        <div class="min-w-0">
+          <h1 class="text-2xl md:text-3xl font-bold font-[Unbounded] mb-1">Meta Ads</h1>
           <p class="text-gray-600">Crea y gestiona campañas de anuncios en Facebook e Instagram.</p>
         </div>
       </div>
 
-      <div class="flex items-center gap-3">
+      <div class="flex flex-wrap items-center gap-3">
         <button
           v-if="campaigns.length > 0"
           @click="syncStats"
@@ -262,7 +262,7 @@ const syncStats = async () => {
     </div>
 
     <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 md:mb-8">
       <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
         <div class="flex items-center gap-3 mb-2">
           <div class="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
@@ -295,8 +295,8 @@ const syncStats = async () => {
     </div>
 
     <!-- Meta Connection -->
-    <div class="mb-8">
-      <div class="flex items-center justify-between mb-4">
+    <div class="mb-6 md:mb-8">
+      <div class="flex items-center justify-between gap-3 mb-4">
         <h2 class="text-lg font-semibold">Cuentas de Meta Ads</h2>
         <button
           v-if="hasConnection"
@@ -312,7 +312,7 @@ const syncStats = async () => {
       <!-- Token expiration warning -->
       <div
         v-if="expiredConnections.length > 0"
-        class="mb-4 bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3"
+        class="mb-4 bg-red-50 border border-red-200 rounded-xl p-4 flex flex-wrap sm:flex-nowrap items-start gap-3"
       >
         <AlertCircle :size="20" class="text-red-500 shrink-0 mt-0.5" />
         <div class="flex-1">
@@ -330,7 +330,7 @@ const syncStats = async () => {
 
       <div
         v-else-if="expiringConnections.length > 0"
-        class="mb-4 bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-start gap-3"
+        class="mb-4 bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex flex-wrap sm:flex-nowrap items-start gap-3"
       >
         <Clock :size="20" class="text-yellow-600 shrink-0 mt-0.5" />
         <div class="flex-1">
@@ -348,7 +348,7 @@ const syncStats = async () => {
         </button>
       </div>
       
-      <div v-if="!hasConnection && expiredConnections.length === 0" class="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
+      <div v-if="!hasConnection && expiredConnections.length === 0" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 md:p-8 text-center">
         <div class="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
           <Megaphone :size="32" class="text-blue-600" />
         </div>
@@ -373,18 +373,18 @@ const syncStats = async () => {
         <div
           v-for="conn in connections"
           :key="conn.id"
-          class="bg-white rounded-xl shadow-sm border p-5 flex items-center justify-between"
+          class="bg-white rounded-xl shadow-sm border p-4 md:p-5 flex items-center justify-between gap-3"
           :class="getTokenStatus(conn) === 'expired' ? 'border-red-200' : getTokenStatus(conn) === 'expiring' ? 'border-yellow-200' : 'border-gray-100'"
         >
-          <div class="flex items-center gap-4">
-            <div class="w-12 h-12 bg-gradient-to-br from-[#1877F2] to-[#0866FF] rounded-xl flex items-center justify-center">
+          <div class="flex items-center gap-3 md:gap-4 min-w-0">
+            <div class="w-12 h-12 shrink-0 bg-gradient-to-br from-[#1877F2] to-[#0866FF] rounded-xl flex items-center justify-center">
               <svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
               </svg>
             </div>
-            <div>
-              <p class="font-semibold">{{ conn.account_name }}</p>
-              <p class="text-sm text-gray-500">
+            <div class="min-w-0">
+              <p class="font-semibold break-words">{{ conn.account_name }}</p>
+              <p class="text-sm text-gray-500 break-all">
                 {{ conn.meta_ad_account_id || 'Meta Ads' }}
                 <template v-if="getDaysUntilExpiry(conn) !== null">
                   · {{ getDaysUntilExpiry(conn) > 0 ? `Expira en ${getDaysUntilExpiry(conn)} días` : 'Expirado' }}
@@ -392,9 +392,9 @@ const syncStats = async () => {
               </p>
             </div>
           </div>
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-2 md:gap-3 shrink-0">
             <span 
-              class="text-xs px-2 py-1 rounded-full"
+              class="text-xs px-2 py-1 rounded-full whitespace-nowrap"
               :class="{
                 'bg-green-50 text-green-700': getTokenStatus(conn) === 'active',
                 'bg-yellow-50 text-yellow-700': getTokenStatus(conn) === 'expiring',
@@ -417,16 +417,16 @@ const syncStats = async () => {
 
     <!-- Campaigns -->
     <div>
-      <div class="flex items-center justify-between mb-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <h2 class="text-lg font-semibold">Campañas</h2>
         
         <!-- Status Filter -->
-        <div class="flex gap-1 bg-gray-100 rounded-lg p-1">
+        <div class="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit max-w-full overflow-x-auto whitespace-nowrap">
           <button
             v-for="filter in ['all', 'active', 'paused', 'completed']"
             :key="filter"
             @click="activeFilter = filter"
-            class="px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
+            class="shrink-0 px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
             :class="activeFilter === filter ? 'bg-white text-black shadow-sm' : 'text-gray-500 hover:text-gray-700'"
           >
             {{ filter === 'all' ? 'Todas' : statusLabels[filter] || filter }}
@@ -434,7 +434,7 @@ const syncStats = async () => {
         </div>
       </div>
 
-      <div v-if="filteredCampaigns.length === 0" class="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+      <div v-if="filteredCampaigns.length === 0" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 md:p-12 text-center">
         <BarChart3 :size="40" class="text-gray-300 mx-auto mb-3" />
         <p class="text-gray-500">
           {{ campaigns.length === 0 ? 'No hay campañas creadas aún.' : 'Sin campañas con este filtro.' }}
@@ -453,13 +453,13 @@ const syncStats = async () => {
         <div
           v-for="campaign in filteredCampaigns"
           :key="campaign.id"
-          class="bg-white rounded-xl shadow-sm border border-gray-100 p-5"
+          class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 md:p-5"
         >
           <div class="flex flex-col md:flex-row md:items-start justify-between gap-4">
             <!-- Campaign Info -->
-            <div class="flex-1">
-              <div class="flex items-center gap-3 mb-2">
-                <h3 class="font-semibold text-lg">{{ campaign.name }}</h3>
+            <div class="flex-1 min-w-0">
+              <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mb-2">
+                <h3 class="font-semibold text-lg break-words">{{ campaign.name }}</h3>
                 <span
                   class="text-xs px-2 py-0.5 rounded-full font-medium"
                   :class="statusColors[campaign.status] || 'bg-gray-50 text-gray-600'"
@@ -473,7 +473,7 @@ const syncStats = async () => {
               </p>
 
               <!-- Metrics Row -->
-              <div v-if="campaign.impressions || campaign.clicks || campaign.spend" class="flex flex-wrap gap-6 text-sm">
+              <div v-if="campaign.impressions || campaign.clicks || campaign.spend" class="flex flex-wrap gap-4 md:gap-6 text-sm">
                 <div>
                   <span class="text-gray-400">Impresiones</span>
                   <p class="font-semibold">{{ formatNumber(campaign.impressions) }}</p>
@@ -508,8 +508,8 @@ const syncStats = async () => {
                 <span v-if="campaign.end_date">Fin: {{ new Date(campaign.end_date).toLocaleDateString('es-CL') }}</span>
               </div>
 
-              <p v-if="campaign.error_message" class="text-xs text-red-500 mt-2 flex items-center gap-1">
-                <AlertCircle :size="12" />
+              <p v-if="campaign.error_message" class="text-xs text-red-500 mt-2 flex items-center gap-1 break-words">
+                <AlertCircle :size="12" class="shrink-0" />
                 {{ campaign.error_message }}
               </p>
             </div>

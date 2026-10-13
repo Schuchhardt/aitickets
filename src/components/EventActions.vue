@@ -8,7 +8,7 @@ import ShareEventModal from "./ShareEventModal.vue";
 import ReservationModal from "./Reservation/ReservationModal.vue";
 import PurchasedTicketsModal from "./PurchasedTicketsModal.vue";
 import { eventBus } from '../utils/eventbus.js';
-import { feeNoteFor } from "./Reservation/pricing.js";
+import { feeNoteFor, isFreeEvent } from "./Reservation/pricing.js";
 
 const props = defineProps({
   event: Object,
@@ -127,6 +127,13 @@ const saleState = computed(() => {
 
 const canBuy = computed(() => saleState.value === "on_sale");
 
+// Evento totalmente gratis: "Confirmar asistencia" en vez de comprar
+const isFree = computed(() => isFreeEvent(props.event));
+const buyLabel = computed(() => (isFree.value ? "Confirmar asistencia" : "Comprar entrada"));
+const viewTicketsLabel = computed(() => (isFree.value ? "Ver mis entradas" : "Ver entradas compradas"));
+const buyMoreLabel = computed(() => (isFree.value ? "Confirmar más asistentes" : "Comprar más entradas"));
+const buyMoreShortLabel = computed(() => (isFree.value ? "Sumar asistentes" : "Comprar más"));
+
 const hasPaidTickets = computed(() => onSaleTickets.value.some((t) => Number(t.price) > 0));
 
 // Texto de precio / estado
@@ -137,7 +144,7 @@ const priceLabel = computed(() => {
     case "upcoming":
       return "Próximamente";
     case "closed":
-      return "Venta cerrada";
+      return isFree.value ? "Inscripción cerrada" : "Venta cerrada";
     case "preview":
       if (!onSaleTickets.value.length) return "Sin entradas a la venta";
   }
@@ -164,7 +171,7 @@ const saleStartsLabel = computed(() => {
   if (saleState.value !== "upcoming" || !props.event?.sale_starts_at) return "";
   const d = new Date(props.event.sale_starts_at);
   if (Number.isNaN(d.getTime())) return "";
-  return "Venta desde el " + d.toLocaleDateString("es-CL", {
+  return (isFree.value ? "Inscripción desde el " : "Venta desde el ") + d.toLocaleDateString("es-CL", {
     day: "numeric",
     month: "long",
     hour: "2-digit",
@@ -190,13 +197,13 @@ const lowStockLabel = computed(() =>
 const unavailableLabel = computed(() => {
   switch (saleState.value) {
     case "sold_out":
-      return "Entradas agotadas";
+      return isFree.value ? "Cupos agotados" : "Entradas agotadas";
     case "upcoming":
-      return "Venta próximamente";
+      return isFree.value ? "Inscripción próximamente" : "Venta próximamente";
     case "preview":
-      return "Vista previa · compra al publicar";
+      return isFree.value ? "Vista previa · inscripción al publicar" : "Vista previa · compra al publicar";
     default:
-      return "Venta cerrada";
+      return isFree.value ? "Inscripción cerrada" : "Venta cerrada";
   }
 });
 
@@ -297,30 +304,30 @@ const addToCalendar = () => {
         <button 
           v-else-if="!hasPurchasedTickets"
           @click="openReserveModal" 
-          aria-label="Comprar entrada" 
+          :aria-label="buyLabel" 
           class="w-full bg-black text-white py-3 rounded-full flex items-center justify-center mt-4 cursor-pointer relative z-10 pointer-events-auto"
         >
-          Comprar entrada
+          {{ buyLabel }}
           <img :src="iconArrow.src" alt="Arrow" class="w-4 h-4 ml-2" />
         </button>
 
         <template v-else>
           <button 
             @click="openPurchasedTickets" 
-            aria-label="Ver entradas compradas" 
+            :aria-label="viewTicketsLabel" 
             class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-full flex items-center justify-center mt-4 cursor-pointer relative z-10 pointer-events-auto"
           >
-            Ver entradas compradas
+            {{ viewTicketsLabel }}
             <img :src="iconTicket.src" alt="Ticket" class="w-4 h-4 ml-2" />
           </button>
 
           <button 
             v-if="canBuy"
             @click="openReserveModal" 
-            aria-label="Comprar más entradas" 
+            :aria-label="buyMoreLabel" 
             class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-full flex items-center justify-center mt-3 cursor-pointer relative z-10 pointer-events-auto"
           >
-            Comprar más entradas
+            {{ buyMoreLabel }}
             <img :src="iconArrow.src" alt="Arrow" class="w-4 h-4 ml-2" />
           </button>
         </template>
@@ -362,10 +369,10 @@ const addToCalendar = () => {
       <button 
         v-else
         @click="openReserveModal" 
-        aria-label="Comprar entrada" 
+        :aria-label="buyLabel" 
         class="shrink-0 whitespace-nowrap bg-black text-white py-3 px-5 rounded-full flex items-center cursor-pointer relative z-10 pointer-events-auto"
       >
-        Comprar entrada
+        {{ buyLabel }}
       </button>
     </div>
 
@@ -374,12 +381,12 @@ const addToCalendar = () => {
       <div class="flex flex-col gap-2">
         <div class="flex justify-between items-center">
           <span class="text-sm text-gray-900 font-medium">{{ priceLabel }}</span>
-          <span class="text-xs text-gray-700">Ya tienes {{ eventOrders.length }} orden(es)</span>
+          <span class="text-xs text-gray-700">{{ isFree ? "Ya confirmaste tu asistencia" : `Ya tienes ${eventOrders.length} orden(es)` }}</span>
         </div>
         <div class="flex gap-2">
           <button 
             @click="openPurchasedTickets" 
-            aria-label="Ver entradas compradas" 
+            :aria-label="viewTicketsLabel" 
             class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-3 rounded-full text-sm font-medium cursor-pointer relative z-10 pointer-events-auto"
           >
             Ver entradas
@@ -387,10 +394,10 @@ const addToCalendar = () => {
           <button 
             v-if="canBuy"
             @click="openReserveModal" 
-            aria-label="Comprar más entradas" 
+            :aria-label="buyMoreLabel" 
             class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded-full text-sm font-medium cursor-pointer relative z-10 pointer-events-auto"
           >
-            Comprar más
+            {{ buyMoreShortLabel }}
           </button>
         </div>
       </div>

@@ -2,6 +2,8 @@
 defineProps({
   currentStep: Number,
   eventName: String,
+  // Evento gratis: se confirma asistencia (sin compra)
+  free: Boolean,
 });
 
 const emit = defineEmits(["close"]);
@@ -20,7 +22,7 @@ const emit = defineEmits(["close"]);
     <!-- Pasos -->
     <div class="flex justify-between w-full mt-2 md:mt-0 gap-2">
       <div class="text-gray-500 text-xs md:text-sm text-center md:text-end font-[Prompt]" :class="{ 'text-black font-bold': currentStep === 1, 'font-normal': currentStep !== 1 }">
-        1. Entradas
+        1. {{ free ? "Asistentes" : "Entradas" }}
       </div>
       <span class="hidden md:block text-gray-400">→</span>
       <div class="text-gray-500 text-xs md:text-sm text-center font-[Prompt]" :class="{ 'text-black font-bold': currentStep === 2, 'font-normal': currentStep !== 2 }">

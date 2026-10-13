@@ -146,7 +146,7 @@ const plainText = (html) => String(html).replace(/<[^>]+>/g, '').trim()
         <span v-else-if="mode === 'markdown'" class="px-1 text-xs text-gray-500">**negrita**, *cursiva*, ## subtítulo, - lista, [texto](url)</span>
         <span v-else class="px-1 text-xs text-gray-500">Etiquetas permitidas: p, br, strong, em, u, h2, h3, ul, ol, li, a, blockquote</span>
       </div>
-      <div class="flex items-center gap-2">
+      <div class="flex flex-wrap items-center gap-2">
         <button v-if="aiContext" type="button" @click="aiOpen = !aiOpen"
           class="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium"
           :class="aiOpen ? 'bg-black text-white' : 'bg-purple-50 text-purple-700 hover:bg-purple-100'">
@@ -177,7 +177,7 @@ const plainText = (html) => String(html).replace(/<[^>]+>/g, '').trim()
     </div>
 
     <div v-show="mode === 'visual'" class="relative">
-      <div ref="editor" contenteditable="true" class="rich-text min-h-[180px] max-h-[480px] overflow-y-auto px-4 py-3 outline-none text-gray-800"
+      <div ref="editor" contenteditable="true" class="rich-text min-h-[180px] max-h-[480px] overflow-y-auto px-3 py-3 sm:px-4 outline-none text-gray-800 break-words"
         :data-placeholder="placeholder" @input="onInput" @paste="onPaste"></div>
     </div>
     <textarea v-if="mode === 'markdown'" v-model="markdown" rows="10" @input="onMarkdown"

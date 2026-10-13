@@ -97,7 +97,7 @@ const copy = async () => {
 </script>
 
 <template>
-  <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm" data-testid="preview-links">
+  <div class="bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-sm" data-testid="preview-links">
     <h3 class="font-bold text-lg mb-1 flex items-center gap-2"><Eye :size="18" /> Vista previa privada</h3>
     <p class="text-sm text-gray-500 mb-4">
       <template v-if="status !== 'published'">Tu evento está en <strong>borrador</strong>: el link público da error hasta publicarlo.</template>
@@ -145,14 +145,14 @@ const copy = async () => {
         <li v-for="l in links.slice(0, 8)" :key="l.id" class="py-2 flex items-center justify-between gap-2">
           <div class="min-w-0">
             <span class="px-2 py-0.5 rounded font-medium" :class="STATUS_CLASS[l.status]">{{ STATUS_LABEL[l.status] }}</span>
-            <span class="ml-1 text-gray-700">{{ l.label || (l.created_via === 'dashboard' ? 'Link' : 'Creado por tu IA') }}</span>
+            <span class="ml-1 text-gray-700 break-words">{{ l.label || (l.created_via === 'dashboard' ? 'Link' : 'Creado por tu IA') }}</span>
             <span class="block text-gray-400 mt-0.5">
               {{ l.single_use ? 'Un solo uso' : 'Varios usos' }} ·
               {{ l.expires_at ? `vence ${fmtDate(l.expires_at)}` : 'sin vencimiento' }} ·
               {{ l.view_count }} {{ l.view_count === 1 ? 'visita' : 'visitas' }}
             </span>
           </div>
-          <button v-if="l.status === 'active'" type="button" :disabled="busyId === l.id" @click="revoke(l)" class="text-red-600 font-medium hover:underline shrink-0 disabled:opacity-50">Revocar</button>
+          <button v-if="l.status === 'active'" type="button" :disabled="busyId === l.id" @click="revoke(l)" class="py-1 text-red-600 font-medium hover:underline shrink-0 disabled:opacity-50">Revocar</button>
         </li>
       </ul>
     </template>

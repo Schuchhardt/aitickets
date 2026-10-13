@@ -129,20 +129,20 @@ const publishBlockers = [
 <DashboardLayout title={event.name}>
     <!-- Header -->
     <div
-        class="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-4"
+        class="flex flex-col md:flex-row md:items-start justify-between gap-4 md:gap-6 mb-4"
     >
-        <div>
-            <div class="flex items-center gap-3 mb-2">
+        <div class="min-w-0">
+            <div class="flex items-center gap-3 mb-2 min-w-0">
                 <a
                     href="/dashboard/events"
                     class="text-gray-500 hover:text-black transition">Eventos</a
                 >
                 <span class="text-gray-300">/</span>
-                <span class="text-gray-900 font-medium truncate max-w-[200px]"
+                <span class="text-gray-900 font-medium truncate min-w-0 max-w-[200px]"
                     >{event.name}</span
                 >
             </div>
-            <h1 class="text-3xl font-bold font-[Unbounded] mb-2">
+            <h1 class="text-2xl md:text-3xl font-bold font-[Unbounded] mb-2 break-words">
                 {event.name}
             </h1>
             <div class="flex items-center gap-4 text-sm text-gray-600">
@@ -157,29 +157,29 @@ const publishBlockers = [
             </div>
         </div>
 
-        <div class="flex flex-wrap gap-3">
+        <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3">
             <a
                 href={publicLink}
                 target="_blank"
-                class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
+                class="flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium text-sm sm:text-base"
             >
                 <Eye size={18} /> {event.status === "published" ? "Ver Página" : "Vista previa"}
             </a>
             <a
                 href={`/dashboard/events/${event.id}/checkin`}
-                class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
+                class="flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium text-sm sm:text-base"
             >
                 <CheckCircle size={18} /> Check-in
             </a>
             <a
                 href={`/dashboard/events/${event.id}/analytics`}
-                class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
+                class="flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium text-sm sm:text-base"
             >
                 <BarChart3 size={18} /> Analytics
             </a>
             <a
                 href={`/dashboard/events/${event.id}/edit`}
-                class="flex items-center gap-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-900 transition font-medium"
+                class="flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2 bg-black text-white rounded-lg hover:bg-gray-900 transition font-medium text-sm sm:text-base"
             >
                 <Edit size={18} /> Editar
             </a>
@@ -222,52 +222,52 @@ const publishBlockers = [
     </div>
 
     <!-- Stats Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-            <div class="flex justify-between items-start mb-4">
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-8">
+        <div class="bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-sm min-w-0">
+            <div class="flex justify-between items-start mb-3 sm:mb-4">
                 <div class="p-2 bg-blue-50 text-blue-600 rounded-lg">
                     <Eye size={20} />
                 </div>
             </div>
             <p class="text-gray-500 text-sm mb-1">Visitas Totales</p>
-            <h3 class="text-2xl font-bold">{totalVisits || 0}</h3>
+            <h3 class="text-xl sm:text-2xl font-bold break-words">{totalVisits || 0}</h3>
             <p class="text-xs text-gray-400 mt-1">{uniqueVisitors} visitantes únicos</p>
         </div>
 
-        <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-            <div class="flex justify-between items-start mb-4">
+        <div class="bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-sm min-w-0">
+            <div class="flex justify-between items-start mb-3 sm:mb-4">
                 <div class="p-2 bg-purple-50 text-purple-600 rounded-lg">
                     <Ticket size={20} />
                 </div>
             </div>
             <p class="text-gray-500 text-sm mb-1">Entradas Vendidas</p>
-            <h3 class="text-2xl font-bold">{ticketsSold || 0} / {totalTickets}</h3>
+            <h3 class="text-xl sm:text-2xl font-bold break-words">{ticketsSold || 0} / {totalTickets}</h3>
         </div>
 
-        <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-            <div class="flex justify-between items-start mb-4">
+        <div class="bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-sm min-w-0">
+            <div class="flex justify-between items-start mb-3 sm:mb-4">
                 <div class="p-2 bg-green-50 text-green-600 rounded-lg">
                     <BarChart3 size={20} />
                 </div>
             </div>
             <p class="text-gray-500 text-sm mb-1">Ingresos Totales</p>
-            <h3 class="text-2xl font-bold">${totalRevenue.toLocaleString()}</h3>
+            <h3 class="text-xl sm:text-2xl font-bold break-words">${totalRevenue.toLocaleString()}</h3>
         </div>
-        <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-            <div class="flex justify-between items-start mb-4">
+        <div class="bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-sm min-w-0">
+            <div class="flex justify-between items-start mb-3 sm:mb-4">
                 <div class="p-2 bg-orange-50 text-orange-600 rounded-lg">
                     <Share2 size={20} />
                 </div>
             </div>
             <p class="text-gray-500 text-sm mb-1">Conversión</p>
-            <h3 class="text-2xl font-bold">{conversion}%</h3>
+            <h3 class="text-xl sm:text-2xl font-bold break-words">{conversion}%</h3>
         </div>
     </div>
 
     <!-- Main Content Layout -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
         <!-- Left Column: Details -->
-        <div class="lg:col-span-2 space-y-8">
+        <div class="lg:col-span-2 space-y-6 md:space-y-8 min-w-0">
             <!-- Portada (vista Desktop / Mobile, ajuste y generación con IA) -->
             <EventCoverManager
                 client:load
@@ -282,7 +282,7 @@ const publishBlockers = [
                 class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
             >
                 <div
-                    class="p-6 border-b border-gray-100 flex justify-between items-center"
+                    class="p-4 sm:p-6 border-b border-gray-100 flex justify-between items-center gap-3"
                 >
                     <h3 class="font-bold text-lg">Tipos de Entrada</h3>
                     <a
@@ -294,9 +294,9 @@ const publishBlockers = [
                 <div class="divide-y divide-gray-100">
                     {
                         event.event_tickets?.map((ticket: any) => (
-                            <div class="p-4 flex justify-between items-center hover:bg-gray-50 transition">
-                                <div>
-                                    <p class="font-bold text-gray-900">
+                            <div class="p-4 flex justify-between items-center gap-3 hover:bg-gray-50 transition">
+                                <div class="min-w-0">
+                                    <p class="font-bold text-gray-900 break-words">
                                         {ticket.ticket_name}
                                     </p>
                                     <p class="text-sm text-gray-500">
@@ -304,7 +304,7 @@ const publishBlockers = [
                                         • {ticketSalesMap[ticket.id] || 0} emitidas / {ticket.total_quantity ?? "sin límite"}
                                     </p>
                                 </div>
-                                <div>
+                                <div class="shrink-0">
                                     <span class={`px-2 py-1 rounded text-xs font-medium ${ticket.status === "unavailable" ? "bg-red-50 text-red-600" : "bg-gray-100 text-gray-600"}`}>
                                         {ticket.status === "unavailable" ? "Retirada" : "Activo"}
                                     </span>
@@ -334,9 +334,9 @@ const publishBlockers = [
         </div>
 
         <!-- Right Column: Public Link & sharing -->
-        <div class="space-y-6">
+        <div class="space-y-6 min-w-0">
             <div
-                class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm"
+                class="bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-sm"
             >
                 <h3 class="font-bold text-lg mb-4">Link Público</h3>
                 <p class="text-sm text-gray-500 mb-2">
@@ -348,14 +348,14 @@ const publishBlockers = [
                         type="text"
                         readonly
                         value={`${siteUrl}${publicLink}`}
-                        class="bg-gray-50 border border-gray-200 text-gray-600 text-sm rounded-lg px-3 py-2 w-full outline-none"
+                        class="bg-gray-50 border border-gray-200 text-gray-600 text-sm rounded-lg px-3 py-2 w-full min-w-0 outline-none"
                     />
                     <button
                         id="copyLinkBtn"
                         type="button"
                         data-link={`${siteUrl}${publicLink}`}
                         title="Copiar link"
-                        class="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition text-gray-700"
+                        class="shrink-0 p-2.5 sm:p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition text-gray-700"
                     >
                         <Share2 size={18} />
                     </button>

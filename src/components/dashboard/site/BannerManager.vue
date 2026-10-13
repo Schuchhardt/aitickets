@@ -146,14 +146,14 @@ async function move(index, delta) {
 
 <template>
   <section class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-    <div class="p-6 border-b border-gray-100">
+    <div class="p-4 md:p-6 border-b border-gray-100">
       <h3 class="font-bold text-lg flex items-center gap-2"><ImageIcon size="18" /> Banners</h3>
       <p class="text-sm text-gray-500 mt-1">
         Imágenes destacadas en la portada de tu sitio (máx. {{ MAX_BANNERS }}). Puedes programar desde y hasta cuándo se muestran.
       </p>
     </div>
 
-    <div class="p-6 space-y-4">
+    <div class="p-4 md:p-6 space-y-4">
       <p v-if="message" class="text-sm" :class="isError ? 'text-red-600' : 'text-green-700'">{{ message }}</p>
 
       <ul v-if="banners.length" class="space-y-3">
@@ -165,9 +165,9 @@ async function move(index, delta) {
               <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" class="hidden" @change="replaceImage($event, b)" />
             </label>
           </div>
-          <div class="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <input v-model="b.link_url" type="url" placeholder="Enlace (opcional)" class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-black" />
-            <input v-model="b.alt" type="text" maxlength="150" placeholder="Texto alternativo" class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-black" />
+          <div class="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <input v-model="b.link_url" type="url" placeholder="Enlace (opcional)" class="w-full min-w-0 px-3 py-1.5 text-sm rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-black" />
+            <input v-model="b.alt" type="text" maxlength="150" placeholder="Texto alternativo" class="w-full min-w-0 px-3 py-1.5 text-sm rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-black" />
             <label class="text-xs text-gray-500">Desde
               <input v-model="b.starts_local" type="datetime-local" class="mt-0.5 w-full px-2 py-1 text-sm rounded-lg border border-gray-300" />
             </label>
@@ -190,8 +190,8 @@ async function move(index, delta) {
 
       <div v-if="banners.length < MAX_BANNERS" class="rounded-lg border border-dashed border-gray-300 p-4 space-y-3">
         <p class="text-sm font-semibold">Nuevo banner</p>
-        <div class="flex items-center gap-3">
-          <div class="h-20 w-36 rounded-md bg-gray-50 border border-gray-200 overflow-hidden flex items-center justify-center">
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="h-20 w-36 shrink-0 rounded-md bg-gray-50 border border-gray-200 overflow-hidden flex items-center justify-center">
             <img v-if="draft.image_url" :src="draft.image_url" alt="" class="h-full w-full object-cover" />
             <Upload v-else size="18" class="text-gray-400" />
           </div>
@@ -201,8 +201,8 @@ async function move(index, delta) {
           </label>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <input v-model="draft.link_url" type="url" placeholder="Enlace (opcional), ej. a un evento" class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-black" />
-          <input v-model="draft.alt" type="text" maxlength="150" placeholder="Texto alternativo (describe la imagen)" class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-black" />
+          <input v-model="draft.link_url" type="url" placeholder="Enlace (opcional), ej. a un evento" class="w-full min-w-0 px-3 py-1.5 text-sm rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-black" />
+          <input v-model="draft.alt" type="text" maxlength="150" placeholder="Texto alternativo (describe la imagen)" class="w-full min-w-0 px-3 py-1.5 text-sm rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-black" />
           <label class="text-xs text-gray-500">Desde (opcional)
             <input v-model="draft.starts_local" type="datetime-local" class="mt-0.5 w-full px-2 py-1 text-sm rounded-lg border border-gray-300" />
           </label>
@@ -210,7 +210,7 @@ async function move(index, delta) {
             <input v-model="draft.ends_local" type="datetime-local" class="mt-0.5 w-full px-2 py-1 text-sm rounded-lg border border-gray-300" />
           </label>
         </div>
-        <button type="button" class="px-4 py-2 text-sm bg-black text-white rounded-lg hover:bg-gray-800 disabled:opacity-40" :disabled="busy || !draft.image_url" @click="addBanner">
+        <button type="button" class="w-full sm:w-auto px-4 py-2 text-sm bg-black text-white rounded-lg hover:bg-gray-800 disabled:opacity-40" :disabled="busy || !draft.image_url" @click="addBanner">
           Agregar banner
         </button>
       </div>

@@ -95,7 +95,7 @@ const positionLabel = computed(() => {
         ref="box"
         class="relative overflow-hidden rounded-lg border border-gray-300 bg-white select-none"
         :class="[
-          device === 'mobile' ? 'w-[240px]' : 'w-full',
+          device === 'mobile' ? 'w-[240px] max-w-full' : 'w-full',
           canDrag ? 'cursor-ns-resize touch-none' : '',
         ]"
         :style="boxStyle"
@@ -150,12 +150,12 @@ const positionLabel = computed(() => {
         Ajuste
         <div class="mt-1 inline-flex w-full rounded-lg border border-gray-300 bg-white p-0.5">
           <button
-            type="button" class="flex-1 rounded-md px-2 py-1 transition"
+            type="button" class="flex-1 rounded-md px-2 py-1.5 sm:py-1 transition"
             :class="current.fit === 'cover' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'"
             @click="update({ fit: 'cover' })"
           >Llenar</button>
           <button
-            type="button" class="flex-1 rounded-md px-2 py-1 transition"
+            type="button" class="flex-1 rounded-md px-2 py-1.5 sm:py-1 transition"
             :class="current.fit === 'contain' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'"
             @click="update({ fit: 'contain' })"
           >Imagen completa</button>

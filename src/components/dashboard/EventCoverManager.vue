@@ -102,7 +102,7 @@ const remove = () => {
 
 <template>
   <section class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden" data-testid="event-cover">
-    <div class="p-6 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
+    <div class="p-4 sm:p-6 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
       <h3 class="font-bold text-lg flex items-center gap-2"><ImageIcon size="18" /> Portada</h3>
       <div class="flex flex-wrap gap-2">
         <button v-if="image && !candidate && !adjusting" type="button" :disabled="!!busy" @click="adjusting = true"
@@ -119,14 +119,14 @@ const remove = () => {
           <Sparkles size="15" /> {{ image ? 'Editar / generar con IA' : 'Generar con IA' }}
         </button>
         <button v-if="image && !candidate" type="button" :disabled="!!busy" title="Quitar portada" @click="remove"
-          class="p-1.5 text-gray-400 hover:text-red-600 rounded-lg disabled:opacity-50">
+          class="p-2 sm:p-1.5 text-gray-400 hover:text-red-600 rounded-lg disabled:opacity-50">
           <Trash2 size="16" />
         </button>
       </div>
       <input ref="fileInput" type="file" accept="image/*" class="hidden" @change="onFile" />
     </div>
 
-    <div class="p-6 space-y-4">
+    <div class="p-4 sm:p-6 space-y-4">
       <!-- Panel IA -->
       <div v-if="aiOpen" class="rounded-xl border border-purple-100 bg-purple-50/50 p-4 space-y-3">
         <label class="block text-sm font-medium text-gray-800">
@@ -166,13 +166,13 @@ const remove = () => {
         :editable="adjusting && !candidate"
       />
       <button v-else type="button" @click="fileInput?.click()"
-        class="w-full border-2 border-dashed border-gray-300 rounded-xl p-10 flex flex-col items-center text-center hover:border-gray-400 hover:bg-gray-50 transition">
+        class="w-full border-2 border-dashed border-gray-300 rounded-xl p-6 sm:p-10 flex flex-col items-center text-center hover:border-gray-400 hover:bg-gray-50 transition">
         <UploadCloud size="28" class="text-gray-400 mb-3" />
         <span class="font-medium text-gray-900">Este evento no tiene portada</span>
         <span class="text-xs text-gray-500 mt-1">Sube una imagen (JPG, PNG o WEBP, máx. 5MB) o genérala con IA.</span>
       </button>
 
-      <div v-if="adjusting && !candidate" class="flex items-center gap-2">
+      <div v-if="adjusting && !candidate" class="flex flex-wrap items-center gap-2">
         <button type="button" :disabled="!!busy || !dirty" @click="saveSettings"
           class="px-4 py-2 bg-black text-white text-sm font-medium rounded-lg hover:bg-gray-900 disabled:opacity-50">
           {{ busy === 'settings' ? 'Guardando...' : 'Guardar ajuste' }}

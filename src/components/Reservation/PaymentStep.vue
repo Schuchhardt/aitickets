@@ -95,6 +95,8 @@ const needsCaptcha = computed(() => Boolean(turnstileSiteKey.value) && !turnstil
 
 const selectedTicketList = computed(() => buildSelectedLines(props.selectedTickets, props.event?.tickets, props.event?.dates));
 const totals = computed(() => computeTotalsWithDiscount(selectedTicketList.value, props.discount, { feeAbsorbed: isFeeAbsorbed(props.event) }));
+// Selección sin costo (evento gratis): se confirma asistencia, sin "total a pagar" ni textos de compra
+const isFreeOrder = computed(() => selectedTicketList.value.length > 0 && totals.value.grossSubtotal === 0);
 // Solo se envía el código si descuenta algo (con entradas gratis no aplica)
 const discountCodeToSend = computed(() => (props.discount && totals.value.discountAmount > 0 ? props.discount.code : undefined));
 
@@ -203,9 +205,10 @@ const handlePayment = async () => {
 <template>
   <div v-if="isDemo && demoCompleted" class="font-[Prompt] max-w-xl mx-auto text-center" data-testid="resv-demo-result">
     <div class="text-4xl mb-2" aria-hidden="true">🎟️</div>
-    <h3 class="text-lg font-semibold mb-2">Así terminaría la compra</h3>
+    <h3 class="text-lg font-semibold mb-2">{{ isFreeOrder ? "Así terminaría la confirmación" : "Así terminaría la compra" }}</h3>
     <ol class="text-left text-sm text-gray-700 space-y-3 border rounded-lg p-4 mb-4">
-      <li><strong>1. Pago seguro:</strong> te llevaríamos a Webpay para pagar {{ formatCLP(totals.total) }}.</li>
+      <li v-if="isFreeOrder"><strong>1. Confirmación:</strong> la asistencia quedaría registrada al instante, sin pagar nada.</li>
+      <li v-else><strong>1. Pago seguro:</strong> te llevaríamos a Webpay para pagar {{ formatCLP(totals.total) }}.</li>
       <li><strong>2. Entradas por email:</strong> al confirmarse el pago, {{ buyerInfo.email || "el comprador" }} recibiría sus entradas con código QR y un recordatorio 24 h antes.</li>
       <li><strong>3. Check-in en la puerta:</strong> el equipo del productor escanea el QR desde el celular, incluso si se cae la señal.</li>
       <li><strong>4. Para el productor:</strong> ve la venta al instante en su panel, con el canal que la trajo, y recibe lo recaudado 48–72 h después de la función.</li>
@@ -218,8 +221,8 @@ const handlePayment = async () => {
     <button type="button" class="mt-3 text-sm underline text-gray-600" @click="demoCompleted = false">Volver al resumen</button>
   </div>
   <div v-else class="font-[Prompt] max-w-xl mx-auto">
-    <h3 class="text-lg font-semibold mb-1 text-center">{{ totals.total > 0 ? "Revisa y paga" : "Confirma tu registro" }}</h3>
-    <p class="text-gray-600 text-sm mb-4 text-center">Revisa tu pedido antes de continuar.</p>
+    <h3 class="text-lg font-semibold mb-1 text-center">{{ isFreeOrder ? "Confirma tu asistencia" : totals.total > 0 ? "Revisa y paga" : "Confirma tu registro" }}</h3>
+    <p class="text-gray-600 text-sm mb-4 text-center">{{ isFreeOrder ? "Revisa tus datos antes de confirmar." : "Revisa tu pedido antes de continuar." }}</p>
 
     <div class="border p-4 rounded-lg text-left mb-4">
       <h4 class="font-semibold mb-2">Entradas</h4>
@@ -232,7 +235,7 @@ const handlePayment = async () => {
           <span class="font-medium whitespace-nowrap">{{ ticket.total > 0 ? formatCLP(ticket.total) : "Gratis" }}</span>
         </li>
       </ul>
-      <div class="border-t mt-3 pt-3 space-y-1 text-sm text-gray-600">
+      <div v-if="!isFreeOrder" class="border-t mt-3 pt-3 space-y-1 text-sm text-gray-600">
         <div class="flex justify-between">
           <span>Subtotal</span>
           <span>{{ totals.grossSubtotal > 0 ? formatCLP(totals.grossSubtotal) : "Gratis" }}</span>
@@ -256,7 +259,7 @@ const handlePayment = async () => {
           </div>
         </template>
       </div>
-      <div class="flex justify-between border-t mt-3 pt-3 text-lg font-bold">
+      <div v-if="!isFreeOrder" class="flex justify-between border-t mt-3 pt-3 text-lg font-bold">
         <span>Total a pagar</span>
         <span :class="totals.total > 0 ? 'text-green-700' : 'text-lime-600'">
           {{ totals.total > 0 ? `${formatCLP(totals.total)} CLP` : "Gratis" }}
@@ -265,7 +268,7 @@ const handlePayment = async () => {
     </div>
 
     <div class="border p-4 rounded-lg text-left mb-4 text-sm break-words">
-      <h4 class="font-semibold mb-2 text-base">Comprador</h4>
+      <h4 class="font-semibold mb-2 text-base">{{ isFreeOrder ? "Asistente" : "Comprador" }}</h4>
       <p><strong>Nombre:</strong> {{ buyerInfo.firstName }} {{ buyerInfo.lastName }}</p>
       <p><strong>Email:</strong> {{ buyerInfo.email }}</p>
       <p v-if="buyerInfo.phone"><strong>Teléfono:</strong> {{ buyerInfo.phone }}</p>
@@ -281,7 +284,7 @@ const handlePayment = async () => {
       :disabled="isLoading || !selectedTicketList.length || needsCaptcha"
       class="bg-black text-white px-6 py-3 rounded-md w-full cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
     >
-      {{ isLoading ? "Procesando..." : isDemo ? `Simular pago de ${formatCLP(totals.total)}` : totals.total > 0 ? `Ir a pagar ${formatCLP(totals.total)}` : "Finalizar registro" }}
+      {{ isLoading ? "Procesando..." : isFreeOrder ? (isDemo ? "Simular confirmación" : "Confirmar asistencia") : isDemo ? `Simular pago de ${formatCLP(totals.total)}` : totals.total > 0 ? `Ir a pagar ${formatCLP(totals.total)}` : "Finalizar registro" }}
     </button>
     <p v-if="isDemo" class="text-xs text-purple-700 text-center mt-2">Demo: no se realizará ningún cobro.</p>
     <p v-else-if="totals.total > 0" class="text-xs text-gray-500 text-center mt-2">{{ REDIRECT_COPY }}</p>
