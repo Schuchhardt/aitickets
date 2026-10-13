@@ -251,18 +251,18 @@ const selectedTone = ref('')
 <template>
   <div>
     <!-- Header -->
-    <div class="flex items-center gap-4 mb-8">
-      <a href="/dashboard/promote" class="p-2 rounded-lg hover:bg-gray-100 transition">
+    <div class="flex items-center gap-3 md:gap-4 mb-6 md:mb-8">
+      <a href="/dashboard/promote" class="shrink-0 p-2 rounded-lg hover:bg-gray-100 transition">
         <ArrowLeft :size="20" class="text-gray-600" />
       </a>
-      <div>
-        <h1 class="text-3xl font-bold font-[Unbounded]">Crear Post</h1>
+      <div class="min-w-0">
+        <h1 class="text-2xl md:text-3xl font-bold font-[Unbounded]">Crear Post</h1>
         <p class="text-gray-600">Publica contenido en tus redes sociales conectadas.</p>
       </div>
     </div>
 
     <!-- Step Indicator -->
-    <div class="flex items-center justify-center gap-2 mb-8">
+    <div class="flex items-center justify-center gap-2 mb-6 md:mb-8">
       <div v-for="step in totalSteps" :key="step" class="flex items-center gap-2">
         <div
           class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors"
@@ -273,7 +273,7 @@ const selectedTone = ref('')
         </div>
         <span
           v-if="step < totalSteps"
-          class="w-12 h-0.5 transition-colors"
+          class="w-6 sm:w-12 h-0.5 transition-colors"
           :class="step < currentStep ? 'bg-black' : 'bg-gray-200'"
         ></span>
       </div>
@@ -281,7 +281,7 @@ const selectedTone = ref('')
 
     <div class="max-w-3xl mx-auto">
       <!-- Step 1: Select Event -->
-      <div v-if="currentStep === 1" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+      <div v-if="currentStep === 1" class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 md:p-6">
         <h2 class="text-xl font-bold mb-1">Selecciona un Evento</h2>
         <p class="text-gray-500 text-sm mb-6">Elige el evento que deseas promocionar.</p>
 
@@ -319,7 +319,7 @@ const selectedTone = ref('')
       <!-- Step 2: Compose Post -->
       <div v-if="currentStep === 2" class="space-y-6">
         <!-- Content Editor -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 md:p-6">
           <h2 class="text-xl font-bold mb-1">Compone tu Post</h2>
           <p class="text-gray-500 text-sm mb-6">Escribe el contenido o genera con IA.</p>
 
@@ -360,7 +360,7 @@ const selectedTone = ref('')
         </div>
 
         <!-- Image Section -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 md:p-6">
           <h3 class="font-bold mb-4">Imágenes</h3>
 
           <!-- Uploaded images preview -->
@@ -369,7 +369,7 @@ const selectedTone = ref('')
               <img :src="url" class="w-full h-full object-cover" />
               <button
                 @click="removeImage(index)"
-                class="absolute top-2 right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
+                class="absolute top-2 right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center sm:opacity-0 sm:group-hover:opacity-100 transition"
               >
                 <X :size="14" />
               </button>
@@ -404,7 +404,7 @@ const selectedTone = ref('')
         </div>
 
         <!-- Platform Selection -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 md:p-6">
           <h3 class="font-bold mb-4">Plataformas</h3>
 
           <div v-if="availablePlatforms.length === 0" class="text-center py-6">
@@ -430,10 +430,10 @@ const selectedTone = ref('')
         </div>
 
         <!-- Schedule -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <div class="flex items-center justify-between mb-4">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 md:p-6">
+          <div class="flex items-center justify-between gap-3 mb-4">
             <h3 class="font-bold">Programar publicación</h3>
-            <label class="relative inline-flex items-center cursor-pointer">
+            <label class="relative inline-flex shrink-0 items-center cursor-pointer">
               <input type="checkbox" v-model="isScheduled" class="sr-only peer" />
               <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-black"></div>
             </label>
@@ -443,7 +443,7 @@ const selectedTone = ref('')
             <input
               v-model="scheduledFor"
               type="datetime-local"
-              class="flex-1 border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-black focus:border-black focus:outline-none"
+              class="flex-1 min-w-0 border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-black focus:border-black focus:outline-none"
               :min="new Date().toISOString().slice(0, 16)"
             />
           </div>
@@ -452,7 +452,7 @@ const selectedTone = ref('')
       </div>
 
       <!-- Step 3: Preview -->
-      <div v-if="currentStep === 3" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+      <div v-if="currentStep === 3" class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 md:p-6">
         <h2 class="text-xl font-bold mb-1">Vista Previa</h2>
         <p class="text-gray-500 text-sm mb-6">Así se verá tu post en redes sociales.</p>
 
@@ -460,11 +460,11 @@ const selectedTone = ref('')
         <div class="max-w-md mx-auto border border-gray-200 rounded-xl overflow-hidden">
           <!-- Post header -->
           <div class="flex items-center gap-3 p-4">
-            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-sm">
+            <div class="w-10 h-10 shrink-0 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-sm">
               {{ selectedEvent?.title?.[0] || selectedEvent?.name?.[0] || 'E' }}
             </div>
-            <div>
-              <p class="font-bold text-sm">{{ selectedEvent?.title || selectedEvent?.name || 'Tu evento' }}</p>
+            <div class="min-w-0">
+              <p class="font-bold text-sm break-words">{{ selectedEvent?.title || selectedEvent?.name || 'Tu evento' }}</p>
               <p class="text-xs text-gray-400">Ahora</p>
             </div>
           </div>
@@ -476,11 +476,11 @@ const selectedTone = ref('')
 
           <!-- Post content -->
           <div class="p-4">
-            <p class="text-sm whitespace-pre-wrap">{{ postContent }}</p>
+            <p class="text-sm whitespace-pre-wrap break-words">{{ postContent }}</p>
           </div>
 
           <!-- Post meta -->
-          <div class="px-4 pb-4 flex items-center gap-3 text-xs text-gray-400">
+          <div class="px-4 pb-4 flex flex-wrap items-center gap-3 text-xs text-gray-400">
             <span v-for="p in selectedPlatforms" :key="p" class="flex items-center gap-1 capitalize">
               <Instagram v-if="p === 'instagram'" :size="12" />
               <Facebook v-if="p === 'facebook'" :size="12" />
@@ -494,7 +494,7 @@ const selectedTone = ref('')
         </div>
 
         <!-- Multiple images indicator -->
-        <div v-if="imageUrls.length > 1" class="flex justify-center gap-2 mt-4">
+        <div v-if="imageUrls.length > 1" class="flex flex-wrap justify-center gap-2 mt-4">
           <div v-for="(url, i) in imageUrls" :key="i" class="w-12 h-12 rounded-lg overflow-hidden border-2 border-gray-200">
             <img :src="url" class="w-full h-full object-cover" />
           </div>
@@ -502,29 +502,29 @@ const selectedTone = ref('')
       </div>
 
       <!-- Step 4: Publish -->
-      <div v-if="currentStep === 4" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-center">
+      <div v-if="currentStep === 4" class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 md:p-6 text-center">
         <h2 class="text-xl font-bold mb-1">{{ isScheduled ? 'Programar Post' : 'Publicar Post' }}</h2>
-        <p class="text-gray-500 text-sm mb-8">
+        <p class="text-gray-500 text-sm mb-6 md:mb-8">
           {{ isScheduled ? 'Tu post se publicará en la fecha programada.' : 'Tu post se publicará ahora en las plataformas seleccionadas.' }}
         </p>
 
         <!-- Summary -->
         <div class="max-w-sm mx-auto text-left space-y-3 mb-8">
-          <div class="flex items-center justify-between text-sm">
+          <div class="flex items-center justify-between gap-4 text-sm">
             <span class="text-gray-500">Evento</span>
-            <span class="font-medium">{{ selectedEvent?.title || selectedEvent?.name }}</span>
+            <span class="font-medium text-right min-w-0 break-words">{{ selectedEvent?.title || selectedEvent?.name }}</span>
           </div>
-          <div class="flex items-center justify-between text-sm">
+          <div class="flex items-center justify-between gap-4 text-sm">
             <span class="text-gray-500">Plataformas</span>
-            <span class="font-medium capitalize">{{ selectedPlatforms.join(', ') }}</span>
+            <span class="font-medium capitalize text-right min-w-0">{{ selectedPlatforms.join(', ') }}</span>
           </div>
-          <div class="flex items-center justify-between text-sm">
+          <div class="flex items-center justify-between gap-4 text-sm">
             <span class="text-gray-500">Imágenes</span>
             <span class="font-medium">{{ imageUrls.length }}</span>
           </div>
-          <div v-if="isScheduled && scheduledFor" class="flex items-center justify-between text-sm">
+          <div v-if="isScheduled && scheduledFor" class="flex items-center justify-between gap-4 text-sm">
             <span class="text-gray-500">Programado para</span>
-            <span class="font-medium">{{ new Date(scheduledFor).toLocaleString('es-CL') }}</span>
+            <span class="font-medium text-right">{{ new Date(scheduledFor).toLocaleString('es-CL') }}</span>
           </div>
         </div>
 
@@ -549,7 +549,7 @@ const selectedTone = ref('')
       </div>
 
       <!-- Navigation Buttons -->
-      <div class="flex justify-between mt-8">
+      <div class="flex justify-between gap-3 mt-6 md:mt-8">
         <button
           v-if="currentStep > 1"
           @click="prevStep"

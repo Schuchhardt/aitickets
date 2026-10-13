@@ -67,7 +67,7 @@ const retryPublish = async (postId) => {
 <template>
   <div>
     <!-- Empty state -->
-    <div v-if="posts.length === 0" class="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+    <div v-if="posts.length === 0" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 md:p-12 text-center">
       <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-400">
         <Send :size="32" />
       </div>
@@ -103,9 +103,9 @@ const retryPublish = async (postId) => {
           :key="post.id"
           class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition"
         >
-          <div class="flex gap-4">
+          <div class="flex gap-3 sm:gap-4">
             <!-- Thumbnail -->
-            <div class="w-20 h-20 rounded-lg bg-gray-100 shrink-0 overflow-hidden">
+            <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-lg bg-gray-100 shrink-0 overflow-hidden">
               <img v-if="post.image_urls?.length > 0" :src="post.image_urls[0]" class="w-full h-full object-cover" />
               <div v-else class="w-full h-full flex items-center justify-center text-gray-300">
                 <Image :size="24" />
@@ -115,9 +115,9 @@ const retryPublish = async (postId) => {
             <!-- Content -->
             <div class="flex-1 min-w-0">
               <div class="flex items-start justify-between gap-2 mb-1">
-                <div>
-                  <p class="text-xs text-gray-400 mb-0.5">{{ getEventName(post) }}</p>
-                  <p class="text-sm text-gray-800">{{ truncateContent(post.content) }}</p>
+                <div class="min-w-0">
+                  <p class="text-xs text-gray-400 mb-0.5 truncate">{{ getEventName(post) }}</p>
+                  <p class="text-sm text-gray-800 break-words">{{ truncateContent(post.content) }}</p>
                 </div>
                 <span
                   class="shrink-0 px-2 py-0.5 text-xs font-medium rounded-full"
@@ -127,7 +127,7 @@ const retryPublish = async (postId) => {
                 </span>
               </div>
 
-              <div class="flex items-center gap-3 mt-2">
+              <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2">
                 <!-- Platforms -->
                 <div class="flex items-center gap-1">
                   <component
@@ -161,7 +161,7 @@ const retryPublish = async (postId) => {
               </div>
 
               <!-- Error message -->
-              <p v-if="post.status === 'failed' && post.error_message" class="text-xs text-red-400 mt-1">
+              <p v-if="post.status === 'failed' && post.error_message" class="text-xs text-red-400 mt-1 break-words">
                 {{ post.error_message }}
               </p>
             </div>

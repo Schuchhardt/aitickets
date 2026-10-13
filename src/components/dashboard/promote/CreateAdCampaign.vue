@@ -191,8 +191,8 @@ const submit = async () => {
 <template>
   <div class="max-w-3xl mx-auto">
     <!-- Header -->
-    <div class="flex items-center gap-3 mb-8">
-      <a href="/dashboard/promote/ads" class="text-gray-400 hover:text-gray-600 transition">
+    <div class="flex items-center gap-3 mb-6 md:mb-8">
+      <a href="/dashboard/promote/ads" class="shrink-0 text-gray-400 hover:text-gray-600 transition">
         <ArrowLeft :size="20" />
       </a>
       <div>
@@ -202,7 +202,7 @@ const submit = async () => {
     </div>
 
     <!-- Progress Bar -->
-    <div class="flex gap-2 mb-8">
+    <div class="flex gap-2 mb-6 md:mb-8">
       <div
         v-for="s in totalSteps"
         :key="s"
@@ -302,7 +302,7 @@ const submit = async () => {
               </div>
               <div class="flex-1 min-w-0">
                 <p class="font-medium text-sm truncate">{{ conn.account_name }}</p>
-                <p class="text-xs text-gray-400">{{ conn.meta_ad_account_id }}</p>
+                <p class="text-xs text-gray-400 truncate">{{ conn.meta_ad_account_id }}</p>
               </div>
               <div
                 class="w-5 h-5 rounded-full border-2 shrink-0 flex items-center justify-center"
@@ -416,7 +416,7 @@ const submit = async () => {
         <!-- Age Range -->
         <div class="mb-5">
           <label class="block text-sm font-medium text-gray-700 mb-2">Rango de edad</label>
-          <div class="flex items-center gap-3">
+          <div class="flex flex-wrap items-center gap-3">
             <input
               v-model.number="form.targetAudience.age_min"
               type="number"
@@ -439,7 +439,7 @@ const submit = async () => {
         <!-- Gender -->
         <div class="mb-5">
           <label class="block text-sm font-medium text-gray-700 mb-2">Género</label>
-          <div class="flex gap-3">
+          <div class="flex flex-wrap gap-3">
             <button
               @click="form.targetAudience.genders = []"
               class="px-4 py-2 rounded-lg border text-sm font-medium transition"
@@ -548,7 +548,7 @@ const submit = async () => {
         </div>
 
         <!-- Dates -->
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">Fecha inicio</label>
             <input
@@ -577,7 +577,7 @@ const submit = async () => {
           <!-- Event -->
           <div class="bg-white rounded-xl border border-gray-100 p-4">
             <p class="text-xs font-medium text-gray-400 uppercase mb-2">Evento</p>
-            <p class="font-semibold">{{ selectedEvent?.title || selectedEvent?.name }}</p>
+            <p class="font-semibold break-words">{{ selectedEvent?.title || selectedEvent?.name }}</p>
           </div>
 
           <!-- Creative Preview -->
@@ -591,11 +591,11 @@ const submit = async () => {
                 class="w-full h-48 object-cover"
               />
               <div class="p-4">
-                <p class="font-semibold text-sm mb-1">{{ form.headline || form.name }}</p>
+                <p class="font-semibold text-sm mb-1 break-words">{{ form.headline || form.name }}</p>
                 <p class="text-xs text-gray-600 line-clamp-3">{{ form.adCopy }}</p>
-                <div class="mt-3 flex items-center justify-between">
-                  <span class="text-xs text-gray-400">{{ form.destinationUrl }}</span>
-                  <span class="bg-gray-100 text-gray-600 text-xs px-3 py-1 rounded font-medium">
+                <div class="mt-3 flex items-center justify-between gap-2">
+                  <span class="text-xs text-gray-400 min-w-0 break-all">{{ form.destinationUrl }}</span>
+                  <span class="shrink-0 bg-gray-100 text-gray-600 text-xs px-3 py-1 rounded font-medium">
                     {{ ctaOptions.find(c => c.value === form.callToAction)?.label || 'Más información' }}
                   </span>
                 </div>
@@ -649,14 +649,14 @@ const submit = async () => {
           </div>
         </div>
 
-        <p v-if="error" class="text-red-500 text-sm mt-4 flex items-center gap-1">
-          <AlertCircle :size="14" />
+        <p v-if="error" class="text-red-500 text-sm mt-4 flex items-center gap-1 break-words">
+          <AlertCircle :size="14" class="shrink-0" />
           {{ error }}
         </p>
       </div>
 
       <!-- Navigation -->
-      <div class="flex items-center justify-between mt-8 pt-6 border-t border-gray-100">
+      <div class="flex items-center justify-between gap-3 mt-6 md:mt-8 pt-6 border-t border-gray-100">
         <button
           v-if="step > 1"
           @click="step--"

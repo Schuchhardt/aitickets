@@ -84,7 +84,7 @@ const copy = async (text, tag) => {
   <div class="space-y-6">
     <div v-if="welcome" class="flex items-start gap-3 p-4 rounded-xl bg-lime-50 border border-lime-200" role="status">
       <PartyPopper :size="22" class="text-lime-700 shrink-0 mt-0.5" />
-      <div>
+      <div class="min-w-0">
         <p class="font-bold text-gray-900">¡Tu cuenta está lista! Último paso: conecta tu IA</p>
         <p class="text-sm text-gray-700">Elige Claude o ChatGPT y sigue los pasos. Toma unos 2 minutos y no necesitas copiar ninguna llave.</p>
       </div>
@@ -92,7 +92,7 @@ const copy = async (text, tag) => {
 
     <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
       <section v-for="g in guides" :key="g.id" class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden flex flex-col" :data-testid="`ai-guide-${g.id}`">
-        <div class="p-5 flex items-center gap-4" :class="g.header">
+        <div class="p-4 md:p-5 flex flex-wrap items-center gap-3 md:gap-4" :class="g.header">
           <span class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-sm" :class="g.iconWrap">
             <AiBrandIcon :brand="g.id" :colored="g.id === 'claude'" class="w-7 h-7" />
           </span>
@@ -105,7 +105,7 @@ const copy = async (text, tag) => {
           </span>
         </div>
 
-        <ol class="p-5 space-y-4 flex-1">
+        <ol class="p-4 md:p-5 space-y-4 flex-1">
           <li v-for="(s, i) in g.steps" :key="s.title" class="flex gap-3">
             <span class="shrink-0 w-7 h-7 rounded-full bg-black text-white text-sm font-bold flex items-center justify-center">{{ i + 1 }}</span>
             <div class="min-w-0 flex-1">
@@ -122,7 +122,7 @@ const copy = async (text, tag) => {
           </li>
         </ol>
 
-        <div class="px-5 pb-5 space-y-3">
+        <div class="px-4 md:px-5 pb-4 md:pb-5 space-y-3">
           <a :href="g.openUrl" target="_blank" rel="noopener"
             class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-black text-white font-medium hover:bg-gray-800 transition">
             {{ g.openLabel }} <ExternalLink :size="16" />
@@ -132,7 +132,7 @@ const copy = async (text, tag) => {
       </section>
     </div>
 
-    <section class="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+    <section class="bg-white rounded-xl border border-gray-100 shadow-sm p-4 md:p-5">
       <h2 class="font-bold text-gray-900">Prueba pidiéndole…</h2>
       <p class="text-sm text-gray-500 mb-3">Copia un ejemplo y pégalo en el chat después de conectar.</p>
       <ul class="grid grid-cols-1 md:grid-cols-2 gap-2">

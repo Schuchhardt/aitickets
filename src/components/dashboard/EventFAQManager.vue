@@ -155,9 +155,9 @@ onMounted(fetchFaqs);
 
 <template>
   <section class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-    <div class="p-6 border-b border-gray-100 flex justify-between items-center">
+    <div class="p-4 sm:p-6 border-b border-gray-100 flex flex-wrap justify-between items-center gap-3">
       <h3 class="font-bold text-lg">Preguntas Frecuentes</h3>
-      <div class="flex items-center gap-3">
+      <div class="flex flex-wrap items-center gap-3">
         <button
           type="button"
           @click="aiOpen = !aiOpen"
@@ -176,7 +176,7 @@ onMounted(fetchFaqs);
     </div>
 
     <!-- Sugerencias con IA -->
-    <div v-if="aiOpen" class="p-6 bg-purple-50/40 border-b border-purple-100 space-y-3">
+    <div v-if="aiOpen" class="p-4 sm:p-6 bg-purple-50/40 border-b border-purple-100 space-y-3">
       <div class="flex flex-col sm:flex-row gap-2">
         <input
           v-model="aiGuide"
@@ -224,7 +224,7 @@ onMounted(fetchFaqs);
     </div>
 
     <!-- Add/Edit Form -->
-    <div v-if="showForm" class="p-6 bg-gray-50 border-b border-gray-100">
+    <div v-if="showForm" class="p-4 sm:p-6 bg-gray-50 border-b border-gray-100">
       <div class="space-y-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Pregunta</label>
@@ -263,11 +263,11 @@ onMounted(fetchFaqs);
     </div>
 
     <!-- FAQ List -->
-    <div v-if="loading" class="p-8 text-center text-gray-500">
+    <div v-if="loading" class="p-6 sm:p-8 text-center text-gray-500">
       Cargando...
     </div>
 
-    <div v-else-if="faqs.length === 0 && !showForm" class="p-8 text-center text-gray-500">
+    <div v-else-if="faqs.length === 0 && !showForm" class="p-6 sm:p-8 text-center text-gray-500">
       No hay preguntas frecuentes. Agrega una para que aparezca en la página del evento.
     </div>
 
@@ -279,19 +279,19 @@ onMounted(fetchFaqs);
       >
         <div class="flex justify-between items-start gap-4">
           <div class="flex-1 min-w-0">
-            <p class="font-bold text-gray-900">{{ faq.question }}</p>
-            <p class="text-sm text-gray-500 mt-1">{{ faq.answer }}</p>
+            <p class="font-bold text-gray-900 break-words">{{ faq.question }}</p>
+            <p class="text-sm text-gray-500 mt-1 break-words">{{ faq.answer }}</p>
           </div>
           <div class="flex gap-2 shrink-0">
             <button
               @click="startEdit(faq)"
-              class="text-xs text-gray-500 hover:text-black cursor-pointer"
+              class="py-1 text-xs text-gray-500 hover:text-black cursor-pointer"
             >
               Editar
             </button>
             <button
               @click="deleteFaq(faq.id)"
-              class="text-xs text-red-500 hover:text-red-700 cursor-pointer"
+              class="py-1 text-xs text-red-500 hover:text-red-700 cursor-pointer"
             >
               Eliminar
             </button>

@@ -52,12 +52,12 @@ const chartOptions = {
 </script>
 
 <template>
-  <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+  <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-6 min-w-0">
     <h3 class="font-bold text-lg text-gray-900 mb-4">{{ title }}</h3>
     <div v-if="isEmpty" class="h-64 flex items-center justify-center text-gray-400 text-sm">
       No hay datos disponibles
     </div>
-    <div v-else class="h-64">
+    <div v-else class="h-56 sm:h-64">
       <Line :data="chartData" :options="chartOptions" />
     </div>
   </div>

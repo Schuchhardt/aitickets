@@ -5,6 +5,8 @@ import { LEGAL } from "../../lib/legal";
 
 const props = defineProps({
   buyerInfo: Object,
+  // Evento gratis: textos de inscripción en vez de compra
+  free: Boolean,
 });
 const emit = defineEmits(["update:buyerInfo"]);
 
@@ -27,7 +29,7 @@ const confirmEmailError = computed(() => {
 
 <template>
   <div class="font-[Prompt] p-4">
-    <h3 class="text-lg font-semibold mb-1">Información del comprador</h3>
+    <h3 class="text-lg font-semibold mb-1">{{ free ? "Tus datos" : "Información del comprador" }}</h3>
     <p class="text-gray-600 text-sm mb-4">Te enviaremos las entradas a este correo.</p>
     <div class="grid grid-cols-1 gap-3">
       <label class="block">
@@ -114,18 +116,18 @@ const confirmEmailError = computed(() => {
         @change="updateBuyerInfo('termsAccepted', $event.target.checked)"
         type="checkbox"
         class="mr-3 mt-0.5 cursor-pointer w-5 h-5 shrink-0 accent-black"
-        aria-describedby="terms-retracto"
+        :aria-describedby="free ? undefined : 'terms-retracto'"
         required
       />
       <label for="terms-accepted" class="text-gray-600 text-sm leading-5">
         Acepto los
         <a href="/terms" class="text-black underline font-medium" target="_blank" rel="noopener">Términos y Condiciones</a>
         y la
-        <a href="/privacy" class="text-black underline font-medium" target="_blank" rel="noopener">Política de Privacidad</a>,
-        y entiendo que esta compra no tiene derecho de retracto.
+        <a href="/privacy" class="text-black underline font-medium" target="_blank" rel="noopener">Política de Privacidad</a><template v-if="!free">,
+        y entiendo que esta compra no tiene derecho de retracto.</template><template v-else>.</template>
         <span class="text-red-500"> (Requerido)</span>
       </label>
     </div>
-    <p id="terms-retracto" class="text-xs text-gray-500 mt-2 ml-8 leading-4">{{ LEGAL.retractoNotice }}</p>
+    <p v-if="!free" id="terms-retracto" class="text-xs text-gray-500 mt-2 ml-8 leading-4">{{ LEGAL.retractoNotice }}</p>
   </div>
 </template>

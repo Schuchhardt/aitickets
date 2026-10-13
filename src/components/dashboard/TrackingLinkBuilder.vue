@@ -61,7 +61,7 @@ const copy = async () => {
 </script>
 
 <template>
-  <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm" data-testid="tracking-link">
+  <div class="bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-sm" data-testid="tracking-link">
     <h3 class="font-bold text-lg mb-1">Link con seguimiento</h3>
     <p class="text-sm text-gray-500 mb-4">
       Elige dónde lo vas a compartir y copia el link. Así sabrás qué canal vende más
@@ -79,7 +79,7 @@ const copy = async () => {
       placeholder="Otro canal o promotor (ej: radio-futuro, juan-perez)"
       class="w-full bg-gray-50 border border-gray-200 text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-black" />
 
-    <button type="button" @click="showMore = !showMore" class="mt-2 flex items-center gap-1 text-xs text-gray-500 hover:text-black">
+    <button type="button" @click="showMore = !showMore" class="mt-2 py-1 flex items-center gap-1 text-xs text-gray-500 hover:text-black">
       <ChevronDown size="14" :class="showMore ? 'rotate-180' : ''" class="transition" /> Más opciones
     </button>
     <div v-if="showMore" class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">

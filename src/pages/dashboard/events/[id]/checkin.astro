@@ -79,7 +79,7 @@ const backHref = dbUser.role === "validator" ? "/dashboard/events" : `/dashboard
 
 <DashboardLayout title={`Check-in · ${event.name}`}>
     <div class="mb-6">
-        <div class="flex items-center gap-3 mb-2">
+        <div class="flex items-center gap-2 sm:gap-3 mb-2 min-w-0 text-sm sm:text-base">
             <a
                 href="/dashboard/events"
                 class="text-gray-500 hover:text-black transition">Eventos</a
@@ -87,14 +87,14 @@ const backHref = dbUser.role === "validator" ? "/dashboard/events" : `/dashboard
             <span class="text-gray-300">/</span>
             <a
                 href={backHref}
-                class="text-gray-500 hover:text-black transition truncate max-w-[200px]"
+                class="text-gray-500 hover:text-black transition truncate min-w-0 max-w-[200px]"
                 >{event.name}</a
             >
             <span class="text-gray-300">/</span>
             <span class="text-gray-900 font-medium">Check-in</span>
         </div>
-        <h1 class="text-3xl font-bold font-[Unbounded]">Check-in</h1>
-        <p class="text-gray-500 mt-1">Escanea los códigos QR, busca asistentes por nombre o email para validarlos manualmente, o reenvía sus entradas.</p>
+        <h1 class="text-2xl md:text-3xl font-bold font-[Unbounded]">Check-in</h1>
+        <p class="text-sm sm:text-base text-gray-500 mt-1">Escanea los códigos QR, busca asistentes por nombre o email para validarlos manualmente, o reenvía sus entradas.</p>
     </div>
 
     <ValidateQR event={event} client:load />

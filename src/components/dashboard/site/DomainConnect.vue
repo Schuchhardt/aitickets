@@ -193,8 +193,8 @@ const GUIDES = computed(() => {
 
 <template>
   <section class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-    <div class="p-6 border-b border-gray-100 flex items-start justify-between gap-4">
-      <div>
+    <div class="p-4 md:p-6 border-b border-gray-100 flex items-start justify-between gap-4">
+      <div class="min-w-0">
         <h3 class="font-bold text-lg flex items-center gap-2"><Link2 size="18" /> Dominio propio</h3>
         <p class="text-sm text-gray-500 mt-1">Muestra tu sitio en tu propio dominio, por ejemplo <strong>entradas.tuproductora.cl</strong>. Gratis y con HTTPS.</p>
       </div>
@@ -204,7 +204,7 @@ const GUIDES = computed(() => {
     </div>
 
     <!-- Stepper -->
-    <ol class="flex items-center gap-2 px-6 pt-5 text-xs font-semibold text-gray-400">
+    <ol class="flex flex-wrap items-center gap-2 px-4 md:px-6 pt-5 text-xs font-semibold text-gray-400">
       <li v-for="(label, i) in ['Tu dominio', 'Configura el DNS', 'Listo']" :key="label" class="flex items-center gap-2">
         <span class="h-6 w-6 rounded-full flex items-center justify-center" :class="step > i ? 'bg-black text-white' : 'bg-gray-100 text-gray-500'">{{ i + 1 }}</span>
         <span :class="step > i ? 'text-gray-900' : ''">{{ label }}</span>
@@ -212,7 +212,7 @@ const GUIDES = computed(() => {
       </li>
     </ol>
 
-    <div class="p-6 space-y-4">
+    <div class="p-4 md:p-6 space-y-4">
       <p v-if="message" class="text-sm" :class="isError ? 'text-red-600' : 'text-green-700'">{{ message }}</p>
 
       <!-- Paso 1 -->
@@ -224,7 +224,7 @@ const GUIDES = computed(() => {
             inputmode="url"
             autocomplete="off"
             placeholder="entradas.tuproductora.cl"
-            class="flex-1 px-3 py-2 rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-black"
+            class="flex-1 min-w-0 px-3 py-2 rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-black"
             aria-label="Tu dominio"
           />
           <button type="submit" class="px-4 py-2 text-sm bg-black text-white rounded-lg hover:bg-gray-800 disabled:opacity-40" :disabled="busy">
@@ -240,7 +240,7 @@ const GUIDES = computed(() => {
       <!-- Paso 2 -->
       <div v-else-if="step === 2" class="space-y-4">
         <p class="text-sm text-gray-800">
-          Dominio: <strong>{{ domain.domain }}</strong>
+          Dominio: <strong class="break-all">{{ domain.domain }}</strong>
         </p>
 
         <div v-if="status === 'pending_provider'" class="rounded-lg bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-900">
@@ -301,7 +301,7 @@ const GUIDES = computed(() => {
           <p class="text-sm font-semibold">Guías rápidas</p>
           <div v-for="g in GUIDES" :key="g.key" class="rounded-lg border border-gray-200">
             <button type="button" class="w-full flex items-center justify-between px-4 py-2 text-sm text-left" @click="openGuide = openGuide === g.key ? '' : g.key">
-              <span>{{ g.title }}</span>
+              <span class="min-w-0">{{ g.title }}</span>
               <span class="text-gray-400">{{ openGuide === g.key ? '−' : '+' }}</span>
             </button>
             <ol v-if="openGuide === g.key" class="list-decimal pl-9 pr-4 pb-3 space-y-1 text-sm text-gray-700">
@@ -334,9 +334,9 @@ const GUIDES = computed(() => {
       <!-- Paso 3 -->
       <div v-else class="space-y-3">
         <div class="flex items-center gap-2 text-green-800">
-          <CheckCircle2 size="20" />
-          <p class="text-sm">Tu sitio está activo en <a :href="domain.url" target="_blank" rel="noopener" class="font-semibold underline">{{ domain.url }}</a></p>
-          <a :href="domain.url" target="_blank" rel="noopener" class="text-gray-500 hover:text-black"><ExternalLink size="14" /></a>
+          <CheckCircle2 size="20" class="shrink-0" />
+          <p class="text-sm min-w-0">Tu sitio está activo en <a :href="domain.url" target="_blank" rel="noopener" class="font-semibold underline break-all">{{ domain.url }}</a></p>
+          <a :href="domain.url" target="_blank" rel="noopener" class="shrink-0 text-gray-500 hover:text-black"><ExternalLink size="14" /></a>
         </div>
         <div v-if="domain.dnsLostAt" class="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-900 flex gap-2">
           <AlertTriangle size="16" class="shrink-0 mt-0.5" />

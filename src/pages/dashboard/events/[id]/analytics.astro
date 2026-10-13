@@ -249,61 +249,61 @@ const peakDatasets = JSON.stringify([
 
 <DashboardLayout title={`Analytics · ${event.name}`}>
     <div class="mb-6">
-        <div class="flex items-center gap-3 mb-2">
+        <div class="flex items-center gap-2 sm:gap-3 mb-2 min-w-0 text-sm sm:text-base">
             <a href="/dashboard/events" class="text-gray-500 hover:text-black transition">Eventos</a>
             <span class="text-gray-300">/</span>
             <a
                 href={`/dashboard/events/${event.id}`}
-                class="text-gray-500 hover:text-black transition truncate max-w-[200px]"
+                class="text-gray-500 hover:text-black transition truncate min-w-0 max-w-[200px]"
             >{event.name}</a>
             <span class="text-gray-300">/</span>
             <span class="text-gray-900 font-medium">Analytics</span>
         </div>
-        <h1 class="text-3xl font-bold font-[Unbounded]">Analytics</h1>
+        <h1 class="text-2xl md:text-3xl font-bold font-[Unbounded]">Analytics</h1>
         <p class="text-gray-500 mt-1">Resumen de rendimiento de tu evento.</p>
     </div>
 
     <!-- Summary Stats -->
-    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
-        <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-8">
+        <div class="bg-white p-4 sm:p-5 rounded-xl border border-gray-200 shadow-sm min-w-0">
             <div class="p-2 bg-blue-50 text-blue-600 rounded-lg w-fit mb-3">
                 <Eye size={18} />
             </div>
             <p class="text-gray-500 text-xs mb-1">Visitas</p>
-            <h3 class="text-xl font-bold">{totalVisits.toLocaleString()}</h3>
+            <h3 class="text-lg sm:text-xl font-bold break-words">{totalVisits.toLocaleString()}</h3>
         </div>
-        <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+        <div class="bg-white p-4 sm:p-5 rounded-xl border border-gray-200 shadow-sm min-w-0">
             <div class="p-2 bg-purple-50 text-purple-600 rounded-lg w-fit mb-3">
                 <Users size={18} />
             </div>
             <p class="text-gray-500 text-xs mb-1">Visitantes unicos</p>
-            <h3 class="text-xl font-bold">{uniqueVisitors.toLocaleString()}</h3>
+            <h3 class="text-lg sm:text-xl font-bold break-words">{uniqueVisitors.toLocaleString()}</h3>
         </div>
-        <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+        <div class="bg-white p-4 sm:p-5 rounded-xl border border-gray-200 shadow-sm min-w-0">
             <div class="p-2 bg-green-50 text-green-600 rounded-lg w-fit mb-3">
                 <Ticket size={18} />
             </div>
             <p class="text-gray-500 text-xs mb-1">Entradas vendidas</p>
-            <h3 class="text-xl font-bold">{totalTicketsSold}</h3>
+            <h3 class="text-lg sm:text-xl font-bold break-words">{totalTicketsSold}</h3>
         </div>
-        <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+        <div class="bg-white p-4 sm:p-5 rounded-xl border border-gray-200 shadow-sm min-w-0">
             <div class="p-2 bg-orange-50 text-orange-600 rounded-lg w-fit mb-3">
                 <BarChart3 size={18} />
             </div>
             <p class="text-gray-500 text-xs mb-1">Ingresos</p>
-            <h3 class="text-xl font-bold">${totalRevenue.toLocaleString()}</h3>
+            <h3 class="text-lg sm:text-xl font-bold break-words">${totalRevenue.toLocaleString()}</h3>
         </div>
-        <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+        <div class="bg-white p-4 sm:p-5 rounded-xl border border-gray-200 shadow-sm min-w-0">
             <div class="p-2 bg-pink-50 text-pink-600 rounded-lg w-fit mb-3">
                 <TrendingUp size={18} />
             </div>
             <p class="text-gray-500 text-xs mb-1">Conversion</p>
-            <h3 class="text-xl font-bold">{conversion}%</h3>
+            <h3 class="text-lg sm:text-xl font-bold break-words">{conversion}%</h3>
         </div>
     </div>
 
     <!-- Charts Grid -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <LineChart
             client:visible
             title="Visitas por dia"
@@ -345,7 +345,7 @@ const peakDatasets = JSON.stringify([
     </div>
 
     <!-- Ventas por canal (UTM / ref) -->
-    <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm mt-6">
+    <div class="bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-sm mt-6">
         <div class="flex flex-wrap items-baseline justify-between gap-2 mb-4">
             <h3 class="font-bold text-lg">Ventas por canal</h3>
             <a href={`/dashboard/events/${event.id}#trackingBuilder`} class="text-sm text-blue-600 hover:underline">Crear link con seguimiento</a>
@@ -353,23 +353,23 @@ const peakDatasets = JSON.stringify([
         {channelRows.length === 0 ? (
             <p class="text-sm text-gray-500">Aún no hay ventas pagadas. Comparte links con <code>utm_source</code> o <code>ref</code> para saber qué canal vende más.</p>
         ) : (
-            <div class="overflow-x-auto">
+            <div class="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="text-left text-gray-500 border-b border-gray-100">
                             <th class="py-2 pr-4 font-medium">Canal</th>
-                            <th class="py-2 pr-4 font-medium text-right">Órdenes</th>
-                            <th class="py-2 pr-4 font-medium text-right">Entradas</th>
-                            <th class="py-2 font-medium text-right">Ingresos</th>
+                            <th class="py-2 pr-4 font-medium text-right whitespace-nowrap">Órdenes</th>
+                            <th class="py-2 pr-4 font-medium text-right whitespace-nowrap">Entradas</th>
+                            <th class="py-2 font-medium text-right whitespace-nowrap">Ingresos</th>
                         </tr>
                     </thead>
                     <tbody>
                         {channelRows.map((row) => (
                             <tr class="border-b border-gray-50">
-                                <td class="py-2 pr-4 text-gray-900 break-all">{row.channel}</td>
-                                <td class="py-2 pr-4 text-right">{row.orders}</td>
-                                <td class="py-2 pr-4 text-right">{row.tickets}</td>
-                                <td class="py-2 text-right">${row.revenue.toLocaleString("es-CL")}</td>
+                                <td class="py-2 pr-4 text-gray-900 break-all min-w-[8rem]">{row.channel}</td>
+                                <td class="py-2 pr-4 text-right whitespace-nowrap">{row.orders}</td>
+                                <td class="py-2 pr-4 text-right whitespace-nowrap">{row.tickets}</td>
+                                <td class="py-2 text-right whitespace-nowrap">${row.revenue.toLocaleString("es-CL")}</td>
                             </tr>
                         ))}
                     </tbody>
@@ -380,25 +380,25 @@ const peakDatasets = JSON.stringify([
     </div>
 
     {providerRows.length > 0 && (
-        <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm mt-6">
+        <div class="bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-sm mt-6">
             <h3 class="font-bold text-lg mb-4">Ventas por medio de pago</h3>
-            <div class="overflow-x-auto">
+            <div class="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="text-left text-gray-500 border-b border-gray-100">
                             <th class="py-2 pr-4 font-medium">Medio de pago</th>
-                            <th class="py-2 pr-4 font-medium text-right">Órdenes</th>
-                            <th class="py-2 pr-4 font-medium text-right">Entradas</th>
-                            <th class="py-2 font-medium text-right">Ingresos</th>
+                            <th class="py-2 pr-4 font-medium text-right whitespace-nowrap">Órdenes</th>
+                            <th class="py-2 pr-4 font-medium text-right whitespace-nowrap">Entradas</th>
+                            <th class="py-2 font-medium text-right whitespace-nowrap">Ingresos</th>
                         </tr>
                     </thead>
                     <tbody>
                         {providerRows.map((row) => (
                             <tr class="border-b border-gray-50">
                                 <td class="py-2 pr-4 text-gray-900">{row.channel}</td>
-                                <td class="py-2 pr-4 text-right">{row.orders}</td>
-                                <td class="py-2 pr-4 text-right">{row.tickets}</td>
-                                <td class="py-2 text-right">${row.revenue.toLocaleString("es-CL")}</td>
+                                <td class="py-2 pr-4 text-right whitespace-nowrap">{row.orders}</td>
+                                <td class="py-2 pr-4 text-right whitespace-nowrap">{row.tickets}</td>
+                                <td class="py-2 text-right whitespace-nowrap">${row.revenue.toLocaleString("es-CL")}</td>
                             </tr>
                         ))}
                     </tbody>

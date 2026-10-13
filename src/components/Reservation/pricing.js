@@ -21,6 +21,15 @@ export {
 /** El productor absorbe el cargo por servicio en este evento (events.fee_absorbed). */
 export const isFeeAbsorbed = (event) => event?.fee_absorbed === true;
 
+/**
+ * Evento totalmente gratis: todas sus entradas a la venta cuestan $0. En ese caso la página y el checkout
+ * hablan de "confirmar asistencia" en vez de comprar/pagar (el servidor igual crea una orden gratis).
+ */
+export const isFreeEvent = (event) => {
+  const tickets = event?.tickets || [];
+  return tickets.length > 0 && tickets.every((t) => !(Number(t?.price) > 0));
+};
+
 /** Nota junto al precio de una entrada pagada: "+ cargo por servicio 8% + IVA" o "Cargo por servicio incluido". */
 export const feeNoteFor = (event) => (isFeeAbsorbed(event) ? FEE_INCLUDED_NOTE : SERVICE_FEE_NOTE);
 export const DEFAULT_MAX_PER_PURCHASE = 10;

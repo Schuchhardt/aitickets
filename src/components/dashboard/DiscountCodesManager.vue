@@ -150,18 +150,18 @@ const copy = async (code) => {
 
 <template>
   <section class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden" data-testid="discount-codes">
-    <div class="p-6 border-b border-gray-100">
+    <div class="p-4 md:p-6 border-b border-gray-100">
       <h3 class="font-bold text-lg flex items-center gap-2"><Tag size="18" /> Códigos de descuento</h3>
       <p class="text-sm text-gray-500 mt-1">
         Se descuenta del valor de las entradas (el cargo por servicio se calcula sobre el monto con descuento).
       </p>
     </div>
 
-    <div v-if="unavailable" class="p-6 text-sm text-amber-700 bg-amber-50">
+    <div v-if="unavailable" class="p-4 md:p-6 text-sm text-amber-700 bg-amber-50">
       Los códigos de descuento se están activando. Vuelve a intentarlo en unos minutos.
     </div>
 
-    <form v-else @submit.prevent="create" class="p-6 space-y-3 border-b border-gray-100">
+    <form v-else @submit.prevent="create" class="p-4 md:p-6 space-y-3 border-b border-gray-100">
       <div class="flex flex-col md:flex-row gap-3 md:items-end">
         <div class="flex-1 min-w-0">
           <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Código</label>
@@ -185,7 +185,7 @@ const copy = async (code) => {
             </div>
             <input v-model="form.value" type="number" :min="1" :max="form.kind === 'percent' ? 100 : undefined" :step="form.kind === 'percent' ? 0.01 : 1"
               :placeholder="form.kind === 'percent' ? '10' : '5000'"
-              class="w-28 px-3 py-2 rounded-r-lg border border-gray-300 outline-none focus:ring-2 focus:ring-black" />
+              class="w-full min-w-0 md:w-28 px-3 py-2 rounded-r-lg border border-gray-300 outline-none focus:ring-2 focus:ring-black" />
           </div>
         </div>
         <button type="submit" :disabled="saving"
@@ -194,12 +194,12 @@ const copy = async (code) => {
         </button>
       </div>
 
-      <button type="button" @click="showOptions = !showOptions" class="flex items-center gap-1 text-xs text-gray-500 hover:text-black">
+      <button type="button" @click="showOptions = !showOptions" class="flex items-center gap-1 text-left text-xs text-gray-500 hover:text-black">
         <ChevronDown size="14" class="transition" :class="showOptions ? 'rotate-180' : ''" />
         Límites y vigencia <span class="text-gray-400">(opcional{{ optionsSummary ? `: ${optionsSummary}` : '' }})</span>
       </button>
-      <div v-if="showOptions" class="grid grid-cols-2 md:grid-cols-4 gap-3 rounded-lg bg-gray-50 p-3">
-        <div v-if="!eventId" class="col-span-2 md:col-span-4">
+      <div v-if="showOptions" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 rounded-lg bg-gray-50 p-3">
+        <div v-if="!eventId" class="sm:col-span-2 md:col-span-4">
           <label class="block text-xs text-gray-500 mb-1">Aplica a</label>
           <select v-model="form.eventId" class="w-full px-3 py-2 rounded-lg border border-gray-300 bg-white outline-none focus:ring-2 focus:ring-black">
             <option value="">Todos mis eventos</option>
@@ -226,18 +226,18 @@ const copy = async (code) => {
           <input v-model="form.endsAt" type="datetime-local"
             class="w-full px-3 py-2 rounded-lg border border-gray-300 bg-white outline-none focus:ring-2 focus:ring-black" />
         </div>
-        <p class="col-span-2 md:col-span-4 text-xs text-gray-400">
+        <p class="sm:col-span-2 md:col-span-4 text-xs text-gray-400">
           Un uso es una compra. Las compras pendientes de pago reservan su uso hasta que vencen.
         </p>
       </div>
       <p v-if="message" class="text-sm" :class="isError ? 'text-red-600' : 'text-green-700'" role="status">{{ message }}</p>
     </form>
 
-    <div v-if="loading" class="p-6 text-sm text-gray-500">Cargando códigos...</div>
-    <div v-else-if="listError" class="p-6 text-sm text-red-600">{{ listError }}</div>
-    <div v-else-if="!codes.length && !unavailable" class="p-6 text-sm text-gray-500">Aún no tienes códigos de descuento.</div>
+    <div v-if="loading" class="p-4 md:p-6 text-sm text-gray-500">Cargando códigos...</div>
+    <div v-else-if="listError" class="p-4 md:p-6 text-sm text-red-600">{{ listError }}</div>
+    <div v-else-if="!codes.length && !unavailable" class="p-4 md:p-6 text-sm text-gray-500">Aún no tienes códigos de descuento.</div>
     <template v-else-if="codes.length">
-      <div class="px-6 py-3 bg-gray-50 text-xs text-gray-600 flex flex-wrap gap-x-6 gap-y-1">
+      <div class="px-4 md:px-6 py-3 bg-gray-50 text-xs text-gray-600 flex flex-wrap gap-x-6 gap-y-1">
         <span><strong>{{ totals.orders }}</strong> compra(s) pagada(s) con código</span>
         <span>Descuento otorgado: <strong>{{ clp(totals.discount) }}</strong></span>
         <span>Ventas con código: <strong>{{ clp(totals.revenue) }}</strong></span>
@@ -246,15 +246,15 @@ const copy = async (code) => {
         <table class="w-full text-left text-sm text-gray-600">
           <thead class="bg-gray-50 text-gray-900 font-semibold border-b border-gray-100">
             <tr>
-              <th class="px-4 py-3">Código</th>
-              <th class="px-4 py-3">Descuento</th>
-              <th class="px-4 py-3">Aplica a</th>
-              <th class="px-4 py-3">Usos</th>
-              <th class="px-4 py-3">Vigencia</th>
-              <th class="px-4 py-3">Descuento otorgado</th>
-              <th class="px-4 py-3">Ventas</th>
-              <th class="px-4 py-3">Estado</th>
-              <th class="px-4 py-3"></th>
+              <th class="px-4 py-3 whitespace-nowrap">Código</th>
+              <th class="px-4 py-3 whitespace-nowrap">Descuento</th>
+              <th class="px-4 py-3 whitespace-nowrap">Aplica a</th>
+              <th class="px-4 py-3 whitespace-nowrap">Usos</th>
+              <th class="px-4 py-3 whitespace-nowrap">Vigencia</th>
+              <th class="px-4 py-3 whitespace-nowrap">Descuento otorgado</th>
+              <th class="px-4 py-3 whitespace-nowrap">Ventas</th>
+              <th class="px-4 py-3 whitespace-nowrap">Estado</th>
+              <th class="px-4 py-3 whitespace-nowrap"></th>
             </tr>
           </thead>
           <tbody>
@@ -263,7 +263,7 @@ const copy = async (code) => {
                 <button type="button" class="hover:underline" title="Copiar" @click="copy(c.code)">{{ c.code }}</button>
               </td>
               <td class="px-4 py-3 whitespace-nowrap">{{ c.label }}</td>
-              <td class="px-4 py-3">{{ c.eventId == null ? 'Todos mis eventos' : (c.eventName || 'Este evento') }}</td>
+              <td class="px-4 py-3 min-w-[9rem]">{{ c.eventId == null ? 'Todos mis eventos' : (c.eventName || 'Este evento') }}</td>
               <td class="px-4 py-3 whitespace-nowrap">
                 {{ c.uses }}{{ c.maxUses != null ? ` / ${c.maxUses}` : '' }}
                 <span v-if="c.perBuyerLimit != null" class="block text-xs text-gray-400">máx. {{ c.perBuyerLimit }} por comprador</span>

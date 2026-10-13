@@ -73,7 +73,7 @@ const handleDisconnect = (accountId) => {
         class="bg-white rounded-xl shadow-sm border overflow-hidden"
         :class="getAccountForPlatform(platform.id) ? platform.borderColor : 'border-gray-100'"
       >
-        <div class="p-6">
+        <div class="p-4 md:p-6">
           <!-- Platform Header -->
           <div class="flex items-center justify-between mb-4">
             <div class="flex items-center gap-3">
@@ -100,14 +100,14 @@ const handleDisconnect = (accountId) => {
               <img
                 v-if="getAccountForPlatform(platform.id).avatar_url"
                 :src="getAccountForPlatform(platform.id).avatar_url"
-                class="w-10 h-10 rounded-full object-cover"
+                class="w-10 h-10 shrink-0 rounded-full object-cover"
                 :alt="getAccountForPlatform(platform.id).account_name"
               />
-              <div v-else class="w-10 h-10 rounded-full flex items-center justify-center text-white bg-gradient-to-br" :class="platform.color">
+              <div v-else class="w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-white bg-gradient-to-br" :class="platform.color">
                 <component :is="platform.icon" :size="18" />
               </div>
-              <div>
-                <p class="font-medium text-sm" :class="platform.textColor">
+              <div class="min-w-0">
+                <p class="font-medium text-sm break-all" :class="platform.textColor">
                   @{{ getAccountForPlatform(platform.id).account_name || 'Cuenta conectada' }}
                 </p>
                 <p class="text-xs text-gray-400">

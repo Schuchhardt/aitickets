@@ -13,9 +13,6 @@ const props = defineProps({
   // Página del evento: portada a todo el ancho, arriba de todo (sin navbar). Fuera de ella (orden, entrada)
   // se muestra como tarjeta.
   hero: { type: Boolean, default: false },
-  // Link de vuelta sobre la portada (solo hero). null = sin link.
-  backHref: { type: String, default: null },
-  backLabel: { type: String, default: "Eventos" },
 });
 
 // title y name suelen ser iguales (el dashboard guarda ambos): mostrar title solo si aporta algo
@@ -66,16 +63,6 @@ const anyContain = computed(() => cover.value.mobile.fit === "contain" || cover.
         height="600"
       />
       <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent hidden lg:block"></div>
-      <div v-if="hero" class="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/50 to-transparent"></div>
-
-      <!-- Vuelta al listado (la página del evento no tiene navbar) -->
-      <a
-        v-if="hero && backHref"
-        :href="backHref"
-        class="absolute top-4 left-4 lg:top-6 lg:left-6 inline-flex items-center gap-1.5 rounded-full bg-black/45 backdrop-blur px-3.5 py-1.5 text-sm font-medium text-white hover:bg-black/65 transition font-['Prompt']"
-      >
-        <span aria-hidden="true">←</span> {{ backLabel }}
-      </a>
 
       <!-- Texto sobre la imagen en desktop -->
       <div class="absolute inset-x-0 bottom-0 hidden lg:block">

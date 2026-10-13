@@ -340,7 +340,7 @@ const submitEvent = async ({ exit = false } = {}) => {
 <template>
   <div class="bg-white rounded-xl border border-gray-200 shadow-sm min-h-[600px] flex flex-col">
     <!-- Steps Header -->
-    <div class="border-b border-gray-100 p-6">
+    <div class="border-b border-gray-100 p-6 pb-12 sm:pb-6">
       <div class="flex items-center justify-between max-w-2xl mx-auto">
         <button
           v-for="(step, index) in steps"
@@ -365,8 +365,8 @@ const submitEvent = async ({ exit = false } = {}) => {
             ></span>
           </div>
           <span 
-            class="text-xs font-medium mt-2 absolute -bottom-6 w-32 text-center"
-            :class="currentStep === step.number ? 'text-black' : 'text-gray-500 group-hover:text-black'"
+            class="text-xs font-medium mt-2 absolute top-full w-20 sm:w-32 text-center leading-tight sm:leading-normal"
+            :class="currentStep === step.number ? 'text-black' : 'hidden sm:block text-gray-500 group-hover:text-black'"
           >
             {{ step.title }}
           </span>
@@ -378,7 +378,7 @@ const submitEvent = async ({ exit = false } = {}) => {
     </div>
 
     <!-- Content -->
-    <div class="flex-1 p-8 overflow-y-auto">
+    <div class="flex-1 p-4 sm:p-8 overflow-y-auto">
       <div class="max-w-3xl mx-auto">
 
         <div v-if="submitError" class="mb-6 p-4 bg-red-50 text-red-600 rounded-lg text-sm border border-red-100">
@@ -441,9 +441,9 @@ const submitEvent = async ({ exit = false } = {}) => {
             />
 
             <!-- Preview State -->
-            <div v-if="form.general.imageUrl" class="relative w-full h-64 rounded-xl overflow-hidden group border border-gray-200">
+            <div v-if="form.general.imageUrl" class="relative w-full h-48 sm:h-64 rounded-xl overflow-hidden group border border-gray-200">
                <img :src="form.general.imageUrl" class="w-full h-full object-cover" />
-               <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
+               <div class="absolute inset-0 bg-black/50 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
                  <button @click="triggerFileInput" class="px-4 py-2 bg-white rounded-lg text-sm font-medium hover:bg-gray-100 transition">Cambiar</button>
                  <button @click="removeImage" class="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"><Trash2 size="18"/></button>
                </div>
@@ -452,7 +452,7 @@ const submitEvent = async ({ exit = false } = {}) => {
             <!-- Empty State / Dropzone -->
             <div 
               v-else
-              class="border-2 border-dashed rounded-xl p-10 flex flex-col items-center justify-center text-center transition-all cursor-pointer"
+              class="border-2 border-dashed rounded-xl p-6 sm:p-10 flex flex-col items-center justify-center text-center transition-all cursor-pointer"
               :class="[
                 isDragging ? 'border-black bg-gray-50' : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50',
                 uploadingImage ? 'opacity-50 pointer-events-none' : ''
@@ -489,12 +489,12 @@ const submitEvent = async ({ exit = false } = {}) => {
 
         <!-- Step 2: Locations & Dates -->
         <div v-show="currentStep === 2" class="space-y-8">
-           <div v-for="(loc, locIndex) in form.locations" :key="loc.id" class="p-6 bg-gray-50 rounded-xl border border-gray-200 relative">
-             <button @click="removeLocation(locIndex)" v-if="form.locations.length > 1" class="absolute top-4 right-4 text-gray-400 hover:text-red-500">
+           <div v-for="(loc, locIndex) in form.locations" :key="loc.id" class="p-4 sm:p-6 bg-gray-50 rounded-xl border border-gray-200 relative">
+             <button @click="removeLocation(locIndex)" v-if="form.locations.length > 1" class="absolute top-3 right-3 sm:top-4 sm:right-4 p-1 text-gray-400 hover:text-red-500">
                <Trash2 size="18" />
              </button>
 
-             <h3 class="font-bold mb-4 flex items-center gap-2">
+             <h3 class="font-bold mb-4 flex items-center gap-2 pr-8">
                <MapPin size="18" /> Ubicación #{{ locIndex + 1 }}
              </h3>
 
@@ -536,13 +536,13 @@ const submitEvent = async ({ exit = false } = {}) => {
              <!-- Dates (Functions) -->
              <div class="space-y-3">
                <label class="text-sm font-bold text-gray-700">Funciones (Fechas y Hora)</label>
-               <div v-for="(date, dateIndex) in loc.dates" :key="date.id" class="flex gap-3 items-center">
-                 <input v-model="date.date" type="date" class="flex-1 px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black outline-none" />
-                 <input v-model="date.startTime" type="time" class="w-24 px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black outline-none" />
+               <div v-for="(date, dateIndex) in loc.dates" :key="date.id" class="flex flex-wrap sm:flex-nowrap gap-3 items-center">
+                 <input v-model="date.date" type="date" class="w-full sm:w-auto sm:flex-1 min-w-0 px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black outline-none" />
+                 <input v-model="date.startTime" type="time" class="flex-1 min-w-0 sm:flex-none sm:w-24 px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black outline-none" />
                  <span class="text-gray-400">-</span>
-                 <input v-model="date.endTime" type="time" class="w-24 px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black outline-none" />
+                 <input v-model="date.endTime" type="time" class="flex-1 min-w-0 sm:flex-none sm:w-24 px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black outline-none" />
                  
-                 <button @click="removeDate(locIndex, dateIndex)" v-if="loc.dates.length > 1" class="text-gray-400 hover:text-red-500">
+                 <button @click="removeDate(locIndex, dateIndex)" v-if="loc.dates.length > 1" class="p-1 text-gray-400 hover:text-red-500">
                    <Trash2 size="16" />
                  </button>
                </div>
@@ -562,16 +562,16 @@ const submitEvent = async ({ exit = false } = {}) => {
            <p v-if="functionOptions.length > 1" class="text-sm text-gray-600 bg-blue-50 border border-blue-100 rounded-lg p-3">
              Para vender cupos separados por función, crea un tipo de entrada por función. Una entrada con "Todas las funciones" comparte su cupo entre todas las fechas.
            </p>
-           <div v-for="(ticket, index) in form.tickets" :key="ticket.id" class="p-6 bg-gray-50 rounded-xl border border-gray-200 relative flex gap-6 items-start">
-             <button @click="removeTicket(index)" v-if="form.tickets.length > 1" class="absolute top-4 right-4 text-gray-400 hover:text-red-500">
+           <div v-for="(ticket, index) in form.tickets" :key="ticket.id" class="p-4 sm:p-6 bg-gray-50 rounded-xl border border-gray-200 relative flex gap-4 sm:gap-6 items-start">
+             <button @click="removeTicket(index)" v-if="form.tickets.length > 1" class="absolute top-3 right-3 sm:top-4 sm:right-4 p-1 text-gray-400 hover:text-red-500">
                <Trash2 size="18" />
              </button>
 
-             <div class="bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
+             <div class="hidden sm:block bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
                 <Ticket size="24" class="text-gray-400" />
              </div>
 
-             <div class="flex-1 grid grid-cols-2 gap-4">
+             <div class="flex-1 min-w-0 grid grid-cols-2 gap-3 sm:gap-4">
                <div class="col-span-2">
                  <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Nombre Ticket</label>
                  <input v-model="ticket.name" type="text" placeholder="Ej: General Early Bird" class="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black outline-none" />
@@ -604,12 +604,12 @@ const submitEvent = async ({ exit = false } = {}) => {
 
         <!-- Step 4: Review -->
         <div v-show="currentStep === 4" class="space-y-6">
-           <div class="bg-gray-50 p-6 rounded-xl border border-gray-200">
+           <div class="bg-gray-50 p-4 sm:p-6 rounded-xl border border-gray-200">
              <img v-if="form.general.imageUrl" :src="form.general.imageUrl" alt="" class="w-full h-40 object-cover rounded-lg mb-4" />
-             <h3 class="font-bold text-lg mb-2">{{ form.general.name }}</h3>
+             <h3 class="font-bold text-lg mb-2 break-words">{{ form.general.name }}</h3>
              <div class="rich-text text-gray-600 text-sm mb-4" v-html="descriptionPreview"></div>
              
-             <div class="grid grid-cols-2 gap-8 pt-4 border-t border-gray-200">
+             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-8 pt-4 border-t border-gray-200">
                <div>
                  <p class="text-xs font-bold text-gray-500 uppercase mb-2">Ubicaciones</p>
                  <ul class="text-sm space-y-1">
@@ -647,11 +647,11 @@ const submitEvent = async ({ exit = false } = {}) => {
     </div>
 
     <!-- Footer Actions -->
-    <div class="p-6 border-t border-gray-100 bg-gray-50 rounded-b-xl flex justify-between items-center">
+    <div class="p-4 sm:p-6 border-t border-gray-100 bg-gray-50 rounded-b-xl flex flex-wrap justify-between items-center gap-3">
       <button 
         v-if="currentStep > 1" 
         @click="prevStep"
-        class="px-6 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-100 transition flex items-center gap-2"
+        class="px-4 sm:px-6 py-2.5 sm:py-2 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-100 transition flex items-center gap-2"
         :disabled="isSubmitting"
       >
         <ChevronLeft size="18" /> Anterior
@@ -660,13 +660,13 @@ const submitEvent = async ({ exit = false } = {}) => {
         <a :href="`/dashboard/events/${props.eventId}`" class="text-sm text-gray-500 hover:text-black">Cancelar</a>
       </div>
 
-      <div class="flex items-center gap-3">
+      <div class="flex flex-wrap items-center justify-end gap-2 sm:gap-3 ml-auto">
         <span v-if="isDirty && !isSubmitting" class="hidden sm:inline text-xs text-gray-500">Cambios sin guardar</span>
 
         <button
           v-if="currentStep < 4"
           @click="submitEvent()"
-          class="px-5 py-2 rounded-lg border border-gray-300 bg-white text-gray-800 font-medium hover:bg-gray-100 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          class="px-4 sm:px-5 py-2.5 sm:py-2 rounded-lg border border-gray-300 bg-white text-gray-800 font-medium hover:bg-gray-100 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           :disabled="isSubmitting || !isDirty"
         >
           <span v-if="isSubmitting" class="animate-spin w-4 h-4 border-2 border-gray-300 border-t-gray-800 rounded-full"></span>
@@ -676,7 +676,7 @@ const submitEvent = async ({ exit = false } = {}) => {
         <button 
           v-if="currentStep < 4" 
           @click="nextStep"
-          class="px-8 py-2 rounded-lg bg-black text-white font-medium hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          class="px-5 sm:px-8 py-2.5 sm:py-2 rounded-lg bg-black text-white font-medium hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           :disabled="!canNext || isSubmitting"
         >
           Siguiente <ChevronRight size="18" />
@@ -694,7 +694,7 @@ const submitEvent = async ({ exit = false } = {}) => {
         <button 
           v-if="currentStep === 4" 
           @click="submitEvent({ exit: true })"
-          class="px-8 py-2 rounded-lg bg-black text-white font-medium hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          class="px-5 sm:px-8 py-2.5 sm:py-2 rounded-lg bg-black text-white font-medium hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           :disabled="isSubmitting"
         >
           <span v-if="isSubmitting" class="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></span>

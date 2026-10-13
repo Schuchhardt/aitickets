@@ -1,4 +1,4 @@
-// POST /api/auth/magic-link — envía un enlace de acceso directo (60 min, uso único) a /auth/link.
+// POST /api/auth/magic-link — envía un enlace de acceso directo (30 min) a /auth/link.
 //
 // { email, purpose: 'recovery', cfToken? }  (sin sesión, "¿Olvidaste tu contraseña?")
 //   - Turnstile obligatorio en producción (si falta TURNSTILE_SECRET_KEY en PROD, se rechaza); en
@@ -21,7 +21,7 @@ export const prerender = false;
 
 const GENERIC = {
     ok: true,
-    message: "Si el correo corresponde a una cuenta de AI Tickets, te enviamos un enlace para ingresar. Revisa tu bandeja de entrada (y spam). El enlace dura 60 minutos.",
+    message: "Si el correo corresponde a una cuenta de AI Tickets, te enviamos un enlace para ingresar. Revisa tu bandeja de entrada (y spam). El enlace dura 30 minutos.",
 };
 const EMAIL_RE = /^[^\s@<>(),;:"[\]]+@[^\s@<>(),;:"[\]]+\.[^\s@<>(),;:"[\]]{2,}$/;
 
@@ -125,7 +125,7 @@ export const POST: APIRoute = async (context) => {
         }
         return jsonResponse({
             ok: true,
-            message: `Te enviamos un enlace a ${authUser.email}. Ábrelo en los próximos 60 minutos para crear tu nueva contraseña.`,
+            message: `Te enviamos un enlace a ${authUser.email}. Ábrelo en los próximos 30 minutos para crear tu nueva contraseña.`,
         }, 200);
     }
 

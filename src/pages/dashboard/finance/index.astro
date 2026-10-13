@@ -177,14 +177,14 @@ const formatDate = (d: string | null) =>
 
 <DashboardLayout title="Ingresos">
     <div class="space-y-6">
-        <div class="flex items-center justify-between">
+        <div class="flex flex-wrap items-center justify-between gap-3">
             <h1 class="text-2xl font-bold text-gray-900">
                 Ingresos y Finanzas
             </h1>
         </div>
 
         <!-- Cómo se paga -->
-        <div class="bg-blue-50 border border-blue-100 rounded-xl p-5 text-sm text-blue-900">
+        <div class="bg-blue-50 border border-blue-100 rounded-xl p-4 md:p-5 text-sm text-blue-900">
             <p class="font-semibold mb-1">¿Cómo recibo mi dinero?</p>
             <p>
                 Recibes el <strong>100% del valor de tus entradas</strong>: el cargo por servicio y su IVA los paga el comprador.
@@ -199,10 +199,10 @@ const formatDate = (d: string | null) =>
         </div>
 
         <!-- Quick Stats -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div class="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+            <div class="bg-white p-4 md:p-6 rounded-xl border border-gray-100 shadow-sm">
                 <h3 class="text-gray-500 text-sm font-medium">Ventas de entradas</h3>
-                <p class="text-3xl font-bold mt-2">{formatCLP(totalRevenue)}</p>
+                <p class="text-2xl md:text-3xl font-bold mt-2">{formatCLP(totalRevenue)}</p>
                 <p class="text-xs text-gray-400 mt-1">Órdenes pagadas. No incluye el cargo por servicio ({formatCLP(totalServiceFees)}) ni su IVA ({formatCLP(totalServiceFeeTax)}).</p>
                 {totalAbsorbedFees > 0 && (
                     <p class="text-xs text-gray-400 mt-1" data-testid="finance-absorbed-fees">
@@ -215,13 +215,13 @@ const formatDate = (d: string | null) =>
                     </p>
                 )}
             </div>
-            <div class="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
+            <div class="bg-white p-4 md:p-6 rounded-xl border border-gray-100 shadow-sm">
                 <h3 class="text-gray-500 text-sm font-medium">Transferido a la fecha</h3>
-                <p class="text-3xl font-bold mt-2">{formatCLP(paidOut)}</p>
+                <p class="text-2xl md:text-3xl font-bold mt-2">{formatCLP(paidOut)}</p>
             </div>
-            <div class="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
+            <div class="bg-white p-4 md:p-6 rounded-xl border border-gray-100 shadow-sm">
                 <h3 class="text-gray-500 text-sm font-medium">Saldo a pagar</h3>
-                <p class="text-3xl font-bold mt-2 text-green-600">{formatCLP(balanceDue)}</p>
+                <p class="text-2xl md:text-3xl font-bold mt-2 text-green-600">{formatCLP(balanceDue)}</p>
                 <p class="text-xs text-gray-400 mt-1">Se transfiere 48–72 h después de cada función.</p>
             </div>
         </div>
@@ -229,32 +229,32 @@ const formatDate = (d: string | null) =>
         <!-- Resumen por evento -->
         {summaries.length > 0 && (
             <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                <div class="p-6 border-b border-gray-100">
+                <div class="p-4 md:p-6 border-b border-gray-100">
                     <h3 class="text-lg font-bold text-gray-900">Resumen por evento</h3>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-sm text-gray-600">
                         <thead class="bg-gray-50 text-gray-900 font-semibold border-b border-gray-100">
                             <tr>
-                                <th class="px-6 py-4">Evento</th>
-                                <th class="px-6 py-4">Última función</th>
-                                <th class="px-6 py-4">Entradas</th>
-                                <th class="px-6 py-4">Ventas de entradas</th>
-                                <th class="px-6 py-4">Transferido</th>
-                                <th class="px-6 py-4">Saldo a pagar</th>
-                                <th class="px-6 py-4"></th>
+                                <th class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">Evento</th>
+                                <th class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">Última función</th>
+                                <th class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">Entradas</th>
+                                <th class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">Ventas de entradas</th>
+                                <th class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">Transferido</th>
+                                <th class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">Saldo a pagar</th>
+                                <th class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap"></th>
                             </tr>
                         </thead>
                         <tbody>
                             {summaries.map((s) => (
                                 <tr class="border-b border-gray-50 hover:bg-gray-50 transition">
-                                    <td class="px-6 py-4 font-medium text-gray-900">{s.name}</td>
-                                    <td class="px-6 py-4">{formatDate(s.endDate)}</td>
-                                    <td class="px-6 py-4">{s.qty}</td>
-                                    <td class="px-6 py-4">{formatCLP(s.amount)}</td>
-                                    <td class="px-6 py-4">{formatCLP(s.paid)}</td>
-                                    <td class="px-6 py-4 font-semibold text-gray-900">{formatCLP(Math.max(0, s.amount - s.paid))}</td>
-                                    <td class="px-6 py-4">
+                                    <td class="px-4 md:px-6 py-3 md:py-4 font-medium text-gray-900 min-w-[10rem]">{s.name}</td>
+                                    <td class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">{formatDate(s.endDate)}</td>
+                                    <td class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">{s.qty}</td>
+                                    <td class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">{formatCLP(s.amount)}</td>
+                                    <td class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">{formatCLP(s.paid)}</td>
+                                    <td class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap font-semibold text-gray-900">{formatCLP(Math.max(0, s.amount - s.paid))}</td>
+                                    <td class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">
                                         <a href={`/api/events/orders-csv?event_id=${s.id}`} class="text-blue-600 hover:underline whitespace-nowrap">Exportar CSV</a>
                                     </td>
                                 </tr>
@@ -275,7 +275,7 @@ const formatDate = (d: string | null) =>
         <!-- Transactions Table -->
         {transactions.length > 0 ? (
             <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                <div class="p-6 border-b border-gray-100">
+                <div class="p-4 md:p-6 border-b border-gray-100">
                     <h3 class="text-lg font-bold text-gray-900">Órdenes pagadas</h3>
                     <p class="text-xs text-gray-500 mt-1">
                         El cargo por servicio ({SERVICE_FEE_PERCENT_LABEL}) y su IVA ({IVA_PERCENT_LABEL} del cargo) los paga el comprador y la comisión de la pasarela de pago la cubre AI Tickets: ninguno se descuenta de tu saldo.
@@ -285,35 +285,35 @@ const formatDate = (d: string | null) =>
                     <table class="w-full text-left text-sm text-gray-600">
                         <thead class="bg-gray-50 text-gray-900 font-semibold border-b border-gray-100">
                             <tr>
-                                <th class="px-6 py-4">Evento</th>
-                                <th class="px-6 py-4">Entradas</th>
-                                <th class="px-6 py-4">Monto entradas</th>
-                                <th class="px-6 py-4">Descuento</th>
-                                <th class="px-6 py-4">Cargo por servicio</th>
-                                <th class="px-6 py-4">IVA cargo</th>
-                                <th class="px-6 py-4">Total pagado</th>
-                                <th class="px-6 py-4">Comisión pasarela</th>
-                                <th class="px-6 py-4">Medio de pago</th>
-                                <th class="px-6 py-4">Fecha</th>
+                                <th class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">Evento</th>
+                                <th class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">Entradas</th>
+                                <th class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">Monto entradas</th>
+                                <th class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">Descuento</th>
+                                <th class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">Cargo por servicio</th>
+                                <th class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">IVA cargo</th>
+                                <th class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">Total pagado</th>
+                                <th class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">Comisión pasarela</th>
+                                <th class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">Medio de pago</th>
+                                <th class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">Fecha</th>
                             </tr>
                         </thead>
                         <tbody>
                             {transactions.map((t) => (
                                 <tr class="border-b border-gray-50 hover:bg-gray-50 transition">
-                                    <td class="px-6 py-4 font-medium text-gray-900">{t.event}</td>
-                                    <td class="px-6 py-4">{t.qty}</td>
-                                    <td class="px-6 py-4 font-medium text-gray-900">{formatCLP(t.amount)}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
+                                    <td class="px-4 md:px-6 py-3 md:py-4 font-medium text-gray-900 min-w-[10rem]">{t.event}</td>
+                                    <td class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">{t.qty}</td>
+                                    <td class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap font-medium text-gray-900">{formatCLP(t.amount)}</td>
+                                    <td class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">
                                         {t.discount > 0 ? (
                                             <span>-{formatCLP(t.discount)}{t.discountCode && <span class="block text-xs text-gray-400 font-mono">{t.discountCode}</span>}</span>
                                         ) : "—"}
                                     </td>
-                                    <td class="px-6 py-4">{formatCLP(t.ticketFee)}</td>
-                                    <td class="px-6 py-4">{formatCLP(t.feeTax)}</td>
-                                    <td class="px-6 py-4">{formatCLP(t.total)}</td>
-                                    <td class="px-6 py-4 text-gray-400">{formatCLP(t.paymentFee)}</td>
-                                    <td class="px-6 py-4">{t.provider}</td>
-                                    <td class="px-6 py-4">{t.date}</td>
+                                    <td class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">{formatCLP(t.ticketFee)}</td>
+                                    <td class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">{formatCLP(t.feeTax)}</td>
+                                    <td class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">{formatCLP(t.total)}</td>
+                                    <td class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap text-gray-400">{formatCLP(t.paymentFee)}</td>
+                                    <td class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">{t.provider}</td>
+                                    <td class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">{t.date}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -321,7 +321,7 @@ const formatDate = (d: string | null) =>
                 </div>
             </div>
         ) : (
-            <div class="bg-white rounded-xl border border-gray-100 p-8 text-center shadow-sm mt-6">
+            <div class="bg-white rounded-xl border border-gray-100 p-6 md:p-8 text-center shadow-sm mt-6">
                 <div class="max-w-md mx-auto">
                     <h3 class="text-lg font-medium text-gray-900 mb-2">Órdenes pagadas</h3>
                     <p class="text-gray-500">

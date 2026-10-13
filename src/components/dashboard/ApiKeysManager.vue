@@ -181,7 +181,7 @@ const copy = async (text, tag) => {
 
     <!-- Otros clientes (llave de API) -->
     <details class="group bg-white rounded-xl border border-gray-100 shadow-sm">
-      <summary class="p-6 cursor-pointer list-none flex items-center justify-between gap-4">
+      <summary class="p-4 md:p-6 cursor-pointer list-none flex items-center justify-between gap-4">
         <div class="min-w-0">
           <h2 class="font-bold text-gray-900">Otros clientes</h2>
           <p class="text-sm text-gray-500">Claude Code, Claude Desktop, Cursor, VS Code y automatizaciones (n8n, Make, Zapier).</p>
@@ -189,17 +189,17 @@ const copy = async (text, tag) => {
         <ChevronDown :size="20" class="shrink-0 text-gray-400 transition-transform group-open:rotate-180" />
       </summary>
       <div class="border-t border-gray-100">
-        <p class="px-6 pt-4 text-sm text-gray-500 break-all">
+        <p class="px-4 md:px-6 pt-4 text-sm text-gray-500 break-all">
           Servidor MCP: <code class="font-mono text-gray-800">{{ mcpUrl }}</code>
         </p>
-        <div class="px-6 pt-4 flex flex-wrap gap-2">
+        <div class="px-4 md:px-6 pt-4 flex flex-wrap gap-2">
           <button v-for="(s, id) in snippets" :key="id" type="button" @click="client = id"
             class="px-3 py-1.5 rounded-full text-sm border transition"
             :class="client === id ? 'bg-black text-white border-black' : 'border-gray-200 text-gray-700 hover:border-gray-400'">
             {{ s.label }}
           </button>
         </div>
-        <div class="p-6 space-y-2">
+        <div class="p-4 md:p-6 space-y-2">
           <p class="text-sm text-gray-600">{{ snippets[client].hint }}</p>
           <div class="relative">
             <pre class="p-4 pr-24 rounded-lg bg-gray-900 text-gray-100 text-xs overflow-x-auto"><code>{{ snippets[client].code }}</code></pre>
@@ -215,16 +215,16 @@ const copy = async (text, tag) => {
 
     <!-- Apps conectadas (OAuth) -->
     <section class="bg-white rounded-xl border border-gray-100 shadow-sm">
-      <div class="p-6 border-b border-gray-100">
+      <div class="p-4 md:p-6 border-b border-gray-100">
         <h2 class="font-bold text-gray-900">Apps conectadas</h2>
         <p class="text-sm text-gray-500">Asistentes que autorizaste iniciando sesión (Claude, ChatGPT…).</p>
       </div>
-      <div v-if="loading" class="p-6 text-sm text-gray-500">Cargando...</div>
-      <div v-else-if="!connections.length" class="p-6 text-sm text-gray-500">Aún no conectas ninguna app.</div>
+      <div v-if="loading" class="p-4 md:p-6 text-sm text-gray-500">Cargando...</div>
+      <div v-else-if="!connections.length" class="p-4 md:p-6 text-sm text-gray-500">Aún no conectas ninguna app.</div>
       <ul v-else class="divide-y divide-gray-50">
-        <li v-for="c in connections" :key="c.id" class="p-4 px-6 flex flex-col sm:flex-row sm:items-center gap-2 justify-between">
-          <div>
-            <p class="font-medium text-gray-900">{{ c.name }} <span v-if="!c.mine && c.owner" class="text-xs text-gray-400 font-normal">de {{ c.owner }}</span></p>
+        <li v-for="c in connections" :key="c.id" class="p-4 md:px-6 flex flex-col sm:flex-row sm:items-center gap-2 justify-between">
+          <div class="min-w-0">
+            <p class="font-medium text-gray-900 break-words">{{ c.name }} <span v-if="!c.mine && c.owner" class="text-xs text-gray-400 font-normal">de {{ c.owner }}</span></p>
             <p class="text-xs text-gray-500">
               Conectada {{ fmtDate(c.createdAt) }} · Último uso {{ c.lastUsedAt ? fmtDate(c.lastUsedAt) : 'nunca' }}
             </p>
@@ -240,19 +240,19 @@ const copy = async (text, tag) => {
 
     <!-- Llaves de API -->
     <section class="bg-white rounded-xl border border-gray-100 shadow-sm">
-      <div class="p-6 border-b border-gray-100 flex items-center gap-3">
-        <KeyRound :size="20" class="text-gray-700" />
-        <div>
+      <div class="p-4 md:p-6 border-b border-gray-100 flex items-center gap-3">
+        <KeyRound :size="20" class="shrink-0 text-gray-700" />
+        <div class="min-w-0">
           <h2 class="font-bold text-gray-900">Llaves de API</h2>
           <p class="text-sm text-gray-500">Para Claude Code, Claude Desktop, Cursor, VS Code o automatizaciones (n8n, Make, Zapier). La llave actúa como tú, solo en tu organización y con los permisos que elijas.</p>
         </div>
       </div>
 
-      <div v-if="unavailable" class="p-6 text-sm text-amber-700 bg-amber-50">
+      <div v-if="unavailable" class="p-4 md:p-6 text-sm text-amber-700 bg-amber-50">
         Las llaves de API estarán disponibles en unos minutos.
       </div>
 
-      <div v-else-if="newKey" class="p-6 space-y-3 bg-green-50 border-b border-green-100">
+      <div v-else-if="newKey" class="p-4 md:p-6 space-y-3 bg-green-50 border-b border-green-100">
         <p class="text-sm font-semibold text-green-800">Tu llave está lista. Cópiala ahora: no la volveremos a mostrar.</p>
         <div class="flex flex-col sm:flex-row gap-2">
           <code class="flex-1 px-3 py-2 rounded-lg bg-white border border-green-200 font-mono text-sm break-all">{{ newKey }}</code>
@@ -265,7 +265,7 @@ const copy = async (text, tag) => {
         <button type="button" class="text-sm underline text-green-800" @click="newKey = ''">Crear otra llave</button>
       </div>
 
-      <form v-else @submit.prevent="create" class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4 border-b border-gray-100">
+      <form v-else @submit.prevent="create" class="p-4 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-4 border-b border-gray-100">
         <div>
           <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Nombre</label>
           <input v-model="form.name" type="text" maxlength="80" placeholder="Ej: Cursor de Sebastián" autocomplete="off"
@@ -303,11 +303,11 @@ const copy = async (text, tag) => {
         </div>
       </form>
 
-      <div v-if="loading" class="p-6 text-sm text-gray-500">Cargando llaves...</div>
-      <div v-else-if="listError" class="p-6 text-sm text-red-600">{{ listError }}</div>
-      <div v-else-if="!keys.length" class="p-6 text-sm text-gray-500">Aún no tienes llaves.</div>
+      <div v-if="loading" class="p-4 md:p-6 text-sm text-gray-500">Cargando llaves...</div>
+      <div v-else-if="listError" class="p-4 md:p-6 text-sm text-red-600">{{ listError }}</div>
+      <div v-else-if="!keys.length" class="p-4 md:p-6 text-sm text-gray-500">Aún no tienes llaves.</div>
       <div v-else class="overflow-x-auto">
-        <table class="w-full text-left text-sm text-gray-600">
+        <table class="w-full min-w-[640px] text-left text-sm text-gray-600">
           <thead class="bg-gray-50 text-gray-900 font-semibold border-b border-gray-100">
             <tr>
               <th class="px-4 py-3">Nombre</th>

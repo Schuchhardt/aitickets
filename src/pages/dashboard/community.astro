@@ -49,10 +49,10 @@ if (dbUser?.organization_id) {
 
 <DashboardLayout title="Comunidad">
   <div
-    class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8"
+    class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 md:mb-8"
   >
     <div>
-      <h1 class="text-3xl font-bold font-[Unbounded] mb-2">Comunidad</h1>
+      <h1 class="text-2xl md:text-3xl font-bold font-[Unbounded] mb-2">Comunidad</h1>
       <p class="text-gray-600">
         Visualiza a los asistentes de todos tus eventos.
       </p>
@@ -61,7 +61,7 @@ if (dbUser?.organization_id) {
     {attendees.length > 0 && (
       <button
         id="exportCsvBtn"
-        class="inline-flex items-center gap-2 bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition font-medium"
+        class="self-start md:self-auto inline-flex items-center gap-2 bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition font-medium"
       >
         <Download size={18} />
         Exportar CSV
@@ -78,27 +78,27 @@ if (dbUser?.organization_id) {
           class="bg-gray-50 text-gray-900 font-semibold border-b border-gray-100"
         >
           <tr>
-            <th class="px-6 py-4">Nombre</th>
-            <th class="px-6 py-4">Email</th>
-            <th class="px-6 py-4">Evento</th>
-            <th class="px-6 py-4">Ticket</th>
-            <th class="px-6 py-4">Fecha Compra</th>
+            <th class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">Nombre</th>
+            <th class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">Email</th>
+            <th class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">Evento</th>
+            <th class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">Ticket</th>
+            <th class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">Fecha Compra</th>
           </tr>
         </thead>
         <tbody>
           {attendees.length > 0 ? (
             attendees.map((a) => (
               <tr class="border-b border-gray-50 hover:bg-gray-50 transition">
-                <td class="px-6 py-4 font-medium text-gray-900">{a.name}</td>
-                <td class="px-6 py-4">{a.email}</td>
-                <td class="px-6 py-4">{a.event}</td>
-                <td class="px-6 py-4">{a.ticket}</td>
-                <td class="px-6 py-4">{a.date}</td>
+                <td class="px-4 md:px-6 py-3 md:py-4 font-medium text-gray-900 whitespace-nowrap">{a.name}</td>
+                <td class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">{a.email}</td>
+                <td class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">{a.event}</td>
+                <td class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">{a.ticket}</td>
+                <td class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">{a.date}</td>
               </tr>
             ))
           ) : (
             <tr>
-              <td colspan="5" class="px-6 py-12 text-center text-gray-400">
+              <td colspan="5" class="px-4 md:px-6 py-12 text-center text-gray-400">
                 <div class="flex flex-col items-center gap-2">
                   <Users size={24} />
                   <span>No se encontraron asistentes aún.</span>

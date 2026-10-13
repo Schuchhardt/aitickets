@@ -77,7 +77,7 @@ const handleDisconnect = async (accountId) => {
     <Transition name="slide-down">
       <div
         v-if="notification.show"
-        class="fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg text-sm font-medium"
+        class="fixed top-4 left-4 right-4 sm:left-auto z-50 flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg text-sm font-medium"
         :class="notification.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'"
       >
         <CheckCircle v-if="notification.type === 'success'" :size="16" />
@@ -88,15 +88,15 @@ const handleDisconnect = async (accountId) => {
     </Transition>
 
     <!-- Header -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 md:mb-8">
       <div>
-        <h1 class="text-3xl font-bold font-[Unbounded] mb-2">Promocionar</h1>
+        <h1 class="text-2xl md:text-3xl font-bold font-[Unbounded] mb-2">Promocionar</h1>
         <p class="text-gray-600">Publica en redes sociales y promociona tus eventos.</p>
       </div>
 
       <a
         href="/dashboard/promote/create"
-        class="inline-flex items-center gap-2 bg-black text-white px-5 py-2.5 rounded-lg hover:bg-gray-800 transition font-medium"
+        class="inline-flex items-center justify-center gap-2 bg-black text-white px-5 py-2.5 rounded-lg hover:bg-gray-800 transition font-medium"
       >
         <Plus :size="20" />
         Crear Post
@@ -104,7 +104,7 @@ const handleDisconnect = async (accountId) => {
     </div>
 
     <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 md:mb-8">
       <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
         <div class="flex items-center gap-3 mb-2">
           <div class="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center">
@@ -138,23 +138,23 @@ const handleDisconnect = async (accountId) => {
     </div>
 
     <!-- Tabs -->
-    <div class="flex gap-1 mb-6 bg-gray-100 rounded-lg p-1 w-fit">
+    <div class="flex gap-1 mb-6 bg-gray-100 rounded-lg p-1 w-fit max-w-full overflow-x-auto whitespace-nowrap">
       <button
         @click="activeTab = 'overview'"
-        class="px-4 py-2 rounded-md text-sm font-medium transition-colors"
+        class="shrink-0 px-4 py-2 rounded-md text-sm font-medium transition-colors"
         :class="activeTab === 'overview' ? 'bg-white text-black shadow-sm' : 'text-gray-500 hover:text-gray-700'"
       >
         Cuentas conectadas
       </button>
       <button
         @click="activeTab = 'posts'"
-        class="px-4 py-2 rounded-md text-sm font-medium transition-colors"
+        class="shrink-0 px-4 py-2 rounded-md text-sm font-medium transition-colors"
         :class="activeTab === 'posts' ? 'bg-white text-black shadow-sm' : 'text-gray-500 hover:text-gray-700'"
       >
         Historial de Posts
       </button>
       <span
-        class="px-4 py-2 rounded-md text-sm font-medium text-gray-400 cursor-not-allowed"
+        class="shrink-0 px-4 py-2 rounded-md text-sm font-medium text-gray-400 cursor-not-allowed"
         title="Las campañas pagadas en Meta estarán disponibles pronto"
       >
         Meta Ads · Próximamente

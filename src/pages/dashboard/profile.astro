@@ -19,21 +19,21 @@ const { data: dbUser } = await getSupabaseAdmin()
     <div class="max-w-2xl mx-auto">
         <h1 class="text-2xl font-bold font-[Unbounded] mb-6">Mi Perfil</h1>
 
-        <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-            <div class="flex items-center gap-4 mb-8">
+        <div class="bg-white p-4 md:p-6 rounded-xl border border-gray-200 shadow-sm">
+            <div class="flex items-center gap-4 mb-6 md:mb-8">
                 <div
-                    class="w-16 h-16 rounded-full bg-black text-white flex items-center justify-center text-2xl font-bold"
+                    class="w-16 h-16 shrink-0 rounded-full bg-black text-white flex items-center justify-center text-2xl font-bold"
                 >
                     {
                         (dbUser?.name || user.user_metadata?.full_name)?.[0]?.toUpperCase() ||
                             user.email?.[0]?.toUpperCase()
                     }
                 </div>
-                <div>
-                    <h2 class="text-lg font-bold">
+                <div class="min-w-0">
+                    <h2 class="text-lg font-bold break-words">
                         {dbUser?.name || user.user_metadata?.full_name || "Usuario"}
                     </h2>
-                    <p class="text-gray-500">{user.email}</p>
+                    <p class="text-gray-500 break-all">{user.email}</p>
                 </div>
             </div>
 
@@ -85,7 +85,7 @@ const { data: dbUser } = await getSupabaseAdmin()
                     <button
                         type="submit"
                         id="submitBtn"
-                        class="px-6 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        class="w-full sm:w-auto justify-center px-6 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
                         <span>Guardar Cambios</span>
                         <div
@@ -100,15 +100,15 @@ const { data: dbUser } = await getSupabaseAdmin()
 
         <!-- Seguridad: cambio de contraseña (cualquier rol). Sin contraseña actual: se envía un enlace al
              correo que abre el panel con el modal para crear la nueva (/api/auth/magic-link → /auth/link). -->
-        <div id="password" class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm mt-6">
+        <div id="password" class="bg-white p-4 md:p-6 rounded-xl border border-gray-200 shadow-sm mt-6">
             <h2 class="text-lg font-bold mb-1">Contraseña</h2>
             <p class="text-gray-500 text-sm mb-4">
-                Te enviaremos un enlace a <span class="font-medium text-gray-700">{user.email}</span>. Al abrirlo
+                Te enviaremos un enlace a <span class="font-medium text-gray-700 break-all">{user.email}</span>. Al abrirlo
                 entrarás directo a tu panel y podrás crear tu nueva contraseña, sin necesidad de la actual.
             </p>
             <div id="pwMsg" class="hidden p-4 rounded-lg mb-4" aria-live="polite"></div>
             <button type="button" id="sendPwLinkBtn"
-                class="px-6 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                class="w-full sm:w-auto px-6 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 data-testid="profile-change-password">
                 Cambiar contraseña
             </button>

@@ -45,12 +45,8 @@ function autoOpenReservation() {
 </script>
 
 <template>
-  <!-- La página parte con la portada a todo el ancho (sin navbar) -->
-  <EventHeader
-    :event="event"
-    hero
-    :backHref="siteMode || event.is_preview ? null : '/eventos'"
-  />
+  <!-- La página parte con la portada a todo el ancho (sin navbar; el link a "Eventos" va solo en el footer) -->
+  <EventHeader :event="event" hero />
 
   <div class="max-w-6xl mx-auto px-6 lg:px-12 py-8 relative">
     <!-- Aviso de evento de demostración -->

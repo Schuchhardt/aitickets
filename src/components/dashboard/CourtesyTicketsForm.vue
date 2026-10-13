@@ -57,16 +57,16 @@ const submit = async () => {
 
 <template>
   <section class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-    <div class="p-6 border-b border-gray-100">
+    <div class="p-4 sm:p-6 border-b border-gray-100">
       <h3 class="font-bold text-lg flex items-center gap-2"><Gift size="18" /> Entradas de cortesía</h3>
       <p class="text-sm text-gray-500 mt-1">Emite entradas gratis (invitados, prensa, staff). Se envían por email con su QR.</p>
     </div>
 
-    <div v-if="!tickets.length" class="p-6 text-sm text-gray-500">
+    <div v-if="!tickets.length" class="p-4 sm:p-6 text-sm text-gray-500">
       Primero agrega un tipo de entrada al evento.
     </div>
 
-    <form v-else @submit.prevent="submit" class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+    <form v-else @submit.prevent="submit" class="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
       <div>
         <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Tipo de entrada</label>
         <select v-model="ticketId" class="w-full px-3 py-2 rounded-lg border border-gray-300 bg-white outline-none focus:ring-2 focus:ring-black">
@@ -94,7 +94,7 @@ const submit = async () => {
         <button
           type="submit"
           :disabled="loading"
-          class="px-5 py-2 bg-black text-white rounded-lg font-medium hover:bg-gray-800 disabled:opacity-50"
+          class="px-5 py-2.5 sm:py-2 bg-black text-white rounded-lg font-medium hover:bg-gray-800 disabled:opacity-50"
         >
           {{ loading ? 'Emitiendo...' : 'Emitir y enviar cortesías' }}
         </button>

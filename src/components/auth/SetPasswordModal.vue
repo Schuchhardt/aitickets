@@ -119,7 +119,7 @@ async function submit() {
       data-testid="set-password-modal"
       @click.self="!loading && close()"
     >
-      <div class="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-200 p-6 relative font-[Prompt]">
+      <div class="w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto bg-white rounded-2xl shadow-2xl border border-gray-200 p-5 sm:p-6 relative font-[Prompt]">
         <button
           type="button"
           class="absolute right-4 top-4 text-gray-400 hover:text-gray-700"
@@ -135,7 +135,7 @@ async function submit() {
         </div>
 
         <template v-if="!linkExpired">
-          <h2 id="set-password-title" class="text-xl font-bold font-[Unbounded] mb-1">Crea tu nueva contraseña</h2>
+          <h2 id="set-password-title" class="text-lg sm:text-xl font-bold font-[Unbounded] mb-1 pr-8">Crea tu nueva contraseña</h2>
           <p class="text-sm text-gray-500 mb-5">Ya ingresaste a tu cuenta. Elige una contraseña nueva para tus próximos ingresos.</p>
 
           <form class="space-y-4" novalidate @submit.prevent="submit">
@@ -211,7 +211,7 @@ async function submit() {
         </template>
 
         <template v-else>
-          <h2 id="set-password-title" class="text-xl font-bold font-[Unbounded] mb-1">Se venció el tiempo para cambiar la contraseña</h2>
+          <h2 id="set-password-title" class="text-lg sm:text-xl font-bold font-[Unbounded] mb-1 pr-8">Se venció el tiempo para cambiar la contraseña</h2>
           <p class="text-sm text-gray-500 mb-5">Por seguridad, tienes 30 minutos desde que abres el enlace. Te enviamos uno nuevo a tu correo con un clic: ábrelo y crea tu contraseña.</p>
           <p v-if="resendState === 'sent'" class="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg p-3 mb-4" role="status">Listo, revisa tu correo: te enviamos un enlace nuevo.</p>
           <p v-else-if="resendState === 'error'" class="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3 mb-4" role="alert">No pudimos enviar el enlace. Intenta de nuevo en unos minutos.</p>
@@ -231,11 +231,11 @@ async function submit() {
     >
       <div
         v-if="toast"
-        class="fixed bottom-6 right-6 z-[110] flex items-center gap-2 rounded-xl bg-gray-900 text-white px-4 py-3 shadow-xl"
+        class="fixed bottom-4 left-4 right-4 sm:left-auto sm:bottom-6 sm:right-6 z-[110] flex items-center gap-2 rounded-xl bg-gray-900 text-white px-4 py-3 shadow-xl"
         role="status"
         data-testid="set-password-toast"
       >
-        <CircleCheck :size="20" class="text-lime-400" />
+        <CircleCheck :size="20" class="shrink-0 text-lime-400" />
         <span class="text-sm">{{ toast }}</span>
       </div>
     </transition>
