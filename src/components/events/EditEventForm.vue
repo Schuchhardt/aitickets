@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { Calendar, MapPin, Ticket, CheckCircle, Image as ImageIcon, Plus, Trash2, ChevronRight, ChevronLeft, UploadCloud } from 'lucide-vue-next'
 import RichTextEditor from './RichTextEditor.vue'
 import { plainTextLength, sanitizeClient } from '../../lib/richTextClient'
+import { prepareImageForUpload, MAX_UPLOAD_BYTES, MAX_SOURCE_BYTES } from '../../lib/clientImage'
 
 const props = defineProps({
   initialVenues: {
@@ -236,8 +237,8 @@ const uploadFile = async (file) => {
     uploadError.value = 'Solo se permiten imágenes.'
     return
   }
-  if (file.size > 5 * 1024 * 1024) {
-    uploadError.value = 'La imagen no debe superar los 5MB.'
+  if (file.size > MAX_SOURCE_BYTES) {
+    uploadError.value = 'La imagen es demasiado pesada (máx. 30MB).'
     return
   }
 
@@ -245,8 +246,11 @@ const uploadFile = async (file) => {
   uploadError.value = ''
 
   try {
+    // Fotos de celular: se achican en el navegador para que suban rápido y bajo el límite de 5MB
+    const prepared = await prepareImageForUpload(file)
+    if (prepared.size > MAX_UPLOAD_BYTES) throw new Error('La imagen no debe superar los 5MB.')
     const formData = new FormData()
-    formData.append('file', file)
+    formData.append('file', prepared)
 
     const response = await fetch('/api/events/upload-image', {
       method: 'POST',
@@ -472,7 +476,7 @@ const submitEvent = async ({ exit = false } = {}) => {
                   <UploadCloud size="24" />
                 </div>
                 <p class="font-medium text-gray-900 mb-1">Haz click o arrastra tu imagen aquí</p>
-                <p class="text-xs text-gray-500">Soporta JPG, PNG, WEBP (Max 5MB)</p>
+                <p class="text-xs text-gray-500">JPG, PNG o WEBP · se optimiza automáticamente</p>
               </div>
             </div>
 

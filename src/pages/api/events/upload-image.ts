@@ -1,94 +1,57 @@
-import { getSupabaseAdmin } from "../../../lib/auth-helpers";
-import { getSessionContext, hasRole, EVENT_MANAGER_ROLES } from "../../../lib/supabaseServer";
+// POST /api/events/upload-image (multipart: file, kind?) → { url, thumb_url, width, height }
+// Portadas (kind=cover, por defecto) e imágenes de galería (kind=gallery, con miniatura WebP).
+// JPG/PNG/WEBP/GIF (sin SVG, que puede contener scripts), tipo verificado por los bytes, máx. 5 MB.
+// Toda imagen se optimiza antes de guardarse (src/lib/imageOptimize.ts): orientación, sin metadatos,
+// lado mayor acotado y recomprimida.
+import { getSessionContext, hasRole, EVENT_MANAGER_ROLES, jsonResponse } from "../../../lib/supabaseServer";
+import { sniffImageType, IMAGE_EXT } from "../../../lib/imageOptimize";
+import { storeOptimizedImage } from "../../../lib/imageStorage";
 import type { APIRoute } from "astro";
+
+export const prerender = false;
+
+const MAX_BYTES = 5 * 1024 * 1024;
+const KINDS = {
+    cover: { folder: "event-covers", maxSize: 2000, thumbnail: false },
+    gallery: { folder: "event-gallery", maxSize: 2000, thumbnail: true },
+} as const;
 
 export const POST: APIRoute = async ({ request, cookies }) => {
     try {
-        // Verificar autenticación
         const session = await getSessionContext({ cookies });
-        if (!session) {
-            return new Response(JSON.stringify({ message: "No autorizado" }), { 
-                status: 401,
-                headers: { "Content-Type": "application/json" }
-            });
-        }
+        if (!session) return jsonResponse({ message: "No autorizado" }, 401);
         if (!hasRole(session.dbUser, EVENT_MANAGER_ROLES)) {
-            return new Response(JSON.stringify({ message: "No tienes permisos para subir imágenes" }), { status: 403, headers: { "Content-Type": "application/json" } });
+            return jsonResponse({ message: "No tienes permisos para subir imágenes" }, 403);
         }
 
-        // Obtener el archivo del FormData
-        const formData = await request.formData();
-        const file = formData.get("file") as File | null;
+        const formData = await request.formData().catch(() => null);
+        const file = formData?.get("file");
+        if (!file || typeof file === "string") return jsonResponse({ message: "No se proporcionó ningún archivo" }, 400);
+        if (file.size > MAX_BYTES) return jsonResponse({ message: "La imagen no debe superar los 5MB" }, 400);
 
-        if (!file) {
-            return new Response(JSON.stringify({ message: "No se proporcionó ningún archivo" }), { 
-                status: 400,
-                headers: { "Content-Type": "application/json" }
-            });
+        const buffer = Buffer.from(await file.arrayBuffer());
+        const contentType = sniffImageType(buffer);
+        if (!contentType || !IMAGE_EXT[contentType]) {
+            return jsonResponse({ message: "Solo se permiten imágenes JPG, PNG, WEBP o GIF" }, 400);
         }
 
-        // Validar tipo de archivo
-        // Solo formatos raster (sin SVG, que puede contener scripts)
-        const ALLOWED_TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif" };
-        if (!ALLOWED_TYPES[file.type]) {
-            return new Response(JSON.stringify({ message: "Solo se permiten imágenes JPG, PNG, WEBP o GIF" }), { 
-                status: 400,
-                headers: { "Content-Type": "application/json" }
-            });
-        }
-
-        // Validar tamaño (5MB máximo)
-        if (file.size > 5 * 1024 * 1024) {
-            return new Response(JSON.stringify({ message: "La imagen no debe superar los 5MB" }), { 
-                status: 400,
-                headers: { "Content-Type": "application/json" }
-            });
-        }
-
-        const supabase = getSupabaseAdmin();
-
-        // Generar nombre único para el archivo
-        const fileExt = ALLOWED_TYPES[file.type];
-        const fileName = `event-covers/${session.dbUser.organization_id}-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-
-        // Convertir File a Buffer para Supabase
-        const arrayBuffer = await file.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-
-        // Subir archivo
-        const { data, error } = await supabase.storage
-            .from("Events")
-            .upload(fileName, buffer, {
-                contentType: file.type,
-                upsert: false
-            });
-
-        if (error) {
-            console.error("Upload error:", error);
-            return new Response(JSON.stringify({ message: "Error al subir la imagen" }), { 
-                status: 500,
-                headers: { "Content-Type": "application/json" }
-            });
-        }
-
-        // Obtener URL pública
-        const { data: { publicUrl } } = supabase.storage
-            .from("Events")
-            .getPublicUrl(fileName);
-
-        return new Response(JSON.stringify({ 
-            message: "Imagen subida correctamente",
-            url: publicUrl 
-        }), { 
-            status: 200,
-            headers: { "Content-Type": "application/json" }
+        const kindRaw = String(formData?.get("kind") || "cover");
+        const kind = kindRaw === "gallery" ? KINDS.gallery : KINDS.cover;
+        const stored = await storeOptimizedImage(buffer, contentType, {
+            pathPrefix: `${kind.folder}/${session.dbUser.organization_id}`,
+            maxSize: kind.maxSize,
+            thumbnail: kind.thumbnail,
         });
 
+        return jsonResponse({
+            message: "Imagen subida correctamente",
+            url: stored.url,
+            thumb_url: stored.thumb_url,
+            width: stored.width,
+            height: stored.height,
+        });
     } catch (error) {
         console.error("Upload error:", error);
-        return new Response(JSON.stringify({ message: "Error interno del servidor" }), { 
-            status: 500,
-            headers: { "Content-Type": "application/json" }
-        });
+        return jsonResponse({ message: "Error al subir la imagen" }, 500);
     }
 };

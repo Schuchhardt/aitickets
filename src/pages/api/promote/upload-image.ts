@@ -1,86 +1,35 @@
-import { getSupabaseAdmin } from "../../../lib/auth-helpers";
-import { getSessionContext, hasRole, EVENT_MANAGER_ROLES } from "../../../lib/supabaseServer";
+// POST /api/promote/upload-image (multipart: file) → { url }
+// Imágenes para posts de redes. Mismas reglas que /api/events/upload-image: JPG/PNG/WEBP/GIF (sin SVG),
+// tipo verificado por los bytes, máx. 5 MB, optimizada antes de guardarse (storeImage).
+import { getSessionContext, hasRole, EVENT_MANAGER_ROLES, jsonResponse } from "../../../lib/supabaseServer";
+import { storeImage, sniffImageType, ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES } from "../../../lib/marketing";
 import type { APIRoute } from "astro";
+
+export const prerender = false;
 
 export const POST: APIRoute = async ({ request, cookies }) => {
     try {
         const session = await getSessionContext({ cookies });
-        if (!session) {
-            return new Response(JSON.stringify({ message: "No autorizado" }), { 
-                status: 401,
-                headers: { "Content-Type": "application/json" }
-            });
-        }
+        if (!session) return jsonResponse({ message: "No autorizado" }, 401);
         if (!hasRole(session.dbUser, EVENT_MANAGER_ROLES)) {
-            return new Response(JSON.stringify({ message: "No tienes permisos para esta acción" }), { status: 403, headers: { "Content-Type": "application/json" } });
+            return jsonResponse({ message: "No tienes permisos para esta acción" }, 403);
         }
 
-        const formData = await request.formData();
-        const file = formData.get("file") as File | null;
+        const formData = await request.formData().catch(() => null);
+        const file = formData?.get("file");
+        if (!file || typeof file === "string") return jsonResponse({ message: "No se proporcionó ningún archivo" }, 400);
+        if (file.size > MAX_IMAGE_BYTES) return jsonResponse({ message: "La imagen no debe superar los 5MB" }, 400);
 
-        if (!file) {
-            return new Response(JSON.stringify({ message: "No se proporcionó ningún archivo" }), { 
-                status: 400,
-                headers: { "Content-Type": "application/json" }
-            });
+        const buffer = Buffer.from(await file.arrayBuffer());
+        const contentType = sniffImageType(buffer);
+        if (!contentType || !ALLOWED_IMAGE_TYPES[contentType]) {
+            return jsonResponse({ message: "Solo se permiten imágenes JPG, PNG, WEBP o GIF" }, 400);
         }
 
-        // Solo formatos raster (sin SVG, que puede contener scripts)
-        const ALLOWED_TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif" };
-        if (!ALLOWED_TYPES[file.type]) {
-            return new Response(JSON.stringify({ message: "Solo se permiten imágenes JPG, PNG, WEBP o GIF" }), { 
-                status: 400,
-                headers: { "Content-Type": "application/json" }
-            });
-        }
-
-        if (file.size > 5 * 1024 * 1024) {
-            return new Response(JSON.stringify({ message: "La imagen no debe superar los 5MB" }), { 
-                status: 400,
-                headers: { "Content-Type": "application/json" }
-            });
-        }
-
-        const supabase = getSupabaseAdmin();
-
-        const fileExt = ALLOWED_TYPES[file.type];
-        const fileName = `promote/${session.dbUser.organization_id}-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-
-        const arrayBuffer = await file.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-
-        const { error } = await supabase.storage
-            .from("Events")
-            .upload(fileName, buffer, {
-                contentType: file.type,
-                upsert: false
-            });
-
-        if (error) {
-            console.error("Upload error:", error);
-            return new Response(JSON.stringify({ message: "Error al subir la imagen" }), { 
-                status: 500,
-                headers: { "Content-Type": "application/json" }
-            });
-        }
-
-        const { data: { publicUrl } } = supabase.storage
-            .from("Events")
-            .getPublicUrl(fileName);
-
-        return new Response(JSON.stringify({ 
-            message: "Imagen subida correctamente",
-            url: publicUrl 
-        }), { 
-            status: 200,
-            headers: { "Content-Type": "application/json" }
-        });
-
+        const url = await storeImage(session.dbUser.organization_id, buffer, contentType);
+        return jsonResponse({ message: "Imagen subida correctamente", url });
     } catch (error) {
         console.error("Upload error:", error);
-        return new Response(JSON.stringify({ message: "Error interno del servidor" }), { 
-            status: 500,
-            headers: { "Content-Type": "application/json" }
-        });
+        return jsonResponse({ message: "Error interno del servidor" }, 500);
     }
 };

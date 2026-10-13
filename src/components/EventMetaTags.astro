@@ -14,6 +14,8 @@ interface Props {
 }
 
 import { LEGAL } from "../lib/legal";
+import { eventOgImagePath } from "../lib/ogImage";
+import { OG_HEIGHT, OG_WIDTH } from "../lib/imageOptimize";
 
 const { event, title, description, canonicalPath, noindex = false } = Astro.props;
 const siteUrl = (import.meta.env.SITE_URL || "https://aitickets.cl").replace(/\/$/, "");
@@ -39,7 +41,13 @@ const stripHtml = (html?: string | null) =>
     .trim();
 
 const canonicalUrl = `${siteUrl}${canonicalPath}`;
+// Portada original (JSON-LD: Google prefiere la imagen en alta) y la versión para compartir: 1200×630,
+// JPEG < 300 KB (WhatsApp no muestra la vista previa con imágenes pesadas). Ver src/pages/og/eventos/[id].jpg.ts.
 const imageUrl = buildAbsoluteUrl(event?.image_url);
+const ogPath = event?.id ? eventOgImagePath(event.id, event.image_url) : null;
+const shareImageUrl = ogPath ? `${siteUrl}${ogPath}` : `${siteUrl}${fallbackImagePath}`;
+const shareImageType = ogPath ? "image/jpeg" : "image/png";
+const shareImageAlt = event?.name ? `Portada de ${event.name}` : "AI Tickets";
 
 const buildPlace = (venue: any) => {
   if (!venue) {
@@ -123,7 +131,7 @@ const generateEventJsonLd = () => {
         name: event.name,
         description: baseDescription.slice(0, 5000),
         url: canonicalUrl,
-        image: [imageUrl],
+        image: ogPath ? [imageUrl, shareImageUrl] : [imageUrl],
         eventStatus: "https://schema.org/EventScheduled",
         eventAttendanceMode: fn.venue?.is_virtual
           ? "https://schema.org/OnlineEventAttendanceMode"
@@ -150,14 +158,19 @@ const eventJsonLd = generateEventJsonLd();
 <link rel="canonical" href={canonicalUrl} />
 {noindex && <meta name="robots" content="noindex, nofollow" />}
 
-<!-- Open Graph / Facebook -->
+<!-- Open Graph (WhatsApp, Facebook, LinkedIn, Telegram, iMessage) -->
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="AI Tickets" />
 <meta property="og:locale" content="es_CL" />
 <meta property="og:url" content={canonicalUrl} />
 <meta property="og:title" content={event?.name || title} />
 <meta property="og:description" content={description} />
-<meta property="og:image" content={imageUrl} />
+<meta property="og:image" content={shareImageUrl} />
+<meta property="og:image:secure_url" content={shareImageUrl} />
+<meta property="og:image:type" content={shareImageType} />
+<meta property="og:image:width" content={String(OG_WIDTH)} />
+<meta property="og:image:height" content={String(OG_HEIGHT)} />
+<meta property="og:image:alt" content={shareImageAlt} />
 
 <!-- Twitter Card -->
 <meta name="twitter:card" content="summary_large_image" />
@@ -165,7 +178,8 @@ const eventJsonLd = generateEventJsonLd();
 <meta name="twitter:url" content={canonicalUrl} />
 <meta name="twitter:title" content={event?.name || title} />
 <meta name="twitter:description" content={description} />
-<meta name="twitter:image" content={imageUrl} />
+<meta name="twitter:image" content={shareImageUrl} />
+<meta name="twitter:image:alt" content={shareImageAlt} />
 
 <!-- Precarga de la imagen principal (LCP) -->
 {event?.image_url && <link rel="preload" as="image" href={event.image_url} fetchpriority="high" />}

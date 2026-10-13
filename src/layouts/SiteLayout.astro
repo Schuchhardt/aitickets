@@ -44,6 +44,8 @@ const cssVars = [
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Meta tags y Open Graph primero: los bots de vista previa (WhatsApp) leen solo el comienzo del HTML -->
+    <slot name="head" />
     <ChunkReload />
     <meta name="generator" content={Astro.generator} />
     <meta name="theme-color" content={theme.primary} />
@@ -60,7 +62,6 @@ const cssVars = [
         <link rel="stylesheet" href={fontHref} />
       </>
     )}
-    <slot name="head" />
   </head>
   <body style={cssVars} class={theme.dark ? "site-dark" : "site-light"}>
     {preview && (

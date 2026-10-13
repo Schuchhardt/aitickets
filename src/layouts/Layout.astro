@@ -45,6 +45,34 @@ const hasCustomHead = Astro.slots.has('head');
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<!-- Título, descripción y Open Graph primero: los bots de vista previa (WhatsApp, Facebook) leen solo el
+		     comienzo del HTML. -->
+		{hasCustomHead ? (
+			<slot name="head" />
+		) : (
+			<>
+				<title>{title}</title>
+				<meta name="description" content={description}>
+				<link rel="canonical" href={canonicalUrl}>
+				{noindex && <meta name="robots" content="noindex, nofollow">}
+				<!-- Open Graph / Facebook -->
+				<meta property="og:type" content={ogType}>
+				<meta property="og:title" content={title}>
+				<meta property="og:description" content={description}>
+				<meta property="og:url" content={canonicalUrl}>
+				<meta property="og:site_name" content="AI Tickets">
+				<meta property="og:locale" content="es_CL">
+				<meta property="og:image" content={imageUrl}>
+				<!-- Twitter -->
+				<meta name="twitter:card" content="summary_large_image">
+				<meta name="twitter:title" content={title}>
+				<meta name="twitter:description" content={description}>
+				<meta name="twitter:url" content={canonicalUrl}>
+				<meta name="twitter:site" content="@aitickets">
+				<meta name="twitter:creator" content="@aitickets">
+				<meta name="twitter:image" content={imageUrl}>
+			</>
+		)}
 		<ChunkReload />
 		<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 		<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -84,32 +112,6 @@ const hasCustomHead = Astro.slots.has('head');
 		</script>
 		</>)}
 
-		{hasCustomHead ? (
-			<slot name="head" />
-		) : (
-			<>
-				<title>{title}</title>
-				<meta name="description" content={description}>
-				<link rel="canonical" href={canonicalUrl}>
-				{noindex && <meta name="robots" content="noindex, nofollow">}
-				<!-- Open Graph / Facebook -->
-				<meta property="og:type" content={ogType}>
-				<meta property="og:title" content={title}>
-				<meta property="og:description" content={description}>
-				<meta property="og:url" content={canonicalUrl}>
-				<meta property="og:site_name" content="AI Tickets">
-				<meta property="og:locale" content="es_CL">
-				<meta property="og:image" content={imageUrl}>
-				<!-- Twitter -->
-				<meta name="twitter:card" content="summary_large_image">
-				<meta name="twitter:title" content={title}>
-				<meta name="twitter:description" content={description}>
-				<meta name="twitter:url" content={canonicalUrl}>
-				<meta name="twitter:site" content="@aitickets">
-				<meta name="twitter:creator" content="@aitickets">
-				<meta name="twitter:image" content={imageUrl}>
-			</>
-		)}
 	</head>
 	<body>
 		<slot />

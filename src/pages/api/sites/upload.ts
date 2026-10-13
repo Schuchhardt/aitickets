@@ -1,13 +1,12 @@
 // POST /api/sites/upload (multipart: file, kind?) → { url }
 // Imágenes del sitio (logo, portada, banners, imagen para redes). Mismo bucket y reglas que
-// /api/events/upload-image: JPG/PNG/WEBP/GIF (sin SVG), máx. 5 MB, ruta sites/<orgId>/.
+// /api/events/upload-image: JPG/PNG/WEBP/GIF (sin SVG), máx. 5 MB, ruta sites/<orgId>/, optimizada.
 import type { APIRoute } from "astro";
-import { getSupabaseAdmin } from "../../../lib/auth-helpers";
+import { storeOptimizedImage } from "../../../lib/imageStorage";
 import { json, requireSiteAdmin } from "../../dashboard/sitio/_lib/site-admin";
 
 export const prerender = false;
 
-const BUCKET = "Events";
 const MAX_BYTES = 5 * 1024 * 1024;
 const ALLOWED_TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif" };
 const KINDS = new Set(["logo", "hero", "banner", "og"]);
@@ -46,16 +45,17 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   const realType = sniffType(buffer);
   if (!realType || !ALLOWED_TYPES[realType]) return json({ message: "El archivo no es una imagen válida" }, 400);
 
-  const ext = ALLOWED_TYPES[realType];
-  const path = `sites/${auth.orgId}/${kind}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}.${ext}`;
-  const supabase = getSupabaseAdmin();
-  const { error } = await supabase.storage.from(BUCKET).upload(path, buffer, { contentType: realType, upsert: false });
-  if (error) {
-    console.error("sites/upload:", error.message);
+  let publicUrl: string;
+  try {
+    // Logos y banners: lado mayor acotado; los PNG con transparencia se mantienen PNG (src/lib/imageOptimize.ts)
+    ({ url: publicUrl } = await storeOptimizedImage(buffer, realType, {
+      pathPrefix: `sites/${auth.orgId}/${kind}`,
+      // og: imagen para compartir el sitio; 1200 px la deja liviana para WhatsApp
+      maxSize: kind === "logo" ? 800 : kind === "og" ? 1200 : 2000,
+    }));
+  } catch (err: any) {
+    console.error("sites/upload:", err?.message || err);
     return json({ message: "Error al subir la imagen" }, 500);
   }
-  const {
-    data: { publicUrl },
-  } = supabase.storage.from(BUCKET).getPublicUrl(path);
   return json({ url: publicUrl, message: "Imagen subida correctamente" });
 };
