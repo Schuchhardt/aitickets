@@ -71,7 +71,7 @@ const MAGIC = {
 }
 
 /**
- * Enlace directo de acceso (vence en 60 minutos, un solo uso).
+ * Enlace directo de acceso (vence en 30 minutos).
  * @param {{ name?: string, url: string, purpose?: 'recovery' | 'change-password' | 'login' }} opts
  */
 export async function renderMagicLinkEmail({ name, url, purpose = 'login' } = {}) {
@@ -86,7 +86,7 @@ export async function renderMagicLinkEmail({ name, url, purpose = 'login' } = {}
     h(
       Panel,
       { tone: 'lime' },
-      h(Paragraph, { small: true, style: { margin: 0, color: '#3f6212' } }, 'Por seguridad, el enlace vence en 60 minutos y sirve una sola vez. No lo reenvíes.')
+      h(Paragraph, { small: true, style: { margin: 0, color: '#3f6212' } }, 'Por seguridad, el enlace vence en 30 minutos. No lo reenvíes.')
     ),
     h(Paragraph, { small: true, muted: true }, copy.ignore),
     h(FallbackLink, { href: url })

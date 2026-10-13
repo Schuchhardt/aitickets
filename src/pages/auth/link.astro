@@ -1,8 +1,8 @@
 ---
 // /auth/link?t=<token> — enlace de acceso directo del correo (recuperar / cambiar contraseña).
-// GET NO consume nada: valida la firma y muestra el botón "Continuar" (los escáneres de enlaces de
-// correo abren los enlaces solos). POST (formulario del mismo sitio con el token oculto) consume el token
-// (uso único), inicia la sesión sin contraseña, deja la cookie aitickets_pw_reset (30 min) y redirige a
+// GET solo valida la firma y muestra el botón "Continuar" (los escáneres de enlaces de correo abren los
+// enlaces solos). POST (formulario del mismo sitio con el token oculto) vuelve a validar el token (vigente
+// 30 min, se puede usar más de una vez dentro de ese plazo), inicia la sesión sin contraseña, deja la cookie aitickets_pw_reset (30 min) y redirige a
 // /dashboard?set_password=1, donde se abre el modal para crear la nueva contraseña.
 import Layout from "../../layouts/Layout.astro";
 import AppHeader from "../../components/AppHeader.vue";
@@ -13,9 +13,7 @@ import { emailHash, getOrgVerification, markOrgVerified } from "../../lib/email-
 import {
   PW_RESET_COOKIE,
   PW_RESET_COOKIE_OPTIONS,
-  consumeAuthLinkToken,
   createPasswordlessSession,
-  dbJtiStore,
   getUsersRow,
   isAiticketsIdentity,
   isSameSitePost,
@@ -28,7 +26,7 @@ import "../../styles/global.css";
 
 export const prerender = false;
 
-type State = "confirm" | "invalid" | "expired" | "used" | "not_found" | "server" | "missing";
+type State = "confirm" | "invalid" | "expired" | "not_found" | "server" | "missing";
 
 let state: State = "missing";
 let purpose: AuthLinkPurpose = "recovery";
@@ -49,13 +47,7 @@ if (Astro.request.method === "POST") {
   if (!token || !isSameSitePost(Astro.request, Astro.url)) {
     state = "invalid";
   } else {
-    let consumed: Awaited<ReturnType<typeof consumeAuthLinkToken>>;
-    try {
-      consumed = await consumeAuthLinkToken(token, dbJtiStore());
-    } catch (err: any) {
-      console.error("auth/link:", err?.message || err);
-      consumed = { ok: false, error: "server" };
-    }
+    const consumed = verifyAuthLinkToken(token);
 
     if (!consumed.ok) {
       state = consumed.error;
@@ -132,7 +124,6 @@ const titles: Record<State, string> = {
   confirm: confirmCopy[purpose].title,
   invalid: "El enlace no es válido",
   expired: "El enlace venció",
-  used: "Este enlace ya se usó",
   not_found: "No encontramos la cuenta",
   server: "No pudimos iniciar tu sesión",
   missing: "Enlace incompleto",
@@ -140,8 +131,7 @@ const titles: Record<State, string> = {
 const messages: Record<State, string> = {
   confirm: confirmCopy[purpose].message,
   invalid: "Puede que el enlace esté incompleto o que lo hayas copiado mal. Pide uno nuevo.",
-  expired: "Por seguridad, los enlaces de acceso duran 60 minutos. Pide uno nuevo.",
-  used: "Cada enlace sirve una sola vez. Si necesitas entrar de nuevo, pide otro enlace.",
+  expired: "Por seguridad, los enlaces de acceso duran 30 minutos. Pide uno nuevo.",
   not_found: "La cuenta asociada a este enlace no existe o está desactivada. Si crees que es un error, escríbenos.",
   server: "Ocurrió un problema al iniciar tu sesión. Pide un nuevo enlace e intenta otra vez en unos minutos.",
   missing: "Abre el enlace completo que te enviamos por correo o pide uno nuevo.",

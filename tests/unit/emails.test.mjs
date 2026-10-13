@@ -44,7 +44,7 @@ describe('plantillas de correo', () => {
     expect(text).toContain(url)
   })
 
-  it('magic link: textos por propósito, 60 minutos y un solo uso', async () => {
+  it('magic link: textos por propósito, 30 minutos', async () => {
     const url = 'https://aitickets.cl/auth/link?t=x&y=1'
     const recovery = await emails.renderMagicLinkEmail({ url, purpose: 'recovery' })
     expect(recovery.html).toContain('Ingresa y crea una nueva contraseña')
@@ -53,8 +53,8 @@ describe('plantillas de correo', () => {
     const login = await emails.renderMagicLinkEmail({ url, purpose: 'login' })
     expect(login.subject).toContain('ingresar')
     for (const r of [recovery, change, login]) {
-      expect(r.text).toContain('60 minutos')
-      expect(r.text).toContain('una sola vez')
+      expect(r.text).toContain('30 minutos')
+      expect(r.text).not.toContain('una sola vez')
       expect(r.html).toContain('href="https://aitickets.cl/auth/link?t=x&amp;y=1"')
     }
   })

@@ -5,8 +5,10 @@
 //   - pu:  propósito ('recovery' | 'change-password' | 'login')
 //   - uid: id del usuario de Supabase Auth
 //   - eh:  hash corto del correo al que se envió (si el correo cambia, el enlace deja de servir)
-//   - exp: vencimiento en segundos (60 min)
-//   - jti: id aleatorio; al usarlo se guarda en aitickets_auth_link_tokens (uso único)
+//   - exp: vencimiento en segundos (30 min). El enlace se puede abrir las veces que haga falta mientras esté
+//     vigente (el uso único fallaba: escáneres de correo, doble envío o un error al crear la sesión lo
+//     dejaban "ya usado" sin que el productor pudiera entrar).
+//   - jti: id aleatorio (solo hace único cada token)
 // Clave: derivada de EMAIL_VERIFY_SECRET (o INTERNAL_API_SECRET / service role, como email-verification.ts)
 // con una etiqueta propia, así un token de verificación nunca sirve como enlace de acceso y viceversa.
 //
@@ -21,7 +23,7 @@ import { emailHash, siteOrigin } from "./email-verification";
 import { sendEmail } from "../../netlify/lib/mailer.mjs";
 import { renderMagicLinkEmail } from "../../netlify/lib/emails/index.mjs";
 
-export const AUTH_LINK_TTL_SECONDS = 60 * 60;
+export const AUTH_LINK_TTL_SECONDS = 30 * 60;
 export const PW_RESET_TTL_SECONDS = 30 * 60;
 export const PW_RESET_COOKIE = "aitickets_pw_reset";
 export const AUTH_LINK_PURPOSES = ["recovery", "change-password", "login"] as const;
@@ -113,70 +115,6 @@ export function verifyAuthLinkToken(
     } catch {
         return { ok: false, error: "invalid" };
     }
-}
-
-// ---------------------------------------------------------------------------
-// Uso único
-// ---------------------------------------------------------------------------
-
-/** 'ok' = primera vez; 'used' = el jti ya estaba; 'unavailable' = no se pudo registrar (error). */
-export type MarkUsedResult = "ok" | "used" | "unavailable";
-export interface JtiStore {
-    markUsed(entry: { jti: string; uid: string; purpose: AuthLinkPurpose; expiresAt: Date }): Promise<MarkUsedResult>;
-}
-
-export type ConsumeAuthLinkResult = ({ ok: true } & AuthLinkClaims) | { ok: false; error: "invalid" | "expired" | "used" | "server" };
-
-/** Verifica el token y lo marca como usado. Un token solo se puede consumir una vez. */
-export async function consumeAuthLinkToken(
-    token: unknown,
-    store: JtiStore,
-    opts: { now?: number; purpose?: AuthLinkPurpose; key?: Buffer } = {},
-): Promise<ConsumeAuthLinkResult> {
-    const parsed = verifyAuthLinkToken(token, opts);
-    if (!parsed.ok) return parsed;
-    const marked = await store.markUsed({ jti: parsed.jti, uid: parsed.uid, purpose: parsed.purpose, expiresAt: new Date(parsed.exp * 1000) });
-    if (marked === "used") return { ok: false, error: "used" };
-    if (marked === "unavailable") return { ok: false, error: "server" };
-    return parsed;
-}
-
-const isMissingTable = (error: any) =>
-    !!error &&
-    (error.code === "42P01" ||
-        error.code === "PGRST205" ||
-        (/aitickets_auth_link_tokens/.test(error.message || "") && /does not exist|schema cache/i.test(error.message || "")));
-
-/** Store en public.aitickets_auth_link_tokens (PK jti: un segundo insert choca con 23505). */
-export function dbJtiStore(): JtiStore {
-    return {
-        async markUsed({ jti, uid, purpose, expiresAt }) {
-            const supabase = getSupabaseAdmin();
-            const { error } = await supabase
-                .from("aitickets_auth_link_tokens")
-                .insert({ jti, auth_user_id: uid, purpose, expires_at: expiresAt.toISOString() });
-            if (!error) {
-                // Limpieza oportunista de filas vencidas hace más de un día (best effort)
-                if (Math.random() < 0.05) {
-                    void supabase
-                        .from("aitickets_auth_link_tokens")
-                        .delete()
-                        .lt("expires_at", new Date(Date.now() - 24 * 3600 * 1000).toISOString())
-                        .then(() => {}, () => {});
-                }
-                return "ok";
-            }
-            if (error.code === "23505") return "used";
-            if (isMissingTable(error)) {
-                // Deploy preview sin la migración 202609280100 (previews no migran): el enlace sigue siendo
-                // de 60 min y solo llega al dueño del correo; en producción la tabla siempre existe.
-                console.warn("magic-link: falta aitickets_auth_link_tokens; no se puede asegurar el uso único");
-                return "ok";
-            }
-            console.error("magic-link: no se pudo registrar el uso del enlace", error.message);
-            return "unavailable";
-        },
-    };
 }
 
 // ---------------------------------------------------------------------------

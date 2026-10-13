@@ -1,5 +1,5 @@
 // Enlaces de acceso directo (recuperar / cambiar contraseña) y cookie de "fijar contraseña":
-// firma, verificación, vencimiento, propósito y uso único. Lógica pura (sin red ni BD).
+// firma, verificación, vencimiento (30 min, reutilizable mientras esté vigente) y propósito. Lógica pura (sin red ni BD).
 import { createHmac } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -7,7 +7,6 @@ import {
   AUTH_LINK_TTL_SECONDS,
   PW_RESET_TTL_SECONDS,
   authLinkKey,
-  consumeAuthLinkToken,
   isAiticketsIdentity,
   isAuthLinkPurpose,
   isSameSitePost,
@@ -24,19 +23,6 @@ const OTHER_KEY = Buffer.from('another-key-fedcba9876543210')
 const UID = '11111111-2222-3333-4444-555555555555'
 const EMAIL = 'Productora@Example.cl'
 const NOW = Date.UTC(2026, 8, 28, 12, 0, 0)
-
-/** Store en memoria con la misma semántica que la tabla (PK jti). */
-function memoryStore() {
-  const used = new Map()
-  return {
-    used,
-    async markUsed({ jti, uid, purpose, expiresAt }) {
-      if (used.has(jti)) return 'used'
-      used.set(jti, { uid, purpose, expiresAt })
-      return 'ok'
-    },
-  }
-}
 
 const decodePayload = (token) => JSON.parse(Buffer.from(token.split('.')[0], 'base64url').toString('utf8'))
 const resign = (payloadObj, key = KEY) => {
@@ -67,10 +53,10 @@ describe('signAuthLinkToken / verifyAuthLinkToken', () => {
     expect(a.jti).not.toBe(b.jti)
   })
 
-  it('vence a los 60 minutos', () => {
+  it('vence a los 30 minutos', () => {
     const token = signAuthLinkToken({ uid: UID, email: EMAIL, purpose: 'change-password', now: NOW, key: KEY })
-    expect(verifyAuthLinkToken(token, { now: NOW + 59 * 60 * 1000, key: KEY }).ok).toBe(true)
-    expect(verifyAuthLinkToken(token, { now: NOW + 60 * 60 * 1000 + 1000, key: KEY })).toEqual({ ok: false, error: 'expired' })
+    expect(verifyAuthLinkToken(token, { now: NOW + 29 * 60 * 1000, key: KEY }).ok).toBe(true)
+    expect(verifyAuthLinkToken(token, { now: NOW + 30 * 60 * 1000 + 1000, key: KEY })).toEqual({ ok: false, error: 'expired' })
   })
 
   it('rechaza firma alterada, otra clave, payload manipulado y basura', () => {
@@ -118,37 +104,18 @@ describe('signAuthLinkToken / verifyAuthLinkToken', () => {
   })
 })
 
-describe('consumeAuthLinkToken (uso único)', () => {
-  it('la primera vez consume y la segunda responde used', async () => {
-    const store = memoryStore()
+describe('enlace de acceso: 30 minutos, sin uso único', () => {
+  it('dura 30 minutos', () => {
+    expect(AUTH_LINK_TTL_SECONDS).toBe(30 * 60)
     const token = signAuthLinkToken({ uid: UID, email: EMAIL, purpose: 'recovery', now: NOW, key: KEY })
-    const first = await consumeAuthLinkToken(token, store, { now: NOW, key: KEY })
-    expect(first.ok).toBe(true)
-    expect(store.used.get(first.jti)).toMatchObject({ uid: UID, purpose: 'recovery' })
-    expect(store.used.get(first.jti).expiresAt.getTime()).toBe(first.exp * 1000)
-    expect(await consumeAuthLinkToken(token, store, { now: NOW + 1000, key: KEY })).toEqual({ ok: false, error: 'used' })
+    expect(verifyAuthLinkToken(token, { now: NOW + (30 * 60 - 1) * 1000, key: KEY }).ok).toBe(true)
+    expect(verifyAuthLinkToken(token, { now: NOW + (30 * 60 + 1) * 1000, key: KEY })).toEqual({ ok: false, error: 'expired' })
   })
 
-  it('no registra tokens inválidos o vencidos', async () => {
-    const store = memoryStore()
+  it('se puede usar más de una vez mientras esté vigente', () => {
     const token = signAuthLinkToken({ uid: UID, email: EMAIL, purpose: 'recovery', now: NOW, key: KEY })
-    expect(await consumeAuthLinkToken(token, store, { now: NOW + 2 * 3600 * 1000, key: KEY })).toEqual({ ok: false, error: 'expired' })
-    expect(await consumeAuthLinkToken('basura', store, { now: NOW, key: KEY })).toEqual({ ok: false, error: 'invalid' })
-    expect(store.used.size).toBe(0)
-  })
-
-  it('si el store no puede registrar el uso, falla cerrado', async () => {
-    const token = signAuthLinkToken({ uid: UID, email: EMAIL, purpose: 'recovery', now: NOW, key: KEY })
-    const res = await consumeAuthLinkToken(token, { markUsed: async () => 'unavailable' }, { now: NOW, key: KEY })
-    expect(res).toEqual({ ok: false, error: 'server' })
-  })
-
-  it('dos tokens distintos del mismo usuario se consumen por separado', async () => {
-    const store = memoryStore()
-    const a = signAuthLinkToken({ uid: UID, email: EMAIL, purpose: 'recovery', now: NOW, key: KEY })
-    const b = signAuthLinkToken({ uid: UID, email: EMAIL, purpose: 'recovery', now: NOW, key: KEY })
-    expect((await consumeAuthLinkToken(a, store, { now: NOW, key: KEY })).ok).toBe(true)
-    expect((await consumeAuthLinkToken(b, store, { now: NOW, key: KEY })).ok).toBe(true)
+    expect(verifyAuthLinkToken(token, { now: NOW + 1000, key: KEY }).ok).toBe(true)
+    expect(verifyAuthLinkToken(token, { now: NOW + 60 * 1000, key: KEY }).ok).toBe(true)
   })
 })
 
