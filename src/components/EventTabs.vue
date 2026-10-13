@@ -159,7 +159,7 @@ const hasMultipleVenues = computed(() => {
       <h2 class="text-2xl font-bold mb-4 font-['Unbounded']">Preguntas Frecuentes</h2>
       <div v-for="(faq, index) in faqs" :key="index" class="border-b border-gray-300 py-3">
         <button @click="toggleFAQ(index)" class="flex justify-between items-center w-full text-left cursor-pointer" aria-label="Mostrar/ocultar respuesta">
-          <span class="text-gray-900 font-medium">{{ index + 1 }}. {{ faq.question }}</span>
+          <span class="text-gray-900 font-medium">{{ faq.question }}</span>
           <span class="text-gray-500">{{ faq.open ? "▲" : "▼" }}</span>
         </button>
         <transition name="fade-slide">
@@ -167,10 +167,6 @@ const hasMultipleVenues = computed(() => {
         </transition>
       </div>
       
-      <!-- Imagen del evento al final de preguntas frecuentes -->
-      <div class="mt-6 flex justify-center">
-        <img :src="event.image_url" :alt="event.name" loading="lazy" decoding="async" class="rounded-lg shadow-md max-w-full h-auto object-cover" style="height: 100%;" />
-      </div>
     </div>
 
     <!-- Categorías o temáticas del evento -->

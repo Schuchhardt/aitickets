@@ -10,6 +10,8 @@ import IconArrowGreen from "../images/icon-arrow-green.png";
 
 const props = defineProps({
   event: Object,
+  // false = sin botón flotante: se abre desde la página del evento (evento "assistant-open" del eventBus)
+  launcher: { type: Boolean, default: true },
 });
 const MAX_MESSAGE_LENGTH = 1000;
 const MAX_HISTORY = 10;
@@ -131,17 +133,25 @@ const handleAssistantShow = () => {
   isModalOpen.value = false;
 };
 
+const handleAssistantOpen = () => {
+  isModalOpen.value = false;
+  isOpen.value = true;
+  scrollToBottom();
+};
+
 onMounted(() => {
   scrollToBottom();
   // Escuchar eventos específicos para ocultar/mostrar el asistente
   eventBus.on('assistant-hide', handleAssistantHide);
   eventBus.on('assistant-show', handleAssistantShow);
+  eventBus.on('assistant-open', handleAssistantOpen);
 });
 
 onUnmounted(() => {
   // Limpiar los listeners
   eventBus.off('assistant-hide', handleAssistantHide);
   eventBus.off('assistant-show', handleAssistantShow);
+  eventBus.off('assistant-open', handleAssistantOpen);
 });
 </script>
 
@@ -155,7 +165,7 @@ onUnmounted(() => {
     </div>
 
     <!-- Botón flotante -->
-    <div v-if="!isOpen" class="assistant-button flex flex-col items-center">
+    <div v-if="!isOpen && launcher" class="assistant-button flex flex-col items-center">
       <span class="bg-gray-800 text-white text-xs px-2 py-1 rounded-md mb-2 opacity-100 transition font-[Prompt]">
         Asistente AI
       </span>

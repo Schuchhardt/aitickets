@@ -85,10 +85,10 @@ const canonicalPath = seo.canonicalPath;
       } catch (e) { /* sessionStorage no disponible */ }
     })();
   </script>
-  <!-- Sin navbar: la página parte con la portada (link de vuelta a /eventos sobre la imagen) -->
   <main>
     <EventDetail event={eventData} siteMode={false} client:idle/>
   </main>
-  <EventAssistant event={eventData} client:idle/>
+  <!-- Sin botón flotante: se abre desde la página ("Pregúntale al asistente" y el ícono de la barra en mobile) -->
+  <EventAssistant event={eventData} launcher={false} client:idle/>
   <AppFooter client:idle/>
 </Layout>

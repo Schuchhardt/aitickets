@@ -8,7 +8,7 @@ import { getSupabaseAdmin, json } from '../../lib/supabase.mjs'
 import { isValidEmail } from '../../lib/mailer.mjs'
 import { TICKET_COLUMNS, isTicketOnSale, maxPerPurchase, getSoldCounts } from '../../lib/tickets.mjs'
 import { IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL, computeBuyerTotal } from '../../lib/fees.mjs'
-import { isDemoEventSlug, getDemoEventDate } from '../../../src/lib/demoEvent.mjs'
+import { isDemoEventSlug, getDemoFunctionDate } from '../../../src/lib/demoEvent.mjs'
 import { EVENT_DATE_COLUMNS, todayInTimeZone, formatDateOnlyLong, formatTimeShort, formatEventLocation } from '../../lib/dates.mjs'
 import { rateLimit } from '../../lib/rate-limit.mjs'
 
@@ -111,8 +111,7 @@ async function loadEventContext(supabase, eventId) {
   }))
 
   // Evento demo: fecha dinámica (misma fecha que muestra la página)
-  const demoDate = isDemo ? getDemoEventDate(now, event.slug) : null
-  const eventDates = (dates || []).map(d => (demoDate ? { ...d, date: demoDate } : d))
+  const eventDates = (dates || []).map(d => (isDemo ? { ...d, date: getDemoFunctionDate(d.date, now, event.slug) } : d))
   return { event, isDemo, dates: eventDates, tickets: saleTickets, faqs: faqs || [] }
 }
 
