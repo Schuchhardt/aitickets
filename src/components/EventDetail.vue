@@ -13,9 +13,10 @@ import CheckoutSheet from "./event/CheckoutSheet.vue";
 import EventGallery from "./EventGallery.vue";
 import ShareSheet from "./event/ShareSheet.vue";
 import { vReveal } from "./event/reveal.js";
-import { normalizePageSettings } from "../lib/eventPageSettings";
+import IridescenceBg from "./event/IridescenceBg.vue";
+import { normalizePageSettings, pageBackgroundPreset } from "../lib/eventPageSettings";
 import PurchasedTicketsModal from "./PurchasedTicketsModal.vue";
-import { cardState, stockSummary, minFinalPrice, formatCLP, formatSaleStart, readCheckoutParams } from "./event/eventView.js";
+import { cardState, stockSummary, minFinalPrice, formatCLP, formatSaleStart, readCheckoutParams, upcomingFunctions, formatFunctionShort } from "./event/eventView.js";
 import { addToCalendar } from "./event/shareActions.js";
 import { storedOrders, trackFunnel } from "./event/checkoutApi.js";
 
@@ -36,6 +37,16 @@ const showAssistant = computed(() => !props.siteMode && !props.event?.is_preview
 // Diseño de la página elegido por el productor (events.page_settings): poster | banner | compact
 const pageSettings = computed(() => normalizePageSettings(props.event?.page_settings));
 const layout = computed(() => (props.event?.image_url ? pageSettings.value.layout : "compact"));
+// Fondo animado (Iridescence) o, sin él, el tinte del póster
+const bgPreset = computed(() => pageBackgroundPreset(pageSettings.value.background));
+
+// ---- Desktop: al pasar la portada, una miniatura cuadrada se acopla sobre la card sticky ----
+const coverEl = ref(null);
+const docked = ref(false);
+const dockDate = computed(() => {
+  const fn = upcomingFunctions(props.event)[0] || props.event?.dates?.[0];
+  return fn ? formatFunctionShort(fn) : "";
+});
 
 // Portada ancha: alto y encuadre del ajuste de portada (events.cover_settings, CoverAdjuster.vue)
 const bannerStyle = computed(() => {
@@ -216,6 +227,13 @@ onMounted(() => {
   window.addEventListener("keydown", onImageKey);
 
   if ("IntersectionObserver" in window) {
+    if (coverEl.value) {
+      const io = new IntersectionObserver(([entry]) => {
+        docked.value = !entry.isIntersecting && entry.boundingClientRect.bottom < 0;
+      });
+      io.observe(coverEl.value);
+      observers.push(io);
+    }
     if (placeSentinel.value) {
       const io = new IntersectionObserver(([entry]) => {
         if (!entry.isIntersecting && entry.boundingClientRect.top < 0) pastPlace.value = true;
@@ -247,7 +265,8 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
 
 <template>
   <div v-if="event" class="ev-page ev-motion" :class="[`layout-${layout}`, { 'has-tint': tint }]" :style="pageStyle">
-    <div class="tint" aria-hidden="true"></div>
+    <IridescenceBg v-if="bgPreset" class="page-bg" :color="bgPreset.color" :soft="bgPreset.soft" />
+    <div v-else class="tint" aria-hidden="true"></div>
 
     <div class="container">
       <p v-if="event.is_demo" class="banner banner-demo" role="note">
@@ -269,13 +288,13 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
       </div>
 
       <!-- Portada ancha: la imagen ocupa todo el ancho y el título se monta sobre su borde -->
-      <figure v-if="layout === 'banner'" class="cover" :class="{ 'is-contain': bannerContain }" :style="bannerStyle" data-testid="event-cover">
+      <figure v-if="layout === 'banner'" ref="coverEl" class="cover" :class="{ 'is-contain': bannerContain }" :style="bannerStyle" data-testid="event-cover">
         <img v-if="bannerContain" :src="event.image_url" alt="" class="cover-blur" aria-hidden="true" />
         <img ref="bannerImg" :src="event.image_url" :alt="event.name" class="cover-img" fetchpriority="high" loading="eager" decoding="async" />
       </figure>
 
       <div class="layout">
-        <figure v-if="layout === 'poster'" class="poster" :class="{ 'is-fallback': !posterRatio.known }" data-testid="event-cover">
+        <figure v-if="layout === 'poster'" ref="coverEl" class="poster" :class="{ 'is-fallback': !posterRatio.known }" data-testid="event-cover">
           <img
             :src="event.image_url"
             :alt="event.name"
@@ -287,7 +306,7 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
           />
         </figure>
 
-        <div class="hero-area">
+        <div class="hero-area" :ref="(el) => layout === 'compact' && (coverEl = el)">
           <EventHero
             :event="event"
             :badges="badges"
@@ -302,6 +321,18 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
 
         <div class="aside" :class="{ 'hide-mobile': cardHiddenOnMobile }">
           <div ref="cardWrap" class="card-wrap">
+            <!-- La portada "se muda" a la columna derecha: miniatura cuadrada sobre la card (solo desktop) -->
+            <div v-if="event.image_url" class="dock" :class="{ 'is-docked': docked }" aria-hidden="true">
+              <div class="dock-inner">
+                <div class="dock-row">
+                  <img :src="event.image_url" alt="" class="dock-img" loading="lazy" decoding="async" />
+                  <div class="dock-text">
+                    <p class="dock-name">{{ event.name }}</p>
+                    <p v-if="dockDate" class="dock-date">{{ dockDate }}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
             <EventActionCard
               ref="card"
               :event="event"
@@ -377,6 +408,13 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
   color: var(--text-1);
   font-family: "Prompt", system-ui, sans-serif;
   isolation: isolate;
+}
+/* Fondo Iridescence: fijo detrás de todo el contenido (la página aísla su stacking context) */
+.page-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
 }
 /* A4: el tinte del póster entra con un fade */
 .tint {
@@ -505,9 +543,9 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
 .layout-banner .hero-area {
   position: relative;
   margin: -40px 0 0;
-  padding: 20px 16px 4px;
+  padding: 20px 16px 20px;
   background: var(--surface-0);
-  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  border-radius: var(--r-xl);
   margin-left: -16px;
   margin-right: -16px;
 }
@@ -568,6 +606,10 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
 }
 .poster:not(.is-fallback) img {
   object-fit: cover; /* la proporción es la real: cover = contain sin bordes */
+}
+/* Miniatura acoplada sobre la card: solo desktop (en mobile no hay columna derecha) */
+.dock {
+  display: none;
 }
 .sentinel {
   display: block;
@@ -680,8 +722,8 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
   }
   .layout-banner .hero-area {
     margin: -72px 0 0 24px;
-    padding: 28px 32px 8px;
-    border-radius: var(--r-xl) var(--r-xl) 0 0;
+    padding: 28px 32px 24px;
+    border-radius: var(--r-xl);
   }
   .layout-banner .aside {
     padding-top: 32px;
@@ -712,6 +754,66 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
   .card-wrap {
     position: sticky;
     top: 24px;
+  }
+  /* A33: al pasar la portada, una miniatura cuadrada "llega" desde la izquierda y se acopla sobre la card.
+     La altura se anima con grid-template-rows (0fr → 1fr) para que la card baje sin saltos. */
+  .dock {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 520ms var(--ease-out);
+  }
+  .dock.is-docked {
+    grid-template-rows: 1fr;
+  }
+  .dock-inner {
+    min-height: 0;
+    overflow: hidden;
+  }
+  .dock-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding-bottom: 14px;
+  }
+  .dock-img {
+    width: 72px;
+    height: 72px;
+    flex: 0 0 auto;
+    border-radius: var(--r-md);
+    object-fit: cover;
+    box-shadow: var(--shadow-card);
+    opacity: 0;
+    transform: translateX(-120px) scale(0.5) rotate(-6deg);
+    transition: transform 640ms var(--ease-spring), opacity 320ms var(--ease-out);
+  }
+  .dock-text {
+    min-width: 0;
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 320ms var(--ease-out) 120ms, transform 420ms var(--ease-out) 120ms;
+  }
+  .dock.is-docked .dock-img {
+    opacity: 1;
+    transform: none;
+  }
+  .dock.is-docked .dock-text {
+    opacity: 1;
+    transform: none;
+  }
+  .dock-name {
+    font-family: "Unbounded", system-ui, sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    line-height: 20px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .dock-date {
+    font-size: 13px;
+    color: var(--text-2);
+    margin-top: 2px;
   }
   .main {
     grid-area: main;

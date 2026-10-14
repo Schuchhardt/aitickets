@@ -7,6 +7,7 @@ import AutoHeight from "./AutoHeight.vue";
 import SuccessCheck from "./SuccessCheck.vue";
 import QuantityStepper from "./QuantityStepper.vue";
 import { suggestEmail } from "./emailSuggest.js";
+import { fireConfetti } from "./confetti.js";
 import { firstNameOf, ticketMax, formatFunctionShort } from "./eventView.js";
 import { addToCalendar, shareEvent } from "./shareActions.js";
 import {
@@ -202,6 +203,8 @@ async function succeed({ orderId }) {
   status.value = "success";
   liveMessage.value = `¡Listo, ${firstName.value}! Estás dentro.`;
   await nextTick();
+  // A32: confetti desde el check de éxito (solo al confirmar ahora, no al volver a la página)
+  setTimeout(() => fireConfetti({ origin: successTitle.value }), 220);
   setTimeout(() => successTitle.value?.focus({ preventScroll: true }), 360);
 }
 

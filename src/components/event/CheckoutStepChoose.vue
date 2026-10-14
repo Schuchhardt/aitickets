@@ -152,12 +152,12 @@ async function onRadioKey(e, items, current, select, keyOf) {
           :style="{ '--i': i }"
         >
           <div class="row-info">
+            <p class="row-price ev-tabular">{{ Number(t.price) > 0 ? formatCLP(t.final_price ?? t.price) : "Gratis" }}</p>
             <p class="row-name">{{ t.ticket_name }}</p>
             <p v-if="t.status === 'sold_out'" class="row-sub">Agotada</p>
             <p v-else-if="t.status === 'upcoming'" class="row-sub">Disponible desde el {{ formatSaleStart(t.sales_start, event.timezone) }}</p>
           </div>
           <div class="row-side">
-            <p class="row-price ev-tabular">{{ Number(t.price) > 0 ? formatCLP(t.final_price ?? t.price) : "Gratis" }}</p>
             <QuantityStepper
               v-if="t.status === 'available'"
               :model-value="selection[t.id] || 0"
@@ -335,9 +335,11 @@ async function onRadioKey(e, items, current, select, keyOf) {
   min-width: 0;
 }
 .row-name {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 500;
+  color: var(--text-2);
   overflow-wrap: anywhere;
+  margin-top: 2px;
 }
 .row-sub {
   font-size: 13px;
@@ -346,14 +348,14 @@ async function onRadioKey(e, items, current, select, keyOf) {
 }
 .row-side {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
+  align-items: center;
   flex: 0 0 auto;
 }
 .row-price {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 700;
+  color: var(--text-1);
 }
 .rows-note,
 .pick-hint {
