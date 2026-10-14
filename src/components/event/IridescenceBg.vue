@@ -111,8 +111,9 @@ function resize() {
     canvas.value.width = w;
     canvas.value.height = h;
     gl.viewport(0, 0, w, h);
-  }
-  if (!running) draw();
+    // Cambiar el tamaño borra el canvas (a negro, alpha: false): redibujar en el acto, sin esperar al loop
+    draw();
+  } else if (!running) draw();
 }
 
 function draw() {
@@ -132,6 +133,14 @@ function loop(now) {
   elapsed += Math.min(now - last, 100);
   last = now;
   draw();
+}
+
+function onContextLost(e) {
+  e.preventDefault();
+  ready.value = false;
+  running = false;
+  cancelAnimationFrame(raf);
+  gl = null;
 }
 
 const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -154,6 +163,8 @@ onMounted(() => {
     gl = null;
     return;
   }
+  // Si el navegador suelta el contexto (pasa en móviles), queda el degradado CSS en vez de un canvas negro
+  canvas.value.addEventListener("webglcontextlost", onContextLost);
   resize();
   ro = new ResizeObserver(resize);
   ro.observe(root.value);
@@ -177,6 +188,7 @@ onBeforeUnmount(() => {
   io?.disconnect();
   ro?.disconnect();
   document.removeEventListener("visibilitychange", updateRunning);
+  canvas.value?.removeEventListener("webglcontextlost", onContextLost);
   gl?.getExtension("WEBGL_lose_context")?.loseContext();
   gl = null;
 });

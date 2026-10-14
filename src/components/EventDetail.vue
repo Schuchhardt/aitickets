@@ -265,7 +265,9 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
 
 <template>
   <div v-if="event" class="ev-page ev-motion" :class="[`layout-${layout}`, { 'has-tint': tint }]" :style="pageStyle">
-    <IridescenceBg v-if="bgPreset" class="page-bg" :color="bgPreset.color" :soft="bgPreset.soft" />
+    <div v-if="bgPreset" class="page-bg-wrap" aria-hidden="true">
+      <IridescenceBg class="page-bg" :color="bgPreset.color" :soft="bgPreset.soft" />
+    </div>
     <div v-else class="tint" aria-hidden="true"></div>
 
     <div class="container">
@@ -409,12 +411,21 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
   font-family: "Prompt", system-ui, sans-serif;
   isolation: isolate;
 }
-/* Fondo Iridescence: fijo detrás de todo el contenido (la página aísla su stacking context) */
-.page-bg {
-  position: fixed;
+/* Fondo Iridescence detrás del contenido. Sticky dentro de la página (no fixed): así no se sale de .ev-page
+   ni tapa el footer, y con 100lvh no cambia de alto (ni se redibuja en negro) cuando la barra del navegador
+   móvil aparece o se esconde al hacer scroll. */
+.page-bg-wrap {
+  position: absolute;
   inset: 0;
   z-index: -1;
   pointer-events: none;
+}
+.page-bg {
+  position: sticky;
+  top: 0;
+  width: 100%;
+  height: 100vh;
+  height: 100lvh;
 }
 /* A4: el tinte del póster entra con un fade */
 .tint {
