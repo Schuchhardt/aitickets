@@ -167,7 +167,8 @@ const organizerUrl = computed(() => props.event.organization?.website || "");
   background: var(--warning);
   animation: ev-pulse 1.2s ease-out 3;
 }
-/* Mobile: la miniatura va sobre el título (al lado no cabe sin cortar palabras); desktop: al lado */
+/* Mobile: la imagen va sobre el título a todo el ancho, con su proporción real (una miniatura se ve
+   chica); desde 640px pasa a miniatura cuadrada al lado del título */
 .title-row.has-thumb {
   display: flex;
   flex-direction: column;
@@ -182,8 +183,7 @@ const organizerUrl = computed(() => props.event.organization?.website || "");
 }
 .thumb {
   flex: 0 0 auto;
-  width: 96px;
-  height: 96px;
+  width: 100%;
   padding: 0;
   border: 0;
   border-radius: var(--r-lg);
@@ -202,7 +202,8 @@ const organizerUrl = computed(() => props.event.organization?.website || "");
 }
 .thumb img {
   width: 100%;
-  height: 100%;
+  height: auto;
+  max-height: 70vh;
   object-fit: cover;
   display: block;
   transition: transform var(--dur-4) var(--ease-out);
@@ -367,6 +368,14 @@ const organizerUrl = computed(() => props.event.organization?.website || "");
     flex-direction: row;
     align-items: center;
     gap: 18px;
+  }
+  .thumb {
+    width: 96px;
+    height: 96px;
+  }
+  .thumb img {
+    height: 100%;
+    max-height: none;
   }
 }
 @media (min-width: 1024px) {
