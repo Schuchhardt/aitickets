@@ -109,6 +109,9 @@ jobs:
               IF EXISTS (SELECT 1 FROM public.events WHERE slug LIKE 'evento-demo-%' AND (name ILIKE '%(evento de demostración)%' OR title ILIKE '%(evento de demostración)%')) THEN
                 RAISE EXCEPTION 'Los eventos demo no deben llevar (evento de demostración) en el nombre: lo dice el banner';
               END IF;
+              IF (SELECT count(DISTINCT page_settings ->> 'background') FROM public.events WHERE slug LIKE 'evento-demo-%' AND coalesce(page_settings ->> 'background', 'none') <> 'none') <> 5 THEN
+                RAISE EXCEPTION 'Cada evento demo debe tener un fondo animado distinto';
+              END IF;
             END \$\$;"
       - name: Permisos (anon/authenticated sin acceso; RLS activo)
         run: psql -v ON_ERROR_STOP=1 -f db/ci/assert-grants.sql
