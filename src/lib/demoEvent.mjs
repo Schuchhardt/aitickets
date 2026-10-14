@@ -2,7 +2,7 @@
 // Los usan la página pública (src/pages/eventos/[slug].astro), el listado (src/pages/eventos/index.astro),
 // el asistente IA y la función de compra (netlify/functions/*), que los rechaza en el servidor.
 // Las filas (evento, recinto, funciones, entradas) las siembran db/migrations/202610090100_event_cover_and_demo_events.sql
-// y 202610140200_demo_events_free_and_tour.sql.
+// 202610140200_demo_events_free_and_tour.sql, 202610140300_demo_event_standup.sql y 202610150400_demo_event_teatro.sql.
 
 export const DEMO_EVENT_SLUG = 'evento-demo-aitickets'
 export const DEMO_TIMEZONE = 'America/Santiago'
@@ -24,6 +24,8 @@ export const DEMO_EVENTS = Object.freeze([
   { slug: 'evento-demo-gratis', rule: 'weekday', weekday: 4, endTime: '21:00' },
   // Gira: 5 funciones en 3 ciudades a partir del próximo viernes
   { slug: 'evento-demo-gira', rule: 'weekday', weekday: 5, endTime: '23:00', anchor: '2026-10-23' },
+  // Teatro: todos los domingos
+  { slug: 'evento-demo-teatro', rule: 'weekday', weekday: 0, endTime: '20:10' },
 ])
 
 export const DEMO_EVENT_SLUGS = Object.freeze(DEMO_EVENTS.map((e) => e.slug))

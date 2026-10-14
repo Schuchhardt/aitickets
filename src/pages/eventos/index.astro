@@ -6,6 +6,7 @@ import EventList from "../../components/EventList.vue";
 import Layout from '../../layouts/Layout.astro';
 import { zonedDateTimeToDate, getZonedParts } from "../../utils/dateHelpers.js";
 import { DEMO_EVENT_SLUGS, isDemoEventSlug, getDemoFunctionDate } from "../../lib/demoEvent.mjs";
+import { currentCoverMeta } from "../../lib/eventCoverMeta";
 import "../../styles/global.css";
 
 export const prerender = false;
@@ -17,35 +18,68 @@ const supabase = getSupabaseAdmin();
 const now = new Date();
 const todaySantiago = getZonedParts(now)?.date || now.toISOString().slice(0, 10);
 
-const EVENT_CARD_COLUMNS = "id, slug, name, title, image_url, location, start_date, end_date";
-const [realRes, demoRes] = await Promise.all([
-  supabase
-    .from("events")
-    .select(EVENT_CARD_COLUMNS)
-    .eq("status", "published")
-    .or("accessibility.is.null,accessibility.eq.public")
-    .not("slug", "is", null),
-  supabase.from("events").select(EVENT_CARD_COLUMNS).eq("status", "published").in("slug", [...DEMO_EVENT_SLUGS]),
-]);
+// cover_meta (proporción real de la portada) arma la grilla masonry sin saltos; si la columna no existe
+// (deploy preview sin migrar) se reintenta sin ella
+const BASE_COLUMNS = "id, slug, name, title, image_url, location, start_date, end_date";
+async function loadCards(withMeta: boolean): Promise<[any, any]> {
+  const columns = withMeta ? `${BASE_COLUMNS}, cover_meta` : BASE_COLUMNS;
+  return Promise.all([
+    supabase
+      .from("events")
+      .select(columns)
+      .eq("status", "published")
+      .or("accessibility.is.null,accessibility.eq.public")
+      .not("slug", "is", null),
+    supabase.from("events").select(columns).eq("status", "published").in("slug", [...DEMO_EVENT_SLUGS]),
+  ]);
+}
+let [realRes, demoRes] = await loadCards(true);
+if (realRes.error?.code === "42703" || demoRes.error?.code === "42703") [realRes, demoRes] = await loadCards(false);
 
 if (realRes.error) console.error("Error al obtener eventos:", realRes.error);
 if (demoRes.error) console.error("Error al obtener eventos demo:", demoRes.error);
 const demoEvents = (demoRes.data || [])
-  .map((e) => ({ ...e, start_date: null, end_date: null }))
-  .sort((a, b) => DEMO_EVENT_SLUGS.indexOf(a.slug) - DEMO_EVENT_SLUGS.indexOf(b.slug));
-const events = [...(realRes.data || []).filter((e) => !isDemoEventSlug(e.slug)), ...demoEvents];
+  .map((e: any) => ({ ...e, start_date: null, end_date: null }))
+  .sort((a: any, b: any) => DEMO_EVENT_SLUGS.indexOf(a.slug) - DEMO_EVENT_SLUGS.indexOf(b.slug));
+const events = [...(realRes.data || []).filter((e: any) => !isDemoEventSlug(e.slug)), ...demoEvents];
 
 const eventIds = (events || []).map((e) => e.id);
-const { data: dates, error: datesError } = eventIds.length
-  ? await supabase
-      .from("event_dates")
-      .select("event_id, date, start_time, end_time")
-      .in("event_id", eventIds)
-      .order("date", { ascending: true })
-      .order("start_time", { ascending: true })
-  : { data: [], error: null };
+const empty = { data: [] as any[], error: null };
+const [{ data: dates, error: datesError }, { data: tagRows, error: tagsError }, { data: ticketRows, error: ticketsError }] =
+  eventIds.length
+    ? await Promise.all([
+        supabase
+          .from("event_dates")
+          .select("event_id, date, start_time, end_time")
+          .in("event_id", eventIds)
+          .order("date", { ascending: true })
+          .order("start_time", { ascending: true }),
+        supabase.from("event_tags").select("event_id, category_tags(name)").in("event_id", eventIds),
+        supabase.from("event_tickets").select("event_id, price, is_gift").in("event_id", eventIds),
+      ])
+    : [empty, empty, empty];
 
 if (datesError) console.error("Error al obtener fechas de eventos:", datesError);
+if (tagsError) console.error("Error al obtener categorías de eventos:", tagsError);
+if (ticketsError) console.error("Error al obtener entradas de eventos:", ticketsError);
+
+// Categorías (para los filtros y la etiqueta de la tarjeta) y precio "desde" (sin cortesías)
+const categoriesByEvent = new Map<number, string[]>();
+for (const row of tagRows || []) {
+  const tag: any = Array.isArray(row.category_tags) ? row.category_tags[0] : row.category_tags;
+  const name = tag?.name?.trim();
+  if (!name) continue;
+  const list = categoriesByEvent.get(row.event_id) || [];
+  if (!list.includes(name)) list.push(name);
+  categoriesByEvent.set(row.event_id, list);
+}
+const pricesByEvent = new Map<number, number[]>();
+for (const t of ticketRows || []) {
+  if (t.is_gift) continue;
+  const list = pricesByEvent.get(t.event_id) || [];
+  list.push(Number(t.price) || 0);
+  pricesByEvent.set(t.event_id, list);
+}
 
 const slugById = new Map(events.map((e) => [e.id, e.slug]));
 const datesByEvent = new Map<number, any[]>();
@@ -71,9 +105,17 @@ const eventData = (events || [])
         ? new Date(e.start_date)
         : null;
     const firstStart = eventDates.length ? zonedDateTimeToDate(eventDates[0].date, eventDates[0].start_time) : null;
+    const prices = pricesByEvent.get(e.id) || [];
+    const paid = prices.filter((p) => p > 0);
+    const meta = currentCoverMeta(e.cover_meta, e.image_url);
+    const { cover_meta: _meta, ...card } = e;
     return {
-      ...e,
+      ...card,
       is_demo: isDemoEventSlug(e.slug),
+      categories: categoriesByEvent.get(e.id) || [],
+      is_free: prices.length > 0 && paid.length === 0,
+      min_price: paid.length ? Math.min(...paid) : null,
+      image_ratio: meta?.width && meta?.height ? Number((meta.width / meta.height).toFixed(4)) : null,
       start_date: e.start_date || firstStart?.toISOString() || null,
       dates: upcomingDates.length ? upcomingDates : eventDates,
       _isUpcoming: isUpcoming,
@@ -93,7 +135,7 @@ const eventData = (events || [])
 >
   <AppHeader client:idle/>
   <main>
-    <EventList events={eventData} client:idle />
+    <EventList events={eventData} today={todaySantiago} client:idle />
   </main>
   <AppFooter client:idle/>
 </Layout>

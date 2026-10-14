@@ -386,6 +386,8 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
       <div class="bar-space" aria-hidden="true"></div>
     </div>
 
+    <!-- Sticky (no fixed) dentro de la página: se pega abajo al hacer scroll y queda justo después de
+         "¿Organizas eventos?", sin montarse sobre el footer -->
     <MobileStickyBar :visible="showBar" :price="bar.price" :note="bar.note" :note-warning="bar.warning" :cta="bar.cta" @action="onBarAction" />
 
     <CheckoutSheet v-if="checkout" :event="event" :initial="checkout" @close="closeCheckout" />
@@ -692,7 +694,7 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
   font-size: 14px;
 }
 .bar-space {
-  height: 96px;
+  height: 24px;
 }
 
 @media (min-width: 1024px) {

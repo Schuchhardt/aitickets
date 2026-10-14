@@ -50,7 +50,7 @@ describe('isDemoEventSlug', () => {
 
 describe('getDemoEventDate (varios eventos demo)', () => {
   it('lista cinco eventos demo (incluye uno gratis y una gira)', () => {
-    expect(DEMO_EVENT_SLUGS).toEqual(['evento-demo-aitickets', 'evento-demo-concierto', 'evento-demo-feria', 'evento-demo-gratis', 'evento-demo-gira'])
+    expect(DEMO_EVENT_SLUGS).toEqual(['evento-demo-aitickets', 'evento-demo-concierto', 'evento-demo-feria', 'evento-demo-gratis', 'evento-demo-gira', 'evento-demo-teatro'])
     expect(isDemoEventSlug('evento-demo-concierto')).toBe(true)
     expect(isDemoEventSlug('evento-demo-feria')).toBe(true)
   })

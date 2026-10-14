@@ -1,5 +1,5 @@
 <script setup>
-// Barra inferior fija en mobile (§4.6): monto final + una sola acción. Aparece con slide-up (A20).
+// Barra inferior en mobile (§4.6): monto final + una sola acción. Aparece con slide-up (A20).
 defineProps({
   visible: { type: Boolean, default: false },
   price: { type: String, default: "" },
@@ -23,10 +23,10 @@ const emit = defineEmits(["action"]);
 </template>
 
 <style scoped>
+/* Sticky dentro de .ev-page (EventDetail.vue): flota abajo mientras se recorre el evento y se detiene al
+   final de la página, antes del footer (fixed se montaba sobre el newsletter del footer) */
 .bar {
-  position: fixed;
-  left: 0;
-  right: 0;
+  position: sticky;
   bottom: 0;
   z-index: 40;
   min-height: 72px;

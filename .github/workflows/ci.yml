@@ -93,14 +93,14 @@ jobs:
           node scripts/migrate.mjs --no-baseline | tee second-run.log
           grep -q "0 pendientes" second-run.log
           node scripts/migrate.mjs --status --fail-on-pending
-      - name: Eventos demo sembrados (stand-up, concierto, feria, gratis y gira)
+      - name: Eventos demo sembrados (stand-up, concierto, feria, gratis, gira y teatro)
         run: |
           psql -v ON_ERROR_STOP=1 -At -c "
             DO \$\$
             DECLARE missing text;
             BEGIN
               SELECT string_agg(s, ', ') INTO missing
-              FROM unnest(ARRAY['evento-demo-aitickets', 'evento-demo-concierto', 'evento-demo-feria', 'evento-demo-gratis', 'evento-demo-gira']) AS s
+              FROM unnest(ARRAY['evento-demo-aitickets', 'evento-demo-concierto', 'evento-demo-feria', 'evento-demo-gratis', 'evento-demo-gira', 'evento-demo-teatro']) AS s
               WHERE NOT EXISTS (SELECT 1 FROM public.events e WHERE e.slug = s);
               IF missing IS NOT NULL THEN RAISE EXCEPTION 'Faltan eventos demo: %', missing; END IF;
               IF (SELECT count(*) FROM public.event_dates d JOIN public.events e ON e.id = d.event_id WHERE e.slug = 'evento-demo-gira') <> 5 THEN
@@ -109,7 +109,7 @@ jobs:
               IF EXISTS (SELECT 1 FROM public.events WHERE slug LIKE 'evento-demo-%' AND (name ILIKE '%(evento de demostración)%' OR title ILIKE '%(evento de demostración)%')) THEN
                 RAISE EXCEPTION 'Los eventos demo no deben llevar (evento de demostración) en el nombre: lo dice el banner';
               END IF;
-              IF (SELECT count(DISTINCT page_settings ->> 'background') FROM public.events WHERE slug LIKE 'evento-demo-%' AND coalesce(page_settings ->> 'background', 'none') <> 'none') <> 5 THEN
+              IF (SELECT count(DISTINCT page_settings ->> 'background') FROM public.events WHERE slug LIKE 'evento-demo-%' AND coalesce(page_settings ->> 'background', 'none') <> 'none') <> 6 THEN
                 RAISE EXCEPTION 'Cada evento demo debe tener un fondo animado distinto';
               END IF;
               IF (SELECT count(DISTINCT page_settings ->> 'layout') FROM public.events WHERE slug LIKE 'evento-demo-%') <> 3 THEN
