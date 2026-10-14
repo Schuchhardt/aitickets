@@ -10,6 +10,7 @@ import {
     resolveSiteByHost,
     type SiteRecord,
 } from "./lib/sites";
+import { purgeEventPages } from "./lib/cdnCache";
 
 // Rutas que requieren sesión de productor
 const PROTECTED_PAGE_PREFIX = "/dashboard";
@@ -85,7 +86,26 @@ const EDGE_TENANT_PREFIX = "/o/_host";
 const MAIN_ONLY_PREFIXES = ["/dashboard", "/organizadores", "/auth", "/api/auth", "/oauth", "/qr", "/order", "/ticket", "/payment-confirmation", "/pago", "/invitacion"];
 
 /** APIs de Astro permitidas en un host de tenant. */
-const TENANT_API_ALLOWLIST = new Set(["/api/sites/contact"]);
+const TENANT_API_ALLOWLIST = new Set(["/api/sites/contact", "/api/events/visit"]);
+
+/**
+ * APIs del panel que cambian algo visible en las páginas públicas de eventos (o en los sitios de productor):
+ * si responden OK, se vacía la caché del CDN de esas páginas (src/lib/cdnCache.ts). Todas exigen sesión,
+ * así que nadie de afuera puede forzar vaciados. La API de productores (/api/mcp, /api/v1) lo hace en
+ * src/lib/producer-api/registry.ts.
+ */
+const PURGE_ON_WRITE = new Set([
+    "/api/events/create",
+    "/api/events/update",
+    "/api/events/cover",
+    "/api/events/faqs",
+    "/api/events/gallery",
+    "/api/events/duplicate",
+    "/api/organizations/update",
+    "/api/sites",
+    "/api/sites/banners",
+    "/api/sites/domain",
+]);
 
 const matchesPrefix = (pathname: string, prefix: string) => pathname === prefix || pathname.startsWith(`${prefix}/`);
 
@@ -219,6 +239,13 @@ export const onRequest = defineMiddleware(async (context, next) => {
     }
 
     const response = await next();
+
+    if (isApi && PURGE_ON_WRITE.has(pathname) && STATE_CHANGING_METHODS.has(request.method.toUpperCase()) && response.ok) {
+        // waitUntil (Netlify) deja responder sin esperar al vaciado; sin él se espera (máx. 2,5 s)
+        const waitUntil = (context.locals as any).netlify?.context?.waitUntil;
+        if (typeof waitUntil === "function") waitUntil(purgeEventPages());
+        else await purgeEventPages();
+    }
 
     // Nada del dashboard ni de las APIs debe indexarse
     if (isDashboard || isApi || isQrValidator || isOAuthPage) {

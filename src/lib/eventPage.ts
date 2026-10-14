@@ -13,10 +13,11 @@ import {
 import { descriptionToHtml } from "./sanitize";
 import { isDemoEventSlug, getDemoFunctionDate } from "./demoEvent.mjs";
 import { normalizeCoverSettings } from "./eventCover";
-import { loadEventGallery } from "./eventGallery";
+import { loadEventGallery, type GalleryImage } from "./eventGallery";
 import { resolveCoverMeta, eventThemeFrom } from "./eventCoverMeta";
 import { normalizePageSettings, stripDemoSuffix } from "./eventPageSettings";
 import { computeFeeSplit } from "../../netlify/lib/fees.mjs";
+import { clientIpFrom } from "./sites";
 
 // Columnas públicas del evento. NUNCA incluir secret_location (C4).
 export const EVENT_PUBLIC_COLUMNS =
@@ -42,13 +43,11 @@ export interface PublicEventOptions {
   organizationId?: number;
   /** Origen del sitio del productor (p. ej. https://entradas.productora.cl); solo informativo (seo.pageUrl). */
   siteOrigin?: string;
-  /** Para registrar la visita (event_visits). Sin request no se registra. */
-  request?: Request;
-  url?: URL;
+  /** Contexto de Netlify (waitUntil) para guardar cover_meta sin bloquear. Las visitas las registra /api/events/visit. */
   locals?: any;
   /**
    * Vista previa privada (link con token o dueño con sesión): carga el evento por id aunque NO esté
-   * publicado, no registra la visita y siempre es noindex. `slug` se ignora.
+   * publicado y siempre es noindex. `slug` se ignora.
    */
   previewEventId?: number;
 }
@@ -69,17 +68,23 @@ export interface PublicEventResult {
   org: { id: number; name: string; website: string | null; instagram: string | null } | null;
 }
 
-async function trackVisit(supabase: ReturnType<typeof getSupabaseAdmin>, eventId: number, request: Request, url?: URL, locals?: any) {
+/**
+ * Registra una visita a la página pública (event_visits). La llama /api/events/visit desde el navegador:
+ * la página se sirve desde el CDN (src/lib/cdnCache.ts) y el servidor no ve cada visita. Solo se guarda el
+ * hash de la IP. `referrer` y `utm` son los de la página (document.referrer y su query string).
+ */
+export async function recordEventVisit(
+  eventId: number,
+  request: Request,
+  page: { referrer?: string | null; utmSource?: string | null; utmMedium?: string | null; utmCampaign?: string | null },
+  locals?: any
+) {
+  const supabase = getSupabaseAdmin();
   const ua = request.headers.get("user-agent") || "";
   if (BOT_PATTERNS.test(ua)) return;
-  const ip =
-    request.headers.get("x-nf-client-connection-ip") ||
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip") ||
-    "unknown";
+  const ip = clientIpFrom(request);
   const hashBuffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(ip));
   const ipHash = Array.from(new Uint8Array(hashBuffer)).map((b) => b.toString(16).padStart(2, "0")).join("");
-  const referrer = request.headers.get("referer") || null;
   // Geo de Netlify: context.geo (adapter). Fallback: header x-nf-geo (JSON en base64) / x-country.
   let geo: any = locals?.netlify?.context?.geo || null;
   if (!geo) {
@@ -100,26 +105,18 @@ async function trackVisit(supabase: ReturnType<typeof getSupabaseAdmin>, eventId
   const country = clip(geo?.country?.code, 8) || clip(request.headers.get("x-country"), 8);
   const city = clip(geo?.city, 128);
 
-  const utmSource = url?.searchParams.get("utm_source") || null;
-  const utmMedium = url?.searchParams.get("utm_medium") || null;
-  const utmCampaign = url?.searchParams.get("utm_campaign") || null;
-
-  supabase
-    .from("event_visits")
-    .insert({
-      event_id: eventId,
-      ip_hash: ipHash,
-      user_agent: ua.substring(0, 512),
-      referrer: referrer?.substring(0, 1024) || null,
-      country,
-      city,
-      utm_source: utmSource?.substring(0, 256) || null,
-      utm_medium: utmMedium?.substring(0, 256) || null,
-      utm_campaign: utmCampaign?.substring(0, 256) || null,
-    })
-    .then(({ error: visitError }) => {
-      if (visitError) console.error("Error tracking visit:", visitError);
-    });
+  const { error: visitError } = await supabase.from("event_visits").insert({
+    event_id: eventId,
+    ip_hash: ipHash,
+    user_agent: ua.substring(0, 512),
+    referrer: clip(page.referrer, 1024),
+    country,
+    city,
+    utm_source: clip(page.utmSource, 256),
+    utm_medium: clip(page.utmMedium, 256),
+    utm_campaign: clip(page.utmCampaign, 256),
+  });
+  if (visitError) console.error("Error tracking visit:", visitError);
 }
 
 /**
@@ -131,12 +128,14 @@ async function loadAvailability(
   supabase: ReturnType<typeof getSupabaseAdmin>,
   eventId: number,
   tickets: any[],
-  now: Date
+  now: Date,
+  // RPC ya lanzada (en paralelo con el resto de las consultas de la página): evita un viaje más a la BD
+  rpcRequest: PromiseLike<{ data: any; error: any }> = supabase.rpc("aitickets_ticket_availability", { p_event_id: eventId })
 ): Promise<{ sold: Map<string, number>; pending: Map<string, number> }> {
   const sold = new Map<string, number>();
   const pending = new Map<string, number>();
 
-  const { data: rpcRows, error: rpcError } = await supabase.rpc("aitickets_ticket_availability", { p_event_id: eventId });
+  const { data: rpcRows, error: rpcError } = await rpcRequest;
   if (!rpcError && Array.isArray(rpcRows)) {
     for (const row of rpcRows as any[]) {
       if (row?.ticket_id === null || row?.ticket_id === undefined) continue;
@@ -226,16 +225,61 @@ export const truncate = (text: string, max: number) => {
   return `${(lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).trim()}…`;
 };
 
-/**
- * Carga un evento publicado con todo lo necesario para su página pública.
- * Devuelve null si no existe, no está publicado o (con organizationId) pertenece a otra organización.
- */
-export async function getPublicEventData(slug: string | undefined, opts: PublicEventOptions = {}): Promise<PublicEventResult | null> {
-  const isPreview = opts.previewEventId !== undefined;
-  if (!slug && !isPreview) return null;
-  const supabase = getSupabaseAdmin();
-  const now = new Date();
+/** Filas crudas de la página de un evento, con las mismas formas que devuelve PostgREST. */
+interface EventPageRows {
+  event: any;
+  categories: any[];
+  tickets: any[];
+  faqs: any[];
+  dates: any[];
+  org: any;
+  hasSecretLocation: boolean;
+  gallery: GalleryImage[];
+  /** Respuesta de aitickets_ticket_availability (loadAvailability cae al conteo anterior si trae error). */
+  availability: { data: any; error: any };
+}
 
+const isMissingFunction = (error: any) => error?.code === "PGRST202" || error?.code === "42883";
+
+/**
+ * Todo lo de la página en UNA llamada (aitickets_public_event_page, migración 202610160100): las funciones
+ * de Netlify corren lejos de Supabase y cada viaje cuesta ~150–250 ms. Si la función aún no existe (deploy
+ * preview sin migrar) o falla, se usan las consultas por separado (loadEventPageRowsByQueries).
+ */
+async function loadEventPageRows(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  slug: string | undefined,
+  opts: PublicEventOptions
+): Promise<EventPageRows | null> {
+  const isPreview = opts.previewEventId !== undefined;
+  const { data, error } = await supabase.rpc(
+    "aitickets_public_event_page",
+    isPreview ? { p_event_id: Number(opts.previewEventId) } : { p_slug: slug }
+  );
+  if (!error) {
+    if (!data?.event) return null;
+    return {
+      event: data.event,
+      categories: data.categories || [],
+      tickets: data.tickets || [],
+      faqs: data.faqs || [],
+      dates: data.dates || [],
+      org: data.org || null,
+      hasSecretLocation: data.has_secret_location === true,
+      gallery: data.gallery || [],
+      availability: { data: data.availability || [], error: null },
+    };
+  }
+  if (!isMissingFunction(error)) console.error("Error en aitickets_public_event_page (se usan las consultas por separado):", error);
+  return loadEventPageRowsByQueries(supabase, slug, opts);
+}
+
+async function loadEventPageRowsByQueries(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  slug: string | undefined,
+  opts: PublicEventOptions
+): Promise<EventPageRows | null> {
+  const isPreview = opts.previewEventId !== undefined;
   const loadEvent = (columns: string) => {
     const baseQuery = supabase.from("events").select(columns);
     return (isPreview
@@ -253,28 +297,12 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
   if (error) {
     console.error("Error al obtener el evento:", error);
   }
-  // Borradores, eventos inexistentes o slugs inválidos => 404
   if (!event) return null;
+  // Sitio de otra organización: no hace falta cargar el resto
   if (opts.organizationId !== undefined && Number(event.organization_id) !== Number(opts.organizationId)) return null;
 
-  const isPrivate = !!event.accessibility && event.accessibility !== "public";
-  // Evento demo: fecha dinámica (src/lib/demoEvent.mjs), sin indexar y sin venta real
-  const isDemo = isDemoEventSlug(event.slug);
-  if (isDemo) {
-    event.start_date = null;
-    event.end_date = null;
-    // El banner de la página ya dice que es demo (y la migración 202610150100 lo quita de la BD)
-    event.name = stripDemoSuffix(event.name);
-    event.title = stripDemoSuffix(event.title);
-  }
-
-  // Tracking de visita (server-side, no bloqueante). Solo se guarda el hash de la IP. Las vistas previas no cuentan.
-  if (opts.request && !isPreview) {
-    await trackVisit(supabase, event.id, opts.request, opts.url, opts.locals);
-  }
-
   // Datos relacionados (en paralelo)
-  const [categoriesRes, ticketsRes, faqsRes, datesRes, orgRes, secretRes, gallery] = await Promise.all([
+  const [categoriesRes, ticketsRes, faqsRes, datesRes, orgRes, secretRes, gallery, availability] = await Promise.all([
     supabase.from("event_tags").select("category_tags(name)").eq("event_id", event.id),
     supabase
       .from("event_tickets")
@@ -302,33 +330,77 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
       .neq("secret_location", ""),
     // Galería al final de la página (tolera que la tabla aún no exista)
     loadEventGallery(Number(event.id)),
+    // Vendidas/pendientes (loadAvailability): no depende de las entradas, va en el mismo viaje
+    supabase.rpc("aitickets_ticket_availability", { p_event_id: event.id }),
   ]);
 
-  // Categorías
   if (categoriesRes.error) console.error("Error al obtener las categorías:", categoriesRes.error);
-  const tags: string[] = (categoriesRes.data || [])
+  if (faqsRes.error) console.error("Error al obtener las faqs:", faqsRes.error);
+  if (ticketsRes.error) console.error("Error al obtener las entradas:", ticketsRes.error);
+  if (datesRes.error) console.error("Error al obtener las fechas:", datesRes.error);
+
+  return {
+    event,
+    categories: categoriesRes.data || [],
+    tickets: ticketsRes.data || [],
+    faqs: faqsRes.data || [],
+    dates: datesRes.data || [],
+    org: orgRes.data,
+    hasSecretLocation: (secretRes.count ?? 0) > 0,
+    gallery,
+    availability,
+  };
+}
+
+/**
+ * Carga un evento publicado con todo lo necesario para su página pública.
+ * Devuelve null si no existe, no está publicado o (con organizationId) pertenece a otra organización.
+ */
+export async function getPublicEventData(slug: string | undefined, opts: PublicEventOptions = {}): Promise<PublicEventResult | null> {
+  const isPreview = opts.previewEventId !== undefined;
+  if (!slug && !isPreview) return null;
+  const supabase = getSupabaseAdmin();
+  const now = new Date();
+
+  const raw = await loadEventPageRows(supabase, slug, opts);
+  // Borradores, eventos inexistentes o slugs inválidos => 404
+  if (!raw) return null;
+  const { event } = raw;
+  if (opts.organizationId !== undefined && Number(event.organization_id) !== Number(opts.organizationId)) return null;
+
+  const isPrivate = !!event.accessibility && event.accessibility !== "public";
+  // Evento demo: fecha dinámica (src/lib/demoEvent.mjs), sin indexar y sin venta real
+  const isDemo = isDemoEventSlug(event.slug);
+  if (isDemo) {
+    event.start_date = null;
+    event.end_date = null;
+    // El banner de la página ya dice que es demo (y la migración 202610150100 lo quita de la BD)
+    event.name = stripDemoSuffix(event.name);
+    event.title = stripDemoSuffix(event.title);
+  }
+
+  // Categorías
+  const tags: string[] = raw.categories
     .map((c: any) => (Array.isArray(c.category_tags) ? c.category_tags[0]?.name : c.category_tags?.name))
     .filter(Boolean);
 
-  // FAQs
-  if (faqsRes.error) console.error("Error al obtener las faqs:", faqsRes.error);
-  const faqs = faqsRes.data || [];
+  const faqs = raw.faqs;
+  const gallery = raw.gallery;
 
   // Organización
-  const orgRow: any = orgRes.data;
+  const orgRow: any = raw.org;
   const organization = orgRow ? { name: orgRow.public_name, website: orgRow.website, instagram: orgRow.instagram } : null;
 
-  const hasSecretLocation = (secretRes.count ?? 0) > 0;
+  const hasSecretLocation = raw.hasSecretLocation;
 
   // Entradas (C2): a la venta = available, no regalo, dentro de la ventana (NULL = abierta)
-  if (ticketsRes.error) console.error("Error al obtener las entradas:", ticketsRes.error);
-  const allTickets: any[] = ticketsRes.data || [];
+  const allTickets: any[] = raw.tickets;
 
   const feeAbsorbed = event.fee_absorbed === true;
   const inWindow = (t: any) => (!t.init_date || new Date(t.init_date) <= now) && (!t.end_date || new Date(t.end_date) >= now);
   const windowTickets = allTickets.filter(inWindow);
 
-  const { sold, pending } = await loadAvailability(supabase, event.id, windowTickets, now);
+  const { sold, pending } = await loadAvailability(supabase, event.id, windowTickets, now, Promise.resolve(raw.availability));
 
   const ticketsWithStock = windowTickets.map((t: any) => {
     const unlimited = t.total_quantity === null || t.total_quantity === undefined;
@@ -367,10 +439,7 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
   else if (upcomingSaleDates.length > 0) saleState = "upcoming";
 
   // Funciones (event_dates + recinto), con horas en la zona horaria del recinto
-  if (datesRes.error) console.error("Error al obtener las fechas:", datesRes.error);
-
-  
-  let dates: any[] = (datesRes.data || [])
+  let dates: any[] = raw.dates
     .map((d: any) => (isDemo ? { ...d, date: getDemoFunctionDate(d.date, now, event.slug) } : d))
     .map((d: any) => {
       const venue = buildVenue(pickOne(d.event_locations));

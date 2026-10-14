@@ -2,6 +2,7 @@
 // Bloque superior de la página del evento: badge, título, organizador, fecha y lugar (§4.5, §4.7).
 // El póster va aparte (EventPoster) para poder ubicarlo en otra columna del grid.
 import { computed } from "vue";
+import { EVENT_COVER_SIZES } from "../../lib/imageCdn.js";
 import {
   formatLongDate,
   formatTimeRange,
@@ -20,6 +21,8 @@ const props = defineProps({
   showOrganizer: { type: Boolean, default: true },
   // Diseño compacto: miniatura de la imagen junto al título
   thumb: { type: String, default: "" },
+  // srcset de la miniatura (portada redimensionada por el CDN, src/lib/imageCdn.js)
+  thumbSrcset: { type: String, default: undefined },
 });
 const emit = defineEmits(["show-functions", "show-location", "open-image"]);
 
@@ -65,7 +68,7 @@ const organizerUrl = computed(() => props.event.organization?.website || "");
 
     <div class="title-row" :class="{ 'has-thumb': thumb }">
       <button v-if="thumb" type="button" class="thumb hero-in" style="--i: 1" :aria-label="`Ver la imagen de ${event.name}`" @click="emit('open-image')">
-        <img :src="thumb" alt="" fetchpriority="high" decoding="async" />
+        <img :src="thumb" :srcset="thumbSrcset" :sizes="thumbSrcset ? EVENT_COVER_SIZES : undefined" alt="" fetchpriority="high" decoding="async" />
       </button>
       <div class="title-text">
         <p v-if="kicker" class="kicker hero-in" style="--i: 1">{{ kicker }}</p>

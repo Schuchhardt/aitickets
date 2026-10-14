@@ -33,8 +33,6 @@ if (site.is_demo && !isDemoEventSlug(eventSlug)) {
 const result = await getPublicEventData(eventSlug, {
   organizationId: site.is_demo ? undefined : site.organization_id,
   siteOrigin: siteCanonicalOrigin(site),
-  request: Astro.request,
-  url: Astro.url,
   locals: Astro.locals,
 });
 if (!result) {
@@ -50,6 +48,8 @@ const { seo } = result;
 const eventData = { ...result.eventData, purchase_url: purchaseUrlFor(site, result.eventData.slug) };
 const props = publicSiteProps(site, template);
 const title = seo.title.replace(/\| AI Tickets$/, `| ${props.name}`);
+// Visita (event_visits): la registra el navegador (/api/events/visit), igual que en /eventos/[slug]
+const visitEventId = preview ? null : eventData.id;
 ---
 <SiteLayout theme={props.theme} preview={preview} favicon={props.theme.logo_url}>
   <EventMetaTags
@@ -78,6 +78,25 @@ const title = seo.title.replace(/\| AI Tickets$/, `| ${props.name}`);
         }));
       } catch (e) { /* sessionStorage no disponible */ }
     })();
+  </script>
+  <script is:inline define:vars={{ visitEventId }}>
+    if (visitEventId) {
+      try {
+        var vp = new URLSearchParams(window.location.search);
+        fetch('/api/events/visit', {
+          method: 'POST',
+          keepalive: true,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event_id: visitEventId,
+            referrer: document.referrer || null,
+            utm_source: vp.get('utm_source'),
+            utm_medium: vp.get('utm_medium'),
+            utm_campaign: vp.get('utm_campaign')
+          })
+        }).catch(function () {});
+      } catch (e) { /* sin fetch: no se registra */ }
+    }
   </script>
   <SiteHeader site={props} base={base} variant="light" />
   <main class="bg-white text-gray-900">

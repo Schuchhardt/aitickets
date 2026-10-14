@@ -7,6 +7,7 @@ import Layout from '../../layouts/Layout.astro';
 import { zonedDateTimeToDate, getZonedParts } from "../../utils/dateHelpers.js";
 import { DEMO_EVENT_SLUGS, isDemoEventSlug, getDemoFunctionDate } from "../../lib/demoEvent.mjs";
 import { currentCoverMeta } from "../../lib/eventCoverMeta";
+import { cachePublicPage } from "../../lib/cdnCache";
 import "../../styles/global.css";
 
 export const prerender = false;
@@ -16,6 +17,10 @@ export const prerender = false;
 // con su fecha dinámica, para mostrar cómo se ve un evento real.
 const supabase = getSupabaseAdmin();
 const now = new Date();
+
+// Igual para todos (sin sesión ni datos por usuario) => la guarda el CDN de Netlify 30 s y la sigue sirviendo
+// mientras la regenera en segundo plano (src/lib/cdnCache.ts). Publicar o editar un evento la vacía al instante.
+cachePublicPage(Astro.response.headers, { sMaxAge: 30, staleWhileRevalidate: 300 });
 const todaySantiago = getZonedParts(now)?.date || now.toISOString().slice(0, 10);
 
 // cover_meta (proporción real de la portada) arma la grilla masonry sin saltos; si la columna no existe

@@ -34,3 +34,8 @@
   to = "/auth/google/callback?code=:code"
   status = 302
   force = true
+
+# Netlify Image CDN (/.netlify/images): portadas de eventos redimensionadas y en AVIF/WebP (src/lib/imageCdn.js).
+# Solo imágenes públicas de nuestro Storage de Supabase: nadie puede usar el CDN para transformar otras URLs.
+[images]
+  remote_images = ["https://bgsmqjrdryafvlyxywud\\.supabase\\.co/storage/v1/object/public/.*"]

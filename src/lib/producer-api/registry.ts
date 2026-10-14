@@ -4,6 +4,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { ApiActor, ApiScope } from "./keys";
 import { roleAllows, rolesWith, ROLE_LABELS, type Permission } from "./permissions";
+import { purgeEventPages } from "../cdnCache";
 
 export type JsonSchema = {
     type?: "object" | "string" | "integer" | "number" | "boolean" | "array";
@@ -440,6 +441,9 @@ export async function runTool(tool: ToolDef, rawArgs: unknown, ctx: ToolContext)
             outcome = { ok: false, code: "internal", message: "Error interno al ejecutar la acción. Intenta nuevamente." };
         }
     }
+    // Una escritura que se ejecutó puede cambiar lo que muestra la página pública del evento: vaciar su caché
+    // en el CDN (src/lib/cdnCache.ts). No pasa por aquí lo que solo pidió confirmación ni las repeticiones.
+    if (auditable && outcome.ok) await purgeEventPages();
     if (auditable) {
         if (!auditInfo.summary) auditInfo.summary = outcome.ok ? tool.title : `${tool.title}: rechazado (${outcome.code})`;
         const source = parsedArgs || (rawArgs && typeof rawArgs === "object" ? (rawArgs as Record<string, unknown>) : undefined);

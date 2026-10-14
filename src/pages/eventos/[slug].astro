@@ -11,16 +11,14 @@ import Layout from '../../layouts/Layout.astro';
 import "../../styles/global.css";
 
 import { notFound } from "../../lib/notFound";
+import { cachePublicPage } from "../../lib/cdnCache";
+import { getTrustedTenantProxy } from "../../lib/sites";
 
 export const prerender = false;
 
-// Toda la carga (evento, visitas, entradas/stock, funciones, SEO) vive en src/lib/eventPage.ts,
+// Toda la carga (evento, entradas/stock, funciones, SEO) vive en src/lib/eventPage.ts,
 // compartida con los sitios de productor (/o/[site]/eventos/[slug]).
-let result = await getPublicEventData(Astro.params.slug, {
-  request: Astro.request,
-  url: Astro.url,
-  locals: Astro.locals,
-});
+let result = await getPublicEventData(Astro.params.slug, { locals: Astro.locals });
 
 // Borrador: el equipo de la productora (con sesión) lo ve en modo vista previa. Para compartirlo con
 // alguien sin cuenta se usa un link privado (/eventos/vista-previa/<token>, ver src/lib/eventPreview.ts).
@@ -53,6 +51,14 @@ if (!result) {
 }
 
 const { eventData, seo } = result;
+
+// Página pública (no la vista previa del dueño): igual para todos => se sirve desde el CDN de Netlify
+// (src/lib/cdnCache.ts). Cualquier cambio del productor la vacía al instante; el TTL corto solo acota el atraso
+// del stock mostrado (la compra lo valida en el servidor). Los demo no cambian: TTL más largo.
+if (!eventData.is_preview && !getTrustedTenantProxy(Astro.request)) {
+  cachePublicPage(Astro.response.headers, eventData.is_demo ? { sMaxAge: 60, staleWhileRevalidate: 600 } : { sMaxAge: 30, staleWhileRevalidate: 60 });
+}
+const visitEventId = eventData.is_preview ? null : eventData.id;
 const pageTitle = seo.title;
 const metaDescription = seo.description;
 const canonicalPath = seo.canonicalPath;
@@ -84,6 +90,26 @@ const canonicalPath = seo.canonicalPath;
         }));
       } catch (e) { /* sessionStorage no disponible */ }
     })();
+  </script>
+  <script is:inline define:vars={{ visitEventId }}>
+    // Visita (event_visits): la página puede venir del CDN, así que la registra el navegador (/api/events/visit)
+    if (visitEventId) {
+      try {
+        var vp = new URLSearchParams(window.location.search);
+        fetch('/api/events/visit', {
+          method: 'POST',
+          keepalive: true,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event_id: visitEventId,
+            referrer: document.referrer || null,
+            utm_source: vp.get('utm_source'),
+            utm_medium: vp.get('utm_medium'),
+            utm_campaign: vp.get('utm_campaign')
+          })
+        }).catch(function () {});
+      } catch (e) { /* sin fetch: no se registra */ }
+    }
   </script>
   <main>
     <EventDetail event={eventData} siteMode={false} client:idle/>
