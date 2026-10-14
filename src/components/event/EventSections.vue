@@ -230,20 +230,10 @@ function toggleFaq(i) {
 .about-wrap.is-collapsed {
   max-height: 260px;
 }
-.about-wrap::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 80px;
-  background: linear-gradient(to bottom, rgba(255, 255, 255, 0), var(--surface-0));
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--dur-3);
-}
-.about-wrap.is-collapsed::after {
-  opacity: 1;
+/* Fade al final del texto colapsado con máscara (no un degradado blanco): funciona sobre el fondo animado */
+.about-wrap.is-collapsed {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 80px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 80px), transparent);
 }
 .about {
   max-width: 68ch;

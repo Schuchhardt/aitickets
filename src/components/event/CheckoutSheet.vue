@@ -19,6 +19,7 @@ import {
   FEE_INCLUDED_NOTE,
 } from "../Reservation/pricing.js";
 import { eventBus } from "../../utils/eventbus.js";
+import { fireConfetti } from "./confetti.js";
 
 const props = defineProps({
   event: { type: Object, required: true },
@@ -293,7 +294,11 @@ const panelStyle = computed(() => (dragY.value ? { transform: `translateY(${drag
 // ---- Pago ----
 function showDemo(result) {
   demoResult.value = result;
-  nextTick(() => body.value?.querySelector(".demo-title")?.focus());
+  nextTick(() => {
+    const title = body.value?.querySelector(".demo-title");
+    title?.focus();
+    fireConfetti({ origin: title || undefined });
+  });
 }
 function onPrimary() {
   if (step.value === 1) goStep2();

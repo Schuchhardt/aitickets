@@ -36,9 +36,10 @@ const settingsOf = (id) => db.tables.events.find((e) => e.id === id).page_settin
 
 describe('normalizePageSettings', () => {
   it('NULL o valores inválidos => por defecto (póster, organizador visible)', () => {
-    expect(normalizePageSettings(null)).toEqual({ layout: 'poster', show_organizer: true })
-    expect(normalizePageSettings({ layout: 'carrusel', show_organizer: 'no' })).toEqual({ layout: 'poster', show_organizer: true })
-    expect(normalizePageSettings({ layout: 'banner', show_organizer: false })).toEqual({ layout: 'banner', show_organizer: false })
+    expect(normalizePageSettings(null)).toEqual({ layout: "poster", show_organizer: true, background: "none" })
+    expect(normalizePageSettings({ layout: 'carrusel', show_organizer: 'no' })).toEqual({ layout: 'poster', show_organizer: true, background: 'none' })
+    expect(normalizePageSettings({ layout: 'banner', show_organizer: false, background: 'lime' })).toEqual({ layout: 'banner', show_organizer: false, background: 'lime' })
+    expect(normalizePageSettings({ background: 'neon' }).background).toBe('none')
   })
   it('detecta los valores por defecto', () => {
     expect(isDefaultPageSettings({ layout: 'poster', show_organizer: true })).toBe(true)
@@ -55,19 +56,27 @@ describe('update_event: diseño de la página', () => {
     const res = await run({ event_id: 10, page_layout: 'banner', show_organizer: false })
     expect(res.ok).toBe(true)
     expect(res.result).toMatchObject({ updated: ['page_layout', 'show_organizer'], page_layout: 'banner', show_organizer: false })
-    expect(settingsOf(10)).toEqual({ layout: 'banner', show_organizer: false })
+    expect(settingsOf(10)).toEqual({ layout: 'banner', show_organizer: false, background: 'none' })
   })
 
   it('combina con lo guardado: cambiar solo el organizador mantiene el diseño', async () => {
     await run({ event_id: 10, page_layout: 'compact' })
     await run({ event_id: 10, show_organizer: false })
-    expect(settingsOf(10)).toEqual({ layout: 'compact', show_organizer: false })
+    expect(settingsOf(10)).toEqual({ layout: 'compact', show_organizer: false, background: 'none' })
   })
 
   it('volver a los valores por defecto guarda NULL', async () => {
     await run({ event_id: 10, page_layout: 'banner' })
     await run({ event_id: 10, page_layout: 'poster' })
     expect(settingsOf(10)).toBeNull()
+  })
+
+  it('cambia el fondo sin tocar el diseño', async () => {
+    await run({ event_id: 10, page_layout: 'banner' })
+    const res = await run({ event_id: 10, page_background: 'lavender' })
+    expect(res.result).toMatchObject({ updated: ['page_background'], page_layout: 'banner', page_background: 'lavender' })
+    expect(settingsOf(10)).toEqual({ layout: 'banner', show_organizer: true, background: 'lavender' })
+    expect(await run({ event_id: 10, page_background: 'neon' })).toMatchObject({ ok: false, code: 'invalid_input' })
   })
 
   it('rechaza un diseño desconocido', async () => {

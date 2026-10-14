@@ -13,7 +13,7 @@ import { createEventGraph, setEventStatus, syncEventCategory, EventInputError, t
 import { listOrgVenues } from "../../orgVenues";
 import { sanitizeRichText } from "../../sanitize";
 import { changeEventSlug, EventSlugError, SLUG_MAX, SLUG_MIN } from "../../eventSlug";
-import { EVENT_PAGE_LAYOUTS, isDefaultPageSettings, normalizePageSettings, type EventPageSettings } from "../../eventPageSettings";
+import { EVENT_PAGE_BACKGROUNDS, EVENT_PAGE_LAYOUTS, isDefaultPageSettings, normalizePageSettings, type EventPageSettings } from "../../eventPageSettings";
 import { notifySlack, dedupeLocation } from "../../../pages/api/_lib/server-utils";
 
 const EVENT_LIST_COLUMNS = "id, name, slug, status, accessibility, start_date, end_date, location, image_url, created_at";
@@ -194,6 +194,7 @@ async function eventDetail(ctx: ToolContext, eventId: number) {
         image_url: event.image_url,
         page_layout: pageSettings.layout,
         show_organizer: pageSettings.show_organizer,
+        page_background: pageSettings.background,
         ...eventDateFields(event),
         dates_note: DATES_NOTE,
         ...eventUrls(ctx, event),
@@ -346,8 +347,8 @@ const updateEvent: ToolDef = {
     name: "update_event",
     title: "Editar evento",
     description:
-        "Edita datos generales de un evento (nombre, descripción, categoría, imagen, privacidad, slug de la URL, diseño de la página y si se " +
-        "muestra el organizador). Solo cambia los campos enviados. " +
+        "Edita datos generales de un evento (nombre, descripción, categoría, imagen, privacidad, slug de la URL, diseño de la página, fondo " +
+        "animado y si se muestra el organizador). Solo cambia los campos enviados. " +
         "slug cambia el link público (/eventos/<slug>); cambiar el nombre NO cambia el slug. Si el evento está publicado o ya tiene registrados " +
         "(órdenes pagadas, entradas o invitados), el link anterior queda redirigiendo (301) al nuevo, así no se rompen los links ya " +
         "compartidos ni los QR; en un borrador sin registrados, el link anterior se libera. " +
@@ -379,6 +380,11 @@ const updateEvent: ToolDef = {
                 description: `Diseño de la página pública: ${PAGE_LAYOUT_HELP} Sin imagen, la página usa siempre el compacto.`,
             },
             show_organizer: { type: "boolean", description: "Mostrar \"Organiza <productora>\" bajo el título de la página pública." },
+            page_background: {
+                type: "string",
+                enum: EVENT_PAGE_BACKGROUNDS.map((b) => b.value),
+                description: `Fondo animado muy suave de la página pública (iridiscente, tonos claros): ${EVENT_PAGE_BACKGROUNDS.map((b) => `${b.value} (${b.label})`).join(", ")}. none = sin fondo.`,
+            },
         },
     },
     async handler(args, ctx) {
@@ -391,7 +397,7 @@ const updateEvent: ToolDef = {
         if (args.description !== undefined) patch.description = sanitizeRichText(args.description);
         if (args.image_url !== undefined) patch.image_url = args.image_url;
         if (args.is_private !== undefined) patch.accessibility = args.is_private ? "private" : "public";
-        const pageChange = args.page_layout !== undefined || args.show_organizer !== undefined;
+        const pageChange = args.page_layout !== undefined || args.show_organizer !== undefined || args.page_background !== undefined;
         if (!Object.keys(patch).length && args.category === undefined && args.slug === undefined && !pageChange) throw new ToolError("invalid_input", "No enviaste cambios.");
         // El slug primero: si choca con otro evento, no se aplica nada
         let slugChange: Awaited<ReturnType<typeof changeEventSlug>> | null = null;
@@ -416,6 +422,7 @@ const updateEvent: ToolDef = {
             pageSettings = normalizePageSettings({
                 layout: args.page_layout ?? current.layout,
                 show_organizer: args.show_organizer ?? current.show_organizer,
+                background: args.page_background ?? current.background,
             });
             const { error } = await ctx.supabase
                 .from("events")
@@ -438,8 +445,9 @@ const updateEvent: ToolDef = {
                 ...(slugChange?.changed ? ["slug"] : []),
                 ...(args.page_layout !== undefined ? ["page_layout"] : []),
                 ...(args.show_organizer !== undefined ? ["show_organizer"] : []),
+                ...(args.page_background !== undefined ? ["page_background"] : []),
             ],
-            ...(pageSettings ? { page_layout: pageSettings.layout, show_organizer: pageSettings.show_organizer } : {}),
+            ...(pageSettings ? { page_layout: pageSettings.layout, show_organizer: pageSettings.show_organizer, page_background: pageSettings.background } : {}),
             ...eventUrls(ctx, event),
             ...(slugChange ? { slug_change: slugChangeSummary(ctx, slugChange) } : {}),
             ...(warnings.length ? { warnings } : {}),

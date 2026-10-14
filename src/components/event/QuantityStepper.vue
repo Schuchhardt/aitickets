@@ -56,7 +56,7 @@ function change(delta) {
     <span class="stepper-plus-wrap">
       <button
         type="button"
-        class="stepper-btn"
+        class="stepper-btn stepper-plus"
         :disabled="disabled"
         :aria-disabled="modelValue >= max ? 'true' : undefined"
         :class="{ 'is-maxed': modelValue >= max }"
@@ -103,6 +103,15 @@ function change(delta) {
 }
 .stepper-btn:active:not(:disabled) {
   transform: scale(0.94);
+}
+/* "+" activo en negro: es la acción principal de la fila */
+.stepper-plus:not(:disabled):not(.is-maxed) {
+  background: var(--text-1);
+  border-color: var(--text-1);
+  color: #fff;
+}
+.stepper-plus:hover:not(:disabled):not(.is-maxed) {
+  background: #2a2a2f;
 }
 .stepper-btn:disabled,
 .stepper-btn.is-maxed {

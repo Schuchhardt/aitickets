@@ -80,7 +80,8 @@ const cssVars = [
     margin: 0;
     width: 100%;
     min-height: 100%;
-    overflow-x: hidden;
+    /* clip (no hidden): con hidden en html y body, body pasa a ser el contenedor de scroll */
+    overflow-x: clip;
   }
   body {
     background: var(--site-bg);

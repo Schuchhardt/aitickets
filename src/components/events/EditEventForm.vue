@@ -4,7 +4,8 @@ import { Calendar, MapPin, Ticket, CheckCircle, Image as ImageIcon, Plus, Trash2
 import RichTextEditor from './RichTextEditor.vue'
 import { plainTextLength, sanitizeClient } from '../../lib/richTextClient'
 import { prepareImageForUpload, MAX_UPLOAD_BYTES, MAX_SOURCE_BYTES } from '../../lib/clientImage'
-import { EVENT_PAGE_LAYOUTS, normalizePageSettings } from '../../lib/eventPageSettings'
+import { EVENT_PAGE_LAYOUTS, EVENT_PAGE_BACKGROUNDS, normalizePageSettings } from '../../lib/eventPageSettings'
+import IridescenceBg from '../event/IridescenceBg.vue'
 
 const props = defineProps({
   initialVenues: {
@@ -539,7 +540,37 @@ const submitEvent = async ({ exit = false } = {}) => {
               </label>
             </div>
 
-            <label class="mt-4 flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
+            <p class="block text-sm font-medium text-gray-700 mt-5 mb-1">Fondo</p>
+            <p class="text-xs text-gray-500 mb-3">Un degradado iridiscente muy suave que se mueve lento detrás de la página.</p>
+            <div class="flex flex-wrap gap-3" role="radiogroup" aria-label="Fondo de la página">
+              <label
+                v-for="bg in EVENT_PAGE_BACKGROUNDS"
+                :key="bg.value"
+                class="flex flex-col items-center gap-1.5 cursor-pointer group"
+              >
+                <input v-model="form.general.pageSettings.background" type="radio" name="pageBackground" :value="bg.value" class="sr-only peer" />
+                <span
+                  class="relative block w-16 h-16 rounded-full overflow-hidden border transition peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-black"
+                  :class="form.general.pageSettings.background === bg.value ? 'border-black ring-2 ring-black/15 scale-105' : 'border-gray-200 group-hover:border-gray-400'"
+                >
+                  <IridescenceBg
+                    v-if="bg.color"
+                    class="absolute inset-0"
+                    :color="bg.color"
+                    :soft="bg.soft"
+                    :still="form.general.pageSettings.background !== bg.value"
+                    :resolution="1"
+                    :speed="0.4"
+                  />
+                  <span v-else class="absolute inset-0 bg-white flex items-center justify-center text-gray-300">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M5.6 18.4L18.4 5.6" /></svg>
+                  </span>
+                </span>
+                <span class="text-xs" :class="form.general.pageSettings.background === bg.value ? 'text-gray-900 font-semibold' : 'text-gray-500'">{{ bg.label }}</span>
+              </label>
+            </div>
+
+            <label class="mt-5 flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
               <input v-model="form.general.pageSettings.show_organizer" type="checkbox" class="mt-0.5 w-4 h-4 rounded border-gray-300" />
               <span>
                 Mostrar el organizador en la página del evento
