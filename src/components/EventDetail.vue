@@ -18,6 +18,7 @@ import { normalizePageSettings, pageBackgroundPreset } from "../lib/eventPageSet
 import PurchasedTicketsModal from "./PurchasedTicketsModal.vue";
 import { cardState, stockSummary, minFinalPrice, formatCLP, formatSaleStart, readCheckoutParams, upcomingFunctions, formatFunctionShort } from "./event/eventView.js";
 import { addToCalendar } from "./event/shareActions.js";
+import { cdnImage, cdnSrcset, EVENT_COVER_SIZES } from "../lib/imageCdn.js";
 import { storedOrders, trackFunnel } from "./event/checkoutApi.js";
 
 const props = defineProps({
@@ -58,6 +59,9 @@ const bannerStyle = computed(() => {
     "--banner-pos-d": `50% ${c.desktop?.position_y ?? 50}%`,
   };
 });
+// Portada redimensionada por el CDN (src/lib/imageCdn.js); mismo srcset/sizes que la precarga del <head>
+const coverSrc = computed(() => cdnImage(props.event?.image_url, 1080));
+const coverSrcset = computed(() => cdnSrcset(props.event?.image_url));
 const bannerContain = computed(() => props.event?.cover_settings?.desktop?.fit === "contain");
 
 // Parallax suave de la imagen de portada ancha (desactivado con prefers-reduced-motion)
@@ -291,14 +295,16 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
 
       <!-- Portada ancha: la imagen ocupa todo el ancho y el título se monta sobre su borde -->
       <figure v-if="layout === 'banner'" ref="coverEl" class="cover" :class="{ 'is-contain': bannerContain }" :style="bannerStyle" data-testid="event-cover">
-        <img v-if="bannerContain" :src="event.image_url" alt="" class="cover-blur" aria-hidden="true" />
-        <img ref="bannerImg" :src="event.image_url" :alt="event.name" class="cover-img" fetchpriority="high" loading="eager" decoding="async" />
+        <img v-if="bannerContain" :src="coverSrc" :srcset="coverSrcset" :sizes="EVENT_COVER_SIZES" alt="" class="cover-blur" aria-hidden="true" />
+        <img ref="bannerImg" :src="coverSrc" :srcset="coverSrcset" :sizes="EVENT_COVER_SIZES" :alt="event.name" class="cover-img" fetchpriority="high" loading="eager" decoding="async" />
       </figure>
 
       <div class="layout">
         <figure v-if="layout === 'poster'" ref="coverEl" class="poster" :class="{ 'is-fallback': !posterRatio.known }" data-testid="event-cover">
           <img
-            :src="event.image_url"
+            :src="coverSrc"
+            :srcset="coverSrcset"
+            :sizes="EVENT_COVER_SIZES"
             :alt="event.name"
             :width="posterRatio.known ? posterRatio.w : undefined"
             :height="posterRatio.known ? posterRatio.h : undefined"
@@ -313,7 +319,8 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
             :event="event"
             :badges="badges"
             :show-organizer="pageSettings.show_organizer"
-            :thumb="layout === 'compact' ? event.image_url || '' : ''"
+            :thumb="layout === 'compact' ? coverSrc || '' : ''"
+            :thumb-srcset="layout === 'compact' ? coverSrcset : undefined"
             @show-functions="scrollToId('funciones')"
             @show-location="scrollToId('ubicacion')"
             @open-image="showImage = true"
@@ -327,7 +334,7 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
             <div v-if="event.image_url" class="dock" :class="{ 'is-docked': docked }" aria-hidden="true">
               <div class="dock-inner">
                 <div class="dock-row">
-                  <img :src="event.image_url" alt="" class="dock-img" loading="lazy" decoding="async" />
+                  <img :src="cdnImage(event.image_url, 240)" alt="" class="dock-img" loading="lazy" decoding="async" />
                   <div class="dock-text">
                     <p class="dock-name">{{ event.name }}</p>
                     <p v-if="dockDate" class="dock-date">{{ dockDate }}</p>

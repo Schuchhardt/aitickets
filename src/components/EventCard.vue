@@ -4,6 +4,7 @@ import { CalendarDays, MapPin, ArrowUpRight } from "lucide-vue-next";
 import { formatEventDateRange } from "../utils/dateHelpers.js";
 import { formatCLP } from "./event/eventView.js";
 import { categoryIcon } from "./event/categoryIcons.js";
+import { cdnImage, cdnSrcset } from "../lib/imageCdn.js";
 
 // Tarjeta del listado /eventos (grilla masonry de EventList.vue): la imagen conserva su proporción real
 // (image_ratio, de events.cover_meta) para que la grilla quede escalonada sin recortes.
@@ -14,6 +15,10 @@ const props = defineProps({
 });
 
 const href = computed(() => `/eventos/${props.event.slug}`);
+// Imagen redimensionada por el CDN (src/lib/imageCdn.js). Columnas de la grilla: 1 (móvil), 2 (≥ 640 px), 3 (≥ 1024 px, máx. 1180 px)
+const imgSrc = computed(() => cdnImage(props.event.image_url, 750));
+const imgSrcset = computed(() => cdnSrcset(props.event.image_url, [480, 750, 1080]));
+const IMG_SIZES = "(min-width: 1024px) 380px, (min-width: 640px) 50vw, 100vw";
 // Proporción acotada (ni tiras ni torres): 3:4 a 16:9
 const ratio = computed(() => Math.min(16 / 9, Math.max(3 / 4, Number(props.event.image_ratio) || 4 / 5)));
 const category = computed(() => props.event.categories?.find((c) => !/^evento cultural$/i.test(c)) || props.event.categories?.[0] || "");
@@ -30,7 +35,9 @@ const priceLabel = computed(() => {
     <a :href="href" class="card-media" :style="{ aspectRatio: ratio }" tabindex="-1" aria-hidden="true">
       <img
         v-if="event.image_url"
-        :src="event.image_url"
+        :src="imgSrc"
+        :srcset="imgSrcset"
+        :sizes="imgSrcset ? IMG_SIZES : undefined"
         :alt="event.name"
         :loading="priority ? 'eager' : 'lazy'"
         :fetchpriority="priority ? 'high' : 'auto'"
