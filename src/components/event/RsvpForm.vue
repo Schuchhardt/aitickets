@@ -95,6 +95,7 @@ const onInputEmail = () => errors.value.email && (errors.value.email = "");
 
 let started = false;
 function onFocusForm() {
+  stopNudge();
   captcha.start();
   if (!started) {
     started = true;
@@ -275,7 +276,48 @@ onMounted(() => {
   eventBus.on("fill-buyer-info", handleAssistantFill);
   emit("state", status.value);
 });
-onBeforeUnmount(() => eventBus.off("fill-buyer-info", handleAssistantFill));
+onBeforeUnmount(() => {
+  eventBus.off("fill-buyer-info", handleAssistantFill);
+  stopNudge();
+});
+
+// ---- A30: si nadie toca el formulario, el botón "Confirmar asistencia" se mueve para llamar la atención ----
+// Solo si está en pantalla: a los 4 s y luego cada 8 s, máximo 3 veces. Se detiene al interactuar.
+const ctaBtn = ref(null);
+const NUDGE_FIRST_MS = 4000;
+const NUDGE_EVERY_MS = 8000;
+const NUDGE_MAX = 3;
+let nudgeTimer = null;
+let nudgeCount = 0;
+function stopNudge() {
+  clearTimeout(nudgeTimer);
+  nudgeTimer = null;
+}
+function onScreen(el) {
+  const r = el.getBoundingClientRect();
+  return r.height > 0 && r.top >= 0 && r.bottom <= window.innerHeight;
+}
+function scheduleNudge(delay) {
+  clearTimeout(nudgeTimer);
+  nudgeTimer = setTimeout(runNudge, delay);
+}
+function runNudge() {
+  const btn = ctaBtn.value;
+  if (!btn || started || status.value !== "idle" || nudgeCount >= NUDGE_MAX) return stopNudge();
+  if (onScreen(btn) && document.visibilityState === "visible") {
+    nudgeCount++;
+    btn.classList.remove("ev-nudge");
+    void btn.offsetWidth; // reinicia la animación
+    btn.classList.add("ev-nudge");
+    btn.addEventListener("animationend", () => btn.classList.remove("ev-nudge"), { once: true });
+  }
+  scheduleNudge(NUDGE_EVERY_MS);
+}
+onMounted(() => {
+  if (props.mode !== "form" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  scheduleNudge(NUDGE_FIRST_MS);
+});
+watch(status, (s) => s !== "idle" && stopNudge());
 </script>
 
 <template>
@@ -395,7 +437,7 @@ onBeforeUnmount(() => eventBus.off("fill-buyer-info", handleAssistantFill));
           class="ev-btn ev-btn-primary w-full"
           @click="retry"
         >Reintentar</button>
-        <button v-else type="submit" class="ev-btn ev-btn-primary w-full" :aria-busy="busy ? 'true' : 'false'" :disabled="busy">
+        <button v-else ref="ctaBtn" type="submit" class="ev-btn ev-btn-primary w-full" :aria-busy="busy ? 'true' : 'false'" :disabled="busy">
           <span v-if="busy" class="ev-spinner" aria-hidden="true"></span>
           <span>{{ ctaLabel }}</span>
         </button>

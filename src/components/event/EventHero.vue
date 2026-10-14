@@ -16,8 +16,12 @@ const props = defineProps({
   event: { type: Object, required: true },
   // [{ label, tone: 'lime'|'warning'|'neutral', pulse? }]
   badges: { type: Array, default: () => [] },
+  // "Organiza <productora>" (events.page_settings.show_organizer)
+  showOrganizer: { type: Boolean, default: true },
+  // Diseño compacto: miniatura de la imagen junto al título
+  thumb: { type: String, default: "" },
 });
-const emit = defineEmits(["show-functions", "show-location"]);
+const emit = defineEmits(["show-functions", "show-location", "open-image"]);
 
 const normalize = (v) => String(v || "").trim().toLowerCase();
 const kicker = computed(() => (normalize(props.event.title) && normalize(props.event.title) !== normalize(props.event.name) ? props.event.title : ""));
@@ -59,10 +63,17 @@ const organizerUrl = computed(() => props.event.organization?.website || "");
       </span>
     </div>
 
-    <p v-if="kicker" class="kicker hero-in" style="--i: 1">{{ kicker }}</p>
-    <h1 class="title hero-in" style="--i: 1">{{ event.name }}</h1>
+    <div class="title-row" :class="{ 'has-thumb': thumb }">
+      <button v-if="thumb" type="button" class="thumb hero-in" style="--i: 1" :aria-label="`Ver la imagen de ${event.name}`" @click="emit('open-image')">
+        <img :src="thumb" alt="" fetchpriority="high" decoding="async" />
+      </button>
+      <div class="title-text">
+        <p v-if="kicker" class="kicker hero-in" style="--i: 1">{{ kicker }}</p>
+        <h1 class="title hero-in" style="--i: 1">{{ event.name }}</h1>
+      </div>
+    </div>
 
-    <div v-if="organizer" class="organizer hero-in" style="--i: 2">
+    <div v-if="organizer && showOrganizer" class="organizer hero-in" style="--i: 2">
       <span class="avatar" aria-hidden="true">{{ initialsOf(organizer) }}</span>
       <span>Organiza
         <a v-if="organizerUrl" :href="organizerUrl" target="_blank" rel="noopener" class="organizer-name ev-link">{{ organizer }}</a>
@@ -156,6 +167,49 @@ const organizerUrl = computed(() => props.event.organization?.website || "");
   background: var(--warning);
   animation: ev-pulse 1.2s ease-out 3;
 }
+/* Mobile: la miniatura va sobre el título (al lado no cabe sin cortar palabras); desktop: al lado */
+.title-row.has-thumb {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+}
+.title-text {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.thumb {
+  flex: 0 0 auto;
+  width: 96px;
+  height: 96px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  background: var(--surface-1);
+  box-shadow: var(--shadow-card);
+  cursor: zoom-in;
+  transition: transform var(--dur-3) var(--ease-spring), box-shadow var(--dur-3);
+}
+.thumb:hover {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06), 0 14px 32px rgba(0, 0, 0, 0.12);
+}
+.thumb:focus-visible {
+  outline: 2px solid var(--text-1);
+  outline-offset: 3px;
+}
+.thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform var(--dur-4) var(--ease-out);
+}
+.thumb:hover img {
+  transform: scale(1.08);
+}
 .kicker {
   font-size: 13px;
   font-weight: 500;
@@ -226,6 +280,29 @@ const organizerUrl = computed(() => props.event.organization?.website || "");
   outline: 2px solid var(--text-1);
   outline-offset: 4px;
 }
+/* El mini-calendario "se da vuelta" y el pin cae al entrar */
+.meta-row.hero-in .cal {
+  animation: cal-flip 640ms var(--ease-spring) 260ms both;
+  transform-origin: top center;
+}
+.meta-row.hero-in .pin svg {
+  animation: pin-drop 560ms var(--ease-spring) 380ms both;
+}
+.place:hover .pin {
+  animation: pin-hop 480ms var(--ease-out);
+}
+@keyframes cal-flip {
+  from { transform: perspective(240px) rotateX(-80deg); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes pin-drop {
+  from { transform: translateY(-14px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes pin-hop {
+  0%, 100% { transform: none; }
+  40% { transform: translateY(-5px); }
+}
 .cal {
   width: 48px;
   height: 48px;
@@ -285,7 +362,18 @@ const organizerUrl = computed(() => props.event.organization?.website || "");
   margin-top: 2px;
   padding: 2px 0;
 }
+@media (min-width: 640px) {
+  .title-row.has-thumb {
+    flex-direction: row;
+    align-items: center;
+    gap: 18px;
+  }
+}
 @media (min-width: 1024px) {
+  .thumb {
+    width: 112px;
+    height: 112px;
+  }
   .title {
     font-size: 40px;
     line-height: 46px;

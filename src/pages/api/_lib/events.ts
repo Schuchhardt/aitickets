@@ -4,6 +4,7 @@ import { computeEventRange, formatLocation, slugify } from "./server-utils";
 import { listOrgVenues, isVenueAllowed, insertOrgVenue } from "../../../lib/orgVenues";
 import { sanitizeRichText } from "../../../lib/sanitize";
 import { isDefaultCoverSettings, normalizeCoverSettings } from "../../../lib/eventCover";
+import { isDefaultPageSettings, normalizePageSettings } from "../../../lib/eventPageSettings";
 
 /** Guarda la categoría del evento vía category_tags(name) + event_tags (reemplaza las anteriores). */
 export async function syncEventCategory(eventId: number, category: string | null | undefined) {
@@ -146,6 +147,18 @@ export async function saveCoverSettings(eventId: number, orgId: number, raw: unk
         .eq("organization_id", orgId);
     if (error && error.code !== "42703" && error.code !== "PGRST204") throw error;
     if (error) console.warn("cover_settings no disponible todavía:", error.message);
+}
+
+/** Guarda el diseño de la página pública (events.page_settings). Tolera que la columna aún no exista. */
+export async function savePageSettings(eventId: number, orgId: number, raw: unknown): Promise<void> {
+    const settings = normalizePageSettings(raw);
+    const { error } = await getSupabaseAdmin()
+        .from("events")
+        .update({ page_settings: isDefaultPageSettings(settings) ? null : settings })
+        .eq("id", eventId)
+        .eq("organization_id", orgId);
+    if (error && error.code !== "42703" && error.code !== "PGRST204") throw error;
+    if (error) console.warn("page_settings no disponible todavía:", error.message);
 }
 
 export type EventGraphInput = {

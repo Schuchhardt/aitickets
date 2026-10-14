@@ -13,6 +13,7 @@ import { createEventGraph, setEventStatus, syncEventCategory, EventInputError, t
 import { listOrgVenues } from "../../orgVenues";
 import { sanitizeRichText } from "../../sanitize";
 import { changeEventSlug, EventSlugError, SLUG_MAX, SLUG_MIN } from "../../eventSlug";
+import { EVENT_PAGE_LAYOUTS, isDefaultPageSettings, normalizePageSettings, type EventPageSettings } from "../../eventPageSettings";
 import { notifySlack, dedupeLocation } from "../../../pages/api/_lib/server-utils";
 
 const EVENT_LIST_COLUMNS = "id, name, slug, status, accessibility, start_date, end_date, location, image_url, created_at";
@@ -148,6 +149,14 @@ const getEvent: ToolDef = {
     handler: (args, ctx) => eventDetail(ctx, args.event_id),
 };
 
+/** Diseño de la página pública (events.page_settings). Tolera que la migración aún no esté aplicada (deploy previews). */
+async function loadPageSettings(ctx: ToolContext, eventId: number): Promise<EventPageSettings> {
+    const { data, error } = await ctx.supabase.from("events").select("page_settings").eq("id", eventId).eq("organization_id", ctx.actor.orgId).maybeSingle();
+    if (error && error.code !== "42703") throw error;
+    return normalizePageSettings((data as any)?.page_settings);
+}
+const PAGE_LAYOUT_HELP = EVENT_PAGE_LAYOUTS.map((l) => `${l.value} (${l.label}: ${l.hint})`).join("; ");
+
 /** Detalle de un evento (get_event; también la respuesta de create_event). */
 async function eventDetail(ctx: ToolContext, eventId: number) {
     const event = await loadOwnedEvent<any>(ctx, eventId, `${EVENT_LIST_COLUMNS}, description`);
@@ -159,6 +168,7 @@ async function eventDetail(ctx: ToolContext, eventId: number) {
     ]);
     const availability = await ticketAvailability(ctx, event.id, (tickets || []).map((t: any) => Number(t.id)));
     const previewLinks = await listPreviewLinks(Number(event.id), ctx.actor.orgId, ctx.supabase).catch(() => []);
+    const pageSettings = await loadPageSettings(ctx, Number(event.id));
     const venueOf = new Map<string, any>();
     for (const l of locations || []) {
         const v = Array.isArray((l as any).venues) ? (l as any).venues[0] : (l as any).venues;
@@ -182,6 +192,8 @@ async function eventDetail(ctx: ToolContext, eventId: number) {
         category: (Array.isArray(tag) ? tag[0]?.name : tag?.name) || null,
         description_html: event.description,
         image_url: event.image_url,
+        page_layout: pageSettings.layout,
+        show_organizer: pageSettings.show_organizer,
         ...eventDateFields(event),
         dates_note: DATES_NOTE,
         ...eventUrls(ctx, event),
@@ -334,7 +346,8 @@ const updateEvent: ToolDef = {
     name: "update_event",
     title: "Editar evento",
     description:
-        "Edita datos generales de un evento (nombre, descripción, categoría, imagen, privacidad, slug de la URL). Solo cambia los campos enviados. " +
+        "Edita datos generales de un evento (nombre, descripción, categoría, imagen, privacidad, slug de la URL, diseño de la página y si se " +
+        "muestra el organizador). Solo cambia los campos enviados. " +
         "slug cambia el link público (/eventos/<slug>); cambiar el nombre NO cambia el slug. Si el evento está publicado o ya tiene registrados " +
         "(órdenes pagadas, entradas o invitados), el link anterior queda redirigiendo (301) al nuevo, así no se rompen los links ya " +
         "compartidos ni los QR; en un borrador sin registrados, el link anterior se libera. " +
@@ -360,6 +373,12 @@ const updateEvent: ToolDef = {
                 maxLength: SLUG_MAX,
                 description: "Nuevo slug de la URL pública (/eventos/<slug>): minúsculas, números y guiones. Se normaliza (tildes y espacios → guiones).",
             },
+            page_layout: {
+                type: "string",
+                enum: EVENT_PAGE_LAYOUTS.map((l) => l.value),
+                description: `Diseño de la página pública: ${PAGE_LAYOUT_HELP} Sin imagen, la página usa siempre el compacto.`,
+            },
+            show_organizer: { type: "boolean", description: "Mostrar \"Organiza <productora>\" bajo el título de la página pública." },
         },
     },
     async handler(args, ctx) {
@@ -372,7 +391,8 @@ const updateEvent: ToolDef = {
         if (args.description !== undefined) patch.description = sanitizeRichText(args.description);
         if (args.image_url !== undefined) patch.image_url = args.image_url;
         if (args.is_private !== undefined) patch.accessibility = args.is_private ? "private" : "public";
-        if (!Object.keys(patch).length && args.category === undefined && args.slug === undefined) throw new ToolError("invalid_input", "No enviaste cambios.");
+        const pageChange = args.page_layout !== undefined || args.show_organizer !== undefined;
+        if (!Object.keys(patch).length && args.category === undefined && args.slug === undefined && !pageChange) throw new ToolError("invalid_input", "No enviaste cambios.");
         // El slug primero: si choca con otro evento, no se aplica nada
         let slugChange: Awaited<ReturnType<typeof changeEventSlug>> | null = null;
         if (args.slug !== undefined) {
@@ -389,6 +409,22 @@ const updateEvent: ToolDef = {
             if (error) throw error;
         }
         if (args.category !== undefined) await syncEventCategory(Number(event.id), args.category);
+        // Diseño de la página: se combina con lo guardado (se puede cambiar uno sin tocar el otro)
+        let pageSettings: EventPageSettings | null = null;
+        if (pageChange) {
+            const current = await loadPageSettings(ctx, Number(event.id));
+            pageSettings = normalizePageSettings({
+                layout: args.page_layout ?? current.layout,
+                show_organizer: args.show_organizer ?? current.show_organizer,
+            });
+            const { error } = await ctx.supabase
+                .from("events")
+                .update({ page_settings: isDefaultPageSettings(pageSettings) ? null : pageSettings })
+                .eq("id", event.id)
+                .eq("organization_id", ctx.actor.orgId);
+            if (error?.code === "42703" || error?.code === "PGRST204") throw new ToolError("unavailable", "El diseño de la página aún no está disponible en este entorno.");
+            if (error) throw error;
+        }
         let warnings: string[] = [];
         if (args.description !== undefined) {
             const { data: dates } = await ctx.supabase.from("event_dates").select("date").eq("event_id", event.id);
@@ -400,7 +436,10 @@ const updateEvent: ToolDef = {
                 ...Object.keys(patch).filter((k) => k !== "title"),
                 ...(args.category !== undefined ? ["category"] : []),
                 ...(slugChange?.changed ? ["slug"] : []),
+                ...(args.page_layout !== undefined ? ["page_layout"] : []),
+                ...(args.show_organizer !== undefined ? ["show_organizer"] : []),
             ],
+            ...(pageSettings ? { page_layout: pageSettings.layout, show_organizer: pageSettings.show_organizer } : {}),
             ...eventUrls(ctx, event),
             ...(slugChange ? { slug_change: slugChangeSummary(ctx, slugChange) } : {}),
             ...(warnings.length ? { warnings } : {}),

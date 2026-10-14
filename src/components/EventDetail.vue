@@ -5,17 +5,18 @@
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from "vue";
 import { trackViewItem } from "../composables/useGoogleAnalytics.js";
 import { eventBus } from "../utils/eventbus.js";
-import logo from "../images/logo.png";
 import EventHero from "./event/EventHero.vue";
 import EventActionCard from "./event/EventActionCard.vue";
 import EventSections from "./event/EventSections.vue";
 import MobileStickyBar from "./event/MobileStickyBar.vue";
 import CheckoutSheet from "./event/CheckoutSheet.vue";
 import EventGallery from "./EventGallery.vue";
-import ShareEventModal from "./ShareEventModal.vue";
+import ShareSheet from "./event/ShareSheet.vue";
+import { vReveal } from "./event/reveal.js";
+import { normalizePageSettings } from "../lib/eventPageSettings";
 import PurchasedTicketsModal from "./PurchasedTicketsModal.vue";
 import { cardState, stockSummary, minFinalPrice, formatCLP, formatSaleStart, readCheckoutParams } from "./event/eventView.js";
-import { addToCalendar, shareEvent } from "./event/shareActions.js";
+import { addToCalendar } from "./event/shareActions.js";
 import { storedOrders, trackFunnel } from "./event/checkoutApi.js";
 
 const props = defineProps({
@@ -31,6 +32,38 @@ const stock = computed(() => stockSummary(props.event));
 const fromPrice = computed(() => minFinalPrice(props.event));
 const isPrivate = computed(() => props.event?.accessibility && props.event.accessibility !== "public");
 const showAssistant = computed(() => !props.siteMode && !props.event?.is_preview);
+
+// Diseño de la página elegido por el productor (events.page_settings): poster | banner | compact
+const pageSettings = computed(() => normalizePageSettings(props.event?.page_settings));
+const layout = computed(() => (props.event?.image_url ? pageSettings.value.layout : "compact"));
+
+// Portada ancha: alto y encuadre del ajuste de portada (events.cover_settings, CoverAdjuster.vue)
+const bannerStyle = computed(() => {
+  const c = props.event?.cover_settings || {};
+  return {
+    "--banner-h-m": `${c.mobile?.height || 340}px`,
+    "--banner-h-d": `${c.desktop?.height || 480}px`,
+    "--banner-pos-m": `50% ${c.mobile?.position_y ?? 50}%`,
+    "--banner-pos-d": `50% ${c.desktop?.position_y ?? 50}%`,
+  };
+});
+const bannerContain = computed(() => props.event?.cover_settings?.desktop?.fit === "contain");
+
+// Parallax suave de la imagen de portada ancha (desactivado con prefers-reduced-motion)
+const bannerImg = ref(null);
+let parallaxRaf = 0;
+function onParallaxScroll() {
+  if (parallaxRaf) return;
+  parallaxRaf = requestAnimationFrame(() => {
+    parallaxRaf = 0;
+    const y = Math.min(window.scrollY, 800);
+    if (bannerImg.value) bannerImg.value.style.transform = `translate3d(0, ${y * 0.18}px, 0) scale(${1 + y * 0.00012})`;
+  });
+}
+
+// Imagen completa (diseño compacto: la miniatura abre la imagen)
+const showImage = ref(false);
+const onImageKey = (e) => e.key === "Escape" && (showImage.value = false);
 
 // Tinte del póster (events.cover_meta, calculado en el servidor) y proporción real del póster
 const tint = computed(() => props.event?.theme?.tint || null);
@@ -123,11 +156,9 @@ function onBarAction() {
 }
 
 // ---- Acciones secundarias ----
+// Compartir abre el modal con las redes (y el share nativo como "Más opciones")
 const showShareModal = ref(false);
-async function onShare() {
-  const result = await shareEvent(props.event);
-  if (result === "fallback") showShareModal.value = true;
-}
+const onShare = () => (showShareModal.value = true);
 const orders = ref([]);
 const showOrders = ref(false);
 const refreshOrders = () => (orders.value = storedOrders(props.event.id));
@@ -179,6 +210,11 @@ onMounted(() => {
     /* URL no disponible */
   }
 
+  if (layout.value === "banner" && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    window.addEventListener("scroll", onParallaxScroll, { passive: true });
+  }
+  window.addEventListener("keydown", onImageKey);
+
   if ("IntersectionObserver" in window) {
     if (placeSentinel.value) {
       const io = new IntersectionObserver(([entry]) => {
@@ -197,6 +233,9 @@ onMounted(() => {
   }
 });
 onBeforeUnmount(() => {
+  window.removeEventListener("scroll", onParallaxScroll);
+  window.removeEventListener("keydown", onImageKey);
+  cancelAnimationFrame(parallaxRaf);
   observers.forEach((o) => o.disconnect());
   eventBus.off("purchase-completed", refreshOrders);
   eventBus.off("open-modal", onAssistantOpenCheckout);
@@ -207,25 +246,13 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
 </script>
 
 <template>
-  <div v-if="event" class="ev-page ev-motion" :class="{ 'has-tint': tint }" :style="pageStyle">
+  <div v-if="event" class="ev-page ev-motion" :class="[`layout-${layout}`, { 'has-tint': tint }]" :style="pageStyle">
     <div class="tint" aria-hidden="true"></div>
-
-    <header v-if="!siteMode" class="topbar">
-      <a href="/" class="topbar-logo" aria-label="AI Tickets, inicio">
-        <img :src="logo.src" alt="AI Tickets" width="152" height="32" />
-      </a>
-      <nav class="topbar-nav" aria-label="Principal">
-        <a href="/eventos">Eventos</a>
-        <a href="/organizadores">Para organizadores</a>
-      </nav>
-      <button v-if="showAssistant" type="button" class="topbar-assistant" aria-label="Preguntarle al asistente" @click="openAssistant">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" /></svg>
-      </button>
-    </header>
 
     <div class="container">
       <p v-if="event.is_demo" class="banner banner-demo" role="note">
-        Evento de demostración: puedes recorrer el flujo completo, no se cobra nada.
+        <span class="demo-dot" aria-hidden="true"></span>
+        <span class="demo-text">Evento de demostración: puedes recorrer el flujo completo, no se cobra nada.</span>
         <a href="/organizadores/registro?utm_source=aitickets&utm_medium=demo_event&utm_campaign=banner" class="ev-link">Crea tu evento gratis →</a>
       </p>
       <div
@@ -241,10 +268,15 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
         <a v-if="event.status === 'published'" :href="`/eventos/${event.slug}`" class="ev-link">Ver página pública →</a>
       </div>
 
+      <!-- Portada ancha: la imagen ocupa todo el ancho y el título se monta sobre su borde -->
+      <figure v-if="layout === 'banner'" class="cover" :class="{ 'is-contain': bannerContain }" :style="bannerStyle" data-testid="event-cover">
+        <img v-if="bannerContain" :src="event.image_url" alt="" class="cover-blur" aria-hidden="true" />
+        <img ref="bannerImg" :src="event.image_url" :alt="event.name" class="cover-img" fetchpriority="high" loading="eager" decoding="async" />
+      </figure>
+
       <div class="layout">
-        <figure class="poster" :class="{ 'is-fallback': !posterRatio.known }" data-testid="event-cover">
+        <figure v-if="layout === 'poster'" class="poster" :class="{ 'is-fallback': !posterRatio.known }" data-testid="event-cover">
           <img
-            v-if="event.image_url"
             :src="event.image_url"
             :alt="event.name"
             :width="posterRatio.known ? posterRatio.w : undefined"
@@ -256,7 +288,15 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
         </figure>
 
         <div class="hero-area">
-          <EventHero :event="event" :badges="badges" @show-functions="scrollToId('funciones')" @show-location="scrollToId('ubicacion')" />
+          <EventHero
+            :event="event"
+            :badges="badges"
+            :show-organizer="pageSettings.show_organizer"
+            :thumb="layout === 'compact' ? event.image_url || '' : ''"
+            @show-functions="scrollToId('funciones')"
+            @show-location="scrollToId('ubicacion')"
+            @open-image="showImage = true"
+          />
           <span ref="placeSentinel" class="sentinel" aria-hidden="true"></span>
         </div>
 
@@ -274,12 +314,12 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
             />
             <div v-if="state !== 'ended' && rsvpState !== 'success'" class="secondary">
               <button type="button" class="secondary-btn" @click="onShare">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8" /></svg>
+                <svg class="share-ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8" /></svg>
                 Compartir
               </button>
               <span aria-hidden="true" class="secondary-sep">·</span>
               <button type="button" class="secondary-btn" @click="addToCalendar(event)">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+                <svg class="cal-ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
                 Añadir al calendario
               </button>
             </div>
@@ -303,7 +343,7 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
             @choose-function="(id) => openCheckout({ entry: 'function_list', step: 1, functionId: String(id) })"
             @open-assistant="openAssistant"
           />
-          <EventGallery v-if="event.gallery?.length" :images="event.gallery" :eventName="event.name" />
+          <EventGallery v-if="event.gallery?.length" v-reveal :images="event.gallery" :eventName="event.name" />
         </div>
       </div>
 
@@ -316,8 +356,17 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
     <MobileStickyBar :visible="showBar" :price="bar.price" :note="bar.note" :note-warning="bar.warning" :cta="bar.cta" @action="onBarAction" />
 
     <CheckoutSheet v-if="checkout" :event="event" :initial="checkout" @close="closeCheckout" />
-    <ShareEventModal :show="showShareModal" :event="event" @close="showShareModal = false" />
+    <ShareSheet :show="showShareModal" :event="event" @close="showShareModal = false" />
     <PurchasedTicketsModal :show="showOrders" :eventOrders="orders" :event="event" @close="showOrders = false" />
+
+    <Teleport to="body">
+      <Transition name="lightbox">
+        <div v-if="showImage" class="lightbox ev-motion" role="dialog" aria-modal="true" :aria-label="event.name" @click="showImage = false">
+          <img :src="event.image_url" :alt="event.name" />
+          <button type="button" class="lightbox-close" aria-label="Cerrar">×</button>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -339,59 +388,10 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
   animation: ev-fade-in 600ms ease both;
   pointer-events: none;
 }
-.topbar {
-  max-width: 1080px;
-  margin: 0 auto;
-  height: 56px;
-  padding: 0 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-.topbar-logo img {
-  height: 26px;
-  width: auto;
-  display: block;
-}
-.topbar-logo:focus-visible {
-  outline: 2px solid var(--text-1);
-  outline-offset: 4px;
-  border-radius: 4px;
-}
-.topbar-nav {
-  display: none;
-  gap: 24px;
-  font-size: 14px;
-  font-weight: 500;
-}
-.topbar-nav a {
-  color: var(--text-2);
-  text-decoration: none;
-}
-.topbar-nav a:hover {
-  color: var(--text-1);
-}
-.topbar-assistant {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--r-md);
-  border: 1px solid var(--border-strong);
-  background: var(--surface-0);
-  color: var(--text-1);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-.topbar-assistant:focus-visible {
-  outline: 2px solid var(--text-1);
-  outline-offset: 2px;
-}
 .container {
   max-width: 1080px;
   margin: 0 auto;
-  padding: 8px 16px 0;
+  padding: 16px 16px 0;
 }
 .banner {
   display: flex;
@@ -406,9 +406,31 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
   margin-bottom: 16px;
 }
 .banner-demo {
+  justify-content: flex-start;
   background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(6px);
   box-shadow: inset 0 0 0 1px var(--border);
   color: var(--text-2);
+  animation: ev-fade-up var(--dur-3) var(--ease-out) both;
+}
+.demo-text {
+  flex: 1 1 240px;
+}
+.demo-dot {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brand-lime);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+.demo-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--brand-lime);
+  animation: ev-pulse 1.6s ease-out 1s 4;
 }
 .banner-info {
   background: #f0f9ff;
@@ -433,7 +455,110 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
   background: var(--surface-1);
   box-shadow: var(--shadow-card);
   /* A1 */
-  animation: ev-poster-in var(--dur-4) var(--ease-out) both;
+  animation: ev-poster-in var(--dur-4) var(--ease-out) backwards; /* backwards: deja libre el transform del hover */
+  transition: transform var(--dur-4) var(--ease-out), box-shadow var(--dur-4) var(--ease-out);
+}
+@media (hover: hover) {
+  .poster:hover {
+    transform: translateY(-4px) rotate(-0.4deg);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05), 0 24px 48px rgba(0, 0, 0, 0.14);
+  }
+}
+
+/* ---- Portada ancha ---- */
+.cover {
+  position: relative;
+  height: var(--banner-h-m);
+  max-height: 62vh;
+  margin: 0 -16px 0;
+  overflow: hidden;
+  background: var(--surface-1);
+  animation: ev-fade-in var(--dur-4) var(--ease-out) both;
+}
+.cover-img {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: var(--banner-pos-m);
+  display: block;
+  will-change: transform;
+  animation: cover-in 1200ms var(--ease-out) backwards; /* backwards: después manda el parallax (inline) */
+}
+.cover.is-contain .cover-img {
+  object-fit: contain;
+}
+.cover-blur {
+  position: absolute;
+  inset: -24px;
+  width: calc(100% + 48px);
+  height: calc(100% + 48px);
+  object-fit: cover;
+  filter: blur(28px) saturate(1.1);
+  opacity: 0.7;
+}
+@keyframes cover-in {
+  from { transform: scale(1.08); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+/* El título se monta sobre el borde inferior de la imagen */
+.layout-banner .hero-area {
+  position: relative;
+  margin: -40px 0 0;
+  padding: 20px 16px 4px;
+  background: var(--surface-0);
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  margin-left: -16px;
+  margin-right: -16px;
+}
+
+/* ---- Imagen completa (diseño compacto) ---- */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(10, 10, 11, 0.86);
+  cursor: zoom-out;
+}
+.lightbox img {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: var(--r-lg);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4);
+}
+.lightbox-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+}
+.lightbox-enter-active,
+.lightbox-leave-active {
+  transition: opacity var(--dur-3) var(--ease-out);
+}
+.lightbox-enter-active img,
+.lightbox-leave-active img {
+  transition: transform var(--dur-3) var(--ease-spring);
+}
+.lightbox-enter-from,
+.lightbox-leave-to {
+  opacity: 0;
+}
+.lightbox-enter-from img,
+.lightbox-leave-to img {
+  transform: scale(0.9);
 }
 .poster img {
   width: 100%;
@@ -480,6 +605,15 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
 .secondary-btn:hover {
   color: var(--text-1);
 }
+.secondary-btn svg {
+  transition: transform var(--dur-3) var(--ease-spring);
+}
+.secondary-btn:hover .share-ico {
+  transform: translate(2px, -2px);
+}
+.secondary-btn:hover .cal-ico {
+  transform: rotate(90deg);
+}
 .secondary-btn:focus-visible {
   outline: 2px solid var(--text-1);
 }
@@ -509,30 +643,51 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
 }
 
 @media (min-width: 1024px) {
-  .topbar {
-    padding: 0 24px;
-    height: 64px;
-  }
-  .topbar-nav {
-    display: flex;
-    margin-left: auto;
-  }
-  .topbar-assistant {
-    display: none;
-  }
   .container {
-    padding: 16px 24px 0;
+    padding: 24px 24px 0;
   }
   .layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 400px;
     grid-template-areas:
+      "hero aside"
+      "main aside";
+    grid-template-rows: auto 1fr;
+    column-gap: 56px;
+    row-gap: 0;
+  }
+  /* Póster: la columna mide lo que mide el póster (limitado por alto), así no queda un hueco entre la imagen
+     y el título. Mínimo 480 px para que la descripción de abajo se lea cómoda. */
+  .layout-poster .layout {
+    --poster-w: calc(min(680px, 78vh) * var(--poster-ar-num));
+    grid-template-columns: minmax(0, max(480px, var(--poster-w))) 400px;
+    grid-template-areas:
       "poster hero"
       "poster aside"
       "main aside";
     grid-template-rows: auto auto 1fr;
+    justify-content: center;
     column-gap: 48px;
-    row-gap: 0;
+  }
+  .cover {
+    height: var(--banner-h-d);
+    margin: 0;
+    border-radius: var(--r-xl);
+    box-shadow: var(--shadow-card);
+  }
+  .cover-img {
+    object-position: var(--banner-pos-d);
+  }
+  .layout-banner .hero-area {
+    margin: -72px 0 0 24px;
+    padding: 28px 32px 8px;
+    border-radius: var(--r-xl) var(--r-xl) 0 0;
+  }
+  .layout-banner .aside {
+    padding-top: 32px;
+  }
+  .layout-compact .hero-area {
+    padding-top: 24px;
   }
   .poster {
     grid-area: poster;
@@ -550,6 +705,9 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
     align-self: stretch;
     padding-top: 24px;
   }
+  .layout-compact .aside {
+    padding-top: 24px;
+  }
   /* La card queda visible mientras se lee la descripción, las funciones y las preguntas */
   .card-wrap {
     position: sticky;
@@ -558,6 +716,10 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
   .main {
     grid-area: main;
     margin-top: 56px;
+  }
+  .layout-banner .main,
+  .layout-compact .main {
+    margin-top: 48px;
   }
   .mobile-only {
     display: none !important;
