@@ -4,6 +4,7 @@ import { Calendar, MapPin, Ticket, CheckCircle, Image as ImageIcon, Plus, Trash2
 import RichTextEditor from './RichTextEditor.vue'
 import { plainTextLength, sanitizeClient } from '../../lib/richTextClient'
 import { prepareImageForUpload, MAX_UPLOAD_BYTES, MAX_SOURCE_BYTES } from '../../lib/clientImage'
+import { EVENT_PAGE_LAYOUTS, normalizePageSettings } from '../../lib/eventPageSettings'
 
 const props = defineProps({
   initialVenues: {
@@ -46,6 +47,8 @@ const steps = [
 
 // Form Data State - Init from Prop
 const form = ref(JSON.parse(JSON.stringify(props.initialFormState)));
+// Diseño de la página pública y organizador visible (events.page_settings)
+form.value.general.pageSettings = normalizePageSettings(form.value.general.pageSettings)
 
 // IA de la descripción: contexto del evento guardado + lo que hay sin guardar en el formulario
 const descriptionAi = {
@@ -489,6 +492,61 @@ const submitEvent = async ({ exit = false } = {}) => {
               <span class="w-1 h-1 bg-red-600 rounded-full"></span> {{ uploadError }}
             </p>
           </div>
+
+          <!-- Diseño de la página pública (events.page_settings) -->
+          <fieldset>
+            <legend class="block text-sm font-medium text-gray-700 mb-1">Diseño de la página</legend>
+            <p class="text-xs text-gray-500 mb-3">Cómo se ubica la imagen respecto del título en la página del evento.</p>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" role="radiogroup" aria-label="Diseño de la página">
+              <label
+                v-for="opt in EVENT_PAGE_LAYOUTS"
+                :key="opt.value"
+                class="relative flex flex-col gap-2 p-3 rounded-xl border cursor-pointer transition has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-black"
+                :class="form.general.pageSettings.layout === opt.value ? 'border-black ring-2 ring-black/10 bg-gray-50' : 'border-gray-200 hover:border-gray-400'"
+              >
+                <input v-model="form.general.pageSettings.layout" type="radio" name="pageLayout" :value="opt.value" class="sr-only" />
+                <!-- Miniatura del diseño -->
+                <div class="h-20 rounded-lg bg-white border border-gray-100 p-2 overflow-hidden" aria-hidden="true">
+                  <div v-if="opt.value === 'poster'" class="flex gap-2 h-full">
+                    <div class="w-2/5 h-full rounded bg-lime-300"></div>
+                    <div class="flex-1 flex flex-col gap-1 pt-1">
+                      <div class="h-2 w-4/5 rounded bg-gray-800"></div>
+                      <div class="h-1.5 w-3/5 rounded bg-gray-300"></div>
+                      <div class="mt-auto h-4 w-full rounded bg-gray-200"></div>
+                    </div>
+                  </div>
+                  <div v-else-if="opt.value === 'banner'" class="flex flex-col gap-1 h-full">
+                    <div class="h-8 w-full rounded bg-lime-300"></div>
+                    <div class="h-2 w-3/5 rounded bg-gray-800 -mt-2.5 ml-1 ring-2 ring-white"></div>
+                    <div class="h-1.5 w-2/5 rounded bg-gray-300 ml-1"></div>
+                    <div class="mt-auto h-3 w-1/3 self-end rounded bg-gray-200"></div>
+                  </div>
+                  <div v-else class="flex flex-col gap-1.5 h-full">
+                    <div class="flex gap-2 items-center">
+                      <div class="w-7 h-7 rounded bg-lime-300 shrink-0"></div>
+                      <div class="flex-1 flex flex-col gap-1">
+                        <div class="h-2 w-4/5 rounded bg-gray-800"></div>
+                        <div class="h-1.5 w-1/2 rounded bg-gray-300"></div>
+                      </div>
+                    </div>
+                    <div class="h-1.5 w-full rounded bg-gray-200"></div>
+                    <div class="h-1.5 w-5/6 rounded bg-gray-200"></div>
+                  </div>
+                </div>
+                <span class="text-sm font-semibold text-gray-900">{{ opt.label }}</span>
+                <span class="text-xs text-gray-500 leading-snug">{{ opt.hint }}</span>
+                <CheckCircle v-if="form.general.pageSettings.layout === opt.value" size="18" class="absolute top-2 right-2 text-black bg-white rounded-full" />
+              </label>
+            </div>
+
+            <label class="mt-4 flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
+              <input v-model="form.general.pageSettings.show_organizer" type="checkbox" class="mt-0.5 w-4 h-4 rounded border-gray-300" />
+              <span>
+                Mostrar el organizador en la página del evento
+                <span class="block text-xs text-gray-500">"Organiza &lt;nombre de tu productora&gt;" bajo el título.</span>
+              </span>
+            </label>
+          </fieldset>
         </div>
 
         <!-- Step 2: Locations & Dates -->

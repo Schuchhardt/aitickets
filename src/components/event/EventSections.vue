@@ -2,6 +2,9 @@
 // Contenido de la página del evento bajo el póster (§4.8, §4.9): Sobre el evento, Funciones (si hay más de
 // una), Ubicación, Preguntas frecuentes, acceso al asistente y categorías. Sin tabs.
 import { ref, computed, onMounted } from "vue";
+import { Navigation } from "lucide-vue-next";
+import { categoryIcon } from "./categoryIcons.js";
+import { vReveal } from "./reveal.js";
 import {
   formatFunctionShort,
   upcomingFunctions,
@@ -61,22 +64,40 @@ const coords = computed(() =>
   venue.value?.latitude != null && venue.value?.longitude != null ? `${venue.value.latitude},${venue.value.longitude}` : "",
 );
 const mapFailed = ref(false);
+// 'static' (SSR / ya cargada al hidratar: sin animación) | 'pending' | 'loaded' (entra con el pin animado)
+const mapState = ref("static");
+const mapImg = ref(null);
+// Paleta de la marca: grises con parques en verde lima. Sin marcador de Google: el pin (animado) va en CSS,
+// centrado sobre la imagen (el mapa está centrado en el lugar y la proporción es la misma, 16:9).
+const MAP_STYLES = [
+  "element:geometry|color:0xf2f2f3",
+  "element:labels.icon|visibility:off",
+  "element:labels.text.fill|color:0x6e6e76",
+  "element:labels.text.stroke|color:0xffffff|weight:3",
+  "feature:administrative|element:geometry|visibility:off",
+  "feature:landscape.man_made|element:geometry|color:0xeaeaec",
+  "feature:poi|visibility:off",
+  "feature:poi.park|visibility:on",
+  "feature:poi.park|element:geometry|color:0xd9f99d",
+  "feature:poi.park|element:labels|visibility:off",
+  "feature:road|element:geometry|color:0xffffff",
+  "feature:road.arterial|element:geometry|color:0xffffff",
+  "feature:road.highway|element:geometry|color:0xd4d4d8",
+  "feature:road.local|element:labels|visibility:off",
+  "feature:transit|visibility:off",
+  "feature:water|element:geometry|color:0xbef264",
+  "feature:water|element:labels|visibility:off",
+];
 const staticMapUrl = computed(() => {
   if (!mapsKey || !mapQuery.value || props.event.has_secret_location) return "";
   const center = coords.value || mapQuery.value;
-  const params = new URLSearchParams({
-    center,
-    zoom: "15",
-    size: "640x360",
-    scale: "2",
-    markers: `color:0x0A0A0B|${center}`,
-    style: "feature:poi|visibility:simplified",
-    key: mapsKey,
-  });
+  const params = new URLSearchParams({ center, zoom: "15", size: "640x360", scale: "2", key: mapsKey });
+  MAP_STYLES.forEach((st) => params.append("style", st));
   return `https://maps.googleapis.com/maps/api/staticmap?${params}`;
 });
 const isIos = ref(false);
 onMounted(() => {
+  if (mapImg.value && !mapImg.value.complete) mapState.value = "pending";
   isIos.value = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 });
 const directions = computed(() => directionsUrl(coords.value || mapQuery.value, { ios: isIos.value }));
@@ -92,7 +113,7 @@ function toggleFaq(i) {
 
 <template>
   <div class="sections">
-    <section v-if="description" id="sobre" class="section" aria-labelledby="sobre-title">
+    <section v-if="description" id="sobre" v-reveal class="section" aria-labelledby="sobre-title">
       <h2 id="sobre-title" class="section-title">Sobre el evento</h2>
       <div class="about-wrap" :class="{ 'is-collapsed': isLong && !expanded }">
         <div class="about event-description" v-html="description"></div>
@@ -102,7 +123,7 @@ function toggleFaq(i) {
       </button>
     </section>
 
-    <section v-if="functions.length > 1" id="funciones" class="section" aria-labelledby="funciones-title">
+    <section v-if="functions.length > 1" id="funciones" v-reveal class="section" aria-labelledby="funciones-title">
       <h2 id="funciones-title" class="section-title">Funciones</h2>
       <div v-for="group in functionGroups" :key="group.key" class="fn-group">
         <p v-if="group.title && functionGroups.length > 1" class="fn-place">{{ group.title }}</p>
@@ -123,7 +144,7 @@ function toggleFaq(i) {
       </div>
     </section>
 
-    <section v-if="mapQuery || event.has_secret_location" id="ubicacion" class="section" aria-labelledby="ubicacion-title">
+    <section v-if="mapQuery || event.has_secret_location" id="ubicacion" v-reveal class="section" aria-labelledby="ubicacion-title">
       <h2 id="ubicacion-title" class="section-title">{{ event.has_secret_location ? "Ubicación aproximada" : "Ubicación" }}</h2>
       <p v-if="venue?.name || event.location" class="loc-name">{{ venue?.name || event.location }}</p>
       <p v-if="venue?.address" class="loc-address">{{ [venue.address, venue.city].filter(Boolean).join(", ") }}</p>
@@ -134,14 +155,22 @@ function toggleFaq(i) {
         target="_blank"
         rel="noopener"
         class="map"
+        :class="`is-${mapState}`"
         :aria-label="`Abrir ${venue?.name || 'la ubicación'} en el mapa`"
       >
-        <img :src="staticMapUrl" :alt="`Mapa de ${venue?.name || mapQuery}`" loading="lazy" decoding="async" width="640" height="360" @error="mapFailed = true" />
+        <img ref="mapImg" :src="staticMapUrl" :alt="`Mapa de ${venue?.name || mapQuery}`" loading="lazy" decoding="async" width="640" height="360" @load="mapState === 'pending' && (mapState = 'loaded')" @error="mapFailed = true" />
+        <span class="map-pin" aria-hidden="true">
+          <span class="map-pin-ring"></span>
+          <svg width="34" height="42" viewBox="0 0 34 42"><path d="M17 41s15-12.6 15-24.5A15 15 0 0 0 2 16.5C2 28.4 17 41 17 41z" fill="#0a0a0b" /><circle cx="17" cy="16.5" r="6" fill="var(--brand-lime)" /></svg>
+        </span>
       </a>
-      <a v-if="mapQuery && !event.has_secret_location" :href="directions" target="_blank" rel="noopener" class="ev-link directions">Cómo llegar ↗</a>
+      <a v-if="mapQuery && !event.has_secret_location" :href="directions" target="_blank" rel="noopener" class="ev-btn ev-btn-secondary directions">
+        <Navigation :size="18" class="directions-icon" aria-hidden="true" />
+        Cómo llegar
+      </a>
     </section>
 
-    <section v-if="event.faqs?.length" id="preguntas" class="section" aria-labelledby="faq-title">
+    <section v-if="event.faqs?.length" id="preguntas" v-reveal class="section" aria-labelledby="faq-title">
       <h2 id="faq-title" class="section-title">Preguntas frecuentes</h2>
       <div class="faq">
         <div v-for="(faq, i) in event.faqs" :key="faq.id ?? i" class="faq-item">
@@ -168,8 +197,11 @@ function toggleFaq(i) {
       <button type="button" class="ev-link" @click="emit('open-assistant')">¿No encuentras lo que buscas? Pregúntale al asistente →</button>
     </p>
 
-    <ul v-if="event.tags?.length" class="tags" aria-label="Categorías">
-      <li v-for="tag in event.tags" :key="tag" class="tag">{{ tag }}</li>
+    <ul v-if="event.tags?.length" v-reveal class="tags" aria-label="Categorías">
+      <li v-for="(tag, i) in event.tags" :key="tag" class="tag" :style="{ '--i': i }">
+        <component :is="categoryIcon(tag)" :size="15" class="tag-icon" aria-hidden="true" />
+        {{ tag }}
+      </li>
     </ul>
   </div>
 </template>
@@ -292,24 +324,93 @@ function toggleFaq(i) {
   margin-top: 4px;
 }
 .map {
+  position: relative;
   display: block;
   margin-top: 12px;
   aspect-ratio: 16 / 9;
   border-radius: var(--r-lg);
   overflow: hidden;
   background: var(--surface-1);
+  box-shadow: inset 0 0 0 1px var(--border);
 }
 .map img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
+  transition: opacity var(--dur-4) var(--ease-out), transform 900ms var(--ease-out);
+}
+.map.is-pending img {
+  opacity: 0;
+  transform: scale(1.04);
+}
+.map:hover img {
+  transform: scale(1.03);
+}
+.map:focus-visible {
+  outline: 2px solid var(--text-1);
+  outline-offset: 3px;
+}
+/* Pin centrado: la punta queda en el centro del mapa. Cae y rebota al cargar; el anillo pulsa. */
+.map-pin {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 34px;
+  height: 42px;
+  margin: -42px 0 0 -17px;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.25));
+}
+.map.is-pending .map-pin {
+  opacity: 0;
+}
+.map.is-loaded .map-pin {
+  animation: map-pin-drop 640ms var(--ease-spring) 200ms both;
+}
+.map-pin svg {
+  display: block;
+  position: relative;
+}
+.map-pin-ring {
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  width: 22px;
+  height: 10px;
+  margin-left: -11px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--brand-lime) 80%, transparent);
+}
+.map:not(.is-pending) .map-pin-ring {
+  animation: map-pin-ring 1.8s ease-out 900ms 3;
+}
+.map:hover .map-pin svg {
+  animation: map-pin-hop 520ms var(--ease-out);
+}
+@keyframes map-pin-drop {
+  from { opacity: 0; transform: translateY(-36px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes map-pin-ring {
+  0% { transform: scale(0.6); opacity: 0.9; }
+  100% { transform: scale(3); opacity: 0; }
+}
+@keyframes map-pin-hop {
+  0%, 100% { transform: none; }
+  40% { transform: translateY(-8px); }
 }
 .directions {
-  display: inline-block;
-  margin-top: 10px;
+  margin-top: 12px;
+  min-height: 44px;
+  padding: 0 18px;
   font-size: 15px;
-  padding: 6px 0;
+  gap: 8px;
+}
+.directions-icon {
+  transition: transform var(--dur-3) var(--ease-spring);
+}
+.directions:hover .directions-icon {
+  transform: translate(2px, -2px) rotate(12deg);
 }
 .faq-item {
   border-bottom: 1px solid var(--border);
@@ -369,11 +470,27 @@ function toggleFaq(i) {
   gap: 8px;
 }
 .tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 13px;
-  color: var(--text-2);
+  font-weight: 500;
+  color: var(--text-1);
   background: var(--surface-1);
   border-radius: var(--r-pill);
-  padding: 4px 12px;
+  padding: 6px 14px 6px 10px;
+  transition: background-color var(--dur-2), transform var(--dur-2) var(--ease-spring);
+}
+.tags.is-in .tag {
+  animation: ev-fade-up var(--dur-3) var(--ease-out) backwards;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+.tag:hover {
+  background: color-mix(in srgb, var(--brand-lime) 35%, var(--surface-1));
+  transform: translateY(-1px);
+}
+.tag-icon {
+  color: var(--text-2);
 }
 @media (min-width: 1024px) {
   .sections {

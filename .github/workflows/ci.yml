@@ -106,6 +106,9 @@ jobs:
               IF (SELECT count(*) FROM public.event_dates d JOIN public.events e ON e.id = d.event_id WHERE e.slug = 'evento-demo-gira') <> 5 THEN
                 RAISE EXCEPTION 'La gira demo debe tener 5 funciones';
               END IF;
+              IF EXISTS (SELECT 1 FROM public.events WHERE slug LIKE 'evento-demo-%' AND (name ILIKE '%(evento de demostración)%' OR title ILIKE '%(evento de demostración)%')) THEN
+                RAISE EXCEPTION 'Los eventos demo no deben llevar (evento de demostración) en el nombre: lo dice el banner';
+              END IF;
             END \$\$;"
       - name: Permisos (anon/authenticated sin acceso; RLS activo)
         run: psql -v ON_ERROR_STOP=1 -f db/ci/assert-grants.sql

@@ -259,6 +259,34 @@
   from { background-position: 200% 0; }
   to { background-position: -200% 0; }
 }
+/* A30: llamado de atención de un CTA (botón "Confirmar asistencia" quieto un rato) */
+@keyframes ev-nudge {
+  0%, 100% { transform: none; }
+  12% { transform: translateY(-3px) scale(1.03) rotate(-1.5deg); }
+  24% { transform: translateY(0) scale(1.03) rotate(1.5deg); }
+  36% { transform: translateY(-2px) scale(1.02) rotate(-1deg); }
+  48% { transform: scale(1.01) rotate(0.5deg); }
+  60% { transform: none; }
+}
+@keyframes ev-glow {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand-lime) 70%, transparent); }
+  100% { box-shadow: 0 0 0 14px color-mix(in srgb, var(--brand-lime) 0%, transparent); }
+}
+.ev-nudge {
+  animation: ev-nudge 900ms var(--ease-out), ev-glow 900ms ease-out;
+}
+
+/* A31: secciones que entran al hacer scroll (la clase la pone v-reveal, src/components/event/reveal.js) */
+.ev-reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 560ms var(--ease-out), transform 560ms var(--ease-out);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+.ev-reveal.is-in {
+  opacity: 1;
+  transform: none;
+}
 
 .ev-skeleton {
   border-radius: var(--r-sm);

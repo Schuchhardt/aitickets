@@ -7,6 +7,7 @@ import { EVENT_MANAGER_ROLES } from "../../../../lib/supabaseServer";
 import { requireDashboardSession } from "../../_lib/guard";
 import { canAccessEventByStaff } from "../../../../../netlify/lib/event-staff.mjs";
 import { decodeBasicEntities } from "../../../../lib/sanitize";
+import { normalizePageSettings } from "../../../../lib/eventPageSettings";
 
 const { id } = Astro.params;
 const guard = await requireDashboardSession(Astro, EVENT_MANAGER_ROLES);
@@ -52,8 +53,9 @@ const loadEvent = (coverColumn: string) => supabaseAdmin
     .eq("id", id)
     .eq("organization_id", dbUser.organization_id)
     .single();
-let { data: event, error }: { data: any; error: any } = await loadEvent(" cover_settings,");
-// Deploy previews: la migración de cover_settings puede no estar aplicada todavía
+let { data: event, error }: { data: any; error: any } = await loadEvent(" cover_settings, page_settings,");
+// Deploy previews: las migraciones de page_settings/cover_settings pueden no estar aplicadas todavía
+if (error?.code === "42703") ({ data: event, error } = await loadEvent(" cover_settings,"));
 if (error?.code === "42703") ({ data: event, error } = await loadEvent(""));
 
 if (error || !event) {
@@ -69,6 +71,7 @@ const initialFormState = {
         description: /<\/?[a-z][^>]*>/i.test(event.description || "") ? event.description : decodeBasicEntities(event.description || ""),
         imageUrl: event.image_url || "",
         coverSettings: event.cover_settings || null,
+        pageSettings: normalizePageSettings(event.page_settings),
         category: (event as any).event_tags?.[0]?.category_tags?.name || "",
         isPrivate: event.accessibility === "private",
     },

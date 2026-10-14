@@ -15,6 +15,7 @@ import { isDemoEventSlug, getDemoFunctionDate } from "./demoEvent.mjs";
 import { normalizeCoverSettings } from "./eventCover";
 import { loadEventGallery } from "./eventGallery";
 import { resolveCoverMeta, eventThemeFrom } from "./eventCoverMeta";
+import { normalizePageSettings, stripDemoSuffix } from "./eventPageSettings";
 import { computeFeeSplit } from "../../netlify/lib/fees.mjs";
 
 // Columnas públicas del evento. NUNCA incluir secret_location (C4).
@@ -242,8 +243,9 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
       : baseQuery.eq("slug", slug!).eq("status", "published")
     ).maybeSingle();
   };
-  let { data: event, error }: { data: any; error: any } = await loadEvent(`${EVENT_PUBLIC_COLUMNS}, cover_settings, fee_absorbed, cover_meta`);
-  // Deploy previews comparten la BD de producción: tolerar que las migraciones de cover_meta/cover_settings/fee_absorbed no estén aplicadas
+  let { data: event, error }: { data: any; error: any } = await loadEvent(`${EVENT_PUBLIC_COLUMNS}, cover_settings, fee_absorbed, cover_meta, page_settings`);
+  // Deploy previews comparten la BD de producción: tolerar que las migraciones de page_settings/cover_meta/cover_settings/fee_absorbed no estén aplicadas
+  if (error?.code === "42703") ({ data: event, error } = await loadEvent(`${EVENT_PUBLIC_COLUMNS}, cover_settings, fee_absorbed, cover_meta`));
   if (error?.code === "42703") ({ data: event, error } = await loadEvent(`${EVENT_PUBLIC_COLUMNS}, cover_settings, fee_absorbed`));
   if (error?.code === "42703") ({ data: event, error } = await loadEvent(`${EVENT_PUBLIC_COLUMNS}, cover_settings`));
   if (error?.code === "42703") ({ data: event, error } = await loadEvent(EVENT_PUBLIC_COLUMNS));
@@ -261,6 +263,9 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
   if (isDemo) {
     event.start_date = null;
     event.end_date = null;
+    // El banner de la página ya dice que es demo (y la migración 202610150100 lo quita de la BD)
+    event.name = stripDemoSuffix(event.name);
+    event.title = stripDemoSuffix(event.title);
   }
 
   // Tracking de visita (server-side, no bloqueante). Solo se guarda el hash de la IP. Las vistas previas no cuentan.
@@ -457,7 +462,7 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
         })(),
   });
 
-  const { cover_meta: _coverMeta, ...eventRow } = event;
+  const { cover_meta: _coverMeta, page_settings: rawPageSettings, ...eventRow } = event;
   const eventData = {
     ...eventRow,
     // R3: la descripción se renderiza con v-html => siempre sanitizada
@@ -479,6 +484,8 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
     organization,
     venue: primaryVenue,
     cover_settings: normalizeCoverSettings(event.cover_settings),
+    // Diseño de la página y si se muestra el organizador (src/lib/eventPageSettings.ts)
+    page_settings: normalizePageSettings(rawPageSettings),
     // El productor absorbe el cargo por servicio: el precio de la entrada es el total (src/components/Reservation/pricing.js)
     fee_absorbed: event.fee_absorbed === true,
     is_demo: isDemo,
