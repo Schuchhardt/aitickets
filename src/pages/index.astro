@@ -3,30 +3,70 @@ export const prerender = true;
 import AppHeader from "../components/AppHeader.vue";
 import AppFooter from "../components/AppFooter.vue";
 import HeroSection from "../components/HeroSection.vue";
-import FeaturesSection from "../components/FeaturesSection.vue";
+import RecurringSection from "../components/landing/RecurringSection.vue";
+import PromotersSection from "../components/landing/PromotersSection.vue";
 import AIConnectSection from "../components/AIConnectSection.vue";
 import VideoSection from "../components/VideoSection.vue";
-import BenefitsSection from "../components/BenefitsSection.vue";
+import DoorSection from "../components/landing/DoorSection.vue";
+import PricingExampleSection from "../components/landing/PricingExampleSection.vue";
+import ProducerFaq from "../components/landing/ProducerFaq.vue";
 import CallToAction from "../components/CallToAction.vue";
+import CtaTracking from "../components/landing/CtaTracking.astro";
 import Layout from '../layouts/Layout.astro';
+import { PRODUCER_FAQ } from "../data/producerFaq";
+import { LEGAL } from "../lib/legal";
+import { SERVICE_FEE_PERCENT_LABEL } from "../../netlify/lib/fees.mjs";
 import "../styles/global.css";
 import 'animate.css';
+
+const SITE_URL = (import.meta.env.SITE_URL || "https://aitickets.cl").replace(/\/$/, "");
+const jsonLd = [
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: LEGAL.brand,
+    url: SITE_URL,
+    logo: `${SITE_URL}/apple-touch-icon.png`,
+    email: LEGAL.supportEmail,
+    parentOrganization: { "@type": "Organization", name: LEGAL.legalName },
+    areaServed: "CL",
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "AI Tickets para productores",
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Web",
+    url: SITE_URL,
+    description: "Ticketera online para productores de eventos en Chile: funciones recurrentes, links de venta por promotor, check-in con QR y pago por función.",
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "CLP",
+      description: `Sin mensualidad y 0% de comisión para el productor. El comprador paga un cargo por servicio de ${SERVICE_FEE_PERCENT_LABEL} + IVA.`,
+    },
+  },
+];
 ---
 
 <Layout
-  title="AI Tickets – Vende entradas para tus eventos en Chile con 0% de comisión"
-  description="Plataforma para vender entradas online: página del evento, pagos con Webpay y tarjetas, entradas con QR y check-in. 0% de comisión para el productor."
+  title="Ticketera para productores de eventos en Chile | AI Tickets"
+  description="Vende entradas para tus funciones, mide qué promotor vende, controla el check-in con QR y cobra lo de cada función. Sin mensualidad y 0% de comisión para el productor."
   canonical="/"
 >
   <AppHeader client:idle/>
-  
-    <main>
-      <HeroSection client:idle/>
-      <AIConnectSection/>
-      <VideoSection/>
-      <FeaturesSection/>
-      <BenefitsSection/>
-      <CallToAction/>
-    </main>
+  <main>
+    <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+    <HeroSection client:idle />
+    <RecurringSection />
+    <PromotersSection />
+    <AIConnectSection />
+    <VideoSection />
+    <DoorSection />
+    <PricingExampleSection />
+    <ProducerFaq items={PRODUCER_FAQ} />
+    <CallToAction campaign="home_final" />
+  </main>
   <AppFooter client:idle/>
+  <CtaTracking />
 </Layout>

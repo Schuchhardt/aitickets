@@ -143,6 +143,16 @@ const submitForm = async (event) => {
         <li><a href="/precios" class="hover:underline">Precios</a></li>
         <li><a href="/web-gratis" class="hover:underline">Web de eventos gratis</a></li>
         <li><a href="/presentacion" class="hover:underline">Presentación</a></li>
+        <li><a href="/guias" class="hover:underline">Guías</a></li>
+        <li><a href="/ticketeras-en-chile" class="hover:underline">Ticketeras en Chile</a></li>
+      </ul>
+      <ul class="flex flex-wrap justify-center gap-x-6 gap-y-2 px-6 mt-2 text-gray-500">
+        <li><a href="/ticketera-stand-up" class="hover:underline">Stand-up</a></li>
+        <li><a href="/ticketera-teatro" class="hover:underline">Teatro</a></li>
+        <li><a href="/ticketera-musica-en-vivo" class="hover:underline">Música en vivo</a></li>
+        <li><a href="/ticketera-talleres" class="hover:underline">Talleres</a></li>
+        <li><a href="/vender-entradas-online" class="hover:underline">Vender entradas online</a></li>
+        <li><a href="/entradas-con-qr" class="hover:underline">Entradas con QR</a></li>
       </ul>
     </nav>
 

@@ -5,6 +5,13 @@ import { ORG_ADMIN_ROLES } from "../../../lib/supabaseServer";
 import { requireDashboardSession } from "../_lib/guard";
 import { SERVICE_FEE_PERCENT_LABEL, IVA_PERCENT_LABEL } from "../../../../netlify/lib/fees.mjs";
 import { getStaffEventIds } from "../../../../netlify/lib/event-staff.mjs";
+import { computeOrgLedger, RELEASE_HOURS, type OrgLedger } from "../../../lib/producer-api/ledger";
+import { roleAllows } from "../../../lib/producer-api/permissions";
+import { getTool } from "../../../lib/producer-api/tools";
+import { runTool } from "../../../lib/producer-api/registry";
+import { dashboardToolContext } from "../../../lib/producer-api/session";
+import { PAYOUT_SCHEDULE_TEXT } from "../../../../netlify/lib/legal.mjs";
+import PayoutRequestButton from "../../../components/dashboard/PayoutRequestButton.vue";
 
 const guard = await requireDashboardSession(Astro, [...ORG_ADMIN_ROLES, "finance"]);
 if (!guard.ok) return guard.response;
@@ -30,7 +37,6 @@ type Tx = {
     date: string;
     provider: string;
 };
-type EventSummary = { id: number; name: string; endDate: string | null; qty: number; amount: number; ticketFee: number; paid: number };
 
 let totalRevenue = 0; // ventas de entradas (lo que recibe el productor)
 let totalServiceFees = 0; // cargo por servicio NETO pagado por los compradores (ticket_fee)
@@ -39,12 +45,9 @@ let totalDiscounts = 0; // descuentos por códigos (discount_amount); amount ya 
 let discountedOrders = 0;
 let totalAbsorbedFees = 0; // cargo + IVA absorbidos por el productor (ya descontados de amount)
 let absorbedOrders = 0;
-let paidOut = 0;
-let balanceDue = 0;
 let transactions: Tx[] = [];
 let refundedCount = 0; // órdenes reembolsadas (no suman al saldo)
 let reviewCount = 0; // pagos en revisión manual (monto no coincide o sin stock)
-const summaries: EventSummary[] = [];
 
 // Equipo asignado a ciertos eventos (aitickets_event_staff): solo ve las finanzas de esos eventos
 const staffEventIds = await getStaffEventIds(supabaseAdmin, dbUser.id);
@@ -58,9 +61,6 @@ const { data: orgEvents } = await orgEventsQuery.order("start_date", { ascending
 if (orgEvents && orgEvents.length > 0) {
     const eventIds = orgEvents.map((e) => e.id);
     const eventNameMap = Object.fromEntries(orgEvents.map((e) => [e.id, e.name]));
-    const byEvent = new Map<number, EventSummary>(
-        orgEvents.map((e) => [e.id, { id: e.id, name: e.name, endDate: e.end_date, qty: 0, amount: 0, ticketFee: 0, paid: 0 }]),
-    );
 
     // Solo órdenes pagadas. Paginado con .range(): PostgREST corta en 1000 filas y los totales quedarían incompletos.
     // payment_provider existe desde la migración 202609270100 y service_fee_tax desde 202609290100;
@@ -115,12 +115,6 @@ if (orgEvents && orgEvents.length > 0) {
             totalDiscounts += discount;
             discountedOrders += 1;
         }
-        const s = byEvent.get(o.event_id);
-        if (s) {
-            s.qty += o.ticket_qty || 0;
-            s.amount += amount;
-            s.ticketFee += ticketFee;
-        }
     }
 
     transactions = (orders || []).slice(0, 300).map((o) => ({
@@ -145,22 +139,37 @@ if (orgEvents && orgEvents.length > 0) {
     refundedCount = refunded || 0;
     reviewCount = review || 0;
 
-    // Transferencias ya realizadas al productor
-    const { data: withdrawals } = await supabaseAdmin
-        .from("event_withdrawals")
-        .select("event_id, amount, status")
-        .in("event_id", eventIds)
-        .eq("status", "paid");
-    for (const w of withdrawals || []) {
-        const amount = Number(w.amount) || 0;
-        paidOut += amount;
-        const s = byEvent.get(w.event_id);
-        if (s) s.paid += amount;
-    }
-
-    balanceDue = Math.max(0, totalRevenue - paidOut);
-    summaries.push(...[...byEvent.values()].filter((s) => s.amount > 0 || s.qty > 0));
 }
+
+// Saldo: misma fuente que get_balance/request_payout (ledger.ts). Cada función se libera 48 h después de terminar.
+let ledger: OrgLedger = { events: [], totals: { available: 0, pending: 0, retained: 0, withdrawn: 0, paid_out: 0, negative_balance: 0, sales_net: 0, partial_refunds: 0 } };
+try {
+    ledger = await computeOrgLedger(supabaseAdmin, Number(dbUser.organization_id), { eventIds: staffEventIds });
+} catch (err: any) {
+    console.error("Error calculando el saldo:", err?.message || err);
+}
+const ledgerEvents = ledger.events
+    .filter((l) => l.sales_net > 0 || l.withdrawn > 0 || l.retained > 0)
+    .sort((a, b) => String(b.last_function_end || "").localeCompare(String(a.last_function_end || "")));
+const nextRelease = ledgerEvents
+    .map((l) => l.next_release_at)
+    .filter(Boolean)
+    .sort()[0] || null;
+
+// Retiros: estado de verificación y últimas solicitudes (mismas herramientas que la API)
+const canManagePayouts = roleAllows(dbUser.role, "finance.manage") && !staffEventIds;
+let verification: any = null;
+let payouts: any[] = [];
+const toolAuth = await dashboardToolContext(Astro);
+if (toolAuth.ok) {
+    const [v, p] = await Promise.all([
+        runTool(getTool("get_verification_status")!, {}, toolAuth.ctx),
+        runTool(getTool("list_payouts")!, { limit: 10 }, toolAuth.ctx),
+    ]);
+    if (v.ok) verification = v.result;
+    if (p.ok) payouts = (p.result as any).payouts || [];
+}
+const PAYOUT_STATUS: Record<string, string> = { requested: "Solicitado", processing: "En proceso", paid: "Transferido", cancelled: "Anulado", failed: "Falló" };
 
 // Datos bancarios (tabla organization_payout_accounts, migración 20260926_C_dashboard)
 const { data: payout } = await supabaseAdmin
@@ -173,6 +182,8 @@ const hasBankData = !!(payout?.bank_name && payout?.bank_account_number && payou
 const formatCLP = (amount: number) => `$${Math.round(Number(amount) || 0).toLocaleString("es-CL")}`;
 const formatDate = (d: string | null) =>
     d ? new Date(d).toLocaleDateString("es-CL", { timeZone: "America/Santiago" }) : "—";
+const formatDateTime = (d: string | null) =>
+    d ? new Date(d).toLocaleString("es-CL", { timeZone: "America/Santiago", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—";
 ---
 
 <DashboardLayout title="Ingresos">
@@ -188,8 +199,7 @@ const formatDate = (d: string | null) =>
             <p class="font-semibold mb-1">¿Cómo recibo mi dinero?</p>
             <p>
                 Recibes el <strong>100% del valor de tus entradas</strong>: el cargo por servicio y su IVA los paga el comprador.
-                Los pagos se hacen <strong>manualmente por transferencia bancaria dentro de 48–72 horas después de cada función</strong>,
-                a la cuenta que registres en <a href="/dashboard/settings" class="underline font-medium">Configuración</a>.
+                {PAYOUT_SCHEDULE_TEXT} La transferencia va a la cuenta que registres en <a href="/dashboard/settings" class="underline font-medium">Configuración</a>.
             </p>
             {!hasBankData && (
                 <p class="mt-2 text-red-700 font-medium">
@@ -215,19 +225,66 @@ const formatDate = (d: string | null) =>
                     </p>
                 )}
             </div>
-            <div class="bg-white p-4 md:p-6 rounded-xl border border-gray-100 shadow-sm">
-                <h3 class="text-gray-500 text-sm font-medium">Transferido a la fecha</h3>
-                <p class="text-2xl md:text-3xl font-bold mt-2">{formatCLP(paidOut)}</p>
+            <div class="bg-white p-4 md:p-6 rounded-xl border border-gray-100 shadow-sm" data-testid="finance-available">
+                <h3 class="text-gray-500 text-sm font-medium">Disponible para retirar</h3>
+                <p class="text-2xl md:text-3xl font-bold mt-2 text-green-600">{formatCLP(ledger.totals.available)}</p>
+                <p class="text-xs text-gray-400 mt-1">Ventas de funciones que terminaron hace {RELEASE_HOURS} h o más.</p>
+                {canManagePayouts && (
+                    <div class="mt-3">
+                        <PayoutRequestButton
+                            client:load
+                            available={ledger.totals.available}
+                            canRequest={Boolean(verification?.can_request_payout)}
+                            missing={(verification?.missing || []).filter((m: any) => m.blocks_payouts).map((m: any) => m.label)}
+                        />
+                    </div>
+                )}
             </div>
-            <div class="bg-white p-4 md:p-6 rounded-xl border border-gray-100 shadow-sm">
-                <h3 class="text-gray-500 text-sm font-medium">Saldo a pagar</h3>
-                <p class="text-2xl md:text-3xl font-bold mt-2 text-green-600">{formatCLP(balanceDue)}</p>
-                <p class="text-xs text-gray-400 mt-1">Se transfiere 48–72 h después de cada función.</p>
+            <div class="bg-white p-4 md:p-6 rounded-xl border border-gray-100 shadow-sm" data-testid="finance-pending">
+                <h3 class="text-gray-500 text-sm font-medium">Por liberar</h3>
+                <p class="text-2xl md:text-3xl font-bold mt-2">{formatCLP(ledger.totals.pending)}</p>
+                <p class="text-xs text-gray-400 mt-1">
+                    {nextRelease ? `Próxima liberación: ${formatDateTime(nextRelease)}.` : "Funciones por realizarse."}
+                    {ledger.totals.retained > 0 && ` Retenido: ${formatCLP(ledger.totals.retained)} (pagos en revisión o eventos cancelados).`}
+                </p>
+                <p class="text-xs text-gray-400 mt-1">Transferido a la fecha: {formatCLP(ledger.totals.paid_out)}</p>
             </div>
         </div>
 
+        {payouts.length > 0 && (
+            <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden" data-testid="finance-payouts">
+                <div class="p-4 md:p-6 border-b border-gray-100">
+                    <h3 class="text-lg font-bold text-gray-900">Retiros</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm text-gray-600">
+                        <thead class="bg-gray-50 text-gray-900 font-semibold border-b border-gray-100">
+                            <tr>
+                                <th class="px-4 md:px-6 py-3 whitespace-nowrap">Solicitado</th>
+                                <th class="px-4 md:px-6 py-3 whitespace-nowrap">Monto</th>
+                                <th class="px-4 md:px-6 py-3 whitespace-nowrap">Cuenta</th>
+                                <th class="px-4 md:px-6 py-3 whitespace-nowrap">Estado</th>
+                                <th class="px-4 md:px-6 py-3 whitespace-nowrap">Depósito estimado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {payouts.map((p) => (
+                                <tr class="border-b border-gray-50">
+                                    <td class="px-4 md:px-6 py-3 whitespace-nowrap">{formatDate(p.requested_at)}</td>
+                                    <td class="px-4 md:px-6 py-3 whitespace-nowrap font-medium text-gray-900">{formatCLP(p.amount)}</td>
+                                    <td class="px-4 md:px-6 py-3 whitespace-nowrap">{p.bank} ****{p.account_last4}</td>
+                                    <td class="px-4 md:px-6 py-3 whitespace-nowrap">{PAYOUT_STATUS[p.status] || p.status}</td>
+                                    <td class="px-4 md:px-6 py-3 whitespace-nowrap">{p.paid_at ? formatDate(p.paid_at) : p.estimated_payment_date || "—"}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        )}
+
         <!-- Resumen por evento -->
-        {summaries.length > 0 && (
+        {ledgerEvents.length > 0 && (
             <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
                 <div class="p-4 md:p-6 border-b border-gray-100">
                     <h3 class="text-lg font-bold text-gray-900">Resumen por evento</h3>
@@ -237,25 +294,43 @@ const formatDate = (d: string | null) =>
                         <thead class="bg-gray-50 text-gray-900 font-semibold border-b border-gray-100">
                             <tr>
                                 <th class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">Evento</th>
-                                <th class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">Última función</th>
+                                <th class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">Funciones</th>
                                 <th class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">Entradas</th>
                                 <th class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">Ventas de entradas</th>
-                                <th class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">Transferido</th>
-                                <th class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">Saldo a pagar</th>
+                                <th class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">Retirado</th>
+                                <th class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">Disponible</th>
+                                <th class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">Por liberar</th>
                                 <th class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap"></th>
                             </tr>
                         </thead>
                         <tbody>
-                            {summaries.map((s) => (
-                                <tr class="border-b border-gray-50 hover:bg-gray-50 transition">
-                                    <td class="px-4 md:px-6 py-3 md:py-4 font-medium text-gray-900 min-w-[10rem]">{s.name}</td>
-                                    <td class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">{formatDate(s.endDate)}</td>
-                                    <td class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">{s.qty}</td>
-                                    <td class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">{formatCLP(s.amount)}</td>
-                                    <td class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">{formatCLP(s.paid)}</td>
-                                    <td class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap font-semibold text-gray-900">{formatCLP(Math.max(0, s.amount - s.paid))}</td>
+                            {ledgerEvents.map((s) => (
+                                <tr class="border-b border-gray-50 hover:bg-gray-50 transition align-top">
+                                    <td class="px-4 md:px-6 py-3 md:py-4 font-medium text-gray-900 min-w-[10rem]">
+                                        {s.name}
+                                        {s.cancelled && <span class="block text-xs text-red-600">Cancelado: saldo retenido</span>}
+                                    </td>
+                                    <td class="px-4 md:px-6 py-3 md:py-4 text-xs min-w-[12rem]">
+                                        {s.functions.filter((f) => f.sales_net > 0).length > 0 ? (
+                                            <ul class="space-y-1">
+                                                {s.functions.filter((f) => f.sales_net > 0).map((f) => (
+                                                    <li>
+                                                        {formatDate(f.ends_at)}{f.start_time ? ` ${f.start_time}` : ""} · {formatCLP(f.sales_net)} ·{" "}
+                                                        {f.released ? <span class="text-green-700">liberado</span> : <span class="text-gray-500">desde {formatDateTime(f.releases_at)}</span>}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        ) : (
+                                            <span class="text-gray-500">Última: {formatDate(s.last_function_end)}</span>
+                                        )}
+                                    </td>
+                                    <td class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">{s.tickets}</td>
+                                    <td class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">{formatCLP(s.sales_net - s.partial_refunds)}</td>
+                                    <td class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">{formatCLP(s.withdrawn)}</td>
+                                    <td class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap font-semibold text-green-700">{formatCLP(s.available)}</td>
+                                    <td class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">{formatCLP(s.pending + s.retained)}</td>
                                     <td class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">
-                                        <a href={`/api/events/orders-csv?event_id=${s.id}`} class="text-blue-600 hover:underline whitespace-nowrap">Exportar CSV</a>
+                                        <a href={`/api/events/orders-csv?event_id=${s.event_id}`} class="text-blue-600 hover:underline whitespace-nowrap">Exportar CSV</a>
                                     </td>
                                 </tr>
                             ))}

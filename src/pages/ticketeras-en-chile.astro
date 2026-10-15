@@ -1,0 +1,116 @@
+---
+export const prerender = true;
+import AppHeader from "../components/AppHeader.vue";
+import AppFooter from "../components/AppFooter.vue";
+import CallToAction from "../components/CallToAction.vue";
+import ProducerFaq from "../components/landing/ProducerFaq.vue";
+import CtaTracking from "../components/landing/CtaTracking.astro";
+import Layout from "../layouts/Layout.astro";
+import { MARKET_ROWS, MARKET_CONTEXT, NOT_PUBLISHED } from "../data/ticketerasChile";
+import { computeFeeSplit } from "../../netlify/lib/fees.mjs";
+import "../styles/global.css";
+
+const fmtDate = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("es-CL", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+const lastChecked = MARKET_ROWS.map((r) => r.checkedAt).sort().at(-1)!;
+const ex = computeFeeSplit(10000);
+const clp = (n: number) => `$${Math.round(n).toLocaleString("es-CL")}`;
+const cols: { key: "buyerFee" | "producerFee" | "freeEvents" | "payout"; label: string }[] = [
+    { key: "buyerFee", label: "Cargo al comprador" },
+    { key: "producerFee", label: "Comisión al productor" },
+    { key: "freeEvents", label: "Eventos gratis" },
+    { key: "payout", label: "Pago al productor" },
+];
+const faq = [
+    {
+        q: "¿Qué es el cargo por servicio?",
+        a: "Es lo que cobra la ticketera por cada entrada, además del precio que fija el productor. Puede pagarlo el comprador, el productor o repartirse. Compara siempre con un precio concreto: cuánto paga el comprador en total y cuánto recibe el productor.",
+    },
+    {
+        q: "¿Hay un máximo legal para el cargo por servicio en Chile?",
+        a: "No. No existe una ley que fije un porcentaje máximo; el Sernac puede actuar ante cláusulas abusivas o información insuficiente sobre el cargo.",
+    },
+    {
+        q: "¿Por qué algunas ticketeras aparecen como \"No publicado\"?",
+        a: "Porque no publican su tarifa estándar para productores en su sitio y el cobro se acuerda caso a caso. Preferimos no usar cifras de terceros como si fueran oficiales.",
+    },
+    {
+        q: "¿Cuánto paga el comprador en AI Tickets?",
+        a: `En una entrada de ${clp(10000)} paga ${clp(ex.total)} (cargo de ${clp(ex.feeNet)} más ${clp(ex.feeIva)} de IVA) y el productor recibe ${clp(ex.producerNet)}. El productor también puede absorber el cargo.`,
+    },
+];
+---
+
+<Layout
+    title="Ticketeras en Chile: cuánto cobra cada una (2026) | AI Tickets"
+    description="Comparamos el cargo por servicio, la comisión al productor y el plazo de pago de las principales ticketeras en Chile, con fuente y fecha de revisión de cada dato."
+    canonical="/ticketeras-en-chile"
+>
+    <AppHeader client:idle />
+    <main class="font-['Prompt']">
+        <section class="bg-black text-white px-4 pt-32 pb-16">
+            <div class="container mx-auto md:px-8 max-w-5xl">
+                <h1 class="text-3xl md:text-5xl font-bold font-['Unbounded'] leading-tight">Ticketeras en Chile: cuánto cobra cada una</h1>
+                <p class="mt-6 text-lg text-white/80 max-w-3xl">
+                    Qué paga el comprador, qué paga el productor y cuándo llega la plata, según lo que cada ticketera publica. Cada dato tiene su fuente y fecha de revisión.
+                    Somos AI Tickets, así que estamos en la tabla: por eso solo usamos datos públicos y marcamos lo que no se publica.
+                </p>
+                <p class="mt-4 text-sm text-white/50">Última revisión: {fmtDate(lastChecked)}</p>
+            </div>
+        </section>
+
+        <section class="px-4 py-12 bg-white">
+            <div class="container mx-auto md:px-8 max-w-6xl">
+                <div class="overflow-x-auto rounded-xl border border-gray-200">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-gray-50 text-gray-900">
+                            <tr>
+                                <th class="px-4 py-3 font-semibold">Ticketera</th>
+                                {cols.map((c) => <th class="px-4 py-3 font-semibold min-w-[11rem]">{c.label}</th>)}
+                                <th class="px-4 py-3 font-semibold min-w-[12rem]">Fuente</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {MARKET_ROWS.map((r) => (
+                                <tr class="border-t border-gray-100 align-top">
+                                    <th scope="row" class="px-4 py-3 font-semibold text-gray-900">{r.name}</th>
+                                    {cols.map((c) => (
+                                        <td class={`px-4 py-3 ${r[c.key] === NOT_PUBLISHED ? "text-gray-400" : "text-gray-700"}`}>{r[c.key]}</td>
+                                    ))}
+                                    <td class="px-4 py-3 text-xs text-gray-500">
+                                        {r.source.url ? <a href={r.source.url} rel="nofollow noopener" target="_blank" class="underline">{r.source.label}</a> : r.source.label}
+                                        <span class="block mt-1">Revisado: {fmtDate(r.checkedAt)}</span>
+                                        {r.note && <span class="block mt-1">{r.note}</span>}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+                <p class="mt-6 text-sm text-gray-600 max-w-3xl">
+                    {MARKET_CONTEXT.text} Fuente: <a href={MARKET_CONTEXT.source.url} rel="nofollow noopener" target="_blank" class="underline">{MARKET_CONTEXT.source.label}</a>.
+                </p>
+                <p class="mt-2 text-xs text-gray-500 max-w-3xl">
+                    Las tarifas pueden cambiar o negociarse por evento. Si representas a una ticketera y un dato está desactualizado, escríbenos a soporte@aitickets.cl con la fuente pública y lo corregimos.
+                </p>
+            </div>
+        </section>
+
+        <section class="px-4 py-16 bg-gradient-to-b from-slate-100 to-lime-100">
+            <div class="container mx-auto md:px-8 max-w-3xl">
+                <h2 class="text-2xl md:text-3xl font-bold font-['Unbounded'] mb-6">Qué mirar además del porcentaje</h2>
+                <ul class="space-y-4 text-gray-700">
+                    <li><strong>El total que paga el comprador.</strong> Un cargo alto encarece la entrada y puede bajar la conversión, aunque tú no lo pagues.</li>
+                    <li><strong>Cuándo recibes la plata.</strong> Cobrar después de cada función o al final de la temporada cambia tu flujo de caja.</li>
+                    <li><strong>Costos fijos.</strong> Mensualidades o planes pagados pesan más cuando recién empiezas.</li>
+                    <li><strong>Lo que necesitas el día del evento.</strong> Check-in, cortesías y equipo de puerta.</li>
+                </ul>
+                <p class="mt-6"><a href="/precios" class="font-semibold underline">Calcula cuánto recibes con AI Tickets</a></p>
+            </div>
+        </section>
+
+        <ProducerFaq items={faq} />
+        <CallToAction campaign="comparativa_chile" />
+    </main>
+    <AppFooter client:idle />
+    <CtaTracking />
+</Layout>

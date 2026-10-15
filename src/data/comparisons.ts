@@ -58,7 +58,7 @@ const AIT = {
   producerFee: "0% (el productor recibe el 100% del precio)",
   buyerFee: "Cargo por servicio de 8% + IVA sobre el precio, visible antes de pagar",
   freeEvents: "Sin costo",
-  payouts: "Transferencia 48 a 72 horas después de cada función",
+  payouts: "Saldo de cada función disponible 48 horas después; retiro transferido en hasta 2 días hábiles",
   website: "Web de eventos gratis para la productora",
   checkin: "Entradas con QR y check-in desde el celular",
   signup: "Registro en línea, sin contrato ni mensualidad",

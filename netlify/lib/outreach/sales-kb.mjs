@@ -13,7 +13,7 @@ export const SALES_KB = Object.freeze({
     // Dato de la competencia confirmado por el dueño (src/data/competitor-fees.mjs). Sin aprobar para
     // respuestas automáticas: solo va en borradores que revisa una persona.
     { key: 'vs_passline_buyer_fee', approved: false, text: 'Según tarifas vigentes de Passline informadas a productores (sep 2026), Passline cobra al comprador 15% sobre la entrada (13% en entradas de menos de 15 mil); en AI Tickets el comprador paga 8% + IVA.' },
-    { key: 'payouts', approved: true, text: 'Transferimos lo recaudado al productor 48 a 72 horas después de cada función.' },
+    { key: 'payouts', approved: true, text: 'Lo vendido para cada función queda disponible 48 horas después de que termina; el productor solicita el retiro y se transfiere en hasta 2 días hábiles.' },
     { key: 'payments', approved: true, text: 'Los compradores pagan con Webpay y tarjetas.' },
     { key: 'free_site', approved: true, text: 'Cada productor tiene una web de eventos gratis en aitickets.cl/o/<nombre-de-tu-productora>, lista al registrarse.' },
     { key: 'custom_domain', approved: false, text: 'Puedes conectar tu propio dominio a la web (sin costo adicional).' },

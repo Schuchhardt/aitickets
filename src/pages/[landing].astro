@@ -1,0 +1,17 @@
+---
+// Landings SEO de productores en la raíz (/ticketera-stand-up, /vender-entradas-online, ...).
+// Solo existen los slugs de src/data/landings.ts; cualquier otra ruta da 404.
+export const prerender = true;
+import LandingPage from "../components/seo/LandingPage.astro";
+import { LANDINGS, type Landing } from "../data/landings";
+import { relatedLinks } from "../lib/seoLinks";
+
+export function getStaticPaths() {
+    return LANDINGS.map((landing) => ({ params: { landing: landing.slug }, props: { landing } }));
+}
+
+const { landing } = Astro.props as { landing: Landing };
+const related = await relatedLinks(landing.related);
+---
+
+<LandingPage landing={landing} related={related} />
