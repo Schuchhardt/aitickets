@@ -10,6 +10,9 @@ import sentry from '@sentry/astro';
 export default defineConfig({
   output: 'server',
   adapter: netlify(),
+  // Páginas estáticas como /precios.html (no /precios/index.html): Netlify las sirve en /precios con 200,
+  // igual que el canonical y el sitemap. Con el formato por carpeta redirigía /precios → /precios/ (301).
+  build: { format: 'file' },
   integrations: [vue(), partytown({
     config: {
       forward: ["dataLayer.push", "gtag"]
