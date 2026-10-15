@@ -1,0 +1,120 @@
+---
+// Plantilla de las landings SEO (src/data/landings.ts). El contenido de cada página es propio; esta
+// plantilla solo arma la estructura, el CTA contextual, las relacionadas y los datos estructurados.
+import AppHeader from "../AppHeader.vue";
+import AppFooter from "../AppFooter.vue";
+import CallToAction from "../CallToAction.vue";
+import ProducerFaq from "../landing/ProducerFaq.vue";
+import CtaTracking from "../landing/CtaTracking.astro";
+import Layout from "../../layouts/Layout.astro";
+import { publishUrl, whatsappUrl } from "../landing/links.js";
+import type { Landing } from "../../data/landings";
+import "../../styles/global.css";
+
+interface Props {
+    landing: Landing;
+    /** Título y texto de cada relacionada (landings y guías), por slug. */
+    related: { href: string; title: string; text: string }[];
+}
+
+const { landing, related } = Astro.props;
+const SITE_URL = (import.meta.env.SITE_URL || "https://aitickets.cl").replace(/\/$/, "");
+const url = `${SITE_URL}/${landing.slug}`;
+const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+        { "@type": "ListItem", position: 1, name: "AI Tickets", item: SITE_URL },
+        { "@type": "ListItem", position: 2, name: "Para organizadores", item: `${SITE_URL}/organizadores` },
+        { "@type": "ListItem", position: 3, name: landing.card.title, item: url },
+    ],
+};
+---
+
+<Layout title={landing.title} description={landing.description} canonical={`/${landing.slug}`}>
+    <AppHeader client:idle />
+    <main class="font-['Prompt']">
+        <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+
+        <section class="relative overflow-hidden bg-black text-white px-4 pt-32 pb-20">
+            <div class="absolute -top-32 -right-32 w-[28rem] h-[28rem] rounded-full bg-lime-400/20 blur-3xl pointer-events-none" aria-hidden="true"></div>
+            <div class="relative container mx-auto md:px-8 max-w-5xl">
+                <nav class="text-xs text-white/50 mb-6" aria-label="Ruta">
+                    <a href="/organizadores" class="hover:text-lime-400">Para organizadores</a> <span aria-hidden="true">/</span> {landing.card.title}
+                </nav>
+                <p class="inline-block text-lime-400 font-semibold text-sm bg-lime-400/10 border border-lime-400/30 px-4 py-1 rounded-full">{landing.eyebrow}</p>
+                <h1 class="mt-5 text-3xl md:text-5xl font-bold font-['Unbounded'] leading-tight max-w-4xl">{landing.h1}</h1>
+                <p class="mt-6 text-lg text-white/80 max-w-3xl">{landing.intro}</p>
+                <ul class="mt-8 flex flex-wrap gap-3">
+                    {landing.highlights.map((h) => (
+                        <li class="text-sm px-3 py-1.5 rounded-full bg-white/10 border border-white/15">{h}</li>
+                    ))}
+                </ul>
+                <div class="mt-10 flex flex-col sm:flex-row gap-4">
+                    <a href={publishUrl(landing.cta.campaign)} data-cta="publish" data-section="landing_hero" class="px-6 py-3 text-lg font-bold font-['Unbounded'] bg-lime-400 text-black rounded-lg hover:bg-lime-300 transition text-center">
+                        {landing.cta.label} →
+                    </a>
+                    <a href={whatsappUrl()} data-cta="whatsapp" data-section="landing_hero" target="_blank" rel="noopener noreferrer" class="px-6 py-3 text-lg font-bold font-['Unbounded'] border border-white rounded-lg hover:bg-white hover:text-black transition text-center">
+                        Hablar por WhatsApp
+                    </a>
+                </div>
+                {landing.demo && (
+                    <p class="mt-6 text-sm">
+                        <a href={landing.demo.url} data-cta="demo_event" data-section="landing_hero" class="underline text-white/70 hover:text-lime-400">{landing.demo.label}</a>
+                    </p>
+                )}
+            </div>
+        </section>
+
+        {landing.sections.map((section, i) => (
+            <section class={`px-4 py-16 md:py-20 ${i % 2 === 0 ? "bg-white" : "bg-gradient-to-b from-slate-100 to-lime-100"}`}>
+                <div class="container mx-auto md:px-8 max-w-5xl">
+                    <h2 class="text-2xl md:text-3xl font-bold font-['Unbounded'] mb-6 max-w-3xl">{section.heading}</h2>
+                    {section.body && <p class="text-gray-700 text-lg max-w-3xl leading-relaxed">{section.body}</p>}
+                    {section.steps && (
+                        <ol class="mt-6 space-y-4 max-w-3xl">
+                            {section.steps.map((step, n) => (
+                                <li class="flex gap-4">
+                                    <span class="shrink-0 w-8 h-8 rounded-full bg-black text-lime-400 font-bold flex items-center justify-center">{n + 1}</span>
+                                    <span class="text-gray-700 pt-1">{step}</span>
+                                </li>
+                            ))}
+                        </ol>
+                    )}
+                    {section.items && (
+                        <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+                            {section.items.map((item) => (
+                                <div class="p-6 rounded-xl bg-white border border-gray-200 shadow-sm">
+                                    <h3 class="font-semibold font-['Unbounded'] mb-2">{item.title}</h3>
+                                    <p class="text-gray-600 text-sm">{item.text}</p>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </section>
+        ))}
+
+        <ProducerFaq items={landing.faq} />
+
+        {related.length > 0 && (
+            <section class="px-4 py-16 bg-slate-100">
+                <div class="container mx-auto md:px-8 max-w-5xl">
+                    <h2 class="text-2xl font-bold font-['Unbounded'] mb-6">También te puede servir</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {related.map((r) => (
+                            <a href={r.href} class="block p-6 rounded-xl bg-white border border-gray-200 hover:border-black transition">
+                                <p class="font-semibold font-['Unbounded']">{r.title}</p>
+                                <p class="text-sm text-gray-600 mt-2">{r.text}</p>
+                            </a>
+                        ))}
+                    </div>
+                </div>
+            </section>
+        )}
+
+        <CallToAction campaign={`${landing.cta.campaign}_final`} />
+    </main>
+    <AppFooter client:idle />
+    <CtaTracking />
+</Layout>

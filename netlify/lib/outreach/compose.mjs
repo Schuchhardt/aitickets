@@ -233,7 +233,7 @@ export function composeInterestedReply({ lead, cfg = getOutreachConfig() }) {
     '¡Buenísimo! Gracias por responder.',
     `Con este enlace creas tu cuenta en un par de minutos${ev}; tu web de eventos gratis queda lista al registrarte:`,
     signupUrl(lead, cfg),
-    'Para ti es 0% de comisión: el comprador paga un cargo por servicio de 8% + IVA, y transferimos lo recaudado 48 a 72 horas después de cada función.',
+    'Para ti es 0% de comisión: el comprador paga un cargo por servicio de 8% + IVA, y lo que vendes para cada función queda disponible 48 horas después de que termina (lo retiras cuando quieras y llega en hasta 2 días hábiles).',
     'Si prefieres, respóndeme y lo vemos juntos.',
   ].join('\n\n')
   const text = withFooter(`${body}\n\n${signature(cfg)}`, lead, cfg)

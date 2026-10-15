@@ -1,70 +1,46 @@
 <script setup>
-import { ArrowRight, Sparkles, Calendar, BarChart3, Bot } from 'lucide-vue-next';
+import { ArrowRight } from 'lucide-vue-next';
 import FadeInSection from './Hero/FadeInSection.vue';
-import FeatureCard from './Hero/FeatureCard.vue';
 import GradientBackground from './Hero/GradientBackground.vue';
+import { publishUrl, whatsappUrl, DEMO_EVENT_URL } from './landing/links.js';
+import { SERVICE_FEE_PERCENT_LABEL } from '../../netlify/lib/fees.mjs';
+import { PAYOUT_RELEASE_HOURS } from '../../netlify/lib/legal.mjs';
 </script>
 
 <template>
-    <section class="relative w-full overflow-hidden text-white px-6 pt-24 pb-12 min-h-screen">
-        
-      <GradientBackground />
-      <!-- Contenido encima -->
-      <div class="relative z-10 container mx-auto px-4 md:px-8 pt-16">
-        <div class="flex flex-col lg:flex-row items-center justify-between gap-12">
-          <div class="w-full text-center lg:text-left">
-            <FadeInSection direction="up">
-              <a href="#ia" class="inline-flex border items-center gap-2 text-lime-400 font-semibold sm:text-xs text-sm md:text-base mb-4 bg-lime-400/10 px-4 py-1.5 rounded-full font-[Prompt] hover:bg-lime-400/20 transition">
-                <Sparkles class="h-4 w-4" />
-                Nuevo: gestiona tus eventos desde Claude o ChatGPT →
-              </a>
-            </FadeInSection>
-  
-            <FadeInSection direction="up" :delay="100">
-              <h1 class="text-3xl md:text-2xl lg:text-4xl font-bold text-white leading-tight mb-6 font-[Unbounded]">
-                La ticketera que
-                <span class="lg:relative lg:inline-block box-decoration-clone max-lg:bg-[linear-gradient(transparent_62%,rgb(163_230_53/0.3)_62%,rgb(163_230_53/0.3)_88%,transparent_88%)]">
-                  llena tus funciones
-                  <span class="hidden lg:block absolute bottom-2 left-0 w-full h-3 bg-lime-400/30 -z-10 rounded"></span>
-                </span>
-              </h1>
-            </FadeInSection>
-  
-            <FadeInSection direction="up" :delay="200">
-              <p class="text-lg text-white/90 mb-8 max-w-2xl mx-auto lg:mx-0 font-[Prompt]">
-                0% de comisión para ti: el comprador paga un cargo por servicio de 8% + IVA. Te transferimos lo recaudado 48–72 h después de cada función, y te ayudamos a armar el evento y los posts con IA.
-              </p>
-            </FadeInSection>
-  
-            <FadeInSection direction="up" :delay="300">
-              <div class="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 mb-12">
-                <a href="/organizadores/registro" class="px-6 py-3 text-lg font-bold font-[Unbounded] border border-white rounded-lg hover:bg-white hover:text-black transition w-full sm:w-auto group">
-                  Crear mi cuenta gratis
-                  <ArrowRight class="ml-2 inline-block h-4 w-4 transition-transform group-hover:translate-x-1" />
-                </a>
-                <a href="https://wa.me/56982347140?text=Hola%2C%20quiero%20vender%20entradas%20con%20AI%20Tickets" target="_blank" rel="noopener noreferrer" class="px-6 py-3 text-lg font-[Prompt] text-white/90 underline underline-offset-4 hover:text-lime-400 transition w-full sm:w-auto">
-                  Hablar por WhatsApp
-                </a>
-                <a href="/eventos/evento-demo-aitickets?utm_source=aitickets&utm_medium=organizadores&utm_campaign=demo" class="px-6 py-3 text-lg font-[Prompt] text-white/90 underline underline-offset-4 hover:text-lime-400 transition w-full sm:w-auto">
-                  Ver evento demo
-                </a>
-              </div>
-            </FadeInSection>
-  
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 text-left">
-              <FadeInSection direction="up" :delay="400">
-                <FeatureCard :icon="Calendar" title="Funciones múltiples" text="Una página de evento con todas tus fechas. Ideal para stand-up y teatro con temporada." />
-              </FadeInSection>
-              <FadeInSection direction="up" :delay="500">
-                <FeatureCard :icon="Bot" title="Tu IA, tu ticketera" text="Crea eventos, descuentos y campañas conversando con Claude o ChatGPT." />
-              </FadeInSection>
-              <FadeInSection direction="up" :delay="600">
-                <FeatureCard :icon="BarChart3" title="Sabe qué canal vende" text="Visitas, ventas y canal de origen (UTM) de cada evento en tu panel." />
-              </FadeInSection>
-            </div>
-          </div>
+  <section class="relative w-full overflow-hidden text-white px-6 pt-24 pb-16">
+    <GradientBackground />
+    <div class="relative z-10 container mx-auto px-4 md:px-8 pt-16 text-center lg:text-left">
+      <FadeInSection direction="up">
+        <p class="inline-flex border items-center gap-2 text-lime-400 font-semibold text-sm mb-4 bg-lime-400/10 px-4 py-1.5 rounded-full font-[Prompt]">
+          Para organizadores
+        </p>
+      </FadeInSection>
+      <FadeInSection direction="up" :delay="100">
+        <h1 class="text-3xl md:text-4xl lg:text-5xl font-bold leading-tight mb-6 font-[Unbounded] max-w-4xl">
+          La ticketera para los que hacen funciones todas las semanas
+        </h1>
+      </FadeInSection>
+      <FadeInSection direction="up" :delay="200">
+        <p class="text-lg text-white/85 mb-8 max-w-2xl mx-auto lg:mx-0 font-[Prompt]">
+          Vende entradas para tus funciones, gestiona promotores, controla el check-in y revisa tus ventas desde una sola plataforma.
+          Sin mensualidad, 0% de comisión para ti (el comprador paga {{ SERVICE_FEE_PERCENT_LABEL }} + IVA) y lo de cada función disponible {{ PAYOUT_RELEASE_HOURS }} h después del show.
+        </p>
+      </FadeInSection>
+      <FadeInSection direction="up" :delay="300">
+        <div class="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
+          <a :href="publishUrl('organizadores_hero')" data-cta="publish" data-section="hero" class="px-6 py-3 text-lg font-bold font-[Unbounded] bg-lime-400 text-black rounded-lg hover:bg-lime-300 transition w-full sm:w-auto group text-center">
+            Publicar mi próxima función
+            <ArrowRight class="ml-2 inline-block h-4 w-4 transition-transform group-hover:translate-x-1" />
+          </a>
+          <a :href="whatsappUrl()" data-cta="whatsapp" data-section="hero" target="_blank" rel="noopener noreferrer" class="px-6 py-3 text-lg font-[Prompt] text-white/90 underline underline-offset-4 hover:text-lime-400 transition">
+            Hablar por WhatsApp
+          </a>
+          <a :href="DEMO_EVENT_URL" data-cta="demo_event" data-section="hero" class="px-6 py-3 text-lg font-[Prompt] text-white/90 underline underline-offset-4 hover:text-lime-400 transition">
+            Ver evento de ejemplo
+          </a>
         </div>
-      </div>
-    </section>
-  </template>
-  
+      </FadeInSection>
+    </div>
+  </section>
+</template>

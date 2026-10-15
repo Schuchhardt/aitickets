@@ -1,6 +1,8 @@
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin } from "../lib/auth-helpers";
+import { getCollection } from "astro:content";
 import { indexableComparisonSlugs } from "../data/comparisons";
+import { LANDINGS } from "../data/landings";
 
 export const prerender = false;
 
@@ -18,6 +20,10 @@ const STATIC_PAGES: { path: string; changefreq: string; priority: string }[] = [
   { path: "/privacy", changefreq: "yearly", priority: "0.2" },
   { path: "/terms", changefreq: "yearly", priority: "0.2" },
   { path: "/terminos-productores", changefreq: "yearly", priority: "0.2" },
+  // Landings SEO de productores (src/data/landings.ts), comparativa y guías
+  ...LANDINGS.map((l) => ({ path: `/${l.slug}`, changefreq: "monthly", priority: l.kind === "vertical" ? "0.8" : "0.7" })),
+  { path: "/ticketeras-en-chile", changefreq: "monthly", priority: "0.7" },
+  { path: "/guias", changefreq: "weekly", priority: "0.6" },
   // Comparaciones: solo las que tienen todos sus datos verificados con fuente y fecha (las demás son noindex)
   ...indexableComparisonSlugs().map((slug) => ({ path: `/comparar/${slug}`, changefreq: "monthly", priority: "0.5" })),
 ];
@@ -83,6 +89,14 @@ export const GET: APIRoute = async () => {
   const entries = STATIC_PAGES.map((p) =>
     urlEntry(`${SITE_URL}${p.path}`, { changefreq: p.changefreq, priority: p.priority })
   );
+  try {
+    for (const g of await getCollection("guias")) {
+      const lastmod = (g.data.updated || g.data.published).toISOString().slice(0, 10);
+      entries.push(urlEntry(`${SITE_URL}/guias/${g.id}`, { lastmod, changefreq: "monthly", priority: "0.6" }));
+    }
+  } catch (err) {
+    console.error("Error agregando guías al sitemap:", err);
+  }
 
   try {
     const supabase = getSupabaseAdmin();

@@ -25,7 +25,8 @@ export const API_KEY_COLUMNS = "id, organization_id, user_id, name, key_prefix, 
 const KEY_RE = /^aitk_[A-Za-z0-9_-]{43}$/;
 
 export type ApiActor = {
-    keyId: string;
+    /** null = sesión del panel (sin llave). */
+    keyId: string | null;
     userId: number;
     orgId: number;
     role: string;

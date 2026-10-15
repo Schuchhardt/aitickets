@@ -226,3 +226,99 @@ describe('saldo y retiros', () => {
     expect(await call('get_settlement_report', { event_id: 20 })).toMatchObject({ ok: false, code: 'not_found' })
   })
 })
+
+describe('liberación por función', () => {
+  // Evento 30 con dos funciones: la 1ª terminó hace 3 días (liberada), la 2ª es en 10 días.
+  const chileDate = (ms) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago' }).format(new Date(Date.now() + ms))
+  const seedFunctions = (extra = {}) =>
+    seed({
+      tables: {
+        events: [{ id: 30, name: 'Stand-up semanal', status: 'published', organization_id: 7, end_date: null, fee_absorbed: false }],
+        event_dates: [
+          { id: 301, event_id: 30, date: chileDate(-3 * DAY), start_time: '21:00', end_time: '23:00' },
+          { id: 302, event_id: 30, date: chileDate(10 * DAY), start_time: '21:00', end_time: '23:00' },
+        ],
+        event_tickets: [
+          { id: 1, event_id: 30, event_date_id: 301 },
+          { id: 2, event_id: 30, event_date_id: 302 },
+          { id: 3, event_id: 30, event_date_id: null }, // abono: válido para cualquier función
+        ],
+        event_orders: [
+          { id: 'a', event_id: 30, status: 'paid', amount: 10000, ticket_qty: 1 },
+          { id: 'b', event_id: 30, status: 'paid', amount: 20000, ticket_qty: 2 },
+          { id: 'c', event_id: 30, status: 'paid', amount: 30000, ticket_qty: 1 },
+          { id: 'd', event_id: 30, status: 'paid', amount: 5000, ticket_qty: 2 }, // entradas de ambas funciones
+        ],
+        event_attendees: [
+          { event_id: 30, event_order_id: 'a', event_ticket_id: 1 },
+          { event_id: 30, event_order_id: 'b', event_ticket_id: 2 },
+          { event_id: 30, event_order_id: 'b', event_ticket_id: 2 },
+          { event_id: 30, event_order_id: 'c', event_ticket_id: 3 },
+          { event_id: 30, event_order_id: 'd', event_ticket_id: 1 },
+          { event_id: 30, event_order_id: 'd', event_ticket_id: 2 },
+          { event_id: 30, event_order_id: null, event_ticket_id: 1, is_complimentary: true }, // cortesía: no suma
+        ],
+        aitickets_refunds: [],
+        event_withdrawals: [],
+        ...extra,
+      },
+    })
+
+  it('solo se libera lo vendido para funciones que terminaron hace ≥ 48 h', async () => {
+    seedFunctions()
+    const l = (await computeOrgLedger(db, 7)).events[0]
+    expect(l.sales_net).toBe(65000)
+    expect(l.released_sales).toBe(10000) // solo la orden 'a'; abono y mixta esperan la última función
+    expect(l.available).toBe(10000)
+    expect(l.pending).toBe(55000)
+    expect(l.released).toBe(false)
+    expect(l.next_release_at).toBe(l.functions[1].releases_at)
+    expect(l.functions.map((f) => [f.event_date_id, f.sales_net, f.released])).toEqual([
+      [301, 10000, true],
+      [302, 20000, false],
+    ])
+  })
+
+  it('reembolsos de órdenes liberadas y retiros se descuentan de lo liberado', async () => {
+    seedFunctions({
+      aitickets_refunds: [{ id: 'r', organization_id: 7, event_id: 30, order_id: 'a', ticket_amount: 4000, status: 'completed' }],
+      event_withdrawals: [{ id: 9, event_id: 30, amount: 5000, status: 'paid' }],
+    })
+    const l = (await computeOrgLedger(db, 7)).events[0]
+    expect(l.released_due).toBe(1000) // 10000 − 4000 − 5000
+    expect(l.available).toBe(1000)
+    expect(l.pending).toBe(55000)
+  })
+
+  it('un evento cancelado no libera ninguna función', async () => {
+    seedFunctions()
+    db.tables.events[0].cancelled_at = iso(-1 * DAY)
+    const l = (await computeOrgLedger(db, 7)).events[0]
+    expect(l.available).toBe(0)
+    expect(l.retained).toBe(65000)
+  })
+
+  it('request_payout desde el panel (sin llave) retira solo lo liberado', async () => {
+    seedFunctions()
+    const panel = { ...ctx('producer', ['read', 'write', 'publish', 'attendees', 'finance', 'team']), channel: 'dashboard' }
+    panel.actor = { ...panel.actor, keyId: null }
+    const first = await call('request_payout', {}, panel)
+    expect(first.result.status).toBe('confirmation_required')
+    expect(first.result.details.amount).toBe(10000)
+    const done = await call('request_payout', { confirmation_token: first.result.confirmation_token, idempotency_key: 'panel-key-1' }, panel)
+    expect(done.ok).toBe(true)
+    expect(done.result.amount).toBe(10000)
+    expect(db.tables.aitickets_payouts[0]).toMatchObject({ requested_via: 'dashboard', amount: 10000 })
+    const again = await call('request_payout', {}, panel)
+    expect(again.ok).toBe(false) // ya no queda saldo liberado
+  })
+
+  it('un confirmation_token del panel no sirve con una llave de API', async () => {
+    seedFunctions()
+    const panel = { ...ctx(), channel: 'dashboard' }
+    panel.actor = { ...panel.actor, keyId: null }
+    const first = await call('request_payout', {}, panel)
+    const withKey = await call('request_payout', { confirmation_token: first.result.confirmation_token }, ctx())
+    expect(withKey).toMatchObject({ ok: false, code: 'invalid_input' })
+  })
+})

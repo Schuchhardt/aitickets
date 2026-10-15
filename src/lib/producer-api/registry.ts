@@ -32,7 +32,8 @@ export type ToolContext = {
     /** Origen público del sitio (SITE_URL o el de la petición), sin "/" final. */
     origin: string;
     requestUrl: URL;
-    channel: "mcp" | "rest";
+    /** "dashboard" = el panel con la sesión del usuario (sin llave: actor.keyId = null). */
+    channel: "mcp" | "rest" | "dashboard";
     /** Resumen que el productor confirmó (solo en la segunda llamada de una herramienta con confirm). */
     confirmed?: ConfirmationSummary;
 };
@@ -285,13 +286,15 @@ async function requestConfirmation(tool: ToolDef, summary: ConfirmationSummary, 
 async function consumeConfirmation(tool: ToolDef, token: string, argsHash: string, ctx: ToolContext): Promise<ConfirmationSummary | undefined> {
     const tokenHash = sha256(token);
     const now = new Date().toISOString();
-    const { count, error } = await ctx.supabase
+    let update = ctx.supabase
         .from("aitickets_api_confirmations")
         .update({ used_at: now }, { count: "exact" })
         .eq("token_hash", tokenHash)
         .eq("organization_id", ctx.actor.orgId)
-        .eq("user_id", ctx.actor.userId)
-        .eq("api_key_id", ctx.actor.keyId)
+        .eq("user_id", ctx.actor.userId);
+    // El panel no usa llave (keyId null) y "= NULL" nunca calza en SQL: se filtra con IS NULL.
+    update = ctx.actor.keyId == null ? update.is("api_key_id", null) : update.eq("api_key_id", ctx.actor.keyId);
+    const { count, error } = await update
         .eq("tool", tool.name)
         .eq("args_hash", argsHash)
         .is("used_at", null)
@@ -307,7 +310,7 @@ async function consumeConfirmation(tool: ToolDef, token: string, argsHash: strin
         .eq("token_hash", tokenHash)
         .maybeSingle();
     const again = `Llama a ${tool.name} sin confirmation_token para obtener un resumen nuevo y vuelve a confirmar con el productor.`;
-    if (!row || Number(row.organization_id) !== ctx.actor.orgId || Number(row.user_id) !== ctx.actor.userId || row.tool !== tool.name || String(row.api_key_id) !== String(ctx.actor.keyId)) {
+    if (!row || Number(row.organization_id) !== ctx.actor.orgId || Number(row.user_id) !== ctx.actor.userId || row.tool !== tool.name || String(row.api_key_id ?? null) !== String(ctx.actor.keyId ?? null)) {
         throw new ToolError("invalid_input", `confirmation_token inválido para ${tool.name}. ${again}`);
     }
     if (row.used_at) throw new ToolError("conflict", `Este confirmation_token ya se usó. ${again}`);

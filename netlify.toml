@@ -35,6 +35,19 @@
   status = 302
   force = true
 
+# /productores era un 404 y se usa en búsquedas y en la propuesta comercial: la página de productores es /organizadores.
+[[redirects]]
+  from = "/productores"
+  to = "/organizadores"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/productores/"
+  to = "/organizadores"
+  status = 301
+  force = true
+
 # Netlify Image CDN (/.netlify/images): portadas de eventos redimensionadas y en AVIF/WebP (src/lib/imageCdn.js).
 # Solo imágenes públicas de nuestro Storage de Supabase: nadie puede usar el CDN para transformar otras URLs.
 [images]

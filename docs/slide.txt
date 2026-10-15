@@ -17,8 +17,8 @@ Tiempo estimado: 8-10 minutos de presentación + preguntas.
 1) ELEVATOR PITCH (30 segundos)
 
 "AI Tickets es la ticketera que llena tus funciones: 0% de comisión para ti,
-el comprador paga un cargo por servicio de 8% + IVA, te transferimos lo recaudado
-48–72 h después de cada función, y te ayudamos a armar el evento y los posts con IA.
+el comprador paga un cargo por servicio de 8% + IVA, cobras por función (lo de cada
+show queda disponible 48 h después y lo retiras cuando quieras), y te ayudamos a armar el evento y los posts con IA.
 
 Estamos en piloto con productores de stand-up y teatro independiente.
 ¿Quieres ver cómo funcionaría con tu próxima función?"
@@ -135,7 +135,7 @@ Texto:
 	
 	✅  Te muestra qué canal (UTM) te trae visitas y ventas
 	
-	✅  Te transfiere lo recaudado 48–72 h después de cada función
+	✅  Cobras por función: disponible 48 h después de cada show
 
 	Eso es AI Tickets.
 
@@ -341,8 +341,8 @@ Texto:
 	│  ✓ Posts con IA y asistente IA en tu página                 │
 	│  ✓ Analítica por evento y canal (UTM)                       │
 	│                                                             │
-	│  Te transferimos lo recaudado 48–72 h después de cada       │
-	│  función.                                                   │
+	│  Lo de cada función queda disponible 48 h después; pides    │
+	│  el retiro y llega en hasta 2 días hábiles.                 │
 	└─────────────────────────────────────────────────────────────┘
 	
 	💡 Sin mensualidad. Sin permanencia.
@@ -384,8 +384,8 @@ Texto:
 
 OBJECIÓN: "Es muy caro / la comisión es alta"
 RESPUESTA: "Tú no pagas comisión: 0% para el productor. El comprador paga
-un cargo por servicio de 8% + IVA, y te transferimos lo recaudado 48–72 h
-después de cada función."
+un cargo por servicio de 8% + IVA, y lo que vendes para cada función queda
+disponible 48 h después de que termina; lo retiras y llega en hasta 2 días hábiles."
 
 OBJECIÓN: "Ya tenemos un sistema"
 RESPUESTA: "Entiendo. ¿Tu sistema actual te dice qué canal vende? ¿Avisa
@@ -565,7 +565,7 @@ Solo datos verificables del producto (no hay métricas de resultados aún):
 
 💸  0% de comisión para el productor
 🧾  8% + IVA de cargo por servicio al comprador
-🏦  Transferencia 48–72 h después de cada función
+🏦  Disponible 48 h después de cada función; retiro en ≤2 días hábiles
 ⏰  Recordatorio automático por email 24 h antes de la función
 
 Cuando haya datos reales del piloto (con permiso del productor), agregarlos

@@ -7,6 +7,7 @@ import AppFooter from "../components/AppFooter.vue";
 import FeeCalculator from "../components/pricing/FeeCalculator.vue";
 import Layout from "../layouts/Layout.astro";
 import { LEGAL } from "../lib/legal";
+import { PAYOUT_SCHEDULE_TEXT } from "../../netlify/lib/legal.mjs";
 import { IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL, computeBuyerTotal } from "../components/Reservation/pricing.js";
 import "../styles/global.css";
 
@@ -52,11 +53,11 @@ const faqs = [
   },
   {
     q: "¿Cuándo recibo el dinero?",
-    a: "Transferimos lo recaudado a la cuenta bancaria que registres en el panel, 48 a 72 horas después de cada función.",
+    a: `${PAYOUT_SCHEDULE_TEXT} La transferencia va a la cuenta bancaria que registres y verifiquemos en el panel.`,
   },
   {
     q: "¿Qué pasa si cancelo el evento?",
-    a: `Con tu autorización, los compradores reciben la devolución del precio de sus entradas y del cargo por servicio que pagaron. El IVA del cargo no se devuelve, porque ya fue declarado y pagado. El detalle está en los términos para productores y compradores.`,
+    a: `Con tu autorización, los compradores reciben la devolución del precio de sus entradas y del cargo por servicio con su IVA: el total que pagaron. El detalle está en los términos para productores y compradores.`,
   },
   {
     q: "¿Tengo que firmar un contrato o pagar una mensualidad?",

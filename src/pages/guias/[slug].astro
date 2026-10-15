@@ -1,0 +1,101 @@
+---
+export const prerender = true;
+import { getCollection, render } from "astro:content";
+import AppHeader from "../../components/AppHeader.vue";
+import AppFooter from "../../components/AppFooter.vue";
+import CallToAction from "../../components/CallToAction.vue";
+import CtaTracking from "../../components/landing/CtaTracking.astro";
+import Layout from "../../layouts/Layout.astro";
+import { getLanding } from "../../data/landings";
+import { relatedLinks } from "../../lib/seoLinks";
+import "../../styles/global.css";
+
+export async function getStaticPaths() {
+    const guides = await getCollection("guias");
+    return guides.map((guide) => ({ params: { slug: guide.id }, props: { guide } }));
+}
+
+const { guide } = Astro.props;
+const { Content } = await render(guide);
+const related = await relatedLinks(guide.data.related);
+const landing = getLanding(guide.data.landing);
+const SITE_URL = (import.meta.env.SITE_URL || "https://aitickets.cl").replace(/\/$/, "");
+const dateFmt = new Intl.DateTimeFormat("es-CL", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+const modified = guide.data.updated || guide.data.published;
+const jsonLd = [
+    {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        headline: guide.data.title,
+        description: guide.data.description,
+        datePublished: guide.data.published.toISOString().slice(0, 10),
+        dateModified: modified.toISOString().slice(0, 10),
+        author: { "@type": "Organization", name: "AI Tickets", url: SITE_URL },
+        publisher: { "@type": "Organization", name: "AI Tickets", url: SITE_URL },
+        mainEntityOfPage: `${SITE_URL}/guias/${guide.id}`,
+        inLanguage: "es-CL",
+    },
+    {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: [
+            { "@type": "ListItem", position: 1, name: "AI Tickets", item: SITE_URL },
+            { "@type": "ListItem", position: 2, name: "Guías", item: `${SITE_URL}/guias` },
+            { "@type": "ListItem", position: 3, name: guide.data.cardTitle, item: `${SITE_URL}/guias/${guide.id}` },
+        ],
+    },
+];
+---
+
+<Layout title={`${guide.data.title} | AI Tickets`} description={guide.data.description} canonical={`/guias/${guide.id}`} ogType="article">
+    <AppHeader client:idle />
+    <main class="font-['Prompt']">
+        <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+        <article class="px-4 pt-32 pb-16 bg-white">
+            <div class="mx-auto max-w-3xl">
+                <nav class="text-xs text-gray-500 mb-6" aria-label="Ruta"><a href="/guias" class="hover:underline">Guías</a> / {guide.data.cardTitle}</nav>
+                <h1 class="text-3xl md:text-4xl font-bold font-['Unbounded'] leading-tight">{guide.data.title}</h1>
+                <p class="mt-4 text-sm text-gray-500">Actualizado el {dateFmt.format(modified)}</p>
+                <div class="guide-body mt-10">
+                    <Content />
+                </div>
+                {landing && (
+                    <aside class="mt-12 p-6 rounded-xl bg-black text-white">
+                        <p class="font-semibold font-['Unbounded']">{landing.card.title} con AI Tickets</p>
+                        <p class="mt-2 text-white/70 text-sm">{landing.card.text}</p>
+                        <a href={`/${landing.slug}`} class="inline-block mt-4 text-lime-400 font-semibold hover:underline">Ver cómo funciona →</a>
+                    </aside>
+                )}
+            </div>
+        </article>
+        {related.length > 0 && (
+            <section class="px-4 py-16 bg-slate-100">
+                <div class="mx-auto max-w-5xl">
+                    <h2 class="text-2xl font-bold font-['Unbounded'] mb-6">Sigue leyendo</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {related.map((r) => (
+                            <a href={r.href} class="block p-6 rounded-xl bg-white border border-gray-200 hover:border-black transition">
+                                <p class="font-semibold font-['Unbounded']">{r.title}</p>
+                                <p class="text-sm text-gray-600 mt-2">{r.text}</p>
+                            </a>
+                        ))}
+                    </div>
+                </div>
+            </section>
+        )}
+        <CallToAction campaign={`guia_${guide.id}`} />
+    </main>
+    <AppFooter client:idle />
+    <CtaTracking />
+</Layout>
+
+<style>
+    .guide-body :global(h2) { font-family: "Unbounded", sans-serif; font-weight: 700; font-size: 1.5rem; margin: 2.5rem 0 1rem; }
+    .guide-body :global(p) { color: rgb(55 65 81); line-height: 1.75; margin: 1rem 0; font-size: 1.0625rem; }
+    .guide-body :global(ul), .guide-body :global(ol) { margin: 1rem 0; padding-left: 1.5rem; color: rgb(55 65 81); line-height: 1.75; }
+    .guide-body :global(ul) { list-style: disc; }
+    .guide-body :global(ol) { list-style: decimal; }
+    .guide-body :global(li) { margin: 0.4rem 0; }
+    .guide-body :global(a) { text-decoration: underline; font-weight: 600; }
+    .guide-body :global(code) { background: rgb(243 244 246); padding: 0.1rem 0.35rem; border-radius: 0.25rem; font-size: 0.9em; }
+</style>

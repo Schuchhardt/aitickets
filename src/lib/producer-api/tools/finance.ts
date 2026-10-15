@@ -5,6 +5,7 @@
 import { randomUUID } from "node:crypto";
 import { ToolError, type ToolDef, type ToolContext } from "../registry";
 import { eventIdSchema, loadOwnedEvent, clp, fetchAll, localDateTime } from "./common";
+import { PAYOUT_BUSINESS_DAYS as LEGAL_PAYOUT_BUSINESS_DAYS } from "../../../../netlify/lib/legal.mjs";
 import { computeOrgLedger, addBusinessDays, loadOrgEvents, RELEASE_HOURS, WITHDRAWN_STATUSES, isActiveRefund } from "../ledger";
 import { computeFeeSplit, SERVICE_FEE_RATE, IVA_RATE, SERVICE_FEE_PERCENT_LABEL, IVA_PERCENT_LABEL } from "../../../../netlify/lib/fees.mjs";
 import { computeDiscountAmount } from "../../../../netlify/lib/discounts.mjs";
@@ -12,7 +13,7 @@ import { notifySlack } from "../../../pages/api/_lib/server-utils";
 import { isTransferOrder } from "../../orderKinds";
 
 export const BANK_CHANGE_HOLD_HOURS = 72;
-const PAYOUT_BUSINESS_DAYS = 2;
+const PAYOUT_BUSINESS_DAYS = LEGAL_PAYOUT_BUSINESS_DAYS;
 const isMissing = (error: any) => ["42P01", "PGRST205", "42703", "PGRST204"].includes(String(error?.code || ""));
 
 // ---------------------------------------------------------------------------
@@ -241,7 +242,7 @@ const getFeeSchedule: ToolDef = {
             },
             events_with_absorbed_fee: events.filter((e) => e.fee_absorbed).map((e) => ({ id: Number(e.id), name: e.name })),
             payouts: {
-                schedule: `El saldo de un evento queda disponible ${RELEASE_HOURS} h después de su última función. AI Tickets transfiere los retiros solicitados en hasta ${PAYOUT_BUSINESS_DAYS} días hábiles.`,
+                schedule: `Lo vendido para cada función queda disponible ${RELEASE_HOURS} h después de que termina esa función (las entradas válidas para cualquier función, con la última). El productor solicita el retiro (panel o request_payout) y AI Tickets lo transfiere en hasta ${PAYOUT_BUSINESS_DAYS} días hábiles.`,
                 payment_processor_fee: "Sin costo adicional para el productor: el cargo por servicio cubre el procesamiento del pago.",
             },
         };
@@ -363,6 +364,11 @@ const presentLedgerEvent = (l: any) => ({
     last_function_end_local: localDateTime(l.last_function_end),
     available_from: l.releases_at,
     available_from_local: localDateTime(l.releases_at),
+    next_release_at: l.next_release_at,
+    next_release_local: localDateTime(l.next_release_at),
+    functions: (l.functions || [])
+        .filter((f: any) => f.sales_net > 0)
+        .map((f: any) => ({ event_date_id: f.event_date_id, date: f.date, start_time: f.start_time, sales_net: f.sales_net, tickets: f.tickets, released: f.released, available_from_local: localDateTime(f.releases_at) })),
     sales_net: l.sales_net,
     partial_refunds: l.partial_refunds,
     withdrawn: l.withdrawn,
@@ -377,7 +383,7 @@ const getBalance: ToolDef = {
     name: "get_balance",
     title: "Saldo",
     description:
-        `Saldo del productor en CLP: disponible para retirar (eventos cuya última función terminó hace ≥ ${RELEASE_HOURS} h), pendiente (eventos por realizarse) ` +
+        `Saldo del productor en CLP: disponible para retirar (ventas de funciones que terminaron hace ≥ ${RELEASE_HOURS} h), pendiente (funciones por realizarse) ` +
         "y retenido (pagos en revisión o eventos cancelados). Incluye el detalle por evento.",
     scope: "finance",
     permission: "finance.read",
@@ -613,12 +619,12 @@ const requestPayout: ToolDef = {
         }
         // Dos solicitudes simultáneas podrían asignar el mismo saldo: se revisa después de insertar.
         const after = await computeOrgLedger(ctx.supabase, ctx.actor.orgId);
-        if (after.events.some((l) => l.net_due < 0 && plan.allocations.some((a) => a.event_id === l.event_id))) {
+        if (after.events.some((l) => (l.net_due < 0 || l.released_due < 0) && plan.allocations.some((a) => a.event_id === l.event_id))) {
             await rollback();
             throw new ToolError("conflict", "El saldo cambió mientras se procesaba el retiro (¿otra solicitud en curso?). Revisa get_balance y vuelve a intentarlo.");
         }
         await notifySlack(
-            `💸 *Retiro solicitado vía ${ctx.channel === "mcp" ? "MCP" : "API"}*\n• *Org:* ${ctx.actor.orgId}\n• *Monto:* ${clp(plan.amount)}\n` +
+            `💸 *Retiro solicitado vía ${ctx.channel === "mcp" ? "MCP" : ctx.channel === "dashboard" ? "panel" : "API"}*\n• *Org:* ${ctx.actor.orgId}\n• *Monto:* ${clp(plan.amount)}\n` +
                 `• *Cuenta:* ${acc.bank_name} ****${last4(acc.bank_account_number)}\n• *Payout:* ${payout.id}\n• *Eventos:* ${plan.allocations.map((a) => `#${a.event_id} ${clp(a.amount)}`).join(", ")}\n• *Estimado:* ${plan.estimated}`,
         );
         return {

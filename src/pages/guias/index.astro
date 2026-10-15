@@ -1,0 +1,41 @@
+---
+export const prerender = true;
+import { getCollection } from "astro:content";
+import AppHeader from "../../components/AppHeader.vue";
+import AppFooter from "../../components/AppFooter.vue";
+import CallToAction from "../../components/CallToAction.vue";
+import CtaTracking from "../../components/landing/CtaTracking.astro";
+import Layout from "../../layouts/Layout.astro";
+import "../../styles/global.css";
+
+const guides = (await getCollection("guias")).sort((a, b) => b.data.published.getTime() - a.data.published.getTime());
+---
+
+<Layout
+    title="Guías para productores de eventos | AI Tickets"
+    description="Guías prácticas para vender entradas online, armar una preventa, medir qué promotor vende y hacer el check-in con QR."
+    canonical="/guias"
+>
+    <AppHeader client:idle />
+    <main class="font-['Prompt']">
+        <section class="bg-black text-white px-4 pt-32 pb-16">
+            <div class="container mx-auto md:px-8 max-w-5xl">
+                <h1 class="text-3xl md:text-5xl font-bold font-['Unbounded']">Guías para productores</h1>
+                <p class="mt-4 text-lg text-white/80 max-w-2xl">Lo práctico de vender entradas, difundir tus funciones y recibir a tu público.</p>
+            </div>
+        </section>
+        <section class="px-4 py-16 bg-white">
+            <div class="container mx-auto md:px-8 max-w-5xl grid grid-cols-1 md:grid-cols-2 gap-6">
+                {guides.map((g) => (
+                    <a href={`/guias/${g.id}`} class="block p-6 rounded-xl border border-gray-200 hover:border-black transition">
+                        <h2 class="text-lg font-semibold font-['Unbounded']">{g.data.title}</h2>
+                        <p class="mt-2 text-sm text-gray-600">{g.data.description}</p>
+                    </a>
+                ))}
+            </div>
+        </section>
+        <CallToAction campaign="guias_index" />
+    </main>
+    <AppFooter client:idle />
+    <CtaTracking />
+</Layout>

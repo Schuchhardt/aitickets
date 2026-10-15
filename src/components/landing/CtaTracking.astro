@@ -1,0 +1,17 @@
+---
+// Mide los clics en los CTA de las landings (GA4 vía window.gtag de Layout.astro).
+// Marca los enlaces con data-cta="<nombre>" y opcionalmente data-section="<sección>".
+// Eventos: producer_cta_clicked { cta, section, page } y whatsapp_clicked { section, page }.
+---
+<script is:inline>
+  document.addEventListener('click', function (e) {
+    var el = e.target && e.target.closest ? e.target.closest('[data-cta]') : null;
+    if (!el) return;
+    try {
+      var params = { cta: el.getAttribute('data-cta'), section: el.getAttribute('data-section') || '', page: location.pathname };
+      window.dataLayer = window.dataLayer || [];
+      var gtag = typeof window.gtag === 'function' ? window.gtag : function () { window.dataLayer.push(arguments); };
+      gtag('event', params.cta === 'whatsapp' ? 'whatsapp_clicked' : 'producer_cta_clicked', params);
+    } catch (err) {}
+  }, { capture: true });
+</script>

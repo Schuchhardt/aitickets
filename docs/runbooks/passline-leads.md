@@ -125,7 +125,7 @@ Para el productor, Passline y AI Tickets se ven iguales: ninguno le cobra comisi
 1. **Su propia web de eventos, gratis y lista al registrarse** (`aitickets.cl/o/<productora>`, con plantillas,
    banner, formulario de contacto y cartelera con venta integrada). Es lo más concreto para una productora de
    stand-up o teatro que hoy vende desde el link de Passline en la bio de Instagram.
-2. **Plata antes**: transferencia 48 a 72 horas después de cada función. Antes de usarlo como comparación,
+2. **Plata antes**: saldo de cada función disponible 48 horas después de que termina (retiro en hasta 2 días hábiles). Antes de usarlo como comparación,
    confirmar a mano el plazo de liquidación de Passline (en `src/data/comparisons.ts` está marcado como
    `TODO(verificar)`).
 3. **Cargo al público más bajo y transparente**: 8% + IVA sobre la entrada (≈ 9,5% en total). Según tarifas

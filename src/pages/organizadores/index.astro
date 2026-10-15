@@ -1,30 +1,95 @@
 ---
+// Hub de productores: enlaza las landings por tipo de evento y por funcionalidad, las guías y la comparativa.
+// Su contenido es distinto al de la portada (/) para no competir por las mismas búsquedas.
 export const prerender = true;
+import { getCollection } from "astro:content";
 import AppHeader from "../../components/AppHeader.vue";
 import AppFooter from "../../components/AppFooter.vue";
 import ProducersHeroSection from "../../components/ProducersHeroSection.vue";
-import ProducersFeaturesSection from "../../components/ProducersFeaturesSection.vue";
-import AIConnectSection from "../../components/AIConnectSection.vue";
-import BenefitsSection from "../../components/BenefitsSection.vue";
-import ContactSection from "../../components/ContactSection.vue";
+import PricingExampleSection from "../../components/landing/PricingExampleSection.vue";
+import CallToAction from "../../components/CallToAction.vue";
+import CtaTracking from "../../components/landing/CtaTracking.astro";
 import Layout from "../../layouts/Layout.astro";
+import { LANDINGS } from "../../data/landings";
 import "../../styles/global.css";
 import "animate.css";
+
+const verticals = LANDINGS.filter((l) => l.kind === "vertical");
+const features = LANDINGS.filter((l) => l.kind === "feature");
+const guides = await getCollection("guias");
 ---
 
 <Layout
-  title="Para organizadores – Vende entradas con 0% de comisión | AI Tickets"
-  description="Publica tu evento en minutos y vende entradas online en Chile. 0% de comisión para el productor, gestiona tus eventos desde Claude o ChatGPT, pagos con Webpay y tarjetas, web de eventos gratis, QR y check-in."
+  title="AI Tickets para productores de eventos | Chile"
+  description="Vende entradas para tus funciones, gestiona promotores, controla el check-in y revisa tus ventas desde una sola plataforma. Sin mensualidad."
   canonical="/organizadores"
 >
   <AppHeader client:idle />
-
-  <main>
+  <main class="font-['Prompt']">
     <ProducersHeroSection client:idle />
-    <AIConnectSection />
-    <ProducersFeaturesSection />
-    <BenefitsSection />
-    <ContactSection />
+
+    <section class="px-4 py-20 bg-white">
+      <div class="container mx-auto md:px-8 max-w-6xl">
+        <h2 class="text-2xl md:text-3xl font-bold font-['Unbounded'] mb-2">Por tipo de evento</h2>
+        <p class="text-gray-600 mb-8">Cómo se usa AI Tickets según lo que produces.</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {verticals.map((l) => (
+            <a href={`/${l.slug}`} class="block p-6 rounded-xl bg-black text-white hover:-translate-y-1 transition">
+              <p class="font-semibold font-['Unbounded'] text-lime-400">{l.card.title}</p>
+              <p class="text-sm text-white/70 mt-2">{l.card.text}</p>
+            </a>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    <section class="px-4 py-20 bg-gradient-to-b from-slate-200 to-lime-200">
+      <div class="container mx-auto md:px-8 max-w-6xl">
+        <h2 class="text-2xl md:text-3xl font-bold font-['Unbounded'] mb-8">Lo que puedes hacer</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {features.map((l) => (
+            <a href={`/${l.slug}`} class="block p-6 rounded-xl bg-white border border-gray-100 shadow-sm hover:border-black transition">
+              <p class="font-semibold font-['Unbounded']">{l.card.title}</p>
+              <p class="text-sm text-gray-600 mt-2">{l.card.text}</p>
+            </a>
+          ))}
+          <a href="/#ia" class="block p-6 rounded-xl bg-white border border-gray-100 shadow-sm hover:border-black transition">
+            <p class="font-semibold font-['Unbounded']">Conector para Claude y ChatGPT</p>
+            <p class="text-sm text-gray-600 mt-2">Consulta ventas, prepara posts y crea códigos de descuento conversando.</p>
+          </a>
+          <a href="/web-gratis" class="block p-6 rounded-xl bg-white border border-gray-100 shadow-sm hover:border-black transition">
+            <p class="font-semibold font-['Unbounded']">Web de eventos gratis</p>
+            <p class="text-sm text-gray-600 mt-2">Una web para tu productora con todos tus eventos, con tu propio dominio.</p>
+          </a>
+          <a href="/ticketeras-en-chile" class="block p-6 rounded-xl bg-white border border-gray-100 shadow-sm hover:border-black transition">
+            <p class="font-semibold font-['Unbounded']">Ticketeras en Chile</p>
+            <p class="text-sm text-gray-600 mt-2">Cuánto cobra cada una, con fuentes y fecha de revisión.</p>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <PricingExampleSection />
+
+    <section class="px-4 py-20 bg-white">
+      <div class="container mx-auto md:px-8 max-w-6xl">
+        <div class="flex items-baseline justify-between gap-4 mb-8">
+          <h2 class="text-2xl md:text-3xl font-bold font-['Unbounded']">Guías para productores</h2>
+          <a href="/guias" class="text-sm font-semibold underline whitespace-nowrap">Ver todas</a>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {guides.map((g) => (
+            <a href={`/guias/${g.id}`} class="block p-6 rounded-xl border border-gray-200 hover:border-black transition">
+              <p class="font-semibold font-['Unbounded']">{g.data.title}</p>
+              <p class="text-sm text-gray-600 mt-2">{g.data.description}</p>
+            </a>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    <CallToAction campaign="organizadores_final" />
   </main>
   <AppFooter client:idle />
+  <CtaTracking />
 </Layout>

@@ -11,7 +11,7 @@
         <div class="text-center lg:text-left">
           <FadeInSection>
             <span class="inline-flex items-center gap-2 text-black font-semibold text-sm bg-lime-400 px-4 py-1 rounded-full">
-              <Bot class="h-4 w-4" /> Nuevo · Exclusivo de AI Tickets
+              <Bot class="h-4 w-4" /> Opcional · Conector para Claude y ChatGPT
             </span>
           </FadeInSection>
           <FadeInSection :delay="100">
@@ -22,8 +22,8 @@
           </FadeInSection>
           <FadeInSection :delay="200">
             <p class="text-white/80 text-lg max-w-xl mx-auto lg:mx-0">
-              Conecta AI Tickets a Claude o ChatGPT y gestiona tus eventos conversando: crea funciones y entradas,
-              lanza códigos de descuento, pregunta cómo van las ventas y arma tu campaña en redes. Sin abrir el panel.
+              Conecta AI Tickets a Claude o ChatGPT y gestiona tus eventos conversando: consulta cómo van las ventas,
+              prepara publicaciones y códigos de descuento, y ejecuta los cambios cuando tú lo confirmas. No es obligatorio: todo funciona también desde el panel.
             </p>
           </FadeInSection>
 
@@ -68,8 +68,11 @@
           </FadeInSection>
 
           <FadeInSection :delay="650">
+            <p class="mt-6 text-sm text-white/60 text-center lg:text-left">
+              Publicar, cobrar, reembolsar o enviar mensajes siempre te muestra un resumen y espera tu confirmación.
+            </p>
             <div class="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 mt-8">
-              <a :href="signupUrl"
+              <a :href="signupUrl" data-cta="connect_ai" data-section="ai"
                 class="px-6 py-3 font-bold font-[Unbounded] bg-lime-400 text-black rounded-lg hover:bg-lime-300 transition w-full sm:w-auto text-center group">
                 Conecta tu IA gratis
                 <ArrowRight class="ml-2 inline-block h-4 w-4 transition-transform group-hover:translate-x-1" />
@@ -95,6 +98,7 @@
               <span class="w-2.5 h-2.5 rounded-full bg-white/20"></span>
               <span class="w-2.5 h-2.5 rounded-full bg-white/20"></span>
               <span class="ml-2 text-xs text-white/50">Tu asistente · conectado a AI Tickets</span>
+              <span class="ml-auto text-[11px] px-2 py-0.5 rounded-full border border-white/15 text-white/50">Ejemplo con datos ficticios</span>
             </div>
             <div class="space-y-4 text-sm">
               <div class="flex justify-end">

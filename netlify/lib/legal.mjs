@@ -46,8 +46,21 @@ const PRIVACY_EMAIL = env('CHANIUM_PRIVACY_EMAIL') || env('LEGAL_PRIVACY_EMAIL')
 const SUPPORT_EMAIL = env('LEGAL_SUPPORT_EMAIL') || 'soporte@aitickets.cl'
 const PHONE = env('CHANIUM_LEGAL_PHONE') || DEFAULT_PHONE
 
+/**
+ * Plazo de pago al productor (fuente única del texto). Debe calzar con src/lib/producer-api/ledger.ts
+ * (RELEASE_HOURS) y tools/finance.ts (PAYOUT_BUSINESS_DAYS): cada función se libera 48 h después de terminar,
+ * el productor solicita el retiro y AI Tickets lo transfiere en hasta 2 días hábiles.
+ */
+export const PAYOUT_RELEASE_HOURS = 48
+export const PAYOUT_BUSINESS_DAYS = 2
+export const PAYOUT_SCHEDULE_TEXT =
+  `Lo que vendes para cada función queda disponible para retirar ${PAYOUT_RELEASE_HOURS} h después de que termina esa función. ` +
+  `Solicitas el retiro desde el panel y te lo transferimos en hasta ${PAYOUT_BUSINESS_DAYS} días hábiles.`
+/** Versión corta para tarjetas y bullets. */
+export const PAYOUT_SHORT_TEXT = `Cobras por función: disponible ${PAYOUT_RELEASE_HOURS} h después de cada show`
+
 /** Versión de los términos que se guarda al aceptar (órdenes y registro de productores). */
-export const TERMS_VERSION = '2026-09-30'
+export const TERMS_VERSION = '2026-10-14'
 
 const EFFECTIVE_DATE = /^\d{4}-\d{2}-\d{2}$/.test(env('LEGAL_EFFECTIVE_DATE')) ? env('LEGAL_EFFECTIVE_DATE') : TERMS_VERSION
 
@@ -107,7 +120,7 @@ export const LEGAL = Object.freeze({
   retractoNotice:
     'Las entradas para eventos en fecha determinada no tienen derecho de retracto (Ley 19.496, art. 3 bis letra b). ' +
     'Una vez completada la compra no hay cambios ni devoluciones, tampoco por errores al comprar. ' +
-    'Si el evento se cancela o reprograma, se devuelven el valor de la entrada y el cargo por servicio (no su IVA), previa autorización del organizador, en hasta 20 días hábiles. ' +
+    'Si el evento se cancela o reprograma, se devuelven el valor de la entrada y el cargo por servicio con su IVA, previa autorización del organizador, en hasta 20 días hábiles. ' +
     'Sin perjuicio de los derechos irrenunciables que te otorga la ley.',
   /** Documento que acompaña cada compra. Nunca "boleta". */
   receiptLabel: 'Comprobante de compra',
