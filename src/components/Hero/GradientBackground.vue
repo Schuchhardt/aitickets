@@ -75,7 +75,8 @@
 <style scoped>
 .gradient-bg {
   width: 100%;
-  height: 100vh;
+  /* Cubre toda la sección (relative) que lo contiene, aunque su contenido sea más alto que la pantalla */
+  height: 100%;
   position: absolute;
   overflow: hidden;
   background: linear-gradient(40deg, var(--color-bg1), var(--color-bg2));
@@ -83,24 +84,6 @@
   left: 0;
   z-index: 0;
 }
-
-/* add height on table */
-@media (max-width: 1024px) {
-  .gradient-bg {
-    height: 90vh;
-  }
-}
-
-
-/* add 145vh on mobile */
-@media (max-width: 640px) {
-  .gradient-bg {
-    height: 200vh;
-  }
-}
-
-
-
 
 .gradient-bg-alt {
   --color-bg1: rgb(15, 10, 40);

@@ -1,7 +1,7 @@
 <template>
     <div
       ref="card"
-      class="bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-6 transition-all duration-300 shadow-[0_4px_20px_rgba(255,255,255,0.05)] hover:-translate-y-1 hover:bg-white/20 hover:border-white/40 hover:shadow-[0_6px_24px_rgba(255,255,255,0.08)]"
+      class="h-full bg-black/40 backdrop-blur-md border border-white/20 rounded-xl p-6 transition-all duration-300 shadow-[0_4px_20px_rgba(255,255,255,0.05)] hover:-translate-y-1 hover:bg-black/50 hover:border-white/40 hover:shadow-[0_6px_24px_rgba(255,255,255,0.08)]"
       @mouseenter="triggerAnimation"
     >
       <div class="flex items-center mb-4">
@@ -10,7 +10,7 @@
         </div>
         <h3 class="text-white text-lg font-semibold font-['Unbounded']">{{ title }}</h3>
       </div>
-      <p class="text-white/90 text-sm font-['Prompt']">
+      <p class="text-white text-sm font-['Prompt']">
         {{ text }}
       </p>
     </div>
