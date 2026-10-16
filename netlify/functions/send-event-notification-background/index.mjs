@@ -9,6 +9,7 @@ import { getSupabaseAdmin, hasValidInternalSecret, json, escapeHtml, fetchAllRow
 import { sendEmail, SITE_URL, formatRecipient, isValidEmail } from '../../lib/mailer.mjs'
 import { renderEventNotificationEmail, CHANGE_TYPES } from '../../lib/emails/index.mjs'
 import { notifySlack } from '../../lib/slack.mjs'
+import { greetingName } from '../../lib/buyer-name.mjs'
 
 const BATCH_SIZE = 50
 
@@ -21,7 +22,7 @@ async function sendNotificationEmails(attendees, eventName, changeType, changeDe
     const recipientVariables = {}
     const to = batch.map((a) => {
       // HTML con el nombre escapado; texto plano y asunto con el nombre tal cual (sin "O&#39;Brien")
-      const name = a.first_name || 'Asistente'
+      const name = greetingName(a.first_name, a.last_name)
       recipientVariables[a.email] = { name: { html: escapeHtml(name), text: name } }
       return formatRecipient(`${a.first_name || ''} ${a.last_name || ''}`, a.email)
     })

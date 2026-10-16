@@ -18,6 +18,7 @@ import { ToolError, type ToolDef, type ToolContext } from "../registry";
 import { eventIdSchema, loadOwnedEvent, fetchAll, clp } from "./common";
 import { isActiveRefund } from "../ledger";
 import { findOrCreateAttendee, newQrCode } from "../../courtesy";
+import { splitFullName } from "../../../../netlify/lib/buyer-name.mjs";
 import { orderLines, lineSoldQty } from "../../orderKinds";
 import { sendTicketsEmail, notifySlack, callInternalFunction } from "../../../pages/api/_lib/server-utils";
 import { sendEmail, formatRecipient, isValidEmail, legalFooterHtml, legalFooterText } from "../../../../netlify/lib/mailer.mjs";
@@ -230,8 +231,9 @@ const transferTicket: ToolDef = {
         if (status !== "active") throw new ToolError("conflict", `La entrada no está vigente (estado: ${status}).`);
 
         const { data: type } = await ctx.supabase.from("event_tickets").select("id, ticket_name").eq("id", ticket.event_ticket_id).maybeSingle();
-        const [firstName, ...rest] = String(args.new_holder_name).trim().split(/\s+/);
-        const lastName = rest.join(" ").slice(0, 100) || null;
+        // Respeta nombres compuestos: "María José Pérez" => "María José" + "Pérez"
+        const { firstName, lastName: restName } = splitFullName(String(args.new_holder_name));
+        const lastName = restName.slice(0, 100) || null;
         const attendeeId = await findOrCreateAttendee(ctx.supabase, { firstName: firstName.slice(0, 100), lastName, email });
 
         // Orden nueva (monto 0) para el nuevo titular: su link /order/<id> y su correo muestran SOLO esta entrada.

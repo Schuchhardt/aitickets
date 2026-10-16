@@ -6,10 +6,13 @@
 // - Dedupe por asistente + evento: notification_log no tiene columna de fecha, así que se considera ya
 //   recordado quien tenga un 'reminder_24h' de ese evento en las últimas 20 horas.
 // - CTA a /order/<order_id> de cada asistente cuando existe (vía recipientVariables de sendEmail).
+// - Saludo con el nombre que escribió en la orden (el attendee se reutiliza por email y puede tener un nombre
+//   antiguo); si la orden no lo tiene, el del attendee. greetingName respeta nombres compuestos ("María José").
 import { getSupabaseAdmin, escapeHtml, fetchAllRows } from '../../lib/supabase.mjs'
 import { sendEmail, SITE_URL, formatRecipient, isValidEmail } from '../../lib/mailer.mjs'
 import { renderReminderEmail } from '../../lib/emails/index.mjs'
 import { LEGAL } from '../../lib/legal.mjs'
+import { greetingName, holderName } from '../../lib/buyer-name.mjs'
 import { EVENT_DATE_COLUMNS, todayInTimeZone, addDays, formatDateOnlyLong, formatTimeShort, formatEventLocation } from '../../lib/dates.mjs'
 
 const REMINDER_TYPE = 'reminder_24h'
@@ -78,7 +81,7 @@ export default async function handler() {
       try {
         eventAttendees = await fetchAllRows(() => supabase
           .from('event_attendees')
-          .select('id, attendee_id, event_order_id, attendees ( id, first_name, last_name, email ), event_tickets ( event_date_id )')
+          .select('id, attendee_id, event_order_id, attendees ( id, first_name, last_name, email ), event_tickets ( event_date_id ), event_orders ( buyer_first_name, buyer_last_name )')
           .eq('event_id', eventId)
           .or('status.is.null,status.neq.cancelled')
           .order('id', { ascending: true }))
@@ -108,8 +111,7 @@ export default async function handler() {
           recipients.push({
             id: a.id,
             email,
-            first_name: a.first_name,
-            last_name: a.last_name,
+            ...holderName(a, ea.event_orders),
             order_url: ea.event_order_id ? `${SITE_URL}/order/${ea.event_order_id}` : `${SITE_URL}/eventos/${encodeURIComponent(event.slug || '')}`,
           })
         }
@@ -129,7 +131,7 @@ export default async function handler() {
           const recipientVars = {}
           const toList = batch.map(r => {
             // En el HTML van escapadas; en el texto plano y el asunto, tal cual (sin "O&#39;Brien")
-            const name = r.first_name || 'Asistente'
+            const name = greetingName(r.first_name, r.last_name)
             recipientVars[r.email] = {
               name: { html: escapeHtml(name), text: name },
               order_url: { html: escapeHtml(r.order_url), text: r.order_url },

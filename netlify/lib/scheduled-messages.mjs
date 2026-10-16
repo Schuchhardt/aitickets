@@ -6,6 +6,7 @@ import { escapeHtml, fetchAllRows } from './supabase.mjs'
 import { sendEmail, SITE_URL, formatRecipient, isValidEmail } from './mailer.mjs'
 import { renderProducerMessageEmail } from './emails/index.mjs'
 import { LEGAL } from './legal.mjs'
+import { greetingName, holderName } from './buyer-name.mjs'
 
 export const MESSAGE_BATCH_SIZE = 50
 export const BACKGROUND_PATH = '/.netlify/functions/send-scheduled-messages-background'
@@ -21,7 +22,7 @@ export const MESSAGE_COLUMNS = 'id, organization_id, event_id, kind, subject, bo
 export async function collectMessageRecipients(supabase, event, audience = 'all') {
   const rows = await fetchAllRows(() => supabase
     .from('event_attendees')
-    .select('id, status, event_order_id, attendees ( id, first_name, last_name, email )')
+    .select('id, status, event_order_id, attendees ( id, first_name, last_name, email ), event_orders ( buyer_first_name, buyer_last_name )')
     .eq('event_id', event.id)
     .order('id', { ascending: true }))
   const eventUrl = `${SITE_URL}/eventos/${encodeURIComponent(event.slug || '')}`
@@ -41,8 +42,7 @@ export async function collectMessageRecipients(supabase, event, audience = 'all'
     byEmail.set(email, {
       id: a.id,
       email,
-      first_name: a.first_name || null,
-      last_name: a.last_name || null,
+      ...holderName(a, ea.event_orders),
       order_url: ea.event_order_id ? `${SITE_URL}/order/${ea.event_order_id}` : eventUrl,
       pending,
     })
@@ -92,7 +92,7 @@ export async function deliverScheduledMessage(supabase, message, { notify = asyn
       const batch = recipients.slice(i, i + MESSAGE_BATCH_SIZE)
       const recipientVariables = {}
       const to = batch.map((r) => {
-        const name = r.first_name || 'Asistente'
+        const name = greetingName(r.first_name, r.last_name)
         recipientVariables[r.email] = {
           name: { html: escapeHtml(name), text: name },
           order_url: { html: escapeHtml(r.order_url), text: r.order_url },
