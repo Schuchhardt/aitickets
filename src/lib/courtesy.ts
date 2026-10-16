@@ -5,6 +5,7 @@
 // puede superar total_quantity, porque las decide el productor. Queda con payment_provider='courtesy'.
 // El envío del correo lo hace quien llama (sendTicketsEmail).
 import { randomBytes } from "node:crypto";
+import { normalizeNameParts } from "../../netlify/lib/buyer-name.mjs";
 
 export const MAX_COURTESY_PER_REQUEST = 50;
 
@@ -22,7 +23,8 @@ export type CourtesyInput = {
 };
 
 /** Busca el attendee por email (el más antiguo) o lo crea. */
-export async function findOrCreateAttendee(supabase: any, { firstName, lastName, email }: { firstName: string; lastName?: string | null; email: string }): Promise<number> {
+export async function findOrCreateAttendee(supabase: any, { firstName: rawFirst, lastName: rawLast, email }: { firstName: string; lastName?: string | null; email: string }): Promise<number> {
+    const { firstName, lastName } = normalizeNameParts(rawFirst, rawLast);
     const { data: existing } = await supabase
         .from("attendees")
         .select("id")
@@ -45,7 +47,9 @@ export const newQrCode = () => randomBytes(32).toString("hex");
 
 /** Emite las cortesías y devuelve el id de la orden creada. Lanza si falla (sin dejar órdenes huérfanas). */
 export async function issueCourtesyTickets(supabase: any, input: CourtesyInput): Promise<{ orderId: string }> {
-    const { event, ticket, quantity, firstName, lastName, email, issuedBy } = input;
+    const { event, ticket, quantity, email, issuedBy } = input;
+    // Nombre normalizado ("  jaVier " => "Javier") para el attendee y la orden
+    const { firstName, lastName } = normalizeNameParts(input.firstName, input.lastName);
 
     // 1. Asistente (buscar por email o crear)
     const attendeeId = await findOrCreateAttendee(supabase, { firstName, lastName, email });

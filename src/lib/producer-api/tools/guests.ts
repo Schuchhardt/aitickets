@@ -5,6 +5,7 @@
 import { ToolError, type ToolDef, type ToolContext } from "../registry";
 import { eventIdSchema, loadOwnedEvent, eventPublicUrl } from "./common";
 import { issueCourtesyTickets, MAX_COURTESY_PER_REQUEST } from "../../courtesy";
+import { splitFullName, normalizePersonName } from "../../../../netlify/lib/buyer-name.mjs";
 import { sendTicketsEmail } from "../../../pages/api/_lib/server-utils";
 import { sendEmail, formatRecipient, isValidEmail, legalFooterHtml, legalFooterText } from "../../../../netlify/lib/mailer.mjs";
 
@@ -121,7 +122,7 @@ const addGuests: ToolDef = {
             rows.push({
                 organization_id: ctx.actor.orgId,
                 event_id: Number(event.id),
-                name: g.name,
+                name: normalizePersonName(g.name) || g.name,
                 email,
                 phone,
                 plus_ones: g.plus_ones ?? 0,
@@ -500,14 +501,15 @@ const issueComplimentary: ToolDef = {
         const results: any[] = [];
         for (const r of args.recipients) {
             const email = String(r.email).trim().toLowerCase();
-            const [firstName, ...rest] = String(r.name).trim().split(/\s+/);
+            // Respeta nombres compuestos y normaliza ("maria jose PEREZ" => "Maria Jose" + "Perez")
+            const { firstName, lastName } = splitFullName(String(r.name));
             try {
                 const { orderId } = await issueCourtesyTickets(ctx.supabase, {
                     event: { id: Number(event.id) },
                     ticket: { id: Number(ticket.id), ticket_name: ticket.ticket_name },
                     quantity: r.quantity ?? 1,
                     firstName: firstName.slice(0, 100),
-                    lastName: rest.join(" ").slice(0, 100) || null,
+                    lastName: lastName.slice(0, 100) || null,
                     email,
                     issuedBy: ctx.actor.userId,
                 });

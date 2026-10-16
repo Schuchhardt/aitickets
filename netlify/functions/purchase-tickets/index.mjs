@@ -45,7 +45,7 @@ import {
   DISCOUNT_STATUS,
 } from '../../lib/discounts.mjs'
 import { isDemoEventSlug } from '../../../src/lib/demoEvent.mjs'
-import { splitFullName } from '../../lib/buyer-name.mjs'
+import { splitFullName, normalizeNameParts } from '../../lib/buyer-name.mjs'
 
 const MAX_TICKET_LINES = 20
 const MAX_PENDING_PER_BUYER = 2
@@ -96,8 +96,10 @@ function validateRequest(body) {
   const buyer = body?.buyer || {}
   const fullName = cleanText(buyer.fullName, 160)
   const split = fullName ? splitFullName(fullName) : null
-  const firstName = split ? split.firstName.slice(0, 80) : cleanText(buyer.firstName, 80)
-  const lastName = split ? split.lastName.slice(0, 80) : cleanText(buyer.lastName, 80)
+  // Normalizado ("  jaVier " => "Javier") tanto si llega en un campo como en dos
+  const parts = split || normalizeNameParts(cleanText(buyer.firstName, 80), cleanText(buyer.lastName, 80))
+  const firstName = parts.firstName.slice(0, 80)
+  const lastName = parts.lastName.slice(0, 80)
   const email = cleanText(buyer.email, 254).toLowerCase()
   const phone = cleanText(buyer.phone, 30).replace(/[^\d+\s()-]/g, '')
   if (firstName.length < 1 || (fullName && fullName.length < 2)) return { error: 'Escribe tu nombre.' }

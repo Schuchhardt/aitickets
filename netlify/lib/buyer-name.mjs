@@ -2,7 +2,10 @@
 // Nombre de pila => first_name; el resto => last_name (puede quedar vacío: "" y no NULL).
 // El nombre de pila es el primer token, o los dos (o más) primeros si forman un nombre compuesto conocido
 // ("María José Pérez" => "María José" + "Pérez"; "Juan de Dios Soto" => "Juan de Dios" + "Soto").
-// Lo usan purchase-tickets, la transferencia de entradas y los correos a asistentes. Sin dependencias de Node.
+// Todo nombre se guarda normalizado ("  jaVier " => "Javier"): normalizePersonName en cada escritura y, como
+// respaldo, triggers en la base (migración 202610170200).
+// Lo usan purchase-tickets, cortesías, transferencias, invitados, el formulario de registro y los correos.
+// Sin dependencias de Node (también se importa desde el navegador).
 
 const fold = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
@@ -39,28 +42,51 @@ function givenNameLength(tokens) {
   return SECOND_BY_FIRST.get(first)?.has(rest[0]) ? 2 : 1
 }
 
+const LOWER_WORDS = new Set(['de', 'del', 'la', 'las', 'los', 'y'])
+
 /**
+ * Normaliza un nombre de persona para guardarlo y mostrarlo: recorta, colapsa espacios y deja cada palabra
+ * con mayúscula inicial y el resto en minúscula ("  jaVier  " => "Javier", "o'brien" => "O'Brien",
+ * "ana-maría" => "Ana-María"). Los conectores (de, del, la, las, los, y) van en minúscula salvo al inicio del
+ * nombre completo; con `continuation` (apellido) también al inicio ("de la fuente" => "de la Fuente").
+ * La misma regla está en SQL (aitickets_normalize_person_name, migración 202610170200): mantenlas iguales.
+ * @param {string | null | undefined} value
+ * @param {{ continuation?: boolean }} [opts]
+ */
+export function normalizePersonName(value, { continuation = false } = {}) {
+  const clean = String(value ?? '').normalize('NFC').replace(/\s+/g, ' ').trim()
+  if (!clean) return ''
+  return clean
+    .split(' ')
+    .map((word, i) => {
+      const lower = word.toLocaleLowerCase('es')
+      if ((i > 0 || continuation) && LOWER_WORDS.has(lower)) return lower
+      // Mayúscula en la primera letra de cada tramo alfanumérico (igual que initcap de Postgres)
+      return lower.replace(/(^|[^\p{L}\p{N}])(\p{L})/gu, (_, sep, ch) => sep + ch.toLocaleUpperCase('es'))
+    })
+    .join(' ')
+}
+
+/**
+ * Divide "Nombre y apellido" y lo normaliza ("maria jose  PEREZ" => "Maria Jose" + "Perez").
  * @param {string} fullName
  * @returns {{firstName: string, lastName: string}}
  */
 export function splitFullName(fullName) {
-  const clean = String(fullName ?? '').replace(/\s+/g, ' ').trim()
+  const clean = normalizePersonName(fullName)
   if (!clean) return { firstName: '', lastName: '' }
   const tokens = clean.split(' ')
   const n = givenNameLength(tokens)
   return { firstName: tokens.slice(0, n).join(' '), lastName: tokens.slice(n).join(' ') }
 }
 
-const LOWER_WORDS = new Set(['de', 'del', 'la', 'las', 'los', 'y'])
-
-/** "maria jose" / "MARIA JOSE" => "Maria Jose". Si ya viene con mayúsculas y minúsculas se respeta tal cual. */
-function fixCase(name) {
-  if (name !== name.toLocaleLowerCase('es') && name !== name.toLocaleUpperCase('es')) return name
-  return name
-    .toLocaleLowerCase('es')
-    .split(' ')
-    .map((w, i) => (i > 0 && LOWER_WORDS.has(w) ? w : w.charAt(0).toLocaleUpperCase('es') + w.slice(1)))
-    .join(' ')
+/**
+ * Nombre y apellido que llegan en campos separados, normalizados para guardar.
+ * @param {string | null | undefined} firstName
+ * @param {string | null | undefined} lastName
+ */
+export function normalizeNameParts(firstName, lastName) {
+  return { firstName: normalizePersonName(firstName), lastName: normalizePersonName(lastName, { continuation: true }) }
 }
 
 /**
@@ -74,7 +100,7 @@ export function greetingName(firstName, lastName, fallback = 'Asistente') {
   // Sin nombre no se saluda por el apellido ("¡Hola Pérez!"): se usa el genérico
   if (!String(firstName ?? '').trim()) return fallback
   const { firstName: given } = splitFullName(`${firstName} ${lastName ?? ''}`)
-  return given ? fixCase(given) : fallback
+  return given || fallback
 }
 
 /**

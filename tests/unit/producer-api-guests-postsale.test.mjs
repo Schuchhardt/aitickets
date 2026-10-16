@@ -132,7 +132,7 @@ describe('invitados', () => {
     expect(mocks.sendEmail).toHaveBeenCalledTimes(1)
     expect(mocks.sendEmail.mock.calls[0][0].recipientVariables['ana@x.cl'].name.text).toBe('Ana')
     expect(db.tables.aitickets_guests.find((g) => g.name === 'Ana').status).toBe('invited')
-    expect(db.tables.aitickets_guests.find((g) => g.name === 'Sin mail').status).toBe('pending')
+    expect(db.tables.aitickets_guests.find((g) => g.name === 'Sin Mail').status).toBe('pending')
     // El token es de un solo uso: repetir devuelve la misma respuesta (idempotente) sin reenviar.
     // (el fake no aplica UNIQUE: se simula la violación de aitickets_api_idempotency_key)
     db.failOn('aitickets_api_idempotency', 'insert', { code: '23505', message: 'duplicate key' })
@@ -173,7 +173,7 @@ describe('invitados', () => {
     expect(r.ok).toBe(true)
     expect(r.result.tickets_issued).toBe(2)
     const order = db.tables.event_orders.find((o) => String(o.id) === r.result.results[0].order_id)
-    expect(order).toMatchObject({ payment_provider: 'courtesy', amount: 0, buyer_email: 'dj@x.cl', buyer_first_name: 'DJ', buyer_last_name: 'Uno' })
+    expect(order).toMatchObject({ payment_provider: 'courtesy', amount: 0, buyer_email: 'dj@x.cl', buyer_first_name: 'Dj', buyer_last_name: 'Uno' })
     expect(db.tables.event_attendees.filter((a) => a.event_order_id === order.id && a.is_complimentary)).toHaveLength(2)
     expect(mocks.sendTicketsEmail).toHaveBeenCalledWith(expect.any(URL), String(order.id))
   })

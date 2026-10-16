@@ -3,6 +3,8 @@
 // Los precios finales vienen calculados del servidor (ticket.final_price, src/lib/eventPage.ts) y los
 // totales se calculan con Reservation/pricing.js (misma regla que /api/purchase-ticket).
 
+import { greetingName } from "../../../netlify/lib/buyer-name.mjs";
+
 const WEEKDAYS_LONG = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 const WEEKDAYS_SHORT = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 const MONTHS_LONG = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
@@ -264,10 +266,9 @@ export function writeCheckoutParams(params, state) {
 // Varios
 // ---------------------------------------------------------------------------------------------------------
 
-/** Primer nombre con mayúscula inicial ("seba" => "Seba"). */
+/** Nombre de pila normalizado, respetando compuestos ("seba" => "Seba", "maria jose perez" => "Maria Jose"). */
 export function firstNameOf(fullName) {
-  const first = String(fullName || "").trim().split(/\s+/)[0] || "";
-  return first ? first.charAt(0).toLocaleUpperCase("es-CL") + first.slice(1) : "";
+  return greetingName(String(fullName || ""), "", "");
 }
 
 /** Iniciales para el avatar del organizador ("Club Surco" => "CS"). */

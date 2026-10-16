@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { splitFullName, greetingName, holderName } from '../../netlify/lib/buyer-name.mjs'
+import { splitFullName, greetingName, holderName, normalizePersonName, normalizeNameParts } from '../../netlify/lib/buyer-name.mjs'
+import { firstNameOf } from '../../src/components/event/eventView.js'
 
 describe('splitFullName: nombres compuestos', () => {
   it('une los compuestos conocidos', () => {
     expect(splitFullName('María José Pérez Soto')).toEqual({ firstName: 'María José', lastName: 'Pérez Soto' })
-    expect(splitFullName('maria jose perez')).toEqual({ firstName: 'maria jose', lastName: 'perez' })
+    expect(splitFullName('maria jose perez')).toEqual({ firstName: 'Maria Jose', lastName: 'Perez' })
     expect(splitFullName('Juan Pablo González')).toEqual({ firstName: 'Juan Pablo', lastName: 'González' })
     expect(splitFullName('José Miguel')).toEqual({ firstName: 'José Miguel', lastName: '' })
     expect(splitFullName('María de los Ángeles Rojas')).toEqual({ firstName: 'María de los Ángeles', lastName: 'Rojas' })
@@ -26,10 +27,10 @@ describe('greetingName', () => {
     expect(greetingName('Ana', 'Pérez')).toBe('Ana')
   })
 
-  it('arregla mayúsculas solo si todo viene en minúsculas o mayúsculas', () => {
+  it('normaliza mayúsculas y espacios', () => {
     expect(greetingName('maria jose', 'perez')).toBe('Maria Jose')
     expect(greetingName('MARÍA DE LOS ÁNGELES', 'ROJAS')).toBe('María de los Ángeles')
-    expect(greetingName('McKenzie', null)).toBe('McKenzie')
+    expect(greetingName('  jaVier ', null)).toBe('Javier')
     expect(greetingName("sinéad o'brien", null)).toBe('Sinéad')
   })
 
@@ -50,5 +51,36 @@ describe('holderName', () => {
     expect(holderName(attendee, { buyer_first_name: ' ', buyer_last_name: 'X' })).toEqual({ first_name: 'seba', last_name: null })
     expect(holderName(attendee, null)).toEqual({ first_name: 'seba', last_name: null })
     expect(holderName(null, null)).toEqual({ first_name: null, last_name: null })
+  })
+})
+
+describe('normalizePersonName', () => {
+  it('deja siempre la misma forma ("Javier") sin importar cómo se escriba', () => {
+    for (const v of ['javier', 'jaVier', '  javier  ', 'JAVIER', 'javier\n']) expect(normalizePersonName(v)).toBe('Javier')
+  })
+  it('respeta tildes, ñ, apóstrofos, guiones y conectores', () => {
+    expect(normalizePersonName('maria   jose')).toBe('Maria Jose')
+    expect(normalizePersonName('ÑANDÚ ñuñoa')).toBe('Ñandú Ñuñoa')
+    expect(normalizePersonName("o'brien")).toBe("O'Brien")
+    expect(normalizePersonName('ana-maría')).toBe('Ana-María')
+    expect(normalizePersonName('MARÍA DE LOS ÁNGELES')).toBe('María de los Ángeles')
+    expect(normalizePersonName('DEL CAMPO')).toBe('Del Campo')
+    expect(normalizePersonName('DEL CAMPO', { continuation: true })).toBe('del Campo')
+    expect(normalizePersonName('jose\u0301')).toBe('José') // tilde combinada (NFD) => NFC
+  })
+  it('vacío o solo espacios => ""', () => {
+    expect(normalizePersonName('   ')).toBe('')
+    expect(normalizePersonName(null)).toBe('')
+  })
+  it('campos separados: el apellido deja los conectores en minúscula', () => {
+    expect(normalizeNameParts(' jaVier ', 'DE LA FUENTE')).toEqual({ firstName: 'Javier', lastName: 'de la Fuente' })
+  })
+})
+
+describe('firstNameOf (saludo del formulario de registro)', () => {
+  it('normaliza y respeta compuestos', () => {
+    expect(firstNameOf('  jaVier  pérez')).toBe('Javier')
+    expect(firstNameOf('maria jose soto')).toBe('Maria Jose')
+    expect(firstNameOf('')).toBe('')
   })
 })

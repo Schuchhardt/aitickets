@@ -7,6 +7,7 @@ import { renderTicketsEmail } from './emails/index.mjs'
 import { LEGAL } from './legal.mjs'
 import { orderBuyerBreakdown } from './fees.mjs'
 import { orderDiscount } from './discounts.mjs'
+import { greetingName } from './buyer-name.mjs'
 import {
   EVENT_DATE_COLUMNS,
   zonedDateTimeToUtc,
@@ -274,7 +275,7 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
     const email = await renderTicketsEmail({
       qrTickets,
       qrMoreCount: Math.max(0, withQr.length - qrTickets.length),
-      customerName: buyer.first_name || 'asistente',
+      customerName: greetingName(buyer.first_name, buyer.last_name, 'asistente'),
       eventName: event.name || 'Tu evento',
       dateLines,
       secretLocation: event.secret_location || '',
