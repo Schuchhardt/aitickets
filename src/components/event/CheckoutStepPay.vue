@@ -3,8 +3,9 @@
 // retracto. El botón de pago vive en el footer del sheet y llama a submit(). Sin paso "Confirmar".
 import { ref, computed, onMounted, nextTick } from "vue";
 import AnimatedNumber from "./AnimatedNumber.vue";
+import QuantityStepper from "./QuantityStepper.vue";
 import { suggestEmail } from "./emailSuggest.js";
-import { formatCLP, formatFunctionShort } from "./eventView.js";
+import { formatCLP, formatFunctionShort, ticketMax } from "./eventView.js";
 import { createOrder, previewDiscount, rememberBuyer, rememberedBuyer, trackFunnel } from "./checkoutApi.js";
 import { useTurnstile } from "./useTurnstile.js";
 import { isValidEmail, normalizeDiscountCode } from "../Reservation/pricing.js";
@@ -19,9 +20,10 @@ const props = defineProps({
   fn: { type: Object, default: null }, // función elegida (o la única)
   autoCode: { type: String, default: "" }, // ?code=XYZ
   canGoBack: { type: Boolean, default: false },
+  qtyTicket: { type: Object, default: null }, // único tipo de entrada (sin paso 1): la cantidad se elige aquí
   buyerPrefill: { type: Object, default: null }, // { name, email } (asistente IA)
 });
-const emit = defineEmits(["update:discount", "busy", "back", "demo", "sold-out"]);
+const emit = defineEmits(["update:discount", "update:qty", "busy", "back", "demo", "sold-out"]);
 
 const name = ref("");
 const email = ref("");
@@ -47,6 +49,10 @@ const lineFinal = (l) => {
   return t?.final_price != null ? t.final_price * l.quantity : l.total;
 };
 const showConditions = ref(false);
+
+// Cantidad del único tipo de entrada
+const qty = computed(() => props.lines.find((l) => String(l.id) === String(props.qtyTicket?.id))?.quantity || 1);
+const qtyMax = computed(() => (props.qtyTicket ? Math.max(1, ticketMax(props.qtyTicket)) : 1));
 
 // ---- Código de descuento ----
 const codeOpen = ref(false);
@@ -173,6 +179,22 @@ onMounted(() => {
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
       Volver
     </button>
+
+    <!-- Cantidad (un solo tipo de entrada: no hay paso 1) -->
+    <section v-if="qtyTicket" class="qty" aria-labelledby="pay-qty-title" data-testid="pay-qty">
+      <div class="qty-info">
+        <p id="pay-qty-title" class="qty-name">{{ qtyTicket.ticket_name }}</p>
+        <p class="qty-price ev-tabular">{{ Number(qtyTicket.price) > 0 ? `${formatCLP(qtyTicket.final_price ?? qtyTicket.price)} por entrada` : "Gratis" }}</p>
+      </div>
+      <QuantityStepper
+        :model-value="qty"
+        :min="1"
+        :max="qtyMax"
+        :item-label="`una entrada ${qtyTicket.ticket_name}`"
+        :disabled="busy"
+        @update:model-value="emit('update:qty', $event)"
+      />
+    </section>
 
     <!-- Resumen -->
     <section class="summary" aria-labelledby="pay-summary-title">
@@ -359,6 +381,32 @@ onMounted(() => {
 .block > .block-title {
   display: block;
   margin-bottom: 12px;
+}
+.qty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+}
+.qty-info {
+  min-width: 0;
+}
+.qty-name {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+.qty-price {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--text-2);
+}
+.qty + .summary {
+  margin-top: -12px;
 }
 .summary {
   border: 1px solid var(--border);

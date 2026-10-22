@@ -36,11 +36,15 @@ test("elegir entradas, datos, no retracto y pago simulado", async ({ page }) => 
   await expect(dialog).toContainText("Demostración");
   await expect(page).toHaveURL(/checkout=1/);
 
-  // Paso 1: entradas (si el evento tiene un solo tipo, el sheet abre directo en "Pagar")
+  // Paso 1: entradas (si el evento tiene un solo tipo, el sheet abre directo en "Pagar" y la cantidad se elige ahí:
+  // en mobile no hay otro lugar donde elegirla)
   const step1 = dialog.getByTestId("resv-step-tickets");
   if (await step1.isVisible()) {
     await dialog.getByRole("button", { name: /^Agregar una entrada/ }).first().click();
     await dialog.getByTestId("resv-pay-button").click();
+  } else {
+    await dialog.getByTestId("pay-qty").getByRole("button", { name: /^Agregar una entrada/ }).click();
+    await expect(page).toHaveURL(/entradas=\d+(%3A|:)2/);
   }
 
   // Paso 2: datos + casilla de no retracto (sin ella no se puede pagar)

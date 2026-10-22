@@ -31,6 +31,10 @@ const emit = defineEmits(["close"]);
 const model = computed(() => checkoutFunctions(props.event));
 const isSimple = computed(() => (props.event.tickets || []).length === 1);
 const hasStep1 = computed(() => !isSimple.value);
+// Un solo tipo de entrada: sin paso 1, la cantidad se ajusta en "Pagar" (en mobile la card con el stepper no se
+// muestra y la barra inferior abre el sheet directo en este paso)
+const simpleTicket = computed(() => (isSimple.value ? props.event.tickets[0] : null));
+const setSimpleQty = (qty) => (selection.value = { [simpleTicket.value.id]: qty });
 
 const step = ref(1);
 const direction = ref("fwd");
@@ -224,7 +228,7 @@ function focusStep() {
       const root = body.value;
       if (!root) return;
       body.value.scrollTop = 0;
-      const target = root.querySelector('[aria-checked="true"]') || root.querySelector('input:not([type="hidden"]):not([readonly]), [role="radio"], button');
+      const target = root.querySelector('[aria-checked="true"]') || root.querySelector('input:not([type="hidden"]):not([readonly]), [role="radio"], button:not([disabled])');
       (target || panel.value)?.focus({ preventScroll: true });
     }, 60),
   );
@@ -429,8 +433,10 @@ onBeforeUnmount(() => {
                   :fn="chosenFunction"
                   :auto-code="autoCode"
                   :can-go-back="hasStep1"
+                  :qty-ticket="simpleTicket"
                   :buyer-prefill="buyerPrefill"
                   data-testid="resv-step-buyer"
+                  @update:qty="setSimpleQty"
                   @busy="busy = $event"
                   @back="goBack"
                   @demo="showDemo"
