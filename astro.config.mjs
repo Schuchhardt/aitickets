@@ -7,6 +7,18 @@ import svgLoader from 'vite-svg-loader';
 
 import sentry from '@sentry/astro';
 
+// Páginas con datos fijos para los e2e sin BD (tests/e2e/fixtures/event-fixture-page.astro): solo en
+// `astro dev` con E2E_FIXTURES=1 (playwright.config.ts). Nunca en el build de producción.
+const e2eFixtures = {
+  name: 'aitickets-e2e-fixtures',
+  hooks: {
+    'astro:config:setup': ({ command, injectRoute }) => {
+      if (command !== 'dev' || process.env.E2E_FIXTURES !== '1') return;
+      injectRoute({ pattern: '/__e2e/eventos/[escenario]', entrypoint: './tests/e2e/fixtures/event-fixture-page.astro', prerender: false });
+    },
+  },
+};
+
 export default defineConfig({
   output: 'server',
   adapter: netlify(),
@@ -17,7 +29,7 @@ export default defineConfig({
     config: {
       forward: ["dataLayer.push", "gtag"]
     }
-  }), sentry()
+  }), sentry(), e2eFixtures
   ],
   vite: {
     plugins: [tailwindcss(), svgLoader()],

@@ -17,6 +17,7 @@ import { loadEventGallery, type GalleryImage } from "./eventGallery";
 import { resolveCoverMeta, eventThemeFrom } from "./eventCoverMeta";
 import { normalizePageSettings, stripDemoSuffix } from "./eventPageSettings";
 import { computeFeeSplit } from "../../netlify/lib/fees.mjs";
+import { maxPerPurchase } from "../../netlify/lib/tickets.mjs";
 import { clientIpFrom } from "./sites";
 
 // Columnas públicas del evento. NUNCA incluir secret_location (C4).
@@ -353,6 +354,31 @@ async function loadEventPageRowsByQueries(
 }
 
 /**
+ * Entrada (fila de event_tickets) tal como la recibe la página pública. `remaining`: stock que queda (null =
+ * ilimitado). max_quantity pasa a ser el máximo de ESTA compra: el configurado o, sin configurar, 10 (misma
+ * regla que /api/purchase-ticket), y nunca más que el stock. La usan también los e2e (tests/e2e/fixtures).
+ */
+export function toPublicTicket(t: any, { remaining, feeAbsorbed }: { remaining: number | null; feeAbsorbed: boolean }) {
+  const perPurchase = maxPerPurchase(t);
+  return {
+    id: t.id,
+    ticket_name: t.ticket_name,
+    price: Number(t.price) || 0,
+    // Precio final por entrada (con cargo e IVA del cargo, o el de lista si el productor lo absorbe): misma
+    // regla que el resumen del checkout y /api/purchase-ticket (netlify/lib/fees.mjs)
+    final_price: computeFeeSplit(Number(t.price) || 0, { absorbed: feeAbsorbed }).total,
+    max_quantity: remaining === null ? perPurchase : Math.min(perPurchase, remaining),
+    init_date: t.init_date,
+    end_date: t.end_date,
+    // R1: null = válida para cualquier función; si no, id de event.dates[]
+    event_date_id: t.event_date_id ?? null,
+    remaining,
+    // Para "Quedan N cupos" (≤ 15 % del total o ≤ 10)
+    total_quantity: t.total_quantity === null || t.total_quantity === undefined ? null : Number(t.total_quantity),
+  };
+}
+
+/**
  * Carga un evento publicado con todo lo necesario para su página pública.
  * Devuelve null si no existe, no está publicado o (con organizationId) pertenece a otra organización.
  */
@@ -407,23 +433,7 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
     const remaining = unlimited
       ? null
       : Math.max(0, Number(t.total_quantity) - (sold.get(String(t.id)) || 0) - (pending.get(String(t.id)) || 0));
-    const maxPerPurchase = Number(t.max_quantity) > 0 ? Number(t.max_quantity) : 10;
-    return {
-      id: t.id,
-      ticket_name: t.ticket_name,
-      price: Number(t.price) || 0,
-      // Precio final por entrada (con cargo e IVA del cargo, o el de lista si el productor lo absorbe): misma
-      // regla que el resumen del checkout y /api/purchase-ticket (netlify/lib/fees.mjs)
-      final_price: computeFeeSplit(Number(t.price) || 0, { absorbed: feeAbsorbed }).total,
-      max_quantity: remaining === null ? maxPerPurchase : Math.min(maxPerPurchase, remaining),
-      init_date: t.init_date,
-      end_date: t.end_date,
-      // R1: null = válida para cualquier función; si no, id de event.dates[]
-      event_date_id: t.event_date_id ?? null,
-      remaining,
-      // Para "Quedan N cupos" (≤ 15 % del total o ≤ 10)
-      total_quantity: unlimited ? null : Number(t.total_quantity),
-    };
+    return toPublicTicket(t, { remaining, feeAbsorbed });
   });
 
   const onSaleTickets = ticketsWithStock.filter((t) => t.remaining === null || t.remaining > 0);

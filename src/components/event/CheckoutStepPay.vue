@@ -200,7 +200,7 @@ onMounted(() => {
     <section class="summary" aria-labelledby="pay-summary-title">
       <button type="button" class="summary-head" :aria-expanded="summaryOpen ? 'true' : 'false'" aria-controls="pay-summary-body" @click="summaryOpen = !summaryOpen">
         <span id="pay-summary-title" class="block-title">Resumen</span>
-        <span class="summary-total ev-tabular">{{ totals.quantity }} {{ totals.quantity === 1 ? "entrada" : "entradas" }} · <AnimatedNumber :value="totals.total" /></span>
+        <span class="summary-total ev-tabular" data-testid="pay-summary-total">{{ totals.quantity }} {{ totals.quantity === 1 ? "entrada" : "entradas" }} · <AnimatedNumber :value="totals.total" /></span>
         <svg class="chev" :class="{ 'is-open': summaryOpen }" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
       </button>
       <div id="pay-summary-body" class="ev-collapse" :class="{ 'is-open': summaryOpen }">

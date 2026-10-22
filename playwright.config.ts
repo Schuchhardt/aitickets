@@ -11,7 +11,8 @@
 //     Usa las credenciales del .env local (evento demo real). OJO: el .env del dueño apunta a la BD de
 //     producción; la página del evento lee datos y registra una visita. Úsalo a conciencia.
 //   E2E_BASE_URL=http://localhost:8888 npm run test:e2e
-//     Contra un `netlify dev` (o `npm run dev`) que ya levantaste tú. Debe ser localhost.
+//     Contra un `netlify dev` (o `npm run dev`) que ya levantaste tú. Debe ser localhost. Levántalo con
+//     E2E_FIXTURES=1 para los specs que usan páginas con datos fijos (tests/e2e/fixtures).
 import { randomBytes } from "node:crypto";
 import { defineConfig, devices } from "@playwright/test";
 
@@ -77,6 +78,8 @@ const offlineEnv: Record<string, string> = {
   PUBLIC_SENTRY_DSN: "",
   SENTRY_DSN: "",
   SENTRY_AUTH_TOKEN: "",
+  // Páginas del evento con datos fijos (tests/e2e/fixtures): las inyecta astro.config.mjs solo en dev
+  E2E_FIXTURES: "1",
 };
 
 export default defineConfig({
@@ -115,6 +118,6 @@ export default defineConfig({
         stdout: "ignore",
         // Con BD falsa el servidor registra muchos "fetch failed" esperados; E2E_DEBUG=1 los muestra.
         stderr: process.env.E2E_DEBUG === "1" ? "pipe" : "ignore",
-        env: useEnvDb ? { SITE_URL: baseURL } : offlineEnv,
+        env: useEnvDb ? { SITE_URL: baseURL, E2E_FIXTURES: "1" } : offlineEnv,
       },
 });

@@ -1,0 +1,75 @@
+---
+// Página pública de un evento (/eventos/[slug]): cabecera SEO, atribución, visita y la página interactiva.
+// También la renderizan los e2e con datos fijos (tests/e2e/fixtures/event-fixture-page.astro): así prueban el
+// mismo markup que ve el público.
+import AppFooter from "./AppFooter.vue";
+import EventDetail from "./EventDetail.vue";
+import EventAssistant from "./EventAssistant.vue";
+import EventMetaTags from "./EventMetaTags.astro";
+import Layout from "../layouts/Layout.astro";
+import type { PublicEventResult } from "../lib/eventPage";
+import "../styles/global.css";
+
+type Props = Pick<PublicEventResult, "eventData" | "seo">;
+
+const { eventData, seo } = Astro.props;
+const visitEventId = eventData.is_preview ? null : eventData.id;
+const pageTitle = seo.title;
+const metaDescription = seo.description;
+const canonicalPath = seo.canonicalPath;
+---
+<Layout>
+  <EventMetaTags
+    slot="head"
+    event={eventData}
+    title={pageTitle}
+    description={metaDescription}
+    canonicalPath={canonicalPath}
+    noindex={seo.noindex}
+  />
+  <script is:inline>
+    // Atribución (C10): guardar ?ref= y utm_* para enviarlos con la compra
+    (function () {
+      try {
+        var p = new URLSearchParams(window.location.search);
+        var ref = p.get('ref');
+        var source = p.get('utm_source');
+        var medium = p.get('utm_medium');
+        var campaign = p.get('utm_campaign');
+        if (!ref && !source && !medium && !campaign) return;
+        var clip = function (v) { return v ? String(v).slice(0, 128) : null; };
+        sessionStorage.setItem('aitickets_attribution', JSON.stringify({
+          ref: clip(ref),
+          utm: { source: clip(source), medium: clip(medium), campaign: clip(campaign) },
+          landing_at: new Date().toISOString()
+        }));
+      } catch (e) { /* sessionStorage no disponible */ }
+    })();
+  </script>
+  <script is:inline define:vars={{ visitEventId }}>
+    // Visita (event_visits): la página puede venir del CDN, así que la registra el navegador (/api/events/visit)
+    if (visitEventId) {
+      try {
+        var vp = new URLSearchParams(window.location.search);
+        fetch('/api/events/visit', {
+          method: 'POST',
+          keepalive: true,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event_id: visitEventId,
+            referrer: document.referrer || null,
+            utm_source: vp.get('utm_source'),
+            utm_medium: vp.get('utm_medium'),
+            utm_campaign: vp.get('utm_campaign')
+          })
+        }).catch(function () {});
+      } catch (e) { /* sin fetch: no se registra */ }
+    }
+  </script>
+  <main>
+    <EventDetail event={eventData} siteMode={false} client:idle/>
+  </main>
+  <!-- Sin botón flotante: se abre desde la página ("Pregúntale al asistente" y el ícono de la barra en mobile) -->
+  <EventAssistant event={eventData} launcher={false} client:idle/>
+  <AppFooter client:idle/>
+</Layout>

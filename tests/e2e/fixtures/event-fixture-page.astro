@@ -1,0 +1,22 @@
+---
+// Página pública del evento con datos fijos (tests/e2e/fixtures/event-scenarios.mjs) para los e2e sin BD. Mismo
+// markup que /eventos/[slug] (src/components/EventPage.astro). No vive en src/pages: astro.config.mjs la inyecta
+// solo en `astro dev` con E2E_FIXTURES=1, así que nunca llega al build de producción.
+import EventPage from "../../../src/components/EventPage.astro";
+import { toPublicTicket } from "../../../src/lib/eventPage";
+import { fixtureEvent } from "./event-scenarios.mjs";
+
+export const prerender = false;
+
+const eventData = fixtureEvent(Astro.params.escenario || "", { toPublicTicket });
+if (!eventData) return new Response("Escenario desconocido", { status: 404 });
+
+const seo = {
+  title: `${eventData.name} | AI Tickets`,
+  description: "Página de prueba (e2e).",
+  canonicalPath: `/eventos/${eventData.slug}`,
+  noindex: true,
+  pageUrl: `${Astro.url.origin}/eventos/${eventData.slug}`,
+};
+---
+<EventPage eventData={eventData} seo={seo} />

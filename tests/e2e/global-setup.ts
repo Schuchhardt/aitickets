@@ -4,7 +4,15 @@
 // Aquí se visitan las páginas con islas una vez (hasta que no haya recargas) para que eso pase antes.
 import { chromium, type FullConfig } from "@playwright/test";
 
-const WARMUP_PATHS = ["/terms", "/precios", "/o/demo", "/o/demo/contacto", "/outreach/baja?t=warmup"];
+const WARMUP_PATHS = [
+  "/terms",
+  "/precios",
+  "/o/demo",
+  "/o/demo/contacto",
+  "/outreach/baja?t=warmup",
+  // Página del evento con datos fijos (tests/e2e/fixtures), con el checkout abierto
+  "/__e2e/eventos/poster-una-entrada?checkout=1",
+];
 
 export default async function globalSetup(config: FullConfig) {
   const baseURL = config.projects[0]?.use?.baseURL;
