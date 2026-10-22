@@ -2,11 +2,14 @@
 // Los crean send_attendee_message / schedule_reminder de la API de productores. Los envía la background
 // function send-scheduled-messages-background; la función programada send-scheduled-messages reclama los
 // que vencen cada 10 minutos. Estados: scheduled → sending → sent | failed (o cancelled antes de enviarse).
+// kind 'invitation' (migración 202610220100): invitación a los asistentes de event_id para el evento
+// target_event_id; sus destinatarios y su correo los arma netlify/lib/invitations.mjs.
 import { escapeHtml, fetchAllRows } from './supabase.mjs'
 import { sendEmail, SITE_URL, formatRecipient, isValidEmail } from './mailer.mjs'
 import { renderProducerMessageEmail } from './emails/index.mjs'
 import { LEGAL } from './legal.mjs'
 import { greetingName, holderName } from './buyer-name.mjs'
+import { deliverInvitation } from './invitations.mjs'
 
 export const MESSAGE_BATCH_SIZE = 50
 export const BACKGROUND_PATH = '/.netlify/functions/send-scheduled-messages-background'
@@ -63,6 +66,11 @@ export async function deliverScheduledMessage(supabase, message, { notify = asyn
       .eq('id', message.id)
     if (updError) console.warn('scheduled message update:', updError.message)
     return { status, sent, failed, ...(error ? { error } : {}) }
+  }
+  if (message.kind === 'invitation') {
+    const result = await deliverInvitation(supabase, message, { notify })
+    if (result.error && !result.total) await notify(`⚠️ No se envió la invitación ${message.id} del evento #${message.event_id}: ${result.error}`)
+    return finish(result.sent || !result.error ? 'sent' : 'failed', result.sent, result.failed, result.error)
   }
   try {
     const { data: event } = await supabase

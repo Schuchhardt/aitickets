@@ -20,18 +20,35 @@ export const SCENARIOS = {
   "compacto-una-entrada": { layout: "compact", image: false, tickets: [TICKETS.general] },
   "varias-entradas": { layout: "poster", tickets: [TICKETS.general, TICKETS.vip] },
   "maximo-configurado": { layout: "poster", tickets: [TICKETS.generalMax3] },
+  // Evento que ya terminó (hace 2 días), con reseñas y fotos de asistentes (tests/e2e/event-reviews.spec.ts)
+  "terminado-con-resenas": { layout: "poster", tickets: [], ended: true, reviews: true },
+};
+
+/** Reseñas como las arma loadPublicReviews (src/lib/eventReviews.ts). */
+export const FIXTURE_REVIEWS = {
+  summary: { count: 4, average: 4.5, distribution: { 1: 0, 2: 0, 3: 1, 4: 0, 5: 3 } },
+  reviews: [
+    { id: "r1", name: "Ana R.", rating: 5, comment: "¡Increíble la energía del público!", created_at: "2026-10-18T12:00:00Z" },
+    { id: "r2", name: "Beto S.", rating: 3, comment: "Buen show, pero la fila para entrar fue larga.", created_at: "2026-10-18T13:00:00Z" },
+  ],
+  comments_total: 2,
+  photos: [
+    { id: "p1", url: "/aitickets_preview.png", thumb_url: null, width: 1200, height: 630, name: "Ana R." },
+    { id: "p2", url: "/aitickets_preview.png", thumb_url: null, width: 1200, height: 630, name: null },
+  ],
 };
 
 const pad = (n) => String(n).padStart(2, "0");
 
 /**
  * Evento publicado y a la venta con la forma de getPublicEventData(...).eventData. La función es en 30 días
- * (el evento nunca "termina"). `toPublicTicket` llega desde la página (src/lib/eventPage.ts).
+ * (el evento nunca "termina"), salvo los escenarios `ended` (hace 2 días). `toPublicTicket` llega desde la página
+ * (src/lib/eventPage.ts).
  */
 export function fixtureEvent(name, { toPublicTicket, now = new Date() }) {
   const scenario = SCENARIOS[name];
   if (!scenario) return null;
-  const day = new Date(now.getTime() + 30 * 24 * 3600 * 1000);
+  const day = new Date(now.getTime() + (scenario.ended ? -2 : 30) * 24 * 3600 * 1000);
   const date = `${day.getUTCFullYear()}-${pad(day.getUTCMonth() + 1)}-${pad(day.getUTCDate())}`;
   const venue = {
     name: "Teatro de Prueba",
@@ -78,7 +95,8 @@ export function fixtureEvent(name, { toPublicTicket, now = new Date() }) {
     ),
     unavailable_tickets: [],
     theme: image ? { tint: "75 60% 94%", poster_width: 1200, poster_height: 630 } : null,
-    sale_state: "on_sale",
+    sale_state: scenario.tickets.length ? "on_sale" : "closed",
+    reviews: scenario.reviews ? FIXTURE_REVIEWS : null,
     sale_starts_at: null,
     has_secret_location: false,
     organization: { name: "Productora de Prueba", website: null, instagram: null },

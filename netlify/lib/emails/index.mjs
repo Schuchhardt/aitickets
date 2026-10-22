@@ -11,4 +11,13 @@ export {
   renderDomainFailedEmail,
   renderInboundLeadConfirmEmail,
 } from './producer.mjs'
+export {
+  renderReviewRequestEmail,
+  renderReviewLinkEmail,
+  renderReviewThanksEmail,
+  renderNextEventInvitationEmail,
+  REVIEW_URL_PLACEHOLDER,
+  UNSUBSCRIBE_PLACEHOLDER,
+  STAR_PLACEHOLDERS,
+} from './reviews.mjs'
 export { logoUrl, siteUrl } from './layout.mjs'

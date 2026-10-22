@@ -282,3 +282,34 @@ export function directionsUrl(query, { ios = false } = {}) {
   const q = encodeURIComponent(query || "");
   return ios ? `https://maps.apple.com/?q=${q}` : `https://www.google.com/maps/search/?api=1&query=${q}`;
 }
+
+// ---------------------------------------------------------------------------------------------------------
+// Reseñas (EventReviews.vue)
+// ---------------------------------------------------------------------------------------------------------
+
+/**
+ * Token de reseña del correo: viene en el fragmento (#resena=<token>&nota=4) para que no llegue a servidores
+ * ni a analytics. null si no hay. rating: nota tocada en el correo (1-5) o null.
+ */
+export function readReviewHash(hash) {
+  const raw = String(hash || "").replace(/^#/, "");
+  if (!/(^|&)resena=/.test(raw)) return null;
+  const params = new URLSearchParams(raw);
+  const token = (params.get("resena") || "").trim();
+  if (!token || token.length > 1024) return null;
+  const nota = Number(params.get("nota"));
+  return { token, rating: Number.isInteger(nota) && nota >= 1 && nota <= 5 ? nota : null };
+}
+
+/** "4,6" */
+export const formatRating = (value) => (Number.isFinite(Number(value)) ? (Math.round(Number(value) * 10) / 10).toLocaleString("es-CL", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : "");
+
+/** "1 reseña" / "23 reseñas" */
+export const reviewsCountLabel = (n) => `${Number(n) || 0} ${Number(n) === 1 ? "reseña" : "reseñas"}`;
+
+/** "octubre de 2026" para la fecha de una reseña. */
+export function formatReviewDate(iso) {
+  const d = new Date(iso);
+  if (!iso || Number.isNaN(d.getTime())) return "";
+  return `${MONTHS_LONG[d.getUTCMonth()]} de ${d.getUTCFullYear()}`;
+}

@@ -14,11 +14,12 @@ import { messagingTools } from "./messaging";
 import { lifecycleTools } from "./lifecycle";
 import { auditTools } from "./audit";
 import { scheduleTools } from "./schedule";
+import { reviewTools } from "./reviews";
 
 export const TOOLS: ToolDef[] = [
     ...eventTools, ...scheduleTools, ...ticketTools, ...discountTools, ...analyticsTools, ...marketingTools,
     ...financeTools, ...teamTools, ...guestTools, ...accessTools, ...postsaleTools,
-    ...messagingTools, ...lifecycleTools, ...auditTools,
+    ...messagingTools, ...reviewTools, ...lifecycleTools, ...auditTools,
 ];
 
 const BY_NAME = new Map(TOOLS.map((t) => [t.name, t]));

@@ -1,0 +1,59 @@
+---
+// Confirmación de baja de las invitaciones de una productora. El GET nunca da de baja (los escáneres de enlaces
+// hacen GET): muestra un botón que hace POST a /api/invitaciones/baja.
+import Layout from "../../layouts/Layout.astro";
+import { LEGAL } from "../../lib/legal";
+import { getSupabaseAdmin } from "../../lib/auth-helpers";
+import { verifyInviteOptoutToken } from "../../../netlify/lib/review-token.mjs";
+import "../../styles/global.css";
+
+export const prerender = false;
+
+const t = Astro.url.searchParams.get("t") || "";
+const done = Astro.url.searchParams.get("listo") === "1";
+const failed = Astro.url.searchParams.get("error") === "1";
+Astro.response.headers.set("Cache-Control", "no-store");
+
+const payload = t ? verifyInviteOptoutToken(t) : null;
+let orgName = "esta productora";
+if (payload) {
+  const { data } = await getSupabaseAdmin().from("organizations").select("public_name").eq("id", payload.organizationId).maybeSingle();
+  if (data?.public_name) orgName = data.public_name;
+}
+---
+
+<Layout title="Dejar de recibir invitaciones | AI Tickets" description="Deja de recibir invitaciones a eventos de una productora." noindex>
+  <main class="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-16">
+    <div class="w-full max-w-md bg-white border border-gray-200 rounded-2xl p-8 text-center shadow-sm">
+      <a href="/" class="inline-block mb-6 text-lg font-bold text-gray-900">AI Tickets</a>
+      {done ? (
+        <>
+          <h1 class="text-2xl font-bold text-gray-900 mb-3">Listo, te dimos de baja</h1>
+          <p class="text-gray-600">No recibirás más invitaciones de esta productora. Tus entradas y los avisos de eventos que ya compraste no cambian.</p>
+        </>
+      ) : failed || (t && !payload) ? (
+        <>
+          <h1 class="text-2xl font-bold text-gray-900 mb-3">No pudimos procesar la baja</h1>
+          <p class="text-gray-600">El enlace no es válido. Responde al correo que recibiste, o escríbenos a <a class="underline" href={`mailto:${LEGAL.supportEmail}`}>{LEGAL.supportEmail}</a>, y te daremos de baja de inmediato.</p>
+        </>
+      ) : t ? (
+        <>
+          <h1 class="text-2xl font-bold text-gray-900 mb-3">¿Dejar de recibir invitaciones de {orgName}?</h1>
+          <p class="text-gray-600 mb-6">No te escribiremos más para invitarte a sus próximos eventos. Seguirás recibiendo tus entradas y los avisos de los eventos que compres.</p>
+          <form method="post" action="/api/invitaciones/baja">
+            <input type="hidden" name="t" value={t} />
+            <input type="hidden" name="from" value="page" />
+            <button type="submit" data-testid="invitaciones-baja-confirm" class="w-full rounded-xl bg-gray-900 px-6 py-3 font-semibold text-white hover:bg-gray-700">
+              Sí, darme de baja
+            </button>
+          </form>
+        </>
+      ) : (
+        <>
+          <h1 class="text-2xl font-bold text-gray-900 mb-3">Enlace incompleto</h1>
+          <p class="text-gray-600">Usa el enlace "Darme de baja" que viene al final de la invitación.</p>
+        </>
+      )}
+    </div>
+  </main>
+</Layout>

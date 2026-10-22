@@ -157,6 +157,20 @@ export function isMissingDiscountSchema(error) {
   return ['42703', '42883', '42P01', 'PGRST202', 'PGRST204', 'PGRST205', 'PGRST200'].includes(code)
 }
 
+/** aitickets_discount_codes.source de los premios por calificar un evento (migración 202610220100). */
+export const REVIEW_REWARD_SOURCE = 'review_reward'
+
+/**
+ * Corre una consulta sobre aitickets_discount_codes SIN los premios de reseñas (no aparecen en las listas ni
+ * cuentan para el máximo de códigos). `build(filter)` arma la consulta y aplica filter() al query builder.
+ * Base sin la columna source (deploy preview sin migrar): la misma consulta sin filtro.
+ */
+export async function withoutRewardCodes(build) {
+  const res = await build((q) => q.neq('source', REVIEW_REWARD_SOURCE))
+  if (String(res?.error?.code || '') === '42703') return build((q) => q)
+  return res
+}
+
 export const DISCOUNT_CODE_COLUMNS = 'id, organization_id, event_id, code, kind, value, max_uses, per_buyer_limit, starts_at, ends_at, active, created_at'
 
 /**

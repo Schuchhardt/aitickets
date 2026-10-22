@@ -11,12 +11,13 @@ import EventSections from "./event/EventSections.vue";
 import MobileStickyBar from "./event/MobileStickyBar.vue";
 import CheckoutSheet from "./event/CheckoutSheet.vue";
 import EventGallery from "./EventGallery.vue";
+import EventReviews from "./event/EventReviews.vue";
 import ShareSheet from "./event/ShareSheet.vue";
 import { vReveal } from "./event/reveal.js";
 import IridescenceBg from "./event/IridescenceBg.vue";
 import { normalizePageSettings, pageBackgroundPreset } from "../lib/eventPageSettings";
 import PurchasedTicketsModal from "./PurchasedTicketsModal.vue";
-import { cardState, stockSummary, minFinalPrice, formatCLP, formatSaleStart, readCheckoutParams, upcomingFunctions, formatFunctionShort } from "./event/eventView.js";
+import { cardState, stockSummary, minFinalPrice, formatCLP, formatSaleStart, readCheckoutParams, upcomingFunctions, formatFunctionShort, readReviewHash, formatRating, reviewsCountLabel } from "./event/eventView.js";
 import { addToCalendar } from "./event/shareActions.js";
 import { cdnImage, cdnSrcset, EVENT_COVER_SIZES } from "../lib/imageCdn.js";
 import { storedOrders, trackFunnel } from "./event/checkoutApi.js";
@@ -102,6 +103,8 @@ const badges = computed(() => {
   else if (s === "upcoming") list.push({ label: props.event.sale_starts_at ? `Venta abre el ${formatSaleStart(props.event.sale_starts_at, props.event.timezone)}` : "Venta próximamente", tone: "neutral" });
   else if (s === "sold_out") list.push({ label: "Agotado", tone: "neutral" });
   else if (s === "ended") list.push({ label: "Evento finalizado", tone: "neutral" });
+  const reviewSummary = props.event.reviews?.summary;
+  if (s === "ended" && reviewSummary?.count) list.push({ label: `★ ${formatRating(reviewSummary.average)} · ${reviewsCountLabel(reviewSummary.count)}`, tone: "neutral" });
   if (s === "free" && stock.value?.few) list.push({ label: `Quedan ${stock.value.remaining} ${stock.value.remaining === 1 ? "cupo" : "cupos"}`, tone: "warning", pulse: true });
   if (isPaidOnSale.value && stock.value?.few) list.push({ label: "Últimas entradas", tone: "warning", pulse: true });
   if (isPrivate.value) list.push({ label: "Evento privado", tone: "neutral" });
@@ -110,6 +113,11 @@ const badges = computed(() => {
 
 // ---- Compra en dominio propio: el checkout vive en aitickets.cl ----
 const externalUrl = ref("");
+// Reseñas (EventReviews.vue): en el evento terminado o cuando se llega con el link del correo "¿Cómo estuvo?"
+// (#resena=…, p. ej. una gira con funciones pendientes). Se decide al montar: el servidor no ve el fragmento.
+const reviewsFromLink = ref(false);
+const showReviews = computed(() => !props.event?.is_preview && !props.event?.is_demo && (state.value === "ended" || reviewsFromLink.value));
+const reviewsOrigin = ref("");
 const isAiticketsHost = (host) =>
   host === "aitickets.cl" || host.endsWith(".aitickets.cl") || host === "localhost" || host === "127.0.0.1" || host.endsWith(".netlify.app");
 
@@ -205,6 +213,16 @@ onMounted(() => {
 
   if (props.siteMode && props.event?.purchase_url && !isAiticketsHost(window.location.hostname.toLowerCase())) {
     externalUrl.value = props.event.purchase_url;
+    try {
+      reviewsOrigin.value = new URL(props.event.purchase_url).origin;
+    } catch {
+      reviewsOrigin.value = "https://aitickets.cl";
+    }
+  }
+  try {
+    reviewsFromLink.value = Boolean(readReviewHash(window.location.hash)) || Boolean(sessionStorage.getItem(`aitickets_review_${props.event.id}`));
+  } catch {
+    reviewsFromLink.value = Boolean(readReviewHash(window.location.hash));
   }
 
   // Deep links: ?checkout=1 (o ?comprar=1 de los sitios con dominio propio), ?funcion, ?entrada, ?code
@@ -351,6 +369,7 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
               @checkout="openCheckout"
               @view-orders="showOrders = true"
               @rsvp-state="rsvpState = $event"
+              @review="scrollToId('resenas')"
             />
             <div v-if="state !== 'ended' && rsvpState !== 'success'" class="secondary">
               <button type="button" class="secondary-btn" @click="onShare">
@@ -383,6 +402,7 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
             @choose-function="(id) => openCheckout({ entry: 'function_list', step: 1, functionId: String(id) })"
             @open-assistant="openAssistant"
           />
+          <EventReviews v-if="showReviews" :event="event" :ended="state === 'ended'" :external-origin="reviewsOrigin" />
           <EventGallery v-if="event.gallery?.length" v-reveal :images="event.gallery" :eventName="event.name" />
         </div>
       </div>

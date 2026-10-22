@@ -57,6 +57,10 @@ export const SAMPLES = {
   'domain-active': () => emails.renderDomainActiveEmail({ host: 'entradas.productorasur.cl', orgName: 'Productora Sur', dashboardUrl: `${SITE}/dashboard/sitio` }),
   'domain-failed': () => emails.renderDomainFailedEmail({ host: 'entradas.productorasur.cl', orgName: 'Productora Sur', error: 'El registro CNAME no apunta a AI Tickets.', siteUrl: `${SITE}/o/productora-sur`, dashboardUrl: `${SITE}/dashboard/sitio` }),
   'inbound-lead-confirm': () => emails.renderInboundLeadConfirmEmail({ orgName: 'Productora Sur', url: `${SITE}/api/outreach/inbound-confirm?t=ejemplo` }),
+  'review-request': () => emails.renderReviewRequestEmail({ eventName: 'Festival de Jazz de Valparaíso', organizerName: 'Jazz Prod', rewardLabel: '10% de descuento' }),
+  'review-link': () => emails.renderReviewLinkEmail({ eventName: 'Festival de Jazz de Valparaíso', reviewUrl: `${SITE}/eventos/festival-jazz#resena=ejemplo` }),
+  'review-thanks': () => emails.renderReviewThanksEmail({ eventName: 'Festival de Jazz de Valparaíso', organizerName: 'Jazz Prod', rewardCode: 'GRACIAS-7KQ2MX', rewardLabel: '10% de descuento', validUntil: 'domingo, 20 de diciembre de 2026', eventsUrl: `${SITE}/eventos` }),
+  'next-event-invitation': () => emails.renderNextEventInvitationEmail({ organizerName: 'Jazz Prod', sourceEventName: 'Festival de Jazz de Valparaíso', eventName: 'Jazz bajo las estrellas', dateLabel: 'sábado, 12 de diciembre de 2026 · 21:00 hrs', venue: 'Teatro Municipal, Valparaíso', imageUrl: `${SITE}/logo-dark.png`, eventUrl: `${SITE}/eventos/jazz-estrellas?utm_source=aitickets&utm_medium=email&utm_campaign=invitacion-1`, message: '¡Gracias por venir! Te guardamos un lugar en la próxima.' }),
 }
 
 async function main() {

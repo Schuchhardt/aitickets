@@ -14,6 +14,8 @@ import { descriptionToHtml } from "./sanitize";
 import { isDemoEventSlug, getDemoFunctionDate } from "./demoEvent.mjs";
 import { normalizeCoverSettings } from "./eventCover";
 import { loadEventGallery, type GalleryImage } from "./eventGallery";
+import { loadPublicReviews } from "./eventReviews";
+import { isEventEnded } from "../components/event/eventView.js";
 import { resolveCoverMeta, eventThemeFrom } from "./eventCoverMeta";
 import { normalizePageSettings, stripDemoSuffix } from "./eventPageSettings";
 import { computeFeeSplit } from "../../netlify/lib/fees.mjs";
@@ -533,13 +535,19 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
       })),
   ].filter((t) => liveFunction(t.event_date_id));
 
+  // Reseñas y fotos de los asistentes: solo cuando el evento ya terminó (src/lib/eventReviews.ts)
+  const ended = !isDemo && !isPreview && isEventEnded({ dates, end_date: endDate, is_demo: isDemo }, now);
+
   // Póster: proporción real y tinte de la página (events.cover_meta, src/lib/eventCoverMeta.ts)
-  const coverMeta = await resolveCoverMeta(event, {
-        waitUntil: (() => {
-          const ctx = opts.locals?.netlify?.context;
-          return typeof ctx?.waitUntil === "function" ? (p: Promise<unknown>) => ctx.waitUntil(p) : undefined;
-        })(),
-  });
+  const [coverMeta, reviews] = await Promise.all([
+    resolveCoverMeta(event, {
+      waitUntil: (() => {
+        const ctx = opts.locals?.netlify?.context;
+        return typeof ctx?.waitUntil === "function" ? (p: Promise<unknown>) => ctx.waitUntil(p) : undefined;
+      })(),
+    }),
+    ended ? loadPublicReviews(Number(event.id)).catch(() => null) : Promise.resolve(null),
+  ]);
 
   const { cover_meta: _coverMeta, page_settings: rawPageSettings, ...eventRow } = event;
   const eventData = {
@@ -553,6 +561,8 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
     tags,
     faqs,
     gallery,
+    // Evento terminado: { summary, reviews, comments_total, photos } (null si no terminó o sin tablas)
+    reviews,
     dates,
     tickets: publicTickets,
     unavailable_tickets: unavailableTickets,
