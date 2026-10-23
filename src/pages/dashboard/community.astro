@@ -4,44 +4,57 @@ import { Download, Users } from "lucide-vue-next";
 import { getSupabaseAdmin } from "../../lib/auth-helpers";
 import { EVENT_MANAGER_ROLES } from "../../lib/supabaseServer";
 import { requireDashboardSession } from "./_lib/guard";
+import { getStaffEventIds } from "../../../netlify/lib/event-staff.mjs";
+import { fetchAll } from "../../lib/producer-api/tools/common";
 
 const guard = await requireDashboardSession(Astro, EVENT_MANAGER_ROLES);
 if (!guard.ok) return guard.response;
 const { dbUser } = guard.session;
 const supabaseAdmin = getSupabaseAdmin();
 
+// Tope de filas en pantalla (y en el CSV, que se arma desde la tabla). Paginado: PostgREST corta en 1000 filas.
+const MAX_ROWS = 5000;
+const dateFmt = new Intl.DateTimeFormat("es-CL", { timeZone: "America/Santiago", day: "2-digit", month: "2-digit", year: "numeric" });
+
 let attendees: Array<{name: string; email: string; event: string; ticket: string; date: string}> = [];
+let truncated = false;
 
 if (dbUser?.organization_id) {
-  // Get all events for this organization
-  const { data: orgEvents } = await supabaseAdmin
-    .from("events")
-    .select("id, name")
-    .eq("organization_id", dbUser.organization_id);
+  // Equipo asignado a ciertos eventos (aitickets_event_staff): solo ve a los asistentes de esos eventos
+  const staffEventIds = await getStaffEventIds(supabaseAdmin, dbUser.id);
+  const orgEvents = await fetchAll<{ id: number; name: string }>(() => {
+    let q = supabaseAdmin.from("events").select("id, name").eq("organization_id", dbUser.organization_id);
+    if (staffEventIds) q = q.in("id", staffEventIds);
+    return q.order("id", { ascending: true });
+  });
 
-  if (orgEvents && orgEvents.length > 0) {
+  if (orgEvents.length > 0) {
     const eventIds = orgEvents.map((e) => e.id);
     const eventNameMap = Object.fromEntries(orgEvents.map((e) => [e.id, e.name]));
 
-    // Get all attendees for these events
-    const { data: eventAttendees } = await supabaseAdmin
+    // Asistentes de esos eventos, los más recientes primero (sin las entradas anuladas por reembolso)
+    const eventAttendees = await fetchAll<any>(() => supabaseAdmin
       .from("event_attendees")
       .select(`
+        id,
         event_id,
         created_at,
         event_ticket_id,
+        status,
         attendees (first_name, last_name, email),
         event_tickets (ticket_name)
       `)
       .in("event_id", eventIds)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: true }), { max: MAX_ROWS });
+    truncated = eventAttendees.length >= MAX_ROWS;
 
-    attendees = (eventAttendees || []).map((ea: any) => ({
+    attendees = eventAttendees.filter((ea: any) => ea.status !== "cancelled").map((ea: any) => ({
       name: [ea.attendees?.first_name, ea.attendees?.last_name].filter(Boolean).join(" ") || "—",
       email: ea.attendees?.email || "—",
       event: eventNameMap[ea.event_id] || "—",
       ticket: ea.event_tickets?.ticket_name || "—",
-      date: new Date(ea.created_at).toLocaleDateString("es-CL"),
+      date: dateFmt.format(new Date(ea.created_at)),
     }));
   }
 }
@@ -68,6 +81,12 @@ if (dbUser?.organization_id) {
       </button>
     )}
   </div>
+
+  {truncated && (
+    <p class="mb-4 text-sm text-gray-500">
+      Se muestran los {MAX_ROWS.toLocaleString("es-CL")} asistentes más recientes. Para la lista completa descarga el CSV de órdenes de cada evento en <a href="/dashboard/tickets" class="underline">Entradas</a>.
+    </p>
+  )}
 
   <div
     class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"

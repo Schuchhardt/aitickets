@@ -29,6 +29,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       request,
       {
         referrer: str(body.referrer),
+        ref: str(body.ref),
         utmSource: str(body.utm_source),
         utmMedium: str(body.utm_medium),
         utmCampaign: str(body.utm_campaign),
