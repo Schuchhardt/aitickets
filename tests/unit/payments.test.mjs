@@ -1,5 +1,5 @@
 // Proveedor de pago (netlify/lib/payments/*): solo Flow. Ningún caso sale a la red.
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const flowMock = vi.hoisted(() => ({ createFlowPayment: vi.fn() }))
 
@@ -12,7 +12,7 @@ vi.mock('../../netlify/lib/payments/flow.mjs', async (importOriginal) => {
 })
 
 import { PROVIDERS, createCheckout, defaultProvider, enabledProviders, holdMinutesFor } from '../../netlify/lib/payments/index.mjs'
-import { signFlowParams } from '../../netlify/lib/payments/flow.mjs'
+import { getFlowPaymentStatusByCommerceId, signFlowParams } from '../../netlify/lib/payments/flow.mjs'
 
 describe('proveedores de pago', () => {
   it('solo Flow', () => {
@@ -46,5 +46,21 @@ describe('otros helpers de pago', () => {
     expect(a).toBe(b)
     expect(a).toMatch(/^[0-9a-f]{64}$/)
     expect(signFlowParams({ a: '1' }, 'otro')).not.toBe(signFlowParams({ a: '1' }, 'secret'))
+  })
+})
+
+describe('consulta de estado en Flow', () => {
+  const env = { FLOW_API_KEY: 'k', FLOW_SECRET_KEY: 's', FLOW_BASE_URL: 'https://sandbox.flow.cl/api' }
+  beforeEach(() => Object.assign(process.env, env))
+  afterEach(() => { for (const k of Object.keys(env)) delete process.env[k] })
+
+  it('getStatusByCommerceId corta la consulta con timeoutMs (AbortSignal) y sin él no', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ status: 1 }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(getFlowPaymentStatusByCommerceId('orden-1', { timeoutMs: 1500 })).resolves.toEqual({ status: 1 })
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/payment\/getStatusByCommerceId\?.*commerceId=orden-1/)
+    expect(fetchMock.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal)
+    await getFlowPaymentStatusByCommerceId('orden-1')
+    expect(fetchMock.mock.calls[1][1].signal).toBeUndefined()
   })
 })
