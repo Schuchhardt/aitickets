@@ -500,6 +500,14 @@ async function restoreTickets(ctx: ToolContext, orderId: string, tickets: any[])
     }
 }
 
+/** Instrucciones para el operador en el aviso de Slack (aitickets_set_refund_status, 202610240100_payout_ops.sql). */
+export function refundSlackSql(refundId: string) {
+    return (
+        `• *Al devolver en Flow:* \`select aitickets_set_refund_status('${refundId}', 'completed', '<id del reembolso en Flow>', null, '<tu nombre>');\`\n` +
+        `• *Si no se pudo:* \`select aitickets_set_refund_status('${refundId}', 'failed', null, '<motivo>', '<tu nombre>');\``
+    );
+}
+
 const refundOrder: ToolDef = {
     name: "refund_order",
     title: "Reembolsar orden",
@@ -591,7 +599,8 @@ const refundOrder: ToolDef = {
         if (plan.total > 0) {
             await notifySlack(
                 `💸 *Reembolso solicitado vía ${ctx.channel === "mcp" ? "MCP" : "API"}*\n• *Evento:* ${plan.event.name} (#${plan.event.id})\n• *Orden:* ${plan.order.id} (${plan.order.payment_provider || "flow"}, ref ${plan.order.payment_external_id || "—"})\n` +
-                    `• *Devolver al comprador:* ${clp(plan.total)} (${clp(plan.ticketAmount)} entradas + ${clp(plan.feeAmount)} cargo)\n• *Tipo:* ${plan.full ? "total" : "parcial"}\n• *Refund id:* ${refund.id}\n• *Por:* ${ctx.actor.name || ctx.actor.email}`,
+                    `• *Devolver al comprador:* ${clp(plan.total)} (${clp(plan.ticketAmount)} entradas + ${clp(plan.feeAmount)} cargo)\n• *Tipo:* ${plan.full ? "total" : "parcial"}\n• *Refund id:* ${refund.id}\n• *Por:* ${ctx.actor.name || ctx.actor.email}\n` +
+                    refundSlackSql(String(refund.id)),
             );
         }
         const emailed = args.notify_buyer !== false ? await emailRefundToBuyer(plan, args.reason || null) : false;
@@ -836,7 +845,11 @@ const cancelEvent: ToolDef = {
         }
         await notifySlack(
             `🛑 *Evento ${plan.resuming ? "cancelado (reintento: completando lo pendiente)" : "cancelado"} vía ${ctx.channel === "mcp" ? "MCP" : "API"}*\n• *Evento:* ${plan.event.name} (#${eventId})\n• *Reembolsos a procesar:* ${refundsCreated} por ${clp(refundTotal)}\n` +
-                `• *Saldo del productor en el evento:* ${clp(plan.balance.available)}\n• *Aviso a compradores:* ${notificationQueued ? "en cola" : "NO enviado"}\n• *Por:* ${ctx.actor.name || ctx.actor.email}`,
+                `• *Saldo del productor en el evento:* ${clp(plan.balance.available)}\n• *Aviso a compradores:* ${notificationQueued ? "en cola" : "NO enviado"}\n• *Por:* ${ctx.actor.name || ctx.actor.email}` +
+                (refundsCreated || plan.resuming
+                    ? `\n• *Reembolsos pendientes:* \`select r.id, r.order_id, o.payment_external_id, r.total_amount from aitickets_refunds r join event_orders o on o.id = r.order_id where r.event_id = ${eventId} and r.status = 'requested';\`\n` +
+                      `• *Por cada uno, al devolver en Flow:* \`select aitickets_set_refund_status('<id>', 'completed', '<id del reembolso en Flow>', null, '<tu nombre>');\``
+                    : ""),
         );
         return {
             event_id: eventId,
