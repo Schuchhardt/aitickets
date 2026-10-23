@@ -100,6 +100,7 @@ const PURGE_ON_WRITE = new Set([
     "/api/events/cover",
     "/api/events/faqs",
     "/api/events/gallery",
+    "/api/events/reviews",
     "/api/events/duplicate",
     "/api/organizations/update",
     "/api/sites",

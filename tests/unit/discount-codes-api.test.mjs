@@ -45,6 +45,13 @@ describe('/api/discount-codes', () => {
     expect(codes.find((c) => c.code === 'EV3')).toMatchObject({ uses: 3, paidOrders: 2, discountTotal: 4000, revenue: 16000, eventName: 'Mío' })
   })
 
+  it('GET no muestra los premios por calificar (source review_reward)', async () => {
+    setup()
+    db.tables.aitickets_discount_codes.push({ id: '00000000-0000-0000-0000-000000000004', organization_id: 7, event_id: null, code: 'GRACIAS-ABC234', kind: 'percent', value: 10, active: true, source: 'review_reward', created_at: '2026-10-04' })
+    const { codes } = await (await api.GET(ctx('GET'))).json()
+    expect(codes.map((c) => c.code).sort()).toEqual(['EV3', 'TODOS'])
+  })
+
   it('validador no puede gestionar códigos', async () => {
     setup('validator')
     expect((await api.GET(ctx('GET'))).status).toBe(403)

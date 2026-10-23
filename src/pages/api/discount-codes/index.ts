@@ -9,7 +9,7 @@
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { getSessionContext, getOwnedEvent, hasRole, EVENT_MANAGER_ROLES, jsonResponse } from "../../../lib/supabaseServer";
-import { validateDiscountInput, describeDiscount, isMissingDiscountSchema, DISCOUNT_CODE_COLUMNS } from "../../../../netlify/lib/discounts.mjs";
+import { validateDiscountInput, describeDiscount, isMissingDiscountSchema, withoutRewardCodes, DISCOUNT_CODE_COLUMNS } from "../../../../netlify/lib/discounts.mjs";
 
 export const prerender = false;
 
@@ -92,13 +92,12 @@ export const GET: APIRoute = async (context) => {
     eventId = Number(event.id);
   }
 
-  const query = supabase
-    .from("aitickets_discount_codes")
-    .select(DISCOUNT_CODE_COLUMNS)
-    .eq("organization_id", auth.orgId)
-    .order("created_at", { ascending: false })
-    .limit(MAX_CODES_PER_ORG);
-  const { data: rows, error } = await query;
+  // Sin los premios por calificar (se ven en la sección de reseñas)
+  const { data: rows, error } = await withoutRewardCodes((filter: (q: any) => any) =>
+    filter(supabase.from("aitickets_discount_codes").select(DISCOUNT_CODE_COLUMNS).eq("organization_id", auth.orgId))
+      .order("created_at", { ascending: false })
+      .limit(MAX_CODES_PER_ORG),
+  );
   if (error) {
     if (isMissingDiscountSchema(error)) return jsonResponse({ codes: [], unavailable: true });
     console.error("discount-codes GET:", error.message);
@@ -130,10 +129,9 @@ export const POST: APIRoute = async (context) => {
     if (!event) return jsonResponse({ message: "Evento no encontrado o no autorizado" }, 404);
   }
 
-  const { count, error: countError } = await supabase
-    .from("aitickets_discount_codes")
-    .select("id", { count: "exact", head: true })
-    .eq("organization_id", auth.orgId);
+  const { count, error: countError } = await withoutRewardCodes((filter: (q: any) => any) =>
+    filter(supabase.from("aitickets_discount_codes").select("id", { count: "exact", head: true }).eq("organization_id", auth.orgId)),
+  );
   if (countError && isMissingDiscountSchema(countError)) return jsonResponse({ message: UNAVAILABLE }, 503);
   if ((count || 0) >= MAX_CODES_PER_ORG) {
     return jsonResponse({ message: `Alcanzaste el máximo de ${MAX_CODES_PER_ORG} códigos. Desactiva o reutiliza alguno.` }, 409);

@@ -130,7 +130,7 @@ const emailOf = (recipient) => {
  * Envía un correo transaccional por Resend.
  * No agrega el pie legal automáticamente: inclúyelo en `html` con legalFooterHtml().
  * Con `recipientVariables` (clave = email) se envía un correo individual por destinatario,
- * reemplazando %recipient.clave% en asunto y contenido (vía /emails/batch). Cada valor es un string
+ * reemplazando %recipient.clave% en asunto, contenido y encabezados (vía /emails/batch). Cada valor es un string
  * (igual en HTML y texto) o `{ html, text }` (HTML ya escapado; texto y asunto con el valor original).
  * @param {{
  *   to: string | string[], subject: string, html: string, text?: string,
@@ -180,9 +180,14 @@ export async function sendEmail({ to, subject, html, text, replyTo, from, bcc, h
       const chunk = recipients.slice(i, i + BATCH_LIMIT)
       const payload = chunk.map((recipient) => {
         const vars = recipientVariables[emailOf(recipient)] || recipientVariables[recipient] || {}
-        const { attachments: _omit, ...rest } = base
+        const { attachments: _omit, headers: baseHeaders, ...rest } = base
+        // Encabezados por destinatario (p. ej. List-Unsubscribe con el enlace de baja de cada uno)
+        const recipientHeaders = baseHeaders
+          ? Object.fromEntries(Object.entries(baseHeaders).map(([k, v]) => [k, cleanHeaderValue(applyRecipientVars(v, vars, 'text'))]))
+          : null
         return {
           ...rest,
+          ...(recipientHeaders ? { headers: recipientHeaders } : {}),
           to: [recipient],
           subject: cleanHeaderValue(applyRecipientVars(subject, vars, 'text')),
           ...(html ? { html: applyRecipientVars(html, vars, 'html') } : {}),

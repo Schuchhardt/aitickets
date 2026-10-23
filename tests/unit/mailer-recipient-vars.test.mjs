@@ -93,4 +93,20 @@ describe('sendEmail con recipientVariables', () => {
     expect(msg.text).toContain("O'Brien")
     expect(msg.html).toContain('O&#39;Brien')
   })
+
+  it('encabezados por destinatario: List-Unsubscribe con el enlace de baja de cada uno', async () => {
+    await sendEmail({
+      to: ['a@example.com', 'b@example.com'],
+      subject: 'Invitación',
+      html: '<p>Hola</p>',
+      headers: { 'List-Unsubscribe': '<%recipient.unsub%>', 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
+      recipientVariables: {
+        'a@example.com': { unsub: { html: 'https://x.cl/baja?t=a&amp;z', text: 'https://x.cl/baja?t=a&z' } },
+        'b@example.com': { unsub: 'https://x.cl/baja?t=b' },
+      },
+    })
+    const [a, b] = calls[0].body
+    expect(a.headers).toEqual({ 'List-Unsubscribe': '<https://x.cl/baja?t=a&z>', 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' })
+    expect(b.headers['List-Unsubscribe']).toBe('<https://x.cl/baja?t=b>')
+  })
 })

@@ -26,7 +26,7 @@ const props = defineProps({
   // Órdenes de este navegador (botón "Ver mis entradas")
   ordersCount: { type: Number, default: 0 },
 });
-const emit = defineEmits(["checkout", "view-orders", "rsvp-state"]);
+const emit = defineEmits(["checkout", "view-orders", "rsvp-state", "review"]);
 
 const rsvp = ref(null);
 defineExpose({ focusForm: () => rsvp.value?.focusForm() });
@@ -152,6 +152,7 @@ function buySimple() {
     <!-- Terminado -->
     <template v-else-if="state === 'ended'">
       <p class="headline">Este evento ya ocurrió.</p>
+      <button v-if="!event.is_preview" type="button" class="ev-btn ev-btn-primary w-full" data-testid="review-cta" @click="emit('review')">★ ¿Fuiste? Califica el evento</button>
       <a class="ev-link" :href="organizerUrl" :target="event.organization?.website ? '_blank' : undefined" rel="noopener">
         {{ organizerName ? `Ver próximos eventos de ${organizerName} →` : "Ver otros eventos →" }}
       </a>

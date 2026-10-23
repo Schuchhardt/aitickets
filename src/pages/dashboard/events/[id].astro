@@ -7,6 +7,7 @@ import DiscountCodesManager from "../../../components/dashboard/DiscountCodesMan
 import PreviewLinksManager from "../../../components/dashboard/PreviewLinksManager.vue";
 import EventCoverManager from "../../../components/dashboard/EventCoverManager.vue";
 import EventGalleryManager from "../../../components/dashboard/EventGalleryManager.vue";
+import EventReviewsManager from "../../../components/dashboard/EventReviewsManager.vue";
 import TrackingLinkBuilder from "../../../components/dashboard/TrackingLinkBuilder.vue";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { EVENT_MANAGER_ROLES } from "../../../lib/supabaseServer";
@@ -335,6 +336,9 @@ const publishBlockers = [
 
             <!-- Galería (al final de la página pública del evento) -->
             <EventGalleryManager client:visible eventId={Number(event.id)} publicUrl={publicLink} />
+
+            <!-- Reseñas, fotos de asistentes e invitación al próximo evento -->
+            <EventReviewsManager client:visible eventId={Number(event.id)} publicUrl={publicLink} />
         </div>
 
         <!-- Right Column: Public Link & sharing -->

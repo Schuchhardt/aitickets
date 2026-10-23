@@ -60,6 +60,7 @@ embeber (`frame-ancestors 'none'`).
 | Entradas / órdenes | `create_ticket_type`, `update_ticket_type`, `delete_ticket_type`, `list_orders` (attendees) |
 | Descuentos | `list_discount_codes`, `create_discount_code`, `update_discount_code` |
 | Analítica | `get_event_performance`, `get_sales_overview` |
+| Reseñas | `list_event_reviews` (attendees), `update_review_settings`, `invite_past_attendees` (publish, con confirmación) |
 | Marketing | `get_marketing_kit`, `create_tracking_link`, `upload_image`, `generate_image`, `create_social_post`, `list_social_posts`, `publish_social_post` (publish) |
 
 El servidor MCP además entrega `instructions` (reglas de uso para el modelo) y 3 prompts:

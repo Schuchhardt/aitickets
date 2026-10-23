@@ -1,7 +1,7 @@
 // Herramientas: códigos de descuento. Misma validación y reglas que /api/discount-codes (dashboard).
 import { ToolError, type ToolDef, type ToolContext } from "../registry";
 import { eventIdSchema, loadOwnedEvent } from "./common";
-import { validateDiscountInput, describeDiscount, isMissingDiscountSchema, DISCOUNT_CODE_COLUMNS } from "../../../../netlify/lib/discounts.mjs";
+import { validateDiscountInput, describeDiscount, isMissingDiscountSchema, withoutRewardCodes, DISCOUNT_CODE_COLUMNS } from "../../../../netlify/lib/discounts.mjs";
 
 const MAX_CODES_PER_ORG = 500;
 const UNAVAILABLE = "Los códigos de descuento aún no están disponibles. Intenta nuevamente en unos minutos.";
@@ -54,12 +54,12 @@ const listCodes: ToolDef = {
     inputSchema: { type: "object", additionalProperties: false, properties: { event_id: eventIdSchema } },
     async handler(args, ctx) {
         if (args.event_id) await loadOwnedEvent(ctx, args.event_id, "id");
-        const { data, error } = await ctx.supabase
-            .from("aitickets_discount_codes")
-            .select(DISCOUNT_CODE_COLUMNS)
-            .eq("organization_id", ctx.actor.orgId)
-            .order("created_at", { ascending: false })
-            .limit(MAX_CODES_PER_ORG);
+        // Sin los premios por calificar (list_event_reviews los resume)
+        const { data, error } = await withoutRewardCodes((filter: (q: any) => any) =>
+            filter(ctx.supabase.from("aitickets_discount_codes").select(DISCOUNT_CODE_COLUMNS).eq("organization_id", ctx.actor.orgId))
+                .order("created_at", { ascending: false })
+                .limit(MAX_CODES_PER_ORG),
+        );
         if (error) {
             if (isMissingDiscountSchema(error)) throw new ToolError("unavailable", UNAVAILABLE);
             throw error;
@@ -108,10 +108,9 @@ const createCode: ToolDef = {
         const values = parsed.values;
         if (values.event_id != null) await loadOwnedEvent(ctx, values.event_id, "id");
 
-        const { count, error: countError } = await ctx.supabase
-            .from("aitickets_discount_codes")
-            .select("id", { count: "exact", head: true })
-            .eq("organization_id", ctx.actor.orgId);
+        const { count, error: countError } = await withoutRewardCodes((filter: (q: any) => any) =>
+            filter(ctx.supabase.from("aitickets_discount_codes").select("id", { count: "exact", head: true }).eq("organization_id", ctx.actor.orgId)),
+        );
         if (countError && isMissingDiscountSchema(countError)) throw new ToolError("unavailable", UNAVAILABLE);
         if ((count || 0) >= MAX_CODES_PER_ORG) throw new ToolError("conflict", `Alcanzaste el máximo de ${MAX_CODES_PER_ORG} códigos. Desactiva alguno.`);
 

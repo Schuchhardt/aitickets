@@ -145,6 +145,11 @@ const generateEventJsonLd = () => {
       if (fn.end_iso) item.endDate = fn.end_iso;
       else if (event.end_date) item.endDate = event.end_date;
       if (offers) item.offers = offers;
+      // Calificación de quienes asistieron (evento terminado, src/lib/eventReviews.ts)
+      const rating = event.reviews?.summary;
+      if (rating?.count > 0 && rating.average) {
+        item.aggregateRating = { "@type": "AggregateRating", ratingValue: rating.average, bestRating: 5, worstRating: 1, ratingCount: rating.count };
+      }
       return item;
     }
   );
