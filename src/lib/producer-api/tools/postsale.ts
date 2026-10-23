@@ -22,6 +22,7 @@ import { splitFullName } from "../../../../netlify/lib/buyer-name.mjs";
 import { orderLines, lineSoldQty } from "../../orderKinds";
 import { sendTicketsEmail, notifySlack, callInternalFunction } from "../../../pages/api/_lib/server-utils";
 import { sendEmail, formatRecipient, isValidEmail, legalFooterHtml, legalFooterText } from "../../../../netlify/lib/mailer.mjs";
+import { loadOrderEmailLog, summarizeEmailDelivery } from "../../../../netlify/lib/email-log.mjs";
 
 const UUID_PATTERN = "^[0-9a-fA-F-]{36}$";
 const orderIdSchema = { type: "string" as const, pattern: UUID_PATTERN, description: "ID de la orden (uuid; ver list_orders o get_order)." };
@@ -125,7 +126,8 @@ const getOrder: ToolDef = {
     name: "get_order",
     title: "Detalle de una orden",
     description:
-        "Detalle de una orden para resolver el reclamo de un comprador: entradas (id, tipo, estado, si ya ingresó), montos, pago, reembolsos y canal. " +
+        "Detalle de una orden para resolver el reclamo de un comprador: entradas (id, tipo, estado, si ya ingresó), montos, pago, reembolsos, canal " +
+        "y email_delivery (si el correo de entradas se envió, se entregó, rebotó o lo marcaron como spam, a qué dirección y cuándo). " +
         "Busca por order_id, o por event_id + buyer_email (devuelve hasta 10 órdenes). Contiene datos personales.",
     scope: "attendees",
     permission: "attendees.read",
@@ -162,7 +164,8 @@ const getOrder: ToolDef = {
         for (const o of orders) {
             const view = presentOrder(o, await loadOrderTickets(ctx, o.id), await loadRefunds(ctx, { orderId: o.id }));
             view.order_url_for_buyer = `${ctx.origin}/order/${o.id}`;
-            out.push(view);
+            const emailDelivery = summarizeEmailDelivery(await loadOrderEmailLog(ctx.supabase, o.id), { emailSentAt: o.email_sent_at || null });
+            out.push({ ...view, email_delivery: emailDelivery });
         }
         return { count: out.length, orders: out };
     },
@@ -171,7 +174,10 @@ const getOrder: ToolDef = {
 const resendTickets: ToolDef = {
     name: "resend_tickets",
     title: "Reenviar entradas",
-    description: "Reenvía al comprador el correo con sus entradas (\"no me llegó la entrada\"). Solo órdenes pagadas; las reembolsadas tienen las entradas anuladas.",
+    description:
+        "Reenvía al comprador el correo con sus entradas (\"no me llegó la entrada\"). Solo órdenes pagadas; las reembolsadas tienen las entradas anuladas. " +
+        "Se reenvía a la misma dirección: si el último correo rebotó o lo marcaron como spam (get_order → email_delivery), la respuesta trae un warning; " +
+        "pide al comprador otra dirección y usa transfer_ticket para enviarle las entradas ahí.",
     scope: "attendees",
     permission: "orders.support",
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
@@ -181,9 +187,25 @@ const resendTickets: ToolDef = {
         const { order } = await loadOrder(ctx, args.order_id);
         if (order.status === "refunded") throw new ToolError("conflict", "La orden fue reembolsada: sus entradas están anuladas.");
         if (order.status !== "paid") throw new ToolError("conflict", "Solo se pueden reenviar órdenes pagadas.");
+        // Estado del último correo ANTES de reenviar: si rebotó, reenviar a la misma dirección probablemente rebote otra vez
+        const previous: any = summarizeEmailDelivery(await loadOrderEmailLog(ctx.supabase, order.id, { limit: 1 }), { emailSentAt: order.email_sent_at || null });
         const result = await sendTicketsEmail(ctx.requestUrl, order.id, true);
         if (!result.ok) throw new ToolError("upstream", result.data?.message || "No se pudo reenviar el correo. Intenta nuevamente.");
-        return { order_id: order.id, event_id: Number(order.event_id), sent_to: order.buyer_email || null, status: "sent" };
+        const lastFailed = previous.last_status === "bounced" || previous.last_status === "complained";
+        return {
+            order_id: order.id,
+            event_id: Number(order.event_id),
+            sent_to: order.buyer_email || null,
+            status: "sent",
+            ...(lastFailed
+                ? {
+                      warning:
+                          `El correo anterior a esta dirección ${previous.last_status === "bounced" ? "rebotó" : "fue marcado como spam"}` +
+                          `${previous.last_error ? ` (${previous.last_error})` : ""}: es probable que este tampoco llegue. ` +
+                          "Pide al comprador otra dirección y usa transfer_ticket para enviarle las entradas ahí.",
+                  }
+                : {}),
+        };
     },
 };
 

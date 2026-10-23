@@ -1,6 +1,8 @@
 // Envío del correo con las entradas de una orden (contrato C6).
 // Lo usan: send-tickets-email (llamadas internas), payment-confirmation (webhook de Flow)
 // y purchase-tickets (órdenes gratis). Idempotente vía event_orders.email_sent_at.
+// Cada intento (también los reenvíos con force) queda en aitickets_email_log con el id de Resend o el error;
+// el webhook de Resend (/api/webhooks/resend) completa la entrega, el rebote o la queja.
 import { getSupabaseAdmin } from './supabase.mjs'
 import { sendEmail, SITE_URL, formatRecipient, isValidEmail } from './mailer.mjs'
 import { renderTicketsEmail } from './emails/index.mjs'
@@ -8,6 +10,7 @@ import { LEGAL } from './legal.mjs'
 import { orderBuyerBreakdown } from './fees.mjs'
 import { orderDiscount } from './discounts.mjs'
 import { greetingName } from './buyer-name.mjs'
+import { logEmailAttempt } from './email-log.mjs'
 import {
   EVENT_DATE_COLUMNS,
   zonedDateTimeToUtc,
@@ -135,7 +138,9 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
     : order.attendees
   const event = order.events
   if (!buyer?.email || !isValidEmail(buyer.email) || !event) {
-    return { ok: false, status: 'error', message: 'Orden sin comprador o evento válido' }
+    const message = 'Orden sin comprador o evento válido'
+    await logEmailAttempt(supabase, { orderId: order.id, eventId: order.event_id, recipient: buyer?.email || null, status: 'failed', error: message })
+    return { ok: false, status: 'error', message }
   }
 
   // Reclamar el envío de forma atómica para que el webhook y un reintento no manden dos correos.
@@ -315,7 +320,7 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
       : []
     attachments.push(...qrAttachments)
 
-    await sendEmail({
+    const sent = await sendEmail({
       to: formatRecipient(`${buyer.first_name || ''} ${buyer.last_name || ''}`, buyer.email),
       subject: email.subject,
       html: email.html,
@@ -325,6 +330,8 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
       attachments,
       tags: ['tickets'],
     })
+    // Solo el destinatario principal (el comprador); la copia oculta al productor no se registra
+    await logEmailAttempt(supabase, { orderId: order.id, eventId: order.event_id, recipient: buyer.email, providerMessageId: sent?.id || null, status: 'sent' })
 
     const { error: markError } = await supabase
       .from('event_orders')
@@ -335,6 +342,7 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
     return { ok: true, status: 'sent' }
   } catch (error) {
     console.error(`❌ Error enviando entradas de la orden ${order.id}:`, error?.message)
+    await logEmailAttempt(supabase, { orderId: order.id, eventId: order.event_id, recipient: buyer.email, status: 'failed', error: error?.message || 'Error enviando correo' })
     await releaseClaim()
     return { ok: false, status: 'error', message: error?.message || 'Error enviando correo' }
   }
