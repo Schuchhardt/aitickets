@@ -1,6 +1,7 @@
 import { defineMiddleware } from "astro:middleware";
 import { createEphemeralAuthClient } from "./lib/auth-helpers";
-import { setSessionCookies, clearSessionCookies } from "./lib/supabaseServer";
+import { setSessionCookies, clearSessionCookies, setProducerHint } from "./lib/supabaseServer";
+import { PRODUCER_HINT_COOKIE } from "../netlify/lib/buyer-session.mjs";
 import {
     getSiteBySlug,
     getTrustedTenantProxy,
@@ -83,7 +84,7 @@ function isCrossSiteRequest(request: Request, url: URL): boolean {
 const EDGE_TENANT_PREFIX = "/o/_host";
 
 /** En un host de tenant estas rutas viven en aitickets.cl. */
-const MAIN_ONLY_PREFIXES = ["/dashboard", "/organizadores", "/auth", "/api/auth", "/oauth", "/qr", "/order", "/ticket", "/payment-confirmation", "/pago", "/invitacion"];
+const MAIN_ONLY_PREFIXES = ["/dashboard", "/organizadores", "/auth", "/api/auth", "/oauth", "/qr", "/order", "/ticket", "/mis-entradas", "/payment-confirmation", "/pago", "/invitacion"];
 
 /** APIs de Astro permitidas en un host de tenant. */
 const TENANT_API_ALLOWLIST = new Set(["/api/sites/contact", "/api/events/visit"]);
@@ -213,6 +214,8 @@ export const onRequest = defineMiddleware(async (context, next) => {
     const isSitePreviewable = pathname.startsWith("/o/");
     // Consentimiento OAuth: necesita la sesión vigente del productor
     const isOAuthPage = pathname.startsWith("/oauth/");
+    // Login/registro: con una sesión vigente llevan directo al panel (se refresca para no pedir la contraseña)
+    const isProducerAuthPage = pathname === "/organizadores/login" || pathname === "/organizadores/registro";
 
     if (isApi && !isTokenOnlyApi(pathname) && STATE_CHANGING_METHODS.has(request.method.toUpperCase()) && isCrossSiteRequest(request, url)) {
         return new Response(JSON.stringify({ error: "Origen no permitido" }), {
@@ -221,7 +224,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
         });
     }
 
-    if ((isDashboard || isApi || isQrValidator || isSitePreviewable || isOAuthPage) && !isTokenOnlyApi(pathname)) {
+    if ((isDashboard || isApi || isQrValidator || isSitePreviewable || isOAuthPage || isProducerAuthPage) && !isTokenOnlyApi(pathname)) {
         const accessToken = context.cookies.get("sb-access-token")?.value;
         const refreshToken = context.cookies.get("sb-refresh-token")?.value;
 
@@ -238,6 +241,9 @@ export const onRequest = defineMiddleware(async (context, next) => {
         if (isDashboard && !context.cookies.get("sb-access-token")?.value) {
             return context.redirect("/organizadores/login");
         }
+        // Sesiones abiertas antes de existir la pista (src/lib/supabaseServer.ts setProducerHint): se agrega al
+        // entrar al panel para que la portada ofrezca "Ir a mi panel".
+        if (isDashboard && !context.cookies.get(PRODUCER_HINT_COOKIE)?.value) setProducerHint(context);
     }
 
     const response = await next();

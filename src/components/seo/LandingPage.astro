@@ -6,6 +6,7 @@ import AppFooter from "../AppFooter.vue";
 import CallToAction from "../CallToAction.vue";
 import ProducerFaq from "../landing/ProducerFaq.vue";
 import CtaTracking from "../landing/CtaTracking.astro";
+import ProducerSessionBanner from "../landing/ProducerSessionBanner.vue";
 import Layout from "../../layouts/Layout.astro";
 import { publishUrl, whatsappUrl } from "../landing/links.js";
 import type { Landing } from "../../data/landings";
@@ -117,4 +118,5 @@ const jsonLd = {
     </main>
     <AppFooter client:idle />
     <CtaTracking />
+    <ProducerSessionBanner client:idle />
 </Layout>

@@ -14,6 +14,8 @@
 //   db.calls                          // [{ table, op, values, filters }] para asserts
 //   db.failOn('organizations', 'select', { code: '42P01', message: 'no existe' })  // inyectar errores
 //   createFakeSupabase({ unique: { aitickets_api_idempotency: [['organization_id', 'tool', 'idem_key']] } })  // 23505 en INSERT
+//   createFakeSupabase({ defaults: { aitickets_event_feed_posts: { status: 'visible' } } })  // DEFAULT de columnas en filas nuevas
+// upsert(row, { onConflict: 'a,b' }) busca la fila existente por todas esas columnas.
 
 function likeToRegex(pattern) {
   let re = ''
@@ -56,7 +58,7 @@ function matches(row, f) {
   }
 }
 
-export function createFakeSupabase({ tables = {}, rpc = {}, unique = {} } = {}) {
+export function createFakeSupabase({ tables = {}, rpc = {}, unique = {}, defaults = {} } = {}) {
   const state = Object.fromEntries(Object.entries(tables).map(([k, rows]) => [k, rows.map((r) => ({ ...r }))]))
   const calls = []
   const failures = []
@@ -140,15 +142,16 @@ export function createFakeSupabase({ tables = {}, rpc = {}, unique = {} } = {}) 
         }
       }
       const out = []
+      const keys = q.op === 'upsert' ? String(q.onConflict).split(',').map((k) => k.trim()).filter(Boolean) : null
       for (const v of list) {
-        const key = q.op === 'upsert' ? q.onConflict : null
-        const existing = key ? rows.find((r) => loose(r[key], v[key])) : null
+        const existing = keys ? rows.find((r) => keys.every((k) => loose(r[k], v[k]))) : null
         if (existing) {
           Object.assign(existing, v)
           out.push({ ...existing })
         } else {
-          rows.push(v)
-          out.push({ ...v })
+          const row = { ...(defaults[q.table] || {}), ...v }
+          rows.push(row)
+          out.push({ ...row })
         }
       }
       return finish(q.returning ? out : null, q, out.length)

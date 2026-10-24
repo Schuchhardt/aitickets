@@ -1,36 +1,40 @@
 ---
-// Página de una entrada individual (event_attendees.id, uuid). Muestra la dirección secreta solo si la
-// entrada está vigente (active/validated/NULL) y su orden (si tiene) está pagada.
+// Página de una entrada individual (event_attendees.id, uuid): el link "Ver QR" de cada entrada del correo, para
+// pasársela a un acompañante. Muestra la dirección secreta solo si la entrada está vigente (active/validated/NULL)
+// y su orden (si tiene) está pagada. El muro de asistentes se ve en modo lectura (publica quien tiene la orden).
 import { getSupabaseAdmin } from "../../lib/auth-helpers";
-import { descriptionToHtml } from "../../lib/sanitize";
+import { cdnImage } from "../../lib/imageCdn.js";
+import { loadAttendeeEvent, functionsForTickets, upcomingFirst, calendarUrl, mapsUrl } from "../../lib/attendeePage";
+import { orderKind, orderCopy } from "../../../netlify/lib/order-kind.mjs";
+import { loadFeed } from "../../../netlify/lib/attendee-community.mjs";
 import Layout from "../../layouts/Layout.astro";
 import AppHeader from "../../components/AppHeader.vue";
 import AppFooter from "../../components/AppFooter.vue";
-import EventHeader from "../../components/EventHeader.vue";
-import EventTabs from "../../components/EventTabs.vue";
 import TicketInfo from "../../components/TicketInfo.vue";
+import AttendeeFeed from "../../components/buyer/AttendeeFeed.vue";
 
 import "../../styles/global.css";
 
 export const prerender = false;
+
+Astro.response.headers.set("Cache-Control", "private, no-store");
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const { id } = Astro.params;
 const supabase = getSupabaseAdmin();
 
-let ticket: Record<string, any> | undefined = undefined;
-let event: Record<string, any> | undefined = undefined;
+let ticket: Record<string, any> | null = null;
+let event: any = null;
+let order: any = null;
 let errorMessage: string | null = null;
 let voidMessage: string | null = null;
-
-const toChileTime = (value: string | null) =>
-  value
-    ? new Date(value).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false, timeZone: "America/Santiago" })
-    : null;
+let secretLocation = "";
+let feed: any = null;
+let functionId: number | null = null;
 
 if (!id || !UUID_RE.test(id)) {
-  errorMessage = "Entrada no encontrada";
+  errorMessage = "No encontramos esta entrada. Revisa que el link esté completo.";
 } else {
   const { data: ticketData } = await supabase
     .from("event_attendees")
@@ -39,76 +43,46 @@ if (!id || !UUID_RE.test(id)) {
     .maybeSingle();
 
   if (!ticketData) {
-    errorMessage = "Entrada no encontrada";
+    errorMessage = "No encontramos esta entrada. Revisa que el link esté completo.";
   } else {
-    const { data: eventData } = await supabase
-      .from("events")
-      .select("id, name, title, slug, description, image_url, location, start_date, end_date")
-      .eq("id", ticketData.event_id)
-      .maybeSingle();
-
     const ticketType: any = Array.isArray(ticketData.event_tickets) ? ticketData.event_tickets[0] : ticketData.event_tickets;
-    const { data: order } = ticketData.event_order_id
-      ? await supabase
-          .from("event_orders")
-          .select("status, buyer_first_name, buyer_last_name, buyer_email")
-          .eq("id", ticketData.event_order_id)
-          .maybeSingle()
-      : { data: null };
+    functionId = ticketType?.event_date_id ?? null;
+    const [loadedEvent, orderResult] = await Promise.all([
+      loadAttendeeEvent(supabase, ticketData.event_id),
+      ticketData.event_order_id
+        ? supabase
+            .from("event_orders")
+            .select("status, buyer_first_name, buyer_last_name, buyer_email, payment_provider, ticket_details, total_payment, amount")
+            .eq("id", ticketData.event_order_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
+    event = loadedEvent;
+    order = orderResult.data;
 
-    if (eventData) {
-      event = { ...eventData, description: descriptionToHtml(eventData.description) };
-      const [{ data: eventDates }, { data: faqs }, { data: categories }] = await Promise.all([
-        supabase
-          .from("event_dates")
-          .select("id, date, start_time, end_time, event_location_id, event_locations ( name, display_name, address_line1_override, city_override, venues ( name, address_line1, city ) )")
-          .eq("event_id", eventData.id)
-          .order("date", { ascending: true })
-          .order("start_time", { ascending: true }),
-        supabase.from("event_faqs").select("question, answer").eq("event_id", eventData.id),
-        supabase.from("event_tags").select("category_tags(name)").eq("event_id", eventData.id),
-      ]);
-      const defaultDate = { date: eventData.start_date, start_time: toChileTime(eventData.start_date), end_time: toChileTime(eventData.end_date) };
-      event.dates = eventDates?.length ? eventDates : eventData.start_date ? [defaultDate] : [];
-
-      const liveTicket = ticketData.status == null || ticketData.status === "active" || ticketData.status === "validated";
-      const paidOrder = !ticketData.event_order_id || order?.status === "paid";
-      if (liveTicket && paidOrder) {
-        const { data: secretRow } = await supabase.from("events").select("secret_location").eq("id", eventData.id).maybeSingle();
-        if (secretRow?.secret_location) event.secret_location = secretRow.secret_location;
+    const liveTicket = ticketData.status == null || ticketData.status === "active" || ticketData.status === "validated";
+    const paidOrder = !ticketData.event_order_id || order?.status === "paid";
+    if (event && liveTicket && paidOrder) {
+      const { data: secretRow } = await supabase.from("events").select("secret_location").eq("id", event.id).maybeSingle();
+      if (secretRow?.secret_location) secretLocation = String(secretRow.secret_location);
+      try {
+        feed = await loadFeed(supabase, event.id);
+      } catch (err: any) {
+        console.warn("ticket: muro no disponible:", err?.message || err);
       }
-      event.faqs = faqs || [];
-      event.tags = (categories || []).map((c: any) => c.category_tags?.name).filter(Boolean);
-      const loc: any = eventDates?.[0]?.event_locations;
-      const venue = loc?.venues || {};
-      event.address = [loc?.display_name || venue.name || (loc?.name && loc.name !== "Main" ? loc.name : null), loc?.address_line1_override || venue.address_line1, loc?.city_override || venue.city]
-        .filter(Boolean)
-        .join(", ") || eventData.location || "";
     }
 
     // R2: comprador de la orden; fallback al registro attendees (entradas antiguas)
-    let attendee: any = order?.buyer_email
-      ? { first_name: order.buyer_first_name, last_name: order.buyer_last_name, email: order.buyer_email }
-      : null;
+    let attendee: any = order?.buyer_email ? { first_name: order.buyer_first_name, last_name: order.buyer_last_name } : null;
     if (!attendee) {
-      const { data } = await supabase
-        .from("attendees")
-        .select("first_name, last_name, email")
-        .eq("id", ticketData.attendee_id)
-        .maybeSingle();
+      const { data } = await supabase.from("attendees").select("first_name, last_name").eq("id", ticketData.attendee_id).maybeSingle();
       attendee = data;
     }
 
-    // R1: entrada de una función específica -> solo esa función
-    const fnId = ticketType?.event_date_id;
-    const fnDates = fnId != null ? (event?.dates || []).filter((d: any) => String(d.id) === String(fnId)) : [];
     ticket = {
       id: ticketData.id,
-      event_name: event?.name || "Evento",
-      event_dates: fnDates.length ? fnDates : event?.dates || [],
       ticket_name: ticketType?.ticket_name || "Entrada General",
       attendee_name: `${attendee?.first_name || ""} ${attendee?.last_name || ""}`.trim(),
-      attendee_email: attendee?.email || "",
       // Entrada anulada (p. ej. orden reembolsada): no se muestra el QR
       qr_code: ticketData.status === "cancelled" ? null : ticketData.qr_code || null,
       status: ticketData.status,
@@ -122,37 +96,62 @@ if (!id || !UUID_RE.test(id)) {
     }
   }
 }
+
+// Una entrada suelta puede ser de un acompañante: "Entrada válida" en vez de "Compra confirmada"
+const kind = order ? orderKind(order) : "purchase";
+const badge = kind === "rsvp" || kind === "courtesy" ? orderCopy(kind, 1).badge : "Entrada válida";
+const functions = event ? upcomingFirst(functionsForTickets(event, [functionId])) : [];
+const fn = functions[0];
+const place = secretLocation || fn?.place || event?.location || "";
+const now = Date.now();
+const ended = functions.length > 0 && functions.every((f) => f.startIso && new Date(f.endIso || f.startIso).getTime() + (f.endIso ? 0 : 3 * 3600 * 1000) < now);
+const valid = Boolean(ticket?.qr_code) && !voidMessage;
+const calendarHref = event && valid && !ended ? calendarUrl(event.name, fn, place, `${Astro.url.origin}/ticket/${id}`) : null;
+const mapsHref = valid ? mapsUrl(place) : null;
 ---
 
 <Layout title={event?.name ? `Tu entrada: ${event.name} | AI Tickets` : "Tu entrada | AI Tickets"} noindex>
   <AppHeader client:idle />
-  <main class="flex flex-col items-center min-h-screen bg-gray-100">
-    <div class="max-w-6xl mx-auto w-full">
-      {errorMessage ? (
-        <div class="mt-12 mx-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
-          <h2 class="text-xl font-semibold font-[Unbounded] mb-2">Error</h2>
-          <p>{errorMessage}</p>
+  <main class="min-h-screen bg-gray-50 pt-20 pb-16 px-4 font-[Prompt]">
+    <div class="max-w-md mx-auto space-y-4">
+      {errorMessage || !event || !ticket ? (
+        <div class="mt-8 rounded-2xl border border-gray-200 bg-white p-6 text-center">
+          <p class="text-gray-800">{errorMessage || "Evento no encontrado"}</p>
+          <a href="/mis-entradas" class="mt-4 inline-block text-sm font-semibold underline">Buscar mis entradas</a>
         </div>
       ) : (
         <>
           {voidMessage && (
-            <div class="mt-12 mx-4 lg:mx-0 bg-amber-50 border border-amber-300 text-amber-800 px-4 py-3 rounded-lg font-[Prompt]">
-              {voidMessage}
-            </div>
+            <div class="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">{voidMessage}</div>
           )}
-          <div class="mt-0 pt-8 lg:pt-12 px-4 lg:px-0">
-            <TicketInfo ticket={ticket} event={event} client:only />
+
+          <section class="flex items-center gap-4 rounded-2xl border border-gray-200 bg-white p-4">
+            {event.image_url && <img src={cdnImage(event.image_url, 480)} alt="" width="64" height="64" class="h-16 w-16 shrink-0 rounded-xl object-cover bg-gray-100" />}
+            <div class="min-w-0">
+              {valid && <span class="inline-block rounded-full bg-lime-300 px-2 py-0.5 text-[11px] font-semibold text-black">{badge}</span>}
+              <h1 class="mt-1 font-bold font-[Unbounded] text-gray-900 leading-snug break-words">{event.name}</h1>
+              {event.organizerName && <p class="text-xs text-gray-500">Organiza {event.organizerName}</p>}
+            </div>
+          </section>
+
+          <div>
+            <TicketInfo ticket={ticket} event={{ name: event.name, slug: event.slug }} functionLabel={fn?.label || ""} place={place} client:only="vue" />
           </div>
 
-          <div class="w-full mt-6 px-4 lg:px-0 mb-8">
-            <details class="bg-white p-4 rounded-lg shadow-lg">
-              <summary class="text-lg font-semibold cursor-pointer font-[Unbounded]">Detalles del Evento</summary>
-              <div class="mt-4">
-                <EventHeader event={event} client:idle />
-                <EventTabs event={event} client:only />
-              </div>
-            </details>
-          </div>
+          {(calendarHref || mapsHref) && (
+            <div class="flex flex-wrap justify-center gap-2">
+              {calendarHref && <a href={calendarHref} target="_blank" rel="noopener" class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-800 hover:border-gray-900 transition">+ Calendario</a>}
+              {mapsHref && <a href={mapsHref} target="_blank" rel="noopener" class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-800 hover:border-gray-900 transition">Cómo llegar</a>}
+            </div>
+          )}
+
+          {feed && feed.total > 0 && <AttendeeFeed initialFeed={feed} ended={ended} client:visible />}
+
+          {event.slug && (
+            <p class="text-center">
+              <a href={`/eventos/${encodeURIComponent(event.slug)}`} class="text-sm text-gray-500 underline hover:text-gray-900">Ver la página del evento</a>
+            </p>
+          )}
         </>
       )}
     </div>

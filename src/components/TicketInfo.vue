@@ -1,68 +1,45 @@
 <script setup>
+// Tarjeta de una entrada (páginas de la orden, de la entrada y de confirmación de pago): QR grande, evento, función,
+// lugar y titular, autocontenida para que sirva como captura de pantalla en la puerta. "PDF" descarga la tarjeta.
 import { ref, computed } from 'vue';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import TicketQR from "./TicketQR.vue";
-import ShareEventModal from "./ShareEventModal.vue";
 import { formatLocalDate, formatLocalTime } from "../utils/dateHelpers.js";
 import { showSuccess, showError } from "../lib/toastBus.js";
 
 const props = defineProps({
   ticket: Object,
   event: Object,
+  // Posición en la orden ("Entrada 2 de 3")
+  index: { type: Number, required: false },
+  total: { type: Number, required: false },
+  // Función de la entrada ya formateada ("Sábado 12 de octubre · 20:00 hrs"); sin ella, la fecha del evento
+  functionLabel: { type: String, required: false },
+  // Lugar a mostrar (la dirección secreta si corresponde); sin él, el del evento
+  place: { type: String, required: false },
 });
 
 const isDownloading = ref(false);
-const showShareModal = ref(false);
+const captureEl = ref(null);
 
-// URL para compartir: la página pública del evento con ?ref=share.
-// NUNCA compartir /ticket/<id> ni el QR: quien tenga ese link podría usar la entrada.
-const eventShareUrl = computed(() => {
-  if (typeof window === "undefined" || !props.event?.slug) return "";
-  return `${window.location.origin}/eventos/${encodeURIComponent(props.event.slug)}?ref=share`;
+const whenLabel = computed(() => {
+  if (props.functionLabel) return props.functionLabel;
+  if (!props.event?.start_date) return '';
+  const day = formatLocalDate(props.event.start_date, { weekday: 'long', day: 'numeric', month: 'long' });
+  return `${day.charAt(0).toUpperCase()}${day.slice(1)} · ${formatLocalTime(props.event.start_date)} hrs`;
 });
-
-// Título personalizado para compartir
-const shareTitle = computed(() => {
-  return `Voy a ${props.event?.name || 'este evento'}`;
-});
-
-// Texto personalizado para compartir (invita a comprar, sin datos de la entrada)
-const shareText = computed(() => {
-  return `¡Voy a ${props.event?.name}! ${formattedDate(props.event)} a las ${formattedTime(props.event)}. Consigue tu entrada acá:`;
-});
-
-// Formatear fecha del evento en la zona horaria del evento (America/Santiago)
-const formattedDate = (event) => {
-  if (!event?.start_date) return "Fecha no disponible";
-  return formatLocalDate(event.start_date, {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric"
-  });
-};
-
-// Formatear hora del evento en la zona horaria del evento (America/Santiago)
-const formattedTime = (event) => {
-  if (!event?.start_date) return "Hora no disponible";
-  return formatLocalTime(event.start_date) + " hrs";
-};
+const whereLabel = computed(() => props.place || props.event?.secret_location || props.event?.address || '');
+const holder = computed(() => props.ticket?.attendee_name || '');
+const position = computed(() => props.index || 1);
+const count = computed(() => props.total || 1);
+const cancelled = computed(() => props.ticket?.status === 'cancelled');
+const used = computed(() => props.ticket?.status === 'validated');
 
 // Función para detectar si el navegador soporta descarga de archivos
 const supportsDownload = () => {
   const a = document.createElement('a');
   return typeof a.download !== 'undefined';
-};
-
-// Abrir modal de compartir
-const openShareModal = () => {
-  showShareModal.value = true;
-};
-
-// Cerrar modal de compartir
-const closeShareModal = () => {
-  showShareModal.value = false;
 };
 
 // 👉 Función mejorada para descargar el ticket como PDF (optimizada para móvil)
@@ -79,7 +56,8 @@ const downloadAsPDF = async () => {
       return;
     }
     
-    const ticketEl = document.getElementById('ticket-container');
+    // Cada tarjeta captura la suya (con varias entradas en la página, un id fijo siempre tomaba la primera)
+    const ticketEl = captureEl.value;
     if (!ticketEl) {
       throw new Error('No se encontró el contenedor del ticket');
     }
@@ -113,6 +91,8 @@ const downloadAsPDF = async () => {
         // Background colors
         if (className.includes('bg-white')) {
           el.style.backgroundColor = 'rgb(255, 255, 255)';
+        } else if (className.includes('bg-lime-100')) {
+          el.style.backgroundColor = 'rgb(236, 252, 203)';
         } else if (className.includes('bg-gray')) {
           el.style.backgroundColor = 'rgb(243, 244, 246)';
         } else if (className.includes('bg-lime')) {
@@ -128,6 +108,8 @@ const downloadAsPDF = async () => {
           el.style.color = 'rgb(55, 65, 81)';
         } else if (className.includes('text-gray-400')) {
           el.style.color = 'rgb(156, 163, 175)';
+        } else if (className.includes('text-gray-900')) {
+          el.style.color = 'rgb(17, 24, 39)';
         } else if (className.includes('text-white')) {
           el.style.color = 'rgb(255, 255, 255)';
         } else if (className.includes('text-black')) {
@@ -309,69 +291,47 @@ const downloadAsPDF = async () => {
 </script>
 
 <template>
-  <div>
-    <div id="ticket-container" class="bg-white p-6 rounded-lg shadow-lg w-full max-w-md text-center mx-auto lg:col-span-1">
-      <div v-if="ticket.qr_code" class="mt-2 flex flex-col items-center">
-        <TicketQR :code="ticket.qr_code" client:idle />
-        <p class="text-gray-500 text-sm mt-2">Muestra este código al ingresar</p>
+  <article class="rounded-2xl bg-white border border-gray-200 shadow-sm overflow-hidden" :class="cancelled ? 'opacity-70' : ''">
+    <div ref="captureEl" class="bg-white px-5 pt-5 pb-4 text-center">
+      <p class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">{{ ticket.ticket_name || ticket.name || 'Entrada' }}</p>
+      <p class="mt-1 font-bold font-[Unbounded] text-gray-900 leading-snug">{{ event?.name }}</p>
+      <p v-if="whenLabel" class="mt-1 text-sm text-gray-600 font-[Prompt]">{{ whenLabel }}</p>
+      <p v-if="whereLabel" class="text-xs text-gray-500 font-[Prompt]">{{ whereLabel }}</p>
+
+      <div v-if="ticket.qr_code" class="mt-3 flex flex-col items-center">
+        <TicketQR :code="ticket.qr_code" />
       </div>
-      <h2 class="text-3xl font-bold mb-4 font-[Unbounded]">{{ event.name }}</h2>
-      <p class="text-gray-600 font-bold font-[Prompt]">{{ ticket.ticket_name || ticket.name }}</p>
-      <p class="text-gray-500 font-[Prompt]">{{ formattedDate(event) }}</p>
-      <p class="text-gray-500 font-[Prompt]">{{ formattedTime(event) }}</p>
-      
-      <!-- Dirección del evento -->
-      <div class="mt-3 text-gray-500 font-[Prompt] text-sm">
-        <div v-if="event.secret_location" class="space-y-1">
-          <p class="font-semibold">📍 {{ event.secret_location }}</p>
-        </div>
-        <p v-else-if="event.address" class="font-semibold">📍 {{ event.address }}</p>
-        <p v-else class="text-gray-400">📍 Dirección por confirmar</p>
-      </div>
+      <p v-else-if="cancelled" class="my-6 text-sm font-semibold text-gray-500">Entrada anulada</p>
+      <p v-else class="my-6 text-sm text-gray-500">El código QR aparecerá aquí apenas se emita.</p>
+
+      <p v-if="used" class="mt-1 inline-block rounded-full bg-lime-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">Ya ingresaste con esta entrada</p>
+      <p v-else-if="ticket.qr_code" class="mt-1 text-xs text-gray-500 font-[Prompt]">Muestra este código en la puerta</p>
     </div>
 
-    <div class="mt-4 flex gap-2">
-      <!-- Botón principal de compartir entrada -->
+    <div class="flex items-center justify-between gap-3 border-t border-dashed border-gray-200 px-5 py-3 font-[Prompt]">
+      <p class="min-w-0 truncate text-xs text-gray-500">
+        <span v-if="holder" class="text-gray-700">{{ holder }}</span>
+        <span v-if="holder && count > 1"> · </span>
+        <span v-if="count > 1">Entrada {{ position }} de {{ count }}</span>
+      </p>
       <button
-        aria-label="Compartir evento"
-        @click="openShareModal"
-        :disabled="isDownloading"
-        class="flex-1 bg-lime-500 font-[Unbounded] text-white text-center py-2 rounded-lg hover:bg-lime-600 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-      >
-        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z"></path>
-        </svg>
-        Invitar amigos
-      </button>
-      
-      <!-- Botón PDF (solo icono) -->
-      <button
-        aria-label="Descargar ticket como PDF"
-        @click="downloadAsPDF"
-        :disabled="isDownloading"
-        class="bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+        v-if="ticket.qr_code"
+        type="button"
+        aria-label="Descargar entrada en PDF"
         title="Descargar PDF"
+        :disabled="isDownloading"
+        class="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:border-gray-900 transition disabled:opacity-50"
+        @click="downloadAsPDF"
       >
-        <svg v-if="isDownloading" class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+        <svg v-if="isDownloading" class="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" aria-hidden="true">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
         </svg>
-        <svg v-else class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+        <svg v-else class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v12m0 0-4-4m4 4 4-4M5 20h14"></path>
         </svg>
+        PDF
       </button>
     </div>
-
-    <!-- Modal de compartir -->
-    <ShareEventModal 
-      :show="showShareModal" 
-      :event="event"
-      :customUrl="eventShareUrl"
-      :customTitle="shareTitle"
-      :customText="shareText"
-      @close="closeShareModal"
-      client:only
-    />
-  </div>
+  </article>
 </template>
-
