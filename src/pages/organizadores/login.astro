@@ -5,7 +5,14 @@ import AppFooter from "../../components/AppFooter.vue";
 import ProducerLoginForm from "../../components/auth/ProducerLoginForm.vue";
 import GradientBackground from "../../components/Hero/GradientBackground.vue";
 import { isGoogleAuthEnabled } from "../../lib/google-auth";
+import { getSessionContext } from "../../lib/supabaseServer";
+import { safeNextPath } from "../../lib/onboarding";
 import "../../styles/global.css";
+
+export const prerender = false;
+
+// Con la sesión iniciada no se pide la contraseña de nuevo: directo al panel (o al ?next= interno)
+if (await getSessionContext(Astro)) return Astro.redirect(safeNextPath(Astro.url.searchParams.get("next")) || "/dashboard");
 ---
 
 <Layout

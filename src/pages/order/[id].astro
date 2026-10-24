@@ -1,25 +1,35 @@
 ---
-// Página de una orden (event_orders.id, uuid). Es el link que recibe el comprador por correo:
-// muestra sus entradas con QR y, solo aquí (y en /ticket), la dirección secreta del evento.
+// Página de una orden (event_orders.id, uuid). Es el link que recibe el asistente por correo ("Ver mis entradas"):
+// sus entradas con QR y, solo aquí (y en /ticket), la dirección secreta del evento.
 // secret_location solo se consulta/serializa si la orden está pagada y tiene al menos una entrada no anulada.
 // Los datos del comprador salen de event_orders.buyer_* (R2), no del registro compartido `attendees`.
+// El lenguaje depende del tipo de orden (netlify/lib/order-kind.mjs): un evento gratis es una confirmación de
+// asistencia (sin "compra", total ni comprobante); solo una compra muestra el detalle de pago y el n.º de orden.
+// Con entradas vigentes: muro de asistentes, mensaje a la productora y "guardar en este dispositivo" (Mis entradas).
 import { getSupabaseAdmin } from "../../lib/auth-helpers";
-import { descriptionToHtml } from "../../lib/sanitize";
 import { LEGAL } from "../../lib/legal";
+import { cdnImage } from "../../lib/imageCdn.js";
+import { getBuyerSession } from "../../lib/buyerSession";
+import { loadAttendeeEvent, functionsForTickets, upcomingFirst, calendarUrl, mapsUrl } from "../../lib/attendeePage";
 import { FEE_INCLUDED_NOTE, SERVICE_FEE_TAX_LABEL, orderBuyerBreakdown, serviceFeeLabelFor } from "../../../netlify/lib/fees.mjs";
 import { orderDiscount, discountLineLabel } from "../../../netlify/lib/discounts.mjs";
+import { orderKind, orderCopy, isPaidKind } from "../../../netlify/lib/order-kind.mjs";
+import { loadFeed } from "../../../netlify/lib/attendee-community.mjs";
+import { maskEmail } from "../../../netlify/lib/reviews.mjs";
 import Layout from "../../layouts/Layout.astro";
 import AppHeader from "../../components/AppHeader.vue";
 import AppFooter from "../../components/AppFooter.vue";
-import EventHeader from "../../components/EventHeader.vue";
-import EventTabs from "../../components/EventTabs.vue";
 import TicketInfo from "../../components/TicketInfo.vue";
-import EventDetails from "../../components/EventDetails.vue";
+import AttendeeFeed from "../../components/buyer/AttendeeFeed.vue";
+import ProducerMessageForm from "../../components/buyer/ProducerMessageForm.vue";
+import BuyerAccessForm from "../../components/buyer/BuyerAccessForm.vue";
 import { formatLocalDate, formatLocalTime } from "../../utils/dateHelpers.js";
 
 import "../../styles/global.css";
 
 export const prerender = false;
+
+Astro.response.headers.set("Cache-Control", "private, no-store");
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -29,126 +39,91 @@ const supabase = getSupabaseAdmin();
 let tickets: any[] = [];
 let event: any = null;
 let orderInfo: any = null;
-let attendeeInfo: any = null;
+let buyer: { first_name: string; last_name: string; email: string } | null = null;
 let errorMessage: string | null = null;
 let pendingMessage: string | null = null;
-
-const formatVenue = (loc: any) => {
-  if (!loc) return "";
-  const venue = loc.venues || {};
-  return [loc.display_name || venue.name || (loc.name && loc.name !== "Main" ? loc.name : null), loc.address_line1_override || venue.address_line1, loc.city_override || venue.city]
-    .filter(Boolean)
-    .filter((v: string, i: number, arr: string[]) => arr.indexOf(v) === i)
-    .join(", ");
-};
+let secretLocation = "";
+let feed: any = null;
 
 if (!id || !UUID_RE.test(id)) {
-  errorMessage = "Orden no encontrada";
+  errorMessage = "No encontramos esta orden. Revisa que el link esté completo.";
 } else {
   try {
-    const ORDER_COLS = "id, created_at, status, event_id, attendee_id, amount, ticket_fee, total_payment, ticket_qty, buyer_first_name, buyer_last_name, buyer_email";
+    const ORDER_COLS = "id, created_at, status, event_id, attendee_id, amount, ticket_fee, total_payment, ticket_qty, ticket_details, payment_provider, buyer_first_name, buyer_last_name, buyer_email";
     // Columnas opcionales, de la más completa a la mínima: descuento (202609300200) e IVA del cargo (202609290100)
-    let orderData: any = null;
     for (const cols of [`${ORDER_COLS}, service_fee_tax, discount_amount, discount_code, fee_absorbed`, `${ORDER_COLS}, service_fee_tax, discount_amount, discount_code`, `${ORDER_COLS}, service_fee_tax`, ORDER_COLS]) {
       const { data, error: orderError } = await supabase.from("event_orders").select(cols).eq("id", id).maybeSingle();
-      orderData = data;
+      orderInfo = data;
       if (!orderError || !["42703", "PGRST204"].includes(String(orderError.code || ""))) break;
     }
 
-    if (!orderData) {
-      errorMessage = "Orden no encontrada";
+    event = orderInfo ? await loadAttendeeEvent(supabase, orderInfo.event_id) : null;
+    if (!orderInfo) {
+      errorMessage = "No encontramos esta orden. Revisa que el link esté completo.";
+    } else if (!event) {
+      errorMessage = "Evento no encontrado";
     } else {
-      orderInfo = orderData;
-
-      const { data: eventData } = await supabase
-        .from("events")
-        .select("id, name, title, slug, description, image_url, location, start_date, end_date")
-        .eq("id", orderData.event_id)
-        .maybeSingle();
-
-      if (!eventData) {
-        errorMessage = "Evento no encontrado";
+      // R2: comprador de esta orden (fallback al registro attendees para órdenes antiguas)
+      if (orderInfo.buyer_email) {
+        buyer = { first_name: orderInfo.buyer_first_name || "", last_name: orderInfo.buyer_last_name || "", email: orderInfo.buyer_email };
       } else {
-        event = { ...eventData, description: descriptionToHtml(eventData.description) };
+        const { data: attendee } = await supabase.from("attendees").select("first_name, last_name, email").eq("id", orderInfo.attendee_id).maybeSingle();
+        buyer = attendee || null;
+      }
 
-        const [{ data: eventDates }, { data: faqs }, { data: categories }, { data: attendee }] = await Promise.all([
-          supabase
-            .from("event_dates")
-            .select("id, date, start_time, end_time, event_location_id, event_locations ( name, display_name, address_line1_override, city_override, venues ( name, address_line1, city ) )")
-            .eq("event_id", event.id)
-            .order("date", { ascending: true })
-            .order("start_time", { ascending: true }),
-          supabase.from("event_faqs").select("question, answer").eq("event_id", event.id),
-          supabase.from("event_tags").select("category_tags(name)").eq("event_id", event.id),
-          orderData.buyer_email
-            ? Promise.resolve({ data: null })
-            : supabase.from("attendees").select("first_name, last_name, email").eq("id", orderData.attendee_id).maybeSingle(),
-        ]);
+      const { data: ticketsData, error: ticketsError } = await supabase
+        .from("event_attendees")
+        .select("id, qr_code, status, validated_at, event_tickets ( ticket_name, price, event_date_id )")
+        .eq("event_order_id", id);
 
-        const defaultDate = {
-          date: event.start_date,
-          start_time: event.start_date
-            ? new Date(event.start_date).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false, timeZone: "America/Santiago" })
-            : null,
-          end_time: event.end_date
-            ? new Date(event.end_date).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false, timeZone: "America/Santiago" })
-            : null,
-        };
-        event.dates = eventDates?.length ? eventDates : event.start_date ? [defaultDate] : [];
-        event.faqs = faqs || [];
-        event.tags = (categories || []).map((c: any) => c.category_tags?.name).filter(Boolean);
-        event.address = formatVenue(eventDates?.[0]?.event_locations) || event.location || "";
-        // R2: comprador de esta orden (fallback al registro attendees para órdenes antiguas)
-        attendeeInfo = orderData.buyer_email
-          ? { first_name: orderData.buyer_first_name, last_name: orderData.buyer_last_name, email: orderData.buyer_email }
-          : attendee || null;
-
-        const { data: ticketsData, error: ticketsError } = await supabase
-          .from("event_attendees")
-          .select("id, qr_code, status, validated_at, event_tickets ( ticket_name, price, event_date_id )")
-          .eq("event_order_id", id);
-
-        if (ticketsError) {
-          console.error("Error al obtener tickets:", ticketsError.message);
-          errorMessage = "Error al cargar las entradas";
-        } else {
-          tickets = (ticketsData || []).map((ticketData: any) => {
-            // R1: entrada de una función específica -> solo esa función
-            const fnId = ticketData.event_tickets?.event_date_id;
-            const fnDates = fnId != null ? (event?.dates || []).filter((d: any) => String(d.id) === String(fnId)) : [];
-            return {
-            id: ticketData.id,
-            event_name: event?.name || "Evento",
-            event_dates: fnDates.length ? fnDates : event?.dates || [],
-            ticket_name: ticketData.event_tickets?.ticket_name || "Entrada General",
-            attendee_name: `${attendeeInfo?.first_name || ""} ${attendeeInfo?.last_name || ""}`.trim(),
-            attendee_email: attendeeInfo?.email || "",
+      if (ticketsError) {
+        console.error("Error al obtener tickets:", ticketsError.message);
+        errorMessage = "Error al cargar las entradas";
+      } else {
+        const holderName = `${buyer?.first_name || ""} ${buyer?.last_name || ""}`.trim();
+        // Vigentes primero (las anuladas al final)
+        const rows = (ticketsData || []).slice().sort((a: any, b: any) => Number(a.status === "cancelled") - Number(b.status === "cancelled"));
+        tickets = rows.map((t: any) => {
+          const fn = functionsForTickets(event, [t.event_tickets?.event_date_id])[0];
+          return {
+            id: t.id,
+            ticket_name: t.event_tickets?.ticket_name || "Entrada General",
+            attendee_name: holderName,
             // Entrada anulada (p. ej. orden reembolsada): no se muestra el QR
-            qr_code: ticketData.status === "cancelled" ? null : ticketData.qr_code || null,
-            status: ticketData.status,
-            };
-          });
-        }
+            qr_code: t.status === "cancelled" ? null : t.qr_code || null,
+            status: t.status,
+            functionId: t.event_tickets?.event_date_id ?? null,
+            functionLabel: t.event_tickets?.event_date_id != null ? fn?.label || "" : "",
+          };
+        });
+      }
 
-        // Dirección secreta: solo para órdenes pagadas con al menos una entrada vigente
-        const hasLiveTicket = (ticketsData || []).some((t: any) => t.status !== "cancelled");
-        if (orderData.status === "paid" && hasLiveTicket) {
-          const { data: secretRow } = await supabase.from("events").select("secret_location").eq("id", event.id).maybeSingle();
-          if (secretRow?.secret_location) event.secret_location = secretRow.secret_location;
-        }
-
-        if (orderData.status !== "paid") {
-          if (orderData.status === "processing") {
-            pendingMessage = "¡Pago recibido! Estamos emitiendo tus entradas; aparecerán aquí y en tu correo en unos minutos.";
-          } else if (orderData.status === "pending") {
-            pendingMessage = "Estamos confirmando tu pago. Tus entradas aparecerán aquí y llegarán a tu correo apenas se confirme (recarga la página en unos minutos).";
-          } else if (orderData.status === "refunded") {
-            pendingMessage = "Esta orden fue reembolsada: sus entradas fueron anuladas y ya no sirven para ingresar al evento.";
-          } else if (["rejected", "cancelled", "failed", "expired"].includes(orderData.status)) {
-            pendingMessage = "El pago de esta orden no se completó, por lo que no tiene entradas asociadas.";
-          } else {
-            pendingMessage = `Esta orden está en revisión. Si ya pagaste, escríbenos a ${LEGAL.supportEmail} indicando el número de orden.`;
+      // Dirección secreta: solo para órdenes pagadas con al menos una entrada vigente
+      const hasLiveTicket = (ticketsData || []).some((t: any) => t.status !== "cancelled");
+      if (orderInfo.status === "paid" && hasLiveTicket) {
+        const { data: secretRow } = await supabase.from("events").select("secret_location").eq("id", event.id).maybeSingle();
+        if (secretRow?.secret_location) secretLocation = String(secretRow.secret_location);
+        // Muro de asistentes (sin la migración aplicada, simplemente no aparece)
+        if (buyer?.email) {
+          try {
+            feed = await loadFeed(supabase, event.id, String(buyer.email).toLowerCase());
+          } catch (err: any) {
+            console.warn("order: muro no disponible:", err?.message || err);
           }
+        }
+      }
+
+      if (orderInfo.status !== "paid") {
+        if (orderInfo.status === "processing") {
+          pendingMessage = "¡Pago recibido! Estamos emitiendo tus entradas; aparecerán aquí y en tu correo en unos minutos.";
+        } else if (orderInfo.status === "pending") {
+          pendingMessage = "Estamos confirmando tu pago. Tus entradas aparecerán aquí y llegarán a tu correo apenas se confirme (recarga la página en unos minutos).";
+        } else if (orderInfo.status === "refunded") {
+          pendingMessage = "Esta orden fue reembolsada: sus entradas fueron anuladas y ya no sirven para ingresar al evento.";
+        } else if (["rejected", "cancelled", "failed", "expired"].includes(orderInfo.status)) {
+          pendingMessage = "El pago de esta orden no se completó, por lo que no tiene entradas asociadas.";
+        } else {
+          pendingMessage = `Esta orden está en revisión. Si ya pagaste, escríbenos a ${LEGAL.supportEmail} indicando el número de orden.`;
         }
       }
     }
@@ -158,116 +133,255 @@ if (!id || !UUID_RE.test(id)) {
   }
 }
 
+const kind = orderInfo ? orderKind(orderInfo) : "purchase";
+const paidKind = isPaidKind(kind);
+const liveTickets = tickets.filter((t) => t.status !== "cancelled");
+const copy = orderCopy(kind, liveTickets.length || tickets.length || 1);
+const isPaid = orderInfo?.status === "paid";
+const canInteract = isPaid && liveTickets.length > 0;
+const firstName = String(buyer?.first_name || "").trim().split(/\s+/)[0] || "";
+
+// Funciones de estas entradas (la próxima primero) y lugar a mostrar (la dirección secreta si corresponde)
+const functions = event ? upcomingFirst(functionsForTickets(event, tickets.map((t) => t.functionId))) : [];
+const shownFunctions = functions.slice(0, 3);
+const place = secretLocation || shownFunctions[0]?.place || event?.location || "";
+const now = Date.now();
+const ended = functions.length > 0 && functions.every((f) => f.startIso && new Date(f.endIso || f.startIso).getTime() + (f.endIso ? 0 : 3 * 3600 * 1000) < now);
+const calendarHref = event && !ended ? calendarUrl(event.name, shownFunctions[0], place, `${Astro.url.origin}/order/${id}`) : null;
+const mapsHref = mapsUrl(place);
+
 // amount = subtotal; ticket_fee = cargo por servicio neto; service_fee_tax = IVA del cargo.
 // Cargo absorbido (fee_absorbed): subtotal = total pagado y no se muestra cargo encima.
 const breakdown = orderInfo ? orderBuyerBreakdown(orderInfo) : null;
 // Descuento: amount ya viene descontado; el subtotal a precio de lista es amount + descuento
 const discount = orderInfo ? orderDiscount(orderInfo) : { code: "", amount: 0 };
-const totalPaid = orderInfo
-  ? Number(orderInfo.total_payment ?? breakdown?.total) || 0
-  : 0;
+const totalPaid = orderInfo ? Number(orderInfo.total_payment ?? breakdown?.total) || 0 : 0;
 const clp = (n: number) => `$${Math.round(Number(n) || 0).toLocaleString("es-CL")}`;
+const createdLabel = orderInfo?.created_at
+  ? `${formatLocalDate(orderInfo.created_at, { day: "numeric", month: "long", year: "numeric" })}, ${formatLocalTime(orderInfo.created_at)} hrs`
+  : "";
+
+// "Guardar en este dispositivo": con sesión de asistente de este mismo email se ofrece ir a Mis entradas
+const buyerEmail = String(buyer?.email || "").toLowerCase();
+const buyerSession = getBuyerSession(Astro);
+const sameBuyer = Boolean(buyerEmail) && buyerSession?.email === buyerEmail;
+
+const statusBadge = isPaid
+  ? { text: copy.badge, tone: "bg-lime-300 text-black" }
+  : orderInfo?.status === "refunded"
+    ? { text: "Reembolsada", tone: "bg-gray-200 text-gray-700" }
+    : ["processing", "pending"].includes(orderInfo?.status)
+      ? { text: orderInfo?.status === "processing" ? "Pago recibido" : "Pago en proceso", tone: "bg-amber-100 text-amber-800" }
+      : { text: "Sin entradas", tone: "bg-gray-200 text-gray-700" };
+const pageTitle = event?.name ? `${kind === "rsvp" ? "Tu asistencia" : copy.ticketsTitle}: ${event.name} | AI Tickets` : "Tu entrada | AI Tickets";
 ---
 
-<Layout title={event?.name ? `Tus entradas: ${event.name} | AI Tickets` : "Tu orden | AI Tickets"} noindex>
+<Layout title={pageTitle} noindex>
   <AppHeader client:idle />
-  <main class="flex flex-col items-center min-h-screen bg-gray-100">
-    <div class="max-w-6xl mx-auto w-full px-4 lg:px-0">
-
+  <main class="min-h-screen bg-gray-50 pt-20 pb-16 px-4 font-[Prompt]">
+    <div class="max-w-xl mx-auto space-y-4">
       {errorMessage ? (
-        <div class="mt-12 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
-          <h2 class="text-xl font-semibold font-[Unbounded] mb-2">Error</h2>
-          <p>{errorMessage}</p>
+        <div class="mt-8 rounded-2xl border border-gray-200 bg-white p-6 text-center">
+          <p class="text-gray-800">{errorMessage}</p>
+          <a href="/mis-entradas" class="mt-4 inline-block text-sm font-semibold underline">Buscar mis entradas</a>
         </div>
       ) : (
         <>
-          <div class="mt-16 lg:mt-12 bg-white rounded-lg shadow-lg p-6">
-            <h3 class="text-lg font-bold font-[Unbounded] text-gray-800 mb-4 break-words">
-              🎟️ Orden #{orderInfo?.id}
-            </h3>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600 font-[Prompt] break-words">
-              <div>
-                <span class="font-semibold">Cliente:</span>
-                <p>{attendeeInfo?.first_name} {attendeeInfo?.last_name}</p>
-                <p>{attendeeInfo?.email}</p>
-              </div>
-              <div>
-                <span class="font-semibold">Fecha de compra:</span>
-                <p>{orderInfo?.created_at ? `${formatLocalDate(orderInfo.created_at, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} a las ${formatLocalTime(orderInfo.created_at)} hrs` : 'N/A'}</p>
-              </div>
-              <div>
-                <span class="font-semibold">{orderInfo?.status === 'paid' ? 'Total pagado:' : 'Total:'}</span>
-                <p class="text-lg font-bold text-green-600">
-                  {totalPaid > 0 ? `$${totalPaid.toLocaleString('es-CL')}` : 'Gratis'}
+          <!-- Evento -->
+          <section class="overflow-hidden rounded-2xl bg-white border border-gray-200">
+            {event.image_url && (
+              <img src={cdnImage(event.image_url, 1080)} alt="" width="1080" height="540" decoding="async" class="block w-full aspect-[2/1] object-cover bg-gray-100" />
+            )}
+            <div class="p-5">
+              <span class={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${statusBadge.tone}`} data-testid="order-badge">
+                {isPaid && <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>}
+                {statusBadge.text}
+              </span>
+              <h1 class="mt-3 text-2xl font-bold font-[Unbounded] text-gray-900 leading-tight break-words">{event.name}</h1>
+              {isPaid && firstName && (
+                <p class="mt-1 text-gray-600">
+                  {kind === "rsvp" ? `${firstName}, te esperamos.` : kind === "purchase" ? `${firstName}, tus entradas están listas.` : `${firstName}, ${copy.headline.charAt(0).toLowerCase()}${copy.headline.slice(1)}.`}
                 </p>
-                {breakdown && (breakdown.fee > 0 || discount.amount > 0) && (
-                  <dl class="mt-1 space-y-0.5 text-xs text-gray-500" data-testid="order-fee-breakdown">
-                    {discount.amount > 0 && (
-                      <>
-                        <div class="flex justify-between gap-2"><dt>Entradas</dt><dd>{clp(breakdown.subtotal + discount.amount)}</dd></div>
-                        <div class="flex justify-between gap-2 text-lime-700" data-testid="order-discount-line"><dt>{discountLineLabel(discount.code)}</dt><dd>-{clp(discount.amount)}</dd></div>
-                      </>
-                    )}
-                    <div class="flex justify-between gap-2"><dt>Subtotal</dt><dd>{clp(breakdown.subtotal)}</dd></div>
-                    {breakdown.feeIncluded && (
-                      <div class="flex justify-between gap-2" data-testid="order-fee-included"><dt>{FEE_INCLUDED_NOTE}</dt><dd>Incluido</dd></div>
-                    )}
-                    {!breakdown.feeIncluded && breakdown.feeNet > 0 && (
-                      <div class="flex justify-between gap-2"><dt>{serviceFeeLabelFor(breakdown.subtotal, breakdown.feeNet)}</dt><dd>{clp(breakdown.feeNet)}</dd></div>
-                    )}
-                    {!breakdown.feeIncluded && breakdown.feeIva > 0 && (
-                      <div class="flex justify-between gap-2"><dt>{SERVICE_FEE_TAX_LABEL}</dt><dd>{clp(breakdown.feeIva)}</dd></div>
-                    )}
-                  </dl>
+              )}
+
+              <dl class="mt-4 space-y-2.5 text-sm">
+                {shownFunctions.length > 0 && (
+                  <div class="flex gap-3">
+                    <dt class="sr-only">Cuándo</dt>
+                    <svg class="mt-0.5 h-4 w-4 shrink-0 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
+                    <dd class="text-gray-800">
+                      {shownFunctions.map((f) => <span class="block">{f.label}</span>)}
+                      {functions.length > shownFunctions.length && <span class="block text-xs text-gray-500">y {functions.length - shownFunctions.length} funciones más</span>}
+                    </dd>
+                  </div>
                 )}
-              </div>
+                {place && (
+                  <div class="flex gap-3">
+                    <dt class="sr-only">Dónde</dt>
+                    <svg class="mt-0.5 h-4 w-4 shrink-0 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></svg>
+                    <dd class="text-gray-800">
+                      {place}
+                      {secretLocation && <span class="block text-xs text-amber-700">Dirección exclusiva para asistentes: no la compartas.</span>}
+                    </dd>
+                  </div>
+                )}
+              </dl>
+
+              {(calendarHref || mapsHref) && isPaid && (
+                <div class="mt-4 flex flex-wrap gap-2">
+                  {calendarHref && <a href={calendarHref} target="_blank" rel="noopener" class="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-800 hover:border-gray-900 transition">+ Calendario</a>}
+                  {mapsHref && <a href={mapsHref} target="_blank" rel="noopener" class="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-800 hover:border-gray-900 transition">Cómo llegar</a>}
+                  {event.slug && (
+                    <button type="button" data-share-event={`${Astro.url.origin}/eventos/${encodeURIComponent(event.slug)}?ref=invite`} data-share-title={event.name} class="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-800 hover:border-gray-900 transition">
+                      Invitar a alguien
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
-          </div>
+          </section>
 
           {pendingMessage && (
-            <div class="mt-6 bg-amber-50 border border-amber-300 text-amber-800 px-4 py-3 rounded-lg font-[Prompt]">
-              {pendingMessage}
-            </div>
+            <div class="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">{pendingMessage}</div>
           )}
 
-          <EventDetails event={event} client:load />
-
+          <!-- Entradas -->
           {tickets.length > 0 && (
-            <div class="mt-6">
-              <h2 class="text-xl font-semibold font-[Unbounded] text-gray-800 mb-4">
-                {tickets.length === 1 ? 'Tu Entrada' : `Tus Entradas (${tickets.length})`}
-              </h2>
+            <section aria-labelledby="entradas" class="space-y-3">
+              <h2 id="entradas" class="px-1 text-xs font-semibold uppercase tracking-wider text-gray-500">{copy.ticketsTitle}</h2>
+              {tickets.map((ticket, index) => (
+                <div>
+                <TicketInfo
+                  ticket={ticket}
+                  event={{ name: event.name, slug: event.slug }}
+                  index={index + 1}
+                  total={tickets.length}
+                  functionLabel={ticket.functionLabel || (functions.length === 1 ? functions[0].label : "")}
+                  place={secretLocation || (functions.length === 1 ? functions[0].place : "")}
+                  client:only="vue"
+                />
+                </div>
+              ))}
+            </section>
+          )}
 
-              <div class="space-y-6">
-                {tickets.map((ticket, index) => (
-                  <div class="relative">
-                    {tickets.length > 1 && (
-                      <div class="text-sm text-gray-500 font-[Prompt] mb-2">
-                        Entrada {index + 1} de {tickets.length}
-                      </div>
-                    )}
-                    <TicketInfo ticket={ticket} event={event} client:only />
-                  </div>
-                ))}
-              </div>
+          {canInteract && feed && <AttendeeFeed orderId={String(id)} initialFeed={feed} ended={ended} client:visible />}
+
+          {canInteract && <ProducerMessageForm orderId={String(id)} organizerName={event.organizerName} email={buyerEmail} client:visible />}
+
+          {canInteract && buyerEmail && (
+            <div class="rounded-2xl border border-gray-200 bg-white p-4">
+              {sameBuyer ? (
+                <a href="/mis-entradas" class="flex items-center justify-between text-sm font-semibold text-gray-900">
+                  Ver todas mis entradas <span aria-hidden="true">→</span>
+                </a>
+              ) : (
+                <BuyerAccessForm orderId={String(id)} maskedEmail={maskEmail(buyerEmail)} client:visible />
+              )}
             </div>
           )}
 
-          <div class="w-full mt-8 mb-8">
-            <details class="bg-white p-4 rounded-lg shadow-lg">
-              <summary class="text-lg font-semibold cursor-pointer font-[Unbounded]">
-                Detalles del Evento
-              </summary>
-              <div class="mt-4">
-                <EventHeader event={event} client:idle />
-                <EventTabs event={event} client:only />
-              </div>
-            </details>
-          </div>
+          <!-- Detalle: comprobante (solo compras), titular e información del evento -->
+          <details class="group rounded-2xl border border-gray-200 bg-white">
+            <summary class="flex cursor-pointer list-none items-center justify-between gap-3 p-5 font-semibold text-gray-900">
+              {paidKind ? "Detalle de la compra" : "Más información"}
+              <svg class="h-4 w-4 text-gray-400 transition group-open:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+            </summary>
+            <div class="space-y-5 border-t border-gray-100 p-5 text-sm">
+              <dl class="space-y-1.5 text-gray-600">
+                {buyer && (
+                  <div class="flex justify-between gap-4"><dt>{paidKind ? "Comprador" : "A nombre de"}</dt><dd class="text-right text-gray-900 break-all">{`${buyer.first_name || ""} ${buyer.last_name || ""}`.trim() || buyer.email}</dd></div>
+                )}
+                {createdLabel && <div class="flex justify-between gap-4"><dt>{copy.dateLabel}</dt><dd class="text-right text-gray-900">{createdLabel}</dd></div>}
+              </dl>
+
+              {paidKind && breakdown && (
+                <dl class="space-y-1 border-t border-gray-100 pt-4 text-gray-600" data-testid="order-fee-breakdown">
+                  {discount.amount > 0 && (
+                    <>
+                      <div class="flex justify-between gap-2"><dt>Entradas</dt><dd>{clp(breakdown.subtotal + discount.amount)}</dd></div>
+                      <div class="flex justify-between gap-2 text-lime-700" data-testid="order-discount-line"><dt>{discountLineLabel(discount.code)}</dt><dd>-{clp(discount.amount)}</dd></div>
+                    </>
+                  )}
+                  {(breakdown.fee > 0 || discount.amount > 0) && <div class="flex justify-between gap-2"><dt>Subtotal</dt><dd>{clp(breakdown.subtotal)}</dd></div>}
+                  {breakdown.feeIncluded && (
+                    <div class="flex justify-between gap-2" data-testid="order-fee-included"><dt>{FEE_INCLUDED_NOTE}</dt><dd>Incluido</dd></div>
+                  )}
+                  {!breakdown.feeIncluded && breakdown.feeNet > 0 && (
+                    <div class="flex justify-between gap-2"><dt>{serviceFeeLabelFor(breakdown.subtotal, breakdown.feeNet)}</dt><dd>{clp(breakdown.feeNet)}</dd></div>
+                  )}
+                  {!breakdown.feeIncluded && breakdown.feeIva > 0 && (
+                    <div class="flex justify-between gap-2"><dt>{SERVICE_FEE_TAX_LABEL}</dt><dd>{clp(breakdown.feeIva)}</dd></div>
+                  )}
+                  <div class="flex justify-between gap-2 pt-1 text-base font-semibold text-gray-900">
+                    <dt>{isPaid ? "Total pagado" : "Total"}</dt><dd>{totalPaid > 0 ? clp(totalPaid) : "Gratis"}</dd>
+                  </div>
+                </dl>
+              )}
+
+              {event.descriptionHtml && (
+                <div class="border-t border-gray-100 pt-4">
+                  <p class="mb-2 font-semibold text-gray-900">Sobre el evento</p>
+                  <div class="text-gray-700 break-words [&_p]:mb-3 [&_ul]:mb-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:mb-3 [&_ol]:list-decimal [&_ol]:pl-5 [&_a]:underline [&_h2]:mt-4 [&_h2]:font-bold [&_h3]:mt-3 [&_h3]:font-semibold" set:html={event.descriptionHtml} />
+                </div>
+              )}
+
+              {event.faqs.length > 0 && (
+                <div class="border-t border-gray-100 pt-4">
+                  <p class="mb-2 font-semibold text-gray-900">Preguntas frecuentes</p>
+                  <dl class="space-y-3">
+                    {event.faqs.map((f: any) => (
+                      <div>
+                        <dt class="font-medium text-gray-900">{f.question}</dt>
+                        <dd class="text-gray-600 whitespace-pre-line">{f.answer}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              )}
+
+              {(paidKind || !isPaid) && (
+                <p class="border-t border-gray-100 pt-4 text-[11px] leading-relaxed text-gray-400 break-all" data-testid="order-id">
+                  N.º de orden {orderInfo.id}
+                </p>
+              )}
+            </div>
+          </details>
+
+          {event.slug && (
+            <p class="text-center">
+              <a href={`/eventos/${encodeURIComponent(event.slug)}`} class="text-sm text-gray-500 underline hover:text-gray-900">Ver la página del evento</a>
+            </p>
+          )}
         </>
       )}
     </div>
   </main>
   <AppFooter client:idle />
 </Layout>
+
+<script>
+  // "Invitar a alguien": comparte la página pública del evento (nunca el link de la orden ni el QR)
+  document.querySelectorAll<HTMLButtonElement>("[data-share-event]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const url = btn.dataset.shareEvent || "";
+      const title = btn.dataset.shareTitle || "Evento";
+      if (navigator.share) {
+        try {
+          await navigator.share({ title, text: `Voy a ${title}, ¿vamos?`, url });
+          return;
+        } catch (err: any) {
+          if (err?.name === "AbortError") return;
+        }
+      }
+      try {
+        await navigator.clipboard.writeText(url);
+        const label = btn.textContent;
+        btn.textContent = "¡Link copiado!";
+        setTimeout(() => (btn.textContent = label), 2000);
+      } catch {
+        window.prompt("Copia el link del evento:", url);
+      }
+    });
+  });
+</script>

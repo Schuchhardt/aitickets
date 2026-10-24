@@ -92,9 +92,53 @@ describe('plantillas de correo', () => {
     expect(html).toContain('Comprobante de compra')
     expect(text).toMatch(/2 x General .*\$30\.000/)
     const free = await SAMPLES['tickets-free']()
-    expect(free.html).toContain('Gratis')
     expect(free.html).not.toContain('Dirección exclusiva')
     expect(free.html).not.toContain('Google Calendar')
+  })
+
+  it('evento gratis: confirmación de asistencia, sin compra, comprobante ni n.º de orden', async () => {
+    const { subject, html, text } = await SAMPLES['tickets-free']()
+    expect(subject).toBe('✅ Asistencia confirmada: Charla abierta')
+    expect(html).toContain('Asistencia confirmada')
+    expect(html).toContain('Tu asistencia está confirmada')
+    expect(html).toContain('Ver mi entrada (QR)')
+    expect(html).toContain('1 x Entrada liberada')
+    for (const out of [subject, html, text]) {
+      expect(out).not.toMatch(/compra|comprobante|total|pagad/i)
+      expect(out).not.toContain('Orden a1b2c3')
+    }
+    // Contacto con la productora: link al formulario de la orden
+    expect(html).toContain('href="https://aitickets.cl/order/a1b2c3#mensaje"')
+    expect(text).toContain('Escríbele a Productora Sur')
+  })
+
+  it('cortesía: invitación sin comprobante; compra: comprobante y link a la productora', async () => {
+    const courtesy = await SAMPLES['tickets-courtesy']()
+    expect(courtesy.subject).toBe('🎟️ Tu invitación para Festival de Jazz de Valparaíso')
+    expect(courtesy.html).toContain('Tienes 2 invitaciones')
+    expect(courtesy.html).not.toMatch(/Comprobante|Total pagado/)
+    const paid = await emails.renderTicketsEmail({ kind: 'purchase', eventName: 'Show', ticketLines: [{ name: 'General', quantity: 1, unitPrice: 1000 }], subtotal: 1000, feeNet: 80, feeIva: 15, total: 1095, orderId: 'o-1', orderUrl: 'https://aitickets.cl/order/o-1', contactUrl: 'https://aitickets.cl/order/o-1#mensaje', organizerName: 'Prod' })
+    expect(paid.html).toContain('Compra confirmada')
+    expect(paid.html).toContain('Comprobante de compra')
+    expect(paid.html).toContain('Escríbele a Prod')
+  })
+
+  it('mensaje de un asistente a la productora: datos, mensaje escapado y link al panel', async () => {
+    const { subject, html, text } = await emails.renderAttendeeMessageEmail({ eventName: 'Show', name: 'Pedro <b>', email: 'pedro@x.cl', ticketsLabel: '2 entradas · Asistencia confirmada', message: '¿Hay <script>?\nGracias', dashboardUrl: 'https://aitickets.cl/dashboard/events/1#mensajes' })
+    expect(subject).toBe('💬 Pedro <b> te escribió sobre Show')
+    expect(html).not.toContain('<script>')
+    expect(html).toContain('href="mailto:pedro@x.cl"')
+    expect(html).toContain('https://aitickets.cl/dashboard/events/1#mensajes')
+    expect(text).toContain('Gracias')
+  })
+
+  it('acceso a Mis entradas: botón con el link y vencimiento', async () => {
+    const url = 'https://aitickets.cl/mis-entradas/acceso?t=abc.def'
+    const { subject, html, text } = await emails.renderBuyerAccessEmail({ name: 'Ana Pérez', url, minutes: 60 })
+    expect(subject).toBe('Tu link para ver tus entradas')
+    expect(html).toContain(`href="${url}"`)
+    expect(html).toContain('Hola Ana')
+    expect(text).toContain('60 minutos')
   })
 
   it('escapa HTML del contenido del usuario y descarta URLs no http(s)', async () => {

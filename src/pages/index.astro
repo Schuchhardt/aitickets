@@ -12,6 +12,7 @@ import PricingExampleSection from "../components/landing/PricingExampleSection.v
 import ProducerFaq from "../components/landing/ProducerFaq.vue";
 import CallToAction from "../components/CallToAction.vue";
 import CtaTracking from "../components/landing/CtaTracking.astro";
+import ProducerSessionBanner from "../components/landing/ProducerSessionBanner.vue";
 import Layout from '../layouts/Layout.astro';
 import { PRODUCER_FAQ } from "../data/producerFaq";
 import { LEGAL } from "../lib/legal";
@@ -69,4 +70,5 @@ const jsonLd = [
   </main>
   <AppFooter client:idle/>
   <CtaTracking />
+  <ProducerSessionBanner client:idle />
 </Layout>

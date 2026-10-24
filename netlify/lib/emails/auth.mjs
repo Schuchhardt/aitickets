@@ -93,3 +93,33 @@ export async function renderMagicLinkEmail({ name, url, purpose = 'login' } = {}
   )
   return renderEmail(copy.subject, element)
 }
+
+/**
+ * Link de acceso de un asistente a "Mis entradas" (sin cuenta ni contraseña). Vence en `minutes` minutos.
+ * @param {{ name?: string, url: string, minutes?: number }} opts
+ */
+export async function renderBuyerAccessEmail({ name, url, minutes = 60 } = {}) {
+  const first = firstName(name)
+  const element = h(
+    EmailLayout,
+    {
+      preview: 'Entra a tus entradas de un clic, sin contraseña.',
+      footer: { reason: 'Recibes este correo porque se pidió un link para ver las entradas de esta dirección en AI Tickets.' },
+    },
+    h(Title, null, 'Tus entradas en AI Tickets'),
+    h(
+      Paragraph,
+      { align: 'center', muted: true },
+      `${first ? `Hola ${first}, con` : 'Con'} este botón entras a todas tus entradas y eventos confirmados. Este dispositivo quedará con la sesión iniciada.`
+    ),
+    h(PrimaryButton, { href: url }, 'Ver mis entradas'),
+    h(
+      Panel,
+      { tone: 'lime' },
+      h(Paragraph, { small: true, style: { margin: 0, color: '#3f6212' } }, `Por seguridad, el link vence en ${minutes} minutos. No lo reenvíes: quien lo abra verá tus entradas.`)
+    ),
+    h(Paragraph, { small: true, muted: true }, 'Si no lo pediste, ignora este correo: nadie puede ver tus entradas sin este link.'),
+    h(FallbackLink, { href: url })
+  )
+  return renderEmail('Tu link para ver tus entradas', element)
+}
