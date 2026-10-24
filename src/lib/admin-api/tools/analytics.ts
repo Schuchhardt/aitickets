@@ -83,6 +83,50 @@ export async function loadVisitsInPeriod(supabase: any, period: Pick<Period, "fr
     return rows.filter((v) => set.has(Number(v.event_id)));
 }
 
+export type VisitGroup = "total" | "event" | "org" | "day" | "week" | "month";
+export type VisitCount = { visits: number; unique_visitors: number };
+
+/**
+ * Visitas y visitantes únicos (ip_hash distintos DENTRO de cada grupo) del período, contados en la base con la RPC
+ * aitickets_admin_visit_counts (202610250116): no trae las filas, así que no depende del volumen. Claves: 'total',
+ * el event_id o el organization_id como texto, o el día/semana/mes de bucketOf(). Si la función aún no existe
+ * (deploy sin migrar) se cuenta en memoria con loadVisitsInPeriod; para group 'org' hace falta orgOfEvent.
+ */
+export async function visitCounts(
+    supabase: any,
+    period: Pick<Period, "fromIso" | "toIso">,
+    eventIds: number[],
+    group: VisitGroup,
+    { orgOfEvent }: { orgOfEvent?: Map<number, number> } = {},
+): Promise<Map<string, VisitCount>> {
+    if (!eventIds.length) return new Map();
+    const { data, error } = await supabase.rpc("aitickets_admin_visit_counts", { p_from: period.fromIso, p_to: period.toIso, p_event_ids: eventIds, p_group: group });
+    if (!error && Array.isArray(data)) {
+        return new Map(data.map((r: any) => [String(r.bucket), { visits: Number(r.visits) || 0, unique_visitors: Number(r.unique_visitors) || 0 }]));
+    }
+    if (error && !["42883", "PGRST202"].includes(String(error.code || ""))) console.error("aitickets_admin_visit_counts:", error.message);
+    const rows = await loadVisitsInPeriod(supabase, period, eventIds, { byEvent: eventIds.length <= 150 });
+    const keyOf = (v: any): string | null => {
+        if (group === "event") return String(v.event_id);
+        if (group === "org") {
+            const org = orgOfEvent?.get(Number(v.event_id));
+            return org == null ? null : String(org);
+        }
+        if (group === "total") return "total";
+        return bucketOf(localDay(v.created_at), group);
+    };
+    const acc = new Map<string, { visits: number; ips: Set<string> }>();
+    for (const v of rows) {
+        const key = keyOf(v);
+        if (key == null) continue;
+        const a = acc.get(key) || { visits: 0, ips: new Set<string>() };
+        a.visits += 1;
+        a.ips.add(String(v.ip_hash));
+        acc.set(key, a);
+    }
+    return new Map([...acc].map(([k, a]) => [k, { visits: a.visits, unique_visitors: a.ips.size }]));
+}
+
 /** Reembolsos activos (requested/processing/completed) creados en el período, de esos eventos. */
 export async function loadActiveRefunds(supabase: any, period: Pick<Period, "fromIso" | "toIso">, eventIds: number[]) {
     const set = new Set(eventIds);
@@ -143,7 +187,7 @@ const getPlatformOverview: AdminToolDef = {
             previous ? loadPaidOrders(supabase, eventIds, previous) : Promise.resolve([]),
             loadActiveRefunds(supabase, current, eventIds),
             previous ? loadActiveRefunds(supabase, previous, eventIds) : Promise.resolve([]),
-            loadVisitsInPeriod(supabase, current, eventIds),
+            visitCounts(supabase, current, eventIds, "total"),
             tolerantAll<any>(() => supabase.from("organizations").select("id, created_at").gte("created_at", current.fromIso).lt("created_at", current.toIso).order("id", { ascending: true })),
             tolerantAll<any>(() => supabase.from("organizations").select("id").gte("email_verified_at", current.fromIso).lt("email_verified_at", current.toIso).order("id", { ascending: true })),
             pendingCounters(supabase),
@@ -157,7 +201,8 @@ const getPlatformOverview: AdminToolDef = {
         const prevRefundFee = sumBy(prevRefunds, "fee_amount");
         const money = moneyBlock(totals, refundFee);
         const prevMoney = prevTotals ? moneyBlock(prevTotals, prevRefundFee) : null;
-        const uniqueVisitors = new Set(visits.map((v) => v.ip_hash)).size;
+        const visitTotals = visits.get("total") || { visits: 0, unique_visitors: 0 };
+        const uniqueVisitors = visitTotals.unique_visitors;
         const eventsCreated = events.filter((e) => e.created_at && e.created_at >= current.fromIso && e.created_at < current.toIso);
 
         const topEvents = [...byEvent.entries()]
@@ -189,7 +234,7 @@ const getPlatformOverview: AdminToolDef = {
                 producers_verified: verifiedOrgs.length,
                 events_created: eventsCreated.length,
                 events_created_and_published: eventsCreated.filter((e) => e.status === "published").length,
-                visits: visits.length,
+                visits: visitTotals.visits,
                 unique_visitors: uniqueVisitors,
                 conversion_pct: pct(totals.paid_orders, uniqueVisitors),
                 ...(prevTotals
@@ -306,7 +351,7 @@ const getPlatformTimeseries: AdminToolDef = {
             want("signups") && !orgIds
                 ? tolerantAll<any>(() => supabase.from("organizations").select("id, created_at").gte("created_at", current.fromIso).lt("created_at", current.toIso).order("id", { ascending: true }))
                 : Promise.resolve([]),
-            want("visits") ? loadVisitsInPeriod(supabase, current, eventIds, { byEvent: Boolean(orgIds) }) : Promise.resolve([]),
+            want("visits") ? visitCounts(supabase, current, eventIds, granularity) : Promise.resolve(new Map<string, VisitCount>()),
             want("refunds") ? loadActiveRefunds(supabase, current, eventIds) : Promise.resolve([]),
         ]);
 
@@ -328,15 +373,6 @@ const getPlatformTimeseries: AdminToolDef = {
             for (const k of [...MONEY_KEYS, "paid_orders", "tickets_sold"] as const) (acc as any)[k] += (t as any)[k];
             bucketSales.set(key, acc);
         }
-        const visitors = new Map<string, Set<string>>();
-        for (const v of visits) {
-            const p = at(v.created_at);
-            if (!p) continue;
-            p.visits = (p.visits || 0) + 1;
-            const set = visitors.get(p.bucket) || new Set<string>();
-            set.add(String(v.ip_hash));
-            visitors.set(p.bucket, set);
-        }
         for (const o of signups) {
             const p = at(o.created_at);
             if (p) p.signups = (p.signups || 0) + 1;
@@ -357,8 +393,8 @@ const getPlatformTimeseries: AdminToolDef = {
             if (want("tickets")) out.tickets_sold = t.tickets_sold;
             if (want("signups") && !orgIds) out.signups = p.signups || 0;
             if (want("visits")) {
-                out.visits = p.visits || 0;
-                out.unique_visitors = visitors.get(p.bucket)?.size || 0;
+                out.visits = visits.get(p.bucket)?.visits || 0;
+                out.unique_visitors = visits.get(p.bucket)?.unique_visitors || 0;
             }
             if (want("refunds")) {
                 out.refunds_count = p.refunds_count || 0;
@@ -413,18 +449,10 @@ const rankProducers: AdminToolDef = {
         const eventIds = rows.flatMap((r) => r.events.map((e: any) => Number(e.id)));
         const orgOfEvent = new Map(rows.flatMap((r) => r.events.map((e: any) => [Number(e.id), Number(r.org.id)] as [number, number])));
         const [visits, refunds, ratings] = await Promise.all([
-            loadVisitsInPeriod(supabase, current, eventIds),
+            visitCounts(supabase, current, eventIds, "org", { orgOfEvent }),
             loadActiveRefunds(supabase, current, eventIds),
             tolerantAll<any>(() => supabase.from("aitickets_event_reviews").select("organization_id, rating").order("id", { ascending: true }), { max: 100000 }),
         ]);
-        const visitorsByOrg = new Map<number, Set<string>>();
-        for (const v of visits) {
-            const org = orgOfEvent.get(Number(v.event_id));
-            if (org == null) continue;
-            const set = visitorsByOrg.get(org) || new Set<string>();
-            set.add(String(v.ip_hash));
-            visitorsByOrg.set(org, set);
-        }
         const refundsByOrg = new Map<number, number>();
         for (const r of refunds) refundsByOrg.set(Number(r.organization_id), (refundsByOrg.get(Number(r.organization_id)) || 0) + 1);
         const ratingByOrg = new Map<number, { sum: number; n: number }>();
@@ -443,7 +471,7 @@ const rankProducers: AdminToolDef = {
             const now = totalsFromOrders(r.orders.filter((o) => inPeriod(o, current)));
             const before = previous ? totalsFromOrders(r.orders.filter((o) => inPeriod(o, previous))) : emptyTotals();
             const eventsWithSales = new Set(r.orders.filter((o) => inPeriod(o, current) && isSaleOrder(o)).map((o) => Number(o.event_id))).size;
-            const unique = visitorsByOrg.get(id)?.size || 0;
+            const unique = visits.get(String(id))?.unique_visitors || 0;
             const rating = ratingByOrg.get(id);
             const growth = pctChange(now.gross_sales_clp, before.gross_sales_clp);
             const alerts: string[] = [];

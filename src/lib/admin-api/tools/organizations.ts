@@ -287,7 +287,7 @@ const getOrganization: AdminToolDef = {
             eventIds.length
                 ? tolerantRows(() => supabase.from("event_orders").select("id, event_id, created_at").in("event_id", eventIds).eq("status", "review").limit(50))
                 : Promise.resolve([]),
-            tolerantRows(() => supabase.from("aitickets_scheduled_messages").select("id, event_id, kind, status, updated_at").eq("organization_id", orgId).eq("status", "failed").limit(20)),
+            tolerantRows(() => supabase.from("aitickets_scheduled_messages").select("id, event_id, kind, status, send_at").eq("organization_id", orgId).eq("status", "failed").limit(20)),
             tolerantRows(() => supabase.from("aitickets_refunds").select("id, order_id, total_amount, created_at").eq("organization_id", orgId).eq("status", "requested").limit(50)),
             eventIds.length ? tolerantRows(() => supabase.from("aitickets_event_reviews").select("rating").in("event_id", eventIds).limit(5000)) : Promise.resolve([]),
         ]);

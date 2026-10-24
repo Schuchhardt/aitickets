@@ -140,6 +140,26 @@ describe('get_platform_overview', () => {
   })
 })
 
+describe('visitas contadas en la base (aitickets_admin_visit_counts)', () => {
+  it('si la función existe, overview usa sus conteos sin traer las filas de event_visits', async () => {
+    const calls = []
+    db = createFakeSupabase({
+      tables: db.tables,
+      rpc: {
+        aitickets_admin_visit_counts: (args) => {
+          calls.push(args)
+          return [{ bucket: 'total', visits: 12345, unique_visitors: 6789 }]
+        },
+      },
+    })
+    const r = await run('get_platform_overview', { preset: '30d' })
+    expect(r.activity).toMatchObject({ visits: 12345, unique_visitors: 6789 })
+    expect(calls[0]).toMatchObject({ p_group: 'total' })
+    expect(calls[0].p_event_ids).not.toContain(99) // sin eventos demo
+    expect(db.calls.some((c) => c.table === 'event_visits')).toBe(false)
+  })
+})
+
 describe('get_platform_timeseries', () => {
   it('semanas desde el lunes en hora de Chile', async () => {
     expect(weekStart('2025-03-09')).toBe('2025-03-03') // domingo → lunes anterior
