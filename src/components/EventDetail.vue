@@ -403,7 +403,7 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
             @open-assistant="openAssistant"
           />
           <EventReviews v-if="showReviews" :event="event" :ended="state === 'ended'" :external-origin="reviewsOrigin" />
-          <EventGallery v-if="event.gallery?.length" v-reveal :images="event.gallery" :eventName="event.name" />
+          <EventGallery v-if="event.gallery?.length || event.gallery_video" v-reveal :images="event.gallery || []" :video="event.gallery_video" :eventName="event.name" />
         </div>
       </div>
 

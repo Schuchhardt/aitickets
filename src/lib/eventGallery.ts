@@ -1,6 +1,6 @@
-// Galería de fotos del evento (public.aitickets_event_gallery_images). La gestionan el panel
-// (/api/events/gallery, EventGalleryManager.vue) y se muestra al final de la página pública (EventGallery.vue,
-// cargada en src/lib/eventPage.ts).
+// Galería de fotos del evento (public.aitickets_event_gallery_images) y su video de portada (events.gallery_video).
+// La gestionan el panel (/api/events/gallery, EventGalleryManager.vue) y se muestra al final de la página pública
+// (EventGallery.vue, cargada en src/lib/eventPage.ts).
 import { getSupabaseAdmin } from "./auth-helpers";
 
 export const GALLERY_TABLE = "aitickets_event_gallery_images";
@@ -46,6 +46,41 @@ export function normalizeGalleryInput(
     width: positiveInt(raw.width),
     height: positiveInt(raw.height),
     caption: normalizeCaption(raw.caption),
+  };
+}
+
+// ---- Video de portada de la galería (events.gallery_video, migración 202610240100) ----
+// Uno por evento, arriba de las fotos. Lo sube el panel directo a Storage (src/lib/videoStorage.ts) y lo muestra
+// src/components/event/GalleryVideo.vue (autoplay sin sonido en pantalla y botón para activar el sonido).
+
+/** Tipos aceptados → extensión del archivo. */
+export const GALLERY_VIDEO_TYPES: Record<string, string> = { "video/mp4": "mp4", "video/webm": "webm", "video/quicktime": "mov" };
+export const GALLERY_VIDEO_MAX_BYTES = 50 * 1024 * 1024;
+
+export interface GalleryVideo {
+  url: string;
+  poster_url: string | null;
+  width: number | null;
+  height: number | null;
+  duration: number | null;
+  mime: string | null;
+}
+
+const httpsUrl = (v: unknown) => (typeof v === "string" && /^https:\/\//.test(v) && v.length <= 1000 ? v : null);
+
+/** Video tal como lo guarda la BD → forma pública (null si no hay o está mal formado). */
+export function normalizeGalleryVideo(raw: any): GalleryVideo | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const url = httpsUrl(raw.url);
+  if (!url) return null;
+  const duration = Number(raw.duration);
+  return {
+    url,
+    poster_url: httpsUrl(raw.poster_url),
+    width: positiveInt(raw.width),
+    height: positiveInt(raw.height),
+    duration: Number.isFinite(duration) && duration > 0 && duration < 24 * 3600 ? Math.round(duration) : null,
+    mime: typeof raw.mime === "string" && GALLERY_VIDEO_TYPES[raw.mime] ? raw.mime : null,
   };
 }
 

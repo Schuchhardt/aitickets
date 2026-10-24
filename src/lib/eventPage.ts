@@ -13,7 +13,7 @@ import {
 import { descriptionToHtml } from "./sanitize";
 import { isDemoEventSlug, getDemoFunctionDate } from "./demoEvent.mjs";
 import { normalizeCoverSettings } from "./eventCover";
-import { loadEventGallery, type GalleryImage } from "./eventGallery";
+import { loadEventGallery, normalizeGalleryVideo, type GalleryImage } from "./eventGallery";
 import { loadPublicReviews } from "./eventReviews";
 import { isEventEnded } from "../components/event/eventView.js";
 import { resolveCoverMeta, eventThemeFrom } from "./eventCoverMeta";
@@ -290,8 +290,9 @@ async function loadEventPageRowsByQueries(
       : baseQuery.eq("slug", slug!).eq("status", "published")
     ).maybeSingle();
   };
-  let { data: event, error }: { data: any; error: any } = await loadEvent(`${EVENT_PUBLIC_COLUMNS}, cover_settings, fee_absorbed, cover_meta, page_settings`);
-  // Deploy previews comparten la BD de producción: tolerar que las migraciones de page_settings/cover_meta/cover_settings/fee_absorbed no estén aplicadas
+  let { data: event, error }: { data: any; error: any } = await loadEvent(`${EVENT_PUBLIC_COLUMNS}, cover_settings, fee_absorbed, cover_meta, page_settings, gallery_video`);
+  // Deploy previews comparten la BD de producción: tolerar que las migraciones de gallery_video/page_settings/cover_meta/cover_settings/fee_absorbed no estén aplicadas
+  if (error?.code === "42703") ({ data: event, error } = await loadEvent(`${EVENT_PUBLIC_COLUMNS}, cover_settings, fee_absorbed, cover_meta, page_settings`));
   if (error?.code === "42703") ({ data: event, error } = await loadEvent(`${EVENT_PUBLIC_COLUMNS}, cover_settings, fee_absorbed, cover_meta`));
   if (error?.code === "42703") ({ data: event, error } = await loadEvent(`${EVENT_PUBLIC_COLUMNS}, cover_settings, fee_absorbed`));
   if (error?.code === "42703") ({ data: event, error } = await loadEvent(`${EVENT_PUBLIC_COLUMNS}, cover_settings`));
@@ -549,7 +550,7 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
     ended ? loadPublicReviews(Number(event.id)).catch(() => null) : Promise.resolve(null),
   ]);
 
-  const { cover_meta: _coverMeta, page_settings: rawPageSettings, ...eventRow } = event;
+  const { cover_meta: _coverMeta, page_settings: rawPageSettings, gallery_video: rawGalleryVideo, ...eventRow } = event;
   const eventData = {
     ...eventRow,
     // R3: la descripción se renderiza con v-html => siempre sanitizada
@@ -561,6 +562,8 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
     tags,
     faqs,
     gallery,
+    // Video de portada de la galería (arriba de las fotos; src/components/event/GalleryVideo.vue)
+    gallery_video: normalizeGalleryVideo(rawGalleryVideo),
     // Evento terminado: { summary, reviews, comments_total, photos } (null si no terminó o sin tablas)
     reviews,
     dates,

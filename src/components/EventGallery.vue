@@ -2,10 +2,13 @@
 // Galería al final de la página pública del evento (aitickets_event_gallery_images, src/lib/eventGallery.ts).
 // Grilla de miniaturas (WebP) y visor a pantalla completa: flechas, Esc, swipe en mobile.
 // También muestra las fotos de los asistentes (EventReviews.vue) con otro título y otro id de sección.
+// Con `video` (events.gallery_video) muestra arriba de las fotos el video de portada (GalleryVideo.vue).
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import GalleryVideo from './event/GalleryVideo.vue'
 
 const props = defineProps({
   images: { type: Array, default: () => [] },
+  video: { type: Object, default: null },
   eventName: { type: String, default: '' },
   title: { type: String, default: 'Galería' },
   sectionId: { type: String, default: 'galeria' },
@@ -80,9 +83,10 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section v-if="images.length" :id="sectionId" class="scroll-mt-24 font-['Prompt']" :class="embedded ? '' : 'mt-12'" :data-testid="testId">
+  <section v-if="images.length || video" :id="sectionId" class="scroll-mt-24 font-['Prompt']" :class="embedded ? '' : 'mt-12'" :data-testid="testId">
     <h2 class="font-bold mb-4 font-['Unbounded']" :class="embedded ? 'text-lg' : 'text-2xl'">{{ title }}</h2>
-    <ul class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
+    <GalleryVideo v-if="video" :video="video" :eventName="eventName" />
+    <ul v-if="images.length" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
       <li v-for="(img, i) in visible" :key="img.id">
         <button type="button" class="group block w-full aspect-square overflow-hidden rounded-lg bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2"
           :aria-label="`Ver ${altFor(img, i)}`" @click="open(i)">

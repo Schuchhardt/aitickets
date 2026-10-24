@@ -22,6 +22,18 @@ export const SCENARIOS = {
   "maximo-configurado": { layout: "poster", tickets: [TICKETS.generalMax3] },
   // Evento que ya terminó (hace 2 días), con reseñas y fotos de asistentes (tests/e2e/event-reviews.spec.ts)
   "terminado-con-resenas": { layout: "poster", tickets: [], ended: true, reviews: true },
+  // Video de portada de la galería (tests/e2e/gallery-video.spec.ts)
+  "con-video-galeria": { layout: "poster", tickets: [TICKETS.general], galleryVideo: true },
+};
+
+/** Video como lo arma normalizeGalleryVideo (src/lib/eventGallery.ts), con el MP4 de public/videos. */
+export const FIXTURE_GALLERY_VIDEO = {
+  url: "/videos/aitickets-demo.mp4",
+  poster_url: "/videos/aitickets-demo-poster.jpg",
+  width: 1920,
+  height: 1080,
+  duration: null,
+  mime: "video/mp4",
 };
 
 /** Reseñas como las arma loadPublicReviews (src/lib/eventReviews.ts). */
@@ -89,6 +101,7 @@ export function fixtureEvent(name, { toPublicTicket, now = new Date() }) {
       { id: 2, question: "¿Hay estacionamiento?", answer: "Hay estacionamientos públicos cerca del teatro." },
     ],
     gallery: [],
+    gallery_video: scenario.galleryVideo ? FIXTURE_GALLERY_VIDEO : null,
     dates: [{ id: 9200, date, start_time: "20:00:00", end_time: "23:00:00", timezone: "America/Santiago", start_iso: start, end_iso: end, venue }],
     tickets: scenario.tickets.map((t) =>
       toPublicTicket({ ...t, init_date: null, end_date: null, event_date_id: null }, { remaining: t.total_quantity ?? null, feeAbsorbed: false }),
