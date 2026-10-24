@@ -2,8 +2,8 @@
 
 | | |
 | --- | --- |
-| Estado | Propuesta para revisión. No hay código todavía. |
-| Fecha | 2026-10-23 |
+| Estado | Propuesta para revisión. El MCP aún no tiene código. Los problemas de la sección 1.4 ya están corregidos (2026-10-24) |
+| Fecha | 2026-10-23 (actualizada 2026-10-24) |
 | Dueño | Sebastián Schuchhardt (único usuario) |
 | Relacionado | `docs/api/productores.md`, `src/lib/producer-api/`, `db/migrations/README.md` |
 
@@ -69,6 +69,17 @@ Toda la operación de AI Tickets es **SQL a mano en Supabase más avisos en Slac
 | Ocultar reseñas o fotos | Pedido del productor | SQL del runbook `docs/runbooks/resenas-e-invitaciones.md` | — |
 | Outreach: aprobar borradores, despausar | Slack con link firmado / aviso "⛔" | `/api/outreach/approve?t=` o SQL en `aitickets_outreach_state` | — |
 
+**Actualización 2026-10-24.** Las tres primeras filas ya no requieren `UPDATE` a mano. La migración
+`202610240100_payout_ops.sql` agrega funciones SQL con transiciones validadas, y los avisos de Slack traen el
+SQL listo con los ids reales. El runbook está en `docs/runbooks/retiros-reembolsos-y-cuentas.md`.
+
+- `aitickets_verify_payout_account(org, 'approve' | 'reject', quién, notas, últimos4)`
+- `aitickets_set_payout_status(payout, 'processing' | 'paid' | 'failed', comprobante, motivo, quién[, forzar])`
+- `aitickets_set_refund_status(refund, 'processing' | 'completed' | 'failed', ref_flow, motivo, quién)`
+
+Un trigger mantiene `event_withdrawals` sincronizada con `aitickets_payouts`. El MCP de admin envuelve estas
+funciones (5.6).
+
 ### 1.3 Analítica: lo que ven los productores y lo que falta
 
 - Las vistas del panel (`src/pages/dashboard/index.astro`, `events/[id].astro`,
@@ -95,22 +106,29 @@ Toda la operación de AI Tickets es **SQL a mano en Supabase más avisos en Slac
 | "Entradas vendidas" | filas de `event_attendees`: incluye cortesías y cuenta dos veces las transferencias | excluye cortesías y transferencias |
 | Totales | varias consultas sin paginar: se truncan a 1000 filas (p. ej. "Ingresos Totales" en `dashboard/index.astro`, visitas en `analytics.astro`) | paginan |
 
-### 1.4 Hallazgos colaterales (backlog, fuera de este MCP salvo donde se indica)
+**Actualización 2026-10-24: resuelto.**
 
-1. **Desfase entre retiros y saldo** (`aitickets_payouts` vs `event_withdrawals`). Este MCP lo cierra con una
-   RPC atómica (ver 7.4).
-2. **`event_withdrawals` guarda el número de cuenta completo, el titular y el RUT en texto plano** en cada
-   retiro (`tools/finance.ts:605`). Conviene guardar solo los últimos 4 dígitos, como `aitickets_payouts`.
-3. **Los correos de entradas no quedan registrados**: `notification_log` no tiene columna de email ni de
-   error, no se guarda el id de Resend y no hay webhook de rebotes. "No me llegó la entrada" solo se puede
-   diagnosticar con `event_orders.email_sent_at` y `email_claimed_at`.
-4. Las órdenes `pending` nunca se reconcilian contra Flow; solo expiran. Un pago tardío depende del webhook.
-5. Las métricas del panel se truncan a 1000 filas y el panel llama "conversión" a algo distinto que la API
-   (1.3).
-6. Los links de seguimiento (`create_tracking_link`) no se guardan, y `event_visits` no registra `ref`.
-7. Un comentario de la migración `202609290100` dice 10% de cargo y `netlify/lib/fees.mjs` dice 8%. Es
-   histórico (bajó el 2026-09-30) y las órdenes guardan su propio `ticket_fee`, así que las métricas de
-   este MCP suman lo cobrado y no recalculan con la tarifa vigente.
+- Toda la analítica del panel y `get_event_performance` salen de `src/lib/eventAnalytics.ts`, paginada y con
+  las definiciones de la sección 6.
+- "Conversión" es órdenes ÷ visitantes únicos; lo que el panel llamaba así ahora se llama "Ocupación".
+- `get_event_performance` agrega ubicación de visitantes, horas pico, medios de pago y conversión por canal.
+- `event_visits` registra `ref`.
+- Sigue faltando: comunidad de compradores entre eventos y los totales de finanzas separando cargo neto,
+  IVA y costo de Flow. Los cubre el MCP de admin (5.5).
+
+### 1.4 Hallazgos colaterales: estado
+
+| # | Hallazgo | Estado (2026-10-24) |
+| --- | --- | --- |
+| 1 | **Desfase entre retiros y saldo** (`aitickets_payouts` vs `event_withdrawals`) | ✅ Trigger que sincroniza `event_withdrawals` con su retiro, más `aitickets_set_payout_status` con transiciones validadas (`202610240100_payout_ops.sql`) |
+| 2 | **`event_withdrawals` guardaba el número de cuenta completo, el titular y el RUT en texto plano** | ✅ Los retiros nuevos guardan solo valores enmascarados (`•••• 6789`). La migración enmascaró las filas de retiros terminados (irreversible) y el trigger enmascara las demás al terminar. Para transferir se usa `organization_payout_accounts` |
+| 3 | **Correos de entradas sin registro**: sin id de Resend ni rebotes | ✅ `aitickets_email_log` (`202610240300_email_log.sql`) guarda cada intento. El webhook firmado `/api/webhooks/resend` agrega entregado, demorado, rebote y spam. `get_order` muestra `email_delivery`. **Falta configurar el webhook en Resend** (ver `.env.example`, `RESEND_WEBHOOK_SECRET`) |
+| 4 | Órdenes `pending` nunca reconciliadas contra Flow | ✅ `expire-pending-orders` consulta a Flow antes de expirar y revisa una vez más las expiradas a los 60–75 min. Avisa a Slack cada pago rescatado sin webhook |
+| 5 | Métricas del panel truncadas a 1000 filas y "conversión" mal definida | ✅ Ver 1.3 |
+| 6 | Visitas sin `ref` | ✅ `event_visits.ref` (`202610240200_event_visits_ref.sql`). Los links de seguimiento siguen sin guardarse (sería una función nueva, no un bug) |
+| 7 | Comentario de la migración `202609290100` con 10% de cargo vs 8% en `fees.mjs` | No es un bug: la tarifa bajó el 2026-09-30 y cada orden guarda su propio `ticket_fee`. Las métricas suman lo cobrado |
+| 8 | (Encontrado al corregir) Comunidad y Entradas no aplicaban el acceso por evento (`aitickets_event_staff`) | ✅ Un miembro limitado a ciertos eventos solo ve los asistentes de esos eventos |
+| 9 | Órdenes en `review` sin herramienta para resolverlas | Pendiente: `resolve_review_order` del MCP de admin (5.6, opcional) |
 
 ---
 
@@ -314,7 +332,9 @@ authorization_token: "aitkadm_…" }]` con el header beta vigente
 
 La bitácora guarda la huella de la llave usada en cada llamada.
 
-### 4.6 Plan B si tu cuenta de claude.ai no tiene "Request headers"
+### 4.6 Plan B si tu cuenta de claude.ai no tiene "Request headers" (no necesario)
+
+Confirmaste que tu cuenta tiene "Request headers", así que esto queda solo como referencia.
 
 claude.ai no acepta `client_credentials`: sin headers, la única vía es OAuth con PKCE y una pantalla de
 consentimiento. Fase 4 lo implementa reusando `oauth.ts`, en un servidor de autorización separado del de
@@ -413,10 +433,9 @@ Ejemplo de `get_platform_overview` (forma, valores ficticios):
 | `search_events` | Todos los eventos de la plataforma. Texto libre, `status`, `when` (`live_today`, `upcoming`, `past`), `organization_id`, rango de fechas, orden por ventas, fecha o creación. Por evento: org, fechas, estado, visibilidad, vendidas / capacidad, ingresos, visitas y conversión. Excluye los eventos demo (`isDemoEventSlug`) salvo que se pidan |
 | `get_event_analytics` | **La vista de analítica completa del panel** para cualquier evento; la org se infiere del `event_id`. Incluye: ventas, capacidad y ritmo (`eventPerformance`); serie diaria; horas pico; fuentes de tráfico; geografía (país y ciudad); ventas por canal (`ref` / UTM), por medio de pago y por tipo de entrada; códigos usados; check-in; reseñas (resumen sin datos personales) |
 
-`get_event_analytics` requiere extraer la lógica del frontmatter de `analytics.astro` a
-`src/lib/eventAnalytics.ts`, extendiendo `eventPerformance()` con geografía, horas pico y medios de pago. El
-panel debe pasar a usar esa misma librería: así se arreglan de paso el truncado a 1000 filas y las
-definiciones distintas (1.3).
+`get_event_analytics` llama a `getEventAnalytics()` de `src/lib/eventAnalytics.ts`, que ya existe: es la
+misma función que usa la página de analítica del panel. Solo falta cargar el evento sin filtrar por
+organización y agregar el resumen de check-in y reseñas.
 
 ### 5.4 Compradores y órdenes (soporte)
 
@@ -443,11 +462,11 @@ Admin").
 
 | Herramienta | Qué hace | Confirmación | Idempotente |
 | --- | --- | --- | --- |
-| `verify_payout_account` | `decision: approve \| reject`, `notes`. Escribe `verified_at`, `verified_by = 'admin:<huella>'` y `verification_notes` **sin tocar columnas bancarias** (si las tocara, el trigger borraría la verificación). Para que el productor sepa qué corregir al rechazar, `get_verification_status` debe empezar a mostrar `verification_notes` (hoy no la lee) | Sí | — |
-| `mark_payout_paid` | `payout_id`, `reference` (comprobante), `paid_at`. RPC atómica que actualiza `aitickets_payouts` **y** sus `event_withdrawals` (7.4). Opcional: aviso por correo al productor (pregunta abierta) | Sí | Sí |
-| `mark_payout_failed` | `payout_id`, `reason`. Misma RPC: deja ambas tablas en `failed`, así la plata vuelve al disponible | Sí | Sí |
-| `mark_refund_completed` | `refund_id`, `provider_reference` (id del reembolso en Flow), `processed_at` | Sí | Sí |
-| `mark_refund_failed` | `refund_id`, `reason`. Libera el bloqueo de doble reembolso (`isActiveRefund`) | Sí | Sí |
+| `verify_payout_account` | `decision: approve \| reject`, `notes`, `expected_last4`. Llama a `aitickets_verify_payout_account` (ya existe), con `verified_by = 'admin:<huella>'`. No toca columnas bancarias. El rechazo ya lo ve el productor en Configuración, `get_payout_account` y `get_verification_status` | Sí | — |
+| `mark_payout_paid` | `payout_id`, `reference` (comprobante), `force`. Llama a `aitickets_set_payout_status(…, 'paid', …)`. Se niega si la cuenta no está verificada o cambió después del retiro, salvo `force`. El trigger sincroniza `event_withdrawals`. Opcional: aviso por correo al productor (pregunta abierta) | Sí | Sí |
+| `mark_payout_failed` | `payout_id`, `reason`. Misma función con `'failed'`: el monto vuelve al disponible | Sí | Sí |
+| `mark_refund_completed` | `refund_id`, `provider_reference` (id del reembolso en Flow). Llama a `aitickets_set_refund_status(…, 'completed', …)` | Sí | Sí |
+| `mark_refund_failed` | `refund_id`, `reason`. Libera el bloqueo de doble reembolso (`isActiveRefund`). No revive las entradas | Sí | Sí |
 | `moderate_review` | Ocultar o mostrar una reseña o foto (`public_status`, `status`). Reemplaza el SQL del runbook | No | — |
 | `update_organization` | Perfil de la org (nombre público, razón social, RUT, correo, redes). Los productores no tienen herramienta MCP para esto | No | — |
 | `add_organization_note` | Nota interna (CRM de soporte) | No | — |
@@ -557,7 +576,10 @@ Viven en `src/lib/admin-api/metrics.ts`. El panel de productores debe migrar a e
 Siguiendo `db/migrations/README.md`: prefijo `aitickets_`, idempotente, RLS sin políticas, `REVOKE` a
 `anon` y `authenticated`, funciones `SECURITY DEFINER` con `search_path`, y expand/contract.
 
-### 7.1 `202610240100_admin_api.sql`
+Los números `202610240100` a `202610240300` ya los usan las correcciones de 1.4. Las migraciones del MCP
+parten en `202610250100`.
+
+### 7.1 `202610250100_admin_api.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS public.aitickets_admin_audit (
@@ -622,23 +644,14 @@ BEGIN
 END $$;
 ```
 
-### 7.3 Verificación de la cuenta bancaria
+### 7.3 y 7.4 Verificación de cuentas, retiros y reembolsos: ya existen
 
-Las columnas ya existen (`verified_at`, `verified_by`, `verification_notes`). Solo hay que asegurar que el
-`UPDATE` de `verify_payout_account` no toque columnas bancarias. Un test verifica que el trigger no
-dispara.
-
-### 7.4 RPC atómica de retiros
-
-```sql
--- aitickets_admin_set_payout_status(p_payout_id uuid, p_status text, p_reference text, p_paid_at timestamptz, p_reason text)
--- En UNA transacción: valida la transición (requested|processing → paid|failed), actualiza aitickets_payouts
--- (status, paid_at, reference, failure_reason) y TODAS sus event_withdrawals (status, paid_at).
--- Devuelve la fila resultante. SECURITY DEFINER, SET search_path = public, solo service_role.
-```
-
-Lo mismo para reembolsos: `aitickets_admin_set_refund_status`, con transición `requested|processing →
-completed|failed`, `provider_reference` y `processed_at`.
+Están en `202610240100_payout_ops.sql`. El MCP no necesita migraciones para esto: llama por `supabase.rpc` a
+`aitickets_verify_payout_account`, `aitickets_set_payout_status` y `aitickets_set_refund_status`. Las tres son
+`SECURITY DEFINER`, solo para `service_role`, validan las transiciones y devuelven `jsonb`. Un trigger
+sincroniza `event_withdrawals` con su retiro. Los errores de validación llegan como excepción de Postgres:
+el MCP los traduce a `ToolError("conflict" | "invalid_input")` con el mismo texto, que ya está escrito para
+quien opera.
 
 ### 7.5 Índices para consultas entre organizaciones (`-- migrate:no-transaction`, `CONCURRENTLY`)
 
@@ -685,12 +698,12 @@ src/lib/admin-api/
     finance.ts       # get_platform_finance, list_payout_requests, list_refund_requests
     operations.ts    # verify_payout_account, mark_payout_*, mark_refund_*, moderate_review, update_organization, notes, send_login_help
     activity.ts      # list_platform_activity, list_pending_operations, get_system_health
-src/lib/eventAnalytics.ts     # extraído de analytics.astro; lo usan el panel, get_event_analytics y eventPerformance
+src/lib/eventAnalytics.ts     # YA EXISTE (2026-10-24): lo usan el panel y eventPerformance; get_event_analytics lo reutiliza
 src/pages/api/admin/mcp.ts    # POST JSON-RPC; GET/DELETE 405; sin CORS *
 scripts/admin-key.mjs
-db/migrations/202610240100_admin_api.sql
-db/migrations/202610240110_admin_payout_refund_fns.sql
-db/migrations/202610240120_admin_indexes.sql   # -- migrate:no-transaction
+db/migrations/202610250100_admin_api.sql
+db/migrations/202610250110_admin_indexes.sql   # -- migrate:no-transaction
+# (las funciones de retiros/reembolsos/cuentas ya existen: 202610240100_payout_ops.sql)
 docs/api/admin.md             # runbook: conectar, rotar, desactivar
 tests/unit/admin-api-auth.test.mjs
 tests/unit/admin-api-mirror.test.mjs
@@ -720,10 +733,10 @@ Cada fase es un PR independiente que se puede desplegar.
 | --- | --- | --- |
 | **0. Base** | Auth (4.3), endpoint, middleware, `createMcpHandler`, migraciones 7.1 y 7.2, `get_admin_context`, `search_organizations`, `get_organization`, `search_events`. Script de llave y runbook | Conectado en claude.ai: "¿qué productores tengo y cuántos eventos tiene cada uno?" se responde bien. Sin variable o con otro Host responde 404; con una llave mala, 401 y una fila de bitácora. Tests verdes |
 | **1. Ver todo** | `metrics.ts`, `get_platform_overview`, `get_platform_timeseries`, `rank_producers` con segmentos y alertas, `get_producer_funnel`, `search_orders`, `get_order_timeline`, `list_platform_activity`. Índices 7.5 | Los números cuadran con `list_events` / `get_balance` del productor para 3 orgs reales. Cada herramienta tarda menos de 3 s con los datos actuales |
-| **2. Analítica completa** | Extraer `src/lib/eventAnalytics.ts`, `get_event_analytics`, y el panel migrado a la librería (arregla el truncado a 1000 y las definiciones) | `get_event_analytics` y `/dashboard/events/:id/analytics` muestran lo mismo para un evento con más de 1000 visitas |
+| **2. Analítica completa** | La librería `src/lib/eventAnalytics.ts` y el panel migrado ya están (2026-10-24). Falta `get_event_analytics` sobre esa librería | `get_event_analytics` y `/dashboard/events/:id/analytics` muestran lo mismo para un evento con más de 1000 visitas |
 | **3. Actuar como productor** | `mirror.ts` con las políticas de 5.7, actor de soporte, canal `admin`, `reason`, confirmación forzada, adaptación de `export_orders`, Slack "vía Admin", "Soporte AI Tickets" en `list_audit_log` | "Cámbiale la hora del evento 812 a las 21:00, me lo pidió por WhatsApp" termina con el evento editado, la bitácora del productor firmada por Soporte y la bitácora admin con el motivo. Herramientas bloqueadas ausentes de `tools/list` |
-| **4. Operación** | `list_pending_operations`, `get_system_health`, `get_platform_finance`, `list_payout_requests`, `list_refund_requests`, `verify_payout_account`, `mark_payout_*` (RPC 7.4), `mark_refund_*`, `moderate_review`, `update_organization`, notas, `send_login_help`. Prompts | La bandeja de un día real se procesa entera desde Claude sin abrir Supabase. Retiros y saldo nunca se desfasan (test de la RPC) |
-| **5. Opcionales** | OAuth (4.6) si hace falta para claude.ai; `resolve_review_order`; outreach; dominios; suspensión; snapshots diarios si el volumen lo pide; llave de solo lectura | Según necesidad |
+| **4. Operación** | `list_pending_operations`, `get_system_health`, `get_platform_finance`, `list_payout_requests`, `list_refund_requests`, `verify_payout_account`, `mark_payout_*` y `mark_refund_*` (envuelven las funciones de `202610240100_payout_ops.sql`), `moderate_review`, `update_organization`, notas, `send_login_help`. Prompts | La bandeja de un día real se procesa entera desde Claude sin abrir Supabase. Retiros y saldo nunca se desfasan (test de la RPC) |
+| **5. Opcionales** | `resolve_review_order`; outreach; dominios; suspensión; snapshots diarios si el volumen lo pide; llave de solo lectura | Según necesidad |
 
 Las fases 0, 1 y 3 cubren lo que pediste: ver todo, cómo le va a cada productor y editar cuando piden
 ayuda. La 2 y la 4 completan la analítica y la operación.
@@ -772,8 +785,8 @@ o extender el fake).
 
 ## 12. Preguntas abiertas (decisiones tuyas)
 
-1. **¿Tu cuenta de claude.ai muestra "Request headers"** al agregar un conector propio? Si no aparece, el
-   OAuth (4.6) sube a la fase 0, porque claude.ai no tiene otra forma de mandar la llave.
+1. ~~¿Tu cuenta de claude.ai muestra "Request headers"?~~ **Resuelta: sí.** Se conecta con header
+   `Authorization`; el OAuth de 4.6 no se implementa.
 2. **Atribución:** ¿el productor ve en su bitácora que soporte hizo cambios? Propuesta: sí, como
    "Soporte AI Tickets", sin el motivo. Da transparencia y evita el "yo no cambié eso".
 3. **Retiros en nombre del productor:** propuesta: bloqueado (5.7). ¿Hay casos en que lo quieras?
@@ -781,9 +794,8 @@ o extender el fake).
    referencia?
 5. **Llave de solo lectura:** ¿la quieres desde el principio (p. ej. para el celular)?
 6. **Retención de `aitickets_admin_audit`:** propuesta: 24 meses.
-7. **Hallazgos colaterales (1.4):** ¿cuáles entran como PRs aparte? Recomiendo priorizar el n.º 2 (número de
-   cuenta en claro en `event_withdrawals`) y el n.º 3 (registrar los correos de entradas), porque afectan
-   seguridad y soporte.
+7. ~~Hallazgos colaterales (1.4)~~ **Resuelta: corregidos todos** (2026-10-24, ver la tabla de 1.4). Solo
+   queda configurar el webhook en Resend (`RESEND_WEBHOOK_SECRET`).
 8. **Más administradores en el futuro** (p. ej. alguien de soporte): el diseño lo permite con llaves por
    persona en una tabla `aitickets_admin_keys` (hash, nombre, scopes) en vez de la variable de entorno. ¿Lo
    dejamos para cuando haga falta?
