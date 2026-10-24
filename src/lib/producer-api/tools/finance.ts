@@ -576,7 +576,8 @@ export function payoutSlackSql(orgId: number, payoutId: string) {
     return (
         `• *Datos para transferir:* \`select bank_name, bank_account_type, bank_account_number, bank_account_holder, bank_account_rut from organization_payout_accounts where organization_id = ${orgId};\`\n` +
         `• *Al transferir:* \`select aitickets_set_payout_status('${payoutId}', 'paid', '<n° de comprobante>', null, '<tu nombre>');\`\n` +
-        `• *Si no se pudo:* \`select aitickets_set_payout_status('${payoutId}', 'failed', null, '<motivo para el productor>', '<tu nombre>');\``
+        `• *Si no se pudo:* \`select aitickets_set_payout_status('${payoutId}', 'failed', null, '<motivo para el productor>', '<tu nombre>');\`\n` +
+        `• *O en Claude (MCP de admin):* «paga el retiro ${payoutId}»`
     );
 }
 

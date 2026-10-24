@@ -57,6 +57,8 @@ export const SAMPLES = {
   'domain-active': () => emails.renderDomainActiveEmail({ host: 'entradas.productorasur.cl', orgName: 'Productora Sur', dashboardUrl: `${SITE}/dashboard/sitio` }),
   'domain-failed': () => emails.renderDomainFailedEmail({ host: 'entradas.productorasur.cl', orgName: 'Productora Sur', error: 'El registro CNAME no apunta a AI Tickets.', siteUrl: `${SITE}/o/productora-sur`, dashboardUrl: `${SITE}/dashboard/sitio` }),
   'inbound-lead-confirm': () => emails.renderInboundLeadConfirmEmail({ orgName: 'Productora Sur', url: `${SITE}/api/outreach/inbound-confirm?t=ejemplo` }),
+  'payout-paid': () => emails.renderPayoutPaidEmail({ orgName: 'Productora Sur', amount: 1250000, bank: 'BancoEstado', last4: '6789', reference: 'TRX-20261024-0042', paidAt: '2026-10-24T15:30:00Z', dashboardUrl: `${SITE}/dashboard/finance` }),
+  'payout-failed': () => emails.renderPayoutFailedEmail({ orgName: 'Productora Sur', amount: 1250000, reason: 'El banco rechazó la transferencia: la cuenta está cerrada.', dashboardUrl: `${SITE}/dashboard/settings#datos-bancarios` }),
   'review-request': () => emails.renderReviewRequestEmail({ eventName: 'Festival de Jazz de Valparaíso', organizerName: 'Jazz Prod', rewardLabel: '10% de descuento' }),
   'review-link': () => emails.renderReviewLinkEmail({ eventName: 'Festival de Jazz de Valparaíso', reviewUrl: `${SITE}/eventos/festival-jazz#resena=ejemplo` }),
   'review-thanks': () => emails.renderReviewThanksEmail({ eventName: 'Festival de Jazz de Valparaíso', organizerName: 'Jazz Prod', rewardCode: 'GRACIAS-7KQ2MX', rewardLabel: '10% de descuento', validUntil: 'domingo, 20 de diciembre de 2026', eventsUrl: `${SITE}/eventos` }),

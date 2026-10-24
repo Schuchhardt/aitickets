@@ -10,6 +10,8 @@ export {
   renderDomainActiveEmail,
   renderDomainFailedEmail,
   renderInboundLeadConfirmEmail,
+  renderPayoutPaidEmail,
+  renderPayoutFailedEmail,
 } from './producer.mjs'
 export {
   renderReviewRequestEmail,
