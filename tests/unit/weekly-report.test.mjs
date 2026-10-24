@@ -88,7 +88,9 @@ describe('canales', () => {
     expect(orderChannel({ ref: 'Juan Pérez' })).toMatchObject({ key: 'ref:juan-perez', network: 'promoter', tracked: true })
     expect(orderChannel({ utm_source: 'IG', utm_medium: 'social' })).toMatchObject({ key: 'instagram', label: 'Instagram' })
     expect(orderChannel({ utm_source: 'facebook', utm_medium: 'cpc' })).toMatchObject({ key: 'facebook:ads', label: 'Facebook (anuncios)', paid: true })
-    expect(orderChannel({ utm_source: 'meta_ads' })).toMatchObject({ key: 'facebook:ads' })
+    // Anuncios de Meta (los creados desde AI Tickets usan utm_source=meta&utm_medium=paid): salen en Facebook e Instagram
+    expect(orderChannel({ utm_source: 'meta_ads' })).toMatchObject({ key: 'meta:ads', label: 'Facebook e Instagram (anuncios)' })
+    expect(orderChannel({ utm_source: 'meta', utm_medium: 'paid', utm_campaign: 'ad-12' })).toMatchObject({ key: 'meta:ads', network: 'meta', paid: true })
     expect(orderChannel({})).toMatchObject({ key: 'direct', tracked: false })
   })
 
@@ -187,6 +189,17 @@ describe('sugerencias', () => {
     expect(fallbackSuggestions(base({ week: { tickets: 0, revenue_clp: 0, orders: 0 } })).map((s) => s.type)).toEqual(['offer', 'content', 'ads'])
     const tiktok = fallbackSuggestions(base({ best_channel: { key: 'tiktok', label: 'TikTok', network: 'tiktok', basis: 'sales', tickets: 2 } }))
     expect(tiktok.find((s) => s.type === 'ads').channel).toBe('tiktok')
+  })
+
+  it('la idea de publicidad usa los números del anuncio de la semana, o invita a crearlo en AI Tickets', () => {
+    const ad = (over) => ({ id: 1, status: 'active', currency: 'CLP', spend: 15000, tickets: 3, revenue_clp: 45000, cost_per_ticket: 5000, ...over })
+    const selling = fallbackSuggestions(base({ ads: [ad()] })).find((s) => s.type === 'ads')
+    expect(selling).toMatchObject({ channel: 'meta', title: 'Ajusta tu anuncio según lo que vende' })
+    expect(selling.body).toContain('$15.000')
+    expect(selling.body).toContain('3 entradas ($5.000 por entrada)')
+    const notSelling = fallbackSuggestions(base({ ads: [ad({ tickets: 0, cost_per_ticket: null })] })).find((s) => s.type === 'ads')
+    expect(notSelling.title).toBe('Cambia la imagen o el texto del anuncio')
+    expect(fallbackSuggestions(base(), { adsInApp: true }).find((s) => s.type === 'ads').body).toMatch(/Crea en AI Tickets un anuncio de Facebook e Instagram/)
   })
 
   it('completa lo que falta de la IA, limpia URLs/markdown y descarta tipos inválidos', () => {
@@ -399,6 +412,50 @@ describe('envío de los domingos', () => {
     const again = await runWeeklyReports(db, { now: new Date(SUNDAY.getTime() + 3600_000), sendEmail, suggest })
     expect(again.sent).toBe(0)
     expect(sendEmail).not.toHaveBeenCalled()
+  })
+
+  it('con un anuncio de AI Tickets: gasto de la semana (Zernio), entradas que vendió y la idea lleva al panel', async () => {
+    vi.stubEnv('ZERNIO_API_KEY', 'zk_test')
+    db.tables.ad_campaigns = [
+      { id: 77, organization_id: 7, event_id: 10, provider: 'zernio', status: 'active', ad_type: 'standalone', headline: 'Fiesta', currency: 'CLP', zernio_ad_id: 'zad77', created_at: iso('2026-10-15T12:00:00Z'), end_date: iso('2026-10-30T12:00:00Z') },
+      { id: 78, organization_id: 7, event_id: 10, provider: 'zernio', status: 'error', zernio_ad_id: null, created_at: iso('2026-10-16T12:00:00Z') },
+    ]
+    db.tables.event_orders.push({ ...order({ utm_source: 'meta', utm_medium: 'paid', utm_campaign: 'ad-77', amount: 30000, ticket_qty: 3 }), event_id: 10 })
+    const zernio = []
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
+      const u = new URL(url)
+      zernio.push(`${u.pathname}?${u.searchParams}`)
+      return new Response(JSON.stringify({ ad: { currency: 'CLP' }, analytics: { summary: { spend: 15000, clicks: 120, impressions: 9000 } } }), { status: 200 })
+    }))
+    await runWeeklyReports(db, { now: SUNDAY, sendEmail, suggest })
+    expect(zernio).toEqual(['/api/v1/ads/zad77/analytics?fromDate=2026-10-18&toDate=2026-10-24'])
+    const { html, text } = sendEmail.mock.calls[0][0]
+    expect(text).toContain('Tus anuncios esta semana')
+    expect(text).toMatch(/Anuncio #77 · activo\s+\$15\.000\s+3 \(\$30\.000\)\s+\$5\.000/)
+    expect(text).toContain('Facebook e Instagram (anuncios)')
+    expect(html).toContain('/dashboard/promote?tab=ads')
+    expect(html).toContain('Ver mis anuncios')
+    expect(db.tables.aitickets_weekly_reports[0].summary.events[0].ads).toEqual([{ id: 77, spend: 15000, tickets: 3, revenue_clp: 30000 }])
+  })
+
+  it('si Zernio o la tabla de anuncios fallan, el reporte sale igual (sin bloque de anuncios)', async () => {
+    vi.stubEnv('ZERNIO_API_KEY', 'zk_test')
+    db.tables.ad_campaigns = [
+      { id: 77, organization_id: 7, event_id: 10, provider: 'zernio', status: 'active', currency: 'CLP', zernio_ad_id: 'zad77', created_at: iso('2026-10-15T12:00:00Z') },
+      { id: 79, organization_id: 7, event_id: 11, provider: 'zernio', status: 'active', currency: 'CLP', zernio_ad_id: 'zad79', created_at: iso('2026-10-15T12:00:00Z') },
+    ]
+    const fetchMock = vi.fn(async () => { throw new Error('fetch failed') })
+    vi.stubGlobal('fetch', fetchMock)
+    const out = await runWeeklyReports(db, { now: SUNDAY, sendEmail, suggest })
+    expect(out.sent).toBe(1)
+    expect(fetchMock).toHaveBeenCalledTimes(1) // tras la caída no se insiste con el resto
+    expect(sendEmail.mock.calls[0][0].text).toMatch(/Anuncio #77 · activo\s+—/)
+
+    db.failOn('ad_campaigns', 'select', { code: 'XX000', message: 'boom' })
+    db.tables.aitickets_weekly_reports = []
+    sendEmail.mockClear()
+    expect((await runWeeklyReports(db, { now: SUNDAY, sendEmail, suggest })).sent).toBe(1)
+    expect(sendEmail.mock.calls[0][0].text).not.toContain('Tus anuncios esta semana')
   })
 
   it('usa las ideas de la IA cuando responde', async () => {

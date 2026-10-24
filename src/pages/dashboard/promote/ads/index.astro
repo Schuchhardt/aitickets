@@ -1,10 +1,8 @@
 ---
-// Meta Ads está deshabilitado temporalmente ("Próximamente").
-// El código de campañas (components/dashboard/promote/*Ad*.vue, api/promote/ads/*) se conserva
-// pero no se expone en el dashboard hasta corregir presupuesto (CLP), budgets y page_id.
+// Los anuncios viven en la pestaña "Anuncios" de /dashboard/promote.
 import { requireDashboardSession } from "../../_lib/guard";
 
 const guard = await requireDashboardSession(Astro);
 if (!guard.ok) return guard.response;
-return Astro.redirect("/dashboard/promote");
+return Astro.redirect("/dashboard/promote?tab=ads");
 ---

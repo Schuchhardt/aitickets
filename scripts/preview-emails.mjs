@@ -90,10 +90,11 @@ export const SAMPLES = {
       ],
       bestChannel: { label: 'Instagram', basis: 'sales', tickets: 24, visits: 920 },
       insight: 'Instagram vendió 24 de tus 42 entradas: tu público compra desde las historias.',
+      ads: [{ id: 77, ad_type: 'standalone', status: 'active', currency: 'CLP', spend: 15000, clicks: 120, tickets: 3, revenue_clp: 45000, cost_per_ticket: 5000, roas: 3 }],
       suggestions: [
         { type: 'channel', title: 'Cuenta regresiva en historias', body: 'Publica una historia diaria hasta el festival con el sticker de cuenta regresiva y el link con seguimiento.', trackingUrl: `${SITE}/eventos/festival-jazz?utm_source=instagram&utm_medium=social&utm_campaign=reporte-semanal`, trackingLabel: 'Link con seguimiento para Instagram' },
         { type: 'content', title: 'Reel con el line-up', body: 'Un reel de 15 segundos con un fragmento de cada banda y el texto "Quedan 190 entradas".', action: { href: `${SITE}/dashboard/promote/create?event=10`, label: 'Crear el post con IA' }, trackingUrl: `${SITE}/eventos/festival-jazz?utm_source=instagram&utm_medium=social&utm_campaign=reporte-semanal`, trackingLabel: 'Link con seguimiento para Instagram' },
-        { type: 'ads', title: 'Anuncio de $5.000 diarios', body: 'Prueba 5 días en Instagram y Facebook, a 25 km de Valparaíso y con intereses en jazz y música en vivo.', trackingUrl: `${SITE}/eventos/festival-jazz?utm_source=instagram&utm_medium=paid&utm_campaign=reporte-semanal`, trackingLabel: 'Link para tus anuncios' },
+        { type: 'ads', title: 'Súbele el presupuesto a tu anuncio', body: 'Tu anuncio vendió 3 entradas a $5.000 cada una, menos que el precio de la entrada: súbelo a $8.000 diarios por 5 días más.', action: { href: `${SITE}/dashboard/promote?tab=ads`, label: 'Ver mis anuncios' } },
       ],
     }],
     moreEvents: 1,

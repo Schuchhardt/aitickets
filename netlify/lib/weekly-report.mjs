@@ -15,8 +15,12 @@
 //     más visitas (sin contar Directo ni "otros sitios").
 //   * Sugerencias: las escribe la IA según el canal que funciona (siempre una de contenido y una de publicidad); sin
 //     IA o si falla, fallbackSuggestions() con reglas fijas para que el correo nunca salga sin ideas.
+//   * Anuncios creados desde AI Tickets (Meta vía Zernio, netlify/lib/zernio-ads.mjs): su link trae
+//     utm_source=meta&utm_medium=paid&utm_campaign=ad-<id>, así que el canal "Facebook e Instagram (anuncios)" y el
+//     bloque de anuncios del evento muestran cuánto se gastó y cuántas entradas vendió cada uno en la semana.
 import { EVENT_TIMEZONE, addDays, todayInTimeZone, zonedDateTimeToUtc } from './dates.mjs'
 import { isCourtesyOrder, isTransferOrder, orderSoldQty } from './order-kinds.mjs'
+import { adEfficiency, formatBudget, salesByAd } from './zernio-ads.mjs'
 import { isDemoEventSlug } from '../../src/lib/demoEvent.mjs'
 
 export const WEEKLY_REPORT_TOPIC = 'weekly_report'
@@ -91,11 +95,13 @@ export function isReportableEvent(event, week, now = new Date()) {
 // ---------------------------------------------------------------------------
 
 /** Canales que la IA puede nombrar en una sugerencia (y para los que el correo arma un link con seguimiento). */
-export const SUGGESTION_CHANNELS = Object.freeze(['instagram', 'facebook', 'tiktok', 'whatsapp', 'email', 'google', 'x', 'youtube', 'promoter', 'other'])
+export const SUGGESTION_CHANNELS = Object.freeze(['instagram', 'facebook', 'meta', 'tiktok', 'whatsapp', 'email', 'google', 'x', 'youtube', 'promoter', 'other'])
 
 const NETWORKS = [
   { key: 'instagram', label: 'Instagram', source: /^(ig|insta|instagram)/, referrer: /instagram\./ },
-  { key: 'facebook', label: 'Facebook', source: /^(fb|facebook|meta)/, referrer: /(^|\.)facebook\.|(^|\.)fb\.|m\.me$|messenger\./ },
+  // utm_source=meta: anuncios de Meta, que salen en Facebook e Instagram (los creados desde AI Tickets lo usan)
+  { key: 'meta', label: 'Facebook e Instagram', source: /^meta/, referrer: /^$/ },
+  { key: 'facebook', label: 'Facebook', source: /^(fb|facebook)/, referrer: /(^|\.)facebook\.|(^|\.)fb\.|m\.me$|messenger\./ },
   { key: 'tiktok', label: 'TikTok', source: /^tik[-_ ]?tok/, referrer: /tiktok\./ },
   { key: 'whatsapp', label: 'WhatsApp', source: /^(wa|wsp|whatsapp)/, referrer: /whatsapp\.|wa\.me$/ },
   { key: 'google', label: 'Google', source: /^(google|gads|adwords)/, referrer: /(^|\.)google\./ },
@@ -192,10 +198,12 @@ export function pickBestChannel(channels) {
 
 /**
  * Cifras de un evento para el reporte.
- * @param {{ event: any, orders: any[], visits: any[], tickets: any[], week: ReturnType<typeof reportWeek>, now?: Date, ownHosts?: string[] }} p
+ * @param {{ event: any, orders: any[], visits: any[], tickets: any[], week: ReturnType<typeof reportWeek>, now?: Date, ownHosts?: string[], ads?: any[] }} p
  *   orders: órdenes pagadas del evento (todas: el total vendido sale de aquí); visits: al menos las de las 2 últimas semanas.
+ *   ads: anuncios del evento que corrieron en la semana ({ id, status, ad_type, headline, currency, week_spend, week_clicks,
+ *   week_impressions }; week_spend null si Zernio no respondió). Sus ventas de la semana salen de las órdenes.
  */
-export function computeEventMetrics({ event, orders, visits, tickets, week, now = new Date(), ownHosts = [] }) {
+export function computeEventMetrics({ event, orders, visits, tickets, week, now = new Date(), ownHosts = [], ads = [] }) {
   const sales = (orders || []).filter((o) => o && !isCourtesyOrder(o) && !isTransferOrder(o))
   const blank = () => ({ tickets: 0, revenue_clp: 0, orders: 0 })
   const current = blank()
@@ -250,6 +258,23 @@ export function computeEventMetrics({ event, orders, visits, tickets, week, now 
   const startMs = Date.parse(event.start_date)
   const topCode = [...codes.entries()].sort((a, b) => b[1] - a[1])[0]
   const best = pickBestChannel(channelList)
+  const adSales = salesByAd(sales, { from: week.startAt, to: week.endAt })
+  const adRows = (ads || []).map((a) => {
+    const sold = adSales.get(Number(a.id)) || { tickets: 0, revenue_clp: 0, orders: 0 }
+    return {
+      id: Number(a.id),
+      status: a.status,
+      ad_type: a.ad_type || 'standalone',
+      headline: a.headline || null,
+      currency: a.currency || 'CLP',
+      spend: a.week_spend ?? null,
+      clicks: a.week_clicks ?? null,
+      impressions: a.week_impressions ?? null,
+      tickets: sold.tickets,
+      revenue_clp: sold.revenue_clp,
+      ...adEfficiency(a.week_spend, sold.tickets, sold.revenue_clp, a.currency || 'CLP'),
+    }
+  })
 
   return {
     event_id: Number(event.id),
@@ -275,6 +300,7 @@ export function computeEventMetrics({ event, orders, visits, tickets, week, now 
     best_channel: best ? { key: best.key, label: best.label, network: best.network, paid: best.paid, ref: best.ref, basis: best.basis, tickets: best.tickets, revenue_clp: best.revenue_clp, visits: best.visits } : null,
     tracked_share_pct: pct(trackedTickets, current.tickets),
     top_discount_code: topCode ? { code: topCode[0], orders: topCode[1] } : null,
+    ads: adRows,
   }
 }
 
@@ -304,6 +330,9 @@ export function summarizeEvents(metrics) {
     previous_revenue_clp: sum((m) => m.previous_week.revenue_clp),
     tickets_change_pct: changePct(tickets, previous),
     visits: sum((m) => m.traffic.visits),
+    // Anuncios: gasto solo de cuentas en CLP (no se mezclan monedas)
+    ad_spend_clp: metrics.reduce((n, m) => n + (m.ads || []).filter((a) => a.currency === 'CLP').reduce((x, a) => x + (Number(a.spend) || 0), 0), 0),
+    ad_tickets: metrics.reduce((n, m) => n + (m.ads || []).reduce((x, a) => x + a.tickets, 0), 0),
     best_channel: best ? { key: best.key, label: best.label, network: best.network, basis: best.basis, tickets: best.tickets, revenue_clp: best.revenue_clp, visits: best.visits } : null,
   }
 }
@@ -357,13 +386,55 @@ const CHANNEL_PLAYS = {
   x: { title: 'Sigue la conversación en X', body: 'Es tu mejor canal: publica novedades del evento y fija el post con el link con seguimiento.' },
   youtube: { title: 'Saca partido a YouTube', body: 'Te llegan desde YouTube: agrega el link con seguimiento en la descripción y en el comentario fijado de tus videos.' },
   promoter: { title: 'Tu promotor está vendiendo', body: 'Dale un código de descuento exclusivo para su público y arma links de promotor para más personas de tu equipo.' },
+  meta: { title: 'Tus anuncios están vendiendo', body: 'Los anuncios en Facebook e Instagram son tu canal que más vende: si el costo por entrada te conviene, súbeles el presupuesto o alárgalos unos días.' },
+}
+
+/**
+ * Idea de publicidad: con un anuncio corriendo, qué hacer según sus números de la semana; si no, probar uno chico
+ * (creándolo en AI Tickets cuando los anuncios están disponibles, adsInApp).
+ */
+function adsSuggestion(m, net, adsInApp) {
+  const running = (m.ads || []).filter((a) => a.spend > 0).sort((a, b) => b.spend - a.spend)[0]
+  if (running) {
+    const spent = formatBudget(running.spend, running.currency)
+    if (running.tickets > 0) {
+      return {
+        type: 'ads',
+        channel: 'meta',
+        title: 'Ajusta tu anuncio según lo que vende',
+        body: `Tu anuncio gastó ${spent} esta semana y vendió ${running.tickets} ${running.tickets === 1 ? 'entrada' : 'entradas'}${running.cost_per_ticket != null ? ` (${formatBudget(running.cost_per_ticket, running.currency)} por entrada)` : ''}. Si te conviene, súbele el presupuesto o alárgalo unos días.`,
+      }
+    }
+    return {
+      type: 'ads',
+      channel: 'meta',
+      title: 'Cambia la imagen o el texto del anuncio',
+      body: `Tu anuncio gastó ${spent} esta semana y todavía no vende entradas. Prueba otra imagen o un texto con la fecha y el lugar, o páusalo y crea uno nuevo cerca del lugar del evento.`,
+    }
+  }
+  if (adsInApp) {
+    return {
+      type: 'ads',
+      channel: 'meta',
+      title: 'Prueba un anuncio chico',
+      body: 'Crea en AI Tickets un anuncio de Facebook e Instagram con un monto bajo por 3 a 5 días, cerca del lugar del evento: te mostramos cuántas entradas vende.',
+    }
+  }
+  return {
+    type: 'ads',
+    channel: net === 'tiktok' ? 'tiktok' : 'instagram',
+    title: 'Prueba un anuncio chico',
+    body: `Invierte un monto bajo durante 3 a 5 días en ${net === 'tiktok' ? 'TikTok' : 'Instagram y Facebook'}, segmentado cerca del lugar del evento, y usa el link de anuncios para ver cuánto vendió.`,
+  }
 }
 
 /**
  * Sugerencias con reglas fijas (sin IA o si la IA falla). Siempre 3: reforzar el mejor canal (o medir), contenido
  * y publicidad; sin ventas en la semana, la primera es una oferta con fecha límite.
+ * @param {any} m cifras de computeEventMetrics
+ * @param {{ adsInApp?: boolean }} [opts] adsInApp: los anuncios se pueden crear desde AI Tickets (Zernio configurado)
  */
-export function fallbackSuggestions(m) {
+export function fallbackSuggestions(m, { adsInApp = false } = {}) {
   const best = m.best_channel
   const net = contentNetwork(best)
   const out = []
@@ -384,12 +455,7 @@ export function fallbackSuggestions(m) {
     title: `Crea un post para ${NET_LABEL[net]}`,
     body: `Genera con IA en AI Tickets un post con imagen para ${NET_LABEL[net]}: muestra qué se va a vivir y termina con un llamado claro a comprar.${urgency}`,
   })
-  out.push({
-    type: 'ads',
-    channel: net === 'tiktok' ? 'tiktok' : 'instagram',
-    title: 'Prueba un anuncio chico',
-    body: `Invierte un monto bajo durante 3 a 5 días en ${net === 'tiktok' ? 'TikTok' : 'Instagram y Facebook'}, segmentado cerca del lugar del evento, y usa el link de anuncios para ver cuánto vendió.`,
-  })
+  out.push(adsSuggestion(m, net, adsInApp))
   return out.slice(0, SUGGESTIONS_PER_EVENT)
 }
 

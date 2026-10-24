@@ -11,6 +11,8 @@
 //   se dieron de baja (aitickets_user_email_optouts topic 'weekly_report'). Si alguien del equipo está asignado solo a
 //   algunos eventos (aitickets_event_staff), su correo trae solo esos.
 // - Una llamada a la IA por productora; sin IA o si falla, sugerencias con reglas fijas (el correo sale igual).
+// - Anuncios creados desde AI Tickets (Zernio): los que corrieron en la semana van con su gasto de la semana (Zernio)
+//   y las entradas que vendieron (utm_campaign=ad-<id>); la idea de publicidad lleva a crear o ver el anuncio en el panel.
 // - previewTo / dryRun (disparo manual): arman el reporte de UNA productora sin tocar el registro, para revisarlo
 //   cualquier día; previewTo lo manda solo a esa dirección.
 import { fetchAllRows } from './supabase.mjs'
@@ -36,15 +38,17 @@ import {
   trackingLink,
 } from './weekly-report.mjs'
 import { generateAiSuggestions, mergeSuggestions } from './weekly-report-ai.mjs'
+import { adAnalyticsSummary, adsEnabled } from './zernio-ads.mjs'
 
 export const STALE_SENDING_MINUTES = 20
 export const MAX_ATTEMPTS = 3
 
 const EVENT_COLUMNS = 'id, name, title, slug, status, organization_id, created_at, start_date, end_date, cancelled_at, archived_at'
-const ORDER_COLUMNS = 'created_at, amount, ticket_qty, ticket_details, payment_provider, ref, utm_source, utm_medium, discount_code'
+const ORDER_COLUMNS = 'created_at, amount, ticket_qty, ticket_details, payment_provider, ref, utm_source, utm_medium, utm_campaign, discount_code'
 const VISIT_COLUMNS = 'created_at, ip_hash, referrer, utm_source, utm_medium'
 
-const NETWORK_LABEL = { instagram: 'Instagram', facebook: 'Facebook', tiktok: 'TikTok', whatsapp: 'WhatsApp', email: 'tu correo', google: 'Google', x: 'X', youtube: 'YouTube', promoter: 'tu promotor', other: 'otros canales' }
+const MAX_ADS_PER_ORG = 20
+const NETWORK_LABEL = { instagram: 'Instagram', facebook: 'Facebook', meta: 'Facebook e Instagram', tiktok: 'TikTok', whatsapp: 'WhatsApp', email: 'tu correo', google: 'Google', x: 'X', youtube: 'YouTube', promoter: 'tu promotor', other: 'otros canales' }
 
 const siteHost = () => {
   try {
@@ -162,8 +166,67 @@ async function loadRecipients(supabase, orgId) {
   return out
 }
 
+/**
+ * Anuncios de la productora (Zernio) que corrieron en la semana, por evento, con su gasto, clics e impresiones de la
+ * semana. Nunca lanza: el reporte sale igual sin anuncios. Sin Zernio configurado, sin la migración 202610250200 o si
+ * falla la lectura, ninguno. Si Zernio no responde por un anuncio su gasto queda null (el correo lo muestra sin cifra);
+ * tras una caída (red, timeout, 5xx) no se le pregunta por los demás.
+ * @returns {Promise<Map<number, any[]>>}
+ */
+async function loadWeekAds(supabase, organizationId, eventIds, week) {
+  try {
+    return await loadWeekAdsUnsafe(supabase, organizationId, eventIds, week)
+  } catch (err) {
+    console.error(`weekly-report: anuncios de la organización ${organizationId}:`, err?.message)
+    return new Map()
+  }
+}
+
+async function loadWeekAdsUnsafe(supabase, organizationId, eventIds, week) {
+  const byEvent = new Map()
+  if (!adsEnabled() || !eventIds.length) return byEvent
+  const { data, error } = await supabase
+    .from('ad_campaigns')
+    .select('id, event_id, status, ad_type, headline, currency, zernio_ad_id, created_at, end_date')
+    .eq('organization_id', organizationId)
+    .eq('provider', 'zernio')
+    .in('event_id', eventIds)
+    .lt('created_at', week.endAt.toISOString())
+    .order('created_at', { ascending: false })
+    .limit(100)
+  if (error) {
+    if (['42703', '42P01', 'PGRST204', 'PGRST205'].includes(String(error.code))) return byEvent
+    throw error
+  }
+  const ran = (data || [])
+    .filter((a) => a.zernio_ad_id && !['creating', 'error'].includes(a.status) && !(a.end_date && Date.parse(a.end_date) < week.startAt.getTime()))
+    .slice(0, MAX_ADS_PER_ORG)
+  let zernioDown = false
+  for (const a of ran) {
+    let stats = null
+    if (!zernioDown) {
+      try {
+        stats = (await adAnalyticsSummary(a.zernio_ad_id, week.weekStart, week.lastDay, { timeoutMs: 10_000 })).summary
+      } catch (err) {
+        zernioDown = !err?.status || err.status >= 500
+        console.warn(`weekly-report: métricas del anuncio ${a.id}:`, err?.status || '', err?.message)
+      }
+    }
+    const row = {
+      ...a,
+      week_spend: stats ? Number(stats.spend) || 0 : null,
+      week_clicks: stats ? Number(stats.clicks) || 0 : null,
+      week_impressions: stats ? Number(stats.impressions) || 0 : null,
+    }
+    const id = Number(a.event_id)
+    if (!byEvent.has(id)) byEvent.set(id, [])
+    byEvent.get(id).push(row)
+  }
+  return byEvent
+}
+
 /** Órdenes pagadas, visitas de las 2 últimas semanas y tipos de entrada de un evento -> cifras del reporte. */
-async function loadEventMetrics(supabase, event, week, now) {
+async function loadEventMetrics(supabase, event, week, now, ads = []) {
   const [orders, visits, ticketsRes] = await Promise.all([
     fetchAllRows(() => supabase.from('event_orders').select(ORDER_COLUMNS).eq('event_id', event.id).eq('status', 'paid').order('created_at', { ascending: true })),
     fetchAllRows(() =>
@@ -178,7 +241,7 @@ async function loadEventMetrics(supabase, event, week, now) {
     supabase.from('event_tickets').select('id, total_quantity, is_gift').eq('event_id', event.id),
   ])
   if (ticketsRes.error) throw ticketsRes.error
-  return computeEventMetrics({ event, orders, visits, tickets: ticketsRes.data || [], week, now, ownHosts: [siteHost()].filter(Boolean) })
+  return computeEventMetrics({ event, orders, visits, tickets: ticketsRes.data || [], week, now, ownHosts: [siteHost()].filter(Boolean), ads })
 }
 
 /** Datos extra que ve la IA (descripción y lugar). Si falla, las ideas salen igual, solo con las cifras. */
@@ -194,14 +257,22 @@ async function loadEventContext(supabase, eventIds) {
 const startsLabel = (m) => (m.start_date ? formatInstantLong(m.start_date) : '')
 
 /** Sugerencias con link (con seguimiento) y acción al panel, listas para la plantilla. */
-function presentSuggestions(m, aiEntry) {
+function presentSuggestions(m, aiEntry, { adsInApp = false } = {}) {
   const publicUrl = eventPublicUrl(m.slug)
   const ref = m.best_channel?.network === 'promoter' ? m.best_channel.ref : null
-  return mergeSuggestions(aiEntry?.suggestions, m).map((s) => {
+  const hasAds = (m.ads || []).length > 0
+  return mergeSuggestions(aiEntry?.suggestions, m, { adsInApp }).map((s) => {
     const out = { type: s.type, channel: s.channel, title: s.title, body: s.body, action: null, trackingUrl: '', trackingLabel: '' }
     const channelName = NETWORK_LABEL[s.channel] || 'ese canal'
     if (s.type === 'content') out.action = { href: `${SITE_URL}/dashboard/promote/create?event=${m.event_id}`, label: 'Crear el post con IA' }
     if (s.type === 'offer') out.action = { href: `${SITE_URL}/dashboard/descuentos`, label: 'Crear un código de descuento' }
+    if (s.type === 'ads' && adsInApp) {
+      // El anuncio se crea (o se ajusta) en el panel y su link ya mide las ventas: no hace falta copiar un link
+      out.action = hasAds
+        ? { href: `${SITE_URL}/dashboard/promote?tab=ads`, label: 'Ver mis anuncios' }
+        : { href: `${SITE_URL}/dashboard/promote/ads/create?event=${m.event_id}`, label: 'Crear el anuncio en AI Tickets' }
+      return out
+    }
     if (s.type !== 'offer') {
       out.trackingUrl = trackingLink(publicUrl, { channel: s.channel, type: s.type, ref })
       out.trackingLabel = s.type === 'ads' ? 'Link para tus anuncios' : s.channel === 'promoter' ? 'Link de tu promotor' : `Link con seguimiento para ${channelName}`
@@ -211,7 +282,7 @@ function presentSuggestions(m, aiEntry) {
 }
 
 /** Vista de un evento para la plantilla. */
-function presentEvent(m, aiEntry) {
+function presentEvent(m, aiEntry, opts = {}) {
   return {
     event_id: m.event_id,
     name: m.name,
@@ -230,7 +301,8 @@ function presentEvent(m, aiEntry) {
     channels: m.channels.filter((c) => c.tickets > 0 || c.visits > 0).slice(0, 5),
     bestChannel: m.best_channel,
     insight: aiEntry?.insight || '',
-    suggestions: presentSuggestions(m, aiEntry),
+    ads: m.ads || [],
+    suggestions: presentSuggestions(m, aiEntry, opts),
   }
 }
 
@@ -239,7 +311,14 @@ function reportSummary({ week, totals, metrics, ai, results }) {
   return {
     week_label: weekLabel(week),
     totals,
-    events: metrics.map((m) => ({ event_id: m.event_id, name: m.name, tickets: m.week.tickets, revenue_clp: m.week.revenue_clp, best_channel: m.best_channel?.label || null })),
+    events: metrics.map((m) => ({
+      event_id: m.event_id,
+      name: m.name,
+      tickets: m.week.tickets,
+      revenue_clp: m.week.revenue_clp,
+      best_channel: m.best_channel?.label || null,
+      ads: (m.ads || []).map((a) => ({ id: a.id, spend: a.spend, tickets: a.tickets, revenue_clp: a.revenue_clp })),
+    })),
     ai: ai ? { provider: ai.provider, model: ai.model } : null,
     recipients: results,
   }
@@ -255,14 +334,16 @@ export async function buildAndSendOrgReport(supabase, { orgId, events, week, now
   const recipients = previewTo ? [{ id: null, name: '', email: previewTo, eventIds: null }] : await loadRecipients(supabase, orgId)
   if (!recipients.length) return { status: 'skipped', reason: 'no_recipients', sent: 0, failed: 0, events: events.length, ai: null, summary: null }
 
+  const adsByEvent = await loadWeekAds(supabase, orgId, events.map((e) => Number(e.id)), week)
   const metrics = []
-  for (const e of events) metrics.push(await loadEventMetrics(supabase, e, week, now))
+  for (const e of events) metrics.push(await loadEventMetrics(supabase, e, week, now, adsByEvent.get(Number(e.id)) || []))
   const visibleFor = (r) => sortEventsForReport(r.eventIds ? metrics.filter((m) => r.eventIds.includes(m.event_id)) : metrics)
   const shownIds = new Set(recipients.flatMap((r) => visibleFor(r).slice(0, MAX_EVENTS_PER_EMAIL).map((m) => m.event_id)))
   const shown = metrics.filter((m) => shownIds.has(m.event_id))
   if (!shown.length) return { status: 'skipped', reason: 'no_visible_events', sent: 0, failed: 0, events: metrics.length, ai: null, summary: null }
 
   const label = weekLabel(week)
+  const adsInApp = adsEnabled()
   const orgTotals = summarizeEvents(metrics)
   const context = await loadEventContext(supabase, shown.map((m) => m.event_id))
   let ai = null
@@ -271,12 +352,13 @@ export async function buildAndSendOrgReport(supabase, { orgId, events, week, now
       orgName: org?.public_name || '',
       weekLabel: label,
       totals: orgTotals,
+      adsInApp,
       events: shown.map((m) => ({ metrics: m, context: { startsLabel: startsLabel(m), place: context.get(m.event_id)?.location || null, description: context.get(m.event_id)?.description || '' } })),
     })
   } catch (err) {
     console.error(`weekly-report: sugerencias de la organización ${orgId}:`, err?.message)
   }
-  const views = new Map(shown.map((m) => [m.event_id, presentEvent(m, ai?.byEvent?.get(m.event_id))]))
+  const views = new Map(shown.map((m) => [m.event_id, presentEvent(m, ai?.byEvent?.get(m.event_id), { adsInApp })]))
 
   const results = []
   const previews = []

@@ -84,3 +84,32 @@ export async function generateEventFaqs(eventContext: string, existing: string[]
         .filter((f: FaqSuggestion) => f.question && f.answer)
         .slice(0, 8);
 }
+
+export type AdCopy = { headline: string; body: string };
+
+/**
+ * Texto para un anuncio pagado en Meta (Facebook e Instagram): título corto y texto principal, sin hashtags ni links
+ * (el botón "Comprar entradas" ya lleva a la página del evento). Límites de AD_LIMITS (netlify/lib/zernio-ads.mjs).
+ */
+export async function generateAdCopy(eventContext: string, guide?: string): Promise<AdCopy> {
+    const text = await ask(
+        "Eres redactor de anuncios pagados de una ticketera chilena. Escribes anuncios de Meta (Facebook e Instagram) para vender " +
+            "entradas, en español de Chile, cercanos y directos. El título (headline) tiene como máximo 40 caracteres y dice qué es y cuándo " +
+            "(p. ej. el nombre corto y el día). El texto principal (body) tiene 1 a 3 frases (máx. 300 caracteres): un gancho en la primera " +
+            "línea, qué se va a vivir, fecha y lugar, y un llamado a comprar. Como máximo 2 emojis. Sin hashtags, sin links y sin inventar " +
+            "artistas, precios, descuentos ni beneficios que no estén en la información entregada.",
+        `Información del evento:\n${eventContext}${guideLine(guide)}`,
+        {
+            type: "json_schema",
+            schema: {
+                type: "object",
+                additionalProperties: false,
+                required: ["headline", "body"],
+                properties: { headline: { type: "string" }, body: { type: "string" } },
+            },
+        },
+    );
+    const parsed = JSON.parse(text);
+    const clean = (v: unknown, max: number) => String(v || "").replace(/https?:\/\/\S+/g, "").replace(/#\S+/g, "").replace(/\s+/g, " ").trim().slice(0, max);
+    return { headline: clean(parsed.headline, 40), body: clean(parsed.body, 1000) };
+}

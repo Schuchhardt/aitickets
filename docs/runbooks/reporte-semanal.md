@@ -36,6 +36,11 @@ Migración `db/migrations/202610250100_weekly_producer_reports.sql`.
   de publicidad. Sin API key, con error o con `WEEKLY_REPORT_AI=off`, todas salen de reglas fijas: el correo se envía
   igual. Los links con seguimiento (`utm_campaign=reporte-semanal`, `utm_medium=paid` para anuncios, `ref` para
   promotores) los arma el servidor, nunca la IA.
+- **Anuncios** (con `ZERNIO_API_KEY`, ver `docs/runbooks/anuncios-zernio.md`): por cada evento, los anuncios creados
+  desde AI Tickets que corrieron en la semana salen con su gasto de la semana (Zernio), las entradas que vendieron
+  (`utm_campaign=ad-<id>`) y el costo por entrada. Sus ventas aparecen como canal "Facebook e Instagram (anuncios)".
+  La idea de publicidad usa esos números (subir presupuesto, cambiar imagen o pausar) y lleva al panel a crear o ver
+  el anuncio; sin Zernio, sugiere hacerlo a mano con el link de anuncios.
 
 ## Una vez por semana (sin duplicados)
 

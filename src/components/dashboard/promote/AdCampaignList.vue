@@ -1,551 +1,232 @@
 <script setup>
+// Pestaña "Anuncios" de /dashboard/promote: cuenta publicitaria de Meta conectada vía Zernio y anuncios creados desde
+// AI Tickets con sus métricas (Meta) y las entradas que vendieron (utm_campaign=ad-<id>). Al abrirla se sincroniza
+// con Zernio (POST /api/promote/ads/stats).
 import { ref, computed, onMounted } from 'vue'
 import {
-  Megaphone, Plus, TrendingUp, DollarSign, Eye, Play, Pause,
-  AlertCircle, CheckCircle, Clock, BarChart3, Unplug, ExternalLink,
-  ArrowLeft, RefreshCw, Target
+  Megaphone, Plus, Play, Pause, XCircle, AlertCircle, CheckCircle, Loader2, Unplug, RefreshCw, Ticket, ExternalLink,
 } from 'lucide-vue-next'
 
 const props = defineProps({
-  connectionsJson: { type: String, default: '[]' },
-  campaignsJson: { type: String, default: '[]' },
-  statsJson: { type: String, default: '{}' },
-  connectedPlatform: { type: String, default: '' },
-  errorType: { type: String, default: '' },
+  adsJson: { type: String, default: '{}' },
+  canManage: { type: Boolean, default: false },
 })
 
-const connections = ref(JSON.parse(props.connectionsJson))
-const campaigns = ref(JSON.parse(props.campaignsJson))
-const stats = ref(JSON.parse(props.statsJson))
-const activeFilter = ref('all')
-const loading = ref({})
+const initial = JSON.parse(props.adsJson)
+const enabled = ref(Boolean(initial.enabled))
+const connections = ref(initial.connections || [])
+const campaigns = ref(initial.campaigns || [])
 const syncing = ref(false)
+const busy = ref({})
+const notice = ref({ type: '', message: '' })
 
-const notification = ref({ show: false, type: '', message: '' })
-
-onMounted(() => {
-  if (props.connectedPlatform === 'meta') {
-    showNotification('success', 'Meta Ads conectado exitosamente')
-  }
-  if (props.errorType) {
-    const messages = {
-      meta_oauth_failed: 'Error al conectar Meta Ads. Intenta nuevamente.',
-      missing_params: 'Error en los parámetros de conexión.',
-      token_exchange: 'Error al obtener token de acceso de Meta.',
-      no_ad_account: 'No se encontró una cuenta de anuncios en Meta. Crea una en business.facebook.com.',
-      db_error: 'Error al guardar la conexión.',
-      invalid_state: 'Estado de sesión inválido.',
-      internal: 'Error interno. Intenta nuevamente.',
-    }
-    showNotification('error', messages[props.errorType] || 'Error desconocido.')
-  }
-})
-
-function showNotification(type, message) {
-  notification.value = { show: true, type, message }
-  setTimeout(() => { notification.value.show = false }, 5000)
+const show = (type, message) => {
+  notice.value = { type, message }
+  setTimeout(() => { if (notice.value.message === message) notice.value = { type: '', message: '' } }, 6000)
 }
 
-const hasConnection = computed(() => connections.value.some(c => c.status === 'active'))
-
-// Fix #4: Token expiration detection
-const expiringConnections = computed(() => {
-  const now = new Date()
-  const warnThreshold = 7 * 24 * 60 * 60 * 1000 // 7 days before expiry
-  return connections.value.filter(c => {
-    if (!c.token_expires_at) return false
-    const expiresAt = new Date(c.token_expires_at)
-    return expiresAt.getTime() - now.getTime() < warnThreshold
-  })
-})
-
-const expiredConnections = computed(() => {
-  const now = new Date()
-  return connections.value.filter(c => {
-    if (!c.token_expires_at) return false
-    return new Date(c.token_expires_at) < now
-  })
-})
-
-const getTokenStatus = (conn) => {
-  if (!conn.token_expires_at) return 'active'
-  const now = new Date()
-  const expiresAt = new Date(conn.token_expires_at)
-  if (expiresAt < now) return 'expired'
-  const daysLeft = Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-  if (daysLeft <= 7) return 'expiring'
-  return 'active'
-}
-
-const getDaysUntilExpiry = (conn) => {
-  if (!conn.token_expires_at) return null
-  const now = new Date()
-  const expiresAt = new Date(conn.token_expires_at)
-  return Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-}
-
-const reconnectMeta = async () => {
-  await connectMeta()
-}
-
-const filteredCampaigns = computed(() => {
-  if (activeFilter.value === 'all') return campaigns.value
-  return campaigns.value.filter(c => c.status === activeFilter.value)
-})
-
-const statusLabels = {
-  active: 'Activa',
-  paused: 'Pausada',
-  completed: 'Completada',
-  rejected: 'Rechazada',
-  pending_review: 'En revisión',
-  draft: 'Borrador',
-}
-
-const statusColors = {
-  active: 'bg-green-50 text-green-700',
-  paused: 'bg-yellow-50 text-yellow-700',
-  completed: 'bg-blue-50 text-blue-700',
-  rejected: 'bg-red-50 text-red-700',
-  pending_review: 'bg-orange-50 text-orange-700',
-  draft: 'bg-gray-50 text-gray-600',
-}
-
-const formatCurrency = (amount) => {
-  if (!amount) return '$0'
-  return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(amount)
-}
-
-const formatNumber = (num) => {
-  if (!num) return '0'
-  return new Intl.NumberFormat('es-CL').format(num)
-}
-
-const connectMeta = async () => {
-  try {
-    loading.value.connect = true
-    const res = await fetch('/api/promote/ads/connect', { method: 'POST' })
-    const data = await res.json()
-    if (data.redirect_url) {
-      window.location.href = data.redirect_url
-    } else {
-      showNotification('error', data.message || 'Error al iniciar conexión')
-    }
-  } catch (e) {
-    showNotification('error', 'Error al conectar con Meta')
-  } finally {
-    loading.value.connect = false
-  }
-}
-
-const disconnectMeta = async (connectionId) => {
-  if (!confirm('¿Desconectar cuenta de Meta Ads? Las campañas activas deben pausarse primero.')) return
-  try {
-    const res = await fetch('/api/promote/ads/disconnect', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ connectionId }),
-    })
-    const data = await res.json()
-    if (res.ok) {
-      connections.value = connections.value.filter(c => c.id !== connectionId)
-      showNotification('success', 'Cuenta desconectada')
-    } else {
-      showNotification('error', data.message)
-    }
-  } catch (e) {
-    showNotification('error', 'Error al desconectar')
-  }
-}
-
-const toggleCampaign = async (campaign) => {
-  const action = campaign.status === 'active' ? 'pause' : 'activate'
-  loading.value[campaign.id] = true
-  try {
-    const res = await fetch('/api/promote/ads/status', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ campaignId: campaign.id, action }),
-    })
-    const data = await res.json()
-    if (res.ok) {
-      campaign.status = data.status
-      showNotification('success', data.message)
-    } else {
-      showNotification('error', data.message)
-    }
-  } catch (e) {
-    showNotification('error', 'Error al cambiar estado')
-  } finally {
-    loading.value[campaign.id] = false
-  }
-}
-
-const syncStats = async () => {
+const sync = async () => {
   syncing.value = true
   try {
-    const res = await fetch('/api/promote/ads/stats', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
-    })
-    const data = await res.json()
-    if (res.ok && data.campaigns) {
-      // Update local campaigns with fresh stats
-      for (const updated of data.campaigns) {
-        const idx = campaigns.value.findIndex(c => c.id === updated.id)
-        if (idx !== -1) {
-          campaigns.value[idx] = { ...campaigns.value[idx], ...updated }
-        }
-      }
-      // Recalculate stats
-      stats.value.activeCampaigns = campaigns.value.filter(c => c.status === 'active').length
-      stats.value.totalSpend = campaigns.value.reduce((sum, c) => sum + (c.spend || 0), 0)
-      stats.value.totalImpressions = campaigns.value.reduce((sum, c) => sum + (c.impressions || 0), 0)
-      showNotification('success', 'Estadísticas actualizadas')
+    const res = await fetch('/api/promote/ads/stats', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+    const data = await res.json().catch(() => ({}))
+    if (res.ok) {
+      enabled.value = Boolean(data.enabled)
+      connections.value = data.connections || []
+      campaigns.value = data.campaigns || []
     }
-  } catch (e) {
-    showNotification('error', 'Error al sincronizar estadísticas')
   } finally {
     syncing.value = false
   }
 }
+onMounted(() => { if (enabled.value) sync() })
+
+const activeConnections = computed(() => connections.value.filter((c) => c.status === 'active'))
+
+const connect = async () => {
+  busy.value.connect = true
+  try {
+    const res = await fetch('/api/promote/ads/connect', { method: 'POST' })
+    const data = await res.json().catch(() => ({}))
+    if (data.redirect_url) { window.location.href = data.redirect_url; return }
+    if (res.ok && data.connected) { show('success', 'Cuenta publicitaria conectada'); await sync() }
+    else show('error', data.message || 'No se pudo conectar la cuenta')
+  } catch {
+    show('error', 'No se pudo conectar la cuenta')
+  } finally {
+    busy.value.connect = false
+  }
+}
+
+const disconnect = async (conn) => {
+  if (!confirm(`¿Desconectar ${conn.account_name} de AI Tickets? Tus anuncios anteriores y sus resultados se mantienen.`)) return
+  busy.value[`c${conn.id}`] = true
+  try {
+    const res = await fetch('/api/promote/ads/disconnect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ connectionId: conn.id }) })
+    const data = await res.json().catch(() => ({}))
+    if (res.ok) { connections.value = connections.value.filter((c) => c.id !== conn.id); show('success', data.message) }
+    else show('error', data.message || 'No se pudo desconectar')
+  } finally {
+    busy.value[`c${conn.id}`] = false
+  }
+}
+
+const changeStatus = async (ad, action) => {
+  if (action === 'cancel' && !confirm('¿Cancelar este anuncio? Deja de mostrarse y no se puede reactivar.')) return
+  busy.value[ad.id] = true
+  try {
+    const res = await fetch('/api/promote/ads/status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ campaignId: ad.id, action }) })
+    const data = await res.json().catch(() => ({}))
+    if (res.ok) { ad.status = data.status; show('success', data.message) }
+    else show('error', data.message || 'No se pudo cambiar el anuncio')
+  } finally {
+    busy.value[ad.id] = false
+  }
+}
+
+const STATUS = {
+  creating: { label: 'Creando', cls: 'bg-gray-100 text-gray-600' },
+  pending_review: { label: 'En revisión de Meta', cls: 'bg-orange-50 text-orange-700' },
+  active: { label: 'Activo', cls: 'bg-green-50 text-green-700' },
+  paused: { label: 'Pausado', cls: 'bg-yellow-50 text-yellow-700' },
+  completed: { label: 'Terminado', cls: 'bg-blue-50 text-blue-700' },
+  rejected: { label: 'Rechazado por Meta', cls: 'bg-red-50 text-red-700' },
+  cancelled: { label: 'Cancelado', cls: 'bg-gray-100 text-gray-500' },
+  error: { label: 'Con error', cls: 'bg-red-50 text-red-700' },
+}
+
+const money = (n, currency = 'CLP') => {
+  const v = Number(n) || 0
+  return !currency || currency === 'CLP' ? `$${Math.round(v).toLocaleString('es-CL')}` : `${currency} ${v.toLocaleString('es-CL', { maximumFractionDigits: 2 })}`
+}
+const num = (n) => (Number(n) || 0).toLocaleString('es-CL')
+const day = (iso) => (iso ? new Date(iso).toLocaleDateString('es-CL', { day: 'numeric', month: 'short' }) : '')
+
+// Totales (solo anuncios en CLP para no mezclar monedas)
+const totals = computed(() => {
+  const clp = campaigns.value.filter((c) => !c.currency || c.currency === 'CLP')
+  const spend = clp.reduce((s, c) => s + (Number(c.spend) || 0), 0)
+  const tickets = campaigns.value.reduce((s, c) => s + (c.sales?.tickets || 0), 0)
+  const revenue = campaigns.value.reduce((s, c) => s + (c.sales?.revenue_clp || 0), 0)
+  const clpTickets = clp.reduce((s, c) => s + (c.sales?.tickets || 0), 0)
+  return { spend, tickets, revenue, costPerTicket: clpTickets && spend ? Math.round(spend / clpTickets) : null }
+})
 </script>
 
 <template>
-  <div>
-    <!-- Notification -->
-    <Transition name="slide-down">
-      <div
-        v-if="notification.show"
-        class="fixed top-4 left-4 right-4 sm:left-auto z-50 flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg text-sm font-medium"
-        :class="notification.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'"
-      >
-        <CheckCircle v-if="notification.type === 'success'" :size="16" />
-        <AlertCircle v-else :size="16" />
-        {{ notification.message }}
-        <button @click="notification.show = false" class="ml-2 text-current opacity-60 hover:opacity-100">&times;</button>
-      </div>
-    </Transition>
-
-    <!-- Header -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 md:mb-8">
-      <div class="flex items-center gap-3">
-        <a href="/dashboard/promote" class="shrink-0 text-gray-400 hover:text-gray-600 transition">
-          <ArrowLeft :size="20" />
-        </a>
-        <div class="min-w-0">
-          <h1 class="text-2xl md:text-3xl font-bold font-[Unbounded] mb-1">Meta Ads</h1>
-          <p class="text-gray-600">Crea y gestiona campañas de anuncios en Facebook e Instagram.</p>
-        </div>
-      </div>
-
-      <div class="flex flex-wrap items-center gap-3">
-        <button
-          v-if="campaigns.length > 0"
-          @click="syncStats"
-          :disabled="syncing"
-          class="inline-flex items-center gap-2 border border-gray-200 text-gray-700 px-4 py-2.5 rounded-lg hover:bg-gray-50 transition font-medium text-sm"
-        >
-          <RefreshCw :size="16" :class="{ 'animate-spin': syncing }" />
-          Sincronizar
-        </button>
-        <a
-          v-if="hasConnection"
-          href="/dashboard/promote/ads/create"
-          class="inline-flex items-center gap-2 bg-black text-white px-5 py-2.5 rounded-lg hover:bg-gray-800 transition font-medium"
-        >
-          <Plus :size="20" />
-          Crear Campaña
-        </a>
-      </div>
+  <div class="space-y-6">
+    <div v-if="notice.message" class="flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-medium" :class="notice.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'">
+      <CheckCircle v-if="notice.type === 'success'" :size="16" /><AlertCircle v-else :size="16" />
+      {{ notice.message }}
     </div>
 
-    <!-- Stats Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 md:mb-8">
-      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-        <div class="flex items-center gap-3 mb-2">
-          <div class="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
-            <Target :size="20" class="text-green-600" />
-          </div>
-          <span class="text-sm text-gray-500">Campañas Activas</span>
-        </div>
-        <p class="text-2xl font-bold">{{ stats.activeCampaigns }}</p>
-      </div>
-
-      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-        <div class="flex items-center gap-3 mb-2">
-          <div class="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center">
-            <DollarSign :size="20" class="text-purple-600" />
-          </div>
-          <span class="text-sm text-gray-500">Gasto Total</span>
-        </div>
-        <p class="text-2xl font-bold">{{ formatCurrency(stats.totalSpend) }}</p>
-      </div>
-
-      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-        <div class="flex items-center gap-3 mb-2">
-          <div class="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
-            <Eye :size="20" class="text-blue-600" />
-          </div>
-          <span class="text-sm text-gray-500">Impresiones</span>
-        </div>
-        <p class="text-2xl font-bold">{{ formatNumber(stats.totalImpressions) }}</p>
-      </div>
+    <div v-if="!enabled" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 md:p-10 text-center">
+      <Megaphone :size="32" class="mx-auto text-gray-400 mb-3" />
+      <h3 class="text-lg font-bold mb-1">Anuncios en Facebook e Instagram</h3>
+      <p class="text-gray-500">Muy pronto podrás crear anuncios pagados para tus eventos desde aquí.</p>
     </div>
 
-    <!-- Meta Connection -->
-    <div class="mb-6 md:mb-8">
-      <div class="flex items-center justify-between gap-3 mb-4">
-        <h2 class="text-lg font-semibold">Cuentas de Meta Ads</h2>
-        <button
-          v-if="hasConnection"
-          @click="reconnectMeta"
-          :disabled="loading.connect"
-          class="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
-        >
-          <RefreshCw :size="14" />
-          Reconectar
-        </button>
-      </div>
-
-      <!-- Token expiration warning -->
-      <div
-        v-if="expiredConnections.length > 0"
-        class="mb-4 bg-red-50 border border-red-200 rounded-xl p-4 flex flex-wrap sm:flex-nowrap items-start gap-3"
-      >
-        <AlertCircle :size="20" class="text-red-500 shrink-0 mt-0.5" />
-        <div class="flex-1">
-          <p class="text-sm font-medium text-red-800">Token de Meta expirado</p>
-          <p class="text-xs text-red-600 mt-1">Tu conexión con Meta ha expirado. Reconecta tu cuenta para seguir gestionando campañas.</p>
+    <template v-else>
+      <!-- Cuenta publicitaria -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 class="font-semibold">Cuenta publicitaria de Meta</h3>
+            <p class="text-sm text-gray-500">Meta le cobra el gasto de tus anuncios directo a esta cuenta. AI Tickets mide cuántas entradas vende cada anuncio.</p>
+          </div>
+          <button v-if="canManage" type="button" @click="connect" :disabled="busy.connect" class="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 text-sm font-medium disabled:opacity-50">
+            <Loader2 v-if="busy.connect" :size="16" class="animate-spin" />
+            {{ connections.length ? 'Actualizar cuentas' : 'Conectar con Meta' }}
+          </button>
         </div>
-        <button
-          @click="reconnectMeta"
-          :disabled="loading.connect"
-          class="shrink-0 text-sm bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition font-medium"
-        >
-          Reconectar
-        </button>
-      </div>
-
-      <div
-        v-else-if="expiringConnections.length > 0"
-        class="mb-4 bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex flex-wrap sm:flex-nowrap items-start gap-3"
-      >
-        <Clock :size="20" class="text-yellow-600 shrink-0 mt-0.5" />
-        <div class="flex-1">
-          <p class="text-sm font-medium text-yellow-800">Token próximo a expirar</p>
-          <p class="text-xs text-yellow-600 mt-1">
-            Tu conexión con Meta expira en {{ getDaysUntilExpiry(expiringConnections[0]) }} días. Reconecta para renovar el acceso.
-          </p>
-        </div>
-        <button
-          @click="reconnectMeta"
-          :disabled="loading.connect"
-          class="shrink-0 text-sm bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition font-medium"
-        >
-          Renovar
-        </button>
-      </div>
-      
-      <div v-if="!hasConnection && expiredConnections.length === 0" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 md:p-8 text-center">
-        <div class="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-          <Megaphone :size="32" class="text-blue-600" />
-        </div>
-        <h3 class="text-lg font-semibold mb-2">Conecta tu cuenta de Meta Ads</h3>
-        <p class="text-gray-500 mb-6 max-w-md mx-auto">
-          Vincula tu cuenta de Meta Business para crear campañas de anuncios en Facebook e Instagram directamente desde aquí.
-        </p>
-        <button
-          @click="connectMeta"
-          :disabled="loading.connect"
-          class="inline-flex items-center gap-2 bg-[#1877F2] text-white px-6 py-3 rounded-lg hover:bg-[#1565C0] transition font-medium"
-        >
-          <svg v-if="!loading.connect" class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-          </svg>
-          <span v-if="loading.connect" class="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-          Conectar con Facebook
-        </button>
-      </div>
-
-      <div v-if="connections.length > 0" class="space-y-3">
-        <div
-          v-for="conn in connections"
-          :key="conn.id"
-          class="bg-white rounded-xl shadow-sm border p-4 md:p-5 flex items-center justify-between gap-3"
-          :class="getTokenStatus(conn) === 'expired' ? 'border-red-200' : getTokenStatus(conn) === 'expiring' ? 'border-yellow-200' : 'border-gray-100'"
-        >
-          <div class="flex items-center gap-3 md:gap-4 min-w-0">
-            <div class="w-12 h-12 shrink-0 bg-gradient-to-br from-[#1877F2] to-[#0866FF] rounded-xl flex items-center justify-center">
-              <svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-              </svg>
-            </div>
+        <div v-if="connections.length" class="mt-4 divide-y divide-gray-100">
+          <div v-for="c in connections" :key="c.id" class="py-2 flex items-center justify-between gap-3 text-sm">
             <div class="min-w-0">
-              <p class="font-semibold break-words">{{ conn.account_name }}</p>
-              <p class="text-sm text-gray-500 break-all">
-                {{ conn.meta_ad_account_id || 'Meta Ads' }}
-                <template v-if="getDaysUntilExpiry(conn) !== null">
-                  · {{ getDaysUntilExpiry(conn) > 0 ? `Expira en ${getDaysUntilExpiry(conn)} días` : 'Expirado' }}
-                </template>
-              </p>
+              <p class="font-medium truncate">{{ c.account_name }} <span class="text-gray-400 font-normal">· {{ c.currency || 'CLP' }}</span></p>
+              <p v-if="c.status === 'unusable'" class="text-xs text-red-600">{{ c.unusable_reason || 'Meta no permite anunciar con esta cuenta' }}</p>
+              <p v-else-if="c.minimum_daily_budget" class="text-xs text-gray-500">Mínimo diario: {{ money(c.minimum_daily_budget, c.currency) }}</p>
             </div>
-          </div>
-          <div class="flex items-center gap-2 md:gap-3 shrink-0">
-            <span 
-              class="text-xs px-2 py-1 rounded-full whitespace-nowrap"
-              :class="{
-                'bg-green-50 text-green-700': getTokenStatus(conn) === 'active',
-                'bg-yellow-50 text-yellow-700': getTokenStatus(conn) === 'expiring',
-                'bg-red-50 text-red-700': getTokenStatus(conn) === 'expired',
-              }"
-            >
-              {{ getTokenStatus(conn) === 'active' ? 'Activa' : getTokenStatus(conn) === 'expiring' ? 'Por expirar' : 'Expirada' }}
-            </span>
-            <button
-              @click="disconnectMeta(conn.id)"
-              class="p-2 text-gray-400 hover:text-red-500 transition"
-              title="Desconectar"
-            >
-              <Unplug :size="18" />
+            <button v-if="canManage" type="button" @click="disconnect(c)" :disabled="busy[`c${c.id}`]" class="shrink-0 inline-flex items-center gap-1 text-xs text-gray-500 hover:text-red-600">
+              <Unplug :size="14" /> Desconectar
             </button>
           </div>
         </div>
+        <p v-else-if="!canManage" class="mt-3 text-sm text-gray-500">Pídele al dueño de la productora que conecte la cuenta publicitaria.</p>
       </div>
-    </div>
 
-    <!-- Campaigns -->
-    <div>
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-        <h2 class="text-lg font-semibold">Campañas</h2>
-        
-        <!-- Status Filter -->
-        <div class="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit max-w-full overflow-x-auto whitespace-nowrap">
-          <button
-            v-for="filter in ['all', 'active', 'paused', 'completed']"
-            :key="filter"
-            @click="activeFilter = filter"
-            class="shrink-0 px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
-            :class="activeFilter === filter ? 'bg-white text-black shadow-sm' : 'text-gray-500 hover:text-gray-700'"
-          >
-            {{ filter === 'all' ? 'Todas' : statusLabels[filter] || filter }}
-          </button>
+      <!-- Resumen -->
+      <div v-if="campaigns.length" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <p class="text-sm text-gray-500">Invertido</p>
+          <p class="text-2xl font-bold">{{ money(totals.spend) }}</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <p class="text-sm text-gray-500">Entradas vendidas por anuncios</p>
+          <p class="text-2xl font-bold">{{ num(totals.tickets) }} <span class="text-sm font-normal text-gray-500">· {{ money(totals.revenue) }}</span></p>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <p class="text-sm text-gray-500">Costo por entrada</p>
+          <p class="text-2xl font-bold">{{ totals.costPerTicket != null ? money(totals.costPerTicket) : '—' }}</p>
         </div>
       </div>
 
-      <div v-if="filteredCampaigns.length === 0" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 md:p-12 text-center">
-        <BarChart3 :size="40" class="text-gray-300 mx-auto mb-3" />
-        <p class="text-gray-500">
-          {{ campaigns.length === 0 ? 'No hay campañas creadas aún.' : 'Sin campañas con este filtro.' }}
-        </p>
-        <a
-          v-if="hasConnection && campaigns.length === 0"
-          href="/dashboard/promote/ads/create"
-          class="inline-flex items-center gap-2 mt-4 bg-black text-white px-5 py-2.5 rounded-lg hover:bg-gray-800 transition font-medium text-sm"
-        >
-          <Plus :size="16" />
-          Crear primera campaña
-        </a>
+      <!-- Anuncios -->
+      <div class="flex items-center justify-between gap-3">
+        <h3 class="font-semibold">Tus anuncios</h3>
+        <div class="flex items-center gap-2">
+          <button type="button" @click="sync" :disabled="syncing" class="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 disabled:opacity-50">
+            <RefreshCw :size="14" :class="syncing ? 'animate-spin' : ''" /> Actualizar
+          </button>
+          <a v-if="canManage && activeConnections.length" href="/dashboard/promote/ads/create" class="inline-flex items-center gap-1.5 bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition text-sm font-medium">
+            <Plus :size="16" /> Crear anuncio
+          </a>
+        </div>
       </div>
 
-      <div v-else class="space-y-4">
-        <div
-          v-for="campaign in filteredCampaigns"
-          :key="campaign.id"
-          class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 md:p-5"
-        >
-          <div class="flex flex-col md:flex-row md:items-start justify-between gap-4">
-            <!-- Campaign Info -->
-            <div class="flex-1 min-w-0">
-              <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mb-2">
-                <h3 class="font-semibold text-lg break-words">{{ campaign.name }}</h3>
-                <span
-                  class="text-xs px-2 py-0.5 rounded-full font-medium"
-                  :class="statusColors[campaign.status] || 'bg-gray-50 text-gray-600'"
-                >
-                  {{ statusLabels[campaign.status] || campaign.status }}
-                </span>
-              </div>
-              
-              <p v-if="campaign.events" class="text-sm text-gray-500 mb-3">
-                {{ campaign.events.title || campaign.events.name }}
-              </p>
+      <div v-if="!campaigns.length" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-center text-gray-500 text-sm">
+        {{ activeConnections.length ? 'Aún no creas anuncios. Empieza con un presupuesto chico (3 a 5 días) y mira cuántas entradas vende.' : 'Conecta tu cuenta publicitaria para crear tu primer anuncio.' }}
+      </div>
 
-              <!-- Metrics Row -->
-              <div v-if="campaign.impressions || campaign.clicks || campaign.spend" class="flex flex-wrap gap-4 md:gap-6 text-sm">
-                <div>
-                  <span class="text-gray-400">Impresiones</span>
-                  <p class="font-semibold">{{ formatNumber(campaign.impressions) }}</p>
-                </div>
-                <div>
-                  <span class="text-gray-400">Clicks</span>
-                  <p class="font-semibold">{{ formatNumber(campaign.clicks) }}</p>
-                </div>
-                <div>
-                  <span class="text-gray-400">Alcance</span>
-                  <p class="font-semibold">{{ formatNumber(campaign.reach) }}</p>
-                </div>
-                <div>
-                  <span class="text-gray-400">Gasto</span>
-                  <p class="font-semibold">{{ formatCurrency(campaign.spend) }}</p>
-                </div>
-                <div>
-                  <span class="text-gray-400">CPC</span>
-                  <p class="font-semibold">{{ formatCurrency(campaign.cpc) }}</p>
-                </div>
-                <div>
-                  <span class="text-gray-400">CPM</span>
-                  <p class="font-semibold">{{ formatCurrency(campaign.cpm) }}</p>
-                </div>
-              </div>
-
-              <!-- Budget info -->
-              <div class="flex flex-wrap items-center gap-4 mt-3 text-xs text-gray-400">
-                <span>Presupuesto diario: {{ formatCurrency(campaign.daily_budget) }}</span>
-                <span v-if="campaign.total_budget">Total: {{ formatCurrency(campaign.total_budget) }}</span>
-                <span v-if="campaign.start_date">Inicio: {{ new Date(campaign.start_date).toLocaleDateString('es-CL') }}</span>
-                <span v-if="campaign.end_date">Fin: {{ new Date(campaign.end_date).toLocaleDateString('es-CL') }}</span>
-              </div>
-
-              <p v-if="campaign.error_message" class="text-xs text-red-500 mt-2 flex items-center gap-1 break-words">
-                <AlertCircle :size="12" class="shrink-0" />
-                {{ campaign.error_message }}
-              </p>
+      <div v-for="ad in campaigns" :key="ad.id" class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 md:p-5">
+        <div class="flex gap-4">
+          <img v-if="ad.image_urls?.[0]" :src="ad.image_urls[0]" alt="" class="w-16 h-16 rounded-lg object-cover shrink-0 hidden sm:block" />
+          <div class="flex-1 min-w-0">
+            <div class="flex flex-wrap items-center gap-2 mb-1">
+              <span class="text-xs px-2 py-0.5 rounded-full font-medium" :class="(STATUS[ad.status] || STATUS.creating).cls">{{ (STATUS[ad.status] || STATUS.creating).label }}</span>
+              <span class="text-xs text-gray-400">{{ ad.ad_type === 'boost' ? 'Post promocionado' : 'Anuncio' }} · #{{ ad.id }}</span>
             </div>
-
-            <!-- Actions -->
-            <div class="flex items-center gap-2 shrink-0">
-              <button
-                v-if="campaign.status === 'active' || campaign.status === 'paused'"
-                @click="toggleCampaign(campaign)"
-                :disabled="loading[campaign.id]"
-                class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium transition"
-                :class="campaign.status === 'active' 
-                  ? 'border-yellow-200 text-yellow-700 hover:bg-yellow-50' 
-                  : 'border-green-200 text-green-700 hover:bg-green-50'"
-              >
-                <span v-if="loading[campaign.id]" class="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
-                <Pause v-else-if="campaign.status === 'active'" :size="14" />
-                <Play v-else :size="14" />
-                {{ campaign.status === 'active' ? 'Pausar' : 'Activar' }}
-              </button>
-            </div>
+            <p class="font-semibold truncate">{{ ad.event?.name || ad.name }}</p>
+            <p class="text-sm text-gray-600 truncate">{{ ad.headline || ad.ad_copy }}</p>
+            <p class="text-xs text-gray-500 mt-1">
+              {{ money(ad.daily_budget, ad.currency) }}/día · {{ day(ad.start_date) }} al {{ day(ad.end_date) }} · máx. {{ money(ad.total_budget, ad.currency) }}
+            </p>
+            <p v-if="ad.error_message && ['error', 'rejected', 'creating'].includes(ad.status)" class="text-xs text-red-600 mt-1">{{ ad.error_message }}</p>
           </div>
         </div>
+
+        <div class="mt-4 grid grid-cols-2 sm:grid-cols-5 gap-3 text-sm">
+          <div><p class="text-xs text-gray-500">Gastado</p><p class="font-semibold">{{ money(ad.spend, ad.currency) }}</p></div>
+          <div><p class="text-xs text-gray-500">Personas</p><p class="font-semibold">{{ num(ad.reach) }}</p></div>
+          <div><p class="text-xs text-gray-500">Clics</p><p class="font-semibold">{{ num(ad.clicks) }}<span v-if="ad.ctr" class="text-xs text-gray-400"> · {{ Number(ad.ctr).toFixed(1) }}%</span></p></div>
+          <div><p class="text-xs text-gray-500 flex items-center gap-1"><Ticket :size="12" /> Entradas</p><p class="font-semibold">{{ num(ad.sales?.tickets) }}<span class="text-xs text-gray-400"> · {{ money(ad.sales?.revenue_clp) }}</span></p></div>
+          <div><p class="text-xs text-gray-500">Costo por entrada</p><p class="font-semibold">{{ ad.cost_per_ticket != null ? money(ad.cost_per_ticket, ad.currency) : '—' }}<span v-if="ad.roas" class="text-xs text-gray-400"> · {{ ad.roas }}x</span></p></div>
+        </div>
+
+        <div class="mt-4 flex flex-wrap items-center gap-2">
+          <button v-if="['active', 'pending_review'].includes(ad.status)" type="button" @click="changeStatus(ad, 'pause')" :disabled="busy[ad.id]" class="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50">
+            <Pause :size="14" /> Pausar
+          </button>
+          <button v-if="ad.status === 'paused' && canManage" type="button" @click="changeStatus(ad, 'activate')" :disabled="busy[ad.id]" class="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50">
+            <Play :size="14" /> Activar
+          </button>
+          <button v-if="['active', 'paused', 'pending_review'].includes(ad.status)" type="button" @click="changeStatus(ad, 'cancel')" :disabled="busy[ad.id]" class="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg text-red-600 hover:bg-red-50 disabled:opacity-50">
+            <XCircle :size="14" /> Cancelar
+          </button>
+          <a v-if="ad.destination_url" :href="ad.destination_url" target="_blank" rel="noopener" class="ml-auto inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800">
+            Link del anuncio <ExternalLink :size="12" />
+          </a>
+        </div>
       </div>
-    </div>
+    </template>
   </div>
 </template>
-
-<style scoped>
-.slide-down-enter-active,
-.slide-down-leave-active {
-  transition: all 0.3s ease;
-}
-.slide-down-enter-from,
-.slide-down-leave-to {
-  opacity: 0;
-  transform: translateY(-10px);
-}
-</style>

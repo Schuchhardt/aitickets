@@ -71,7 +71,7 @@ const SYSTEM = [
   `- suggestions: exactamente ${SUGGESTIONS_PER_EVENT} acciones concretas para esta semana, en este orden:`,
   '  1) type "channel": cómo reforzar best_channel con una acción específica de ese canal. Si best_channel es null, su basis es "visits" o tracked_share_pct es menor a 50, usa type "tracking": que use un link con seguimiento distinto por canal para saber qué vende (si hay un canal con visitas, nómbralo). Si el evento no vendió nada en la semana y falta más de un día, usa type "offer": un código de descuento o preventa con fecha límite.',
   '  2) type "content": una pieza de contenido para crear con el generador de posts con IA de AI Tickets, pensada para el canal que funciona (o Instagram si no hay datos): formato (reel, carrusel, historia, video corto), el gancho y qué mostrar.',
-  '  3) type "ads": una prueba de publicidad pagada chica y medible en la red que más calce con ese canal (Instagram/Facebook o TikTok): monto diario y duración sugeridos en CLP, y a quién apuntar. Di que use el link de anuncios del correo para medir cuánto vende.',
+  '  3) type "ads": publicidad pagada. Si el evento ya tiene anuncios (ads, de la semana: spend, tickets, cost_per_ticket, roas), decide con esos números: si venden a un costo por entrada razonable frente al precio promedio (week.revenue_clp / week.tickets), sugiere subir el presupuesto o alargarlo; si gastan sin vender, cambiar imagen o texto, o pausarlo. Si no tiene anuncios, una prueba chica y medible: monto diario y duración en CLP, y a quién apuntar (cerca del lugar del evento). Cuando ads_in_app es true, el anuncio se crea desde AI Tickets en 3 pasos (Facebook e Instagram, channel "meta") y mide solo cuántas entradas vende; si es false, en Instagram/Facebook o TikTok usando el link de anuncios del correo.',
   '- channel: la red o canal al que apunta cada acción; "promoter" para promotores (ref), "other" si no aplica ninguno.',
   'Adapta las ideas a la urgencia: días que faltan para el evento (days_until) y cuánto queda por vender (sell_through_pct).',
   'summary: una o dos frases para abrir el correo sobre la semana de la productora en conjunto.',
@@ -116,8 +116,8 @@ function replaceableIndex(list) {
  * Sugerencias finales de un evento: las de la IA (limpias) completadas con las de reglas fijas para que siempre haya
  * SUGGESTIONS_PER_EVENT, con al menos una de contenido y una de publicidad.
  */
-export function mergeSuggestions(aiSuggestions, metrics) {
-  const fallback = fallbackSuggestions(metrics)
+export function mergeSuggestions(aiSuggestions, metrics, opts = {}) {
+  const fallback = fallbackSuggestions(metrics, opts)
   const list = (Array.isArray(aiSuggestions) ? aiSuggestions : []).map(cleanSuggestion).filter(Boolean).slice(0, SUGGESTIONS_PER_EVENT)
   for (const required of ['content', 'ads']) {
     if (list.some((s) => s.type === required)) continue
@@ -161,6 +161,7 @@ export function eventPromptData(m, context = {}) {
     best_channel: m.best_channel ? { channel: m.best_channel.label, network: m.best_channel.network, basis: m.best_channel.basis, tickets: m.best_channel.tickets, visits: m.best_channel.visits } : null,
     tracked_share_pct: m.tracked_share_pct,
     top_discount_code: m.top_discount_code,
+    ads: (m.ads || []).map((a) => ({ status: a.status, currency: a.currency, spend: a.spend, clicks: a.clicks, tickets: a.tickets, revenue_clp: a.revenue_clp, cost_per_ticket: a.cost_per_ticket, roas: a.roas })),
   }
 }
 
@@ -174,14 +175,15 @@ function defaultClient() {
  * Pide las sugerencias de una productora. events: [{ metrics, context: { startsLabel, place, description } }].
  * @returns {Promise<{ provider: string, model: string, summary: string, byEvent: Map<number, { insight: string, suggestions: any[] }> } | null>}
  */
-export async function generateAiSuggestions({ orgName, weekLabel, totals, events }, { client } = {}) {
+export async function generateAiSuggestions({ orgName, weekLabel, totals, events, adsInApp = false }, { client } = {}) {
   if (!events?.length) return null
   if (!client && !isReportAiConfigured()) return null
   const model = env('WEEKLY_REPORT_MODEL') || env('ANTHROPIC_MODEL') || DEFAULT_ANTHROPIC_MODEL
   const data = {
     organization: String(orgName || '').slice(0, 120),
     week: weekLabel,
-    totals: { tickets: totals.tickets, revenue_clp: totals.revenue_clp, previous_tickets: totals.previous_tickets, tickets_change_pct: totals.tickets_change_pct, visits: totals.visits },
+    totals: { tickets: totals.tickets, revenue_clp: totals.revenue_clp, previous_tickets: totals.previous_tickets, tickets_change_pct: totals.tickets_change_pct, visits: totals.visits, ad_spend_clp: totals.ad_spend_clp, ad_tickets: totals.ad_tickets },
+    ads_in_app: Boolean(adsInApp),
     events: events.map((e) => eventPromptData(e.metrics, e.context)),
   }
   let response

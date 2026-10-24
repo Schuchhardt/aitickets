@@ -7,6 +7,8 @@ import {
 
 const props = defineProps({
   posts: { type: Array, default: () => [] },
+  // Anuncios vía Zernio disponibles y el usuario puede crearlos: botón "Promocionar" en los posts publicados
+  canBoost: { type: Boolean, default: false },
 })
 
 const activeFilter = ref('all')
@@ -149,6 +151,15 @@ const retryPublish = async (postId) => {
                   <Clock :size="12" />
                   {{ new Date(post.scheduled_for).toLocaleString('es-CL') }}
                 </span>
+
+                <!-- Promocionar con un anuncio pagado (posts publicados desde AI Tickets) -->
+                <a
+                  v-if="canBoost && post.status === 'published' && post.zernio_post_id"
+                  :href="`/dashboard/promote/ads/create?event=${post.event_id}&post=${post.id}`"
+                  class="text-xs text-gray-700 hover:text-black font-medium underline"
+                >
+                  Promocionar
+                </a>
 
                 <!-- Retry button for failed posts -->
                 <button

@@ -18,6 +18,9 @@ export function changeLabel(pct) {
 }
 
 const TYPE_LABELS = { channel: 'Tu mejor canal', tracking: 'Mide tus canales', offer: 'Oferta', content: 'Contenido', ads: 'Publicidad' }
+const AD_STATUS_LABELS = { active: 'activo', paused: 'pausado', pending_review: 'en revisión', completed: 'terminado', rejected: 'rechazado', cancelled: 'cancelado' }
+/** Gasto en la moneda de la cuenta publicitaria ("$20.000" en CLP, "USD 12" en otras). */
+const adMoney = (n, currency) => (n == null ? '—' : !currency || currency === 'CLP' ? clp(n) : `${currency} ${Number(n).toLocaleString('es-CL', { maximumFractionDigits: 2 })}`)
 
 /** Fila de 3 cifras grandes (entradas, ventas, mejor canal). En texto plano sale como "etiqueta: valor". */
 function StatTiles({ items }) {
@@ -74,6 +77,40 @@ function ChannelTable({ channels }) {
           h('td', { style: { ...cell, ...num } }, c.visits ? c.visits.toLocaleString('es-CL') : '—'),
           h('td', { style: { ...cell, ...num } }, c.tickets ? c.tickets.toLocaleString('es-CL') : '—'),
           h('td', { style: { ...cell, ...num } }, c.revenue_clp ? clp(c.revenue_clp) : '—')
+        )
+      )
+    )
+  )
+}
+
+/** Anuncios del evento en la semana (creados desde AI Tickets): gasto, entradas que vendieron y costo por entrada. */
+function AdsTable({ ads }) {
+  const head = { fontFamily: FONT_FAMILY, fontSize: '11px', lineHeight: '16px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', color: COLORS.muted, padding: '0 0 6px', borderBottom: `1px solid ${COLORS.border}` }
+  const cell = { fontFamily: FONT_FAMILY, fontSize: '13px', lineHeight: '18px', color: COLORS.text, padding: '7px 0', borderBottom: `1px solid ${COLORS.border}` }
+  const num = { textAlign: 'right', paddingLeft: '8px', whiteSpace: 'nowrap' }
+  return h(
+    Panel,
+    { label: 'Tus anuncios esta semana' },
+    h(
+      'table',
+      { ...TABLE_PROPS, style: { borderCollapse: 'collapse' } },
+      h(
+        'thead',
+        null,
+        h('tr', null, h('th', { style: { ...head, textAlign: 'left' } }, 'Anuncio'), h('th', { style: { ...head, ...num } }, 'Gastado'), h('th', { style: { ...head, ...num } }, 'Entradas'), h('th', { style: { ...head, ...num } }, 'Por entrada'))
+      ),
+      h(
+        'tbody',
+        null,
+        ads.map((a, i) =>
+          h(
+            'tr',
+            { key: `ad-${i}` },
+            h('td', { style: cell }, `${a.ad_type === 'boost' ? 'Post' : 'Anuncio'} #${a.id}`, AD_STATUS_LABELS[a.status] ? h('span', { style: { color: COLORS.muted } }, ` · ${AD_STATUS_LABELS[a.status]}`) : null),
+            h('td', { style: { ...cell, ...num } }, adMoney(a.spend, a.currency)),
+            h('td', { style: { ...cell, ...num } }, a.tickets ? `${a.tickets.toLocaleString('es-CL')} (${clp(a.revenue_clp)})` : '0'),
+            h('td', { style: { ...cell, ...num } }, a.cost_per_ticket != null ? adMoney(a.cost_per_ticket, a.currency) : '—')
+          )
         )
       )
     )
@@ -145,6 +182,7 @@ function EventSection({ e, isFirst }) {
         )
       : null,
     e.insight ? h(Paragraph, { small: true, style: { margin: '0 0 16px' } }, oneLine(e.insight)) : null,
+    e.ads?.length ? h(AdsTable, { ads: e.ads }) : null,
     h(Paragraph, { style: { margin: '0 0 10px', fontWeight: 700 } }, 'Ideas para esta semana'),
     ...(e.suggestions || []).map((s, i) => h(SuggestionCard, { key: `s-${i}`, s, index: i })),
     h(PrimaryButton, { href: e.createPostUrl }, 'Crear contenido con IA'),
