@@ -2,7 +2,7 @@
 
 | | |
 | --- | --- |
-| Estado | Propuesta para revisión. El MCP aún no tiene código. Los problemas de la sección 1.4 ya están corregidos (2026-10-24) |
+| Estado | **Implementado** (fases 0 a 4, 2026-10-24): `src/lib/admin-api/`, runbook en `docs/api/admin.md`. Los problemas de la sección 1.4 también están corregidos |
 | Fecha | 2026-10-23 (actualizada 2026-10-24) |
 | Dueño | Sebastián Schuchhardt (único usuario) |
 | Relacionado | `docs/api/productores.md`, `src/lib/producer-api/`, `db/migrations/README.md` |
@@ -454,6 +454,17 @@ Las acciones sobre una orden se hacen con el espejo: `org_resend_tickets`, `org_
 | `get_platform_finance` | Período: ventas brutas, cargo neto (ingreso AI Tickets), IVA a declarar, costo Flow, reembolsos (lo que asume AI Tickets: `fee_amount`) y margen. **Saldo adeudado a productores** (Σ `computeOrgLedger`: disponible, pendiente, retenido), retiros solicitados y pagados. Desglose por org. Formato apto para el contador |
 | `list_payout_requests` | Retiros de todas las orgs por estado, con banco, últimos 4, estado de verificación y saldo disponible al pedirlo. Advierte si `aitickets_payouts` y `event_withdrawals` no cuadran |
 | `list_refund_requests` | Reembolsos por estado, con orden, `payment_external_id` para buscarlo en Flow, monto a devolver y desglose (entradas vs cargo) |
+| `get_payout_transfer_details` | **Sensible** (solo la llave completa; queda en la bitácora). Lo necesario para transferir un retiro: banco, tipo, número de cuenta completo, titular, RUT, correo para el aviso, monto exacto, comentario sugerido y las mismas alertas de riesgo |
+
+**Flujo de pago a productores (implementado).**
+1. El productor pide el retiro y Slack avisa ("💸 Retiro solicitado", que sugiere el camino por Claude).
+2. En Claude: "paga los retiros" (prompt `pagar_retiros`) → `list_payout_requests` → `get_payout_transfer_details`.
+3. Transfieres desde el banco y le das a Claude el n° de comprobante.
+4. `mark_payout_paid` muestra el resumen, pide confirmación y registra el pago. Retiro y reparto quedan en `paid`.
+5. Al productor le llega un correo con el monto, el banco, los últimos 4 y el comprobante, y Slack recibe "✅ Retiro pagado vía Admin".
+
+Si la cuenta no está verificada, cambió después de pedir el retiro o los últimos 4 no calzan, la herramienta se
+detiene antes de pedir confirmación. Solo `force=true` la salta, para cuando ya transferiste a la cuenta correcta.
 
 ### 5.6 Operación de plataforma (escrituras)
 
@@ -787,13 +798,14 @@ o extender el fake).
 
 1. ~~¿Tu cuenta de claude.ai muestra "Request headers"?~~ **Resuelta: sí.** Se conecta con header
    `Authorization`; el OAuth de 4.6 no se implementa.
-2. **Atribución:** ¿el productor ve en su bitácora que soporte hizo cambios? Propuesta: sí, como
-   "Soporte AI Tickets", sin el motivo. Da transparencia y evita el "yo no cambié eso".
-3. **Retiros en nombre del productor:** propuesta: bloqueado (5.7). ¿Hay casos en que lo quieras?
-4. **Aviso al productor cuando se marca un retiro pagado:** hoy no existe. ¿Correo automático con la
-   referencia?
-5. **Llave de solo lectura:** ¿la quieres desde el principio (p. ej. para el celular)?
-6. **Retención de `aitickets_admin_audit`:** propuesta: 24 meses.
+2. ~~Atribución~~ **Resuelta:** el productor ve "Soporte AI Tickets" en su bitácora, sin el motivo.
+3. ~~Retiros en nombre del productor~~ **Resuelta:** bloqueado (5.7).
+4. ~~Aviso al productor cuando se marca un retiro pagado~~ **Implementado:** correo por defecto en
+   `mark_payout_paid` y `mark_payout_failed` (`notify_producer=false` para no enviarlo).
+5. ~~Llave de solo lectura~~ **Resuelta:** soportada desde ya (`AITICKETS_ADMIN_READONLY_KEY_SHA256`); crearla
+   queda para cuando la necesites.
+6. ~~Retención de `aitickets_admin_audit`~~ **Resuelta:** 24 meses. El borrado periódico aún no está
+   programado: es una tarea pendiente.
 7. ~~Hallazgos colaterales (1.4)~~ **Resuelta: corregidos todos** (2026-10-24, ver la tabla de 1.4). Solo
    queda configurar el webhook en Resend (`RESEND_WEBHOOK_SECRET`).
 8. **Más administradores en el futuro** (p. ej. alguien de soporte): el diseño lo permite con llaves por

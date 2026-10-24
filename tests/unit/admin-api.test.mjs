@@ -340,6 +340,26 @@ describe('métricas', () => {
   })
 })
 
+describe('humo: cada herramienta de lectura de plataforma responde sin error interno', () => {
+  const SAMPLE = {
+    organization_id: 7,
+    event_id: 10,
+    order_id: 'o1',
+    payout_id: '11111111-1111-4111-8111-111111111111',
+    query: 'ana@prod.cl',
+  }
+  it('todas', async () => {
+    const tools = ADMIN_TOOLS.filter((t) => t.readOnly && !t.name.startsWith('org_'))
+    expect(tools.length).toBeGreaterThan(15)
+    for (const tool of tools) {
+      const schema = adminEffectiveSchema(tool)
+      const args = Object.fromEntries((schema.required || []).map((k) => [k, SAMPLE[k]]))
+      const out = await runAdminTool(tool, args, actx())
+      if (!out.ok) expect(out.code, `${tool.name}: ${out.message}`).not.toBe('internal')
+    }
+  })
+})
+
 describe('aislamiento', () => {
   it('ningún archivo de la API de productores importa el MCP de admin', () => {
     const root = join(process.cwd(), 'src/lib/producer-api')

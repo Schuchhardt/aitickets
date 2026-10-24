@@ -43,7 +43,26 @@ claude mcp add --scope user --transport http aitickets-admin https://aitickets.c
   --header "Authorization: Bearer $AITICKETS_ADMIN_KEY"
 ```
 
-## 3. Rotar la llave
+## 3. Qué puedes hacer
+
+Empieza siempre con `get_admin_context`. Prompts listos: `ayudar_productor`, `revisar_productor`, `pagar_retiros`,
+`bandeja_operacion`, `cierre_mensual` y `reporte_plataforma`.
+
+| Familia | Herramientas |
+| --- | --- |
+| Plataforma | `get_platform_overview`, `get_platform_timeseries`, `rank_producers`, `get_producer_funnel`, `list_platform_activity`, `get_system_health` |
+| Productores | `search_organizations`, `get_organization`, `search_users`, `list_organization_notes` |
+| Eventos | `search_events`, `get_event_analytics` |
+| Compradores y órdenes | `search_orders`, `get_order_timeline` |
+| Plata | `get_platform_finance`, `list_payout_requests`, `get_payout_transfer_details` (sensible), `list_refund_requests` |
+| Operación (escrituras con `reason`) | `list_pending_operations` (lectura), `verify_payout_account`, `mark_payout_paid`, `mark_payout_failed`, `mark_refund_completed`, `mark_refund_failed`, `moderate_review`, `update_organization`, `add_organization_note`, `send_login_help` |
+| Como productor | `org_<herramienta>` para todas las herramientas del MCP de productores, salvo pedir o anular retiros y tocar datos bancarios |
+
+**Pagar un retiro.** Llega el aviso de Slack. En Claude dices "paga los retiros" y te muestra los pendientes y
+los datos para transferir. Transfieres y le das el n° de comprobante. Claude te muestra el resumen, confirmas
+y queda registrado; al productor le llega un correo con el comprobante.
+
+## 4. Rotar la llave
 
 1. `node scripts/admin-key.mjs` → llave y hash nuevos.
 2. `AITICKETS_ADMIN_KEY_SHA256=<nuevo>,<viejo>` en Netlify y redeploy: las dos funcionan.
@@ -52,11 +71,11 @@ claude mcp add --scope user --transport http aitickets-admin https://aitickets.c
 
 Cada llamada guarda la huella de la llave (los primeros 8 caracteres del hash) en `aitickets_admin_audit`.
 
-## 4. Desactivarlo de emergencia
+## 5. Desactivarlo de emergencia
 
 `ADMIN_MCP_ENABLED=false` (o borra el hash) y redeploya: el endpoint vuelve a responder 404.
 
-## 5. Qué queda registrado
+## 6. Qué queda registrado
 
 - **`aitickets_admin_audit`**: toda llamada, también las lecturas. Guarda la herramienta, el resultado, la
   organización, el objetivo, el motivo, el hash de los argumentos (nunca los argumentos), el hash de la IP y la
