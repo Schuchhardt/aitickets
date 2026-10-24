@@ -1,6 +1,8 @@
 // Herramientas de admin: eventos de toda la plataforma.
 import { eventDateFields, eventPublicUrl, fetchAll } from "../../producer-api/tools/common";
-import { eventVisitCounts } from "../../eventAnalytics";
+import { ToolError } from "../../producer-api/registry";
+import { eventVisitCounts, getEventAnalytics } from "../../eventAnalytics";
+import { isDemoEventSlug } from "../../demoEvent.mjs";
 import type { AdminToolDef } from "../registry";
 import { emptyTotals, loadPaidOrders, loadPlatformEvents, pct, totalsByEvent } from "../metrics";
 import { organizationIdSchema } from "./organizations";
@@ -124,4 +126,81 @@ const searchEvents: AdminToolDef = {
     },
 };
 
-export const eventTools: AdminToolDef[] = [searchEvents];
+const isMissing = (error: any) => ["42P01", "PGRST205", "42703", "PGRST204"].includes(String(error?.code || ""));
+
+const getEventAnalyticsTool: AdminToolDef = {
+    name: "get_event_analytics",
+    title: "Analítica completa de un evento",
+    description:
+        "La misma vista de analítica que ve el productor en su panel, para cualquier evento de la plataforma (la organización se infiere del evento): " +
+        "visitas y visitantes únicos, conversión (órdenes ÷ visitantes únicos), ocupación (emitidas ÷ capacidad), serie diaria en hora de Chile, " +
+        "horas pico, fuentes de tráfico, ubicación de visitantes, ventas y conversión por canal (ref/UTM), por medio de pago y por tipo de entrada, " +
+        "reembolsos, más el resumen de check-in y de reseñas (sin datos personales). Ventas sin cortesías ni transferencias.",
+    readOnly: true,
+    inputSchema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["event_id"],
+        properties: {
+            event_id: { type: "integer", minimum: 1, description: "ID del evento (ver search_events)." },
+            include_demo: { type: "boolean", default: false, description: "true = permitir eventos demo." },
+        },
+    },
+    async handler(args, actx) {
+        const { supabase } = actx;
+        const load = (cols: string) => supabase.from("events").select(cols).eq("id", args.event_id).maybeSingle();
+        let { data: event, error } = await load("id, name, slug, status, organization_id, start_date, end_date, capacity, archived_at, cancelled_at");
+        if (error && isMissing(error)) ({ data: event, error } = await load("id, name, slug, status, organization_id, start_date, end_date, capacity"));
+        if (error) throw error;
+        if (!event) throw new ToolError("not_found", `No existe el evento ${args.event_id}. Usa search_events para ver los IDs.`);
+        if (isDemoEventSlug(event.slug) && !args.include_demo) {
+            throw new ToolError("invalid_input", `El evento ${args.event_id} es un evento demo. Pasa include_demo = true si de verdad quieres su analítica.`);
+        }
+        const [analytics, { data: org }, attendees, reviews] = await Promise.all([
+            getEventAnalytics(supabase, { id: Number(event.id), status: event.status }),
+            supabase.from("organizations").select("id, public_name").eq("id", event.organization_id).maybeSingle(),
+            fetchAll<any>(() => supabase.from("event_attendees").select("id, status, validated_at, is_complimentary").eq("event_id", event.id).order("id", { ascending: true })).catch((err: any) => {
+                if (isMissing(err)) return [];
+                throw err;
+            }),
+            fetchAll<any>(() => supabase.from("aitickets_event_reviews").select("rating").eq("event_id", event.id).order("id", { ascending: true })).catch((err: any) => {
+                if (isMissing(err)) return [];
+                throw err;
+            }),
+        ]);
+        const active = attendees.filter((a: any) => a.status !== "cancelled");
+        const checkedIn = active.filter((a: any) => a.validated_at || a.status === "validated").length;
+        const ratings = reviews.map((r: any) => Number(r.rating)).filter((n: number) => n >= 1 && n <= 5);
+        const distribution = Object.fromEntries([1, 2, 3, 4, 5].map((n) => [n, ratings.filter((r: number) => r === n).length]));
+        return {
+            event: {
+                id: Number(event.id),
+                name: event.name,
+                status: event.status,
+                ...(event.archived_at ? { archived: true } : {}),
+                ...(event.cancelled_at ? { cancelled_at: event.cancelled_at } : {}),
+                ...eventDateFields(event),
+                public_url: event.status === "published" ? eventPublicUrl({ origin: actx.origin } as any, event.slug) : null,
+            },
+            organization: { id: Number(event.organization_id), name: org?.public_name ?? null },
+            ...analytics,
+            checkin: {
+                issued_tickets: active.length,
+                checked_in: checkedIn,
+                pending: active.length - checkedIn,
+                complimentary_issued: active.filter((a: any) => a.is_complimentary === true).length,
+                checked_in_pct: pct(checkedIn, active.length),
+            },
+            reviews: {
+                count: ratings.length,
+                average: ratings.length ? Math.round((ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length) * 10) / 10 : null,
+                distribution,
+            },
+            definitions:
+                "Ventas sin cortesías ni transferencias; revenue_clp = neto del productor. Conversión = órdenes vendidas ÷ visitantes únicos; " +
+                "ocupación = emitidas ÷ capacidad a la venta. Días y horas en hora de Chile.",
+        };
+    },
+};
+
+export const eventTools: AdminToolDef[] = [searchEvents, getEventAnalyticsTool];

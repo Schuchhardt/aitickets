@@ -73,6 +73,8 @@ type OrgOverview = {
     totals: SalesTotals;
     segment: Segment;
     payoutStatus: string;
+    /** Órdenes 'paid' de sus eventos (también cortesías y transferencias): para cortes por período sin recargar. */
+    orders: any[];
 };
 
 /** Visión resumida de varias organizaciones (eventos, ventas históricas, segmento, cuenta bancaria). */
@@ -97,14 +99,21 @@ async function overviewOrganizations(supabase: any, orgs: any[], now = new Date(
     ]);
     const orders = await loadPaidOrders(supabase, events.map((e) => Number(e.id)));
     const byEvent = totalsByEvent(orders);
+    const push = <T,>(map: Map<number, T[]>, key: number, value: T) => {
+        const list = map.get(key);
+        if (list) list.push(value);
+        else map.set(key, [value]);
+    };
     const eventsByOrg = new Map<number, any[]>();
-    for (const e of events) eventsByOrg.set(Number(e.organization_id), [...(eventsByOrg.get(Number(e.organization_id)) || []), e]);
+    for (const e of events) push(eventsByOrg, Number(e.organization_id), e);
     const salesByOrg = new Map<number, Array<{ event_id: number; created_at: string }>>();
+    const ordersByOrg = new Map<number, any[]>();
     const orgOfEvent = new Map(events.map((e) => [Number(e.id), Number(e.organization_id)]));
     for (const o of orders) {
         const org = orgOfEvent.get(Number(o.event_id));
         if (org == null) continue;
-        if (totalsFromOrders([o]).paid_orders) salesByOrg.set(org, [...(salesByOrg.get(org) || []), { event_id: Number(o.event_id), created_at: o.created_at }]);
+        push(ordersByOrg, org, o);
+        if (totalsFromOrders([o]).paid_orders) push(salesByOrg, org, { event_id: Number(o.event_id), created_at: o.created_at });
     }
     const accountByOrg = new Map(accounts.map((a: any) => [Number(a.organization_id), a]));
 
@@ -122,6 +131,7 @@ async function overviewOrganizations(supabase: any, orgs: any[], now = new Date(
             totals,
             segment: segmentFor(org, orgEvents, salesByOrg.get(id) || [], now),
             payoutStatus: presentAccount(accountByOrg.get(id) || null).status,
+            orders: ordersByOrg.get(id) || [],
         };
     });
 }
