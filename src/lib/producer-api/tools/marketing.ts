@@ -10,9 +10,16 @@ import {
 import { rateLimit } from "../../../../netlify/lib/rate-limit.mjs";
 import { serverEnv } from "../../../pages/api/_lib/server-utils";
 import { fetchPublic, isPublicIp, SafeFetchError } from "../../safe-fetch";
+import { EVENT_VIDEO_MAX_BYTES } from "../../eventVideo";
+import { clearEventVideo, EventVideoUnavailableError, loadEventVideoState, saveEventVideo } from "../../eventVideoStore";
+import { readMp4Meta, sniffVideoType } from "../../videoProbe";
+import { storeVideoBuffer, VideoStorageError } from "../../videoStorage";
 
 const PLATFORMS = ["instagram", "facebook"] as const;
 const IMAGE_GENERATIONS_PER_DAY = 20;
+const VIDEO_UPLOADS_PER_HOUR = 20;
+// La función responde de forma síncrona: la descarga tiene que caber holgada en su tiempo máximo
+const VIDEO_DOWNLOAD_TIMEOUT_MS = 20_000;
 
 // ---------------------------------------------------------------------------
 // Imágenes por URL (anti-SSRF en src/lib/safe-fetch.ts) o base64
@@ -183,6 +190,111 @@ const uploadImage: ToolDef = {
         const url = await storeImage(ctx.actor.orgId, buffer, contentType, "api");
         if (args.set_as_cover) await setCover(ctx, args.event_id, url);
         return { url, content_type: contentType, bytes: buffer.length, event_id: args.event_id ?? null, set_as_cover: Boolean(args.set_as_cover) };
+    },
+};
+
+/** Descarga un video público (https, máx. 50 MB, redirecciones verificadas); el tipo se detecta por bytes. */
+async function fetchPublicVideo(rawUrl: string) {
+    if (!/^https:\/\//i.test(String(rawUrl || "").trim())) {
+        throw new ToolError("invalid_input", "Video: solo se aceptan URLs https públicas que descarguen el archivo (ej: https://…/video.mp4).");
+    }
+    let buffer: Buffer;
+    try {
+        ({ buffer } = await fetchPublic(rawUrl, { maxBytes: EVENT_VIDEO_MAX_BYTES, accept: "video/*", timeoutMs: VIDEO_DOWNLOAD_TIMEOUT_MS }));
+    } catch (err: any) {
+        if (err instanceof SafeFetchError) {
+            const message = /supera/.test(err.message) ? "el archivo supera los 50 MB: comprímelo o recórtalo." : err.message;
+            throw new ToolError(err.kind === "invalid" ? "invalid_input" : "upstream", `Video: ${message}`);
+        }
+        throw err;
+    }
+    const contentType = sniffVideoType(buffer);
+    if (!contentType) {
+        throw new ToolError(
+            "invalid_input",
+            "Video: el link no descarga un video MP4, WEBM o MOV (si es de YouTube, Instagram, Drive o Dropbox, usa el link de descarga directa del archivo).",
+        );
+    }
+    return { buffer, contentType };
+}
+
+const setEventVideo: ToolDef = {
+    name: "set_event_video",
+    title: "Video de portada o de la galería",
+    description:
+        "Pone un video en la página pública del evento desde una URL https pública que descargue el archivo (MP4 recomendado, WEBM o MOV; " +
+        "máx. 50 MB, ideal menos de 20 MB y menos de 1 minuto). slot=cover (por defecto): reemplaza la imagen de portada arriba de la página " +
+        "(la imagen se sigue usando en la cartelera, al compartir y en los correos). slot=gallery: video opcional arriba de las fotos de la galería. " +
+        "En la página se reproduce solo y sin sonido mientras está en pantalla, con un botón para activar el sonido. " +
+        "poster_image_url (opcional, recomendado): imagen que se ve mientras carga el video; con slot=cover y sin imagen de portada, pasa a ser la imagen del evento. " +
+        "remove=true quita el video del slot. Reemplazar un video borra el anterior. Los links de YouTube, Instagram, TikTok o páginas de " +
+        "Drive/Dropbox no sirven: se necesita el archivo.",
+    scope: "write",
+    audit: (args) => ({
+        summary: args.remove ? `Quitó el video (${args.slot || "cover"})` : `Puso un video (${args.slot || "cover"})`,
+        target: `event:${args.event_id}`,
+    }),
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+    inputSchema: {
+        type: "object",
+        required: ["event_id"],
+        additionalProperties: false,
+        properties: {
+            event_id: eventIdSchema,
+            video_url: { type: "string", maxLength: 2000, description: "URL https pública que descarga el archivo de video (MP4, WEBM o MOV)." },
+            slot: { type: "string", enum: ["cover", "gallery"], default: "cover", description: "cover = portada (reemplaza la imagen arriba de la página); gallery = arriba de las fotos." },
+            poster_image_url: { type: "string", maxLength: 2000, description: "Imagen (URL https, JPG/PNG/WEBP, máx. 5 MB) que se muestra mientras carga el video." },
+            remove: { type: "boolean", default: false, description: "true = quitar el video de ese slot (sin video_url)." },
+        },
+    },
+    async handler(args, ctx) {
+        const slot = args.slot === "gallery" ? "gallery" : "cover";
+        const eventId = Number(args.event_id);
+        await loadOwnedEvent(ctx, eventId, "id");
+        const orgId = ctx.actor.orgId;
+        try {
+            if (args.remove) {
+                if (args.video_url) throw new ToolError("invalid_input", "Envía video_url o remove=true, no ambos.");
+                const { removed } = await clearEventVideo(ctx.supabase, { eventId, organizationId: orgId, slot });
+                return { event_id: eventId, slot, removed, video: null };
+            }
+            if (!args.video_url) throw new ToolError("invalid_input", "Envía video_url (o remove=true para quitar el video).");
+            if (!(await loadEventVideoState(ctx.supabase, eventId, slot)).available) throw new EventVideoUnavailableError();
+
+            // Se descargan antes de gastar el cupo: una URL mala no lo consume
+            const { buffer, contentType } = await fetchPublicVideo(args.video_url);
+            const poster = args.poster_image_url ? await fetchPublicImage(args.poster_image_url) : null;
+            const limit = await rateLimit("api:video", `org:${orgId}`, { windowSeconds: 3600, max: VIDEO_UPLOADS_PER_HOUR, supabase: ctx.supabase });
+            if (!limit.allowed) throw new ToolError("rate_limited", `Alcanzaste el máximo de ${VIDEO_UPLOADS_PER_HOUR} videos por hora.`);
+
+            const meta = contentType === "video/webm" ? { width: null, height: null, duration: null } : readMp4Meta(buffer);
+            const posterUrl = poster ? await storeImage(orgId, poster.buffer, poster.contentType, "video-poster") : null;
+            const { url } = await storeVideoBuffer(orgId, eventId, buffer, contentType);
+            const saved = await saveEventVideo(ctx.supabase, {
+                eventId,
+                organizationId: orgId,
+                slot,
+                video: { url, poster_url: posterUrl, ...meta, mime: contentType, bytes: buffer.length },
+            });
+            const warnings = [
+                posterUrl ? null : "Sin póster: mientras carga el video se ve un fondo negro. Pasa poster_image_url (p. ej. la imagen de portada actual) para mejorarlo.",
+                meta.width ? null : "No se pudieron leer las dimensiones del video: la página lo muestra en 16:9.",
+                buffer.length > 20 * 1024 * 1024 ? "El video pesa más de 20 MB: en celulares con mala conexión puede tardar en partir. Considera comprimirlo." : null,
+            ].filter(Boolean);
+            return {
+                event_id: eventId,
+                slot,
+                video: saved.video,
+                image_url: saved.image_url,
+                ...(saved.image_from_poster ? { image_note: "El evento no tenía imagen: el póster del video quedó como su imagen (cartelera, al compartir y correos)." } : {}),
+                bytes: buffer.length,
+                ...(warnings.length ? { warnings } : {}),
+            };
+        } catch (err) {
+            if (err instanceof EventVideoUnavailableError) throw new ToolError("unavailable", err.message);
+            if (err instanceof VideoStorageError) throw new ToolError("invalid_input", err.message);
+            throw err;
+        }
     },
 };
 
@@ -454,4 +566,4 @@ const publishPost: ToolDef = {
     },
 };
 
-export const marketingTools: ToolDef[] = [getMarketingKit, createTrackingLink, uploadImage, generateImage, createSocialPost, listSocialPosts, deleteSocialPost, publishPost];
+export const marketingTools: ToolDef[] = [getMarketingKit, createTrackingLink, uploadImage, setEventVideo, generateImage, createSocialPost, listSocialPosts, deleteSocialPost, publishPost];

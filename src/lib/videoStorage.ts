@@ -6,6 +6,8 @@
 // video y no supera el máximo. Las rutas son event-videos/<organización>/<evento>-<aleatorio>.<ext>: la
 // confirmación solo acepta archivos de ese evento y esa organización (ownVideoLocation).
 //
+// La API de productores (set_event_video) descarga el video desde una URL y lo sube con storeVideoBuffer.
+//
 // Bucket propio "aitickets-event-videos" (público, máx. 50 MB, solo video; migración 202610240100). Si todavía no
 // existe (deploy preview o la migración no pudo crearlo) se usa el bucket de imágenes "Events".
 import { getSupabaseAdmin } from "./auth-helpers";
@@ -43,6 +45,24 @@ export async function createVideoUpload(organizationId: number, eventId: number,
             return { bucket, path, uploadUrl: data.signedUrl, publicUrl: storage.from(bucket).getPublicUrl(path).data.publicUrl };
         }
         if (!isMissingBucket(error)) throw new Error(`createSignedUploadUrl (${bucket}): ${error?.message || "sin URL"}`);
+    }
+    throw new Error("No hay bucket de Storage para videos");
+}
+
+/**
+ * Sube un video ya descargado por el servidor (API de productores, set_event_video) a la carpeta del evento.
+ * `contentType` debe venir de sniffVideoType (src/lib/videoProbe.ts), nunca del servidor de origen.
+ */
+export async function storeVideoBuffer(organizationId: number, eventId: number, buffer: Buffer, contentType: string): Promise<{ url: string }> {
+    const ext = EVENT_VIDEO_TYPES[contentType];
+    if (!ext) throw new VideoStorageError(400, "Formato no soportado: usa MP4 (recomendado), WEBM o MOV.");
+    if (buffer.length > EVENT_VIDEO_MAX_BYTES) throw new VideoStorageError(400, "El video supera los 50 MB.");
+    const path = `${videoPathPrefix(organizationId, eventId)}${randomSuffix()}.${ext}`;
+    const storage = getSupabaseAdmin().storage;
+    for (const bucket of BUCKETS) {
+        const { error } = await storage.from(bucket).upload(path, buffer, { contentType, cacheControl: "31536000", upsert: false });
+        if (!error) return { url: storage.from(bucket).getPublicUrl(path).data.publicUrl };
+        if (!isMissingBucket(error)) throw new Error(`upload (${bucket}): ${error.message}`);
     }
     throw new Error("No hay bucket de Storage para videos");
 }

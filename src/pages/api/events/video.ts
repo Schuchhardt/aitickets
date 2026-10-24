@@ -5,20 +5,18 @@
 // POST { eventId, slot, action: "set", url, poster_url?, width?, height?, duration? } → { video, image_url }
 // POST { eventId, slot, action: "delete" }                          → { ok }
 // "set" solo acepta archivos de ese evento y organización, verificados como video y bajo el máximo
-// (src/lib/videoStorage.ts), y borra el video anterior del slot (solo se usa aquí y pesa mucho). Con slot "cover",
-// si el evento no tiene imagen, el póster del video pasa a ser su imagen (cartelera, al compartir, correos).
+// (src/lib/videoStorage.ts). El guardado (borra el video anterior; con "cover" y sin imagen, el póster pasa a ser la
+// imagen) está en src/lib/eventVideoStore.ts, compartido con la API de productores (set_event_video).
 // Los cambios vacían la caché de la página pública (src/middleware.ts, PURGE_ON_WRITE).
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { getSessionContext, getOwnedEvent, hasRole, EVENT_MANAGER_ROLES, jsonResponse, type SessionContext } from "../../../lib/supabaseServer";
-import { EVENT_VIDEO_MAX_BYTES, EVENT_VIDEO_SLOTS, EVENT_VIDEO_TYPES, isEventVideoSlot, normalizeEventVideo, type EventVideoSlot } from "../../../lib/eventVideo";
+import { EVENT_VIDEO_MAX_BYTES, EVENT_VIDEO_TYPES, isEventVideoSlot, type EventVideoSlot } from "../../../lib/eventVideo";
+import { clearEventVideo, EventVideoUnavailableError, EVENT_VIDEO_UNAVAILABLE, loadEventVideoState, saveEventVideo } from "../../../lib/eventVideoStore";
 import { publicImageBaseUrl } from "../../../lib/imageStorage";
-import { createVideoUpload, ownVideoLocation, removeStoredVideo, verifyUploadedVideo, VideoStorageError } from "../../../lib/videoStorage";
+import { createVideoUpload, ownVideoLocation, verifyUploadedVideo, VideoStorageError } from "../../../lib/videoStorage";
 
 export const prerender = false;
-
-const UNAVAILABLE = "Los videos del evento aún no están disponibles. Intenta en unos minutos.";
-const isMissingColumn = (error: any) => error?.code === "42703" || error?.code === "PGRST204";
 
 async function authorize(
     context: Parameters<typeof getSessionContext>[0],
@@ -35,17 +33,22 @@ async function authorize(
     return { session, slot };
 }
 
-/** Video actual del slot y la imagen del evento. available=false si la columna aún no existe (preview sin migrar). */
+/** Estado actual; si la lectura falla por otra cosa que la migración pendiente, se registra y se informa como no disponible. */
 async function loadCurrent(eventId: number, slot: EventVideoSlot) {
-    const column = EVENT_VIDEO_SLOTS[slot];
-    const { data, error } = await getSupabaseAdmin().from("events").select(`image_url, ${column}`).eq("id", eventId).maybeSingle();
-    if (error) {
-        if (!isMissingColumn(error)) console.error(`events/video (${slot}):`, error.message);
-        return { available: !isMissingColumn(error), video: null, raw: null, imageUrl: null };
+    try {
+        return await loadEventVideoState(getSupabaseAdmin(), eventId, slot);
+    } catch (err: any) {
+        console.error(`events/video (${slot}):`, err?.message || err);
+        return { available: false, video: null, raw: null, imageUrl: null };
     }
-    const raw = (data as any)?.[column] ?? null;
-    return { available: true, video: normalizeEventVideo(raw), raw, imageUrl: ((data as any)?.image_url as string | null) || null };
 }
+
+/** Errores del guardado → respuesta (migración pendiente: 503). */
+const saveFailure = (err: any, label: "set" | "delete") => {
+    if (err instanceof EventVideoUnavailableError) return jsonResponse({ message: EVENT_VIDEO_UNAVAILABLE }, 503);
+    console.error(`events/video (${label}):`, err?.message || err);
+    return jsonResponse({ message: label === "delete" ? "No se pudo quitar el video" : "No se pudo guardar el video" }, 500);
+};
 
 const positiveInt = (v: unknown, max: number) => {
     const n = Math.round(Number(v));
@@ -68,7 +71,6 @@ export const POST: APIRoute = async (context) => {
     if (auth instanceof Response) return auth;
     const { slot } = auth;
     const orgId = Number(auth.session.dbUser.organization_id);
-    const column = EVENT_VIDEO_SLOTS[slot];
     const supabase = getSupabaseAdmin();
 
     switch (body?.action) {
@@ -78,7 +80,7 @@ export const POST: APIRoute = async (context) => {
             if (!EVENT_VIDEO_TYPES[contentType]) return jsonResponse({ message: "Formato no soportado: usa MP4 (recomendado), WEBM o MOV." }, 400);
             if (!Number.isFinite(size) || size <= 0) return jsonResponse({ message: "Archivo de video no válido" }, 400);
             if (size > EVENT_VIDEO_MAX_BYTES) return jsonResponse({ message: "El video supera los 50 MB. Comprímelo o recórtalo antes de subirlo." }, 400);
-            if (!(await loadCurrent(eventId, slot)).available) return jsonResponse({ message: UNAVAILABLE }, 503);
+            if (!(await loadCurrent(eventId, slot)).available) return jsonResponse({ message: EVENT_VIDEO_UNAVAILABLE }, 503);
             try {
                 const upload = await createVideoUpload(orgId, eventId, contentType);
                 return jsonResponse({ uploadUrl: upload.uploadUrl, publicUrl: upload.publicUrl, maxBytes: EVENT_VIDEO_MAX_BYTES });
@@ -92,8 +94,7 @@ export const POST: APIRoute = async (context) => {
         case "set": {
             const location = ownVideoLocation(body.url, orgId, eventId);
             if (!location) return jsonResponse({ message: "Video no válido" }, 400);
-            const current = await loadCurrent(eventId, slot);
-            if (!current.available) return jsonResponse({ message: UNAVAILABLE }, 503);
+            if (!(await loadCurrent(eventId, slot)).available) return jsonResponse({ message: EVENT_VIDEO_UNAVAILABLE }, 503);
             let verified;
             try {
                 verified = await verifyUploadedVideo(location);
@@ -107,40 +108,34 @@ export const POST: APIRoute = async (context) => {
                 typeof body.poster_url === "string" && body.poster_url.startsWith(imageBase) && !body.poster_url.includes("..") && body.poster_url.length <= 1000
                     ? body.poster_url
                     : null;
-            const value = {
-                url: String(body.url),
-                poster_url: poster,
-                width: positiveInt(body.width, 20000),
-                height: positiveInt(body.height, 20000),
-                duration: positiveInt(body.duration, 24 * 3600),
-                mime: verified.mime,
-                bytes: verified.bytes,
-                updated_at: new Date().toISOString(),
-            };
-            // Portada sin imagen: el póster del video la reemplaza en la cartelera, al compartir y en los correos
-            const setsImage = slot === "cover" && !current.imageUrl && Boolean(poster);
-            const patch: Record<string, unknown> = { [column]: value, ...(setsImage ? { image_url: poster } : {}) };
-            const { error } = await supabase.from("events").update(patch).eq("id", eventId).eq("organization_id", orgId);
-            if (error) {
-                if (isMissingColumn(error)) return jsonResponse({ message: UNAVAILABLE }, 503);
-                console.error("events/video (set):", error.message);
-                return jsonResponse({ message: "No se pudo guardar el video" }, 500);
+            try {
+                const saved = await saveEventVideo(supabase, {
+                    eventId,
+                    organizationId: orgId,
+                    slot,
+                    video: {
+                        url: String(body.url),
+                        poster_url: poster,
+                        width: positiveInt(body.width, 20000),
+                        height: positiveInt(body.height, 20000),
+                        duration: positiveInt(body.duration, 24 * 3600),
+                        mime: verified.mime,
+                        bytes: verified.bytes,
+                    },
+                });
+                return jsonResponse({ video: saved.video, image_url: saved.image_url });
+            } catch (err) {
+                return saveFailure(err, "set");
             }
-            if (current.video && current.video.url !== value.url) await removeStoredVideo(current.video.url, orgId, eventId);
-            return jsonResponse({ video: normalizeEventVideo(value), image_url: setsImage ? poster : current.imageUrl });
         }
 
         case "delete": {
-            const current = await loadCurrent(eventId, slot);
-            if (!current.available) return jsonResponse({ message: UNAVAILABLE }, 503);
-            if (!current.raw) return jsonResponse({ ok: true });
-            const { error } = await supabase.from("events").update({ [column]: null }).eq("id", eventId).eq("organization_id", orgId);
-            if (error) {
-                console.error("events/video (delete):", error.message);
-                return jsonResponse({ message: "No se pudo quitar el video" }, 500);
+            try {
+                await clearEventVideo(supabase, { eventId, organizationId: orgId, slot });
+                return jsonResponse({ ok: true });
+            } catch (err) {
+                return saveFailure(err, "delete");
             }
-            if (current.video) await removeStoredVideo(current.video.url, orgId, eventId);
-            return jsonResponse({ ok: true });
         }
 
         default:
