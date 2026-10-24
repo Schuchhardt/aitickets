@@ -1,7 +1,9 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { Calendar, MapPin, Ticket, CheckCircle, Image as ImageIcon, Plus, Trash2, ChevronRight, ChevronLeft, UploadCloud } from 'lucide-vue-next'
+import { Calendar, MapPin, Ticket, CheckCircle, Image as ImageIcon, Plus, Trash2, ChevronRight, ChevronLeft, UploadCloud, Star } from 'lucide-vue-next'
 import RichTextEditor from './RichTextEditor.vue'
+import EventFAQManager from '../dashboard/EventFAQManager.vue'
+import { normalizeSlug, SLUG_MIN, SLUG_PATTERN } from '../../lib/eventSlugFormat'
 import { plainTextLength, sanitizeClient } from '../../lib/richTextClient'
 import { prepareImageForUpload, MAX_UPLOAD_BYTES, MAX_SOURCE_BYTES } from '../../lib/clientImage'
 import { EVENT_PAGE_LAYOUTS, EVENT_PAGE_BACKGROUNDS, normalizePageSettings } from '../../lib/eventPageSettings'
@@ -28,6 +30,16 @@ const props = defineProps({
   attendeeCount: {
     type: Number,
     default: 0
+  },
+  // Prefijo del link público, p. ej. https://aitickets.cl/eventos/
+  publicBaseUrl: {
+    type: String,
+    default: ''
+  },
+  // Eventos demo: su link no se puede cambiar
+  slugLocked: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -50,6 +62,24 @@ const steps = [
 const form = ref(JSON.parse(JSON.stringify(props.initialFormState)));
 // Diseño de la página pública y organizador visible (events.page_settings)
 form.value.general.pageSettings = normalizePageSettings(form.value.general.pageSettings)
+if (typeof form.value.general.slug !== 'string') form.value.general.slug = ''
+// Reseñas: correo "¿Cómo estuvo?" 24 h después de cada función (toggle al final del formulario)
+if (!form.value.reviews) form.value.reviews = { enabled: true }
+
+// Link público (/eventos/<slug>). Se normaliza al salir del campo; el servidor valida que esté libre y, si el
+// evento ya circula (publicado o con inscritos), deja el link anterior redirigiendo al nuevo.
+const originalSlug = props.initialFormState.general?.slug || ''
+const slugError = ref('')
+const slugPreview = computed(() => normalizeSlug(form.value.general.slug))
+const slugChanged = computed(() => slugPreview.value !== originalSlug)
+const isSlugValid = computed(() =>
+  props.slugLocked || (!originalSlug && !slugPreview.value) || (slugPreview.value.length >= SLUG_MIN && SLUG_PATTERN.test(slugPreview.value))
+)
+const publicUrl = computed(() => `${props.publicBaseUrl}${slugPreview.value}`)
+const publicBaseLabel = computed(() => props.publicBaseUrl.replace(/^https?:\/\//, ''))
+const normalizeSlugInput = () => { form.value.general.slug = slugPreview.value }
+const slugFromName = () => { form.value.general.slug = normalizeSlug(form.value.general.name) }
+watch(() => form.value.general.slug, () => { slugError.value = '' })
 
 // IA de la descripción: contexto del evento guardado + lo que hay sin guardar en el formulario
 const descriptionAi = {
@@ -88,7 +118,7 @@ const descriptionPreview = computed(() => (mounted.value ? sanitizeClient(form.v
 
 // Validation per step
 const isStep1Valid = computed(() => {
-  return form.value.general.name.length > 3 && plainTextLength(form.value.general.description) > 10
+  return form.value.general.name.length > 3 && plainTextLength(form.value.general.description) > 10 && isSlugValid.value
 })
 
 const isStep2Valid = computed(() => {
@@ -288,7 +318,7 @@ const submitSuccess = ref(false)
 const savedNotice = ref(false)
 
 const STEP_ERRORS = {
-  1: 'Revisa la información: el nombre debe tener más de 3 caracteres y la descripción más de 10.',
+  1: 'Revisa la información: el nombre debe tener más de 3 caracteres, la descripción más de 10 y el link público al menos 3 (letras minúsculas, números y guiones).',
   2: 'Revisa ubicación y fechas: cada ubicación necesita un lugar y al menos una función con fecha y hora.',
   3: 'Revisa las entradas: cada una necesita nombre, precio válido y cantidad mayor a 0 (o sin límite).',
 }
@@ -311,6 +341,8 @@ const submitEvent = async ({ exit = false } = {}) => {
     // Add eventId to payload
     const payload = {
       ...form.value,
+      general: { ...form.value.general, slug: props.slugLocked ? undefined : slugPreview.value },
+      reviewsEnabled: form.value.reviews.enabled,
       eventId: props.eventId,
       notifyAttendees: canNotify && exit && notifyAttendees.value,
       notifyMessage: canNotify && exit && notifyAttendees.value ? notifyMessage.value.trim() : '',
@@ -324,7 +356,13 @@ const submitEvent = async ({ exit = false } = {}) => {
     
     const result = await response.json()
     
-    if (!response.ok) throw new Error(result.message || 'Error al actualizar evento')
+    if (!response.ok) {
+      if (result.field === 'slug') {
+        currentStep.value = 1
+        slugError.value = result.message || 'Ese link no está disponible.'
+      }
+      throw new Error(result.message || 'Error al actualizar evento')
+    }
     
     leavingAfterSave = true
     if (exit) {
@@ -404,6 +442,43 @@ const submitEvent = async ({ exit = false } = {}) => {
             <label class="block text-sm font-medium text-gray-700 mb-1">Nombre del Evento</label>
             <input v-model="form.general.name" type="text" placeholder="Ej: Festival de Verano 2025" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black focus:border-black outline-none" />
           </div>
+
+          <!-- Link público (events.slug) -->
+          <div id="link-publico" class="scroll-mt-24">
+            <label for="eventSlug" class="block text-sm font-medium text-gray-700 mb-1">Link público</label>
+            <div
+              class="flex rounded-lg border overflow-hidden bg-white focus-within:ring-2 focus-within:ring-black"
+              :class="slugError || !isSlugValid ? 'border-red-300' : 'border-gray-300'"
+            >
+              <span v-if="publicBaseLabel" class="hidden sm:flex items-center pl-4 pr-1 bg-gray-50 text-gray-500 text-sm whitespace-nowrap border-r border-gray-200">{{ publicBaseLabel }}</span>
+              <input
+                id="eventSlug"
+                v-model="form.general.slug"
+                type="text"
+                :disabled="slugLocked || isSubmitting"
+                maxlength="120"
+                autocomplete="off"
+                autocapitalize="off"
+                spellcheck="false"
+                placeholder="fiesta-de-verano-2026"
+                aria-describedby="eventSlugHelp"
+                class="flex-1 min-w-0 px-3 py-2 outline-none text-sm disabled:bg-gray-50 disabled:text-gray-500"
+                @blur="normalizeSlugInput"
+              />
+            </div>
+            <div id="eventSlugHelp" class="mt-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs">
+              <span class="text-gray-500 break-all">{{ publicUrl }}</span>
+              <button v-if="!slugLocked" type="button" class="text-gray-600 underline hover:text-black" @click="slugFromName">Usar el nombre del evento</button>
+            </div>
+            <p v-if="slugError" class="mt-1 text-sm text-red-600" role="alert">{{ slugError }}</p>
+            <p v-else-if="!isSlugValid" class="mt-1 text-xs text-red-600">Usa al menos 3 caracteres: letras minúsculas sin tildes, números y guiones.</p>
+            <p v-else-if="slugLocked" class="mt-1 text-xs text-gray-500">El link de un evento demo no se puede cambiar.</p>
+            <p v-else-if="slugChanged && originalSlug" class="mt-1 text-xs text-amber-700">
+              {{ eventStatus === 'published'
+                ? `El link anterior (/eventos/${originalSlug}) seguirá funcionando: redirige automáticamente al nuevo.`
+                : 'Se aplica al guardar. Si el evento ya tiene inscritos, el link anterior redirige al nuevo; si no, queda libre.' }}
+            </p>
+          </div>
           
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -435,6 +510,12 @@ const submitEvent = async ({ exit = false } = {}) => {
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
             <RichTextEditor v-model="form.general.description" :aiContext="descriptionAi" />
+          </div>
+
+          <!-- Preguntas frecuentes: crear y editar en un modal; se guardan al instante -->
+          <div>
+            <EventFAQManager :eventId="Number(props.eventId)" />
+            <p class="mt-2 text-xs text-gray-500">Las preguntas se guardan al instante, sin necesidad de "Guardar".</p>
           </div>
 
            <div>
@@ -699,7 +780,8 @@ const submitEvent = async ({ exit = false } = {}) => {
         <div v-show="currentStep === 4" class="space-y-6">
            <div class="bg-gray-50 p-4 sm:p-6 rounded-xl border border-gray-200">
              <img v-if="form.general.imageUrl" :src="form.general.imageUrl" alt="" class="w-full h-40 object-cover rounded-lg mb-4" />
-             <h3 class="font-bold text-lg mb-2 break-words">{{ form.general.name }}</h3>
+             <h3 class="font-bold text-lg mb-1 break-words">{{ form.general.name }}</h3>
+             <p v-if="slugPreview" class="text-xs text-gray-500 mb-3 break-all">{{ publicUrl }}</p>
              <div class="rich-text text-gray-600 text-sm mb-4" v-html="descriptionPreview"></div>
              
              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-8 pt-4 border-t border-gray-200">
@@ -729,6 +811,30 @@ const submitEvent = async ({ exit = false } = {}) => {
              <p class="text-sm font-medium text-gray-800">Aviso a {{ attendeeLabel }}</p>
              <p class="text-xs text-gray-500">Se enviará un correo al guardar. Si cambiaste fechas, horarios o el lugar, se les avisa automáticamente aunque no marques la opción.</p>
              <textarea v-model="notifyMessage" rows="2" maxlength="1500" placeholder="Mensaje opcional para los asistentes (ej: se agregó un nuevo artista)" class="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black outline-none text-sm"></textarea>
+           </div>
+
+           <!-- Reseñas (events.review_settings.enabled): toggle al final de la edición -->
+           <div class="flex items-start justify-between gap-4 p-4 rounded-xl border border-gray-200" data-testid="reviews-toggle">
+             <div class="min-w-0">
+               <p id="reviewsToggleLabel" class="text-sm font-semibold text-gray-900 flex items-center gap-1.5"><Star size="16" /> Pedir reseñas a los asistentes</p>
+               <p class="text-xs text-gray-500 mt-1">
+                 24 h después de cada función les enviamos un correo para calificar de 1 a 5 estrellas, comentar y subir fotos.
+                 El premio por calificar y la revisión de fotos se configuran en
+                 <a :href="`/dashboard/events/${props.eventId}#resenas`" class="underline hover:text-black">Reseñas</a>.
+               </p>
+             </div>
+             <button
+               type="button"
+               role="switch"
+               :aria-checked="form.reviews.enabled ? 'true' : 'false'"
+               aria-labelledby="reviewsToggleLabel"
+               :disabled="isSubmitting"
+               class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 disabled:opacity-50"
+               :class="form.reviews.enabled ? 'bg-black' : 'bg-gray-300'"
+               @click="form.reviews.enabled = !form.reviews.enabled"
+             >
+               <span class="inline-block h-5 w-5 rounded-full bg-white shadow transition-transform" :class="form.reviews.enabled ? 'translate-x-5' : 'translate-x-0.5'"></span>
+             </button>
            </div>
 
            <div v-if="submitSuccess" class="p-4 bg-green-50 text-green-600 rounded-lg text-sm border border-green-100 font-bold text-center">

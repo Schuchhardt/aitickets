@@ -346,7 +346,14 @@ const publishBlockers = [
             <div
                 class="bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-sm"
             >
-                <h3 class="font-bold text-lg mb-4">Link Público</h3>
+                <div class="flex items-center justify-between gap-3 mb-4">
+                    <h3 class="font-bold text-lg">Link Público</h3>
+                    <a
+                        href={`/dashboard/events/${event.id}/edit#link-publico`}
+                        class="text-sm text-black font-medium hover:underline"
+                        >Cambiar</a
+                    >
+                </div>
                 <p class="text-sm text-gray-500 mb-2">
                     Comparte este enlace para vender entradas.
                 </p>

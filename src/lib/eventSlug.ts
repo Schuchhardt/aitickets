@@ -11,11 +11,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseAdmin } from "./auth-helpers";
 import { isDemoEventSlug } from "./demoEvent.mjs";
+import { SLUG_PATTERN, SLUG_MIN, SLUG_MAX, normalizeSlug } from "./eventSlugFormat";
 
+export { SLUG_PATTERN, SLUG_MIN, SLUG_MAX, normalizeSlug };
 export const SLUG_REDIRECTS_TABLE = "aitickets_event_slug_redirects";
-export const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-export const SLUG_MIN = 3;
-export const SLUG_MAX = 120;
 
 /** Prefijos/rutas que chocarían con páginas propias bajo /eventos. */
 const RESERVED_SLUGS = new Set(["vista-previa", "index"]);
@@ -24,19 +23,6 @@ export class EventSlugError extends Error {
     constructor(public code: "invalid_input" | "conflict", message: string) {
         super(message);
     }
-}
-
-/** Normaliza texto libre a slug: minúsculas, sin tildes, solo [a-z0-9-]. */
-export function normalizeSlug(input: string): string {
-    return String(input || "")
-        .normalize("NFD")
-        .replace(/[̀-ͯ]/g, "")
-        .toLowerCase()
-        .trim()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "")
-        .slice(0, SLUG_MAX)
-        .replace(/-+$/g, "");
 }
 
 export function validateSlug(slug: string): void {
