@@ -11,6 +11,7 @@ import EventSections from "./event/EventSections.vue";
 import MobileStickyBar from "./event/MobileStickyBar.vue";
 import CheckoutSheet from "./event/CheckoutSheet.vue";
 import EventGallery from "./EventGallery.vue";
+import AutoplayVideo from "./event/AutoplayVideo.vue";
 import EventReviews from "./event/EventReviews.vue";
 import ShareSheet from "./event/ShareSheet.vue";
 import { vReveal } from "./event/reveal.js";
@@ -36,15 +37,27 @@ const fromPrice = computed(() => minFinalPrice(props.event));
 const isPrivate = computed(() => props.event?.accessibility && props.event.accessibility !== "public");
 const showAssistant = computed(() => !props.siteMode && !props.event?.is_preview);
 
+// Video de portada (events.cover_video, src/lib/eventVideo.ts): reemplaza la imagen en el póster y en la portada
+// ancha. Se reproduce solo y sin sonido en pantalla (AutoplayVideo.vue); si no carga, vuelve la imagen.
+const coverVideoFailed = ref(false);
+const coverVideo = computed(() => (coverVideoFailed.value ? null : props.event?.cover_video || null));
+
 // Diseño de la página elegido por el productor (events.page_settings): poster | banner | compact
 const pageSettings = computed(() => normalizePageSettings(props.event?.page_settings));
-const layout = computed(() => (props.event?.image_url ? pageSettings.value.layout : "compact"));
+const layout = computed(() => {
+  if (!props.event?.image_url && !coverVideo.value) return "compact";
+  // El video necesita espacio: el diseño compacto (miniatura junto al título) se muestra como póster
+  if (coverVideo.value && pageSettings.value.layout === "compact") return "poster";
+  return pageSettings.value.layout;
+});
 // Fondo animado (Iridescence) o, sin él, el tinte del póster
 const bgPreset = computed(() => pageBackgroundPreset(pageSettings.value.background));
 
 // ---- Desktop: al pasar la portada, una miniatura cuadrada se acopla sobre la card sticky ----
 const coverEl = ref(null);
 const docked = ref(false);
+// Con video de portada y sin imagen, la miniatura es el póster del video
+const dockImage = computed(() => props.event?.image_url || coverVideo.value?.poster_url || "");
 const dockDate = computed(() => {
   const fn = upcomingFunctions(props.event)[0] || props.event?.dates?.[0];
   return fn ? formatFunctionShort(fn) : "";
@@ -84,6 +97,11 @@ const onImageKey = (e) => e.key === "Escape" && (showImage.value = false);
 // Tinte del póster (events.cover_meta, calculado en el servidor) y proporción real del póster
 const tint = computed(() => props.event?.theme?.tint || null);
 const posterRatio = computed(() => {
+  // Con video, la proporción es la del video (16:9 si el navegador del productor no pudo leerla)
+  if (coverVideo.value) {
+    const { width, height } = coverVideo.value;
+    return width && height ? { w: width, h: height, known: true } : { w: 16, h: 9, known: true };
+  }
   const w = Number(props.event?.theme?.poster_width);
   const h = Number(props.event?.theme?.poster_height);
   return w > 0 && h > 0 ? { w, h, known: true } : { w: 4, h: 5, known: false };
@@ -312,14 +330,21 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
       </div>
 
       <!-- Portada ancha: la imagen ocupa todo el ancho y el título se monta sobre su borde -->
-      <figure v-if="layout === 'banner'" ref="coverEl" class="cover" :class="{ 'is-contain': bannerContain }" :style="bannerStyle" data-testid="event-cover">
-        <img v-if="bannerContain" :src="coverSrc" :srcset="coverSrcset" :sizes="EVENT_COVER_SIZES" alt="" class="cover-blur" aria-hidden="true" />
-        <img ref="bannerImg" :src="coverSrc" :srcset="coverSrcset" :sizes="EVENT_COVER_SIZES" :alt="event.name" class="cover-img" fetchpriority="high" loading="eager" decoding="async" />
+      <figure v-if="layout === 'banner'" ref="coverEl" class="cover" :class="{ 'is-contain': bannerContain && !coverVideo }" :style="bannerStyle" data-testid="event-cover">
+        <div v-if="coverVideo" ref="bannerImg" class="cover-media">
+          <AutoplayVideo fill eager sound-position="top" :video="coverVideo" :event-name="event.name" test-id="cover-video" @failed="coverVideoFailed = true" />
+        </div>
+        <template v-else>
+          <img v-if="bannerContain" :src="coverSrc" :srcset="coverSrcset" :sizes="EVENT_COVER_SIZES" alt="" class="cover-blur" aria-hidden="true" />
+          <img ref="bannerImg" :src="coverSrc" :srcset="coverSrcset" :sizes="EVENT_COVER_SIZES" :alt="event.name" class="cover-img" fetchpriority="high" loading="eager" decoding="async" />
+        </template>
       </figure>
 
       <div class="layout">
-        <figure v-if="layout === 'poster'" ref="coverEl" class="poster" :class="{ 'is-fallback': !posterRatio.known }" data-testid="event-cover">
+        <figure v-if="layout === 'poster'" ref="coverEl" class="poster" :class="{ 'is-fallback': !posterRatio.known, 'has-video': coverVideo }" data-testid="event-cover">
+          <AutoplayVideo v-if="coverVideo" fill eager :video="coverVideo" :event-name="event.name" test-id="cover-video" @failed="coverVideoFailed = true" />
           <img
+            v-else
             :src="coverSrc"
             :srcset="coverSrcset"
             :sizes="EVENT_COVER_SIZES"
@@ -349,10 +374,10 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
         <div class="aside" :class="{ 'hide-mobile': cardHiddenOnMobile }">
           <div ref="cardWrap" class="card-wrap">
             <!-- La portada "se muda" a la columna derecha: miniatura cuadrada sobre la card (solo desktop) -->
-            <div v-if="event.image_url" class="dock" :class="{ 'is-docked': docked }" aria-hidden="true">
+            <div v-if="dockImage" class="dock" :class="{ 'is-docked': docked }" aria-hidden="true">
               <div class="dock-inner">
                 <div class="dock-row">
-                  <img :src="cdnImage(event.image_url, 240)" alt="" class="dock-img" loading="lazy" decoding="async" />
+                  <img :src="cdnImage(dockImage, 240)" alt="" class="dock-img" loading="lazy" decoding="async" />
                   <div class="dock-text">
                     <p class="dock-name">{{ event.name }}</p>
                     <p v-if="dockDate" class="dock-date">{{ dockDate }}</p>
@@ -403,7 +428,7 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
             @open-assistant="openAssistant"
           />
           <EventReviews v-if="showReviews" :event="event" :ended="state === 'ended'" :external-origin="reviewsOrigin" />
-          <EventGallery v-if="event.gallery?.length" v-reveal :images="event.gallery" :eventName="event.name" />
+          <EventGallery v-if="event.gallery?.length || event.gallery_video" v-reveal :images="event.gallery || []" :video="event.gallery_video" :eventName="event.name" />
         </div>
       </div>
 
@@ -574,6 +599,17 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
   object-fit: cover;
   filter: blur(28px) saturate(1.1);
   opacity: 0.7;
+}
+/* Video de portada en la portada ancha: el parallax mueve el contenedor; el encuadre vertical es el del ajuste */
+.cover-media {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+  --video-pos: var(--banner-pos-m);
+  animation: cover-in 1200ms var(--ease-out) backwards;
+}
+.poster.has-video {
+  position: relative;
 }
 @keyframes cover-in {
   from { transform: scale(1.08); opacity: 0; }
@@ -759,6 +795,9 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
   }
   .cover-img {
     object-position: var(--banner-pos-d);
+  }
+  .cover-media {
+    --video-pos: var(--banner-pos-d);
   }
   .layout-banner .hero-area {
     margin: -72px 0 0 24px;

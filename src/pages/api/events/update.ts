@@ -6,6 +6,24 @@ import { syncEventCategory, refreshEventDenorm, normalizeTicket, isClientTempId,
 import { sanitizeRichText } from "../../../lib/sanitize";
 import { listOrgVenues, isVenueAllowed, insertOrgVenue } from "../../../lib/orgVenues";
 import { loadSchedule, describeScheduleChange } from "../_lib/eventSchedule";
+import { changeEventSlug, EventSlugError, type SlugChangeResult } from "../../../lib/eventSlug";
+import { normalizeReviewSettings } from "../../../../netlify/lib/reviews.mjs";
+
+/** Correo "¿Cómo estuvo?" 24 h después de cada función (toggle al final del formulario). Premio y moderación no cambian. */
+async function saveReviewsEnabled(supabase: ReturnType<typeof getSupabaseAdmin>, eventId: number, organizationId: number, enabled: boolean) {
+    const { data, error } = await supabase.from("events").select("review_settings").eq("id", eventId).maybeSingle();
+    // Deploy previews: la migración de reseñas puede no estar aplicada todavía
+    if (error?.code === "42703") return;
+    if (error) throw error;
+    const prev = normalizeReviewSettings(data?.review_settings);
+    if (prev.enabled === enabled) return;
+    const { error: updateError } = await supabase
+        .from("events")
+        .update({ review_settings: { ...prev, enabled } })
+        .eq("id", eventId)
+        .eq("organization_id", organizationId);
+    if (updateError) throw updateError;
+}
 
 export const POST: APIRoute = async (context) => {
     const session = await getSessionContext(context);
@@ -79,6 +97,23 @@ export const POST: APIRoute = async (context) => {
         const notifyAttendees = body?.notifyAttendees === true;
         const notifyMessage = typeof body?.notifyMessage === "string" ? body.notifyMessage.trim().slice(0, 1500) : "";
 
+        // Link público (slug): antes que todo lo demás, así un slug inválido u ocupado no deja el evento a medio
+        // guardar. Publicado o con registrados, el link anterior redirige al nuevo (src/lib/eventSlug.ts).
+        let slugChange: SlugChangeResult | null = null;
+        if (typeof general.slug === "string" && general.slug.trim()) {
+            try {
+                slugChange = await changeEventSlug(
+                    supabaseAdmin,
+                    { id: event.id, slug: event.slug, organization_id: dbUser.organization_id, status: event.status },
+                    general.slug,
+                    { userId: dbUser.id },
+                );
+            } catch (err) {
+                if (err instanceof EventSlugError) return jsonResponse({ message: err.message, field: "slug" }, err.code === "conflict" ? 409 : 400);
+                throw err;
+            }
+        }
+
         // Foto "antes" de funciones y recintos, para decidir si hay que avisar a los asistentes
         const before = await loadSchedule(event.id);
 
@@ -105,6 +140,10 @@ export const POST: APIRoute = async (context) => {
         // Diseño de la página y organizador visible (idem: solo si el formulario lo envía)
         if (general.pageSettings !== undefined) {
             await savePageSettings(event.id, dbUser.organization_id, general.pageSettings);
+        }
+        // Reseñas: correo "¿Cómo estuvo?" activado o no (idem)
+        if (typeof body?.reviewsEnabled === "boolean") {
+            await saveReviewsEnabled(supabaseAdmin, event.id, dbUser.organization_id, body.reviewsEnabled);
         }
 
         // 3. Ubicaciones y funciones (antes que las entradas: las entradas pueden apuntar a una función nueva — R1)
@@ -280,7 +319,16 @@ export const POST: APIRoute = async (context) => {
             }
         }
 
-        return jsonResponse({ message: "Evento actualizado", id: event.id, notified }, 200);
+        return jsonResponse(
+            {
+                message: "Evento actualizado",
+                id: event.id,
+                notified,
+                slug: slugChange?.new_slug ?? event.slug,
+                slug_redirect_created: slugChange?.redirect_created ?? false,
+            },
+            200,
+        );
     } catch (error) {
         console.error("Update error:", error);
         return jsonResponse({ message: getFriendlyErrorMessage(error) }, 500);

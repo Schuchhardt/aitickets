@@ -219,7 +219,7 @@ const sendInvite = async () => {
 </script>
 
 <template>
-  <section class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden" data-testid="event-reviews-manager">
+  <section id="resenas" class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden scroll-mt-24" data-testid="event-reviews-manager">
     <div class="p-4 md:p-6 border-b border-gray-100">
       <h3 class="font-bold text-lg flex items-center gap-2"><Star size="18" /> Reseñas y fotos de asistentes</h3>
       <p class="text-sm text-gray-500 mt-1">

@@ -61,7 +61,7 @@ embeber (`frame-ancestors 'none'`).
 | Descuentos | `list_discount_codes`, `create_discount_code`, `update_discount_code` |
 | Analítica | `get_event_performance`, `get_sales_overview` |
 | Reseñas | `list_event_reviews` (attendees), `update_review_settings`, `invite_past_attendees` (publish, con confirmación) |
-| Marketing | `get_marketing_kit`, `create_tracking_link`, `upload_image`, `generate_image`, `create_social_post`, `list_social_posts`, `publish_social_post` (publish) |
+| Marketing | `get_marketing_kit`, `create_tracking_link`, `upload_image`, `set_event_video`, `generate_image`, `create_social_post`, `list_social_posts`, `publish_social_post` (publish) |
 
 El servidor MCP además entrega `instructions` (reglas de uso para el modelo) y 3 prompts:
 `lanzar_evento`, `reporte_de_ventas`, `campana_redes`.
@@ -74,6 +74,10 @@ Decisiones:
   imágenes, genera imágenes (OpenAI, opcional) y publica vía Zernio.
 - `upload_image` por URL: solo https, DNS resuelto a IPs públicas, redirecciones re-verificadas, 5 MB,
   tipo detectado por bytes (sin SVG).
+- `set_event_video` (video de portada en vez de la imagen, o arriba de la galería con `slot=gallery`): mismas
+  reglas de descarga, 50 MB, 20 s de descarga (la función es síncrona), MP4/WEBM/MOV detectado por bytes
+  (src/lib/videoProbe.ts, que también lee ancho, alto rotado y duración del MP4) y copia en nuestro Storage
+  (nunca se enlaza el video de terceros). Máx. 20 por hora por organización; reemplazar borra el anterior.
 - `aitickets_api_audit` registra cada escritura (herramienta, resultado, evento) sin argumentos.
 
 ## Agregar una herramienta

@@ -1,6 +1,6 @@
 // Galería de fotos del evento (public.aitickets_event_gallery_images). La gestionan el panel
 // (/api/events/gallery, EventGalleryManager.vue) y se muestra al final de la página pública (EventGallery.vue,
-// cargada en src/lib/eventPage.ts).
+// cargada en src/lib/eventPage.ts). Su video opcional (events.gallery_video) está en src/lib/eventVideo.ts.
 import { getSupabaseAdmin } from "./auth-helpers";
 
 export const GALLERY_TABLE = "aitickets_event_gallery_images";

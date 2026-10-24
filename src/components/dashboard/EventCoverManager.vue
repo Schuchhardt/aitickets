@@ -1,9 +1,12 @@
 <script setup>
 // Portada del evento en el detalle del panel: vista previa Desktop/Mobile, ajuste del encuadre,
 // subir otra imagen o generarla con IA (también a partir de la actual). Guarda en /api/events/cover.
+// Video de portada (EventVideoUploader.vue): reemplaza la imagen arriba de la página pública; la imagen se sigue
+// usando en la cartelera, al compartir y en los correos.
 import { computed, ref } from 'vue'
 import { Sparkles, UploadCloud, SlidersHorizontal, Trash2, Image as ImageIcon } from 'lucide-vue-next'
 import CoverAdjuster from '../events/CoverAdjuster.vue'
+import EventVideoUploader from './EventVideoUploader.vue'
 import { prepareImageForUpload, MAX_UPLOAD_BYTES, MAX_SOURCE_BYTES } from '../../lib/clientImage'
 
 const props = defineProps({
@@ -102,6 +105,11 @@ const generate = () => run('ai', async () => {
 const remove = () => {
   if (confirm('¿Quitar la imagen de portada?')) saveImage('')
 }
+
+// Sin imagen, el servidor usa el póster del video como imagen del evento
+const onVideoChange = ({ image_url }) => {
+  if (image_url && !image.value) image.value = image_url
+}
 </script>
 
 <template>
@@ -186,6 +194,12 @@ const remove = () => {
 
       <p v-if="error" class="text-sm text-red-600" role="alert">{{ error }}</p>
       <p v-else-if="notice" class="text-sm text-green-700" role="status">{{ notice }}</p>
+
+      <div class="pt-4 border-t border-gray-100">
+        <EventVideoUploader :event-id="eventId" kind="cover"
+          hint="Reemplaza la imagen arriba de la página del evento: se reproduce solo y sin sonido, y tu público activa el sonido con el ícono del parlante. La imagen se sigue usando en la cartelera, al compartir y en los correos."
+          @change="onVideoChange" />
+      </div>
     </div>
   </section>
 </template>

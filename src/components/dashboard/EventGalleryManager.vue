@@ -2,9 +2,11 @@
 // Galería del evento en el detalle del panel: subir varias fotos a la vez (se achican en el navegador y el
 // servidor las optimiza), ordenarlas, ponerles leyenda y quitarlas. Se muestra al final de la página
 // pública (EventGallery.vue). API: /api/events/upload-image (kind=gallery) y /api/events/gallery.
+// Arriba de las fotos puede ir, opcional, un video (EventVideoUploader.vue, /api/events/video con slot gallery).
 import { computed, onMounted, ref } from 'vue'
 import { Images, UploadCloud, Trash2, ChevronLeft, ChevronRight, Check } from 'lucide-vue-next'
 import { prepareImageForUpload, MAX_UPLOAD_BYTES, MAX_SOURCE_BYTES } from '../../lib/clientImage'
+import EventVideoUploader from './EventVideoUploader.vue'
 
 const props = defineProps({
   eventId: { type: Number, required: true },
@@ -186,6 +188,12 @@ onMounted(load)
         {{ busy === 'upload' ? `Subiendo ${progress.done}/${progress.total}...` : 'Agregar fotos' }}
       </button>
       <input ref="fileInput" type="file" accept="image/*" multiple class="hidden" @change="onFiles" />
+    </div>
+
+    <!-- Video opcional arriba de las fotos (el video de portada va en la sección Portada) -->
+    <div class="p-4 sm:p-6 border-b border-gray-100">
+      <EventVideoUploader :event-id="eventId" kind="gallery" title="Video de la galería (opcional)"
+        hint="Va arriba de las fotos. Se reproduce solo y sin sonido cuando aparece en pantalla; tu público activa el sonido con el ícono del parlante." />
     </div>
 
     <div class="p-4 sm:p-6 space-y-4"

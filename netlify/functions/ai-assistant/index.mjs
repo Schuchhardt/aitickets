@@ -3,7 +3,8 @@
 // Body: { eventId, messages: [{ role: 'user'|'assistant', text }] }
 // El contexto del evento se arma EN EL SERVIDOR desde la BD (solo eventos publicados, columnas
 // explícitas, nunca secret_location); el cliente no puede inyectar instrucciones de sistema.
-import Anthropic from '@anthropic-ai/sdk'
+// Responde Claude y, si falla (sin saldo, clave inválida, caída), ChatGPT como respaldo; los errores que
+// necesitan a una persona avisan a Slack (netlify/lib/assistant-llm.mjs).
 import { getSupabaseAdmin, json } from '../../lib/supabase.mjs'
 import { isValidEmail } from '../../lib/mailer.mjs'
 import { TICKET_COLUMNS, isTicketOnSale, maxPerPurchase, getSoldCounts } from '../../lib/tickets.mjs'
@@ -11,8 +12,8 @@ import { IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL, computeBuyerTotal } from 
 import { isDemoEventSlug, getDemoFunctionDate } from '../../../src/lib/demoEvent.mjs'
 import { EVENT_DATE_COLUMNS, todayInTimeZone, formatDateOnlyLong, formatTimeShort, formatEventLocation } from '../../lib/dates.mjs'
 import { rateLimit } from '../../lib/rate-limit.mjs'
+import { configuredProviders, runAssistantTurn, alertAssistantError } from '../../lib/assistant-llm.mjs'
 
-const MODEL = process.env.ANTHROPIC_MODEL || 'claude-opus-5'
 const MAX_HISTORY = 10
 const MAX_MESSAGE_LENGTH = 1000
 
@@ -112,14 +113,14 @@ async function loadEventContext(supabase, eventId) {
 
   // Evento demo: fecha dinámica (misma fecha que muestra la página)
   const eventDates = (dates || []).map(d => (isDemo ? { ...d, date: getDemoFunctionDate(d.date, now, event.slug) } : d))
-  return { event, isDemo, dates: eventDates, tickets: saleTickets, faqs: faqs || [] }
+  return { event, isDemo, feeAbsorbed, dates: eventDates, tickets: saleTickets, faqs: faqs || [] }
 }
 
 function paymentMethodsLine() {
   return 'El pago se hace con Webpay.'
 }
 
-function buildSystemPrompt({ event, isDemo, dates, tickets, faqs }) {
+export function buildSystemPrompt({ event, isDemo, feeAbsorbed = false, dates, tickets, faqs }) {
   const today = todayInTimeZone()
   const upcoming = dates.filter(d => d.date >= today)
   const dateLines = (upcoming.length ? upcoming : dates).map(d => {
@@ -191,8 +192,10 @@ export default async function handler(req, context) {
   const history = sanitizeHistory(body.messages)
   if (!history.some(m => m.role === 'user')) return json({ message: 'No se enviaron mensajes válidos.' }, 400)
 
-  if (!process.env.ANTHROPIC_API_KEY) {
-    console.error('Falta ANTHROPIC_API_KEY')
+  const providers = configuredProviders()
+  if (!providers.length) {
+    console.error('Asistente sin proveedores de IA: falta ANTHROPIC_API_KEY u OPENAI_API_KEY')
+    await alertAssistantError(new Error('No hay ANTHROPIC_API_KEY ni OPENAI_API_KEY en las Functions'), { eventId })
     return json({ message: 'El asistente no está disponible en este momento.' }, 503)
   }
 
@@ -201,92 +204,71 @@ export default async function handler(req, context) {
     const eventContext = await loadEventContext(supabase, eventId)
     if (!eventContext) return json({ message: 'Evento no encontrado' }, 404)
 
-    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 45_000, maxRetries: 1 })
-    const system = buildSystemPrompt(eventContext)
-    const messages = [...history]
-
-    // Chat corto de preguntas y respuestas: esfuerzo bajo para mantener la latencia.
-    // fallbacks "default": si el modelo rechaza por política, la API reintenta con el modelo recomendado.
-    const request = {
-      model: MODEL,
-      max_tokens: 4000,
-      system,
-      tools: TOOLS,
-      output_config: { effort: 'low' },
-      betas: ['server-side-fallback-2026-07-01'],
-      fallbacks: 'default',
-    }
-    const textOf = (message) => message.content.filter(b => b.type === 'text').map(b => b.text).join('').trim()
-
-    const response = await anthropic.beta.messages.create({ ...request, messages })
-    if (response.stop_reason === 'refusal') {
-      return json({ message: 'No puedo ayudarte con eso. ¿Tienes alguna pregunta sobre el evento?' }, 200)
-    }
-
-    const toolUses = response.content.filter(b => b.type === 'tool_use')
-    if (response.stop_reason === 'tool_use' && toolUses.length) {
-      const toolResults = []
-      for (const toolUse of toolUses) {
-        const args = toolUse.input || {}
-
-        if (toolUse.name === 'fill_buyer_information') {
-          const ticket = eventContext.tickets.find(t => t.id === Number(args.ticket_type_id) && !t.soldOut)
-          const quantity = ticket ? Math.min(Math.max(Number.parseInt(args.quantity, 10) || 1, 1), ticket.max) : undefined
-          return json({
-            message: null,
-            function_calling: {
-              called: true,
-              name: 'fill_buyer_information',
-              properties: {
-                first_name: String(args.first_name || '').slice(0, 80),
-                last_name: String(args.last_name || '').slice(0, 80),
-                email: isValidEmail(String(args.email || '').trim()) ? String(args.email).trim() : '',
-                phone: String(args.phone || '').slice(0, 30),
-                ...(ticket ? { ticket_type_id: ticket.id, quantity } : {}),
-              },
+    let questionSent = false
+    const executeTool = async (name, args) => {
+      if (name === 'fill_buyer_information') {
+        const ticket = eventContext.tickets.find(t => t.id === Number(args.ticket_type_id) && !t.soldOut)
+        const quantity = ticket ? Math.min(Math.max(Number.parseInt(args.quantity, 10) || 1, 1), ticket.max) : undefined
+        return {
+          clientAction: {
+            called: true,
+            name: 'fill_buyer_information',
+            properties: {
+              first_name: String(args.first_name || '').slice(0, 80),
+              last_name: String(args.last_name || '').slice(0, 80),
+              email: isValidEmail(String(args.email || '').trim()) ? String(args.email).trim() : '',
+              phone: String(args.phone || '').slice(0, 30),
+              ...(ticket ? { ticket_type_id: ticket.id, quantity } : {}),
             },
-          }, 200)
-        }
-
-        if (toolUse.name === 'send_message_to_producer') {
-          const question = String(args.message || '').trim().slice(0, 2000)
-          const userName = String(args.user_name || '').trim().slice(0, 100)
-          const userEmail = String(args.user_email || '').trim().toLowerCase()
-          let result
-          let isError = false
-          if (!question || !userName || !isValidEmail(userEmail)) {
-            result = 'Faltan datos: se necesita la pregunta, el nombre y un correo válido.'
-            isError = true
-          } else {
-            const { error } = await supabase
-              .from('questions')
-              .insert([{ event_id: eventId, question, user_name: userName, user_email: userEmail }])
-            result = error ? 'No se pudo enviar la pregunta. Pide al usuario intentarlo más tarde.' : 'La pregunta fue enviada a la productora.'
-            isError = Boolean(error)
-            if (error) console.error('Error guardando pregunta:', error.message)
-          }
-          toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: result, is_error: isError })
-        } else {
-          toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: 'Función no disponible.', is_error: true })
+          },
         }
       }
 
-      // Devolver el turno del asistente completo (incluye bloques de thinking) y todos los resultados juntos
-      const second = await anthropic.beta.messages.create({
-        ...request,
-        messages: [...messages, { role: 'assistant', content: response.content }, { role: 'user', content: toolResults }],
-      })
-      const finalContent = second.stop_reason === 'refusal' ? '' : textOf(second)
-      return json({ message: finalContent || '✅ Tu pregunta fue enviada a la productora.' }, 200)
+      if (name === 'send_message_to_producer') {
+        const question = String(args.message || '').trim().slice(0, 2000)
+        const userName = String(args.user_name || '').trim().slice(0, 100)
+        const userEmail = String(args.user_email || '').trim().toLowerCase()
+        if (!question || !userName || !isValidEmail(userEmail)) {
+          return { content: 'Faltan datos: se necesita la pregunta, el nombre y un correo válido.', isError: true }
+        }
+        const { error } = await supabase
+          .from('questions')
+          .insert([{ event_id: eventId, question, user_name: userName, user_email: userEmail }])
+        if (error) {
+          console.error('Error guardando pregunta:', error.message)
+          return { content: 'No se pudo enviar la pregunta. Pide al usuario intentarlo más tarde.', isError: true }
+        }
+        questionSent = true
+        return { content: 'La pregunta fue enviada a la productora.' }
+      }
+
+      return { content: 'Función no disponible.', isError: true }
     }
 
-    const content = textOf(response)
-    return json({ message: content || 'No pude generar una respuesta. ¿Puedes reformular tu pregunta?' }, 200)
-  } catch (error) {
-    if (error instanceof Anthropic.RateLimitError) {
-      return json({ message: 'El asistente está recibiendo muchas consultas. Inténtalo en un momento. 🙏' }, 429)
+    const result = await runAssistantTurn({
+      system: buildSystemPrompt(eventContext),
+      messages: history,
+      tools: TOOLS,
+      executeTool,
+      providers,
+      eventId,
+    })
+
+    if (!result.ok) {
+      const onlyRateLimited = result.failures.every(f => f.kind === 'rate_limit' || f.kind === 'overloaded')
+      return onlyRateLimited
+        ? json({ message: 'El asistente está recibiendo muchas consultas. Inténtalo en un momento. 🙏' }, 429)
+        : json({ message: 'Lo siento, hubo un error. Inténtalo de nuevo más tarde.' }, 503)
     }
-    console.error('Error en ai-assistant:', error?.status, error?.message)
+    if (result.clientAction) return json({ message: null, function_calling: result.clientAction }, 200)
+    if (result.refusal && !result.text) {
+      return json({ message: 'No puedo ayudarte con eso. ¿Tienes alguna pregunta sobre el evento?' }, 200)
+    }
+    const fallbackText = questionSent ? '✅ Tu pregunta fue enviada a la productora.' : 'No pude generar una respuesta. ¿Puedes reformular tu pregunta?'
+    return json({ message: result.text || fallbackText }, 200)
+  } catch (error) {
+    console.error('Error en ai-assistant:', error?.name, error?.message)
+    await alertAssistantError(error, { eventId })
     return json({ message: 'Lo siento, hubo un error. Inténtalo de nuevo más tarde.' }, 500)
   }
 }
