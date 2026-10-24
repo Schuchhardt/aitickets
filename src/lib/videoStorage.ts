@@ -1,8 +1,8 @@
-// Video de portada de la galería (events.gallery_video) en Supabase Storage.
+// Videos del evento (events.cover_video y events.gallery_video, src/lib/eventVideo.ts) en Supabase Storage.
 //
 // Los videos pesan demasiado para pasar por las funciones de Netlify (cuerpo máx. ~6 MB): el panel pide una URL
 // firmada de un solo uso (createVideoUpload), el navegador sube el archivo directo a Storage y luego confirma
-// (/api/events/gallery, acción video_set), que verifica con verifyUploadedVideo que el archivo existe, es un
+// (/api/events/video, acción set), que verifica con verifyUploadedVideo que el archivo existe, es un
 // video y no supera el máximo. Las rutas son event-videos/<organización>/<evento>-<aleatorio>.<ext>: la
 // confirmación solo acepta archivos de ese evento y esa organización (ownVideoLocation).
 //
@@ -10,7 +10,7 @@
 // existe (deploy preview o la migración no pudo crearlo) se usa el bucket de imágenes "Events".
 import { getSupabaseAdmin } from "./auth-helpers";
 import { IMAGE_BUCKET } from "./imageStorage";
-import { GALLERY_VIDEO_MAX_BYTES, GALLERY_VIDEO_TYPES } from "./eventGallery";
+import { EVENT_VIDEO_MAX_BYTES, EVENT_VIDEO_TYPES } from "./eventVideo";
 
 export const VIDEO_BUCKET = "aitickets-event-videos";
 export const VIDEO_FOLDER = "event-videos";
@@ -33,7 +33,7 @@ const publicBase = (bucket: string) =>
 
 /** URL firmada para subir un video del evento (válida 2 h, una sola ruta) y su URL pública. */
 export async function createVideoUpload(organizationId: number, eventId: number, contentType: string) {
-    const ext = GALLERY_VIDEO_TYPES[contentType];
+    const ext = EVENT_VIDEO_TYPES[contentType];
     if (!ext) throw new VideoStorageError(400, "Formato no soportado: usa MP4 (recomendado), WEBM o MOV.");
     const path = `${videoPathPrefix(organizationId, eventId)}${randomSuffix()}.${ext}`;
     const storage = getSupabaseAdmin().storage;
@@ -51,7 +51,7 @@ export async function createVideoUpload(organizationId: number, eventId: number,
 export function ownVideoLocation(url: unknown, organizationId: number, eventId: number): { bucket: string; path: string } | null {
     if (typeof url !== "string" || url.length > 1000 || url.includes("..")) return null;
     const prefix = videoPathPrefix(organizationId, eventId);
-    const extensions = new Set(Object.values(GALLERY_VIDEO_TYPES));
+    const extensions = new Set(Object.values(EVENT_VIDEO_TYPES));
     for (const bucket of BUCKETS) {
         const base = publicBase(bucket);
         if (!url.startsWith(base)) continue;
@@ -69,9 +69,9 @@ export async function verifyUploadedVideo(location: { bucket: string; path: stri
     if (error || !data) throw new VideoStorageError(400, "No encontramos el video subido. Vuelve a subirlo.");
     const mime = String((data as any).contentType || "").split(";")[0].trim().toLowerCase();
     const bytes = Number((data as any).size) || null;
-    if (!GALLERY_VIDEO_TYPES[mime] || (bytes !== null && bytes > GALLERY_VIDEO_MAX_BYTES)) {
+    if (!EVENT_VIDEO_TYPES[mime] || (bytes !== null && bytes > EVENT_VIDEO_MAX_BYTES)) {
         await file.remove([location.path]).catch(() => {});
-        throw new VideoStorageError(400, GALLERY_VIDEO_TYPES[mime] ? "El video supera los 50 MB." : "El archivo subido no es un video MP4, WEBM o MOV.");
+        throw new VideoStorageError(400, EVENT_VIDEO_TYPES[mime] ? "El video supera los 50 MB." : "El archivo subido no es un video MP4, WEBM o MOV.");
     }
     return { mime, bytes };
 }

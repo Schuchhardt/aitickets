@@ -1,21 +1,27 @@
--- Video de portada de la galería del evento (arriba de las fotos, al final de la página pública). Idempotente.
+-- Videos del evento: video de portada (reemplaza la imagen arriba de la página pública) y, opcional, un video
+-- arriba de las fotos de la galería. Idempotente.
 --
--- 1) events.gallery_video (jsonb, NULL = sin video): { "url", "poster_url", "width", "height", "duration", "mime" }.
---    La escribe /api/events/gallery (acciones video_*) después de verificar que el archivo es un video del evento
---    y de la organización; la lee src/lib/eventPage.ts (normalizeGalleryVideo) y la muestra
---    src/components/event/GalleryVideo.vue (se reproduce solo y sin sonido en pantalla; botón para el sonido).
+-- 1) events.cover_video y events.gallery_video (jsonb, NULL = sin video):
+--      { "url", "poster_url", "width", "height", "duration", "mime", "bytes", "updated_at" }
+--    Los escribe /api/events/video (slot "cover" | "gallery") después de verificar que el archivo es un video
+--    del evento y de la organización; los lee src/lib/eventPage.ts (normalizeEventVideo) y los muestra
+--    src/components/event/AutoplayVideo.vue (se reproduce solo y sin sonido en pantalla; botón para el sonido).
+--    La imagen (image_url) se sigue usando en la cartelera, al compartir y en los correos.
 --
 -- 2) Bucket público aitickets-event-videos (máx. 50 MB, solo mp4/webm/mov). Los videos no pasan por las funciones
 --    de Netlify (cuerpo máx. ~6 MB): el navegador los sube directo con una URL firmada de un solo uso
 --    (src/lib/videoStorage.ts). Si el bucket no se puede crear aquí (permisos, o la CI sin el esquema storage),
 --    se avisa y el panel usa el bucket "Events".
 --
--- 3) aitickets_public_event_page (202610160100) devuelve también events.gallery_video. Mismo cuerpo, una columna más.
+-- 3) aitickets_public_event_page (202610160100) devuelve también cover_video y gallery_video. Mismo cuerpo.
 
+ALTER TABLE public.events ADD COLUMN IF NOT EXISTS cover_video jsonb;
 ALTER TABLE public.events ADD COLUMN IF NOT EXISTS gallery_video jsonb;
 
+COMMENT ON COLUMN public.events.cover_video IS
+  'Video de portada (reemplaza la imagen en la página pública): {url, poster_url, width, height, duration, mime}. NULL = sin video.';
 COMMENT ON COLUMN public.events.gallery_video IS
-  'Video de portada de la galería: {url, poster_url, width, height, duration, mime}. NULL = sin video.';
+  'Video opcional arriba de las fotos de la galería: {url, poster_url, width, height, duration, mime}. NULL = sin video.';
 
 DO $$
 BEGIN
@@ -47,7 +53,7 @@ AS $$
       SELECT to_jsonb(x) FROM (
         SELECT ev.id, ev.slug, ev.name, ev.title, ev.description, ev.image_url, ev.location, ev.capacity, ev.status,
                ev.accessibility, ev.start_date, ev.end_date, ev.organization_id,
-               ev.cover_settings, ev.fee_absorbed, ev.cover_meta, ev.page_settings, ev.gallery_video
+               ev.cover_settings, ev.fee_absorbed, ev.cover_meta, ev.page_settings, ev.cover_video, ev.gallery_video
       ) x
     ),
     'categories', COALESCE((

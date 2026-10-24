@@ -2,11 +2,11 @@
 // Galería del evento en el detalle del panel: subir varias fotos a la vez (se achican en el navegador y el
 // servidor las optimiza), ordenarlas, ponerles leyenda y quitarlas. Se muestra al final de la página
 // pública (EventGallery.vue). API: /api/events/upload-image (kind=gallery) y /api/events/gallery.
-// Video de portada (uno por evento, arriba de las fotos): se sube directo a Storage con una URL firmada
-// (los videos no caben en las funciones), con un póster sacado de un cuadro del video en el navegador.
+// Arriba de las fotos puede ir, opcional, un video (EventVideoUploader.vue, /api/events/video con slot gallery).
 import { computed, onMounted, ref } from 'vue'
-import { Images, UploadCloud, Trash2, ChevronLeft, ChevronRight, Check, Film } from 'lucide-vue-next'
+import { Images, UploadCloud, Trash2, ChevronLeft, ChevronRight, Check } from 'lucide-vue-next'
 import { prepareImageForUpload, MAX_UPLOAD_BYTES, MAX_SOURCE_BYTES } from '../../lib/clientImage'
+import EventVideoUploader from './EventVideoUploader.vue'
 
 const props = defineProps({
   eventId: { type: Number, required: true },
@@ -50,9 +50,6 @@ async function load() {
     if (!res.ok) throw new Error(data.message || 'No se pudo cargar la galería')
     setImages(data.images)
     if (data.max) max.value = data.max
-    video.value = data.video || null
-    videoAvailable.value = data.video_available !== false
-    if (data.video_max_bytes) videoMaxBytes.value = data.video_max_bytes
   } catch (e) {
     error.value = e.message
   } finally {
@@ -175,157 +172,6 @@ async function remove(img) {
   }
 }
 
-// ---- Video de portada ----
-const VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime']
-const video = ref(null)
-const videoAvailable = ref(true)
-const videoMaxBytes = ref(50 * 1024 * 1024)
-const videoBusy = ref('')
-const videoProgress = ref(0)
-const videoError = ref('')
-const videoNotice = ref('')
-const videoInput = ref(null)
-const mb = (bytes) => `${Math.round(bytes / (1024 * 1024))} MB`
-
-/** Ancho, alto, duración y un cuadro como póster (JPEG). Si el navegador no puede leer el video, todo null. */
-function readVideoMeta(file) {
-  return new Promise((resolve) => {
-    const src = URL.createObjectURL(file)
-    const v = document.createElement('video')
-    let done = false
-    const finish = (poster) => {
-      if (done) return
-      done = true
-      clearTimeout(timer)
-      const meta = {
-        width: v.videoWidth || null,
-        height: v.videoHeight || null,
-        duration: Number.isFinite(v.duration) ? Math.round(v.duration) : null,
-        poster: poster || null,
-      }
-      v.removeAttribute('src')
-      URL.revokeObjectURL(src)
-      resolve(meta)
-    }
-    const timer = setTimeout(() => finish(null), 10000)
-    v.muted = true
-    v.playsInline = true
-    v.preload = 'auto'
-    v.onerror = () => finish(null)
-    v.onloadeddata = () => {
-      try { v.currentTime = Math.min(1, (v.duration || 2) / 4) } catch { finish(null) }
-    }
-    v.onseeked = () => {
-      try {
-        const scale = Math.min(1, 1280 / (v.videoWidth || 1280))
-        const canvas = document.createElement('canvas')
-        canvas.width = Math.max(1, Math.round(v.videoWidth * scale))
-        canvas.height = Math.max(1, Math.round(v.videoHeight * scale))
-        canvas.getContext('2d').drawImage(v, 0, 0, canvas.width, canvas.height)
-        canvas.toBlob((blob) => finish(blob), 'image/jpeg', 0.85)
-      } catch {
-        finish(null)
-      }
-    }
-    v.src = src
-  })
-}
-
-/** Mensaje claro a partir de la respuesta de Supabase Storage. */
-function storageError(status, text) {
-  let body = {}
-  try { body = JSON.parse(text || '{}') } catch { /* sin JSON */ }
-  const msg = String(body.message || body.error || '')
-  if (status === 413 || /maximum allowed size|too large/i.test(msg)) return `El video supera el máximo permitido (${mb(videoMaxBytes.value)}).`
-  if (/mime type|invalid_mime/i.test(msg)) return 'Formato no soportado: usa MP4 (recomendado), WEBM o MOV.'
-  return `No se pudo subir el video${msg ? `: ${msg}` : ''}. Intenta de nuevo.`
-}
-
-/** PUT a la URL firmada con progreso (fetch no informa el avance de la subida). Mismo formato que supabase-js. */
-function uploadToSignedUrl(url, file) {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest()
-    xhr.open('PUT', url)
-    xhr.setRequestHeader('x-upsert', 'false')
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) videoProgress.value = Math.min(99, Math.round((e.loaded / e.total) * 100))
-    }
-    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(storageError(xhr.status, xhr.responseText))))
-    xhr.onerror = () => reject(new Error('Se cortó la conexión mientras subía el video. Intenta de nuevo.'))
-    const body = new FormData()
-    body.append('cacheControl', '31536000')
-    body.append('', file)
-    xhr.send(body)
-  })
-}
-
-async function uploadPoster(blob) {
-  if (!blob) return null
-  try {
-    const fd = new FormData()
-    fd.append('file', new File([blob], 'video-poster.jpg', { type: 'image/jpeg' }))
-    fd.append('kind', 'gallery')
-    const res = await fetch('/api/events/upload-image', { method: 'POST', body: fd })
-    const data = await res.json().catch(() => ({}))
-    return res.ok ? data.url : null
-  } catch {
-    return null
-  }
-}
-
-async function uploadVideo(file) {
-  videoError.value = ''
-  videoNotice.value = ''
-  if (!file) return
-  if (!VIDEO_TYPES.includes(file.type)) {
-    videoError.value = 'Formato no soportado: usa MP4 (recomendado), WEBM o MOV.'
-    return
-  }
-  if (file.size > videoMaxBytes.value) {
-    videoError.value = `El video pesa ${mb(file.size)}; el máximo es ${mb(videoMaxBytes.value)}. Recórtalo o comprímelo (1080p y menos de 1 minuto suele bastar).`
-    return
-  }
-  videoBusy.value = 'upload'
-  videoProgress.value = 0
-  try {
-    const meta = await readVideoMeta(file)
-    const { uploadUrl, publicUrl } = await api({ action: 'video_upload_url', contentType: file.type, size: file.size })
-    await uploadToSignedUrl(uploadUrl, file)
-    videoProgress.value = 100
-    const posterUrl = await uploadPoster(meta.poster)
-    const data = await api({ action: 'video_set', url: publicUrl, poster_url: posterUrl, width: meta.width, height: meta.height, duration: meta.duration })
-    video.value = data.video
-    videoNotice.value = meta.width
-      ? 'Video listo. Se reproduce solo y sin sonido cuando aparece en pantalla.'
-      : 'Video subido, pero este navegador no pudo leerlo: puede que no se vea en todos los dispositivos. Recomendamos MP4 (H.264).'
-  } catch (e) {
-    videoError.value = e.message || 'No se pudo subir el video.'
-  } finally {
-    videoBusy.value = ''
-  }
-}
-
-const onVideoFile = (e) => {
-  const file = e.target.files?.[0]
-  uploadVideo(file).finally(() => { e.target.value = '' })
-}
-
-async function removeVideo() {
-  if (!confirm('¿Quitar el video de la galería?')) return
-  videoBusy.value = 'delete'
-  videoError.value = ''
-  videoNotice.value = ''
-  try {
-    await api({ action: 'video_delete' })
-    video.value = null
-    videoNotice.value = 'Video quitado.'
-  } catch (e) {
-    videoError.value = e.message
-  } finally {
-    videoBusy.value = ''
-  }
-}
-
 onMounted(load)
 </script>
 
@@ -334,7 +180,7 @@ onMounted(load)
     <div class="p-4 sm:p-6 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
       <div class="min-w-0">
         <h3 class="font-bold text-lg flex items-center gap-2"><Images size="18" /> Galería</h3>
-        <p class="text-sm text-gray-500">Un video de portada y fotos del lugar, line-up o ediciones anteriores. Se muestran al final de la página del evento.</p>
+        <p class="text-sm text-gray-500">Fotos del lugar, line-up o ediciones anteriores. Se muestran al final de la página del evento.</p>
       </div>
       <button type="button" :disabled="!!busy || !remaining" @click="fileInput?.click()"
         class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50">
@@ -344,38 +190,10 @@ onMounted(load)
       <input ref="fileInput" type="file" accept="image/*" multiple class="hidden" @change="onFiles" />
     </div>
 
-    <!-- Video de portada (arriba de las fotos en la página pública) -->
-    <div v-if="!loading" class="p-4 sm:p-6 border-b border-gray-100 space-y-3" data-testid="gallery-video-manager">
-      <div class="flex flex-wrap items-start justify-between gap-3">
-        <div class="min-w-0">
-          <p class="font-semibold text-sm flex items-center gap-1.5"><Film size="16" /> Video de portada</p>
-          <p class="text-xs text-gray-500 mt-0.5">Va arriba de las fotos. Se reproduce solo y sin sonido cuando aparece en pantalla; tu público activa el sonido con el ícono del parlante.</p>
-        </div>
-        <div v-if="video && videoAvailable" class="flex gap-2">
-          <button type="button" :disabled="!!videoBusy" @click="videoInput?.click()"
-            class="px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50">Cambiar</button>
-          <button type="button" :disabled="!!videoBusy" @click="removeVideo" title="Quitar video"
-            class="p-2 border border-gray-200 rounded-lg text-gray-600 hover:text-red-600 disabled:opacity-50"><Trash2 size="15" /></button>
-        </div>
-      </div>
-      <input ref="videoInput" type="file" accept="video/mp4,video/webm,video/quicktime" class="hidden" @change="onVideoFile" />
-
-      <p v-if="!videoAvailable" class="text-sm text-amber-700 bg-amber-50 rounded-lg p-3">El video de portada se está activando. Vuelve a intentarlo en unos minutos.</p>
-      <template v-else>
-        <video v-if="video && videoBusy !== 'upload'" :key="video.url" :src="video.url" :poster="video.poster_url || undefined"
-          controls muted playsinline preload="metadata" class="w-full max-h-80 rounded-lg bg-black"></video>
-        <button v-else type="button" :disabled="!!videoBusy" @click="videoInput?.click()"
-          class="w-full border-2 border-dashed border-gray-300 rounded-xl p-5 sm:p-6 flex flex-col items-center text-center transition hover:border-gray-400 hover:bg-gray-50 disabled:opacity-70 disabled:cursor-wait">
-          <Film size="24" class="text-gray-400 mb-2" />
-          <span class="font-medium text-gray-900 text-sm">{{ videoBusy === 'upload' ? `Subiendo video... ${videoProgress}%` : 'Subir un video' }}</span>
-          <span class="text-xs text-gray-500 mt-1">MP4 (recomendado), WEBM o MOV · máx. {{ mb(videoMaxBytes) }}</span>
-        </button>
-        <div v-if="videoBusy === 'upload'" class="h-1.5 rounded-full bg-gray-100 overflow-hidden" role="progressbar" :aria-valuenow="videoProgress" aria-valuemin="0" aria-valuemax="100" aria-label="Subida del video">
-          <div class="h-full bg-black transition-all" :style="{ width: `${videoProgress}%` }"></div>
-        </div>
-      </template>
-      <p v-if="videoError" class="text-sm text-red-600" role="alert">{{ videoError }}</p>
-      <p v-else-if="videoNotice" class="text-sm text-green-700" role="status">{{ videoNotice }}</p>
+    <!-- Video opcional arriba de las fotos (el video de portada va en la sección Portada) -->
+    <div class="p-4 sm:p-6 border-b border-gray-100">
+      <EventVideoUploader :event-id="eventId" kind="gallery" title="Video de la galería (opcional)"
+        hint="Va arriba de las fotos. Se reproduce solo y sin sonido cuando aparece en pantalla; tu público activa el sonido con el ícono del parlante." />
     </div>
 
     <div class="p-4 sm:p-6 space-y-4"

@@ -22,12 +22,16 @@ export const SCENARIOS = {
   "maximo-configurado": { layout: "poster", tickets: [TICKETS.generalMax3] },
   // Evento que ya terminó (hace 2 días), con reseñas y fotos de asistentes (tests/e2e/event-reviews.spec.ts)
   "terminado-con-resenas": { layout: "poster", tickets: [], ended: true, reviews: true },
-  // Video de portada de la galería (tests/e2e/gallery-video.spec.ts)
+  // Videos del evento (tests/e2e/event-video.spec.ts): de portada en cada diseño (compacto se muestra como póster)
+  // y opcional en la galería
+  "con-video-portada": { layout: "poster", tickets: [TICKETS.general], coverVideo: true },
+  "con-video-portada-ancha": { layout: "banner", tickets: [TICKETS.general], coverVideo: true },
+  "con-video-portada-compacto": { layout: "compact", tickets: [TICKETS.general], coverVideo: true },
   "con-video-galeria": { layout: "poster", tickets: [TICKETS.general], galleryVideo: true },
 };
 
-/** Video como lo arma normalizeGalleryVideo (src/lib/eventGallery.ts), con el MP4 de public/videos. */
-export const FIXTURE_GALLERY_VIDEO = {
+/** Video como lo arma normalizeEventVideo (src/lib/eventVideo.ts), con el MP4 de public/videos. */
+export const FIXTURE_VIDEO = {
   url: "/videos/aitickets-demo.mp4",
   poster_url: "/videos/aitickets-demo-poster.jpg",
   width: 1920,
@@ -101,7 +105,8 @@ export function fixtureEvent(name, { toPublicTicket, now = new Date() }) {
       { id: 2, question: "¿Hay estacionamiento?", answer: "Hay estacionamientos públicos cerca del teatro." },
     ],
     gallery: [],
-    gallery_video: scenario.galleryVideo ? FIXTURE_GALLERY_VIDEO : null,
+    cover_video: scenario.coverVideo ? FIXTURE_VIDEO : null,
+    gallery_video: scenario.galleryVideo ? FIXTURE_VIDEO : null,
     dates: [{ id: 9200, date, start_time: "20:00:00", end_time: "23:00:00", timezone: "America/Santiago", start_iso: start, end_iso: end, venue }],
     tickets: scenario.tickets.map((t) =>
       toPublicTicket({ ...t, init_date: null, end_date: null, event_date_id: null }, { remaining: t.total_quantity ?? null, feeAbsorbed: false }),

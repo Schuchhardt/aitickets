@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { Calendar, MapPin, Ticket, CheckCircle, Image as ImageIcon, Plus, Trash2, ChevronRight, ChevronLeft, UploadCloud, Star } from 'lucide-vue-next'
 import RichTextEditor from './RichTextEditor.vue'
 import EventFAQManager from '../dashboard/EventFAQManager.vue'
+import EventVideoUploader from '../dashboard/EventVideoUploader.vue'
 import { normalizeSlug, SLUG_MIN, SLUG_PATTERN } from '../../lib/eventSlugFormat'
 import { plainTextLength, sanitizeClient } from '../../lib/richTextClient'
 import { prepareImageForUpload, MAX_UPLOAD_BYTES, MAX_SOURCE_BYTES } from '../../lib/clientImage'
@@ -311,6 +312,18 @@ const removeImage = () => {
   form.value.general.imageUrl = ''
 }
 
+// Video de portada (se guarda al instante, EventVideoUploader.vue). Si el evento no tenía imagen, el servidor usa
+// el póster del video: se refleja aquí y en la versión guardada, para que "Guardar" no la borre ni la marque como cambio.
+const onCoverVideoChange = ({ image_url }) => {
+  if (!image_url || form.value.general.imageUrl) return
+  form.value.general.imageUrl = image_url
+  const saved = JSON.parse(savedSnapshot.value)
+  if (!saved.general.imageUrl) {
+    saved.general.imageUrl = image_url
+    savedSnapshot.value = JSON.stringify(saved)
+  }
+}
+
 // Submit
 const isSubmitting = ref(false)
 const submitError = ref('')
@@ -573,12 +586,19 @@ const submitEvent = async ({ exit = false } = {}) => {
             <p v-if="uploadError" class="mt-2 text-sm text-red-600 flex items-center gap-1">
               <span class="w-1 h-1 bg-red-600 rounded-full"></span> {{ uploadError }}
             </p>
+
+            <!-- Video de portada: reemplaza la imagen arriba de la página del evento -->
+            <div class="mt-4 p-4 rounded-xl border border-gray-200">
+              <EventVideoUploader :event-id="Number(props.eventId)" kind="cover"
+                hint="Reemplaza la imagen arriba de la página del evento: se reproduce solo y sin sonido, y tu público activa el sonido con el ícono del parlante. La imagen se sigue usando en la cartelera, al compartir y en los correos. Se guarda al instante."
+                @change="onCoverVideoChange" />
+            </div>
           </div>
 
           <!-- Diseño de la página pública (events.page_settings) -->
           <fieldset>
             <legend class="block text-sm font-medium text-gray-700 mb-1">Diseño de la página</legend>
-            <p class="text-xs text-gray-500 mb-3">Cómo se ubica la imagen respecto del título en la página del evento.</p>
+            <p class="text-xs text-gray-500 mb-3">Cómo se ubica la imagen (o el video de portada) respecto del título en la página del evento. Con video, el diseño compacto se muestra como póster.</p>
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" role="radiogroup" aria-label="Diseño de la página">
               <label
                 v-for="opt in EVENT_PAGE_LAYOUTS"
