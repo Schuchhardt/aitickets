@@ -29,7 +29,7 @@ export interface CreateInvitationInput {
   audience: string;
   subject?: unknown;
   message?: unknown;
-  channel: "dashboard" | "mcp" | "rest";
+  channel: "dashboard" | "mcp" | "rest" | "admin";
   requestUrl: URL;
 }
 

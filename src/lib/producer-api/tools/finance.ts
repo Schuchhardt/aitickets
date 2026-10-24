@@ -3,7 +3,7 @@
 // banco, tipo y últimos 4 dígitos. Los retiros se solicitan aquí y AI Tickets los transfiere manualmente.
 // Saldo: ver src/lib/producer-api/ledger.ts.
 import { randomUUID } from "node:crypto";
-import { ToolError, type ToolDef, type ToolContext } from "../registry";
+import { ToolError, type ToolDef, type ToolContext, channelLabel } from "../registry";
 import { eventIdSchema, loadOwnedEvent, clp, fetchAll, localDateTime } from "./common";
 import { PAYOUT_BUSINESS_DAYS as LEGAL_PAYOUT_BUSINESS_DAYS } from "../../../../netlify/lib/legal.mjs";
 import { computeOrgLedger, addBusinessDays, loadOrgEvents, RELEASE_HOURS, WITHDRAWN_STATUSES, isActiveRefund } from "../ledger";
@@ -68,7 +68,8 @@ export function payoutAccountState(acc: any, now = new Date()) {
     return { complete, status, holdUntil, coolingActive, canPayout: status === "verified" && !coolingActive };
 }
 
-function presentAccount(acc: any) {
+/** Cuenta de pago para mostrar: banco, tipo y últimos 4 dígitos; nunca el número completo ni el RUT. */
+export function presentAccount(acc: any) {
     const state = payoutAccountState(acc);
     return {
         status: state.status,
@@ -230,7 +231,7 @@ const removePayoutAccount: ToolDef = {
             ({ error } = await ctx.supabase.from("organization_payout_accounts").update(patch).eq("organization_id", ctx.actor.orgId));
         }
         if (error) throw error;
-        await notifySlack(`🏦 *Cuenta de pago dada de baja vía ${ctx.channel === "mcp" ? "MCP" : "API"}*\n• *Org:* ${ctx.actor.orgId}\n• *Por usuario:* ${ctx.actor.userId}`);
+        await notifySlack(`🏦 *Cuenta de pago dada de baja vía ${channelLabel(ctx.channel)}*\n• *Org:* ${ctx.actor.orgId}\n• *Por usuario:* ${ctx.actor.userId}`);
         return { status: "removed", manage_url: settingsUrl(ctx) };
     },
     audit: () => ({ summary: "Cuenta de pago dada de baja", target: "payout_account" }),
@@ -664,7 +665,7 @@ const requestPayout: ToolDef = {
             throw new ToolError("conflict", "El saldo cambió mientras se procesaba el retiro (¿otra solicitud en curso?). Revisa get_balance y vuelve a intentarlo.");
         }
         await notifySlack(
-            `💸 *Retiro solicitado vía ${ctx.channel === "mcp" ? "MCP" : ctx.channel === "dashboard" ? "panel" : "API"}*\n• *Org:* ${ctx.actor.orgId}\n• *Monto:* ${clp(plan.amount)}\n` +
+            `💸 *Retiro solicitado vía ${channelLabel(ctx.channel)}*\n• *Org:* ${ctx.actor.orgId}\n• *Monto:* ${clp(plan.amount)}\n` +
                 `• *Cuenta:* ${acc.bank_name} ****${last4(acc.bank_account_number)}\n• *Payout:* ${payout.id}\n• *Eventos:* ${plan.allocations.map((a) => `#${a.event_id} ${clp(a.amount)}`).join(", ")}\n• *Estimado:* ${plan.estimated}\n` +
                 payoutSlackSql(ctx.actor.orgId, String(payout.id)),
         );

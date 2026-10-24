@@ -14,7 +14,7 @@
 // Concurrencia: las entradas se anulan con un UPDATE condicionado a que sigan vigentes y con conteo exacto;
 // si otra operación ya anuló alguna, esta revierte lo suyo y aborta. El registro del reembolso se inserta
 // solo después de anular con éxito.
-import { ToolError, type ToolDef, type ToolContext } from "../registry";
+import { ToolError, type ToolDef, type ToolContext, channelLabel } from "../registry";
 import { eventIdSchema, loadOwnedEvent, fetchAll, clp } from "./common";
 import { isActiveRefund } from "../ledger";
 import { findOrCreateAttendee, newQrCode } from "../../courtesy";
@@ -598,7 +598,7 @@ const refundOrder: ToolDef = {
         }
         if (plan.total > 0) {
             await notifySlack(
-                `💸 *Reembolso solicitado vía ${ctx.channel === "mcp" ? "MCP" : "API"}*\n• *Evento:* ${plan.event.name} (#${plan.event.id})\n• *Orden:* ${plan.order.id} (${plan.order.payment_provider || "flow"}, ref ${plan.order.payment_external_id || "—"})\n` +
+                `💸 *Reembolso solicitado vía ${channelLabel(ctx.channel)}*\n• *Evento:* ${plan.event.name} (#${plan.event.id})\n• *Orden:* ${plan.order.id} (${plan.order.payment_provider || "flow"}, ref ${plan.order.payment_external_id || "—"})\n` +
                     `• *Devolver al comprador:* ${clp(plan.total)} (${clp(plan.ticketAmount)} entradas + ${clp(plan.feeAmount)} cargo)\n• *Tipo:* ${plan.full ? "total" : "parcial"}\n• *Refund id:* ${refund.id}\n• *Por:* ${ctx.actor.name || ctx.actor.email}\n` +
                     refundSlackSql(String(refund.id)),
             );
@@ -844,7 +844,7 @@ const cancelEvent: ToolDef = {
             notificationQueued = res.ok;
         }
         await notifySlack(
-            `🛑 *Evento ${plan.resuming ? "cancelado (reintento: completando lo pendiente)" : "cancelado"} vía ${ctx.channel === "mcp" ? "MCP" : "API"}*\n• *Evento:* ${plan.event.name} (#${eventId})\n• *Reembolsos a procesar:* ${refundsCreated} por ${clp(refundTotal)}\n` +
+            `🛑 *Evento ${plan.resuming ? "cancelado (reintento: completando lo pendiente)" : "cancelado"} vía ${channelLabel(ctx.channel)}*\n• *Evento:* ${plan.event.name} (#${eventId})\n• *Reembolsos a procesar:* ${refundsCreated} por ${clp(refundTotal)}\n` +
                 `• *Saldo del productor en el evento:* ${clp(plan.balance.available)}\n• *Aviso a compradores:* ${notificationQueued ? "en cola" : "NO enviado"}\n• *Por:* ${ctx.actor.name || ctx.actor.email}` +
                 (refundsCreated || plan.resuming
                     ? `\n• *Reembolsos pendientes:* \`select r.id, r.order_id, o.payment_external_id, r.total_amount from aitickets_refunds r join event_orders o on o.id = r.order_id where r.event_id = ${eventId} and r.status = 'requested';\`\n` +
