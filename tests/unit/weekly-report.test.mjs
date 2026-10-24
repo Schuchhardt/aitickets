@@ -505,7 +505,7 @@ describe('envío de los domingos', () => {
 
   it('sin la tabla del registro no envía nada', async () => {
     db.failOn('aitickets_weekly_reports', 'select', { code: '42P01', message: 'relation "aitickets_weekly_reports" does not exist' })
-    await expect(runWeeklyReports(db, { now: SUNDAY, sendEmail, suggest })).rejects.toThrow(/migración 202610250100/)
+    await expect(runWeeklyReports(db, { now: SUNDAY, sendEmail, suggest })).rejects.toThrow(/migración 202610250300/)
     expect(sendEmail).not.toHaveBeenCalled()
   })
 

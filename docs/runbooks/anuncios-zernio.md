@@ -3,7 +3,7 @@
 Las productoras crean anuncios pagados de sus eventos desde **Promocionar → Anuncios** (`/dashboard/promote?tab=ads`),
 miden cuántas entradas vende cada uno y lo ven también en su reporte de los domingos. Todo pasa por Zernio, que es
 Meta Marketing Partner: AI Tickets no necesita app propia de Meta ni App Review de `ads_management`.
-Migración `db/migrations/202610250200_zernio_ads.sql`. Referencia de la API: https://docs.zernio.com/platforms/meta-ads
+Migración `db/migrations/202610250400_zernio_ads.sql`. Referencia de la API: https://docs.zernio.com/platforms/meta-ads
 (contrato completo en https://zernio.com/openapi.json).
 
 | Pieza | Archivo |

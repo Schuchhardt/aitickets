@@ -1,14 +1,22 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { Menu, X } from 'lucide-vue-next';
 import logoLight from '../images/logo.png';
+import { fetchSession } from '../lib/sessionHints.js';
 
 const mobileMenuOpen = ref(false);
 const showMobileMenu = ref(false);
 const currentPath = ref('/');
+// Con sesión de productor, "Ingresar" lleva directo al panel (sin pasar por el login)
+const producer = ref(null);
+const accountHref = computed(() => (producer.value ? '/dashboard' : '/organizadores/login'));
+const accountLabel = computed(() => (producer.value ? 'Ir a mi panel' : 'Ingresar'));
 
 onMounted(() => {
   currentPath.value = window.location.pathname;
+  fetchSession().then((s) => {
+    producer.value = s?.producer || null;
+  });
 });
 
 const toggleMenu = () => {
@@ -38,7 +46,7 @@ const toggleMenu = () => {
         </a>
 
         <!-- Desktop Menu -->
-        <div class="hidden md:flex items-center space-x-8">
+        <div class="hidden md:flex items-center space-x-2 lg:space-x-6">
           <a
             href="/eventos"
             :class="[
@@ -62,10 +70,19 @@ const toggleMenu = () => {
             Para organizadores
           </a>
           <a
-            href="/organizadores/login"
+            href="/mis-entradas"
+            :class="[
+              'text-sm font-medium font-[Unbounded] px-3 py-1.5 rounded-lg transition-colors text-black hover:text-gray-600',
+              currentPath.startsWith('/mis-entradas') ? 'border-b-2 border-lime-400' : ''
+            ]"
+          >
+            Mis entradas
+          </a>
+          <a
+            :href="accountHref"
             class="text-sm font-medium font-[Unbounded] bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors"
           >
-            Ingresar
+            {{ accountLabel }}
           </a>
         </div>
 
@@ -107,13 +124,22 @@ const toggleMenu = () => {
             Para organizadores
           </a>
           <a
-            href="/organizadores/login"
+            href="/mis-entradas"
+            :class="[
+              'text-sm font-medium font-[Unbounded] px-4 py-2 rounded-md transition-colors block',
+              currentPath.startsWith('/mis-entradas') ? 'border-b-2 border-lime-400' : 'hover:bg-gray-100'
+            ]"
+          >
+            Mis entradas
+          </a>
+          <a
+            :href="accountHref"
             :class="[
               'text-sm font-medium font-[Unbounded] px-4 py-2 rounded-md transition-colors block',
               currentPath === '/organizadores/login' ? 'border-b-2 border-lime-400' : 'hover:bg-gray-100'
             ]"
           >
-            Ingresar
+            {{ accountLabel }}
           </a>
         </div>
       </div>

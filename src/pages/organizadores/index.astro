@@ -9,6 +9,7 @@ import ProducersHeroSection from "../../components/ProducersHeroSection.vue";
 import PricingExampleSection from "../../components/landing/PricingExampleSection.vue";
 import CallToAction from "../../components/CallToAction.vue";
 import CtaTracking from "../../components/landing/CtaTracking.astro";
+import ProducerSessionBanner from "../../components/landing/ProducerSessionBanner.vue";
 import Layout from "../../layouts/Layout.astro";
 import { LANDINGS } from "../../data/landings";
 import "../../styles/global.css";
@@ -92,4 +93,5 @@ const guides = await getCollection("guias");
   </main>
   <AppFooter client:idle />
   <CtaTracking />
+  <ProducerSessionBanner client:idle />
 </Layout>

@@ -1,0 +1,38 @@
+---
+// Link de acceso a "Mis entradas" (correo de /api/buyer/access-link): si el token es válido crea la sesión de
+// asistente en este dispositivo y lleva a ?next= (Mis entradas o una orden). Vencido o inválido: se explica y se
+// ofrece pedir otro. El token no debe filtrarse por Referer ni quedar en caché.
+import Layout from "../../layouts/Layout.astro";
+import AppHeader from "../../components/AppHeader.vue";
+import AppFooter from "../../components/AppFooter.vue";
+import BuyerAccessForm from "../../components/buyer/BuyerAccessForm.vue";
+import { setBuyerSession } from "../../lib/buyerSession";
+import { verifyBuyerLink, safeBuyerNext } from "../../../netlify/lib/buyer-session.mjs";
+import "../../styles/global.css";
+
+export const prerender = false;
+
+Astro.response.headers.set("Referrer-Policy", "no-referrer");
+Astro.response.headers.set("Cache-Control", "private, no-store");
+
+const link = verifyBuyerLink(Astro.url.searchParams.get("t") || "");
+if (link && setBuyerSession(Astro, link.email)) {
+  return Astro.redirect(safeBuyerNext(Astro.url.searchParams.get("next")));
+}
+---
+
+<Layout title="Link vencido | AI Tickets" noindex>
+  <AppHeader client:idle />
+  <main class="min-h-screen bg-gray-50 pt-28 pb-16 px-4">
+    <div class="max-w-md mx-auto">
+      <h1 class="text-2xl font-bold font-[Unbounded] text-gray-900">Este link ya no sirve</h1>
+      <p class="mt-2 text-gray-600 font-[Prompt]">
+        Los links de acceso vencen al poco rato por seguridad. Pide uno nuevo y ábrelo apenas te llegue.
+      </p>
+      <div class="mt-6">
+        <BuyerAccessForm client:load />
+      </div>
+    </div>
+  </main>
+  <AppFooter client:idle />
+</Layout>

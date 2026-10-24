@@ -3,6 +3,7 @@
 // La calculadora usa la misma regla que el checkout (netlify/lib/fees.mjs): cargo 8% del subtotal + IVA del cargo.
 export const prerender = true;
 import AppHeader from "../components/AppHeader.vue";
+import ProducerSessionBanner from "../components/landing/ProducerSessionBanner.vue";
 import AppFooter from "../components/AppFooter.vue";
 import FeeCalculator from "../components/pricing/FeeCalculator.vue";
 import Layout from "../layouts/Layout.astro";
@@ -215,4 +216,5 @@ const jsonLd = [
   </main>
 
   <AppFooter client:idle />
+  <ProducerSessionBanner client:idle />
 </Layout>

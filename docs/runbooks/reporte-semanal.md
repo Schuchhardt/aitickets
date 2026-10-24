@@ -2,7 +2,7 @@
 
 Correo de los domingos a los dueños de cada productora con eventos activos: entradas vendidas y dinero de la
 semana, mejor canal e ideas con IA para promover cada evento (siempre una de contenido y una de publicidad).
-Migración `db/migrations/202610250100_weekly_producer_reports.sql`.
+Migración `db/migrations/202610250300_weekly_producer_reports.sql`.
 
 | Pieza | Archivo |
 | --- | --- |

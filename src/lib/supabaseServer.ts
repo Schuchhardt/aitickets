@@ -2,6 +2,7 @@ import type { AstroGlobal } from 'astro';
 import type { User } from "@supabase/supabase-js";
 import { getSupabaseAdmin } from "./auth-helpers";
 import { canAccessEventByStaff } from "../../netlify/lib/event-staff.mjs";
+import { PRODUCER_HINT_COOKIE } from "../../netlify/lib/buyer-session.mjs";
 
 type CookieContext = Pick<AstroGlobal, 'cookies'>;
 
@@ -16,6 +17,15 @@ export const SESSION_COOKIE_OPTIONS = {
 export function setSessionCookies(context: CookieContext, accessToken: string, refreshToken: string) {
     context.cookies.set("sb-access-token", accessToken, SESSION_COOKIE_OPTIONS);
     context.cookies.set("sb-refresh-token", refreshToken, SESSION_COOKIE_OPTIONS);
+    setProducerHint(context);
+}
+
+/**
+ * Pista sin datos (legible por JS) de que hay una sesión de productor: la portada y las páginas estáticas la
+ * miran para mostrar "Ir a mi panel" sin llamar a /api/auth/session en cada visita anónima.
+ */
+export function setProducerHint(context: CookieContext) {
+    context.cookies.set(PRODUCER_HINT_COOKIE, "1", { ...SESSION_COOKIE_OPTIONS, httpOnly: false });
 }
 
 /**
@@ -41,6 +51,7 @@ export async function recordLogin(match: { id: number } | { auth_user_id: string
 export function clearSessionCookies(context: CookieContext) {
     context.cookies.delete("sb-access-token", { path: "/" });
     context.cookies.delete("sb-refresh-token", { path: "/" });
+    context.cookies.delete(PRODUCER_HINT_COOKIE, { path: "/" });
 }
 
 /**

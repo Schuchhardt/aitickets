@@ -1,5 +1,5 @@
-// Correos a productoras: mensaje del formulario de contacto de su sitio, confirmación del correo de
-// contacto, estado del dominio propio y doble opt-in del formulario /web-gratis.
+// Correos a productoras: mensaje del formulario de contacto de su sitio, mensaje de un asistente desde su
+// orden, confirmación del correo de contacto, estado del dominio propio y doble opt-in del formulario /web-gratis.
 import { Link } from '@react-email/components'
 import { h, str, safeHref, multiline, COLORS, EmailLayout, Title, Paragraph, Badge, PrimaryButton, Panel, KeyValueTable, FallbackLink, renderEmail } from './layout.mjs'
 
@@ -44,6 +44,41 @@ export async function renderSiteContactMessageEmail({ siteName, contactUrl, name
     ),
     h(Panel, { label: 'Mensaje' }, h(Paragraph, { style: { margin: 0 } }, multiline(message))),
     h(Paragraph, { small: true, muted: true, align: 'center', style: { margin: 0 } }, `Responde este correo para contestarle directamente a ${visitor}.`)
+  )
+  return renderEmail(subject, element)
+}
+
+/**
+ * Mensaje de un asistente (con entrada vigente) desde la página de su orden (Reply-To = asistente).
+ * @param {{ eventName?: string, name?: string, email: string, ticketsLabel?: string, message: string, dashboardUrl?: string }} opts
+ */
+export async function renderAttendeeMessageEmail({ eventName, name, email, ticketsLabel, message, dashboardUrl } = {}) {
+  const who = oneLine(name) || 'Un asistente'
+  const event = oneLine(eventName) || 'tu evento'
+  const mail = oneLine(email)
+  const subject = `💬 ${who.slice(0, 60)} te escribió sobre ${event.slice(0, 80)}`
+  const element = h(
+    EmailLayout,
+    {
+      preview: `${who} tiene una pregunta sobre ${event}.`,
+      footer: { reason: 'Recibes este correo porque alguien con entrada para tu evento te escribió desde AI Tickets.' },
+    },
+    h(Badge, null, 'Mensaje de un asistente'),
+    h(Title, null, event),
+    h(
+      Panel,
+      { tone: 'outline' },
+      h(KeyValueTable, {
+        rows: [
+          { label: 'Nombre', value: who, align: 'left' },
+          { label: 'Correo', value: mail ? h(Link, { href: `mailto:${mail}`, style: linkStyle }, mail) : '', align: 'left' },
+          { label: 'Entradas', value: oneLine(ticketsLabel), align: 'left' },
+        ],
+      })
+    ),
+    h(Panel, { label: 'Mensaje' }, h(Paragraph, { style: { margin: 0 } }, multiline(message))),
+    h(Paragraph, { small: true, muted: true, align: 'center' }, `Responde este correo para contestarle directamente a ${who}.`),
+    safeHref(dashboardUrl) ? h(PrimaryButton, { href: dashboardUrl }, 'Ver mensajes en el panel') : null
   )
   return renderEmail(subject, element)
 }

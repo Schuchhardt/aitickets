@@ -93,7 +93,7 @@ async function loadWeekLog(supabase, week) {
   const rows = await fetchAllRows(() =>
     supabase.from(REPORTS_TABLE).select('id, organization_id, status, attempts, claimed_at').eq('week_start', week.weekStart).order('organization_id', { ascending: true })
   ).catch((err) => {
-    throw /does not exist|PGRST205|42P01|schema cache/i.test(String(err?.message)) ? new Error(`falta la tabla ${REPORTS_TABLE} (migración 202610250100)`) : err
+    throw /does not exist|PGRST205|42P01|schema cache/i.test(String(err?.message)) ? new Error(`falta la tabla ${REPORTS_TABLE} (migración 202610250300)`) : err
   })
   return new Map(rows.map((r) => [Number(r.organization_id), r]))
 }
@@ -168,7 +168,7 @@ async function loadRecipients(supabase, orgId) {
 
 /**
  * Anuncios de la productora (Zernio) que corrieron en la semana, por evento, con su gasto, clics e impresiones de la
- * semana. Nunca lanza: el reporte sale igual sin anuncios. Sin Zernio configurado, sin la migración 202610250200 o si
+ * semana. Nunca lanza: el reporte sale igual sin anuncios. Sin Zernio configurado, sin la migración 202610250400 o si
  * falla la lectura, ninguno. Si Zernio no responde por un anuncio su gasto queda null (el correo lo muestra sin cifra);
  * tras una caída (red, timeout, 5xx) no se le pregunta por los demás.
  * @returns {Promise<Map<number, any[]>>}
