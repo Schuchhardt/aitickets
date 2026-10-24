@@ -1,0 +1,408 @@
+// Analítica de eventos: una sola fuente para el panel (/dashboard, /dashboard/events/:id y su analítica),
+// la API/MCP de productores (get_event_performance) y, más adelante, el MCP de administración.
+//
+// Definiciones (docs/specs/mcp-admin.md, sección 6):
+//   * Venta = orden 'paid' que no es cortesía ni transferencia (src/lib/orderKinds.ts). Entradas vendidas =
+//     orderSoldQty (las transferidas siguen contando en su orden de origen). Ingresos = Σ amount (lo que recibe
+//     el productor, ya con descuentos y sin cargo por servicio).
+//   * Cortesías: se informan aparte, nunca como venta.
+//   * Conversión = órdenes vendidas ÷ visitantes únicos (ip_hash distintos).
+//   * Ocupación (sell-through) = entradas emitidas ÷ capacidad a la venta (sin el tipo "Cortesía" del sistema).
+//   * Días y horas en hora de Chile (America/Santiago).
+// Todo se lee paginado (fetchAll): PostgREST corta en 1000 filas sin avisar.
+import { fetchAll, localDay, ticketAvailability, presentTicket, TICKET_SELECT, isCourtesyName, TZ } from "./producer-api/tools/common";
+import { isCourtesyOrder, isTransferOrder, lineSoldQty, orderLines, orderSoldQty } from "./orderKinds";
+
+export const MAX_VISITS = 50000;
+/** Tope de días de la serie diaria del panel. */
+export const MAX_SERIES_DAYS = 366;
+export const DIRECT_CHANNEL = "Directo / sin seguimiento";
+
+export const PROVIDER_LABELS: Record<string, string> = { flow: "Webpay", free: "Gratis", courtesy: "Cortesía", demo: "Demo", stripe: "Tarjeta" };
+export const providerLabel = (p: string | null | undefined) => (p ? PROVIDER_LABELS[p] || p : "Webpay");
+
+const isMissingColumn = (error: any) =>
+    ["42703", "PGRST204"].includes(String(error?.code || "")) || /column .* does not exist|could not find .* column/i.test(String(error?.message || ""));
+const isMissingFunction = (error: any) => ["42883", "PGRST202"].includes(String(error?.code || ""));
+
+const pct = (part: number, total: number) => (total > 0 ? Math.round((part / total) * 1000) / 10 : null);
+
+const hourFmt = new Intl.DateTimeFormat("en-US", { timeZone: TZ, hour: "2-digit", hourCycle: "h23" });
+/** Hora 0-23 en Chile. */
+export const localHour = (iso: string | Date) => Number(hourFmt.format(new Date(iso))) % 24;
+
+/** Día YYYY-MM-DD + n días (calendario, sin zona horaria). */
+export function addDays(day: string, n: number): string {
+    const [y, m, d] = day.split("-").map(Number);
+    return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+}
+
+/** Días YYYY-MM-DD de `from` a `to` (inclusive). */
+export function dayRange(from: string, to: string): string[] {
+    const out: string[] = [];
+    for (let d = from; d <= to && out.length <= MAX_SERIES_DAYS * 2; d = addDays(d, 1)) out.push(d);
+    return out;
+}
+
+// ---------------------------------------------------------------------------
+// Clasificación
+// ---------------------------------------------------------------------------
+
+/** Fuente de una visita: utm_source si viene; si no, el sitio de origen (referrer). */
+export function categorizeReferrer(referrer: string | null | undefined, utmSource: string | null | undefined): string {
+    if (utmSource) return utmSource;
+    if (!referrer) return "Directo";
+    const url = referrer.toLowerCase();
+    if (url.includes("google")) return "Google";
+    if (url.includes("facebook") || url.includes("fb.")) return "Facebook";
+    if (url.includes("instagram")) return "Instagram";
+    if (url.includes("twitter") || url.includes("x.com")) return "X/Twitter";
+    if (url.includes("tiktok")) return "TikTok";
+    if (url.includes("linkedin")) return "LinkedIn";
+    if (url.includes("whatsapp")) return "WhatsApp";
+    return "Otro";
+}
+
+type Attribution = { ref?: string | null; utm_source?: string | null; utm_medium?: string | null; utm_campaign?: string | null };
+
+/** Canal de seguimiento (link con ?ref= o utm_*): el mismo criterio para órdenes y visitas. */
+export function trackingChannel(a: Attribution): string {
+    if (a.ref) return `ref:${a.ref}`;
+    return [a.utm_source, a.utm_medium, a.utm_campaign].filter(Boolean).join(" / ") || DIRECT_CHANNEL;
+}
+
+// ---------------------------------------------------------------------------
+// Carga (paginada)
+// ---------------------------------------------------------------------------
+
+export type VisitRow = Attribution & { created_at: string; ip_hash: string | null; referrer: string | null; country?: string | null; city?: string | null };
+
+const VISIT_COLUMNS = "created_at, ip_hash, referrer, utm_source, utm_medium, utm_campaign, country, city";
+
+/**
+ * Visitas de un evento (hasta `max`). `refTracked` = false si la columna ref aún no existe (deploy preview sin la
+ * migración 202610240200): las visitas se leen igual, sin ref.
+ */
+export async function loadEventVisits(supabase: any, eventId: number, { max = MAX_VISITS } = {}): Promise<{ visits: VisitRow[]; truncated: boolean; refTracked: boolean }> {
+    const build = (cols: string) => () =>
+        supabase.from("event_visits").select(cols).eq("event_id", eventId).order("created_at", { ascending: true }).order("id", { ascending: true });
+    let refTracked = true;
+    let visits: VisitRow[];
+    try {
+        visits = await fetchAll<VisitRow>(build(`${VISIT_COLUMNS}, ref`), { max });
+    } catch (err) {
+        if (!isMissingColumn(err)) throw err;
+        refTracked = false;
+        visits = await fetchAll<VisitRow>(build(VISIT_COLUMNS), { max });
+    }
+    return { visits, truncated: visits.length >= max, refTracked };
+}
+
+export const PAID_ORDER_COLUMNS =
+    "id, created_at, amount, ticket_qty, discount_amount, discount_code, ticket_details, ref, utm_source, utm_medium, utm_campaign, payment_provider";
+
+/** Órdenes pagadas de un evento (todas, en orden de creación). */
+export async function loadPaidOrders(supabase: any, eventId: number): Promise<any[]> {
+    return fetchAll<any>(() =>
+        supabase.from("event_orders").select(PAID_ORDER_COLUMNS).eq("event_id", eventId).eq("status", "paid").order("created_at", { ascending: true }).order("id", { ascending: true }),
+    );
+}
+
+/** Visitas y visitantes únicos sin traer las filas (RPC); si la función aún no existe, se cuentan paginando. */
+export async function eventVisitCounts(supabase: any, eventId: number): Promise<{ visits: number; unique_visitors: number; truncated: boolean }> {
+    const { data, error } = await supabase.rpc("aitickets_event_visit_counts", { p_event_id: Number(eventId) });
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!error && row) return { visits: Number(row.visits) || 0, unique_visitors: Number(row.unique_visitors) || 0, truncated: false };
+    if (error && !isMissingFunction(error)) console.error("aitickets_event_visit_counts:", error.message);
+    const rows = await fetchAll<{ ip_hash: string | null }>(
+        () => supabase.from("event_visits").select("ip_hash").eq("event_id", eventId).order("id", { ascending: true }),
+        { max: MAX_VISITS },
+    );
+    return { visits: rows.length, unique_visitors: new Set(rows.map((v) => v.ip_hash)).size, truncated: rows.length >= MAX_VISITS };
+}
+
+// ---------------------------------------------------------------------------
+// Ventas
+// ---------------------------------------------------------------------------
+
+export type ChannelSales = { channel: string; orders: number; tickets: number; revenue_clp: number };
+export type ProviderSales = { provider: string; label: string; orders: number; tickets: number; revenue_clp: number };
+
+export function summarizeSales(orders: any[]) {
+    const sales = orders.filter((o) => !isCourtesyOrder(o) && !isTransferOrder(o));
+    const courtesyTickets = orders.filter((o) => isCourtesyOrder(o) && !isTransferOrder(o)).reduce((n, o) => n + orderSoldQty(o), 0);
+    let revenue = 0, ticketsSold = 0, discountTotal = 0;
+    const byType = new Map<string, { name: string; tickets: number; gross_revenue_clp: number }>();
+    const channels = new Map<string, ChannelSales>();
+    const codes = new Map<string, { code: string; orders: number; discount_clp: number }>();
+    const providers = new Map<string, ProviderSales>();
+    for (const o of sales) {
+        const qty = orderSoldQty(o);
+        const amount = Number(o.amount) || 0;
+        revenue += amount;
+        ticketsSold += qty;
+        discountTotal += Number(o.discount_amount) || 0;
+        for (const l of orderLines(o)) {
+            const name = l?.name || "Entrada";
+            const row = byType.get(name) || { name, tickets: 0, gross_revenue_clp: 0 };
+            row.tickets += lineSoldQty(l);
+            row.gross_revenue_clp += (Number(l?.price) || 0) * lineSoldQty(l);
+            byType.set(name, row);
+        }
+        const channel = trackingChannel(o);
+        const ch = channels.get(channel) || { channel, orders: 0, tickets: 0, revenue_clp: 0 };
+        ch.orders += 1; ch.tickets += qty; ch.revenue_clp += amount;
+        channels.set(channel, ch);
+        const provider = String(o.payment_provider || "flow");
+        const pr = providers.get(provider) || { provider, label: providerLabel(provider), orders: 0, tickets: 0, revenue_clp: 0 };
+        pr.orders += 1; pr.tickets += qty; pr.revenue_clp += amount;
+        providers.set(provider, pr);
+        if (o.discount_code) {
+            const c = codes.get(o.discount_code) || { code: o.discount_code, orders: 0, discount_clp: 0 };
+            c.orders += 1; c.discount_clp += Number(o.discount_amount) || 0;
+            codes.set(o.discount_code, c);
+        }
+    }
+    const byRevenue = <T extends { revenue_clp: number; orders: number }>(a: T, b: T) => b.revenue_clp - a.revenue_clp || b.orders - a.orders;
+    return {
+        sales,
+        paidOrders: sales.length,
+        ticketsSold,
+        courtesyTickets,
+        revenue,
+        discountTotal,
+        lastSaleAt: sales.length ? sales[sales.length - 1].created_at : null,
+        byType: [...byType.values()].sort((a, b) => b.tickets - a.tickets),
+        channels: [...channels.values()].sort(byRevenue),
+        providers: [...providers.values()].sort(byRevenue),
+        codes: [...codes.values()].sort((a, b) => b.orders - a.orders),
+    };
+}
+
+// ---------------------------------------------------------------------------
+// Tráfico
+// ---------------------------------------------------------------------------
+
+export function summarizeTraffic(visits: VisitRow[], { geoTop = 10, sourcesTop = 8 } = {}) {
+    const sources = new Map<string, { source: string; visits: number }>();
+    const geo = new Map<string, { location: string; country: string | null; city: string | null; visits: number }>();
+    const peakHours = new Array(24).fill(0) as number[];
+    for (const v of visits) {
+        const s = categorizeReferrer(v.referrer, v.utm_source);
+        const row = sources.get(s) || { source: s, visits: 0 };
+        row.visits += 1;
+        sources.set(s, row);
+        const location = [v.city, v.country].filter(Boolean).join(", ") || "Desconocido";
+        const g = geo.get(location) || { location, country: v.country || null, city: v.city || null, visits: 0 };
+        g.visits += 1;
+        geo.set(location, g);
+        peakHours[localHour(v.created_at)] += 1;
+    }
+    const total = visits.length;
+    return {
+        visits: total,
+        uniqueVisitors: new Set(visits.map((v) => v.ip_hash)).size,
+        sources: [...sources.values()].sort((a, b) => b.visits - a.visits).slice(0, sourcesTop),
+        locations: [...geo.values()]
+            .sort((a, b) => b.visits - a.visits)
+            .slice(0, geoTop)
+            .map((g) => ({ ...g, percentage: total ? Math.round((g.visits / total) * 100) : 0 })),
+        peakHours,
+    };
+}
+
+/**
+ * Ventas y conversión por canal de seguimiento. Las visitas se atribuyen por los parámetros del link con que
+ * llegaron (ref / utm_*); las órdenes, por la atribución que guardó el checkout. Si ref aún no se registra en las
+ * visitas (refTracked = false), los canales ref:* no tienen visitas conocidas (null).
+ */
+export function channelConversion(visits: VisitRow[], sales: any[], { refTracked = true, top = 20 } = {}) {
+    const rows = new Map<string, { channel: string; visits: number; visitors: Set<string>; orders: number; tickets: number; revenue_clp: number }>();
+    const get = (channel: string) => {
+        let r = rows.get(channel);
+        if (!r) rows.set(channel, (r = { channel, visits: 0, visitors: new Set(), orders: 0, tickets: 0, revenue_clp: 0 }));
+        return r;
+    };
+    for (const v of visits) {
+        const r = get(trackingChannel(v));
+        r.visits += 1;
+        r.visitors.add(String(v.ip_hash));
+    }
+    for (const o of sales) {
+        const r = get(trackingChannel(o));
+        r.orders += 1;
+        r.tickets += orderSoldQty(o);
+        r.revenue_clp += Number(o.amount) || 0;
+    }
+    return [...rows.values()]
+        .map((r) => {
+            const unknownVisits = !refTracked && r.channel.startsWith("ref:");
+            const unique = r.visitors.size;
+            return {
+                channel: r.channel,
+                visits: unknownVisits ? null : r.visits,
+                unique_visitors: unknownVisits ? null : unique,
+                orders: r.orders,
+                tickets: r.tickets,
+                revenue_clp: r.revenue_clp,
+                // Más órdenes que visitantes (p. ej. visitas anteriores a que se registrara ref): no es una conversión real
+                conversion_pct: unknownVisits || !unique || r.orders > unique ? null : pct(r.orders, unique),
+            };
+        })
+        .sort((a, b) => b.revenue_clp - a.revenue_clp || b.orders - a.orders || (b.visits || 0) - (a.visits || 0))
+        .slice(0, top);
+}
+
+/** Serie diaria (hora de Chile) de visitas, entradas vendidas e ingresos sobre los días dados. */
+export function dailySeries(days: string[], visits: VisitRow[], sales: any[]) {
+    const series = new Map(days.map((d) => [d, { date: d, visits: 0, tickets: 0, revenue_clp: 0 }]));
+    for (const v of visits) {
+        const row = series.get(localDay(v.created_at));
+        if (row) row.visits += 1;
+    }
+    for (const o of sales) {
+        const row = series.get(localDay(o.created_at));
+        if (row) { row.tickets += orderSoldQty(o); row.revenue_clp += Number(o.amount) || 0; }
+    }
+    return [...series.values()];
+}
+
+/** Días del primer al último movimiento (visita o venta), con tope MAX_SERIES_DAYS (los más recientes). */
+export function activityDays(visits: VisitRow[], sales: any[]): { days: string[]; truncated: boolean } {
+    const all = [...visits.map((v) => v.created_at), ...sales.map((o) => o.created_at)].filter(Boolean).map((t) => localDay(t));
+    if (!all.length) return { days: [], truncated: false };
+    let from = all.reduce((a, b) => (a < b ? a : b));
+    const to = all.reduce((a, b) => (a > b ? a : b));
+    const truncated = addDays(from, MAX_SERIES_DAYS - 1) < to;
+    if (truncated) from = addDays(to, -(MAX_SERIES_DAYS - 1));
+    return { days: dayRange(from, to), truncated };
+}
+
+// ---------------------------------------------------------------------------
+// Capacidad y entradas emitidas
+// ---------------------------------------------------------------------------
+
+/** Capacidad a la venta y entradas emitidas (stock real: aitickets_ticket_availability). */
+export async function eventCapacity(supabase: any, event: { id: number; status?: string | null }) {
+    const { data: tickets, error } = await supabase.from("event_tickets").select(TICKET_SELECT).eq("event_id", event.id);
+    if (error) console.error("eventCapacity:", error.message);
+    const availability = await ticketAvailability({ supabase } as any, event.id, (tickets || []).map((t: any) => Number(t.id)));
+    const ticketTypes = (tickets || []).map((t: any) => presentTicket(t, availability.get(Number(t.id)), event));
+    // El tipo de cortesía del sistema no es capacidad a la venta
+    const forSale = ticketTypes.filter((t: any) => !t.is_system);
+    const unlimited = forSale.some((t: any) => t.quantity == null);
+    const capacity = unlimited ? null : forSale.reduce((s: number, t: any) => s + (t.quantity || 0), 0);
+    const issued = forSale.reduce((s: number, t: any) => s + t.sold, 0);
+    return { ticketTypes, capacity, unlimited, issued, sellThroughPct: capacity ? pct(issued, capacity) : null };
+}
+
+/**
+ * Entradas vigentes (no anuladas) por tipo, desde event_attendees. Las cortesías emitidas en un tipo de venta se
+ * muestran como "<tipo> (cortesía)"; el tipo "Cortesía" del sistema aparece con su nombre.
+ */
+export async function issuedByTicketType(supabase: any, eventId: number) {
+    const rows = await fetchAll<any>(() =>
+        supabase.from("event_attendees").select("id, event_ticket_id, status, is_complimentary, event_tickets(ticket_name)").eq("event_id", eventId).order("id", { ascending: true }),
+    );
+    const byType = new Map<string, { name: string; ticket_type_id: number | null; complimentary: boolean; tickets: number }>();
+    for (const a of rows) {
+        if (a.status === "cancelled") continue;
+        const base = a.event_tickets?.ticket_name || "Desconocido";
+        const complimentary = a.is_complimentary === true && !isCourtesyName(base);
+        const name = complimentary ? `${base} (cortesía)` : base;
+        const row = byType.get(name) || { name, ticket_type_id: a.event_ticket_id != null ? Number(a.event_ticket_id) : null, complimentary, tickets: 0 };
+        row.tickets += 1;
+        byType.set(name, row);
+    }
+    return [...byType.values()].sort((a, b) => b.tickets - a.tickets);
+}
+
+// ---------------------------------------------------------------------------
+// Vistas del panel
+// ---------------------------------------------------------------------------
+
+/** Página de analítica de un evento (/dashboard/events/:id/analytics). El evento ya debe estar autorizado. */
+export async function getEventAnalytics(supabase: any, event: { id: number; status?: string | null }) {
+    const [{ visits, truncated: visitsTruncated, refTracked }, orders, capacity, ticketTypes, { count: refunded }] = await Promise.all([
+        loadEventVisits(supabase, event.id),
+        loadPaidOrders(supabase, event.id),
+        eventCapacity(supabase, event),
+        issuedByTicketType(supabase, event.id),
+        supabase.from("event_orders").select("id", { count: "exact", head: true }).eq("event_id", event.id).eq("status", "refunded"),
+    ]);
+    const sales = summarizeSales(orders);
+    const traffic = summarizeTraffic(visits);
+    const { days, truncated: seriesTruncated } = activityDays(visits, sales.sales);
+    return {
+        kpis: {
+            visits: traffic.visits,
+            unique_visitors: traffic.uniqueVisitors,
+            paid_orders: sales.paidOrders,
+            tickets_sold: sales.ticketsSold,
+            courtesy_tickets: sales.courtesyTickets,
+            revenue_clp: sales.revenue,
+            conversion_pct: pct(sales.paidOrders, traffic.uniqueVisitors),
+            capacity: capacity.capacity,
+            issued_tickets: capacity.issued,
+            sell_through_pct: capacity.sellThroughPct,
+        },
+        daily: dailySeries(days, visits, sales.sales),
+        series_truncated: seriesTruncated,
+        peak_hours: traffic.peakHours,
+        sources: traffic.sources,
+        locations: traffic.locations,
+        channels: channelConversion(visits, sales.sales, { refTracked }),
+        providers: sales.providers,
+        ticket_types: ticketTypes,
+        refunded_orders: refunded || 0,
+        visits_truncated: visitsTruncated,
+        ref_tracked: refTracked,
+    };
+}
+
+/** Tarjetas del resumen de un evento (/dashboard/events/:id): sin traer las visitas completas. */
+export async function getEventSummary(supabase: any, event: { id: number; status?: string | null }) {
+    const [visitCounts, orders, capacity, ticketTypes] = await Promise.all([
+        eventVisitCounts(supabase, event.id),
+        loadPaidOrders(supabase, event.id),
+        eventCapacity(supabase, event),
+        issuedByTicketType(supabase, event.id),
+    ]);
+    const sales = summarizeSales(orders);
+    const issuedByTypeId: Record<string, number> = {};
+    for (const t of ticketTypes) if (t.ticket_type_id != null) issuedByTypeId[t.ticket_type_id] = (issuedByTypeId[t.ticket_type_id] || 0) + t.tickets;
+    return {
+        visits: visitCounts.visits,
+        unique_visitors: visitCounts.unique_visitors,
+        paid_orders: sales.paidOrders,
+        tickets_sold: sales.ticketsSold,
+        courtesy_tickets: sales.courtesyTickets,
+        revenue_clp: sales.revenue,
+        conversion_pct: pct(sales.paidOrders, visitCounts.unique_visitors),
+        capacity: capacity.capacity,
+        issued_tickets: capacity.issued,
+        sell_through_pct: capacity.sellThroughPct,
+        issued_by_ticket_type_id: issuedByTypeId,
+    };
+}
+
+const ORG_ORDER_COLUMNS = "id, event_id, amount, ticket_qty, ticket_details, payment_provider";
+const EVENT_ID_CHUNK = 150;
+
+/** Totales históricos de ventas de un conjunto de eventos (inicio del panel), paginado y por tandas de eventos. */
+export async function orgSalesTotals(supabase: any, eventIds: number[]) {
+    let paidOrders = 0, ticketsSold = 0, courtesyTickets = 0, revenue = 0;
+    for (let i = 0; i < eventIds.length; i += EVENT_ID_CHUNK) {
+        const chunk = eventIds.slice(i, i + EVENT_ID_CHUNK);
+        const orders = await fetchAll<any>(
+            () => supabase.from("event_orders").select(ORG_ORDER_COLUMNS).in("event_id", chunk).eq("status", "paid").order("id", { ascending: true }),
+            { max: 500000 },
+        );
+        const s = summarizeSales(orders);
+        paidOrders += s.paidOrders;
+        ticketsSold += s.ticketsSold;
+        courtesyTickets += s.courtesyTickets;
+        revenue += s.revenue;
+    }
+    return { paid_orders: paidOrders, tickets_sold: ticketsSold, courtesy_tickets: courtesyTickets, revenue_clp: revenue };
+}

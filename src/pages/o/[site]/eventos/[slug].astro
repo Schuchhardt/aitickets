@@ -90,6 +90,7 @@ const visitEventId = preview ? null : eventData.id;
           body: JSON.stringify({
             event_id: visitEventId,
             referrer: document.referrer || null,
+            ref: vp.get('ref'),
             utm_source: vp.get('utm_source'),
             utm_medium: vp.get('utm_medium'),
             utm_campaign: vp.get('utm_campaign')

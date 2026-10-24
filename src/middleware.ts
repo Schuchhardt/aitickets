@@ -31,8 +31,10 @@ const STATE_CHANGING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
  * API de productores (MCP + REST) y endpoints OAuth máquina-a-máquina (token, registro, revocación): se
  * autentican SOLO con credenciales en el header/cuerpo y nunca leen cookies, así que no hay CSRF que prevenir;
  * deben aceptar clientes de otros orígenes. /api/oauth/authorize NO está aquí: usa la sesión del productor.
+ * /api/webhooks/resend se autentica con la firma de Svix (RESEND_WEBHOOK_SECRET) y /api/admin/mcp con la llave de
+ * administración (src/lib/admin-api/auth.ts).
  */
-const TOKEN_ONLY_APIS = new Set(["/api/mcp", "/api/v1", "/api/oauth/token", "/api/oauth/register", "/api/oauth/revoke"]);
+const TOKEN_ONLY_APIS = new Set(["/api/mcp", "/api/v1", "/api/oauth/token", "/api/oauth/register", "/api/oauth/revoke", "/api/webhooks/resend", "/api/admin/mcp"]);
 const isTokenOnlyApi = (pathname: string) => TOKEN_ONLY_APIS.has(pathname) || pathname.startsWith("/api/v1/");
 
 /**

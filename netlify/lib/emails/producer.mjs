@@ -162,3 +162,63 @@ export async function renderInboundLeadConfirmEmail({ orgName, url } = {}) {
   )
   return renderEmail(subject, element)
 }
+
+const PAYOUT_REASON = 'Recibes este correo porque tu productora pidió un retiro de su saldo en AI Tickets.'
+const clpText = (n) => `$${Math.round(Number(n) || 0).toLocaleString('es-CL')} CLP`
+const longDate = (iso) => {
+  const d = iso ? new Date(iso) : new Date()
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('es-CL', { timeZone: 'America/Santiago', day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+/**
+ * Aviso al productor: AI Tickets transfirió su retiro. Nunca lleva el número de cuenta completo.
+ * @param {{ orgName?: string | null, amount: number, bank?: string | null, last4?: string | null, reference: string, paidAt?: string | null, dashboardUrl: string }} opts
+ */
+export async function renderPayoutPaidEmail({ orgName, amount, bank, last4, reference, paidAt, dashboardUrl } = {}) {
+  const amountText = clpText(amount)
+  const subject = `Transferimos tu retiro de ${amountText}`
+  const account = [oneLine(bank), last4 ? `terminada en ${oneLine(last4)}` : ''].filter(Boolean).join(' ')
+  const element = h(
+    EmailLayout,
+    { preview: `AI Tickets transfirió ${amountText} a tu cuenta.`, footer: { reason: PAYOUT_REASON } },
+    h(Badge, null, 'Retiro transferido'),
+    h(Title, null, `Transferimos ${amountText}`),
+    h(Paragraph, null, `Hola ${oneLine(orgName) || 'equipo'}:`),
+    h(Paragraph, null, 'Ya hicimos la transferencia de tu retiro. Según tu banco, puede tardar hasta un día hábil en verse en tu cuenta.'),
+    h(
+      Panel,
+      { tone: 'outline' },
+      h(KeyValueTable, {
+        rows: [
+          { label: 'Monto', value: amountText },
+          { label: 'Cuenta', value: account },
+          { label: 'Fecha', value: longDate(paidAt) },
+          { label: 'N° de comprobante', value: oneLine(reference) },
+        ],
+      })
+    ),
+    h(PrimaryButton, { href: dashboardUrl }, 'Ver mis ingresos'),
+    h(Paragraph, { small: true, muted: true }, 'Si no ves la transferencia en 2 días hábiles, responde este correo con el n° de comprobante.')
+  )
+  return renderEmail(subject, element)
+}
+
+/**
+ * Aviso al productor: un retiro no se pudo transferir; el monto vuelve a su saldo disponible.
+ * @param {{ orgName?: string | null, amount: number, reason: string, dashboardUrl: string }} opts
+ */
+export async function renderPayoutFailedEmail({ orgName, amount, reason, dashboardUrl } = {}) {
+  const amountText = clpText(amount)
+  const subject = `No pudimos transferir tu retiro de ${amountText}`
+  const element = h(
+    EmailLayout,
+    { preview: 'El monto volvió a tu saldo disponible.', footer: { reason: PAYOUT_REASON } },
+    h(Badge, { tone: 'danger' }, 'Retiro sin transferir'),
+    h(Title, null, `No pudimos transferir ${amountText}`),
+    h(Paragraph, null, `Hola ${oneLine(orgName) || 'equipo'}:`),
+    h(Panel, { label: 'Qué pasó' }, h(Paragraph, { style: { margin: 0 } }, oneLine(reason) || 'La transferencia no se pudo completar.')),
+    h(Paragraph, null, 'El monto volvió a tu saldo disponible. Revisa tus datos bancarios y vuelve a pedir el retiro cuando estén listos.'),
+    h(PrimaryButton, { href: dashboardUrl }, 'Revisar mis datos bancarios')
+  )
+  return renderEmail(subject, element)
+}

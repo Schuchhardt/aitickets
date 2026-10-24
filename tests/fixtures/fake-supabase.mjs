@@ -1,11 +1,12 @@
 // Cliente Supabase falso, en memoria, para tests unitarios (sin red ni BD).
 //
 // Soporta el subconjunto del query builder de supabase-js que usa el código de AI Tickets:
-//   from(t).select(cols, {count, head}).eq/neq/is/in/not/ilike/gt/gte/lt/lte/order/limit
+//   from(t).select(cols, {count, head}).eq/neq/is/in/not/ilike/gt/gte/lt/lte/order/limit/range
 //          .maybeSingle()/.single()  |  insert(rows)  |  update(patch)  |  upsert(row, {onConflict})  |  delete()
 //   rpc(name, args)
-// Las columnas de select se ignoran (devuelve filas completas). `.or()` no se soporta (lanza) para que
-// un test no pase en falso con un filtro que no se aplicó.
+// Las columnas de select se ignoran (devuelve filas completas) y order() no reordena (orden de inserción).
+// range(from, to) corta como PostgREST (para probar la paginación de fetchAll). `.or()` no se soporta (lanza)
+// para que un test no pase en falso con un filtro que no se aplicó.
 //
 // Uso:
 //   const db = createFakeSupabase({ tables: { aitickets_suppressions: [{ id: 1, email: 'a@b.cl' }] },
@@ -71,7 +72,7 @@ export function createFakeSupabase({ tables = {}, rpc = {}, unique = {} } = {}) 
   }
 
   function builder(table) {
-    const q = { table, op: 'select', values: null, filters: [], single: null, limit: null, count: null, head: false, returning: false, onConflict: null }
+    const q = { table, op: 'select', values: null, filters: [], single: null, limit: null, range: null, count: null, head: false, returning: false, onConflict: null }
 
     const api = {
       select(_cols, opts = {}) {
@@ -97,7 +98,7 @@ export function createFakeSupabase({ tables = {}, rpc = {}, unique = {} } = {}) 
       not(col, op, value) { q.filters.push({ col, op: `not_${op}`, value }); return api },
       or() { throw new Error('fake-supabase: .or() no está soportado; usa un mock específico') },
       order() { return api },
-      range() { return api },
+      range(from, to) { q.range = [from, to]; return api },
       limit(n) { q.limit = n; return api },
       maybeSingle() { q.single = 'maybe'; return api },
       single() { q.single = 'one'; return api },
@@ -123,6 +124,7 @@ export function createFakeSupabase({ tables = {}, rpc = {}, unique = {} } = {}) 
     if (q.op === 'select') {
       data = filtered()
       const count = data.length
+      if (q.range) data = data.slice(q.range[0], q.range[1] + 1)
       if (q.limit != null) data = data.slice(0, q.limit)
       if (q.head) return { data: null, error: null, count }
       return finish(data.map((r) => ({ ...r })), q, count)

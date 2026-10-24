@@ -3,6 +3,8 @@ import DashboardLayout from "../../layouts/DashboardLayout.astro";
 import { getSupabaseAdmin } from "../../lib/auth-helpers";
 import { requireDashboardSession, VALIDATOR_HOME } from "./_lib/guard";
 import { getStaffEventIds } from "../../../netlify/lib/event-staff.mjs";
+import { orgSalesTotals } from "../../lib/eventAnalytics";
+import { fetchAll } from "../../lib/producer-api/tools/common";
 import {
   LayoutDashboard,
   CalendarDays,
@@ -27,6 +29,7 @@ const onlyStaffEvents = <Q,>(query: Q): Q => (staffEventIds ? (query as any).in(
 // Fetch real stats
 let activeEvents = 0;
 let ticketsSold = 0;
+let courtesyTickets = 0;
 let totalRevenue = 0;
 
 if (dbUser?.organization_id) {
@@ -38,30 +41,20 @@ if (dbUser?.organization_id) {
     .eq("status", "published"));
   activeEvents = eventsCount || 0;
 
-  // Get all event IDs for this organization
-  const { data: orgEvents } = await onlyStaffEvents(supabaseAdmin
+  // Get all event IDs for this organization (paginado: PostgREST corta en 1000 filas)
+  const orgEvents = await fetchAll<{ id: number }>(() => onlyStaffEvents(supabaseAdmin
     .from("events")
     .select("id")
-    .eq("organization_id", dbUser.organization_id));
+    .eq("organization_id", dbUser.organization_id))
+    .order("id", { ascending: true }));
 
-  if (orgEvents && orgEvents.length > 0) {
-    const eventIds = orgEvents.map((e) => e.id);
-
-    // Count tickets sold (attendees). Las entradas anuladas (reembolsos) no cuentan.
-    const { count: attendeesCount } = await supabaseAdmin
-      .from("event_attendees")
-      .select("id", { count: "exact", head: true })
-      .in("event_id", eventIds)
-      .or("status.is.null,status.neq.cancelled");
-    ticketsSold = attendeesCount || 0;
-
-    // Sum revenue from paid orders
-    const { data: ordersData } = await supabaseAdmin
-      .from("event_orders")
-      .select("amount")
-      .in("event_id", eventIds)
-      .eq("status", "paid");
-    totalRevenue = ordersData?.reduce((sum, o) => sum + (o.amount || 0), 0) || 0;
+  if (orgEvents.length > 0) {
+    // Totales históricos (src/lib/eventAnalytics.ts): paginados (antes se cortaban en 1000 órdenes) y con la misma
+    // definición que el resto del panel y la API: ventas sin cortesías ni transferencias; cortesías aparte.
+    const totals = await orgSalesTotals(supabaseAdmin, orgEvents.map((e) => Number(e.id)));
+    ticketsSold = totals.tickets_sold;
+    courtesyTickets = totals.courtesy_tickets;
+    totalRevenue = totals.revenue_clp;
   }
 }
 
@@ -117,11 +110,12 @@ if (dbUser?.organization_id) {
       <div class="text-sm text-gray-500 font-medium mb-1">
         Entradas Vendidas
       </div>
-      <div class="text-2xl md:text-3xl font-bold font-[Unbounded]">{ticketsSold}</div>
+      <div class="text-2xl md:text-3xl font-bold font-[Unbounded]">{ticketsSold.toLocaleString("es-CL")}</div>
+      {courtesyTickets > 0 && <div class="text-xs text-gray-400 mt-1">+ {courtesyTickets.toLocaleString("es-CL")} cortesías</div>}
     </div>
     <div class="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-gray-100 min-w-0">
       <div class="text-sm text-gray-500 font-medium mb-1">Ingresos Totales</div>
-      <div class="text-2xl md:text-3xl font-bold font-[Unbounded] text-green-600 break-all">${totalRevenue.toLocaleString()}</div>
+      <div class="text-2xl md:text-3xl font-bold font-[Unbounded] text-green-600 break-all">${totalRevenue.toLocaleString("es-CL")}</div>
     </div>
   </div>
 

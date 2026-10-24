@@ -61,11 +61,14 @@ export async function createFlowPayment({ commerceOrder, subject, amount, email,
   return { url: data.url, token: data.token, flowOrder: data.flowOrder }
 }
 
-async function flowGet(path, extra) {
+async function flowGet(path, extra, { timeoutMs } = {}) {
   const { apiKey, secretKey, baseUrl } = flowConfig()
   const params = { apiKey, ...extra }
   const qs = new URLSearchParams({ ...params, s: signFlowParams(params, secretKey) })
-  const res = await fetch(`${baseUrl}${path}?${qs.toString()}`, { method: 'GET' })
+  const res = await fetch(`${baseUrl}${path}?${qs.toString()}`, {
+    method: 'GET',
+    ...(timeoutMs > 0 ? { signal: AbortSignal.timeout(timeoutMs) } : {}),
+  })
   let data = null
   try { data = await res.json() } catch { /* respuesta no JSON */ }
   if (!res.ok || !data) {
@@ -82,11 +85,12 @@ export async function getFlowPaymentStatus(token) {
 }
 
 /**
- * Consulta el estado de un pago por commerceOrder (payment/getStatusByCommerceId). Lo usa el barrido de
- * órdenes 'processing' abandonadas, que no guarda el token de Flow.
+ * Consulta el estado de un pago por commerceOrder (payment/getStatusByCommerceId). Lo usa la conciliación de
+ * expire-pending-orders (órdenes 'processing' abandonadas y pendientes/expiradas cuyo webhook no llegó), que no
+ * guarda el token de Flow. timeoutMs: corta la consulta (la función programada tiene un presupuesto de tiempo).
  */
-export async function getFlowPaymentStatusByCommerceId(commerceId) {
-  return flowGet('/payment/getStatusByCommerceId', { commerceId: String(commerceId) })
+export async function getFlowPaymentStatusByCommerceId(commerceId, { timeoutMs } = {}) {
+  return flowGet('/payment/getStatusByCommerceId', { commerceId: String(commerceId) }, { timeoutMs })
 }
 
 /** true si las credenciales de Flow están configuradas. */

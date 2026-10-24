@@ -30,6 +30,8 @@ export type ExportClaims = {
     events: number[] | null;
     from: string | null;
     to: string | null;
+    /** true = lo pidió el MCP de admin (org_export_orders): uid es el usuario de servicio, sin organización. */
+    adm?: boolean;
     exp: number;
 };
 

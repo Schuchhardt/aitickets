@@ -24,6 +24,17 @@ const PAYOUT_FIELDS: Record<string, number> = {
 
 const RUT_REGEX = /^[0-9]{1,2}\.?[0-9]{3}\.?[0-9]{3}-?[0-9kK]$/;
 
+/** Aviso a AI Tickets de una cuenta por verificar, con el SQL para aprobarla o rechazarla (solo los últimos 4 dígitos). */
+function bankAccountSlackMessage(orgId: number, userId: number, bankName: string | null | undefined, accountNumber: string) {
+    const last4 = String(accountNumber || "").replace(/\D/g, "").slice(-4);
+    return (
+        `🏦 *Cuenta bancaria por verificar* (org ${orgId}, usuario ${userId}, ${bankName || "banco"} ****${last4})\n` +
+        `• *Ver datos:* \`select * from organization_payout_accounts where organization_id = ${orgId};\`\n` +
+        `• *Aprobar:* \`select aitickets_verify_payout_account(${orgId}, 'approve', '<tu nombre>', null, '${last4}');\`\n` +
+        `• *Rechazar:* \`select aitickets_verify_payout_account(${orgId}, 'reject', '<tu nombre>', '<qué debe corregir el productor>', '${last4}');\``
+    );
+}
+
 function pickFields(body: any, fields: Record<string, number>) {
     const out: Record<string, string | null> = {};
     for (const [field, max] of Object.entries(fields)) {
@@ -92,8 +103,18 @@ export const POST: APIRoute = async (context) => {
                 );
             if (error) throw error;
             const bankChanged = ["bank_name", "bank_account_type", "bank_account_number", "bank_account_holder", "bank_account_rut"].some((f) => f in payoutData);
-            // El trigger de la BD anula la verificación solo si los datos cambiaron; se avisa a AI Tickets para revisarlos
-            if (bankChanged) await notifySlack(`🏦 *Datos bancarios guardados* (org ${dbUser.organization_id}, usuario ${dbUser.id}, banco ${payoutData.bank_name || "—"}). Si cambiaron, verificar la cuenta (organization_payout_accounts.verified_at).`);
+            // El trigger de la BD anula la verificación solo si los datos cambiaron: se avisa a AI Tickets solo si
+            // la cuenta quedó por verificar, con el SQL listo (aitickets_verify_payout_account, 202610240100_payout_ops.sql).
+            if (bankChanged) {
+                const { data: saved } = await supabaseAdmin
+                    .from("organization_payout_accounts")
+                    .select("verified_at, bank_name, bank_account_number")
+                    .eq("organization_id", dbUser.organization_id)
+                    .maybeSingle();
+                if (!saved?.verified_at && saved?.bank_account_number) {
+                    await notifySlack(bankAccountSlackMessage(Number(dbUser.organization_id), Number(dbUser.id), saved.bank_name, saved.bank_account_number));
+                }
+            }
         }
 
         return jsonResponse({ message: "Organización actualizada" }, 200);

@@ -14,7 +14,7 @@
 // Concurrencia: las entradas se anulan con un UPDATE condicionado a que sigan vigentes y con conteo exacto;
 // si otra operación ya anuló alguna, esta revierte lo suyo y aborta. El registro del reembolso se inserta
 // solo después de anular con éxito.
-import { ToolError, type ToolDef, type ToolContext } from "../registry";
+import { ToolError, type ToolDef, type ToolContext, channelLabel } from "../registry";
 import { eventIdSchema, loadOwnedEvent, fetchAll, clp } from "./common";
 import { isActiveRefund } from "../ledger";
 import { findOrCreateAttendee, newQrCode } from "../../courtesy";
@@ -22,6 +22,7 @@ import { splitFullName } from "../../../../netlify/lib/buyer-name.mjs";
 import { orderLines, lineSoldQty } from "../../orderKinds";
 import { sendTicketsEmail, notifySlack, callInternalFunction } from "../../../pages/api/_lib/server-utils";
 import { sendEmail, formatRecipient, isValidEmail, legalFooterHtml, legalFooterText } from "../../../../netlify/lib/mailer.mjs";
+import { loadOrderEmailLog, summarizeEmailDelivery } from "../../../../netlify/lib/email-log.mjs";
 
 const UUID_PATTERN = "^[0-9a-fA-F-]{36}$";
 const orderIdSchema = { type: "string" as const, pattern: UUID_PATTERN, description: "ID de la orden (uuid; ver list_orders o get_order)." };
@@ -125,7 +126,8 @@ const getOrder: ToolDef = {
     name: "get_order",
     title: "Detalle de una orden",
     description:
-        "Detalle de una orden para resolver el reclamo de un comprador: entradas (id, tipo, estado, si ya ingresó), montos, pago, reembolsos y canal. " +
+        "Detalle de una orden para resolver el reclamo de un comprador: entradas (id, tipo, estado, si ya ingresó), montos, pago, reembolsos, canal " +
+        "y email_delivery (si el correo de entradas se envió, se entregó, rebotó o lo marcaron como spam, a qué dirección y cuándo). " +
         "Busca por order_id, o por event_id + buyer_email (devuelve hasta 10 órdenes). Contiene datos personales.",
     scope: "attendees",
     permission: "attendees.read",
@@ -162,7 +164,8 @@ const getOrder: ToolDef = {
         for (const o of orders) {
             const view = presentOrder(o, await loadOrderTickets(ctx, o.id), await loadRefunds(ctx, { orderId: o.id }));
             view.order_url_for_buyer = `${ctx.origin}/order/${o.id}`;
-            out.push(view);
+            const emailDelivery = summarizeEmailDelivery(await loadOrderEmailLog(ctx.supabase, o.id), { emailSentAt: o.email_sent_at || null });
+            out.push({ ...view, email_delivery: emailDelivery });
         }
         return { count: out.length, orders: out };
     },
@@ -171,7 +174,10 @@ const getOrder: ToolDef = {
 const resendTickets: ToolDef = {
     name: "resend_tickets",
     title: "Reenviar entradas",
-    description: "Reenvía al comprador el correo con sus entradas (\"no me llegó la entrada\"). Solo órdenes pagadas; las reembolsadas tienen las entradas anuladas.",
+    description:
+        "Reenvía al comprador el correo con sus entradas (\"no me llegó la entrada\"). Solo órdenes pagadas; las reembolsadas tienen las entradas anuladas. " +
+        "Se reenvía a la misma dirección: si el último correo rebotó o lo marcaron como spam (get_order → email_delivery), la respuesta trae un warning; " +
+        "pide al comprador otra dirección y usa transfer_ticket para enviarle las entradas ahí.",
     scope: "attendees",
     permission: "orders.support",
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
@@ -181,9 +187,25 @@ const resendTickets: ToolDef = {
         const { order } = await loadOrder(ctx, args.order_id);
         if (order.status === "refunded") throw new ToolError("conflict", "La orden fue reembolsada: sus entradas están anuladas.");
         if (order.status !== "paid") throw new ToolError("conflict", "Solo se pueden reenviar órdenes pagadas.");
+        // Estado del último correo ANTES de reenviar: si rebotó, reenviar a la misma dirección probablemente rebote otra vez
+        const previous: any = summarizeEmailDelivery(await loadOrderEmailLog(ctx.supabase, order.id, { limit: 1 }), { emailSentAt: order.email_sent_at || null });
         const result = await sendTicketsEmail(ctx.requestUrl, order.id, true);
         if (!result.ok) throw new ToolError("upstream", result.data?.message || "No se pudo reenviar el correo. Intenta nuevamente.");
-        return { order_id: order.id, event_id: Number(order.event_id), sent_to: order.buyer_email || null, status: "sent" };
+        const lastFailed = previous.last_status === "bounced" || previous.last_status === "complained";
+        return {
+            order_id: order.id,
+            event_id: Number(order.event_id),
+            sent_to: order.buyer_email || null,
+            status: "sent",
+            ...(lastFailed
+                ? {
+                      warning:
+                          `El correo anterior a esta dirección ${previous.last_status === "bounced" ? "rebotó" : "fue marcado como spam"}` +
+                          `${previous.last_error ? ` (${previous.last_error})` : ""}: es probable que este tampoco llegue. ` +
+                          "Pide al comprador otra dirección y usa transfer_ticket para enviarle las entradas ahí.",
+                  }
+                : {}),
+        };
     },
 };
 
@@ -478,6 +500,14 @@ async function restoreTickets(ctx: ToolContext, orderId: string, tickets: any[])
     }
 }
 
+/** Instrucciones para el operador en el aviso de Slack (aitickets_set_refund_status, 202610240100_payout_ops.sql). */
+export function refundSlackSql(refundId: string) {
+    return (
+        `• *Al devolver en Flow:* \`select aitickets_set_refund_status('${refundId}', 'completed', '<id del reembolso en Flow>', null, '<tu nombre>');\`\n` +
+        `• *Si no se pudo:* \`select aitickets_set_refund_status('${refundId}', 'failed', null, '<motivo>', '<tu nombre>');\``
+    );
+}
+
 const refundOrder: ToolDef = {
     name: "refund_order",
     title: "Reembolsar orden",
@@ -568,8 +598,9 @@ const refundOrder: ToolDef = {
         }
         if (plan.total > 0) {
             await notifySlack(
-                `💸 *Reembolso solicitado vía ${ctx.channel === "mcp" ? "MCP" : "API"}*\n• *Evento:* ${plan.event.name} (#${plan.event.id})\n• *Orden:* ${plan.order.id} (${plan.order.payment_provider || "flow"}, ref ${plan.order.payment_external_id || "—"})\n` +
-                    `• *Devolver al comprador:* ${clp(plan.total)} (${clp(plan.ticketAmount)} entradas + ${clp(plan.feeAmount)} cargo)\n• *Tipo:* ${plan.full ? "total" : "parcial"}\n• *Refund id:* ${refund.id}\n• *Por:* ${ctx.actor.name || ctx.actor.email}`,
+                `💸 *Reembolso solicitado vía ${channelLabel(ctx.channel)}*\n• *Evento:* ${plan.event.name} (#${plan.event.id})\n• *Orden:* ${plan.order.id} (${plan.order.payment_provider || "flow"}, ref ${plan.order.payment_external_id || "—"})\n` +
+                    `• *Devolver al comprador:* ${clp(plan.total)} (${clp(plan.ticketAmount)} entradas + ${clp(plan.feeAmount)} cargo)\n• *Tipo:* ${plan.full ? "total" : "parcial"}\n• *Refund id:* ${refund.id}\n• *Por:* ${ctx.actor.name || ctx.actor.email}\n` +
+                    refundSlackSql(String(refund.id)),
             );
         }
         const emailed = args.notify_buyer !== false ? await emailRefundToBuyer(plan, args.reason || null) : false;
@@ -813,8 +844,12 @@ const cancelEvent: ToolDef = {
             notificationQueued = res.ok;
         }
         await notifySlack(
-            `🛑 *Evento ${plan.resuming ? "cancelado (reintento: completando lo pendiente)" : "cancelado"} vía ${ctx.channel === "mcp" ? "MCP" : "API"}*\n• *Evento:* ${plan.event.name} (#${eventId})\n• *Reembolsos a procesar:* ${refundsCreated} por ${clp(refundTotal)}\n` +
-                `• *Saldo del productor en el evento:* ${clp(plan.balance.available)}\n• *Aviso a compradores:* ${notificationQueued ? "en cola" : "NO enviado"}\n• *Por:* ${ctx.actor.name || ctx.actor.email}`,
+            `🛑 *Evento ${plan.resuming ? "cancelado (reintento: completando lo pendiente)" : "cancelado"} vía ${channelLabel(ctx.channel)}*\n• *Evento:* ${plan.event.name} (#${eventId})\n• *Reembolsos a procesar:* ${refundsCreated} por ${clp(refundTotal)}\n` +
+                `• *Saldo del productor en el evento:* ${clp(plan.balance.available)}\n• *Aviso a compradores:* ${notificationQueued ? "en cola" : "NO enviado"}\n• *Por:* ${ctx.actor.name || ctx.actor.email}` +
+                (refundsCreated || plan.resuming
+                    ? `\n• *Reembolsos pendientes:* \`select r.id, r.order_id, o.payment_external_id, r.total_amount from aitickets_refunds r join event_orders o on o.id = r.order_id where r.event_id = ${eventId} and r.status = 'requested';\`\n` +
+                      `• *Por cada uno, al devolver en Flow:* \`select aitickets_set_refund_status('<id>', 'completed', '<id del reembolso en Flow>', null, '<tu nombre>');\``
+                    : ""),
         );
         return {
             event_id: eventId,

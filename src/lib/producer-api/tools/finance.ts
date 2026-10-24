@@ -3,7 +3,7 @@
 // banco, tipo y últimos 4 dígitos. Los retiros se solicitan aquí y AI Tickets los transfiere manualmente.
 // Saldo: ver src/lib/producer-api/ledger.ts.
 import { randomUUID } from "node:crypto";
-import { ToolError, type ToolDef, type ToolContext } from "../registry";
+import { ToolError, type ToolDef, type ToolContext, channelLabel } from "../registry";
 import { eventIdSchema, loadOwnedEvent, clp, fetchAll, localDateTime } from "./common";
 import { PAYOUT_BUSINESS_DAYS as LEGAL_PAYOUT_BUSINESS_DAYS } from "../../../../netlify/lib/legal.mjs";
 import { computeOrgLedger, addBusinessDays, loadOrgEvents, RELEASE_HOURS, WITHDRAWN_STATUSES, isActiveRefund } from "../ledger";
@@ -22,10 +22,13 @@ const isMissing = (error: any) => ["42P01", "PGRST205", "42703", "PGRST204"].inc
 
 const PAYOUT_COLUMNS = "legal_name, legal_rut, bank_name, bank_account_type, bank_account_number, bank_account_holder, bank_account_rut, updated_at";
 const PAYOUT_V2_COLUMNS = `${PAYOUT_COLUMNS}, verified_at, verified_by, bank_changed_at, removed_at`;
+// Rechazo de la verificación (202610240100_payout_ops.sql: aitickets_verify_payout_account)
+const PAYOUT_V3_COLUMNS = `${PAYOUT_V2_COLUMNS}, verification_notes, verification_rejected_at`;
 
 export async function loadPayoutAccount(ctx: ToolContext): Promise<any | null> {
     const run = (cols: string) => ctx.supabase.from("organization_payout_accounts").select(cols).eq("organization_id", ctx.actor.orgId).maybeSingle();
-    let { data, error } = await run(PAYOUT_V2_COLUMNS);
+    let { data, error } = await run(PAYOUT_V3_COLUMNS);
+    if (error && isMissing(error)) ({ data, error } = await run(PAYOUT_V2_COLUMNS));
     if (error && isMissing(error)) ({ data, error } = await run(PAYOUT_COLUMNS));
     if (error) throw error;
     return data || null;
@@ -46,19 +49,27 @@ const maskRut = (v: unknown) => {
     const s = String(v || "").replace(/[^0-9kK]/g, "");
     return s.length >= 2 ? `••••${s.slice(-4, -1)}-${s.slice(-1).toUpperCase()}` : null;
 };
+/** Número de cuenta enmascarado ("•••• 6789"), mismo formato que aitickets_mask_account_number en la BD. */
+export const maskAccountNumber = (v: unknown) => {
+    const digits = last4(v);
+    return digits ? `•••• ${digits}` : "••••";
+};
 
 export function payoutAccountState(acc: any, now = new Date()) {
     const complete = Boolean(acc?.bank_name && acc?.bank_account_number && acc?.bank_account_holder && acc?.bank_account_rut);
     const holdUntil = acc?.bank_changed_at ? new Date(new Date(acc.bank_changed_at).getTime() + BANK_CHANGE_HOLD_HOURS * 3600000) : null;
     const coolingActive = Boolean(holdUntil && holdUntil.getTime() > now.getTime());
-    let status: "missing" | "pending_verification" | "verified" | "removed";
+    let status: "missing" | "pending_verification" | "verified" | "rejected" | "removed";
     if (!complete) status = acc?.removed_at ? "removed" : "missing";
     else if (acc?.verified_at) status = "verified";
+    // AI Tickets la rechazó y el productor aún no corrige los datos (cambiarlos borra el rechazo en la BD)
+    else if (acc?.verification_rejected_at) status = "rejected";
     else status = "pending_verification";
     return { complete, status, holdUntil, coolingActive, canPayout: status === "verified" && !coolingActive };
 }
 
-function presentAccount(acc: any) {
+/** Cuenta de pago para mostrar: banco, tipo y últimos 4 dígitos; nunca el número completo ni el RUT. */
+export function presentAccount(acc: any) {
     const state = payoutAccountState(acc);
     return {
         status: state.status,
@@ -69,6 +80,7 @@ function presentAccount(acc: any) {
         holder_rut: maskRut(acc?.bank_account_rut),
         legal_name: acc?.legal_name || null,
         verified_at: acc?.verified_at || null,
+        ...(state.status === "rejected" ? { rejected_at: acc.verification_rejected_at, rejection_reason: acc.verification_notes || null } : {}),
         last_changed_at: acc?.bank_changed_at || acc?.updated_at || null,
         payouts_blocked_until: state.coolingActive ? state.holdUntil!.toISOString() : null,
         can_request_payout: state.canPayout,
@@ -81,7 +93,8 @@ const getPayoutAccount: ToolDef = {
     name: "get_payout_account",
     title: "Ver cuenta de pago",
     description:
-        "Muestra si hay una cuenta bancaria registrada para recibir los pagos y su estado (missing, pending_verification, verified, removed). " +
+        "Muestra si hay una cuenta bancaria registrada para recibir los pagos y su estado (missing, pending_verification, verified, rejected, removed). " +
+        "Si AI Tickets la rechazó, rejection_reason dice qué corregir en el panel. " +
         "Solo expone banco, tipo de cuenta y últimos 4 dígitos: nunca el número completo ni el RUT.",
     scope: "finance",
     permission: "finance.read",
@@ -139,7 +152,16 @@ const getVerificationStatus: ToolDef = {
             { item: "terms_accepted", label: "Términos para productores aceptados", ok: Boolean(org?.terms_accepted_at), required: false },
             { item: "legal_identity", label: "Razón social y RUT de la empresa (recomendado para la boleta/factura)", ok: Boolean(acc?.legal_name && acc?.legal_rut), required: false },
             { item: "bank_account", label: "Datos bancarios completos (banco, número, titular y RUT del titular)", ok: state.complete, required: true },
-            { item: "bank_verified", label: "Cuenta verificada por AI Tickets", ok: state.status === "verified", required: true },
+            state.status === "rejected"
+                ? {
+                      item: "bank_verified",
+                      label: `AI Tickets rechazó la cuenta: ${acc.verification_notes || "revisa los datos"}. Corrige los datos bancarios en el panel y guárdalos de nuevo.`,
+                      ok: false,
+                      required: true,
+                      rejected: true,
+                      rejection_reason: acc.verification_notes || null,
+                  }
+                : { item: "bank_verified", label: "Cuenta verificada por AI Tickets", ok: state.status === "verified", required: true },
             {
                 item: "bank_change_hold",
                 label: `Espera de ${BANK_CHANGE_HOLD_HOURS} h tras cambiar la cuenta`,
@@ -154,7 +176,12 @@ const getVerificationStatus: ToolDef = {
             missing,
             checks,
             manage_url: settingsUrl(ctx),
-            note: state.status === "pending_verification" ? "AI Tickets revisa las cuentas nuevas o modificadas, normalmente en 1 día hábil." : undefined,
+            note:
+                state.status === "pending_verification"
+                    ? "AI Tickets revisa las cuentas nuevas o modificadas, normalmente en 1 día hábil."
+                    : state.status === "rejected"
+                      ? "Al guardar datos bancarios corregidos, la cuenta vuelve a revisión."
+                      : undefined,
         };
     },
 };
@@ -204,7 +231,7 @@ const removePayoutAccount: ToolDef = {
             ({ error } = await ctx.supabase.from("organization_payout_accounts").update(patch).eq("organization_id", ctx.actor.orgId));
         }
         if (error) throw error;
-        await notifySlack(`🏦 *Cuenta de pago dada de baja vía ${ctx.channel === "mcp" ? "MCP" : "API"}*\n• *Org:* ${ctx.actor.orgId}\n• *Por usuario:* ${ctx.actor.userId}`);
+        await notifySlack(`🏦 *Cuenta de pago dada de baja vía ${channelLabel(ctx.channel)}*\n• *Org:* ${ctx.actor.orgId}\n• *Por usuario:* ${ctx.actor.userId}`);
         return { status: "removed", manage_url: settingsUrl(ctx) };
     },
     audit: () => ({ summary: "Cuenta de pago dada de baja", target: "payout_account" }),
@@ -526,6 +553,9 @@ async function planPayout(args: any, ctx: ToolContext) {
     const acc = await loadPayoutAccount(ctx);
     const state = payoutAccountState(acc);
     if (!state.complete) throw new ToolError("conflict", `No hay una cuenta bancaria registrada. Regístrala en ${settingsUrl(ctx)} (create_payout_account_link).`);
+    if (state.status === "rejected") {
+        throw new ToolError("conflict", `AI Tickets rechazó la cuenta bancaria: ${acc.verification_notes || "revisa los datos"}. Corrígela en ${settingsUrl(ctx)} y vuelve a guardarla.`);
+    }
     if (state.status !== "verified") throw new ToolError("conflict", "La cuenta bancaria aún no está verificada por AI Tickets. Revisa get_verification_status.");
     if (state.coolingActive) {
         throw new ToolError("conflict", `La cuenta bancaria cambió hace poco: por seguridad los retiros quedan habilitados desde ${state.holdUntil!.toISOString()}.`);
@@ -539,6 +569,16 @@ async function planPayout(args: any, ctx: ToolContext) {
     const allocated = allocations.reduce((s, a) => s + a.amount, 0);
     if (allocated < amount) throw new ToolError("conflict", `Solo se pueden asignar ${clp(allocated)} a eventos con saldo disponible.`);
     return { acc, amount, available, allocations, estimated: addBusinessDays(new Date(), PAYOUT_BUSINESS_DAYS) };
+}
+
+/** Instrucciones para el operador en el aviso de Slack (funciones de 202610240100_payout_ops.sql). */
+export function payoutSlackSql(orgId: number, payoutId: string) {
+    return (
+        `• *Datos para transferir:* \`select bank_name, bank_account_type, bank_account_number, bank_account_holder, bank_account_rut from organization_payout_accounts where organization_id = ${orgId};\`\n` +
+        `• *Al transferir:* \`select aitickets_set_payout_status('${payoutId}', 'paid', '<n° de comprobante>', null, '<tu nombre>');\`\n` +
+        `• *Si no se pudo:* \`select aitickets_set_payout_status('${payoutId}', 'failed', null, '<motivo para el productor>', '<tu nombre>');\`\n` +
+        `• *O en Claude (MCP de admin):* «paga el retiro ${payoutId}»`
+    );
 }
 
 const requestPayout: ToolDef = {
@@ -596,16 +636,18 @@ const requestPayout: ToolDef = {
             if (isMissing(error)) throw new ToolError("unavailable", "Los retiros aún no están disponibles. Intenta en unos minutos.");
             throw error;
         }
+        // El reparto guarda solo datos enmascarados: para transferir se usa la cuenta verificada de
+        // organization_payout_accounts (aitickets_set_payout_status revisa que no haya cambiado).
         const rows = plan.allocations.map((a) => ({
             event_id: a.event_id,
             user_id: ctx.actor.userId,
             amount: a.amount,
             status: "requested",
             estimated_payment_date: plan.estimated,
-            account_number: acc.bank_account_number,
+            account_number: maskAccountNumber(acc.bank_account_number),
             bank_name: acc.bank_name,
-            account_holder_name: acc.bank_account_holder,
-            account_holder_rut: acc.bank_account_rut,
+            account_holder_name: maskName(acc.bank_account_holder) || "••••",
+            account_holder_rut: maskRut(acc.bank_account_rut) || "••••",
             payout_id: payout.id,
         }));
         const { error: wError } = await ctx.supabase.from("event_withdrawals").insert(rows);
@@ -624,8 +666,9 @@ const requestPayout: ToolDef = {
             throw new ToolError("conflict", "El saldo cambió mientras se procesaba el retiro (¿otra solicitud en curso?). Revisa get_balance y vuelve a intentarlo.");
         }
         await notifySlack(
-            `💸 *Retiro solicitado vía ${ctx.channel === "mcp" ? "MCP" : ctx.channel === "dashboard" ? "panel" : "API"}*\n• *Org:* ${ctx.actor.orgId}\n• *Monto:* ${clp(plan.amount)}\n` +
-                `• *Cuenta:* ${acc.bank_name} ****${last4(acc.bank_account_number)}\n• *Payout:* ${payout.id}\n• *Eventos:* ${plan.allocations.map((a) => `#${a.event_id} ${clp(a.amount)}`).join(", ")}\n• *Estimado:* ${plan.estimated}`,
+            `💸 *Retiro solicitado vía ${channelLabel(ctx.channel)}*\n• *Org:* ${ctx.actor.orgId}\n• *Monto:* ${clp(plan.amount)}\n` +
+                `• *Cuenta:* ${acc.bank_name} ****${last4(acc.bank_account_number)}\n• *Payout:* ${payout.id}\n• *Eventos:* ${plan.allocations.map((a) => `#${a.event_id} ${clp(a.amount)}`).join(", ")}\n• *Estimado:* ${plan.estimated}\n` +
+                payoutSlackSql(ctx.actor.orgId, String(payout.id)),
         );
         return {
             payout_id: payout.id,

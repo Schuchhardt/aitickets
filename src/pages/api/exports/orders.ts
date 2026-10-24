@@ -1,6 +1,8 @@
 // GET /api/exports/orders?token=… — descarga el CSV contable de órdenes que entrega export_orders (API de
 // productores). El token (HMAC, 30 min) lleva organización, usuario, eventos y rango; aquí se vuelve a revisar
 // que el usuario siga activo en la organización y con permiso para ver compradores. Sin cookies.
+// Si lo pidió el MCP de admin (claim adm, firmado), uid debe ser el usuario de servicio de la plataforma
+// (aitickets_platform_settings.support_user_id), que no pertenece a ninguna organización.
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { buildOrderExportRows, rowsToCsv, verifyExportToken } from "../../../lib/ordersExport";
@@ -16,9 +18,14 @@ export const GET: APIRoute = async ({ url }) => {
     if (!claims) return fail(410, "El link de descarga no es válido o venció. Pide uno nuevo con export_orders.");
 
     const supabase = getSupabaseAdmin();
-    const { data: user } = await supabase.from("users").select("id, organization_id, role, active").eq("id", claims.uid).maybeSingle();
-    if (!user || user.active === false || Number(user.organization_id) !== claims.org || !roleAllows(user.role, "attendees.read")) {
-        return fail(403, "Ya no tienes acceso a estas órdenes.");
+    if (claims.adm === true) {
+        const { data: setting } = await supabase.from("aitickets_platform_settings").select("value").eq("key", "support_user_id").maybeSingle();
+        if (!setting || Number(setting.value) !== claims.uid) return fail(403, "Ya no tienes acceso a estas órdenes.");
+    } else {
+        const { data: user } = await supabase.from("users").select("id, organization_id, role, active").eq("id", claims.uid).maybeSingle();
+        if (!user || user.active === false || Number(user.organization_id) !== claims.org || !roleAllows(user.role, "attendees.read")) {
+            return fail(403, "Ya no tienes acceso a estas órdenes.");
+        }
     }
 
     try {

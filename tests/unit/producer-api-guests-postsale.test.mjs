@@ -250,6 +250,10 @@ describe('postventa', () => {
     expect(db.tables.event_orders.find((o) => o.id === ORDER_A).status).toBe('paid')
     expect(db.tables.aitickets_refunds).toHaveLength(1)
     expect(mocks.notifySlack).toHaveBeenCalled()
+    // El aviso trae el SQL para que el operador cierre el reembolso tras devolverlo en Flow
+    const slack = mocks.notifySlack.mock.calls.map((c) => c[0]).join('\n')
+    expect(slack).toContain(`aitickets_set_refund_status('${r.result.refund_id}', 'completed'`)
+    expect(slack).toContain(`aitickets_set_refund_status('${r.result.refund_id}', 'failed'`)
     expect(mocks.sendEmail).toHaveBeenCalledTimes(1)
   })
 
@@ -295,6 +299,9 @@ describe('postventa', () => {
     expect(db.tables.event_attendees.every((a) => a.status === 'cancelled')).toBe(true)
     expect(db.tables.event_orders.every((o) => o.event_id !== 10 || o.status === 'refunded')).toBe(true)
     expect(mocks.callInternalFunction.mock.calls[0][2]).toMatchObject({ eventId: 10, changeType: 'cancellation', includeCancelled: true })
+    const slack = mocks.notifySlack.mock.calls.map((c) => c[0]).join('\n')
+    expect(slack).toMatch(/where r\.event_id = 10 and r\.status = 'requested'/)
+    expect(slack).toContain("aitickets_set_refund_status('<id>', 'completed'")
     expect((await call('cancel_event', { event_id: 10, reason: 'otra vez' })).code).toBe('conflict')
   })
 })

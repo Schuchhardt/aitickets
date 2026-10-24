@@ -211,7 +211,9 @@ const PROVIDER_LABEL = { flow: 'Flow' }
  * @param {{provider:'flow', amount:number, currency?:string, externalId?:string|null,
  *          fee?:number|null, net?:number|null, method?:string|null}} payment
  *   externalId: flowOrder de Flow.
- * @returns {Promise<{status:'paid'|'already_paid'|'review'|'retry'|'not_found', httpStatus:number, message:string}>}
+ * @returns {Promise<{status:'paid'|'already_paid'|'review'|'retry'|'not_found', httpStatus:number, message:string, inProgress?:boolean}>}
+ *   inProgress: otra invocación tiene la orden reclamada; alreadyPaid: ya estaba pagada (en ambos casos no la
+ *   cumplió esta llamada).
  */
 export async function confirmPaidOrder(supabase, orderId, payment) {
   const { provider, amount, currency, externalId = null, fee = null, net = null, method = null } = payment || {}
@@ -224,7 +226,7 @@ export async function confirmPaidOrder(supabase, orderId, payment) {
   // Idempotencia: ya pagada -> solo asegurar entradas y correo (por si un intento anterior falló a medias)
   if (order.status === 'paid') {
     const emailed = await fulfillPaidOrder(supabase, order)
-    if (!emailed) return { status: 'retry', httpStatus: 503, message: 'Orden pagada; correo pendiente' }
+    if (!emailed) return { status: 'retry', httpStatus: 503, message: 'Orden pagada; correo pendiente', alreadyPaid: true }
     return { status: 'already_paid', httpStatus: 200, message: 'Orden ya procesada' }
   }
   if (order.status === 'review') return { status: 'review', httpStatus: 200, message: 'Orden en revisión manual' }
@@ -276,7 +278,7 @@ export async function confirmPaidOrder(supabase, orderId, payment) {
   if (!claimed?.length) {
     // Otra invocación la está procesando (o ya terminó): el proveedor reintentará y caerá en el camino idempotente
     console.log(`Orden ${order.id}: ya está siendo procesada por otra invocación`)
-    return { status: 'retry', httpStatus: 503, message: 'Orden en proceso' }
+    return { status: 'retry', httpStatus: 503, message: 'Orden en proceso', inProgress: true }
   }
   const claimedOrder = claimed[0]
 

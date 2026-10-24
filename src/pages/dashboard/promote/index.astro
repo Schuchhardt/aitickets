@@ -34,10 +34,20 @@ const { data: events } = await supabaseAdmin
   .order("created_at", { ascending: false });
 
 // Meta Ads está deshabilitado ("Próximamente"): no se consultan conexiones ni campañas
-// Stats
-const totalPosts = socialPosts?.length || 0;
-const publishedPosts = socialPosts?.filter((p) => p.status === "published").length || 0;
-const scheduledPosts = socialPosts?.filter((p) => p.status === "scheduled").length || 0;
+// Stats: conteos sobre TODOS los posts de la organización (la lista de arriba solo trae los 20 más recientes)
+const countPosts = (status?: string) => {
+  let q = supabaseAdmin.from("social_posts").select("id", { count: "exact", head: true }).eq("organization_id", dbUser.organization_id);
+  if (status) q = q.eq("status", status);
+  return q;
+};
+const [{ count: totalCount }, { count: publishedCount }, { count: scheduledCount }] = await Promise.all([
+  countPosts(),
+  countPosts("published"),
+  countPosts("scheduled"),
+]);
+const totalPosts = totalCount || 0;
+const publishedPosts = publishedCount || 0;
+const scheduledPosts = scheduledCount || 0;
 const activeCampaigns = 0;
 const totalAdSpend = 0;
 const hasMetaAds = false;
