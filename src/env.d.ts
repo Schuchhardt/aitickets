@@ -138,11 +138,9 @@ interface AiticketsEnv {
   readonly LEADS_PASSLINE_TOKENS_PER_RUN?: string
   readonly LEADS_PASSLINE_RESULTS_PER_QUERY?: string
 
-  // Legal (Chanium LLC)
-  readonly CHANIUM_LEGAL_STATE?: string
-  readonly CHANIUM_LEGAL_ADDRESS?: string
-  readonly CHANIUM_LEGAL_EMAIL?: string
-  readonly CHANIUM_PRIVACY_EMAIL?: string
+  // Legal (operador en Chile: Servicios Informáticos Sebastián Schuchhardt EIRL)
+  readonly LEGAL_ADDRESS?: string
+  readonly LEGAL_PHONE?: string
   readonly LEGAL_EFFECTIVE_DATE?: string
   readonly LEGAL_SUPPORT_EMAIL?: string
   readonly LEGAL_PRIVACY_EMAIL?: string

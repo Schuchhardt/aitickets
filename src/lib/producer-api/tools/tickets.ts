@@ -3,6 +3,14 @@ import { ToolError, type ToolDef } from "../registry";
 import { eventIdSchema, loadOwnedEvent, ticketAvailability, presentTicket, TICKET_SELECT, isoOrNull, rejectCourtesyName, clp } from "./common";
 import { normalizeTicket } from "../../../pages/api/_lib/events";
 import { isTransferOrder } from "../../orderKinds";
+import { IDENTITY_REQUIRED_MESSAGE, eventHasPaidTickets, identityApproved, loadOrgIdentity } from "../../producerIdentity";
+
+/** Evento publicado y gratuito que pasa a vender entradas pagadas: exige identidad verificada (igual que al publicar). */
+async function assertCanSellPaid(ctx: any, event: any, price: number | undefined) {
+    if (event.status !== "published" || !(Number(price) > 0)) return;
+    if (await eventHasPaidTickets(ctx.supabase, Number(event.id))) return;
+    if (!identityApproved(await loadOrgIdentity(ctx.supabase, ctx.actor.orgId))) throw new ToolError("conflict", IDENTITY_REQUIRED_MESSAGE);
+}
 
 const ticketIdSchema = { type: "integer" as const, minimum: 1, description: "ID del tipo de entrada (ver get_event → ticket_types)." };
 
@@ -61,6 +69,7 @@ const createTicketType: ToolDef = {
         const normalized = normalizeTicket({ name: args.name, price: args.price, quantity: args.quantity ?? null, initDate: args.sales_start, endDate: args.sales_end });
         if (!normalized) throw new ToolError("invalid_input", "Revisa nombre, precio y cantidad.");
         checkWindow(normalized.init_date, normalized.end_date);
+        await assertCanSellPaid(ctx, event, normalized.price);
         const functionId = await resolveFunctionId(ctx, event.id, args.function_id);
         const { data, error } = await ctx.supabase
             .from("event_tickets")
@@ -112,7 +121,10 @@ const updateTicketType: ToolDef = {
             rejectCourtesyName(args.name);
             patch.ticket_name = args.name.slice(0, 120);
         }
-        if (args.price !== undefined) patch.price = Math.round(args.price);
+        if (args.price !== undefined) {
+            if (!(Number(ticket.price) > 0)) await assertCanSellPaid(ctx, event, args.price);
+            patch.price = Math.round(args.price);
+        }
         if (args.max_per_order !== undefined) patch.max_quantity = args.max_per_order;
         if (args.on_sale !== undefined) patch.status = args.on_sale ? "available" : "unavailable";
         if (args.sales_start !== undefined) patch.init_date = isoOrNull(args.sales_start);

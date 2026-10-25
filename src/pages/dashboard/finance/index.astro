@@ -5,7 +5,8 @@ import { ORG_ADMIN_ROLES } from "../../../lib/supabaseServer";
 import { requireDashboardSession } from "../_lib/guard";
 import { SERVICE_FEE_PERCENT_LABEL, IVA_PERCENT_LABEL } from "../../../../netlify/lib/fees.mjs";
 import { getStaffEventIds } from "../../../../netlify/lib/event-staff.mjs";
-import { computeOrgLedger, RELEASE_HOURS, type OrgLedger } from "../../../lib/producer-api/ledger";
+import { computeOrgLedger, RELEASE_HOURS, CHECKIN_RELEASE_THRESHOLD, RESERVE_HOLD_DAYS, type OrgLedger, type HoldReason } from "../../../lib/producer-api/ledger";
+import { RISK_LEVEL_LABELS } from "../../../lib/eventRisk";
 import { roleAllows } from "../../../lib/producer-api/permissions";
 import { getTool } from "../../../lib/producer-api/tools";
 import { runTool } from "../../../lib/producer-api/registry";
@@ -142,7 +143,11 @@ if (orgEvents && orgEvents.length > 0) {
 }
 
 // Saldo: misma fuente que get_balance/request_payout (ledger.ts). Cada función se libera 48 h después de terminar.
-let ledger: OrgLedger = { events: [], totals: { available: 0, pending: 0, retained: 0, withdrawn: 0, paid_out: 0, negative_balance: 0, sales_net: 0, partial_refunds: 0 } };
+let ledger: OrgLedger = {
+    events: [],
+    totals: { available: 0, pending: 0, retained: 0, withdrawn: 0, paid_out: 0, negative_balance: 0, sales_net: 0, partial_refunds: 0, held: 0, reserve: 0 },
+    hold_reasons: [],
+};
 try {
     ledger = await computeOrgLedger(supabaseAdmin, Number(dbUser.organization_id), { eventIds: staffEventIds });
 } catch (err: any) {
@@ -179,6 +184,11 @@ const { data: payout } = await supabaseAdmin
     .maybeSingle();
 const hasBankData = !!(payout?.bank_name && payout?.bank_account_number && payout?.bank_account_holder && payout?.bank_account_rut);
 
+/** Motivos de retención propios de una función/evento (los de la cuenta se muestran una sola vez arriba). */
+const ACCOUNT_CODES = new Set(["identity_pending", "bank_unverified", "holder_unchecked", "holder_mismatch"]);
+const ownReasons = (reasons: HoldReason[] = []) => reasons.filter((r) => !ACCOUNT_CODES.has(r.code));
+const pct = (r: number | null) => (r == null ? "—" : `${Math.round(r * 100)}%`);
+
 const formatCLP = (amount: number) => `$${Math.round(Number(amount) || 0).toLocaleString("es-CL")}`;
 const formatDate = (d: string | null) =>
     d ? new Date(d).toLocaleDateString("es-CL", { timeZone: "America/Santiago" }) : "—";
@@ -208,6 +218,19 @@ const formatDateTime = (d: string | null) =>
             )}
         </div>
 
+        {ledger.hold_reasons.length > 0 && (ledger.totals.held > 0 || ledger.totals.pending > 0) && (
+            <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 md:p-5 text-sm text-amber-900" data-testid="finance-account-holds">
+                <p class="font-semibold mb-1">Para liberar tus ventas falta:</p>
+                <ul class="list-disc pl-5 space-y-0.5">
+                    {ledger.hold_reasons.map((r) => <li>{r.label}</li>)}
+                </ul>
+                <p class="mt-2">
+                    Complétalo en <a href="/dashboard/settings" class="underline font-medium">Configuración</a>.{" "}
+                    <a href="/terminos-productores#recaudacion" class="underline">*Se aplican términos y condiciones</a>
+                </p>
+            </div>
+        )}
+
         <!-- Quick Stats -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
             <div class="bg-white p-4 md:p-6 rounded-xl border border-gray-100 shadow-sm">
@@ -228,7 +251,7 @@ const formatDateTime = (d: string | null) =>
             <div class="bg-white p-4 md:p-6 rounded-xl border border-gray-100 shadow-sm" data-testid="finance-available">
                 <h3 class="text-gray-500 text-sm font-medium">Disponible para retirar</h3>
                 <p class="text-2xl md:text-3xl font-bold mt-2 text-green-600">{formatCLP(ledger.totals.available)}</p>
-                <p class="text-xs text-gray-400 mt-1">Ventas de funciones que terminaron hace {RELEASE_HOURS} h o más.</p>
+                <p class="text-xs text-gray-400 mt-1">Ventas de funciones que terminaron hace {RELEASE_HOURS} h o más y cumplen las condiciones de liberación.</p>
                 {canManagePayouts && (
                     <div class="mt-3">
                         <PayoutRequestButton
@@ -245,7 +268,8 @@ const formatDateTime = (d: string | null) =>
                 <p class="text-2xl md:text-3xl font-bold mt-2">{formatCLP(ledger.totals.pending)}</p>
                 <p class="text-xs text-gray-400 mt-1">
                     {nextRelease ? `Próxima liberación: ${formatDateTime(nextRelease)}.` : "Funciones por realizarse."}
-                    {ledger.totals.retained > 0 && ` Retenido: ${formatCLP(ledger.totals.retained)} (pagos en revisión o eventos cancelados).`}
+                    {ledger.totals.retained > 0 && ` Retenido: ${formatCLP(ledger.totals.retained)} (pagos en revisión, eventos cancelados o condiciones pendientes; detalle por evento abajo).`}
+                    {ledger.totals.reserve > 0 && ` Incluye ${formatCLP(ledger.totals.reserve)} de reserva por riesgo.`}
                 </p>
                 <p class="text-xs text-gray-400 mt-1">Transferido a la fecha: {formatCLP(ledger.totals.paid_out)}</p>
             </div>
@@ -309,14 +333,51 @@ const formatDateTime = (d: string | null) =>
                                     <td class="px-4 md:px-6 py-3 md:py-4 font-medium text-gray-900 min-w-[10rem]">
                                         {s.name}
                                         {s.cancelled && <span class="block text-xs text-red-600">Cancelado: saldo retenido</span>}
+                                        {s.risk_level && s.risk_level !== "low" && (
+                                            <span class="block text-xs text-amber-700">
+                                                Riesgo {RISK_LEVEL_LABELS[s.risk_level as keyof typeof RISK_LEVEL_LABELS]?.toLowerCase() || s.risk_level} · reserva {s.reserve_pct}%
+                                            </span>
+                                        )}
+                                        {s.reserve_amount > 0 && (
+                                            <span class="block text-xs text-gray-500">Reserva {formatCLP(s.reserve_amount)} hasta {formatDate(s.reserve_release_at)}</span>
+                                        )}
+                                        {ownReasons(s.hold_reasons).filter((r) => r.code !== "risk_reserve" && r.code !== "event_cancelled").map((r) => (
+                                            <span class="block text-xs text-amber-700">Retenido: {r.label}</span>
+                                        ))}
                                     </td>
                                     <td class="px-4 md:px-6 py-3 md:py-4 text-xs min-w-[12rem]">
                                         {s.functions.filter((f) => f.sales_net > 0).length > 0 ? (
                                             <ul class="space-y-1">
                                                 {s.functions.filter((f) => f.sales_net > 0).map((f) => (
-                                                    <li>
+                                                    <li data-testid="finance-function" data-release-status={f.release_status}>
                                                         {formatDate(f.ends_at)}{f.start_time ? ` ${f.start_time}` : ""} · {formatCLP(f.sales_net)} ·{" "}
-                                                        {f.released ? <span class="text-green-700">liberado</span> : <span class="text-gray-500">desde {formatDateTime(f.releases_at)}</span>}
+                                                        {f.release_status === "released" ? (
+                                                            <span class="text-green-700">liberado</span>
+                                                        ) : f.release_status === "held" ? (
+                                                            <span class="text-amber-700">retenido</span>
+                                                        ) : f.release_status === "cancelled" ? (
+                                                            <span class="text-red-600">cancelado</span>
+                                                        ) : (
+                                                            <span class="text-gray-500">desde {formatDateTime(f.releases_at)}</span>
+                                                        )}
+                                                        {f.checkin_ratio != null && f.release_status !== "pending" && (
+                                                            <span class="text-gray-400"> · check-ins {pct(f.checkin_ratio)}{f.attested_at ? " · acreditada" : ""}</span>
+                                                        )}
+                                                        {ownReasons(f.hold_reasons).map((r) => (
+                                                            <span class="block text-amber-700">
+                                                                {r.code === "risk_reserve" ? `Reserva ${formatCLP(f.reserve_amount)} hasta ${formatDate(f.reserve_release_at)}` : r.label}
+                                                            </span>
+                                                        ))}
+                                                        {canManagePayouts && f.hold_reasons.some((r) => r.code === "low_checkins") && !f.attested_at && (
+                                                            <details class="mt-1">
+                                                                <summary class="cursor-pointer text-blue-600 hover:underline">Acreditar que la función se realizó</summary>
+                                                                <form class="mt-1 space-y-1" data-attest-form data-event-id={s.event_id} data-event-date-id={f.event_date_id}>
+                                                                    <textarea name="note" required minlength="3" maxlength="1000" rows="2" class="w-full border rounded p-1 text-xs" placeholder="Cómo se realizó y qué evidencia tienes (asistentes aprox., link a fotos)"></textarea>
+                                                                    <button type="submit" class="px-2 py-1 rounded bg-black text-white text-xs">Acreditar</button>
+                                                                    <p class="text-red-600" data-attest-error></p>
+                                                                </form>
+                                                            </details>
+                                                        )}
                                                     </li>
                                                 ))}
                                             </ul>
@@ -405,5 +466,40 @@ const formatDateTime = (d: string | null) =>
                 </div>
             </div>
         )}
+        <p class="text-xs text-gray-400">
+            Lo de cada función se libera {RELEASE_HOURS} h después de que termina si tu identidad y tu cuenta bancaria están verificadas, la función registró
+            check-ins de al menos {Math.round(CHECKIN_RELEASE_THRESHOLD * 100)}% de las entradas (o acreditas que se realizó) y no hay reclamos abiertos. En eventos con
+            riesgo podemos retener una reserva hasta {RESERVE_HOLD_DAYS} días después de la función.{" "}
+            <a href="/terminos-productores#recaudacion" class="underline">*Se aplican términos y condiciones</a>
+        </p>
     </div>
 </DashboardLayout>
+
+<script>
+    document.querySelectorAll<HTMLFormElement>("form[data-attest-form]").forEach((form) => {
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const button = form.querySelector("button");
+            const errorEl = form.querySelector("[data-attest-error]");
+            if (button) button.disabled = true;
+            if (errorEl) errorEl.textContent = "";
+            try {
+                const res = await fetch("/api/events/attest", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        event_id: Number(form.dataset.eventId),
+                        event_date_id: Number(form.dataset.eventDateId),
+                        note: String(new FormData(form).get("note") || ""),
+                    }),
+                });
+                const out = await res.json().catch(() => ({}));
+                if (!res.ok || !out.ok) throw new Error(out?.error?.message || "No se pudo acreditar la función.");
+                window.location.reload();
+            } catch (err: any) {
+                if (errorEl) errorEl.textContent = err?.message || "No se pudo acreditar la función.";
+                if (button) button.disabled = false;
+            }
+        });
+    });
+</script>

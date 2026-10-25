@@ -15,10 +15,11 @@ import { lifecycleTools } from "./lifecycle";
 import { auditTools } from "./audit";
 import { scheduleTools } from "./schedule";
 import { reviewTools } from "./reviews";
+import { complianceTools } from "./compliance";
 
 export const TOOLS: ToolDef[] = [
     ...eventTools, ...scheduleTools, ...ticketTools, ...discountTools, ...analyticsTools, ...marketingTools,
-    ...financeTools, ...teamTools, ...guestTools, ...accessTools, ...postsaleTools,
+    ...financeTools, ...complianceTools, ...teamTools, ...guestTools, ...accessTools, ...postsaleTools,
     ...messagingTools, ...reviewTools, ...lifecycleTools, ...auditTools,
 ];
 

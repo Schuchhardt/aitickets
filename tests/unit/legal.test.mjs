@@ -20,46 +20,46 @@ afterEach(() => {
 })
 
 describe('legalReady', () => {
-  it('es true por defecto: los datos públicos de Chanium, LLC vienen fijados en legal.mjs', async () => {
+  it('es true por defecto: los datos públicos de la EIRL vienen fijados en legal.mjs', async () => {
     const { legalReady } = await loadLegal()
     expect(legalReady()).toBe(true)
   })
 
   it('valores en blanco en el entorno caen a los valores por defecto', async () => {
-    const { legalReady, LEGAL } = await loadLegal({ CHANIUM_LEGAL_ADDRESS: '   ', CHANIUM_LEGAL_EMAIL: '  ' })
+    const { legalReady, LEGAL } = await loadLegal({ LEGAL_ADDRESS: '   ', LEGAL_CONTACT_EMAIL: '  ' })
     expect(legalReady()).toBe(true)
     expect(LEGAL.address).toContain('Lican Ray 6742')
-    expect(LEGAL.legalEmail).toBe('hello@chanium.com')
+    expect(LEGAL.legalEmail).toBe('contacto@aitickets.cl')
   })
 
   it('el entorno sobrescribe dirección y correo legal (o su alias LEGAL_CONTACT_EMAIL)', async () => {
-    let { LEGAL } = await loadLegal({ CHANIUM_LEGAL_ADDRESS: '8 The Green, Dover, DE 19901, EE.UU.', CHANIUM_LEGAL_EMAIL: 'legal@aitickets.cl' })
+    let { LEGAL } = await loadLegal({ LEGAL_ADDRESS: '8 The Green, Dover, DE 19901, EE.UU.', LEGAL_CONTACT_EMAIL: 'contacto@aitickets.cl' })
     expect(LEGAL.address).toBe('8 The Green, Dover, DE 19901, EE.UU.')
-    expect(LEGAL.legalEmail).toBe('legal@aitickets.cl')
-    expect(LEGAL.privacyEmail).toBe('legal@aitickets.cl')
+    expect(LEGAL.legalEmail).toBe('contacto@aitickets.cl')
+    expect(LEGAL.privacyEmail).toBe('contacto@aitickets.cl')
     vi.unstubAllEnvs()
     ;({ LEGAL } = await loadLegal({ LEGAL_CONTACT_EMAIL: 'otro@aitickets.cl' }))
     expect(LEGAL.legalEmail).toBe('otro@aitickets.cl')
   })
 })
 
-describe('LEGAL por defecto (Chanium, LLC)', () => {
-  it('trae la razón social, el registro de Delaware y el domicilio, y nunca muestra TODO ni "AI Tickets SpA"', async () => {
+describe('LEGAL por defecto (Servicios Informáticos Sebastián Schuchhardt EIRL)', () => {
+  it('trae la razón social, el RUT y el domicilio de la EIRL, sin rastros de Chanium ni Delaware', async () => {
     const { LEGAL, legalLine, outreachFooterText } = await loadLegal()
-    expect(LEGAL.entity).toBe('Chanium LLC')
-    expect(LEGAL.legalName).toBe('Chanium, LLC')
-    expect(LEGAL.entityKind).toBe('Delaware LLC')
-    expect(LEGAL.state).toBe('Delaware')
-    expect(LEGAL.delawareFileNumber).toBe('10669971')
-    expect(LEGAL.formationDate).toBe('2026-06-22')
-    expect(LEGAL.representative).toBe('Sebastian Schuchhardt')
+    expect(LEGAL.legalName).toBe('Servicios Informáticos Sebastián Schuchhardt EIRL')
+    expect(LEGAL.rut).toBe('77.893.286-5')
+    expect(LEGAL.entityKind).toBe('EIRL')
+    expect(LEGAL.brand).toBe('AI Tickets')
+    expect(LEGAL.representative).toBe('Sebastián Schuchhardt')
     expect(LEGAL.phone).toBe('+56 9 8234 7140')
-    expect(LEGAL.address).toBe('Lican Ray 6742, Vitacura, Región Metropolitana, 7660043, Chile')
+    expect(LEGAL.address).toBe('Lican Ray 6742, Vitacura, Región Metropolitana, Chile')
     expect(LEGAL.addressLine).toBe(LEGAL.address)
-    expect(LEGAL.legalEmail).toBe('hello@chanium.com')
-    expect(LEGAL.privacyEmail).toBe('hello@chanium.com')
+    expect(LEGAL.legalEmail).toBe('contacto@aitickets.cl')
+    expect(LEGAL.privacyEmail).toBe('contacto@aitickets.cl')
     expect(LEGAL.supportEmail).toBe('soporte@aitickets.cl')
-    expect(legalLine()).toContain('Chanium, LLC')
+    expect(LEGAL.flowMerchantName).toBe('AI Tickets')
+    expect(JSON.stringify(LEGAL)).not.toMatch(/Chanium|Delaware|LLC/)
+    expect(legalLine()).toContain('Servicios Informáticos Sebastián Schuchhardt EIRL, RUT 77.893.286-5')
     expect(legalLine()).toContain('Lican Ray 6742')
     const texts = [LEGAL.addressLine, legalLine(), outreachFooterText({ sourceLabel: 'x', unsubscribeUrl: 'https://aitickets.cl/u' })]
     for (const t of texts) {
@@ -137,16 +137,16 @@ describe('el EIN nunca se publica', () => {
 })
 
 describe('outreachFooterText', () => {
-  it('por defecto incluye la razón social, el domicilio, el correo legal, el origen del dato y el enlace de baja', async () => {
+  it('por defecto identifica al remitente por su marca (sin razón social), con domicilio, correo legal, origen del dato y enlace de baja', async () => {
     const { outreachFooterText } = await loadLegal()
     const footer = outreachFooterText({
       sourceLabel: 'el sitio web público de tu organización (teatro.cl)',
       unsubscribeUrl: 'https://aitickets.cl/api/outreach/unsubscribe?t=abc',
     })
     expect(footer.startsWith('--\n')).toBe(true)
-    // compose.mjs / instantly.mjs exigen que el pie contenga LEGAL.entity ("Chanium LLC")
-    expect(footer).toContain('Chanium LLC')
-    expect(footer).toContain('Chanium, LLC · Lican Ray 6742, Vitacura, Región Metropolitana, 7660043, Chile · hello@chanium.com')
+    // compose.mjs / instantly.mjs exigen que el pie contenga la marca y el domicilio (LEGAL.address)
+    expect(footer).toContain('AI Tickets · Lican Ray 6742, Vitacura, Región Metropolitana, Chile · contacto@aitickets.cl')
+    expect(footer).not.toContain('EIRL')
     expect(footer).toContain('teatro.cl')
     expect(footer).toContain('https://aitickets.cl/api/outreach/unsubscribe?t=abc')
     expect(footer).toMatch(/correo comercial/)
@@ -155,10 +155,10 @@ describe('outreachFooterText', () => {
 
   it('usa la dirección y el correo del entorno si se sobrescriben', async () => {
     const ADDRESS = '8 The Green, Dover, DE 19901, EE.UU.'
-    const { outreachFooterText } = await loadLegal({ CHANIUM_LEGAL_ADDRESS: ADDRESS, CHANIUM_LEGAL_EMAIL: 'legal@aitickets.cl' })
+    const { outreachFooterText } = await loadLegal({ LEGAL_ADDRESS: ADDRESS, LEGAL_CONTACT_EMAIL: 'contacto@aitickets.cl' })
     const footer = outreachFooterText({})
     expect(footer).toContain(ADDRESS)
-    expect(footer).toContain('legal@aitickets.cl')
+    expect(footer).toContain('contacto@aitickets.cl')
   })
 
   it('sin enlace de baja igual explica cómo darse de baja', async () => {
@@ -175,10 +175,11 @@ describe('outreachFooterText', () => {
 })
 
 describe('pie legal de correos transaccionales (mailer)', () => {
-  it('legalFooterHtml es mínimo: marca, operador y la baja cuando corresponde', async () => {
+  it('legalFooterHtml es mínimo: solo la marca y la baja cuando corresponde', async () => {
     const { legalFooterHtml } = await loadMailer()
     const html = legalFooterHtml({ reason: 'Recibes este correo porque <compraste>', unsubscribeUrl: 'https://aitickets.cl/baja?t=1&x=2' })
-    expect(html).toContain('AI Tickets · Chanium LLC')
+    expect(html).toContain('AI Tickets')
+    expect(html).not.toMatch(/EIRL|77\.893\.286/)
     expect(html).toContain('href="https://aitickets.cl/baja?t=1&amp;x=2"')
     expect(html).not.toContain('compraste')
     expect(legalFooterHtml()).not.toContain('baja')
@@ -193,7 +194,8 @@ describe('pie legal de correos transaccionales (mailer)', () => {
   it('el pie de texto incluye la baja cuando corresponde', async () => {
     const { legalFooterText } = await loadMailer()
     const text = legalFooterText({ unsubscribeUrl: 'https://aitickets.cl/u' })
-    expect(text).toContain('AI Tickets · Chanium LLC')
+    expect(text).toContain('AI Tickets')
+    expect(text).not.toContain('EIRL')
     expect(text).toContain('Darme de baja: https://aitickets.cl/u')
   })
 

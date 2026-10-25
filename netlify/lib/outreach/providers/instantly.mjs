@@ -63,7 +63,7 @@ function checkFollowups(followups) {
     throw new Error(`Instantly: la campaña tiene ${INSTANTLY_SEQUENCE_FOLLOWUPS} seguimientos fijos y se recibieron ${list.length}; no se inscribe el lead (un paso vacío saldría sin pie legal)`)
   }
   list.forEach((f, i) => {
-    if (!f.text.trim() || !f.text.includes(LEGAL.entity) || !UNSUB_LINK_RE.test(f.text)) {
+    if (!f.text.trim() || !f.text.includes(LEGAL.address) || !UNSUB_LINK_RE.test(f.text)) {
       throw new Error(`Instantly: el seguimiento ${i + 1} no tiene pie legal completo; no se inscribe el lead`)
     }
   })
@@ -78,7 +78,7 @@ function checkFollowups(followups) {
 export async function sendInitial({ lead, subject, text, followups = [] }) {
   const campaign = process.env.INSTANTLY_CAMPAIGN_ID
   if (!campaign) throw new Error('INSTANTLY_CAMPAIGN_ID no configurado')
-  if (!String(text || '').includes(LEGAL.entity) || !UNSUB_LINK_RE.test(String(text || ''))) {
+  if (!String(text || '').includes(LEGAL.address) || !UNSUB_LINK_RE.test(String(text || ''))) {
     throw new Error('Instantly: el correo inicial no tiene pie legal completo')
   }
   const [f1, f2] = checkFollowups(followups)

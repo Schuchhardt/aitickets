@@ -237,6 +237,8 @@ interface EventPageRows {
   faqs: any[];
   dates: any[];
   org: any;
+  /** Razón social, RUT, identidad verificada del organizador y autorización del evento (migración 202610260100). */
+  trust: any;
   hasSecretLocation: boolean;
   gallery: GalleryImage[];
   /** Respuesta de aitickets_ticket_availability (loadAvailability cae al conteo anterior si trae error). */
@@ -269,6 +271,8 @@ async function loadEventPageRows(
       faqs: data.faqs || [],
       dates: data.dates || [],
       org: data.org || null,
+      // Función anterior a 202610260100 (sin 'trust'): se consulta aparte
+      trust: data.trust !== undefined ? data.trust : await loadTrust(supabase, data.event),
       hasSecretLocation: data.has_secret_location === true,
       gallery: data.gallery || [],
       availability: { data: data.availability || [], error: null },
@@ -276,6 +280,31 @@ async function loadEventPageRows(
   }
   if (!isMissingFunction(error)) console.error("Error en aitickets_public_event_page (se usan las consultas por separado):", error);
   return loadEventPageRowsByQueries(supabase, slug, opts);
+}
+
+/**
+ * Razón social, RUT e identidad verificada del organizador + autorización del evento (eventos masivos).
+ * Tolera columnas que aún no existen (deploy preview sin migrar): devuelve lo que haya.
+ */
+async function loadTrust(supabase: ReturnType<typeof getSupabaseAdmin>, event: any): Promise<any> {
+  if (!event?.organization_id) return null;
+  const [orgRes, evRes] = await Promise.all([
+    supabase.from("organizations").select("legal_name, legal_id, identity_status").eq("id", event.organization_id).maybeSingle(),
+    supabase.from("events").select("is_massive, permit_status").eq("id", event.id).maybeSingle(),
+  ]);
+  let org: any = orgRes.data;
+  if (orgRes.error) {
+    const legacy = await supabase.from("organizations").select("legal_name, legal_id").eq("id", event.organization_id).maybeSingle();
+    org = legacy.data;
+  }
+  const ev: any = evRes.error ? null : evRes.data;
+  return {
+    legal_name: org?.legal_name ?? null,
+    legal_rut: org?.legal_id ?? null,
+    identity_status: org?.identity_status ?? null,
+    is_massive: ev?.is_massive ?? null,
+    permit_status: ev?.permit_status ?? null,
+  };
 }
 
 async function loadEventPageRowsByQueries(
@@ -351,6 +380,7 @@ async function loadEventPageRowsByQueries(
     faqs: faqsRes.data || [],
     dates: datesRes.data || [],
     org: orgRes.data,
+    trust: await loadTrust(supabase, event),
     hasSecretLocation: (secretRes.count ?? 0) > 0,
     gallery,
     availability,
@@ -419,7 +449,20 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
 
   // Organización
   const orgRow: any = raw.org;
-  const organization = orgRow ? { name: orgRow.public_name, website: orgRow.website, instagram: orgRow.instagram } : null;
+  const trust: any = raw.trust || {};
+  const organization = orgRow
+    ? {
+        name: orgRow.public_name,
+        website: orgRow.website,
+        instagram: orgRow.instagram,
+        // Identificación del organizador (Ley 19.496) y sello "Productor verificado" (Didit aprobado)
+        legal_name: trust.legal_name || null,
+        legal_rut: trust.legal_rut || null,
+        verified: trust.identity_status === "approved",
+      }
+    : null;
+  // Eventos masivos: estado de la autorización de la Delegación Presidencial (Ley 21.659)
+  const permit = trust.is_massive === true ? { status: trust.permit_status === "approved" ? "approved" : "pending" } : null;
 
   const hasSecretLocation = raw.hasSecretLocation;
 
@@ -577,6 +620,7 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
     sale_starts_at: upcomingSaleDates[0] || null,
     has_secret_location: hasSecretLocation,
     organization,
+    permit,
     venue: primaryVenue,
     cover_settings: normalizeCoverSettings(event.cover_settings),
     // Diseño de la página y si se muestra el organizador (src/lib/eventPageSettings.ts)

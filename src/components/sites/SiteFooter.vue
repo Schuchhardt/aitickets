@@ -44,7 +44,7 @@ const year = new Date().getFullYear();
         <p>
           Entradas vendidas por
           <a :href="`${LEGAL.siteUrl}/?utm_source=sitio_productor&utm_medium=footer&utm_campaign=${site.slug}`" class="underline" rel="noopener">{{ LEGAL.brand }}</a>
-          · operado por {{ LEGAL.entity }} ·
+          ·
           <a :href="`${LEGAL.siteUrl}/terms`" class="underline" rel="noopener">Términos</a> ·
           <a :href="`${LEGAL.siteUrl}/privacy`" class="underline" rel="noopener">Privacidad</a>
         </p>

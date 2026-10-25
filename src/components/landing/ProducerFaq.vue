@@ -1,8 +1,9 @@
 <script setup>
 import { Plus } from 'lucide-vue-next'
+import { TERMS_NOTE } from '../../data/producerFaq'
 
 defineProps({
-  items: { type: Array, required: true }, // [{ q, a }]
+  items: { type: Array, required: true }, // [{ q, a, terms? }]
   title: { type: String, required: false },
 })
 </script>
@@ -17,7 +18,10 @@ defineProps({
             <span>{{ item.q }}</span>
             <Plus class="h-5 w-5 shrink-0 transition-transform group-open:rotate-45" />
           </summary>
-          <p class="mt-3 text-sm leading-relaxed text-gray-600">{{ item.a }}</p>
+          <p class="mt-3 text-sm leading-relaxed text-gray-600">
+            {{ item.a }}
+            <a v-if="item.terms" :href="TERMS_NOTE.href" class="block mt-1 text-xs text-gray-400 underline hover:text-gray-600">{{ TERMS_NOTE.text }}</a>
+          </p>
         </details>
       </div>
     </div>

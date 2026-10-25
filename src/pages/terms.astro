@@ -14,12 +14,12 @@ const vatPct = Math.round(LEGAL.serviceFeeVatRate * 100);
 
 <Layout
   title="Términos y condiciones para compradores | AI Tickets"
-  description={`Términos y condiciones de compra de entradas en AI Tickets, servicio operado por ${LEGAL.legalName}.`}
+  description={`Términos y condiciones de compra de entradas en AI Tickets, plataforma operada en Chile por ${LEGAL.legalName}.`}
   canonical="/terms"
 >
   <AppHeader client:idle/>
   <main>
-    <!-- Borrador pendiente de revisión legal (Chile y EE.UU.). -->
+    <!-- Pendiente de validación con abogado y contador (devolución directa §7, boleta del cargo §3). -->
     <div class="legal container mx-auto px-6 py-12 text-gray-700 font-['Prompt']">
       <h1 class="text-3xl font-bold pt-12 mb-2 font-['Unbounded'] text-gray-900">Términos y condiciones para compradores</h1>
       <p class="text-sm text-gray-500 mb-6">Versión {LEGAL.termsVersion} · Vigentes desde el {effective}</p>
@@ -32,9 +32,8 @@ const vatPct = Math.round(LEGAL.serviceFeeVatRate * 100);
       <section>
         <h2>1. Quiénes somos</h2>
         <p>
-          AI Tickets es un servicio operado por <strong>{LEGAL.legalName}</strong>, {LEGAL.stateLabel} (archivo N° {LEGAL.delawareFileNumber} de la División de Sociedades de {LEGAL.state}),
-          con domicilio comercial en {LEGAL.address}.
-          En estos términos, "AI Tickets", "nosotros" o "la plataforma" se refieren a {LEGAL.legalName}.
+          AI Tickets es una plataforma de venta de entradas operada en Chile por <strong>{LEGAL.legalName}</strong>, RUT {LEGAL.rut},
+          con domicilio en {LEGAL.address} ("AI Tickets" o "nosotros").
         </p>
         <p>
           Atención a compradores: <a href={`mailto:${LEGAL.supportEmail}`}>{LEGAL.supportEmail}</a>.
@@ -60,12 +59,13 @@ const vatPct = Math.round(LEGAL.serviceFeeVatRate * 100);
           <li>Antes de pagar verás el detalle de las entradas, el precio de cada una, el cargo por servicio y el total.</li>
           <li>
             {LEGAL.serviceFeeTaxMode === 'added'
-              ? `El cargo por servicio es de ${feePct}% del valor de las entradas, más IVA (${vatPct}% calculado sobre el cargo). Lo paga el comprador, se suma al precio de las entradas y corresponde a ${LEGAL.legalName}, no al productor.`
-              : `El cargo por servicio es de ${feePct}% del valor de las entradas. Lo paga el comprador, se suma al precio de las entradas y corresponde a ${LEGAL.legalName}, no al productor.`}
+              ? `El cargo por servicio es de ${feePct}% del valor de las entradas, más IVA (${vatPct}% calculado sobre el cargo). Lo paga el comprador, se suma al precio de las entradas y corresponde a AI Tickets, no al productor.`
+              : `El cargo por servicio es de ${feePct}% del valor de las entradas. Lo paga el comprador, se suma al precio de las entradas y corresponde a AI Tickets, no al productor.`}
             Las entradas gratuitas no pagan cargo por servicio.
           </li>
           <li>La compra queda confirmada cuando el medio de pago autoriza la transacción. Las entradas se reservan por un tiempo limitado mientras completas el pago; si no se completa, la reserva se libera.</li>
           <li>Recibirás por correo un <strong>{LEGAL.receiptLabel.toLowerCase()}</strong> con tus entradas y un enlace para verlas. Este comprobante no reemplaza los documentos tributarios que correspondan.</li>
+          <li>Por el cargo por servicio emitimos boleta electrónica. El precio de la entrada lo documenta el productor.</li>
           <li>Debes ser mayor de edad o contar con autorización de tu representante legal. Algunos eventos exigen edad mínima: revisa las condiciones del evento.</li>
           <li>Revisa que tu correo esté bien escrito; lo usamos para enviarte las entradas y avisos del evento.</li>
         </ul>
@@ -74,7 +74,7 @@ const vatPct = Math.round(LEGAL.serviceFeeVatRate * 100);
       <section>
         <h2>4. Medios de pago</h2>
         <ul>
-          <li><strong>Webpay, a través de Flow:</strong> tarjetas de débito, crédito y prepago emitidas en Chile. En tu estado de cuenta el cobro aparecerá a nombre de <strong>{LEGAL.flowMerchantName}</strong> o de Flow.</li>
+          <li><strong>Webpay, a través de Flow:</strong> tarjetas de débito, crédito y prepago emitidas en Chile. En tu estado de cuenta (cartola) el cobro aparece como <strong>{LEGAL.flowMerchantName}</strong>, a través de Flow.</li>
           <li>Los precios se expresan en pesos chilenos (CLP). No almacenamos los datos completos de tu tarjeta: los procesa directamente el proveedor de pago.</li>
         </ul>
       </section>
@@ -101,15 +101,23 @@ const vatPct = Math.round(LEGAL.serviceFeeVatRate * 100);
       <section>
         <h2>7. Cancelación, reprogramación y cambios del evento</h2>
         <ul>
-          <li><strong>Evento cancelado:</strong> se devuelve el <strong>valor de tus entradas</strong>, previa autorización, coordinación y publicación del productor. Como {LEGAL.legalName} actúa por cuenta y orden del productor, la responsabilidad de devolver el dinero es del productor y no podemos hacer devoluciones sin su autorización. Te avisaremos por correo cuando esté autorizada.</li>
-          <li><strong>Evento reprogramado o con cambios de fecha, horario, lugar o de sus características esenciales:</strong> tus entradas siguen válidas para la nueva fecha. Si no puedes o no quieres asistir, puedes pedir la devolución del valor de tus entradas escribiendo a <a href={`mailto:${LEGAL.supportEmail}`}>{LEGAL.supportEmail}</a> dentro del plazo que informemos en el aviso, previa autorización del productor.</li>
-          <li><strong>Cómo y cuándo:</strong> las devoluciones se hacen en las mismas condiciones de la compra (al mismo medio de pago o, si no es posible, por transferencia bancaria a la cuenta que nos indiques) en un plazo de hasta <strong>20 días hábiles</strong> desde que el productor autoriza la devolución.</li>
+          <li><strong>Evento cancelado:</strong> se devuelve el <strong>valor de tus entradas</strong>, previa autorización, coordinación y publicación del productor. Como actuamos por cuenta y orden del productor, el productor es el responsable principal de la devolución. Te avisaremos por correo cuando esté autorizada.</li>
           <li>
-            <strong>Qué se devuelve:</strong> en las devoluciones autorizadas por cancelación o cambios del evento se devuelve el valor de tus entradas <strong>y el cargo por servicio ({feePct}%) con su IVA</strong>, es decir, el total que pagaste.
+            <strong>Devolución directa:</strong> aunque el productor no la autorice, AI Tickets podrá devolver el total pagado (entradas, cargo por servicio e IVA) cuando:
+            (a) el evento no se realice en la fecha anunciada y el productor no informe una reprogramación dentro de 5 días hábiles;
+            (b) el productor no responda nuestras comunicaciones durante 5 días hábiles después de un cambio o cancelación;
+            (c) una autoridad niegue, revoque o suspenda la autorización del evento; o
+            (d) detectemos indicios de fraude o de que el evento no existe.
+            La devolución se hará en un plazo de hasta <strong>20 días hábiles</strong>.
+          </li>
+          <li><strong>Evento reprogramado o con cambios de fecha, horario, lugar o de sus características esenciales:</strong> tus entradas siguen válidas para la nueva fecha. Si no puedes o no quieres asistir, puedes pedir la devolución del valor de tus entradas escribiendo a <a href={`mailto:${LEGAL.supportEmail}`}>{LEGAL.supportEmail}</a> dentro del plazo que informemos en el aviso, previa autorización del productor.</li>
+          <li><strong>Cómo y cuándo:</strong> las devoluciones se hacen en las mismas condiciones de la compra (al mismo medio de pago o, si no es posible, por transferencia bancaria a la cuenta que nos indiques) en un plazo de hasta <strong>20 días hábiles</strong> desde que el productor autoriza la devolución o, en los casos de devolución directa, desde que la decidimos.</li>
+          <li>
+            <strong>Qué se devuelve:</strong> en las devoluciones por cancelación o cambios del evento, incluidas las devoluciones directas, se devuelve el valor de tus entradas <strong>y el cargo por servicio ({feePct}%) con su IVA</strong>, es decir, el total que pagaste.
             Esto no limita los derechos que la Ley N° 19.496 te otorga y que son irrenunciables: si en un caso concreto la ley o una autoridad competente dispone otra cosa, la cumpliremos.
           </li>
           <li>Cuando se reembolsa el total de una orden, sus entradas quedan <strong>anuladas</strong> y sus códigos QR dejan de permitir el ingreso.</li>
-          <li>El productor es el responsable principal de la realización del evento. Esto no limita tus derechos frente a {LEGAL.legalName} como intermediario según el artículo 43 de la Ley N° 19.496, sin perjuicio de nuestro derecho a repetir contra el productor.</li>
+          <li>El productor es el responsable principal de la realización del evento. Esto no limita tus derechos frente a AI Tickets como intermediario según el artículo 43 de la Ley N° 19.496, sin perjuicio de nuestro derecho a repetir contra el productor.</li>
         </ul>
       </section>
 
@@ -118,6 +126,14 @@ const vatPct = Math.round(LEGAL.serviceFeeVatRate * 100);
         <p>
           Si tienes un problema con tu compra, escríbenos primero: normalmente lo resolvemos más rápido que un reclamo al banco.
           Si desconoces un cargo ante tu banco, las entradas asociadas pueden quedar suspendidas mientras se revisa la disputa y se anularán si el cargo se revierte.
+        </p>
+      </section>
+
+      <section>
+        <h2>8 bis. Seguridad y conducta</h2>
+        <p>
+          El productor es responsable de la seguridad, los permisos y el control de acceso del evento. Puede negarse el ingreso a quien no cumpla la edad mínima o las condiciones del evento,
+          o porte objetos o sustancias prohibidas por la ley. AI Tickets no organiza ni opera los eventos.
         </p>
       </section>
 
@@ -144,7 +160,6 @@ const vatPct = Math.round(LEGAL.serviceFeeVatRate * 100);
           Los productores son responsables del contenido que publican. Si crees que un evento o contenido infringe derechos de autor, de marca u otros derechos, o es ilícito,
           escríbenos a <a href={`mailto:${LEGAL.legalEmail}`}>{LEGAL.legalEmail}</a> indicando el enlace, el derecho afectado, tus datos de contacto y una declaración de buena fe.
           Revisaremos el aviso y, si corresponde, retiraremos o deshabilitaremos el contenido e informaremos al productor, que podrá responder.
-          Las notificaciones bajo la Digital Millennium Copyright Act (DMCA) de EE.UU. se reciben en esa misma dirección.
         </p>
       </section>
 
@@ -182,8 +197,8 @@ const vatPct = Math.round(LEGAL.serviceFeeVatRate * 100);
       <section>
         <h2>16. Contacto</h2>
         <p>
-          {LEGAL.legalName} · {LEGAL.entityKind} · archivo N° {LEGAL.delawareFileNumber}<br />
-          Domicilio comercial: {LEGAL.address}<br />
+          {LEGAL.legalName} · RUT {LEGAL.rut}<br />
+          Domicilio: {LEGAL.address}<br />
           Compradores: <a href={`mailto:${LEGAL.supportEmail}`}>{LEGAL.supportEmail}</a> · Legal: <a href={`mailto:${LEGAL.legalEmail}`}>{LEGAL.legalEmail}</a>
         </p>
       </section>

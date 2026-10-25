@@ -13,18 +13,13 @@ import {
 export type ServiceFeeTaxMode = 'added' | 'included' | 'exempt' | 'unknown'
 
 export interface LegalInfo {
-  /** Nombre corto para la línea de marca: "Chanium LLC". */
-  readonly entity: string
-  /** Razón social exacta: "Chanium, LLC". */
+  /** Razón social exacta: "Servicios Informáticos Sebastián Schuchhardt EIRL". Solo términos y aviso de privacidad. */
   readonly legalName: string
-  readonly entityType: string
-  /** "Delaware LLC". */
+  /** RUT de la empresa: "77.893.286-5". Solo términos y aviso de privacidad. */
+  readonly rut: string
+  /** "EIRL". */
   readonly entityKind: string
-  readonly state: string
-  readonly stateLabel: string
   readonly country: string
-  readonly delawareFileNumber: string
-  readonly formationDate: string
   readonly representative: string
   readonly phone: string
   /** Domicilio comercial publicado. */

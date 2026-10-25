@@ -327,6 +327,9 @@ const inputClass = (field) => [
             <span v-if="errors.termsAccepted" class="block text-red-300 text-xs mt-1">{{ errors.termsAccepted }}</span>
           </span>
         </label>
+        <p class="text-[11px] text-white/50" data-testid="register-identity-note">
+          Crear tu cuenta y publicar eventos gratis no requiere más. Para vender entradas pagadas te pediremos verificar tu identidad (cédula y selfie).
+        </p>
 
         <div v-if="errorMsg" class="p-3 bg-red-500/20 text-red-200 rounded-lg border border-red-400/30 text-center text-sm font-medium" role="alert">
           {{ errorMsg }}

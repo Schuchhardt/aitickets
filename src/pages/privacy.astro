@@ -13,6 +13,9 @@ const processors = [
   { name: 'Netlify', purpose: 'Alojamiento del sitio y ejecución del servidor', where: 'EE.UU.' },
   { name: 'Resend', purpose: 'Envío de correos transaccionales (entradas, avisos, verificación)', where: 'EE.UU. (envío desde São Paulo, Brasil)' },
   { name: 'Flow', purpose: 'Procesamiento de pagos con Webpay', where: 'Chile' },
+  // Didit: para clientes fuera de la UE contrata Didit Identity, Inc. (EE.UU.); la región de almacenamiento se elige en su panel.
+  // Confirmar en el contrato (DPA) la región configurada y ajustar esta fila.
+  { name: 'Didit', purpose: 'Verificación de identidad de productores y prueba de vida (datos biométricos)', where: 'EE.UU. / UE (según la región de datos contratada)' },
   { name: 'Anthropic', purpose: 'Modelos de inteligencia artificial (asistente virtual, textos y clasificación de mensajes)', where: 'EE.UU.' },
   { name: 'Google', purpose: 'Analítica web (Google Analytics) y mapas', where: 'EE.UU.' },
   { name: 'OpenAI', purpose: 'Generación de imágenes con IA para eventos', where: 'EE.UU.' },
@@ -26,12 +29,12 @@ const processors = [
 
 <Layout
   title="Aviso de privacidad | AI Tickets"
-  description={`Cómo ${LEGAL.legalName} (AI Tickets) trata los datos personales de compradores, productores, visitantes y contactos comerciales.`}
+  description={`Cómo AI Tickets trata los datos personales de compradores, productores, visitantes y contactos comerciales.`}
   canonical="/privacy"
 >
   <AppHeader client:idle/>
   <main>
-    <!-- Borrador pendiente de revisión legal (Ley 21.719). Plazos de conservación a confirmar por el dueño. -->
+    <!-- Pendiente de validación con abogado (Ley 21.719, consentimiento biométrico Didit). Plazos de conservación a confirmar por el dueño. -->
     <div class="legal container mx-auto px-6 py-12 text-gray-700 font-['Prompt']">
       <h1 class="text-3xl font-bold mb-2 pt-12 font-['Unbounded'] text-gray-900">Aviso de privacidad</h1>
       <p class="text-sm text-gray-500 mb-6">Vigente desde el {effective}</p>
@@ -44,7 +47,7 @@ const processors = [
       <section>
         <h2>1. Responsable del tratamiento</h2>
         <p>
-          <strong>{LEGAL.legalName}</strong>, {LEGAL.stateLabel} (archivo N° {LEGAL.delawareFileNumber} de la División de Sociedades de {LEGAL.state}), con domicilio comercial en {LEGAL.address}, que opera AI Tickets.
+          <strong>{LEGAL.legalName}</strong>, RUT {LEGAL.rut}, con domicilio en {LEGAL.address}, que opera AI Tickets en Chile.
           Contacto para privacidad: <a href={`mailto:${LEGAL.privacyEmail}`}>{LEGAL.privacyEmail}</a>.
         </p>
         <p>
@@ -58,6 +61,7 @@ const processors = [
         <ul>
           <li><strong>Compradores y asistentes:</strong> nombre, correo, teléfono (opcional), entradas compradas, evento y función, montos, estado del pago, registro de ingreso (check-in) y datos técnicos de la compra (IP, navegador). No almacenamos los datos completos de tu tarjeta.</li>
           <li><strong>Productores y sus equipos:</strong> nombre, correo, teléfono, datos de la organización, información de los eventos, datos bancarios para transferir lo recaudado y registros de uso del panel.</li>
+          <li><strong>Productores — verificación de identidad:</strong> imagen del documento, selfie y prueba de vida, procesados por Didit. Datos de la organización: RUT, razón social, poderes y documentos de permisos del evento.</li>
           <li><strong>Visitantes del sitio:</strong> páginas visitadas, origen de la visita (por ejemplo, parámetros UTM), ciudad aproximada, dispositivo, cookies y mensajes enviados al asistente virtual o a formularios de contacto.</li>
           <li><strong>Contactos comerciales B2B:</strong> nombre de la productora o espacio cultural, correo y sitio web de contacto publicados por ellos, ciudad, eventos públicos y el historial de nuestras comunicaciones (ver sección 9).</li>
         </ul>
@@ -70,6 +74,7 @@ const processors = [
           <li><strong>Avisos sobre el evento</strong> (recordatorios, cambios de horario o lugar, cancelaciones): ejecución del contrato.</li>
           <li><strong>Prestar el servicio a productores</strong> (cuenta, panel, web de eventos, transferencias): ejecución del contrato.</li>
           <li><strong>Prevenir fraude, contracargos y abusos, y mantener la seguridad:</strong> interés legítimo.</li>
+          <li><strong>Verificar la identidad de productores y prevenir fraude y lavado de activos:</strong> consentimiento expreso para los datos biométricos (que se pide en una casilla específica antes de la captura) e interés legítimo para el resto.</li>
           <li><strong>Cumplir obligaciones legales, contables y tributarias</strong> y atender requerimientos de autoridades: obligación legal.</li>
           <li><strong>Analítica y mejora del servicio:</strong> interés legítimo o consentimiento, según corresponda para las cookies.</li>
           <li><strong>Boletín y novedades:</strong> tu consentimiento, que puedes retirar en cualquier momento.</li>
@@ -96,14 +101,15 @@ const processors = [
           </table>
         </div>
         <p class="mt-3">
-          También podemos comunicar datos cuando lo exija la ley o una autoridad competente. No vendemos datos personales.
+          <strong>Con autoridades:</strong> podemos comunicar datos a Carabineros, la PDI, el Ministerio Público, el SERNAC u otra autoridad competente cuando lo requieran conforme a la ley,
+          o al denunciar hechos que puedan constituir delito. No vendemos datos personales.
         </p>
       </section>
 
       <section>
         <h2>5. Transferencias internacionales</h2>
         <p>
-          {LEGAL.legalName} es una sociedad de EE.UU. y varios de nuestros proveedores están en EE.UU. u otros países. Por eso tus datos se transfieren fuera de Chile.
+          Varios de nuestros proveedores están fuera de Chile (por ejemplo Netlify, Anthropic, OpenAI y Didit, en EE.UU. u otros países). Por eso tus datos se transfieren fuera de Chile.
           Elegimos proveedores con estándares de seguridad reconocidos y, cuando corresponde, cláusulas contractuales de protección de datos.
         </p>
       </section>
@@ -113,6 +119,7 @@ const processors = [
         <ul>
           <li><strong>Compras y entradas:</strong> mientras sea necesario para el evento y la atención de reclamos, y luego por los plazos que exigen las normas contables, tributarias y de protección al consumidor.</li>
           <li><strong>Cuentas de productores:</strong> mientras la cuenta esté activa y, después, por el tiempo necesario para cerrar pagos pendientes y cumplir obligaciones legales.</li>
+          <li><strong>Datos de verificación de identidad:</strong> mientras la cuenta esté activa y hasta 5 años después, para prevenir fraude y atender requerimientos de autoridades. En AI Tickets guardamos solo el resultado (nombre, RUT o número de documento y estado); las imágenes biométricas se conservan solo en Didit y por el plazo que establece nuestro contrato con Didit.</li>
           <li><strong>Analítica y registros técnicos:</strong> por un período limitado, tras el cual se eliminan o anonimizan.</li>
           <li><strong>Contactos comerciales B2B:</strong> mientras exista una relación comercial potencial; si pides no ser contactado, conservamos solo el correo o dominio en una lista de exclusión para respetar tu decisión.</li>
         </ul>
@@ -126,7 +133,7 @@ const processors = [
         </p>
         <p>
           Para hacerlo, escribe a <a href={`mailto:${LEGAL.privacyEmail}`}>{LEGAL.privacyEmail}</a> desde el correo asociado a tus datos, indicando qué derecho quieres ejercer.
-          Podemos pedirte información adicional para verificar tu identidad. Responderemos dentro de los plazos legales.
+          Podemos pedirte información adicional para verificar tu identidad. Responderemos dentro de los plazos que establece la Ley N° 21.719.
           Si tu solicitud se refiere a datos que un productor exportó, también puedes dirigirte a ese productor.
         </p>
         <p>
@@ -154,7 +161,7 @@ const processors = [
         </ul>
         <p>
           La base de licitud es nuestro <strong>interés legítimo</strong> en ofrecer un servicio relacionado con la actividad profesional del destinatario.
-          Solo usamos datos de contacto profesionales, enviamos pocos mensajes y cada correo identifica a {LEGAL.legalName} e incluye una forma simple de darse de baja.
+          Solo usamos datos de contacto profesionales, enviamos pocos mensajes y cada correo identifica a AI Tickets, con su domicilio, e incluye una forma simple de darse de baja.
         </p>
         <p>
           Para no recibir más correos, responde "NO" a cualquiera de ellos o entra a <a href="/outreach/baja">aitickets.cl/outreach/baja</a>.
