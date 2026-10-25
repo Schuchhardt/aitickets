@@ -83,10 +83,9 @@ const ACCOUNT_TYPES = ["Cuenta Corriente", "Cuenta Vista / CuentaRUT", "Cuenta d
     <div class="max-w-4xl mx-auto space-y-8">
         {canEditOrg && (
         <!-- Profile Section -->
-        <section class="space-y-6">
-            <div
-                class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-gray-100 pb-4"
-            >
+        <!-- Mobile: el botón Guardar y su mensaje van bajo el formulario; desde sm, el botón vuelve arriba a la derecha -->
+        <section class="relative flex flex-col gap-6">
+            <div class="border-b border-gray-100 pb-4 sm:pr-44">
                 <div>
                     <h2 class="text-xl font-bold text-gray-900">
                         Perfil de la Organización
@@ -95,15 +94,9 @@ const ACCOUNT_TYPES = ["Cuenta Corriente", "Cuenta Vista / CuentaRUT", "Cuenta d
                         Actualiza la información visible para el público.
                     </p>
                 </div>
-                <button
-                    id="saveOrgBtn"
-                    class="w-full sm:w-auto shrink-0 px-4 py-2 text-sm bg-black text-white rounded-lg hover:bg-gray-800"
-                >
-                    Guardar Cambios
-                </button>
             </div>
 
-            <div id="orgMsg" class="hidden rounded-lg px-4 py-3 text-sm font-medium"></div>
+            <div id="orgMsg" class="hidden order-1 sm:order-none rounded-lg px-4 py-3 text-sm font-medium"></div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                 <div class="space-y-2">
@@ -143,6 +136,13 @@ const ACCOUNT_TYPES = ["Cuenta Corriente", "Cuenta Vista / CuentaRUT", "Cuenta d
                     />
                 </div>
             </div>
+
+            <button
+                id="saveOrgBtn"
+                class="order-2 sm:order-none w-full sm:w-auto sm:absolute sm:top-0 sm:right-0 px-4 py-2 text-sm bg-black text-white rounded-lg hover:bg-gray-800"
+            >
+                Guardar Cambios
+            </button>
         </section>
         )}
 
@@ -181,20 +181,17 @@ const ACCOUNT_TYPES = ["Cuenta Corriente", "Cuenta Vista / CuentaRUT", "Cuenta d
         </section>
 
         <!-- Bank / Payout Section -->
-        <section id="datos-bancarios" class="space-y-6 pt-6 scroll-mt-24">
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-gray-100 pb-4">
+        <section id="datos-bancarios" class="relative flex flex-col gap-6 pt-6 scroll-mt-24">
+            <div class="border-b border-gray-100 pb-4 sm:pr-44">
                 <div>
                     <h2 class="text-xl font-bold text-gray-900">Datos para pagos</h2>
                     <p class="text-gray-500 text-sm">
                         Lo que vendes para cada función queda disponible 48 horas después de que termina; cuando solicitas un retiro desde Ingresos, lo transferimos a esta cuenta en hasta 2 días hábiles.
                     </p>
                 </div>
-                <button id="saveBankBtn" class="w-full sm:w-auto shrink-0 px-4 py-2 text-sm bg-black text-white rounded-lg hover:bg-gray-800">
-                    Guardar Datos
-                </button>
             </div>
 
-            <div id="bankMsg" class="hidden rounded-lg px-4 py-3 text-sm font-medium"></div>
+            <div id="bankMsg" class="hidden order-1 sm:order-none rounded-lg px-4 py-3 text-sm font-medium"></div>
 
             <div class="rounded-lg border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-900" data-testid="bank-verification-note">
                 {bankComplete && payout?.verified_at && !holdActive && <p class="font-medium">✓ Cuenta verificada: puedes solicitar retiros.</p>}
@@ -249,6 +246,10 @@ const ACCOUNT_TYPES = ["Cuenta Corriente", "Cuenta Vista / CuentaRUT", "Cuenta d
                     <input id="bankAccountRut" type="text" class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-black/5" placeholder="12.345.678-9" value={payout?.bank_account_rut || ""} />
                 </div>
             </div>
+
+            <button id="saveBankBtn" class="order-2 sm:order-none w-full sm:w-auto sm:absolute sm:top-6 sm:right-0 px-4 py-2 text-sm bg-black text-white rounded-lg hover:bg-gray-800">
+                Guardar Datos
+            </button>
         </section>
 
         <!-- La contraseña se cambia desde Mi Perfil (disponible para todos los roles) -->
@@ -268,7 +269,7 @@ const ACCOUNT_TYPES = ["Cuenta Corriente", "Cuenta Vista / CuentaRUT", "Cuenta d
   function showMsg(el: HTMLElement | null, text: string, isError: boolean) {
     if (!el) return;
     el.textContent = text;
-    el.className = `rounded-lg px-4 py-3 text-sm font-medium ${isError ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`;
+    el.className = `order-1 sm:order-none rounded-lg px-4 py-3 text-sm font-medium ${isError ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`;
     el.classList.remove('hidden');
     setTimeout(() => el.classList.add('hidden'), 4000);
   }
