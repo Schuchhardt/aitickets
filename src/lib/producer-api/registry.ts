@@ -32,11 +32,20 @@ export type ToolContext = {
     /** Origen público del sitio (SITE_URL o el de la petición), sin "/" final. */
     origin: string;
     requestUrl: URL;
-    /** "dashboard" = el panel con la sesión del usuario (sin llave: actor.keyId = null). */
-    channel: "mcp" | "rest" | "dashboard";
+    /**
+     * "dashboard" = el panel con la sesión del usuario (sin llave: actor.keyId = null).
+     * "admin" = el MCP de administración actuando como la organización (src/lib/admin-api/mirror.ts).
+     */
+    channel: ToolChannel;
     /** Resumen que el productor confirmó (solo en la segunda llamada de una herramienta con confirm). */
     confirmed?: ConfirmationSummary;
 };
+
+export type ToolChannel = "mcp" | "rest" | "dashboard" | "admin";
+
+const CHANNEL_LABELS: Record<ToolChannel, string> = { mcp: "MCP", rest: "API", dashboard: "panel", admin: "Admin (Soporte AI Tickets)" };
+/** Canal legible para avisos de Slack ("Evento publicado vía MCP"). */
+export const channelLabel = (channel: ToolChannel) => CHANNEL_LABELS[channel] || channel;
 
 /** Resumen que se muestra al productor antes de ejecutar una acción que mueve plata o es pública. */
 export type ConfirmationSummary = { message: string; details?: Record<string, unknown>; warnings?: string[] };

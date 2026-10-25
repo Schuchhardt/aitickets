@@ -29,6 +29,13 @@ describe('reconcileOrder', () => {
     expect(mocks.confirmPaidOrder).toHaveBeenCalledWith({}, ORDER.id, { provider: 'flow', amount: 33000, currency: 'CLP', externalId: '99', fee: 119, net: 32881, method: 'Webpay' })
   })
 
+  it('pasa el timeout a la consulta de Flow y devuelve los datos del pago', async () => {
+    mocks.getFlowPaymentStatusByCommerceId.mockResolvedValueOnce({ status: 2, amount: 5000, currency: 'CLP', flowOrder: 7 })
+    const rec = await reconcileOrder({}, ORDER, { timeoutMs: 1500 })
+    expect(mocks.getFlowPaymentStatusByCommerceId).toHaveBeenCalledWith(ORDER.id, { timeoutMs: 1500 })
+    expect(rec).toMatchObject({ outcome: 'confirmed', payment: { amount: 5000, externalId: '7' } })
+  })
+
   it('Flow no pagada → not_paid, sin confirmar', async () => {
     mocks.getFlowPaymentStatusByCommerceId.mockResolvedValueOnce({ status: 1 })
     expect(await reconcileOrder({}, ORDER)).toMatchObject({ outcome: 'not_paid', status: 1 })

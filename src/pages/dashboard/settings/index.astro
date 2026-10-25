@@ -22,6 +22,8 @@ type OrgSettings = {
 
 type PayoutAccount = {
     verified_at?: string | null;
+    verification_rejected_at?: string | null;
+    verification_notes?: string | null;
     bank_changed_at?: string | null;
     legal_name: string | null;
     legal_rut: string | null;
@@ -44,8 +46,10 @@ let payout: PayoutAccount | null = null;
 {
     const BASE = "legal_name, legal_rut, bank_name, bank_account_type, bank_account_number, bank_account_holder, bank_account_rut";
     const load = (cols: string) => supabaseAdmin.from("organization_payout_accounts").select(cols).eq("organization_id", dbUser.organization_id).maybeSingle();
-    // verified_at/bank_changed_at existen desde la migración 202610090200
-    let { data, error } = await load(`${BASE}, verified_at, bank_changed_at, holder_match_status`);
+    // verified_at/bank_changed_at existen desde 202610090200; holder_match_status, desde la verificación de identidad
+    // (Didit); el rechazo de la cuenta, desde payout_ops
+    let { data, error } = await load(`${BASE}, verified_at, bank_changed_at, holder_match_status, verification_rejected_at, verification_notes`);
+    if (error) ({ data, error } = await load(`${BASE}, verified_at, bank_changed_at, holder_match_status`));
     if (error) ({ data, error } = await load(`${BASE}, verified_at, bank_changed_at`));
     if (error) ({ data, error } = await load(BASE));
     if (error) console.error("Error cargando datos de pago:", error.message);
@@ -54,6 +58,8 @@ let payout: PayoutAccount | null = null;
 const bankComplete = Boolean(payout?.bank_name && payout?.bank_account_number && payout?.bank_account_holder && payout?.bank_account_rut);
 const holdUntil = payout?.bank_changed_at ? new Date(new Date(payout.bank_changed_at).getTime() + BANK_CHANGE_HOLD_HOURS * 3600000) : null;
 const holdActive = Boolean(holdUntil && holdUntil.getTime() > Date.now());
+// AI Tickets rechazó la cuenta y el productor aún no corrige los datos (guardarlos de nuevo borra el rechazo)
+const bankRejected = Boolean(bankComplete && !payout?.verified_at && payout?.verification_rejected_at);
 
 // Verificación de identidad (Didit). Al volver del flujo (?identidad=volver) se consulta la decisión por si el
 // webhook aún no llega.
@@ -195,7 +201,12 @@ const ACCOUNT_TYPES = ["Cuenta Corriente", "Cuenta Vista / CuentaRUT", "Cuenta d
 
             <div class="rounded-lg border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-900" data-testid="bank-verification-note">
                 {bankComplete && payout?.verified_at && !holdActive && <p class="font-medium">✓ Cuenta verificada: puedes solicitar retiros.</p>}
-                {bankComplete && !payout?.verified_at && <p class="font-medium">Cuenta en verificación por AI Tickets (normalmente 1 día hábil).</p>}
+                {bankComplete && !payout?.verified_at && !bankRejected && <p class="font-medium">Cuenta en verificación por AI Tickets (normalmente 1 día hábil).</p>}
+                {bankRejected && (
+                    <p class="font-medium text-red-700" data-testid="bank-rejected-note">
+                        AI Tickets no pudo verificar la cuenta: {payout?.verification_notes || "revisa los datos"}. Corrige los datos y guárdalos de nuevo para que la revisemos.
+                    </p>
+                )}
                 {holdActive && holdUntil && (
                     <p class="font-medium">Por seguridad, los retiros quedan habilitados desde el {holdUntil.toLocaleString("es-CL", { timeZone: "America/Santiago", dateStyle: "medium", timeStyle: "short" })}.</p>
                 )}

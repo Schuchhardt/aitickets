@@ -25,6 +25,18 @@ const PAYOUT_FIELDS: Record<string, number> = {
 
 const RUT_REGEX = /^[0-9]{1,2}\.?[0-9]{3}\.?[0-9]{3}-?[0-9kK]$/;
 
+/** Aviso a AI Tickets de una cuenta por verificar, con el SQL para aprobarla o rechazarla (solo los últimos 4 dígitos). */
+function bankAccountSlackMessage(orgId: number, userId: number, bankName: string | null | undefined, accountNumber: string, holderMatch?: string | null) {
+    const last4 = String(accountNumber || "").replace(/\D/g, "").slice(-4);
+    const holder = holderMatch === "match" ? "coincide con la identidad verificada" : holderMatch === "mismatch" ? "NO coincide con la identidad verificada" : "identidad aún sin verificar";
+    return (
+        `🏦 *Cuenta bancaria por verificar* (org ${orgId}, usuario ${userId}, ${bankName || "banco"} ****${last4}; titular: ${holder})\n` +
+        `• *Ver datos:* \`select * from organization_payout_accounts where organization_id = ${orgId};\`\n` +
+        `• *Aprobar:* \`select aitickets_verify_payout_account(${orgId}, 'approve', '<tu nombre>', null, '${last4}');\`\n` +
+        `• *Rechazar:* \`select aitickets_verify_payout_account(${orgId}, 'reject', '<tu nombre>', '<qué debe corregir el productor>', '${last4}');\``
+    );
+}
+
 function pickFields(body: any, fields: Record<string, number>) {
     const out: Record<string, string | null> = {};
     for (const [field, max] of Object.entries(fields)) {
@@ -93,11 +105,21 @@ export const POST: APIRoute = async (context) => {
                 );
             if (error) throw error;
             const bankChanged = ["bank_name", "bank_account_type", "bank_account_number", "bank_account_holder", "bank_account_rut"].some((f) => f in payoutData);
-            // El trigger de la BD anula la verificación solo si los datos cambiaron; se avisa a AI Tickets para revisarlos
-            if (bankChanged) await notifySlack(`🏦 *Datos bancarios guardados* (org ${dbUser.organization_id}, usuario ${dbUser.id}, banco ${payoutData.bank_name || "—"}). Si cambiaron, verificar la cuenta (organization_payout_accounts.verified_at).`);
             // Razón social y RUT visibles en la página del evento; titular de la cuenta = identidad verificada (§2 bis)
             await syncOrganizerLegalData(supabaseAdmin, Number(dbUser.organization_id), payoutData);
             if (bankChanged || "legal_rut" in payoutData) await recomputeHolderMatch(supabaseAdmin, Number(dbUser.organization_id));
+            // El trigger de la BD anula la verificación solo si los datos cambiaron: se avisa a AI Tickets solo si
+            // la cuenta quedó por verificar, con el SQL listo (aitickets_verify_payout_account, payout_ops.sql).
+            if (bankChanged) {
+                const { data: saved } = await supabaseAdmin
+                    .from("organization_payout_accounts")
+                    .select("*")
+                    .eq("organization_id", dbUser.organization_id)
+                    .maybeSingle();
+                if (!saved?.verified_at && saved?.bank_account_number) {
+                    await notifySlack(bankAccountSlackMessage(Number(dbUser.organization_id), Number(dbUser.id), saved.bank_name, saved.bank_account_number, saved.holder_match_status));
+                }
+            }
         }
 
         return jsonResponse({ message: "Organización actualizada" }, 200);

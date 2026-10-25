@@ -4,10 +4,11 @@ import { getSupabaseAdmin } from "../../../../lib/auth-helpers";
 import LineChart from "../../../../components/dashboard/analytics/LineChart.vue";
 import BarChart from "../../../../components/dashboard/analytics/BarChart.vue";
 import GeoTable from "../../../../components/dashboard/analytics/GeoTable.vue";
-import { Eye, Users, Ticket, BarChart3, TrendingUp } from "lucide-vue-next";
+import { Eye, Users, Ticket, BarChart3, TrendingUp, Gauge } from "lucide-vue-next";
 import { EVENT_MANAGER_ROLES } from "../../../../lib/supabaseServer";
 import { requireDashboardSession } from "../../_lib/guard";
 import { canAccessEventByStaff } from "../../../../../netlify/lib/event-staff.mjs";
+import { getEventAnalytics } from "../../../../lib/eventAnalytics";
 
 const { id } = Astro.params;
 const guard = await requireDashboardSession(Astro, EVENT_MANAGER_ROLES);
@@ -28,173 +29,32 @@ if (error || !event) {
     return Astro.redirect("/dashboard/events");
 }
 
-// --- Zona horaria: todo se agrupa en hora de Chile (America/Santiago), no en UTC ---
-const TZ = "America/Santiago";
-const dayFmt = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" });
-const hourFmt = new Intl.DateTimeFormat("en-US", { timeZone: TZ, hour: "2-digit", hourCycle: "h23" });
-const localDay = (iso: string) => dayFmt.format(new Date(iso)); // YYYY-MM-DD
-const localHour = (iso: string) => Number(hourFmt.format(new Date(iso))) % 24;
+// Toda la analítica sale de src/lib/eventAnalytics.ts (la misma que usan get_event_performance y el resumen del
+// evento): paginada, en hora de Chile y con las definiciones canónicas (ventas sin cortesías ni transferencias;
+// conversión = órdenes ÷ visitantes únicos; ocupación = emitidas ÷ capacidad).
+const analytics = await getEventAnalytics(supabaseAdmin, { id: Number(event.id), status: event.status });
+const { kpis } = analytics;
+const fmtPct = (v: number | null) => (v == null ? "—" : `${v.toLocaleString("es-CL")}%`);
 
-// --- Data Queries ---
+const visitDates = analytics.daily.map((d) => d.date);
+const visitCounts = analytics.daily.map((d) => d.visits);
+const salesDates = visitDates;
+const salesCounts = analytics.daily.map((d) => d.tickets);
 
-// 1. All visits (for visits/day, peak hours, unique visitors)
-const { data: visitsRaw } = await supabaseAdmin
-    .from("event_visits")
-    .select("created_at, ip_hash, referrer, utm_source, country, city")
-    .eq("event_id", event.id)
-    .order("created_at", { ascending: true });
-
-const totalVisits = visitsRaw?.length || 0;
-const uniqueVisitors = new Set(visitsRaw?.map((v: any) => v.ip_hash)).size;
-
-// Group visits by day
-const visitsByDay: Record<string, number> = {};
-visitsRaw?.forEach((v: any) => {
-    const day = localDay(v.created_at);
-    visitsByDay[day] = (visitsByDay[day] || 0) + 1;
-});
-const visitDates = Object.keys(visitsByDay);
-const visitCounts = Object.values(visitsByDay);
-
-// Peak hours
-const hourCounts = new Array(24).fill(0);
-visitsRaw?.forEach((v: any) => {
-    const hour = localHour(v.created_at);
-    hourCounts[hour]++;
-});
+const hourCounts = analytics.peak_hours;
 const hourLabels = hourCounts.map((_: number, i: number) => `${i.toString().padStart(2, "0")}:00`);
 
-// 2. Orders (for sales/day, revenue)
-const { data: ordersRaw } = await supabaseAdmin
-    .from("event_orders")
-    .select("created_at, amount, ticket_qty")
-    .eq("event_id", event.id)
-    .eq("status", "paid")
-    .order("created_at", { ascending: true });
+const sourceLabels = analytics.sources.map((s) => s.source);
+const sourceValues = analytics.sources.map((s) => s.visits);
 
-const totalRevenue = ordersRaw?.reduce((sum: number, o: any) => sum + (o.amount || 0), 0) || 0;
-const totalTicketsSold = ordersRaw?.reduce((sum: number, o: any) => sum + (o.ticket_qty || 1), 0) || 0;
+const ticketLabels = analytics.ticket_types.map((t) => t.name);
+const ticketValues = analytics.ticket_types.map((t) => t.tickets);
 
-const salesByDay: Record<string, { count: number; revenue: number }> = {};
-ordersRaw?.forEach((o: any) => {
-    const day = localDay(o.created_at);
-    if (!salesByDay[day]) salesByDay[day] = { count: 0, revenue: 0 };
-    salesByDay[day].count += o.ticket_qty || 1;
-    salesByDay[day].revenue += o.amount || 0;
-});
-const salesDates = Object.keys(salesByDay);
-const salesCounts = salesDates.map((d) => salesByDay[d].count);
-const salesRevenue = salesDates.map((d) => salesByDay[d].revenue);
+const geoData = analytics.locations.map(({ location, visits, percentage }) => ({ location, visits, percentage }));
 
-// 2b. Ventas por canal (atribución guardada en la orden: ref / utm_*). Consulta aparte para que
-// la página funcione aunque la migración de atribución aún no esté aplicada.
-const { data: channelOrdersRaw, error: channelError } = await supabaseAdmin
-    .from("event_orders")
-    .select("amount, ticket_qty, ref, utm_source, utm_medium, utm_campaign")
-    .eq("event_id", event.id)
-    .eq("status", "paid");
-if (channelError) console.error("Ventas por canal:", channelError.message);
-
-type ChannelRow = { channel: string; orders: number; tickets: number; revenue: number };
-const channelMap = new Map<string, ChannelRow>();
-(channelOrdersRaw || []).forEach((o: any) => {
-    let channel = "Directo / sin seguimiento";
-    if (o.ref) channel = `ref: ${o.ref}`;
-    else if (o.utm_source) channel = [o.utm_source, o.utm_medium, o.utm_campaign].filter(Boolean).join(" / ");
-    const row = channelMap.get(channel) || { channel, orders: 0, tickets: 0, revenue: 0 };
-    row.orders += 1;
-    row.tickets += o.ticket_qty || 1;
-    row.revenue += o.amount || 0;
-    channelMap.set(channel, row);
-});
-const channelRows = [...channelMap.values()].sort((a, b) => b.revenue - a.revenue || b.orders - a.orders);
-
-// 2c. Ventas por medio de pago (payment_provider, migración 202609270100) y órdenes fuera del saldo.
-// Consultas aparte: si la columna aún no existe, la sección simplemente no se muestra.
-const PROVIDER_LABELS: Record<string, string> = { flow: "Webpay", free: "Gratis", courtesy: "Cortesía", demo: "Demo" };
-const { data: providerOrdersRaw, error: providerError } = await supabaseAdmin
-    .from("event_orders")
-    .select("amount, ticket_qty, payment_provider")
-    .eq("event_id", event.id)
-    .eq("status", "paid");
-const providerMap = new Map<string, ChannelRow>();
-if (!providerError) {
-    (providerOrdersRaw || []).forEach((o: any) => {
-        const channel = PROVIDER_LABELS[o.payment_provider] || o.payment_provider || "Webpay";
-        const row = providerMap.get(channel) || { channel, orders: 0, tickets: 0, revenue: 0 };
-        row.orders += 1;
-        row.tickets += o.ticket_qty || 1;
-        row.revenue += o.amount || 0;
-        providerMap.set(channel, row);
-    });
-}
-const providerRows = [...providerMap.values()].sort((a, b) => b.revenue - a.revenue || b.orders - a.orders);
-const { count: refundedOrders } = await supabaseAdmin
-    .from("event_orders")
-    .select("id", { count: "exact", head: true })
-    .eq("event_id", event.id)
-    .eq("status", "refunded");
-
-// 3. Traffic sources
-function categorizeReferrer(referrer: string | null, utmSource: string | null): string {
-    if (utmSource) return utmSource;
-    if (!referrer) return "Directo";
-    const url = referrer.toLowerCase();
-    if (url.includes("google")) return "Google";
-    if (url.includes("facebook") || url.includes("fb.")) return "Facebook";
-    if (url.includes("instagram")) return "Instagram";
-    if (url.includes("twitter") || url.includes("x.com")) return "X/Twitter";
-    if (url.includes("tiktok")) return "TikTok";
-    if (url.includes("linkedin")) return "LinkedIn";
-    if (url.includes("whatsapp")) return "WhatsApp";
-    return "Otro";
-}
-
-const sourceCounts: Record<string, number> = {};
-visitsRaw?.forEach((v: any) => {
-    const source = categorizeReferrer(v.referrer, v.utm_source);
-    sourceCounts[source] = (sourceCounts[source] || 0) + 1;
-});
-const sortedSources = Object.entries(sourceCounts).sort((a, b) => b[1] - a[1]);
-const sourceLabels = sortedSources.map((s) => s[0]);
-const sourceValues = sortedSources.map((s) => s[1]);
-
-// 4. Sales by ticket type
-const { data: ticketSalesRaw } = await supabaseAdmin
-    .from("event_attendees")
-    .select("event_ticket_id, event_tickets(ticket_name)")
-    .eq("event_id", event.id);
-
-const ticketTypeCounts: Record<string, number> = {};
-ticketSalesRaw?.forEach((ea: any) => {
-    const name = ea.event_tickets?.ticket_name || "Desconocido";
-    ticketTypeCounts[name] = (ticketTypeCounts[name] || 0) + 1;
-});
-const ticketLabels = Object.keys(ticketTypeCounts);
-const ticketValues = Object.values(ticketTypeCounts);
-
-// 5. Geographic breakdown
-const geoCounts: Record<string, number> = {};
-visitsRaw?.forEach((v: any) => {
-    const location = [v.city, v.country].filter(Boolean).join(", ") || "Desconocido";
-    geoCounts[location] = (geoCounts[location] || 0) + 1;
-});
-const geoData = Object.entries(geoCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10)
-    .map(([location, visits]) => ({
-        location,
-        visits,
-        percentage: Math.round((visits / (totalVisits || 1)) * 100),
-    }));
-
-// Conversion
-const { data: eventTickets } = await supabaseAdmin
-    .from("event_tickets")
-    .select("total_quantity")
-    .eq("event_id", event.id);
-const totalCapacity = eventTickets?.reduce((acc: number, t: any) => acc + (t.total_quantity || 0), 0) || 0;
-const conversion = totalCapacity > 0 ? Math.round((totalTicketsSold / totalCapacity) * 100) : 0;
+const channelRows = analytics.channels.map((c) => ({ ...c, channel: c.channel.startsWith("ref:") ? `ref: ${c.channel.slice(4)}` : c.channel }));
+const providerRows = analytics.providers;
+const refundedOrders = analytics.refunded_orders;
 
 // --- Chart Data Serialization ---
 const visitsDatasets = JSON.stringify([
@@ -264,61 +124,75 @@ const peakDatasets = JSON.stringify([
     </div>
 
     <!-- Summary Stats -->
-    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-8">
+    <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 mb-8">
         <div class="bg-white p-4 sm:p-5 rounded-xl border border-gray-200 shadow-sm min-w-0">
             <div class="p-2 bg-blue-50 text-blue-600 rounded-lg w-fit mb-3">
                 <Eye size={18} />
             </div>
             <p class="text-gray-500 text-xs mb-1">Visitas</p>
-            <h3 class="text-lg sm:text-xl font-bold break-words">{totalVisits.toLocaleString()}</h3>
+            <h3 class="text-lg sm:text-xl font-bold break-words">{kpis.visits.toLocaleString("es-CL")}</h3>
         </div>
         <div class="bg-white p-4 sm:p-5 rounded-xl border border-gray-200 shadow-sm min-w-0">
             <div class="p-2 bg-purple-50 text-purple-600 rounded-lg w-fit mb-3">
                 <Users size={18} />
             </div>
-            <p class="text-gray-500 text-xs mb-1">Visitantes unicos</p>
-            <h3 class="text-lg sm:text-xl font-bold break-words">{uniqueVisitors.toLocaleString()}</h3>
+            <p class="text-gray-500 text-xs mb-1">Visitantes únicos</p>
+            <h3 class="text-lg sm:text-xl font-bold break-words">{kpis.unique_visitors.toLocaleString("es-CL")}</h3>
         </div>
         <div class="bg-white p-4 sm:p-5 rounded-xl border border-gray-200 shadow-sm min-w-0">
             <div class="p-2 bg-green-50 text-green-600 rounded-lg w-fit mb-3">
                 <Ticket size={18} />
             </div>
             <p class="text-gray-500 text-xs mb-1">Entradas vendidas</p>
-            <h3 class="text-lg sm:text-xl font-bold break-words">{totalTicketsSold}</h3>
+            <h3 class="text-lg sm:text-xl font-bold break-words">{kpis.tickets_sold.toLocaleString("es-CL")}</h3>
+            {kpis.courtesy_tickets > 0 && <p class="text-xs text-gray-400 mt-1">+ {kpis.courtesy_tickets.toLocaleString("es-CL")} cortesías</p>}
         </div>
         <div class="bg-white p-4 sm:p-5 rounded-xl border border-gray-200 shadow-sm min-w-0">
             <div class="p-2 bg-orange-50 text-orange-600 rounded-lg w-fit mb-3">
                 <BarChart3 size={18} />
             </div>
             <p class="text-gray-500 text-xs mb-1">Ingresos</p>
-            <h3 class="text-lg sm:text-xl font-bold break-words">${totalRevenue.toLocaleString()}</h3>
+            <h3 class="text-lg sm:text-xl font-bold break-words">${kpis.revenue_clp.toLocaleString("es-CL")}</h3>
+            <p class="text-xs text-gray-400 mt-1">{kpis.paid_orders.toLocaleString("es-CL")} órdenes</p>
         </div>
         <div class="bg-white p-4 sm:p-5 rounded-xl border border-gray-200 shadow-sm min-w-0">
             <div class="p-2 bg-pink-50 text-pink-600 rounded-lg w-fit mb-3">
                 <TrendingUp size={18} />
             </div>
-            <p class="text-gray-500 text-xs mb-1">Conversion</p>
-            <h3 class="text-lg sm:text-xl font-bold break-words">{conversion}%</h3>
+            <p class="text-gray-500 text-xs mb-1">Conversión</p>
+            <h3 class="text-lg sm:text-xl font-bold break-words">{fmtPct(kpis.conversion_pct)}</h3>
+            <p class="text-xs text-gray-400 mt-1">órdenes ÷ visitantes únicos</p>
+        </div>
+        <div class="bg-white p-4 sm:p-5 rounded-xl border border-gray-200 shadow-sm min-w-0">
+            <div class="p-2 bg-gray-100 text-gray-700 rounded-lg w-fit mb-3">
+                <Gauge size={18} />
+            </div>
+            <p class="text-gray-500 text-xs mb-1">Ocupación</p>
+            <h3 class="text-lg sm:text-xl font-bold break-words">{fmtPct(kpis.sell_through_pct)}</h3>
+            <p class="text-xs text-gray-400 mt-1">{kpis.capacity == null ? `${kpis.issued_tickets.toLocaleString("es-CL")} emitidas · sin límite` : `${kpis.issued_tickets.toLocaleString("es-CL")} emitidas de ${kpis.capacity.toLocaleString("es-CL")}`}</p>
         </div>
     </div>
+    {analytics.visits_truncated && (
+        <p class="text-xs text-gray-500 -mt-5 mb-6">Mostrando las primeras 50.000 visitas en los gráficos de tráfico.</p>
+    )}
 
     <!-- Charts Grid -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <LineChart
             client:visible
-            title="Visitas por dia"
+            title={analytics.series_truncated ? "Visitas por día (último año)" : "Visitas por día"}
             labelsJson={JSON.stringify(visitDates)}
             datasetsJson={visitsDatasets}
         />
         <LineChart
             client:visible
-            title="Ventas por dia"
+            title={analytics.series_truncated ? "Entradas vendidas por día (último año)" : "Entradas vendidas por día"}
             labelsJson={JSON.stringify(salesDates)}
             datasetsJson={salesDatasets}
         />
         <BarChart
             client:visible
-            title="Fuentes de trafico"
+            title="Fuentes de tráfico"
             horizontal
             labelsJson={JSON.stringify(sourceLabels)}
             datasetsJson={sourceDatasets}
@@ -326,39 +200,41 @@ const peakDatasets = JSON.stringify([
         <BarChart
             client:visible
             horizontal={false}
-            title="Ventas por tipo de entrada"
+            title="Entradas vigentes por tipo"
             labelsJson={JSON.stringify(ticketLabels)}
             datasetsJson={ticketDatasets}
         />
         <BarChart
             client:visible
             horizontal={false}
-            title="Horas pico de visitas"
+            title="Horas pico de visitas (hora de Chile)"
             labelsJson={JSON.stringify(hourLabels)}
             datasetsJson={peakDatasets}
         />
         <GeoTable
             client:visible
-            title="Ubicacion de visitantes"
+            title="Ubicación de visitantes"
             dataJson={JSON.stringify(geoData)}
         />
     </div>
 
-    <!-- Ventas por canal (UTM / ref) -->
+    <!-- Ventas y conversión por canal (UTM / ref) -->
     <div class="bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-sm mt-6">
         <div class="flex flex-wrap items-baseline justify-between gap-2 mb-4">
             <h3 class="font-bold text-lg">Ventas por canal</h3>
             <a href={`/dashboard/events/${event.id}#trackingBuilder`} class="text-sm text-blue-600 hover:underline">Crear link con seguimiento</a>
         </div>
         {channelRows.length === 0 ? (
-            <p class="text-sm text-gray-500">Aún no hay ventas pagadas. Comparte links con <code>utm_source</code> o <code>ref</code> para saber qué canal vende más.</p>
+            <p class="text-sm text-gray-500">Aún no hay visitas ni ventas. Comparte links con <code>utm_source</code> o <code>ref</code> para saber qué canal vende más.</p>
         ) : (
             <div class="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="text-left text-gray-500 border-b border-gray-100">
                             <th class="py-2 pr-4 font-medium">Canal</th>
+                            <th class="py-2 pr-4 font-medium text-right whitespace-nowrap">Visitantes</th>
                             <th class="py-2 pr-4 font-medium text-right whitespace-nowrap">Órdenes</th>
+                            <th class="py-2 pr-4 font-medium text-right whitespace-nowrap">Conversión</th>
                             <th class="py-2 pr-4 font-medium text-right whitespace-nowrap">Entradas</th>
                             <th class="py-2 font-medium text-right whitespace-nowrap">Ingresos</th>
                         </tr>
@@ -367,16 +243,21 @@ const peakDatasets = JSON.stringify([
                         {channelRows.map((row) => (
                             <tr class="border-b border-gray-50">
                                 <td class="py-2 pr-4 text-gray-900 break-all min-w-[8rem]">{row.channel}</td>
+                                <td class="py-2 pr-4 text-right whitespace-nowrap">{row.unique_visitors == null ? "—" : row.unique_visitors.toLocaleString("es-CL")}</td>
                                 <td class="py-2 pr-4 text-right whitespace-nowrap">{row.orders}</td>
+                                <td class="py-2 pr-4 text-right whitespace-nowrap">{fmtPct(row.conversion_pct)}</td>
                                 <td class="py-2 pr-4 text-right whitespace-nowrap">{row.tickets}</td>
-                                <td class="py-2 text-right whitespace-nowrap">${row.revenue.toLocaleString("es-CL")}</td>
+                                <td class="py-2 text-right whitespace-nowrap">${row.revenue_clp.toLocaleString("es-CL")}</td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
             </div>
         )}
-        <p class="text-xs text-gray-400 mt-3">Fechas y horas en horario de Chile continental.</p>
+        <p class="text-xs text-gray-400 mt-3">
+            Visitantes según el link con que llegaron; órdenes según la atribución guardada en la compra. Las visitas empezaron a registrar <code>ref</code> con esta versión de la analítica: en ventas por <code>ref</code> anteriores la conversión puede no mostrarse.
+            Ventas sin cortesías ni transferencias. Fechas y horas en horario de Chile continental.
+        </p>
     </div>
 
     {providerRows.length > 0 && (
@@ -395,17 +276,17 @@ const peakDatasets = JSON.stringify([
                     <tbody>
                         {providerRows.map((row) => (
                             <tr class="border-b border-gray-50">
-                                <td class="py-2 pr-4 text-gray-900">{row.channel}</td>
+                                <td class="py-2 pr-4 text-gray-900">{row.label}</td>
                                 <td class="py-2 pr-4 text-right whitespace-nowrap">{row.orders}</td>
                                 <td class="py-2 pr-4 text-right whitespace-nowrap">{row.tickets}</td>
-                                <td class="py-2 text-right whitespace-nowrap">${row.revenue.toLocaleString("es-CL")}</td>
+                                <td class="py-2 text-right whitespace-nowrap">${row.revenue_clp.toLocaleString("es-CL")}</td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
             </div>
             {(refundedOrders || 0) > 0 && (
-                <p class="text-xs text-gray-500 mt-3">{refundedOrders} orden(es) reembolsada(s) no se incluyen en las ventas.</p>
+                <p class="text-xs text-gray-500 mt-3">{refundedOrders} orden(es) reembolsada(s) no se incluyen en las ventas. Las cortesías y transferencias tampoco.</p>
             )}
         </div>
     )}

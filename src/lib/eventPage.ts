@@ -80,7 +80,7 @@ export interface PublicEventResult {
 export async function recordEventVisit(
   eventId: number,
   request: Request,
-  page: { referrer?: string | null; utmSource?: string | null; utmMedium?: string | null; utmCampaign?: string | null },
+  page: { referrer?: string | null; ref?: string | null; utmSource?: string | null; utmMedium?: string | null; utmCampaign?: string | null },
   locals?: any
 ) {
   const supabase = getSupabaseAdmin();
@@ -109,7 +109,7 @@ export async function recordEventVisit(
   const country = clip(geo?.country?.code, 8) || clip(request.headers.get("x-country"), 8);
   const city = clip(geo?.city, 128);
 
-  const { error: visitError } = await supabase.from("event_visits").insert({
+  const row: Record<string, unknown> = {
     event_id: eventId,
     ip_hash: ipHash,
     user_agent: ua.substring(0, 512),
@@ -119,7 +119,16 @@ export async function recordEventVisit(
     utm_source: clip(page.utmSource, 256),
     utm_medium: clip(page.utmMedium, 256),
     utm_campaign: clip(page.utmCampaign, 256),
-  });
+  };
+  // ?ref= del link de seguimiento (mismo largo que guarda la atribución del checkout)
+  const ref = clip(page.ref, 128);
+  if (ref) row.ref = ref;
+  let { error: visitError } = await supabase.from("event_visits").insert(row);
+  // Deploy preview sin la migración 202610270200 (sin columna ref): se guarda la visita sin ref
+  if (visitError && "ref" in row && ["42703", "PGRST204"].includes(String(visitError.code || ""))) {
+    delete row.ref;
+    ({ error: visitError } = await supabase.from("event_visits").insert(row));
+  }
   if (visitError) console.error("Error tracking visit:", visitError);
 }
 
