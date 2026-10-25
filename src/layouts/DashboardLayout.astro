@@ -6,6 +6,8 @@ import "../styles/global.css";
 import { getSessionContext, type SessionContext } from "../lib/supabaseServer";
 import SetPasswordModal from "../components/auth/SetPasswordModal.vue";
 import { PW_RESET_COOKIE, verifyPwResetCookie } from "../lib/magic-link";
+import { getSupabaseAdmin } from "../lib/auth-helpers";
+import { needsIdentityForPublishedEvents } from "../lib/producerIdentity";
 
 const { title = "Dashboard" } = Astro.props;
 
@@ -31,6 +33,13 @@ const canSetPassword =
 
 // Recién verificó su correo (verificar.astro redirige con ?bienvenida=1 ya con sesión iniciada)
 const showWelcome = !!session && Astro.url.searchParams.get("bienvenida") === "1";
+
+// Productores con eventos pagados ya publicados y sin identidad verificada: sus eventos siguen a la venta,
+// pero se les pide verificar (Términos para productores §2 bis) porque sin eso no pueden retirar.
+const showIdentityNotice =
+  !!session &&
+  !Astro.url.pathname.startsWith("/dashboard/settings") &&
+  (await needsIdentityForPublishedEvents(getSupabaseAdmin(), Number(session.dbUser.organization_id)).catch(() => false));
 ---
 
 <!doctype html>
@@ -94,6 +103,22 @@ const showWelcome = !!session && Astro.url.searchParams.get("bienvenida") === "1
                 >
                   ✕
                 </button>
+              </div>
+            )
+          }
+          {
+            showIdentityNotice && (
+              <div role="status" class="mb-6 flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-gray-900">
+                <div class="flex-1">
+                  <p class="font-semibold">Verifica tu identidad para poder retirar lo recaudado</p>
+                  <p class="text-gray-700">
+                    Tus eventos siguen publicados y a la venta. Para transferirte el dinero necesitamos verificar tu identidad con Didit (toma un par de minutos)
+                    y que tu cuenta bancaria esté a tu nombre o al de tu empresa.
+                  </p>
+                </div>
+                <a href="/dashboard/settings#identidad" class="shrink-0 rounded-lg bg-gray-900 px-4 py-2 text-center font-semibold text-white hover:bg-gray-700">
+                  Verificar identidad
+                </a>
               </div>
             )
           }

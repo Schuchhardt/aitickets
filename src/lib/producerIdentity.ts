@@ -68,6 +68,23 @@ export async function eventHasPaidTickets(supabase: any, eventId: number): Promi
 export const IDENTITY_REQUIRED_MESSAGE =
     "Para publicar eventos con entradas pagadas debes verificar tu identidad. Hazlo en Configuración > Verificación de identidad (/dashboard/settings#identidad). Los eventos gratuitos no lo requieren.";
 
+/**
+ * true si la organización tiene eventos publicados con entradas pagadas y aún no verifica su identidad.
+ * Esos eventos siguen a la venta (no se pausan); solo se le pide verificar para poder retirar.
+ */
+export async function needsIdentityForPublishedEvents(supabase: any, orgId: number): Promise<boolean> {
+    if (identityApproved(await loadOrgIdentity(supabase, orgId))) return false;
+    const { data, error } = await supabase
+        .from("events")
+        .select("id, event_tickets!inner(id)")
+        .eq("organization_id", orgId)
+        .eq("status", "published")
+        .gt("event_tickets.price", 0)
+        .limit(1);
+    if (error) return false;
+    return (data || []).length > 0;
+}
+
 /** Mensaje de bloqueo si el evento no se puede publicar por falta de identidad verificada; null si puede. */
 export async function identityPublishBlocker(supabase: any, orgId: number, eventId: number): Promise<string | null> {
     if (!(await eventHasPaidTickets(supabase, eventId))) return null;
