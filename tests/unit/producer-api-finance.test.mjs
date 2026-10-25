@@ -18,7 +18,7 @@ const iso = (msFromNow) => new Date(Date.now() + msFromNow).toISOString()
 function seed({ account = {}, tables = {} } = {}) {
   db = createFakeSupabase({
     tables: {
-      organizations: [{ id: 7, public_name: 'Mi Productora', email_verified_at: '2026-01-01T00:00:00Z', terms_accepted_at: '2026-01-01T00:00:00Z' }],
+      organizations: [{ id: 7, public_name: 'Mi Productora', email_verified_at: '2026-01-01T00:00:00Z', terms_accepted_at: '2026-01-01T00:00:00Z', identity_status: 'approved', identity_verified_at: '2026-01-02T00:00:00Z' }],
       events: [
         { id: 10, name: 'Pasado', status: 'published', organization_id: 7, end_date: iso(-5 * DAY), fee_absorbed: false },
         { id: 11, name: 'Futuro', status: 'published', organization_id: 7, end_date: iso(20 * DAY), fee_absorbed: true },
@@ -44,7 +44,7 @@ function seed({ account = {}, tables = {} } = {}) {
         {
           organization_id: 7, legal_name: 'Mi Productora SpA', legal_rut: '76.123.456-7', bank_name: 'BancoEstado', bank_account_type: 'Cuenta Corriente',
           bank_account_number: '000123456789', bank_account_holder: 'Ana Pérez', bank_account_rut: '12.345.678-9',
-          verified_at: iso(-10 * DAY), verified_by: 'ops', bank_changed_at: iso(-10 * DAY), removed_at: null, ...account,
+          verified_at: iso(-10 * DAY), verified_by: 'ops', bank_changed_at: iso(-10 * DAY), removed_at: null, holder_match_status: 'match', ...account,
         },
       ],
       aitickets_payouts: [],
@@ -288,11 +288,11 @@ describe('liberación por función', () => {
           { id: 'd', event_id: 30, status: 'paid', amount: 5000, ticket_qty: 2 }, // entradas de ambas funciones
         ],
         event_attendees: [
-          { event_id: 30, event_order_id: 'a', event_ticket_id: 1 },
+          { event_id: 30, event_order_id: 'a', event_ticket_id: 1, validated_at: iso(-3 * DAY) },
           { event_id: 30, event_order_id: 'b', event_ticket_id: 2 },
           { event_id: 30, event_order_id: 'b', event_ticket_id: 2 },
           { event_id: 30, event_order_id: 'c', event_ticket_id: 3 },
-          { event_id: 30, event_order_id: 'd', event_ticket_id: 1 },
+          { event_id: 30, event_order_id: 'd', event_ticket_id: 1, validated_at: iso(-3 * DAY) },
           { event_id: 30, event_order_id: 'd', event_ticket_id: 2 },
           { event_id: 30, event_order_id: null, event_ticket_id: 1, is_complimentary: true }, // cortesía: no suma
         ],

@@ -26,14 +26,14 @@ export function resetSupportUserCache() {
     supportUserId = null;
 }
 
-/** users.id del usuario de servicio (migración 202610250100_admin_api.sql), leído una vez. */
+/** users.id del usuario de servicio (migración 202610270400_admin_api.sql), leído una vez. */
 export async function getSupportUserId(supabase: any): Promise<number> {
     if (supportUserId) return supportUserId;
     const { data, error } = await supabase.from("aitickets_platform_settings").select("value").eq("key", "support_user_id").maybeSingle();
     if (error && !["42P01", "PGRST205"].includes(String(error.code || ""))) throw error;
     const id = Number(data?.value);
     if (!Number.isInteger(id) || id <= 0) {
-        throw new ToolError("unavailable", "Falta el usuario de soporte: la migración 202610250100_admin_api.sql aún no se aplica en esta base.");
+        throw new ToolError("unavailable", "Falta el usuario de soporte: la migración 202610270400_admin_api.sql aún no se aplica en esta base.");
     }
     supportUserId = id;
     return id;

@@ -500,7 +500,7 @@ async function restoreTickets(ctx: ToolContext, orderId: string, tickets: any[])
     }
 }
 
-/** Instrucciones para el operador en el aviso de Slack (aitickets_set_refund_status, 202610240100_payout_ops.sql). */
+/** Instrucciones para el operador en el aviso de Slack (aitickets_set_refund_status, 202610270100_payout_ops.sql). */
 export function refundSlackSql(refundId: string) {
     return (
         `• *Al devolver en Flow:* \`select aitickets_set_refund_status('${refundId}', 'completed', '<id del reembolso en Flow>', null, '<tu nombre>');\`\n` +
@@ -696,7 +696,15 @@ async function cancelLiveTickets(ctx: ToolContext, eventId: number) {
     return liveByOrder;
 }
 
-const cancelEvent: ToolDef = {
+/**
+ * Canal para el aviso de cancelación. Canal admin sin usuario = devolución directa de AI Tickets
+ * (src/lib/adminDirectRefund.ts, sin autorización del productor); con usuario = soporte actuando por pedido del
+ * productor (MCP de admin, org_cancel_event).
+ */
+const cancelChannelLabel = (ctx: ToolContext) =>
+    ctx.channel === "admin" && !ctx.actor.userId ? "ADMIN (devolución directa, sin autorización del productor)" : channelLabel(ctx.channel);
+
+export const cancelEvent: ToolDef = {
     name: "cancel_event",
     title: "Cancelar evento",
     description:
@@ -844,7 +852,7 @@ const cancelEvent: ToolDef = {
             notificationQueued = res.ok;
         }
         await notifySlack(
-            `🛑 *Evento ${plan.resuming ? "cancelado (reintento: completando lo pendiente)" : "cancelado"} vía ${channelLabel(ctx.channel)}*\n• *Evento:* ${plan.event.name} (#${eventId})\n• *Reembolsos a procesar:* ${refundsCreated} por ${clp(refundTotal)}\n` +
+            `🛑 *Evento ${plan.resuming ? "cancelado (reintento: completando lo pendiente)" : "cancelado"} vía ${cancelChannelLabel(ctx)}*\n• *Evento:* ${plan.event.name} (#${eventId})\n• *Reembolsos a procesar:* ${refundsCreated} por ${clp(refundTotal)}\n` +
                 `• *Saldo del productor en el evento:* ${clp(plan.balance.available)}\n• *Aviso a compradores:* ${notificationQueued ? "en cola" : "NO enviado"}\n• *Por:* ${ctx.actor.name || ctx.actor.email}` +
                 (refundsCreated || plan.resuming
                     ? `\n• *Reembolsos pendientes:* \`select r.id, r.order_id, o.payment_external_id, r.total_amount from aitickets_refunds r join event_orders o on o.id = r.order_id where r.event_id = ${eventId} and r.status = 'requested';\`\n` +

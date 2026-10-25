@@ -169,6 +169,9 @@ test("con un máximo configurado (3) se respeta ese máximo", async ({ page, isM
   }
   await expect(qty.getByRole("group")).toHaveText("3");
   await expect(add).toHaveAttribute("aria-disabled", "true");
+  // En desktop el checkout entra deslizándose desde la derecha y aquí no hubo clicks normales (que esperan a que
+  // quede quieto): el click forzado no espera, así que antes hay que esperar el fin de la animación de entrada
+  await expect(dialog).toHaveCSS("transform", "none");
   await add.click({ force: true });
   await expect(qty.getByRole("status")).toHaveText("Máximo 3 por compra");
 

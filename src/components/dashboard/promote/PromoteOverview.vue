@@ -7,6 +7,7 @@ import {
 } from 'lucide-vue-next'
 import ConnectedAccounts from './ConnectedAccounts.vue'
 import PostHistory from './PostHistory.vue'
+import AdCampaignList from './AdCampaignList.vue'
 
 const props = defineProps({
   accountsJson: { type: String, default: '[]' },
@@ -16,20 +17,24 @@ const props = defineProps({
   connectedPlatform: { type: String, default: '' },
   errorType: { type: String, default: '' },
   initialTab: { type: String, default: '' },
+  adsJson: { type: String, default: '{}' },
+  canManageAds: { type: Boolean, default: false },
 })
 
 const accounts = ref(JSON.parse(props.accountsJson))
 const posts = ref(JSON.parse(props.postsJson))
 const events = ref(JSON.parse(props.eventsJson))
 const stats = ref(JSON.parse(props.statsJson))
-const activeTab = ref(props.initialTab === 'posts' ? 'posts' : 'overview')
+const ads = JSON.parse(props.adsJson)
+const adsEnabled = Boolean(ads.enabled)
+const activeTab = ref(['posts', 'ads'].includes(props.initialTab) ? props.initialTab : 'overview')
 
 const notification = ref({ show: false, type: '', message: '' })
 
 onMounted(() => {
   if (props.connectedPlatform) {
-    const platformName = props.connectedPlatform === 'instagram' ? 'Instagram' : 'Facebook'
-    notification.value = { show: true, type: 'success', message: `${platformName} conectado exitosamente` }
+    const platformName = props.connectedPlatform === 'ads' ? 'Cuenta publicitaria de Meta' : props.connectedPlatform === 'instagram' ? 'Instagram' : 'Facebook'
+    notification.value = { show: true, type: 'success', message: `${platformName} conectada exitosamente` }
     setTimeout(() => { notification.value.show = false }, 5000)
   }
   if (props.errorType) {
@@ -44,6 +49,11 @@ onMounted(() => {
       invalid_profile: 'La cuenta no corresponde a tu organización.',
       invalid_account: 'No pudimos verificar la cuenta conectada. Intenta nuevamente.',
       forbidden: 'No tienes permisos para conectar cuentas.',
+      ads_failed: 'No pudimos conectar tu cuenta publicitaria de Meta. Intenta nuevamente.',
+      ads_denied: 'Cancelaste la autorización en Meta. Para crear anuncios, vuelve a conectar y acepta los permisos.',
+      ads_no_pages: 'Meta pide una página de Facebook para anunciar. Selecciona tu página al conectar.',
+      ads_no_accounts: 'Tu cuenta de Meta no tiene cuentas publicitarias autorizadas. Crea una en business.facebook.com o márcala al conectar.',
+      ads_unavailable: 'Los anuncios no están disponibles en este momento. Escríbenos y lo revisamos.',
     }
     notification.value = { show: true, type: 'error', message: messages[props.errorType] || 'Error desconocido.' }
     setTimeout(() => { notification.value.show = false }, 5000)
@@ -94,13 +104,23 @@ const handleDisconnect = async (accountId) => {
         <p class="text-gray-600">Publica en redes sociales y promociona tus eventos.</p>
       </div>
 
-      <a
-        href="/dashboard/promote/create"
-        class="inline-flex items-center justify-center gap-2 bg-black text-white px-5 py-2.5 rounded-lg hover:bg-gray-800 transition font-medium"
-      >
-        <Plus :size="20" />
-        Crear Post
-      </a>
+      <div class="flex flex-wrap gap-2">
+        <a
+          v-if="adsEnabled && canManageAds"
+          href="/dashboard/promote/ads/create"
+          class="inline-flex items-center justify-center gap-2 border border-gray-300 bg-white px-5 py-2.5 rounded-lg hover:bg-gray-50 transition font-medium"
+        >
+          <Target :size="20" />
+          Crear anuncio
+        </a>
+        <a
+          href="/dashboard/promote/create"
+          class="inline-flex items-center justify-center gap-2 bg-black text-white px-5 py-2.5 rounded-lg hover:bg-gray-800 transition font-medium"
+        >
+          <Plus :size="20" />
+          Crear Post
+        </a>
+      </div>
     </div>
 
     <!-- Stats Cards -->
@@ -153,11 +173,20 @@ const handleDisconnect = async (accountId) => {
       >
         Historial de Posts
       </button>
-      <span
-        class="shrink-0 px-4 py-2 rounded-md text-sm font-medium text-gray-400 cursor-not-allowed"
-        title="Las campañas pagadas en Meta estarán disponibles pronto"
+      <button
+        v-if="adsEnabled"
+        @click="activeTab = 'ads'"
+        class="shrink-0 px-4 py-2 rounded-md text-sm font-medium transition-colors"
+        :class="activeTab === 'ads' ? 'bg-white text-black shadow-sm' : 'text-gray-500 hover:text-gray-700'"
       >
-        Meta Ads · Próximamente
+        Anuncios
+      </button>
+      <span
+        v-else
+        class="shrink-0 px-4 py-2 rounded-md text-sm font-medium text-gray-400 cursor-not-allowed"
+        title="Los anuncios pagados en Meta estarán disponibles pronto"
+      >
+        Anuncios · Próximamente
       </span>
     </div>
 
@@ -170,7 +199,11 @@ const handleDisconnect = async (accountId) => {
     </div>
 
     <div v-if="activeTab === 'posts'">
-      <PostHistory :posts="posts" />
+      <PostHistory :posts="posts" :can-boost="adsEnabled && canManageAds" />
+    </div>
+
+    <div v-if="activeTab === 'ads'">
+      <AdCampaignList :ads-json="adsJson" :can-manage="canManageAds" />
     </div>
 
   </div>

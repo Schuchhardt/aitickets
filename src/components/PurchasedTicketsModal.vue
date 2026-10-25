@@ -40,8 +40,9 @@
                 <div class="flex-1">
                   <!-- Order Header -->
                   <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-sm sm:text-lg font-semibold text-gray-900 font-['Unbounded'] break-all">
-                      Orden #{{ order.orderId }}
+                    <h3 class="text-sm font-semibold text-gray-900 font-['Unbounded']">
+                      {{ order.ticketsCount === 1 ? '1 entrada' : `${order.ticketsCount} entradas` }}
+                      <span class="block text-[11px] font-normal text-gray-400 font-['Prompt']" :title="order.orderId">Orden {{ shortRef(order.orderId) }}</span>
                     </h3>
                     <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
                       Pagado
@@ -137,6 +138,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { shortOrderRef as shortRef } from '../../netlify/lib/order-kind.mjs'
 
 const props = defineProps({
   show: {

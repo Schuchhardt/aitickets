@@ -111,7 +111,6 @@ const generateEventJsonLd = () => {
     : {
         "@type": "Organization",
         name: LEGAL.brand,
-        legalName: LEGAL.entity,
         url: siteUrl,
         contactPoint: {
           "@type": "ContactPoint",
@@ -187,8 +186,11 @@ const eventJsonLd = generateEventJsonLd();
 <meta name="twitter:image" content={shareImageUrl} />
 <meta name="twitter:image:alt" content={shareImageAlt} />
 
-<!-- Precarga de la imagen principal (LCP) -->
-{event?.image_url && <link rel="preload" as="image" href={cdnImage(event.image_url, 1080)} imagesrcset={cdnSrcset(event.image_url)} imagesizes={cdnSrcset(event.image_url) ? EVENT_COVER_SIZES : undefined} fetchpriority="high" />}
+<!-- Precarga de la imagen principal (LCP). Con video de portada (AutoplayVideo.vue) la imagen no se ve arriba:
+     se precarga el póster del video, que se pinta mientras el video carga -->
+{event?.cover_video
+  ? event.cover_video.poster_url && <link rel="preload" as="image" href={event.cover_video.poster_url} fetchpriority="high" />
+  : event?.image_url && <link rel="preload" as="image" href={cdnImage(event.image_url, 1080)} imagesrcset={cdnSrcset(event.image_url)} imagesizes={cdnSrcset(event.image_url) ? EVENT_COVER_SIZES : undefined} fetchpriority="high" />}
 
 <!-- JSON-LD Structured Data -->
 {eventJsonLd && !noindex && (

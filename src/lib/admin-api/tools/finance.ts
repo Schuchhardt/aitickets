@@ -48,14 +48,22 @@ export async function loadPayoutAccountRow(supabase: any, orgId: number): Promis
 
 const digitsOf = (v: unknown) => String(v || "").replace(/\D/g, "");
 
-/** Señales de riesgo antes de transferir: las mismas que revisa aitickets_set_payout_status al marcar pagado. */
+/**
+ * Señales de riesgo antes de transferir: las que revisa aitickets_set_payout_status al marcar pagado, más que el
+ * titular de la cuenta sea la persona o empresa con identidad verificada (holder_match_status, Didit; Términos
+ * §2 bis: no se transfiere a terceros). Esa la revisa solo esta herramienta.
+ */
 export function payoutFlags(payout: any, acc: any) {
     const last4 = digitsOf(acc?.bank_account_number).slice(-4) || null;
+    const holder = acc && "holder_match_status" in acc ? acc.holder_match_status ?? null : undefined;
     return {
         account_missing: !acc?.bank_account_number,
         account_not_verified: !acc?.verified_at,
         account_changed_after_request: Boolean(acc?.bank_changed_at && payout?.created_at && Date.parse(acc.bank_changed_at) > Date.parse(payout.created_at)),
         last4_mismatch: Boolean(payout?.bank_account_last4 && last4 && last4 !== String(payout.bank_account_last4)),
+        // undefined = la columna aún no existe (base sin la verificación de identidad): no se marca
+        holder_mismatch: holder === "mismatch",
+        holder_unverified: holder !== undefined && holder !== "match" && holder !== "mismatch",
     };
 }
 
@@ -67,6 +75,8 @@ export function payoutWarnings(payout: any, acc: any): string[] {
     else if (f.account_not_verified) out.push("La cuenta bancaria NO está verificada: verifícala (verify_payout_account) antes de transferir.");
     if (f.account_changed_after_request) out.push("La cuenta bancaria cambió DESPUÉS de pedir el retiro: confirma con el productor a qué cuenta transferir.");
     if (f.last4_mismatch) out.push(`El retiro se pidió a la cuenta terminada en ${payout.bank_account_last4} y la registrada termina en ${digitsOf(acc?.bank_account_number).slice(-4)}.`);
+    if (f.holder_mismatch) out.push("El titular de la cuenta NO coincide con la identidad verificada del productor: no se transfiere a terceros.");
+    else if (f.holder_unverified) out.push("Aún no se confirma que el titular de la cuenta sea la identidad verificada del productor (verificación Didit pendiente).");
     return out;
 }
 
@@ -158,7 +168,7 @@ const listPayoutRequests: AdminToolDef = {
                 warnings: payoutWarnings(p, acc),
                 available_balance_now_clp: balance ? balance.available : null,
                 events: parts.map((s: any) => ({ event_id: Number(s.event_id), name: eventName.get(Number(s.event_id)) || null, amount_clp: Number(s.amount) || 0, status: s.status })),
-                // event_withdrawals debe tener el mismo estado que el retiro (un trigger lo mantiene desde 202610240100)
+                // event_withdrawals debe tener el mismo estado que el retiro (un trigger lo mantiene desde 202610270100)
                 consistent: parts.every((s: any) => s.status === p.status),
             };
         });

@@ -87,7 +87,7 @@ export const LANDINGS: Landing[] = [
                 q: "¿Sirve para open mics o funciones gratis?",
                 a: "Sí. Puedes publicar eventos gratuitos con inscripción: la gente recibe su QR igual que en una función pagada y no se cobra cargo por servicio.",
             },
-            { q: "¿Cuándo recibo la plata de cada show?", a: payout },
+            { q: "¿Cuándo recibo la plata de cada show?", a: payout, terms: true },
         ],
         demo: { url: "/eventos/evento-demo-aitickets", label: "Ver un evento de stand-up de ejemplo" },
         cta: { label: "Publicar mi próximo show", campaign: "vertical_standup" },
@@ -176,7 +176,7 @@ export const LANDINGS: Landing[] = [
                 q: "¿Puedo vender entradas de distintas zonas o precios?",
                 a: "Sí, con tipos de entrada distintos, cada uno con su precio y su cupo. AI Tickets no tiene mapa de asientos numerados.",
             },
-            { q: "¿Cómo cobro si hago varias fechas?", a: payout },
+            { q: "¿Cómo cobro si hago varias fechas?", a: payout, terms: true },
             {
                 q: "¿Hay costo por usar la plataforma?",
                 a: `No hay mensualidad ni costo por publicar. El comprador paga un cargo por servicio de ${fee} por entrada pagada.`,

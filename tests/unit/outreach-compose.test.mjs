@@ -65,13 +65,13 @@ describe('validateOutgoing', () => {
     expect(validateOutgoing(email('Tu web: https://teatro.aitickets.cl'), { cfg: cfg() }).ok).toBe(true)
   })
 
-  it('rechaza un pie sin baja o sin Chanium LLC, y la falta de pie', () => {
+  it('rechaza un pie sin baja o sin marca y domicilio, y la falta de pie', () => {
     expect(validateOutgoing('Hola, te escribo por tu evento.', { cfg: cfg() }).errors).toContain('falta el pie legal')
     const noLink = `Hola.\n${outreachFooterText({ sourceLabel: 'x' })}`
     expect(validateOutgoing(noLink, { cfg: cfg() }).errors).toContain('falta el enlace de baja')
     const fake = 'Hola.\n--\nSaludos, AI Tickets'
     const errs = validateOutgoing(fake, { cfg: cfg() }).errors
-    expect(errs).toEqual(expect.arrayContaining(['el pie no identifica a Chanium LLC', 'el pie no explica cómo darse de baja', 'falta el enlace de baja']))
+    expect(errs).toEqual(expect.arrayContaining(['el pie no identifica al remitente (marca y domicilio)', 'el pie no explica cómo darse de baja', 'falta el enlace de baja']))
   })
 
   it('rechaza precios inventados y porcentajes no aprobados', () => {
@@ -111,7 +111,7 @@ describe('plantillas', () => {
     expect(interested.subject).toBe('Re: Web gratis para La Pérgola de las Flores')
     for (const out of [f1, f2, interested]) {
       expect(out.validation).toEqual({ ok: true, errors: [] })
-      expect(out.text).toContain('Chanium LLC')
+      expect(out.text).toContain('Lican Ray 6742')
       expect(out.text).toContain('/api/outreach/unsubscribe?t=')
     }
   })

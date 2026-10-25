@@ -1,0 +1,138 @@
+---
+// "Mis entradas": con la sesión de asistente (link de acceso por correo, netlify/lib/buyer-session.mjs) lista los
+// eventos y entradas del email en todos los eventos (próximos y pasados). Sin sesión: pide el email y envía el link.
+import Layout from "../../layouts/Layout.astro";
+import AppHeader from "../../components/AppHeader.vue";
+import AppFooter from "../../components/AppFooter.vue";
+import BuyerAccessForm from "../../components/buyer/BuyerAccessForm.vue";
+import { getSupabaseAdmin } from "../../lib/auth-helpers";
+import { getBuyerSession } from "../../lib/buyerSession";
+import { cdnImage } from "../../lib/imageCdn.js";
+import { listBuyerOrders } from "../../../netlify/lib/buyer-orders.mjs";
+import { orderCopy } from "../../../netlify/lib/order-kind.mjs";
+import { formatLocalDate, formatLocalTime } from "../../utils/dateHelpers.js";
+import "../../styles/global.css";
+
+export const prerender = false;
+
+Astro.response.headers.set("Cache-Control", "private, no-store");
+
+const session = getBuyerSession(Astro);
+let groups: { upcoming: any[]; past: any[] } = { upcoming: [], past: [] };
+let loadError = false;
+if (session) {
+  try {
+    groups = await listBuyerOrders(getSupabaseAdmin(), session.email);
+  } catch (err: any) {
+    console.error("mis-entradas:", err?.message || err);
+    loadError = true;
+  }
+}
+
+const dateLabel = (iso: string | null) =>
+  iso ? `${formatLocalDate(iso, { weekday: "short", day: "numeric", month: "short", year: "numeric" })} · ${formatLocalTime(iso)} hrs` : "Fecha por confirmar";
+const statusLabel = (item: any) =>
+  item.status === "processing" ? "Emitiendo tus entradas…" : item.kind === "purchase" ? `${item.count} ${item.count === 1 ? "entrada" : "entradas"}` : orderCopy(item.kind, item.count).badge;
+const total = groups.upcoming.length + groups.past.length;
+---
+
+<Layout title="Mis entradas | AI Tickets" description="Tus entradas y eventos confirmados en AI Tickets." noindex>
+  <AppHeader client:idle />
+  <main class="min-h-screen bg-gray-50 pt-24 pb-16 px-4 font-[Prompt]">
+    <div class="max-w-2xl mx-auto">
+      {session ? (
+        <>
+          <header class="flex items-end justify-between gap-4 flex-wrap">
+            <div class="min-w-0">
+              <h1 class="text-2xl sm:text-3xl font-bold font-[Unbounded] text-gray-900">Mis entradas</h1>
+              <p class="mt-1 text-sm text-gray-500 break-all">{session.email}</p>
+            </div>
+            <button id="buyer-logout" type="button" class="text-sm text-gray-500 underline hover:text-gray-900">Cerrar sesión</button>
+          </header>
+
+          {loadError && (
+            <p class="mt-6 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-800">No pudimos cargar tus entradas. Recarga la página en unos segundos.</p>
+          )}
+
+          {!loadError && total === 0 && (
+            <div class="mt-10 rounded-2xl border border-dashed border-gray-300 bg-white p-8 text-center">
+              <p class="text-gray-700">Todavía no tienes entradas con este email.</p>
+              <a href="/eventos" class="mt-4 inline-block rounded-lg bg-black px-5 py-2.5 text-sm font-semibold font-[Unbounded] text-white hover:bg-gray-800">Ver eventos</a>
+            </div>
+          )}
+
+          {groups.upcoming.length > 0 && (
+            <section class="mt-8" aria-labelledby="proximos">
+              <h2 id="proximos" class="text-xs font-semibold uppercase tracking-wider text-gray-500">Próximos</h2>
+              <ul class="mt-3 space-y-3">
+                {groups.upcoming.map((item) => (
+                  <li>
+                    <a href={`/order/${item.orderId}`} class="group flex items-stretch gap-4 rounded-2xl border border-gray-200 bg-white p-3 hover:border-gray-900 transition">
+                      {item.event.image_url ? (
+                        <img src={cdnImage(item.event.image_url, 480)} alt="" loading="lazy" decoding="async" class="h-20 w-20 sm:h-24 sm:w-24 shrink-0 rounded-xl object-cover bg-gray-100" />
+                      ) : (
+                        <div class="h-20 w-20 sm:h-24 sm:w-24 shrink-0 rounded-xl bg-gradient-to-br from-lime-200 to-lime-400" aria-hidden="true"></div>
+                      )}
+                      <div class="min-w-0 flex-1 py-1">
+                        <p class="font-semibold text-gray-900 leading-snug line-clamp-2">{item.event.name}</p>
+                        <p class="mt-1 text-sm text-gray-500">{dateLabel(item.event.start_date)}</p>
+                        <p class="mt-2 inline-flex items-center gap-1.5 rounded-full bg-lime-100 px-2.5 py-0.5 text-xs font-medium text-lime-900">
+                          <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
+                          {statusLabel(item)}
+                        </p>
+                      </div>
+                      <span class="self-center pr-1 text-gray-400 group-hover:text-gray-900 transition" aria-hidden="true">→</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {groups.past.length > 0 && (
+            <section class="mt-10" aria-labelledby="pasados">
+              <h2 id="pasados" class="text-xs font-semibold uppercase tracking-wider text-gray-500">Pasados</h2>
+              <ul class="mt-3 divide-y divide-gray-200 rounded-2xl border border-gray-200 bg-white">
+                {groups.past.map((item) => (
+                  <li>
+                    <a href={`/order/${item.orderId}`} class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-gray-50 transition">
+                      <span class="min-w-0">
+                        <span class="block truncate text-gray-900">{item.event.name}</span>
+                        <span class="block text-xs text-gray-500">{dateLabel(item.event.start_date)}</span>
+                      </span>
+                      <span class="shrink-0 text-gray-400" aria-hidden="true">→</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </>
+      ) : (
+        <>
+          <h1 class="text-2xl sm:text-3xl font-bold font-[Unbounded] text-gray-900">Mis entradas</h1>
+          <p class="mt-2 text-gray-600">
+            Mira todas tus entradas y eventos confirmados en un solo lugar, sin crear una cuenta: te enviamos un link de acceso a tu correo.
+          </p>
+          <div class="mt-6 rounded-2xl border border-gray-200 bg-white p-5 sm:p-6">
+            <BuyerAccessForm client:load />
+          </div>
+          <p class="mt-6 text-sm text-gray-500">
+            ¿Eres productor? <a href="/organizadores/login" class="underline hover:text-gray-900">Ingresa a tu panel</a>.
+          </p>
+        </>
+      )}
+    </div>
+  </main>
+  <AppFooter client:idle />
+</Layout>
+
+<script>
+  document.getElementById("buyer-logout")?.addEventListener("click", async () => {
+    try {
+      await fetch("/api/buyer/logout", { method: "POST" });
+    } finally {
+      window.location.href = "/mis-entradas";
+    }
+  });
+</script>

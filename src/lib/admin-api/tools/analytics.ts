@@ -88,7 +88,7 @@ export type VisitCount = { visits: number; unique_visitors: number };
 
 /**
  * Visitas y visitantes únicos (ip_hash distintos DENTRO de cada grupo) del período, contados en la base con la RPC
- * aitickets_admin_visit_counts (202610250116): no trae las filas, así que no depende del volumen. Claves: 'total',
+ * aitickets_admin_visit_counts (202610270415): no trae las filas, así que no depende del volumen. Claves: 'total',
  * el event_id o el organization_id como texto, o el día/semana/mes de bucketOf(). Si la función aún no existe
  * (deploy sin migrar) se cuenta en memoria con loadVisitsInPeriod; para group 'org' hace falta orgOfEvent.
  */

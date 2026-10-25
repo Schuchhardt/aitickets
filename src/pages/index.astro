@@ -12,6 +12,7 @@ import PricingExampleSection from "../components/landing/PricingExampleSection.v
 import ProducerFaq from "../components/landing/ProducerFaq.vue";
 import CallToAction from "../components/CallToAction.vue";
 import CtaTracking from "../components/landing/CtaTracking.astro";
+import ProducerSessionBanner from "../components/landing/ProducerSessionBanner.vue";
 import Layout from '../layouts/Layout.astro';
 import { PRODUCER_FAQ } from "../data/producerFaq";
 import { LEGAL } from "../lib/legal";
@@ -28,7 +29,6 @@ const jsonLd = [
     url: SITE_URL,
     logo: `${SITE_URL}/apple-touch-icon.png`,
     email: LEGAL.supportEmail,
-    parentOrganization: { "@type": "Organization", name: LEGAL.legalName },
     areaServed: "CL",
   },
   {
@@ -69,4 +69,5 @@ const jsonLd = [
   </main>
   <AppFooter client:idle/>
   <CtaTracking />
+  <ProducerSessionBanner client:idle />
 </Layout>

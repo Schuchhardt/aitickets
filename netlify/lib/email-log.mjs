@@ -1,4 +1,4 @@
-// Registro de entrega de correos (public.aitickets_email_log, migración 202610240300_email_log.sql).
+// Registro de entrega de correos (public.aitickets_email_log, migración 202610270300_email_log.sql).
 //
 // - logEmailAttempt: una fila por intento de envío (sent con el id de Resend, o failed con el error).
 // - applyProviderEvent: el webhook de Resend (/api/webhooks/resend) actualiza el estado por provider_message_id.

@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { getSessionContext, hasRole, EVENT_MANAGER_ROLES } from "../../../lib/supabaseServer";
 import { buildEventContext, generateEventImage, isImageGenerationConfigured, EVENT_CONTEXT_SELECT } from "../../../lib/marketing";
+import { generateAdCopy, isTextGenerationConfigured } from "../../../lib/aiText";
 import { canAccessEventByStaff } from "../../../../netlify/lib/event-staff.mjs";
 
 export const POST: APIRoute = async (context) => {
@@ -17,7 +18,7 @@ export const POST: APIRoute = async (context) => {
 
     try {
         const body = await context.request.json();
-        const { eventId, type, tone } = body; // type: 'text' | 'image'
+        const { eventId, type, tone } = body; // type: 'text' | 'image' | 'ad'
 
         if (!eventId || !type) {
             return new Response(JSON.stringify({ message: "Faltan datos requeridos" }), { status: 400 });
@@ -71,7 +72,16 @@ export const POST: APIRoute = async (context) => {
             });
         }
 
-        return new Response(JSON.stringify({ message: "Tipo no válido. Usa 'text' o 'image'" }), { status: 400 });
+        if (type === "ad") {
+            // Título + texto de un anuncio pagado en Meta (sin hashtags ni links): /dashboard/promote/ads/create
+            if (!isTextGenerationConfigured()) {
+                return new Response(JSON.stringify({ message: "IA no configurada" }), { status: 500 });
+            }
+            const copy = await generateAdCopy(eventContext);
+            return new Response(JSON.stringify(copy), { status: 200, headers: { "Content-Type": "application/json" } });
+        }
+
+        return new Response(JSON.stringify({ message: "Tipo no válido. Usa 'text', 'image' o 'ad'" }), { status: 400 });
     } catch (error) {
         console.error("Generate error:", error);
         return new Response(JSON.stringify({ message: "Error al generar contenido con IA" }), { status: 500 });

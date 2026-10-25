@@ -1,136 +1,59 @@
+// Vuelta del diálogo de Meta al conectar la cuenta publicitaria vía Zernio (./connect).
+// Zernio agrega ?connected=metaads&profileId=X&accountId=Y (o ?error=... si falló). La organización se toma de la
+// SESIÓN y se valida contra el state firmado; el perfil debe ser el de la organización y la conexión debe pertenecer a
+// ese perfil según Zernio (falla cerrado). Luego se guardan sus cuentas publicitarias.
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin } from "../../../../lib/auth-helpers";
-import { getSessionContext } from "../../../../lib/supabaseServer";
-import { verifyOAuthState, encryptToken } from "../../../../lib/crypto";
+import { getSessionContext, hasRole, ORG_ADMIN_ROLES } from "../../../../lib/supabaseServer";
+import { verifyOAuthState } from "../../../../lib/crypto";
+import { ADS_STATE_MAX_AGE_MS, ADS_STATE_PURPOSE } from "../../../../lib/ads";
+import { adsAccountBelongsToProfile, syncAdAccounts } from "../../../../../netlify/lib/zernio-ads.mjs";
+
+const back = (params: string) => `/dashboard/promote?tab=ads&${params}`;
+
+/** Errores de Zernio/Meta que el panel sabe explicar; el resto, genérico. */
+function errorCode(error: string, reason: string): string {
+    if (error === "payment_required" || error === "ads_addon_required") return "ads_unavailable";
+    if (error === "meta_ads_authorization_denied") return "ads_denied";
+    if (error === "no_facebook_pages" || /no_pages|page_not_granted|pages_permission/.test(reason)) return "ads_no_pages";
+    if (/ad_accounts_not_granted/.test(reason)) return "ads_no_accounts";
+    if (error === "invalid_state" || /state_expired/.test(reason)) return "expired_state";
+    return "ads_failed";
+}
 
 export const GET: APIRoute = async (context) => {
     const { url, redirect } = context;
-
     try {
-        // Fix #1: Validate session — user must be logged in
-        // getSessionContext exige además usuario activo y organización con correo verificado
         const session = await getSessionContext(context);
-        const user = session?.authUser;
-        if (!user) {
-            return redirect("/organizadores/login?redirect=/dashboard/promote");
-        }
+        if (!session) return redirect("/organizadores/login");
+        if (!hasRole(session.dbUser, ORG_ADMIN_ROLES)) return redirect(back("error=forbidden"));
 
-        const code = url.searchParams.get("code");
-        const stateRaw = url.searchParams.get("state");
         const error = url.searchParams.get("error");
-
         if (error) {
-            console.error("Meta OAuth error:", error, url.searchParams.get("error_description"));
-            return redirect("/dashboard/promote?tab=ads&error=meta_oauth_failed");
+            console.error("[ads/callback] Zernio/Meta:", error, url.searchParams.get("error_reason") || "", (url.searchParams.get("error_message") || "").slice(0, 200));
+            return redirect(back(`error=${errorCode(error, url.searchParams.get("error_reason") || "")}`));
         }
 
-        if (!code || !stateRaw) {
-            return redirect("/dashboard/promote?tab=ads&error=missing_params");
+        const state = verifyOAuthState(url.searchParams.get("state") || "");
+        if (!state || state.purpose !== ADS_STATE_PURPOSE || state.uid !== session.authUser.id || Number(state.org) !== Number(session.dbUser.organization_id)) {
+            return redirect(back("error=invalid_state"));
         }
+        if (typeof state.ts !== "number" || Date.now() - state.ts > ADS_STATE_MAX_AGE_MS) return redirect(back("error=expired_state"));
 
-        // Fix #1: Verify HMAC-signed state (prevents CSRF)
-        const state = verifyOAuthState(stateRaw);
-        if (!state || !state.org || !state.uid) {
-            return redirect("/dashboard/promote?tab=ads&error=invalid_state");
-        }
+        const orgId = Number(session.dbUser.organization_id);
+        const profileId = url.searchParams.get("profileId") || "";
+        const adsAccountId = url.searchParams.get("accountId") || "";
+        if (!profileId || !adsAccountId) return redirect(back("error=missing_params"));
 
-        // Verify the OAuth state belongs to the logged-in user
-        if (state.uid !== user.id) {
-            console.error("OAuth state uid mismatch:", state.uid, "vs", user.id);
-            return redirect("/dashboard/promote?tab=ads&error=invalid_state");
-        }
+        const supabase = getSupabaseAdmin();
+        const { data: org } = await supabase.from("organizations").select("zernio_profile_id").eq("id", orgId).maybeSingle();
+        if (!org?.zernio_profile_id || org.zernio_profile_id !== profileId) return redirect(back("error=invalid_profile"));
+        if (!(await adsAccountBelongsToProfile(adsAccountId, profileId))) return redirect(back("error=invalid_account"));
 
-        // Reject states older than 15 minutes
-        if (Date.now() - state.ts > 15 * 60 * 1000) {
-            return redirect("/dashboard/promote?tab=ads&error=expired_state");
-        }
-
-        // Verify user actually belongs to the org in state
-        const supabaseAdmin = getSupabaseAdmin();
-        const { data: dbUser } = await supabaseAdmin
-            .from("users")
-            .select("organization_id")
-            .eq("auth_user_id", user.id)
-            .single();
-
-        if (!dbUser || dbUser.organization_id !== state.org) {
-            console.error("Org mismatch:", dbUser?.organization_id, "vs", state.org);
-            return redirect("/dashboard/promote?tab=ads&error=invalid_state");
-        }
-
-        const orgId = state.org;
-        const metaAppId = import.meta.env.META_APP_ID;
-        const metaAppSecret = import.meta.env.META_APP_SECRET;
-        const siteUrl = import.meta.env.SITE_URL || "https://aitickets.cl";
-        const redirectUri = `${siteUrl}/api/promote/ads/callback`;
-
-        // Exchange code for short-lived token
-        const tokenUrl = `https://graph.facebook.com/v21.0/oauth/access_token?client_id=${metaAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&client_secret=${metaAppSecret}&code=${code}`;
-
-        const tokenRes = await fetch(tokenUrl);
-        if (!tokenRes.ok) {
-            console.error("Meta token exchange failed:", await tokenRes.text());
-            return redirect("/dashboard/promote?tab=ads&error=token_exchange");
-        }
-        const tokenData = await tokenRes.json();
-
-        // Exchange for long-lived token (60 days)
-        const longLivedUrl = `https://graph.facebook.com/v21.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${metaAppId}&client_secret=${metaAppSecret}&fb_exchange_token=${tokenData.access_token}`;
-
-        const longLivedRes = await fetch(longLivedUrl);
-        const longLivedData = longLivedRes.ok ? await longLivedRes.json() : tokenData;
-        const accessToken = longLivedData.access_token || tokenData.access_token;
-        const expiresIn = longLivedData.expires_in || 5184000; // default 60 days
-
-        // Get user info
-        const meRes = await fetch(`https://graph.facebook.com/v21.0/me?fields=id,name&access_token=${accessToken}`);
-        const meData = meRes.ok ? await meRes.json() : { id: null, name: null };
-
-        // Fix #2: Fetch ALL ad accounts, not just first
-        const adAccountsRes = await fetch(`https://graph.facebook.com/v21.0/me/adaccounts?fields=id,name,account_status&limit=50&access_token=${accessToken}`);
-        const adAccountsData = adAccountsRes.ok ? await adAccountsRes.json() : { data: [] };
-        const adAccounts = adAccountsData.data?.filter((a: any) => a.account_status === 1) || []; // 1 = ACTIVE
-
-        if (adAccounts.length === 0) {
-            return redirect("/dashboard/promote?tab=ads&error=no_ad_account");
-        }
-
-        const tokenExpiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
-
-        // Fix #3: Encrypt access token before storing
-        const encryptedToken = encryptToken(accessToken);
-
-        // Fix #2: If multiple accounts, store them all. If one, store directly.
-        // Remove old connections for this org first (re-auth refreshes everything)
-        await supabaseAdmin
-            .from("ad_account_connections")
-            .delete()
-            .eq("organization_id", orgId)
-            .eq("platform", "meta");
-
-        const connectionsToInsert = adAccounts.map((account: any) => ({
-            organization_id: orgId,
-            platform: "meta",
-            meta_ad_account_id: account.id,
-            meta_user_id: meData.id,
-            account_name: account.name || meData.name || "Meta Ads",
-            access_token: encryptedToken,
-            token_expires_at: tokenExpiresAt,
-            status: "active",
-        }));
-
-        const { error: insertError } = await supabaseAdmin
-            .from("ad_account_connections")
-            .insert(connectionsToInsert);
-
-        if (insertError) {
-            console.error("Insert ad account error:", insertError);
-            return redirect("/dashboard/promote?tab=ads&error=db_error");
-        }
-
-        return redirect("/dashboard/promote/ads?connected=meta");
-    } catch (error) {
-        console.error("Meta callback error:", error);
-        return redirect("/dashboard/promote?tab=ads&error=internal");
+        const count = await syncAdAccounts(supabase, orgId, adsAccountId);
+        return redirect(back(count ? "connected=ads" : "error=ads_no_accounts"));
+    } catch (err: any) {
+        console.error("[ads/callback]", err?.status || "", err?.message);
+        return redirect(back("error=ads_failed"));
     }
 };

@@ -6,11 +6,12 @@ import { randomUUID } from "node:crypto";
 import { ToolError, type ToolDef, type ToolContext, channelLabel } from "../registry";
 import { eventIdSchema, loadOwnedEvent, clp, fetchAll, localDateTime } from "./common";
 import { PAYOUT_BUSINESS_DAYS as LEGAL_PAYOUT_BUSINESS_DAYS } from "../../../../netlify/lib/legal.mjs";
-import { computeOrgLedger, addBusinessDays, loadOrgEvents, RELEASE_HOURS, WITHDRAWN_STATUSES, isActiveRefund } from "../ledger";
+import { computeOrgLedger, addBusinessDays, loadOrgEvents, RELEASE_HOURS, WITHDRAWN_STATUSES, isActiveRefund, CHECKIN_RELEASE_THRESHOLD, RESERVE_HOLD_DAYS } from "../ledger";
 import { computeFeeSplit, SERVICE_FEE_RATE, IVA_RATE, SERVICE_FEE_PERCENT_LABEL, IVA_PERCENT_LABEL } from "../../../../netlify/lib/fees.mjs";
 import { computeDiscountAmount } from "../../../../netlify/lib/discounts.mjs";
 import { notifySlack } from "../../../pages/api/_lib/server-utils";
 import { isTransferOrder } from "../../orderKinds";
+import { identityApproved, loadOrgIdentity, recomputeHolderMatch } from "../../producerIdentity";
 
 export const BANK_CHANGE_HOLD_HOURS = 72;
 const PAYOUT_BUSINESS_DAYS = LEGAL_PAYOUT_BUSINESS_DAYS;
@@ -22,12 +23,14 @@ const isMissing = (error: any) => ["42P01", "PGRST205", "42703", "PGRST204"].inc
 
 const PAYOUT_COLUMNS = "legal_name, legal_rut, bank_name, bank_account_type, bank_account_number, bank_account_holder, bank_account_rut, updated_at";
 const PAYOUT_V2_COLUMNS = `${PAYOUT_COLUMNS}, verified_at, verified_by, bank_changed_at, removed_at`;
-// Rechazo de la verificación (202610240100_payout_ops.sql: aitickets_verify_payout_account)
-const PAYOUT_V3_COLUMNS = `${PAYOUT_V2_COLUMNS}, verification_notes, verification_rejected_at`;
+const PAYOUT_V3_COLUMNS = `${PAYOUT_V2_COLUMNS}, holder_match_status`;
+// Rechazo de la verificación (payout_ops.sql: aitickets_verify_payout_account)
+const PAYOUT_V4_COLUMNS = `${PAYOUT_V3_COLUMNS}, verification_notes, verification_rejected_at`;
 
 export async function loadPayoutAccount(ctx: ToolContext): Promise<any | null> {
     const run = (cols: string) => ctx.supabase.from("organization_payout_accounts").select(cols).eq("organization_id", ctx.actor.orgId).maybeSingle();
-    let { data, error } = await run(PAYOUT_V3_COLUMNS);
+    let { data, error } = await run(PAYOUT_V4_COLUMNS);
+    if (error && isMissing(error)) ({ data, error } = await run(PAYOUT_V3_COLUMNS));
     if (error && isMissing(error)) ({ data, error } = await run(PAYOUT_V2_COLUMNS));
     if (error && isMissing(error)) ({ data, error } = await run(PAYOUT_COLUMNS));
     if (error) throw error;
@@ -137,7 +140,7 @@ const createPayoutAccountLink: ToolDef = {
 const getVerificationStatus: ToolDef = {
     name: "get_verification_status",
     title: "Estado de verificación para retiros",
-    description: "Indica qué falta para poder retirar dinero: correo verificado, términos aceptados, datos bancarios completos, verificación de AI Tickets y espera tras cambios.",
+    description: "Indica qué falta para poder retirar dinero: correo verificado, términos aceptados, identidad verificada (Didit), datos bancarios completos y a nombre de la identidad verificada, verificación de AI Tickets y espera tras cambios.",
     scope: "finance",
     permission: "finance.read",
     annotations: { readOnlyHint: true },
@@ -145,8 +148,10 @@ const getVerificationStatus: ToolDef = {
     async handler(_args, ctx) {
         let { data: org, error } = await ctx.supabase.from("organizations").select("id, email_verified_at, terms_accepted_at").eq("id", ctx.actor.orgId).maybeSingle();
         if (error && isMissing(error)) org = { id: ctx.actor.orgId, email_verified_at: true, terms_accepted_at: true };
+        const identity = await loadOrgIdentity(ctx.supabase, ctx.actor.orgId);
         const acc = await loadPayoutAccount(ctx);
         const state = payoutAccountState(acc);
+        const holder = await holderMatchStatus(ctx, acc, identity);
         const checks = [
             { item: "email_verified", label: "Correo de la organización verificado", ok: Boolean(org?.email_verified_at), required: true },
             { item: "terms_accepted", label: "Términos para productores aceptados", ok: Boolean(org?.terms_accepted_at), required: false },
@@ -162,6 +167,20 @@ const getVerificationStatus: ToolDef = {
                       rejection_reason: acc.verification_notes || null,
                   }
                 : { item: "bank_verified", label: "Cuenta verificada por AI Tickets", ok: state.status === "verified", required: true },
+            {
+                item: "identity_verified",
+                label: "Identidad del productor (o del representante legal) verificada con Didit",
+                ok: identityApproved(identity),
+                required: true,
+                status: identity?.identity_status ?? "not_started",
+            },
+            {
+                item: "holder_matches_identity",
+                label: "Cuenta bancaria a nombre de la persona o empresa verificada (no se transfiere a terceros)",
+                ok: holder === "match",
+                required: true,
+                status: holder,
+            },
             {
                 item: "bank_change_hold",
                 label: `Espera de ${BANK_CHANGE_HOLD_HOURS} h tras cambiar la cuenta`,
@@ -395,7 +414,22 @@ const presentLedgerEvent = (l: any) => ({
     next_release_local: localDateTime(l.next_release_at),
     functions: (l.functions || [])
         .filter((f: any) => f.sales_net > 0)
-        .map((f: any) => ({ event_date_id: f.event_date_id, date: f.date, start_time: f.start_time, sales_net: f.sales_net, tickets: f.tickets, released: f.released, available_from_local: localDateTime(f.releases_at) })),
+        .map((f: any) => ({
+            event_date_id: f.event_date_id,
+            date: f.date,
+            start_time: f.start_time,
+            sales_net: f.sales_net,
+            tickets: f.tickets,
+            released: f.released,
+            release_status: f.release_status,
+            available_from_local: localDateTime(f.releases_at),
+            checkins: f.checkins,
+            checkin_ratio: f.checkin_ratio,
+            attested: Boolean(f.attested_at),
+            hold_reasons: presentHoldReasons(f.hold_reasons),
+            reserve_amount: f.reserve_amount || 0,
+            reserve_release_local: localDateTime(f.reserve_release_at),
+        })),
     sales_net: l.sales_net,
     partial_refunds: l.partial_refunds,
     withdrawn: l.withdrawn,
@@ -404,14 +438,26 @@ const presentLedgerEvent = (l: any) => ({
     available: l.available,
     pending: l.pending,
     retained: l.retained,
+    held: l.held || 0,
+    risk_level: l.risk_level || null,
+    reserve_pct: l.reserve_pct || 0,
+    reserve_amount: l.reserve_amount || 0,
+    reserve_release_local: localDateTime(l.reserve_release_at),
+    hold_reasons: presentHoldReasons(l.hold_reasons),
 });
+
+const presentHoldReasons = (reasons: any[] | undefined) =>
+    (reasons || []).map((r) => ({ code: r.code, label: r.label, ...(r.amount != null ? { amount: r.amount } : {}), ...(r.until ? { until_local: localDateTime(r.until) } : {}) }));
 
 const getBalance: ToolDef = {
     name: "get_balance",
     title: "Saldo",
     description:
-        `Saldo del productor en CLP: disponible para retirar (ventas de funciones que terminaron hace ≥ ${RELEASE_HOURS} h), pendiente (funciones por realizarse) ` +
-        "y retenido (pagos en revisión o eventos cancelados). Incluye el detalle por evento.",
+        `Saldo del productor en CLP: disponible para retirar (ventas de funciones que terminaron hace ≥ ${RELEASE_HOURS} h y cumplen las condiciones de liberación), ` +
+        "pendiente (funciones por realizarse) y retenido (pagos en revisión, eventos cancelados o condiciones sin cumplir). " +
+        "Condiciones para liberar una función: identidad del productor verificada, cuenta bancaria verificada a su nombre, check-ins de al menos " +
+        `${Math.round(CHECKIN_RELEASE_THRESHOLD * 100)}% de las entradas (o la función acreditada con attest_function_held) y sin reclamos ni contracargos abiertos; ` +
+        `además puede aplicarse una reserva por riesgo de hasta el 100% por hasta ${RESERVE_HOLD_DAYS} días. hold_reasons explica cada retención (código y texto). Incluye el detalle por evento y función.`,
     scope: "finance",
     permission: "finance.read",
     annotations: { readOnlyHint: true },
@@ -430,8 +476,13 @@ const getBalance: ToolDef = {
             retained: ledger.totals.retained,
             ...(ledger.totals.negative_balance ? { negative_balance: ledger.totals.negative_balance, negative_balance_note: "Hay reembolsos posteriores a un retiro: se descuentan del disponible." } : {}),
             total_paid_out: ledger.totals.paid_out,
+            held_by_conditions: ledger.totals.held,
+            risk_reserve: ledger.totals.reserve,
+            account_hold_reasons: presentHoldReasons(ledger.hold_reasons),
             events,
-            summary: `Disponible ${clp(ledger.totals.available)} · Pendiente ${clp(ledger.totals.pending)} · Retenido ${clp(ledger.totals.retained)}.`,
+            summary:
+                `Disponible ${clp(ledger.totals.available)} · Pendiente ${clp(ledger.totals.pending)} · Retenido ${clp(ledger.totals.retained)}.` +
+                (ledger.hold_reasons.length ? ` Retenido hasta resolver: ${ledger.hold_reasons.map((r) => r.label).join("; ")}.` : ""),
         };
     },
 };
@@ -549,20 +600,43 @@ function allocateFifo(ledgerEvents: any[], amount: number): Allocation[] {
     return out;
 }
 
+/** holder_match_status de la cuenta; si nunca se calculó (cuenta anterior a la regla) se calcula ahora. */
+async function holderMatchStatus(ctx: ToolContext, acc: any, identity: any): Promise<"match" | "mismatch" | "pending"> {
+    if (!acc?.bank_account_rut) return "pending";
+    const stored = acc.holder_match_status;
+    if (stored === "match" || stored === "mismatch") return stored;
+    if (!identityApproved(identity)) return "pending";
+    return (await recomputeHolderMatch(ctx.supabase, ctx.actor.orgId))?.status ?? "pending";
+}
+
 async function planPayout(args: any, ctx: ToolContext) {
     const acc = await loadPayoutAccount(ctx);
     const state = payoutAccountState(acc);
+    const identity = await loadOrgIdentity(ctx.supabase, ctx.actor.orgId);
+    if (!identityApproved(identity)) {
+        throw new ToolError("conflict", `Para recibir transferencias debes verificar tu identidad (Didit) en ${ctx.origin}/dashboard/settings#identidad. Revisa get_verification_status.`);
+    }
     if (!state.complete) throw new ToolError("conflict", `No hay una cuenta bancaria registrada. Regístrala en ${settingsUrl(ctx)} (create_payout_account_link).`);
     if (state.status === "rejected") {
         throw new ToolError("conflict", `AI Tickets rechazó la cuenta bancaria: ${acc.verification_notes || "revisa los datos"}. Corrígela en ${settingsUrl(ctx)} y vuelve a guardarla.`);
     }
     if (state.status !== "verified") throw new ToolError("conflict", "La cuenta bancaria aún no está verificada por AI Tickets. Revisa get_verification_status.");
+    const holder = await holderMatchStatus(ctx, acc, identity);
+    if (holder !== "match") {
+        throw new ToolError(
+            "conflict",
+            "La cuenta bancaria debe estar a nombre de la persona o empresa verificada: no transferimos a cuentas de terceros. AI Tickets la revisará; si la cuenta es correcta, escríbenos a soporte.",
+        );
+    }
     if (state.coolingActive) {
         throw new ToolError("conflict", `La cuenta bancaria cambió hace poco: por seguridad los retiros quedan habilitados desde ${state.holdUntil!.toISOString()}.`);
     }
     const ledger = await computeOrgLedger(ctx.supabase, ctx.actor.orgId);
     const available = ledger.totals.available;
-    if (available <= 0) throw new ToolError("conflict", `No hay saldo disponible para retirar (pendiente ${clp(ledger.totals.pending)}, retenido ${clp(ledger.totals.retained)}).`);
+    if (available <= 0) {
+        const why = ledger.hold_reasons.length ? ` Retenido hasta resolver: ${ledger.hold_reasons.map((r) => r.label).join("; ")}.` : "";
+        throw new ToolError("conflict", `No hay saldo disponible para retirar (pendiente ${clp(ledger.totals.pending)}, retenido ${clp(ledger.totals.retained)}).${why}`);
+    }
     const amount = args.amount ?? available;
     if (amount > available) throw new ToolError("conflict", `El monto supera el saldo disponible (${clp(available)}).`);
     const allocations = allocateFifo(ledger.events, amount);
@@ -571,7 +645,7 @@ async function planPayout(args: any, ctx: ToolContext) {
     return { acc, amount, available, allocations, estimated: addBusinessDays(new Date(), PAYOUT_BUSINESS_DAYS) };
 }
 
-/** Instrucciones para el operador en el aviso de Slack (funciones de 202610240100_payout_ops.sql). */
+/** Instrucciones para el operador en el aviso de Slack (funciones de 202610270100_payout_ops.sql). */
 export function payoutSlackSql(orgId: number, payoutId: string) {
     return (
         `• *Datos para transferir:* \`select bank_name, bank_account_type, bank_account_number, bank_account_holder, bank_account_rut from organization_payout_accounts where organization_id = ${orgId};\`\n` +

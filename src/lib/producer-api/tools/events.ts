@@ -14,6 +14,7 @@ import { listOrgVenues } from "../../orgVenues";
 import { sanitizeRichText } from "../../sanitize";
 import { changeEventSlug, EventSlugError, SLUG_MAX, SLUG_MIN } from "../../eventSlug";
 import { EVENT_PAGE_BACKGROUNDS, EVENT_PAGE_LAYOUTS, isDefaultPageSettings, normalizePageSettings, type EventPageSettings } from "../../eventPageSettings";
+import { normalizeEventVideo } from "../../eventVideo";
 import { notifySlack, dedupeLocation } from "../../../pages/api/_lib/server-utils";
 
 const EVENT_LIST_COLUMNS = "id, name, slug, status, accessibility, start_date, end_date, location, image_url, created_at";
@@ -157,6 +158,13 @@ async function loadPageSettings(ctx: ToolContext, eventId: number): Promise<Even
 }
 const PAGE_LAYOUT_HELP = EVENT_PAGE_LAYOUTS.map((l) => `${l.value} (${l.label}: ${l.hint})`).join("; ");
 
+/** Videos de la página (events.cover_video / gallery_video, set_event_video). Tolera la migración pendiente. */
+async function loadEventVideos(ctx: ToolContext, eventId: number) {
+    const { data, error } = await ctx.supabase.from("events").select("cover_video, gallery_video").eq("id", eventId).eq("organization_id", ctx.actor.orgId).maybeSingle();
+    if (error && error.code !== "42703") throw error;
+    return { cover_video: normalizeEventVideo((data as any)?.cover_video), gallery_video: normalizeEventVideo((data as any)?.gallery_video) };
+}
+
 /** Detalle de un evento (get_event; también la respuesta de create_event). */
 async function eventDetail(ctx: ToolContext, eventId: number) {
     const event = await loadOwnedEvent<any>(ctx, eventId, `${EVENT_LIST_COLUMNS}, description`);
@@ -169,6 +177,7 @@ async function eventDetail(ctx: ToolContext, eventId: number) {
     const availability = await ticketAvailability(ctx, event.id, (tickets || []).map((t: any) => Number(t.id)));
     const previewLinks = await listPreviewLinks(Number(event.id), ctx.actor.orgId, ctx.supabase).catch(() => []);
     const pageSettings = await loadPageSettings(ctx, Number(event.id));
+    const videos = await loadEventVideos(ctx, Number(event.id));
     const venueOf = new Map<string, any>();
     for (const l of locations || []) {
         const v = Array.isArray((l as any).venues) ? (l as any).venues[0] : (l as any).venues;
@@ -192,6 +201,9 @@ async function eventDetail(ctx: ToolContext, eventId: number) {
         category: (Array.isArray(tag) ? tag[0]?.name : tag?.name) || null,
         description_html: event.description,
         image_url: event.image_url,
+        // Con cover_video, la página muestra el video arriba en vez de image_url (set_event_video)
+        cover_video: videos.cover_video,
+        gallery_video: videos.gallery_video,
         page_layout: pageSettings.layout,
         show_organizer: pageSettings.show_organizer,
         page_background: pageSettings.background,
@@ -353,7 +365,7 @@ const updateEvent: ToolDef = {
         "(órdenes pagadas, entradas o invitados), el link anterior queda redirigiendo (301) al nuevo, así no se rompen los links ya " +
         "compartidos ni los QR; en un borrador sin registrados, el link anterior se libera. " +
         "Fechas y horarios de las funciones se cambian con update_event_functions (avisa a los asistentes); el lugar, desde el panel o " +
-        "update_venue. Para entradas usa las herramientas de ticket_type.",
+        "update_venue. Para entradas usa las herramientas de ticket_type. Para un video de portada (en vez de la imagen) usa set_event_video.",
     scope: "write",
     audit: (args, result) => ({ summary: `Editó ${((result as any).updated || []).join(", ") || "el evento"}`, target: `event:${args.event_id}` }),
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },

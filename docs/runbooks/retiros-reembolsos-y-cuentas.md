@@ -1,7 +1,7 @@
 # Runbook: verificar cuentas bancarias, pagar retiros y cerrar reembolsos
 
 Hasta que exista el MCP de administración (`docs/specs/mcp-admin.md`), estas tareas se hacen desde
-**Supabase > SQL editor** con las funciones de `db/migrations/202610240100_payout_ops.sql`. Cada aviso de Slack
+**Supabase > SQL editor** con las funciones de `db/migrations/202610270100_payout_ops.sql`. Cada aviso de Slack
 trae el SQL listo con los ids reales: solo hay que completar lo que va entre `< >`.
 
 Nunca actualices a mano `aitickets_payouts`, `event_withdrawals`, `aitickets_refunds` ni las columnas de

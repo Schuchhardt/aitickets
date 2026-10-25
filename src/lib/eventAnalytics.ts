@@ -81,7 +81,7 @@ const VISIT_COLUMNS = "created_at, ip_hash, referrer, utm_source, utm_medium, ut
 
 /**
  * Visitas de un evento (hasta `max`). `refTracked` = false si la columna ref aún no existe (deploy preview sin la
- * migración 202610240200): las visitas se leen igual, sin ref.
+ * migración 202610270200): las visitas se leen igual, sin ref.
  */
 export async function loadEventVisits(supabase: any, eventId: number, { max = MAX_VISITS } = {}): Promise<{ visits: VisitRow[]; truncated: boolean; refTracked: boolean }> {
     const build = (cols: string) => () =>

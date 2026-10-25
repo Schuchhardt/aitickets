@@ -45,7 +45,7 @@ const P2 = '22222222-2222-4222-8222-222222222222'
 const R1 = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 const REV = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
 
-// Emula las funciones de 202610240100_payout_ops.sql (lo que importa aquí: transiciones, force y el trigger)
+// Emula las funciones de 202610270100_payout_ops.sql (lo que importa aquí: transiciones, force y el trigger)
 function setPayoutStatus({ p_payout_id, p_status, p_reference, p_failure_reason, p_actor, p_force }, state) {
   const p = state.aitickets_payouts.find((r) => r.id === p_payout_id)
   if (!p) throw new Error(`No existe el retiro ${p_payout_id}`)
@@ -206,6 +206,16 @@ describe('retiros', () => {
     expect(sent[0].subject).toMatch(/150\.000/)
     expect(sent[0].html).toContain('TRX-123')
     expect(sent[0].html).not.toContain('000123456789')
+  })
+
+  it('mark_payout_paid: titular distinto de la identidad verificada (Didit) se niega sin force', async () => {
+    db.tables.organization_payout_accounts[0].holder_match_status = 'mismatch'
+    const blocked = await run('mark_payout_paid', { payout_id: P1, reference: 'TRX-55', reason: 'Pago del retiro de Siete' })
+    expect(blocked).toMatchObject({ ok: false, code: 'conflict' })
+    expect(blocked.message).toMatch(/no se transfiere a terceros/)
+    db.tables.organization_payout_accounts[0].holder_match_status = 'match'
+    const ok = await run('mark_payout_paid', { payout_id: P1, reference: 'TRX-55', reason: 'Pago del retiro de Siete' })
+    expect(ok.result.status).toBe('confirmation_required')
   })
 
   it('mark_payout_paid: con la cuenta sin verificar se niega antes de confirmar; con force pide confirmación con advertencias', async () => {

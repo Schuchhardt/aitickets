@@ -1,7 +1,7 @@
 // Herramientas de admin: operación de plataforma (escrituras). Lo que antes era SQL a mano en Supabase:
 // verificar cuentas bancarias, registrar retiros pagados o fallidos, cerrar reembolsos hechos en Flow, moderar
 // reseñas, editar el perfil de una organización, notas internas y ayuda para entrar.
-// Las de plata usan las funciones de db/migrations/202610240100_payout_ops.sql (validan las transiciones; un trigger
+// Las de plata usan las funciones de db/migrations/202610270100_payout_ops.sql (validan las transiciones; un trigger
 // sincroniza event_withdrawals): aquí no se reimplementa su lógica, solo se confirma, se registra y se avisa.
 import { ToolError, type JsonSchema } from "../../producer-api/registry";
 import { fetchAll } from "../../producer-api/tools/common";

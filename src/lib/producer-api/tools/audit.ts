@@ -84,10 +84,13 @@ async function loadMoneyEntries(ctx: ToolContext, args: any, limit: number): Pro
     return out;
 }
 
-/** Quién hizo la acción. Canal 'admin' = el equipo de AI Tickets actuando por la organización (MCP de admin, org_*). */
+/**
+ * Quién hizo la acción. Canal 'admin' con usuario = soporte actuando por pedido de la organización (MCP de admin,
+ * org_*); sin usuario = AI Tickets por su cuenta (devolución directa, src/lib/adminDirectRefund.ts).
+ */
 const SUPPORT_LABEL = "Soporte AI Tickets";
 function entryUser(e: { user_id: number | null; channel: string | null }, names: Map<number, string>): string | null {
-    if (e.channel === "admin") return SUPPORT_LABEL;
+    if (e.channel === "admin") return e.user_id != null ? SUPPORT_LABEL : "AI Tickets";
     if (e.user_id != null) return names.get(Number(e.user_id)) || `Usuario ${e.user_id}`;
     return e.channel === "aitickets" ? "AI Tickets" : null;
 }

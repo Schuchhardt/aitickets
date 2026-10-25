@@ -5,9 +5,14 @@ import AppFooter from "../../components/AppFooter.vue";
 import ProducerRegisterForm from "../../components/auth/ProducerRegisterForm.vue";
 import GradientBackground from "../../components/Hero/GradientBackground.vue";
 import { isGoogleAuthEnabled } from "../../lib/google-auth";
+import { getSessionContext } from "../../lib/supabaseServer";
+import { safeNextPath } from "../../lib/onboarding";
 import "../../styles/global.css";
 
 export const prerender = false;
+
+// Ya tiene cuenta y sesión: al panel en vez de registrarse de nuevo
+if (await getSessionContext(Astro)) return Astro.redirect(safeNextPath(Astro.url.searchParams.get("next")) || "/dashboard");
 
 const turnstileSiteKey = import.meta.env.TURNSTILE_SITE_KEY;
 const googleEnabled = isGoogleAuthEnabled();

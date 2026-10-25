@@ -11,6 +11,7 @@ import { orderBuyerBreakdown } from './fees.mjs'
 import { orderDiscount } from './discounts.mjs'
 import { greetingName } from './buyer-name.mjs'
 import { logEmailAttempt } from './email-log.mjs'
+import { orderKind } from './order-kind.mjs'
 import {
   EVENT_DATE_COLUMNS,
   zonedDateTimeToUtc,
@@ -63,14 +64,14 @@ function buildIcs({ orderId, eventName, description, start, end, location, order
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Chanium LLC//AI Tickets//ES',
+    'PRODID:-//AI Tickets//AI Tickets//ES',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     'BEGIN:VEVENT',
     `UID:${orderId}@aitickets.cl`,
     `DTSTAMP:${icsDate(new Date())}`,
     `SUMMARY;LANGUAGE=es:${escapeIcsText(eventName)}`,
-    `DESCRIPTION;LANGUAGE=es:${escapeIcsText(`Tus entradas: ${orderUrl}\n\n${description.slice(0, 1500)}`)}`,
+    `DESCRIPTION;LANGUAGE=es:${escapeIcsText(`Tu entrada: ${orderUrl}\n\n${description.slice(0, 1500)}`)}`,
     `DTSTART:${icsDate(start)}`,
     `DTEND:${icsDate(end)}`,
     `LOCATION:${escapeIcsText(location)}`,
@@ -111,7 +112,7 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
   const selectOrder = (feeTaxColumn) => supabase
     .from('event_orders')
     .select(`
-      id, created_at, status, event_id, attendee_id, amount, ticket_fee,${feeTaxColumn} total_payment, ticket_details, email_sent_at,
+      id, created_at, status, event_id, attendee_id, amount, ticket_fee,${feeTaxColumn} total_payment, ticket_details, email_sent_at, payment_provider,
       buyer_first_name, buyer_last_name, buyer_email,
       attendees ( first_name, last_name, email ),
       events ( id, name, slug, description, location, secret_location, start_date, end_date, organization_id )
@@ -249,9 +250,11 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
     if (event.secret_location) calendarLocation = event.secret_location
 
     const orderUrl = `${SITE_URL}/order/${order.id}`
+    // Gratis (confirmación de asistencia), cortesía, transferida o compra: cambia el lenguaje y si va comprobante
+    const kind = orderKind(order)
     const description = stripHtml(event.description)
     const calendarUrl = start
-      ? googleCalendarUrl({ eventName: event.name || 'Evento', start, end, location: calendarLocation, details: `Tus entradas: ${orderUrl}` })
+      ? googleCalendarUrl({ eventName: event.name || 'Evento', start, end, location: calendarLocation, details: `Tu entrada: ${orderUrl}` })
       : null
 
     // QR listos en el correo (imagen inline por entrada). Límite para no inflar el correo: el resto, por link.
@@ -277,7 +280,27 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
       }
     }
 
+    // Copia oculta al administrador de la productora (y al equipo solo si TICKETS_BCC está definido)
+    const bcc = String(process.env.TICKETS_BCC || '').split(',').map(s => s.trim()).filter(isValidEmail)
+    let organizerName = ''
+    if (event.organization_id) {
+      const [{ data: admins }, { data: org }] = await Promise.all([
+        supabase
+          .from('users')
+          .select('email')
+          .eq('organization_id', event.organization_id)
+          .in('role', ['admin', 'producer'])
+          .limit(1),
+        supabase.from('organizations').select('public_name').eq('id', event.organization_id).maybeSingle(),
+      ])
+      if (admins?.[0]?.email && isValidEmail(admins[0].email)) bcc.push(admins[0].email)
+      organizerName = String(org?.public_name || '').trim()
+    }
+
     const email = await renderTicketsEmail({
+      kind,
+      organizerName,
+      contactUrl: `${orderUrl}#mensaje`,
       qrTickets,
       qrMoreCount: Math.max(0, withQr.length - qrTickets.length),
       customerName: greetingName(buyer.first_name, buyer.last_name, 'asistente'),
@@ -298,18 +321,6 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
       orderUrl,
       calendarUrl,
     })
-
-    // Copia oculta al administrador de la productora (y al equipo solo si TICKETS_BCC está definido)
-    const bcc = String(process.env.TICKETS_BCC || '').split(',').map(s => s.trim()).filter(isValidEmail)
-    if (event.organization_id) {
-      const { data: admins } = await supabase
-        .from('users')
-        .select('email')
-        .eq('organization_id', event.organization_id)
-        .in('role', ['admin', 'producer'])
-        .limit(1)
-      if (admins?.[0]?.email && isValidEmail(admins[0].email)) bcc.push(admins[0].email)
-    }
 
     const attachments = start
       ? [{

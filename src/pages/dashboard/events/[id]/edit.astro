@@ -8,6 +8,9 @@ import { requireDashboardSession } from "../../_lib/guard";
 import { canAccessEventByStaff } from "../../../../../netlify/lib/event-staff.mjs";
 import { decodeBasicEntities } from "../../../../lib/sanitize";
 import { normalizePageSettings } from "../../../../lib/eventPageSettings";
+import { isDemoEventSlug } from "../../../../lib/demoEvent.mjs";
+import { normalizeReviewSettings } from "../../../../../netlify/lib/reviews.mjs";
+import { siteUrl as siteUrlFromEnv } from "../../../api/_lib/server-utils";
 
 const { id } = Astro.params;
 const guard = await requireDashboardSession(Astro, EVENT_MANAGER_ROLES);
@@ -22,7 +25,7 @@ const loadEvent = (coverColumn: string) => supabaseAdmin
     .from("events")
     .select(
         `
-        id, name, description, image_url, accessibility, status,${coverColumn}
+        id, name, slug, description, image_url, accessibility, status,${coverColumn}
         event_tags ( category_tags ( name ) ),
         event_tickets (
           id,
@@ -53,8 +56,9 @@ const loadEvent = (coverColumn: string) => supabaseAdmin
     .eq("id", id)
     .eq("organization_id", dbUser.organization_id)
     .single();
-let { data: event, error }: { data: any; error: any } = await loadEvent(" cover_settings, page_settings,");
-// Deploy previews: las migraciones de page_settings/cover_settings pueden no estar aplicadas todavía
+let { data: event, error }: { data: any; error: any } = await loadEvent(" cover_settings, page_settings, review_settings,");
+// Deploy previews: las migraciones de review_settings/page_settings/cover_settings pueden no estar aplicadas todavía
+if (error?.code === "42703") ({ data: event, error } = await loadEvent(" cover_settings, page_settings,"));
 if (error?.code === "42703") ({ data: event, error } = await loadEvent(" cover_settings,"));
 if (error?.code === "42703") ({ data: event, error } = await loadEvent(""));
 
@@ -67,6 +71,8 @@ if (error || !event) {
 const initialFormState = {
     general: {
         name: event.name,
+        // Link público /eventos/<slug> (editable; src/lib/eventSlug.ts crea el redirect si ya circula)
+        slug: event.slug || "",
         // Descripción guardada como texto plano sanitizado: mostrar sin entidades HTML en el textarea
         description: /<\/?[a-z][^>]*>/i.test(event.description || "") ? event.description : decodeBasicEntities(event.description || ""),
         imageUrl: event.image_url || "",
@@ -75,6 +81,8 @@ const initialFormState = {
         category: (event as any).event_tags?.[0]?.category_tags?.name || "",
         isPrivate: event.accessibility === "private",
     },
+    // Toggle al final del formulario: correo "¿Cómo estuvo?" 24 h después de cada función
+    reviews: { enabled: normalizeReviewSettings(event.review_settings).enabled },
     locations:
         event.event_locations?.map((loc: any) => ({
             id: loc.id,
@@ -112,6 +120,8 @@ const { count: attendeeCount } = await supabaseAdmin
     .eq("event_id", event.id)
     .or("status.is.null,status.neq.cancelled");
 
+const siteUrl = (siteUrlFromEnv() || Astro.url.origin).replace(/\/+$/, "");
+
 // Lugares para el selector: solo los de mi organización o los que ya usan mis eventos
 let venues: OrgVenue[] = [];
 try {
@@ -139,6 +149,8 @@ try {
             initialVenues={venues}
             eventStatus={(event as any).status || "draft"}
             attendeeCount={attendeeCount || 0}
+            publicBaseUrl={`${siteUrl}/eventos/`}
+            slugLocked={isDemoEventSlug(event.slug)}
         />
     </div>
 </DashboardLayout>

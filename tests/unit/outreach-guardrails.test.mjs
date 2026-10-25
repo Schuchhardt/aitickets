@@ -82,17 +82,17 @@ describe('canSend', () => {
     expect(await canSend(db(), lead(), MON_NOON, { cfg: cfg() })).toEqual({ ok: true })
   })
 
-  it('envío real: legalReady() viene listo con los datos de Chanium, LLC fijados por defecto', async () => {
+  it('envío real: legalReady() viene listo con los datos de la EIRL fijados por defecto', async () => {
     const real = cfg({ dryRun: false, liaApproved: true, provider: 'instantly' })
     expect(await canSend(db(), lead(), MON_NOON, { cfg: real, dryRun: false })).toEqual({ ok: true })
-    vi.stubEnv('CHANIUM_LEGAL_ADDRESS', '8 The Green, Dover, DE 19901, EE.UU.')
-    vi.stubEnv('CHANIUM_LEGAL_EMAIL', 'legal@aitickets.cl')
+    vi.stubEnv('LEGAL_ADDRESS', '8 The Green, Dover, DE 19901, EE.UU.')
+    vi.stubEnv('LEGAL_CONTACT_EMAIL', 'contacto@aitickets.cl')
     expect(await canSend(db(), lead(), MON_NOON, { cfg: real, dryRun: false })).toEqual({ ok: true })
   })
 
   it('envío real exige la evaluación de interés legítimo aprobada', async () => {
-    vi.stubEnv('CHANIUM_LEGAL_ADDRESS', '8 The Green, Dover, DE 19901, EE.UU.')
-    vi.stubEnv('CHANIUM_LEGAL_EMAIL', 'legal@aitickets.cl')
+    vi.stubEnv('LEGAL_ADDRESS', '8 The Green, Dover, DE 19901, EE.UU.')
+    vi.stubEnv('LEGAL_CONTACT_EMAIL', 'contacto@aitickets.cl')
     const real = cfg({ dryRun: false, liaApproved: false, provider: 'instantly' })
     expect(await canSend(db(), lead(), MON_NOON, { cfg: real, dryRun: false })).toEqual({ ok: false, reason: 'lia_not_approved' })
   })
@@ -156,8 +156,8 @@ describe('canSend', () => {
   })
 
   it('tope por casilla en envío real', async () => {
-    vi.stubEnv('CHANIUM_LEGAL_ADDRESS', '8 The Green, Dover, DE 19901, EE.UU.')
-    vi.stubEnv('CHANIUM_LEGAL_EMAIL', 'legal@aitickets.cl')
+    vi.stubEnv('LEGAL_ADDRESS', '8 The Green, Dover, DE 19901, EE.UU.')
+    vi.stubEnv('LEGAL_CONTACT_EMAIL', 'contacto@aitickets.cl')
     const real = cfg({ dryRun: false, liaApproved: true, provider: 'instantly' })
     const supabase = db()
     await bumpCounter(supabase, counterKeys.mailboxToday('Ventas@AiTickets.cl', MON_NOON), 15)

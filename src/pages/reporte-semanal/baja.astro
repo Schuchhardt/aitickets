@@ -1,0 +1,81 @@
+---
+// Baja y re-suscripción del reporte semanal a productores. El GET nunca cambia nada (los escáneres de enlaces hacen
+// GET): muestra un botón que hace POST a /api/reporte-semanal/baja.
+import Layout from "../../layouts/Layout.astro";
+import { LEGAL } from "../../lib/legal";
+import { getSupabaseAdmin } from "../../lib/auth-helpers";
+import { verifyWeeklyReportOptoutToken } from "../../../netlify/lib/review-token.mjs";
+import { USER_OPTOUTS_TABLE, WEEKLY_REPORT_TOPIC } from "../../../netlify/lib/weekly-report.mjs";
+import "../../styles/global.css";
+
+export const prerender = false;
+
+const t = Astro.url.searchParams.get("t") || "";
+const done = Astro.url.searchParams.get("listo");
+const failed = Astro.url.searchParams.get("error") === "1";
+Astro.response.headers.set("Cache-Control", "no-store");
+
+const payload = t ? verifyWeeklyReportOptoutToken(t) : null;
+let orgName = "tu productora";
+let optedOut = false;
+if (payload && !done) {
+  const supabase = getSupabaseAdmin();
+  const [{ data: user }, { data: optout }] = await Promise.all([
+    supabase.from("users").select("organizations ( public_name )").eq("id", payload.userId).maybeSingle(),
+    supabase.from(USER_OPTOUTS_TABLE).select("user_id").eq("user_id", payload.userId).eq("topic", WEEKLY_REPORT_TOPIC).maybeSingle(),
+  ]);
+  const org: any = Array.isArray((user as any)?.organizations) ? (user as any).organizations[0] : (user as any)?.organizations;
+  if (org?.public_name) orgName = org.public_name;
+  optedOut = Boolean(optout);
+}
+---
+
+<Layout title="Reporte semanal | AI Tickets" description="Elige si quieres recibir el reporte semanal de tus eventos." noindex>
+  <main class="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-16">
+    <div class="w-full max-w-md bg-white border border-gray-200 rounded-2xl p-8 text-center shadow-sm">
+      <a href="/" class="inline-block mb-6 text-lg font-bold text-gray-900">AI Tickets</a>
+      {failed || (t && !payload) ? (
+        <>
+          <h1 class="text-2xl font-bold text-gray-900 mb-3">No pudimos procesar tu solicitud</h1>
+          <p class="text-gray-600">El enlace no es válido. Responde al correo del reporte, o escríbenos a <a class="underline" href={`mailto:${LEGAL.supportEmail}`}>{LEGAL.supportEmail}</a>, y lo arreglamos de inmediato.</p>
+        </>
+      ) : done === "alta" ? (
+        <>
+          <h1 class="text-2xl font-bold text-gray-900 mb-3">Listo, volverás a recibirlo</h1>
+          <p class="text-gray-600">Te llegará el reporte semanal de tus eventos los domingos.</p>
+        </>
+      ) : t && (done === "baja" || optedOut) ? (
+        <>
+          <h1 class="text-2xl font-bold text-gray-900 mb-3">{done === "baja" ? "Listo, te dimos de baja" : "Ya no recibes el reporte semanal"}</h1>
+          <p class="text-gray-600 mb-6">No te enviaremos más el reporte de los domingos. Los demás avisos de tu cuenta (ventas, retiros, seguridad) no cambian.</p>
+          <form method="post" action="/api/reporte-semanal/baja">
+            <input type="hidden" name="t" value={t} />
+            <input type="hidden" name="from" value="page" />
+            <input type="hidden" name="action" value="alta" />
+            <button type="submit" data-testid="reporte-semanal-alta" class="w-full rounded-xl border border-gray-300 px-6 py-3 font-semibold text-gray-900 hover:bg-gray-100">
+              Volver a recibir el reporte
+            </button>
+          </form>
+        </>
+      ) : t ? (
+        <>
+          <h1 class="text-2xl font-bold text-gray-900 mb-3">¿Dejar de recibir el reporte semanal?</h1>
+          <p class="text-gray-600 mb-6">Cada domingo te enviamos cómo vendieron los eventos de {orgName}, qué canal te funciona mejor e ideas para promoverlos. Puedes volver a activarlo cuando quieras desde este mismo enlace.</p>
+          <form method="post" action="/api/reporte-semanal/baja">
+            <input type="hidden" name="t" value={t} />
+            <input type="hidden" name="from" value="page" />
+            <input type="hidden" name="action" value="baja" />
+            <button type="submit" data-testid="reporte-semanal-baja" class="w-full rounded-xl bg-gray-900 px-6 py-3 font-semibold text-white hover:bg-gray-700">
+              Sí, darme de baja
+            </button>
+          </form>
+        </>
+      ) : (
+        <>
+          <h1 class="text-2xl font-bold text-gray-900 mb-3">Enlace incompleto</h1>
+          <p class="text-gray-600">Usa el enlace "Darme de baja" que viene al final del reporte semanal.</p>
+        </>
+      )}
+    </div>
+  </main>
+</Layout>

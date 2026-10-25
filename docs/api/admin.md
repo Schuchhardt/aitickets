@@ -21,7 +21,7 @@ plata, opera lo que antes era SQL a mano y puede actuar como cualquier productor
    - `ADMIN_MCP_ENABLED` = `true`.
    - Opcional: `AITICKETS_ADMIN_READONLY_KEY_SHA256` (de `node scripts/admin-key.mjs --readonly`). Esa llave
      solo ve herramientas de lectura que no exponen datos personales ni bancarios.
-3. Redeploya producción. La migración `202610250100_admin_api.sql` se aplica en ese deploy: crea la bitácora,
+3. Redeploya producción. La migración `202610270400_admin_api.sql` se aplica en ese deploy: crea la bitácora,
    el usuario de servicio "Soporte AI Tickets" y amplía los CHECK de canal a `admin`.
 
 ## 2. Conectarlo a Claude

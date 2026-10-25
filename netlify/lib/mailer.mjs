@@ -42,14 +42,14 @@ function safeHttpUrl(url) {
 }
 
 /**
- * Pie legal para correos HTML: operador (Chanium LLC), contacto, enlaces a términos/privacidad
- * y, si corresponde, el motivo del envío y un enlace para darse de baja.
+ * Pie legal para correos HTML: solo la marca (AI Tickets; sin razón social ni RUT) y, si corresponde,
+ * un enlace para darse de baja.
  * @param {{ reason?: string, unsubscribeUrl?: string }} [opts]
  */
 export function legalFooterHtml({ unsubscribeUrl } = {}) {
   const unsub = unsubscribeUrl ? safeHttpUrl(unsubscribeUrl) : ''
   const link = unsub ? ` · <a href="${esc(unsub)}" style="color:#9ca3af;text-decoration:underline">Darme de baja</a>` : ''
-  return `<div style="margin-top:20px;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:16px;color:#9ca3af;text-align:center">${esc(LEGAL.brand)} · ${esc(LEGAL.entity)}${link}</div>`
+  return `<div style="margin-top:20px;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:16px;color:#9ca3af;text-align:center">${esc(LEGAL.brand)}${link}</div>`
 }
 
 /**
@@ -58,7 +58,7 @@ export function legalFooterHtml({ unsubscribeUrl } = {}) {
  */
 export function legalFooterText({ unsubscribeUrl } = {}) {
   const unsub = unsubscribeUrl ? safeHttpUrl(unsubscribeUrl) : ''
-  return ['--', `${LEGAL.brand} · ${LEGAL.entity}`, unsub ? `Darme de baja: ${unsub}` : ''].filter(Boolean).join('\n')
+  return ['--', LEGAL.brand, unsub ? `Darme de baja: ${unsub}` : ''].filter(Boolean).join('\n')
 }
 
 function stripHtml(html) {

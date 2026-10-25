@@ -1,9 +1,11 @@
 ---
 import DashboardLayout from "../../../layouts/DashboardLayout.astro";
-import { EVENT_MANAGER_ROLES } from "../../../lib/supabaseServer";
+import { EVENT_MANAGER_ROLES, ORG_ADMIN_ROLES, hasRole } from "../../../lib/supabaseServer";
 import { requireDashboardSession } from "../_lib/guard";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import PromoteOverview from "../../../components/dashboard/promote/PromoteOverview.vue";
+import { loadAdConnections, loadAdsView } from "../../../lib/ads";
+import { adsEnabled } from "../../../../netlify/lib/zernio-ads.mjs";
 
 const guard = await requireDashboardSession(Astro, EVENT_MANAGER_ROLES);
 if (!guard.ok) return guard.response;
@@ -33,7 +35,21 @@ const { data: events } = await supabaseAdmin
   .eq("status", "published")
   .order("created_at", { ascending: false });
 
-// Meta Ads está deshabilitado ("Próximamente"): no se consultan conexiones ni campañas
+// Anuncios en Meta vía Zernio (src/lib/ads.ts). Sin sincronizar aquí: la pestaña lo hace al abrirse.
+const enabledAds = adsEnabled();
+let ads = { enabled: enabledAds, connections: [] as any[], campaigns: [] as any[] };
+if (enabledAds) {
+  try {
+    const [connections, campaigns] = await Promise.all([
+      loadAdConnections(supabaseAdmin, Number(dbUser.organization_id)),
+      loadAdsView(supabaseAdmin, { organizationId: Number(dbUser.organization_id), userId: Number(dbUser.id) }),
+    ]);
+    ads = { enabled: true, connections, campaigns };
+  } catch (err: any) {
+    console.error("promote: anuncios", err?.message);
+  }
+}
+
 // Stats: conteos sobre TODOS los posts de la organización (la lista de arriba solo trae los 20 más recientes)
 const countPosts = (status?: string) => {
   let q = supabaseAdmin.from("social_posts").select("id", { count: "exact", head: true }).eq("organization_id", dbUser.organization_id);
@@ -48,14 +64,14 @@ const [{ count: totalCount }, { count: publishedCount }, { count: scheduledCount
 const totalPosts = totalCount || 0;
 const publishedPosts = publishedCount || 0;
 const scheduledPosts = scheduledCount || 0;
-const activeCampaigns = 0;
-const totalAdSpend = 0;
-const hasMetaAds = false;
+const activeCampaigns = ads.campaigns.filter((c) => c.status === "active").length;
+const totalAdSpend = ads.campaigns.filter((c) => !c.currency || c.currency === "CLP").reduce((s, c) => s + (Number(c.spend) || 0), 0);
+const hasMetaAds = ads.connections.some((c) => c.status === "active");
 
 const connected = Astro.url.searchParams.get("connected");
 const error = Astro.url.searchParams.get("error");
 const rawTab = Astro.url.searchParams.get("tab");
-const tab = rawTab === "ads" ? "" : rawTab;
+const tab = rawTab === "ads" && !enabledAds ? "" : rawTab;
 ---
 
 <DashboardLayout title="Promocionar">
@@ -68,5 +84,7 @@ const tab = rawTab === "ads" ? "" : rawTab;
     connectedPlatform={connected || ""}
     errorType={error || ""}
     initialTab={tab || ""}
+    adsJson={JSON.stringify(ads)}
+    canManageAds={hasRole(dbUser, ORG_ADMIN_ROLES)}
   />
 </DashboardLayout>

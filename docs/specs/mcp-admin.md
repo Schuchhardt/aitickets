@@ -70,7 +70,7 @@ Toda la operación de AI Tickets es **SQL a mano en Supabase más avisos en Slac
 | Outreach: aprobar borradores, despausar | Slack con link firmado / aviso "⛔" | `/api/outreach/approve?t=` o SQL en `aitickets_outreach_state` | — |
 
 **Actualización 2026-10-24.** Las tres primeras filas ya no requieren `UPDATE` a mano. La migración
-`202610240100_payout_ops.sql` agrega funciones SQL con transiciones validadas, y los avisos de Slack traen el
+`202610270100_payout_ops.sql` agrega funciones SQL con transiciones validadas, y los avisos de Slack traen el
 SQL listo con los ids reales. El runbook está en `docs/runbooks/retiros-reembolsos-y-cuentas.md`.
 
 - `aitickets_verify_payout_account(org, 'approve' | 'reject', quién, notas, últimos4)`
@@ -120,12 +120,12 @@ funciones (5.6).
 
 | # | Hallazgo | Estado (2026-10-24) |
 | --- | --- | --- |
-| 1 | **Desfase entre retiros y saldo** (`aitickets_payouts` vs `event_withdrawals`) | ✅ Trigger que sincroniza `event_withdrawals` con su retiro, más `aitickets_set_payout_status` con transiciones validadas (`202610240100_payout_ops.sql`) |
+| 1 | **Desfase entre retiros y saldo** (`aitickets_payouts` vs `event_withdrawals`) | ✅ Trigger que sincroniza `event_withdrawals` con su retiro, más `aitickets_set_payout_status` con transiciones validadas (`202610270100_payout_ops.sql`) |
 | 2 | **`event_withdrawals` guardaba el número de cuenta completo, el titular y el RUT en texto plano** | ✅ Los retiros nuevos guardan solo valores enmascarados (`•••• 6789`). La migración enmascaró las filas de retiros terminados (irreversible) y el trigger enmascara las demás al terminar. Para transferir se usa `organization_payout_accounts` |
-| 3 | **Correos de entradas sin registro**: sin id de Resend ni rebotes | ✅ `aitickets_email_log` (`202610240300_email_log.sql`) guarda cada intento. El webhook firmado `/api/webhooks/resend` agrega entregado, demorado, rebote y spam. `get_order` muestra `email_delivery`. **Falta configurar el webhook en Resend** (ver `.env.example`, `RESEND_WEBHOOK_SECRET`) |
+| 3 | **Correos de entradas sin registro**: sin id de Resend ni rebotes | ✅ `aitickets_email_log` (`202610270300_email_log.sql`) guarda cada intento. El webhook firmado `/api/webhooks/resend` agrega entregado, demorado, rebote y spam. `get_order` muestra `email_delivery`. **Falta configurar el webhook en Resend** (ver `.env.example`, `RESEND_WEBHOOK_SECRET`) |
 | 4 | Órdenes `pending` nunca reconciliadas contra Flow | ✅ `expire-pending-orders` consulta a Flow antes de expirar y revisa una vez más las expiradas a los 60–75 min. Avisa a Slack cada pago rescatado sin webhook |
 | 5 | Métricas del panel truncadas a 1000 filas y "conversión" mal definida | ✅ Ver 1.3 |
-| 6 | Visitas sin `ref` | ✅ `event_visits.ref` (`202610240200_event_visits_ref.sql`). Los links de seguimiento siguen sin guardarse (sería una función nueva, no un bug) |
+| 6 | Visitas sin `ref` | ✅ `event_visits.ref` (`202610270200_event_visits_ref.sql`). Los links de seguimiento siguen sin guardarse (sería una función nueva, no un bug) |
 | 7 | Comentario de la migración `202609290100` con 10% de cargo vs 8% en `fees.mjs` | No es un bug: la tarifa bajó el 2026-09-30 y cada orden guarda su propio `ticket_fee`. Las métricas suman lo cobrado |
 | 8 | (Encontrado al corregir) Comunidad y Entradas no aplicaban el acceso por evento (`aitickets_event_staff`) | ✅ Un miembro limitado a ciertos eventos solo ve los asistentes de esos eventos |
 | 9 | Órdenes en `review` sin herramienta para resolverlas | Pendiente: `resolve_review_order` del MCP de admin (5.6, opcional) |
@@ -587,10 +587,10 @@ Viven en `src/lib/admin-api/metrics.ts`. El panel de productores debe migrar a e
 Siguiendo `db/migrations/README.md`: prefijo `aitickets_`, idempotente, RLS sin políticas, `REVOKE` a
 `anon` y `authenticated`, funciones `SECURITY DEFINER` con `search_path`, y expand/contract.
 
-Los números `202610240100` a `202610240300` ya los usan las correcciones de 1.4. Las migraciones del MCP
-parten en `202610250100`.
+Las correcciones de 1.4 son `202610270100` a `202610270300` y las del MCP parten en `202610270400`, todas después
+de la última migración de `main` (`202610260200`).
 
-### 7.1 `202610250100_admin_api.sql`
+### 7.1 `202610270400_admin_api.sql`
 
 ```sql
 CREATE TABLE IF NOT EXISTS public.aitickets_admin_audit (
@@ -657,7 +657,7 @@ END $$;
 
 ### 7.3 y 7.4 Verificación de cuentas, retiros y reembolsos: ya existen
 
-Están en `202610240100_payout_ops.sql`. El MCP no necesita migraciones para esto: llama por `supabase.rpc` a
+Están en `202610270100_payout_ops.sql`. El MCP no necesita migraciones para esto: llama por `supabase.rpc` a
 `aitickets_verify_payout_account`, `aitickets_set_payout_status` y `aitickets_set_refund_status`. Las tres son
 `SECURITY DEFINER`, solo para `service_role`, validan las transiciones y devuelven `jsonb`. Un trigger
 sincroniza `event_withdrawals` con su retiro. Los errores de validación llegan como excepción de Postgres:
@@ -712,9 +712,10 @@ src/lib/admin-api/
 src/lib/eventAnalytics.ts     # YA EXISTE (2026-10-24): lo usan el panel y eventPerformance; get_event_analytics lo reutiliza
 src/pages/api/admin/mcp.ts    # POST JSON-RPC; GET/DELETE 405; sin CORS *
 scripts/admin-key.mjs
-db/migrations/202610250100_admin_api.sql
-db/migrations/202610250110_admin_indexes.sql   # -- migrate:no-transaction
-# (las funciones de retiros/reembolsos/cuentas ya existen: 202610240100_payout_ops.sql)
+db/migrations/202610270400_admin_api.sql
+db/migrations/202610270410…14_admin_idx_*.sql  # -- migrate:no-transaction, un índice por archivo
+db/migrations/202610270415_admin_visit_counts.sql
+# (las funciones de retiros/reembolsos/cuentas ya existen: 202610270100_payout_ops.sql)
 docs/api/admin.md             # runbook: conectar, rotar, desactivar
 tests/unit/admin-api-auth.test.mjs
 tests/unit/admin-api-mirror.test.mjs
@@ -746,7 +747,7 @@ Cada fase es un PR independiente que se puede desplegar.
 | **1. Ver todo** | `metrics.ts`, `get_platform_overview`, `get_platform_timeseries`, `rank_producers` con segmentos y alertas, `get_producer_funnel`, `search_orders`, `get_order_timeline`, `list_platform_activity`. Índices 7.5 | Los números cuadran con `list_events` / `get_balance` del productor para 3 orgs reales. Cada herramienta tarda menos de 3 s con los datos actuales |
 | **2. Analítica completa** | La librería `src/lib/eventAnalytics.ts` y el panel migrado ya están (2026-10-24). Falta `get_event_analytics` sobre esa librería | `get_event_analytics` y `/dashboard/events/:id/analytics` muestran lo mismo para un evento con más de 1000 visitas |
 | **3. Actuar como productor** | `mirror.ts` con las políticas de 5.7, actor de soporte, canal `admin`, `reason`, confirmación forzada, adaptación de `export_orders`, Slack "vía Admin", "Soporte AI Tickets" en `list_audit_log` | "Cámbiale la hora del evento 812 a las 21:00, me lo pidió por WhatsApp" termina con el evento editado, la bitácora del productor firmada por Soporte y la bitácora admin con el motivo. Herramientas bloqueadas ausentes de `tools/list` |
-| **4. Operación** | `list_pending_operations`, `get_system_health`, `get_platform_finance`, `list_payout_requests`, `list_refund_requests`, `verify_payout_account`, `mark_payout_*` y `mark_refund_*` (envuelven las funciones de `202610240100_payout_ops.sql`), `moderate_review`, `update_organization`, notas, `send_login_help`. Prompts | La bandeja de un día real se procesa entera desde Claude sin abrir Supabase. Retiros y saldo nunca se desfasan (test de la RPC) |
+| **4. Operación** | `list_pending_operations`, `get_system_health`, `get_platform_finance`, `list_payout_requests`, `list_refund_requests`, `verify_payout_account`, `mark_payout_*` y `mark_refund_*` (envuelven las funciones de `202610270100_payout_ops.sql`), `moderate_review`, `update_organization`, notas, `send_login_help`. Prompts | La bandeja de un día real se procesa entera desde Claude sin abrir Supabase. Retiros y saldo nunca se desfasan (test de la RPC) |
 | **5. Opcionales** | `resolve_review_order`; outreach; dominios; suspensión; snapshots diarios si el volumen lo pide; llave de solo lectura | Según necesidad |
 
 Las fases 0, 1 y 3 cubren lo que pediste: ver todo, cómo le va a cada productor y editar cuando piden

@@ -12,7 +12,7 @@ const advantages = [
   {
     icon: Wallet,
     title: 'Cobras por función',
-    text: `Lo de cada show queda disponible ${PAYOUT_RELEASE_HOURS} h después de que termina. Lo retiras desde el panel y llega en hasta ${PAYOUT_BUSINESS_DAYS} días hábiles.`,
+    text: `Lo de cada show queda disponible ${PAYOUT_RELEASE_HOURS} h después de que termina.* Lo retiras desde el panel y llega en hasta ${PAYOUT_BUSINESS_DAYS} días hábiles.`,
   },
   {
     icon: Users,
@@ -75,6 +75,9 @@ const advantages = [
             <FeatureCard :icon="a.icon" :title="a.title" :text="a.text" />
           </FadeInSection>
         </div>
+        <p class="-mt-4 pb-8 text-xs text-white/50 font-[Prompt] text-left">
+          <a href="/terminos-productores" class="underline hover:text-white/80">*Se aplican términos y condiciones</a>
+        </p>
       </div>
     </div>
   </section>

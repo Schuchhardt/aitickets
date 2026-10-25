@@ -3,6 +3,8 @@ import DashboardLayout from "../../../layouts/DashboardLayout.astro";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { ORG_ADMIN_ROLES, hasRole } from "../../../lib/supabaseServer";
 import { requireDashboardSession } from "../_lib/guard";
+import { IDENTITY_STATUS_LABELS, loadOrgIdentity, syncIdentityFromDidit } from "../../../lib/producerIdentity";
+import { BIOMETRIC_CONSENT_TEXT, IDENTITY_WHY_TEXT } from "../../../../netlify/lib/identity.mjs";
 
 // Finanzas entra solo para los datos de pago (el perfil de la organización lo editan dueño y administradores)
 const guard = await requireDashboardSession(Astro, [...ORG_ADMIN_ROLES, "finance"]);
@@ -44,8 +46,10 @@ let payout: PayoutAccount | null = null;
 {
     const BASE = "legal_name, legal_rut, bank_name, bank_account_type, bank_account_number, bank_account_holder, bank_account_rut";
     const load = (cols: string) => supabaseAdmin.from("organization_payout_accounts").select(cols).eq("organization_id", dbUser.organization_id).maybeSingle();
-    // verified_at/bank_changed_at existen desde la migración 202610090200; el rechazo, desde 202610240100
-    let { data, error } = await load(`${BASE}, verified_at, bank_changed_at, verification_rejected_at, verification_notes`);
+    // verified_at/bank_changed_at existen desde 202610090200; holder_match_status, desde la verificación de identidad
+    // (Didit); el rechazo de la cuenta, desde payout_ops
+    let { data, error } = await load(`${BASE}, verified_at, bank_changed_at, holder_match_status, verification_rejected_at, verification_notes`);
+    if (error) ({ data, error } = await load(`${BASE}, verified_at, bank_changed_at, holder_match_status`));
     if (error) ({ data, error } = await load(`${BASE}, verified_at, bank_changed_at`));
     if (error) ({ data, error } = await load(BASE));
     if (error) console.error("Error cargando datos de pago:", error.message);
@@ -56,6 +60,22 @@ const holdUntil = payout?.bank_changed_at ? new Date(new Date(payout.bank_change
 const holdActive = Boolean(holdUntil && holdUntil.getTime() > Date.now());
 // AI Tickets rechazó la cuenta y el productor aún no corrige los datos (guardarlos de nuevo borra el rechazo)
 const bankRejected = Boolean(bankComplete && !payout?.verified_at && payout?.verification_rejected_at);
+
+// Verificación de identidad (Didit). Al volver del flujo (?identidad=volver) se consulta la decisión por si el
+// webhook aún no llega.
+let identity = await loadOrgIdentity(supabaseAdmin, Number(dbUser.organization_id)).catch(() => null);
+if (Astro.url.searchParams.get("identidad") === "volver" && identity?.identity_session_id && identity.identity_status !== "approved") {
+    try {
+        await syncIdentityFromDidit(supabaseAdmin, Number(dbUser.organization_id));
+        identity = await loadOrgIdentity(supabaseAdmin, Number(dbUser.organization_id));
+    } catch (err: any) {
+        console.error("Didit sync:", err?.message || err);
+    }
+}
+const identityStatus = identity?.identity_status ?? null;
+const identityLabel = identityStatus ? IDENTITY_STATUS_LABELS[identityStatus] : "Sin verificar";
+const canStartIdentity = canEditOrg && identityStatus !== "approved" && identityStatus !== "in_review";
+const holderMismatch = (payout as any)?.holder_match_status === "mismatch";
 
 const BANKS = [
     "BancoEstado", "Banco de Chile / Edwards", "Santander", "BCI / MACH", "Scotiabank", "Itaú", "Banco Security",
@@ -132,6 +152,40 @@ const ACCOUNT_TYPES = ["Cuenta Corriente", "Cuenta Vista / CuentaRUT", "Cuenta d
         </section>
         )}
 
+        <!-- Verificación de identidad (Didit) -->
+        <section id="identidad" class="space-y-4 pt-6 scroll-mt-24" data-testid="identity-section">
+            <div class="border-b border-gray-100 pb-4">
+                <h2 class="text-xl font-bold text-gray-900">Verificación de identidad</h2>
+                <p class="text-gray-500 text-sm">{IDENTITY_WHY_TEXT} Es obligatoria para publicar eventos con entradas pagadas y para recibir transferencias.</p>
+            </div>
+
+            <div class={`rounded-lg border px-4 py-3 text-sm ${identityStatus === "approved" ? "border-green-100 bg-green-50 text-green-900" : identityStatus === "declined" ? "border-red-100 bg-red-50 text-red-800" : "border-gray-200 bg-gray-50 text-gray-800"}`}>
+                <p class="font-medium" data-testid="identity-status">
+                    {identityStatus === "approved" ? "✓ " : ""}{identityLabel}{identityStatus === "approved" && identity?.identity_name ? `: ${identity.identity_name}` : ""}
+                </p>
+                {identityStatus === "pending" && <p class="mt-1">Si ya completaste los pasos, el resultado puede tardar unos minutos. Puedes retomar la verificación si la dejaste a medias.</p>}
+                {identityStatus === "in_review" && <p class="mt-1">El equipo de AI Tickets está revisando tu verificación (normalmente 1 día hábil).</p>}
+                {identityStatus === "declined" && <p class="mt-1">No pudimos verificar tu identidad. Puedes intentarlo de nuevo con tu cédula vigente y buena luz, o escribirnos a soporte.</p>}
+                {!identityStatus && <p class="mt-1">Si operas como empresa, verifica la identidad del representante legal y registra abajo la razón social y el RUT de la empresa.</p>}
+            </div>
+
+            {canStartIdentity && (
+                <div class="space-y-3">
+                    <label class="flex items-start gap-2 text-sm text-gray-700">
+                        <input id="identityConsent" type="checkbox" class="mt-1 h-4 w-4 rounded border-gray-300" />
+                        <span>{BIOMETRIC_CONSENT_TEXT.replace("Aviso de privacidad.", "")}<a href="/privacy" target="_blank" rel="noopener" class="underline">Aviso de privacidad</a>.</span>
+                    </label>
+                    <button id="startIdentityBtn" class="w-full sm:w-auto px-4 py-2 text-sm bg-black text-white rounded-lg hover:bg-gray-800 disabled:opacity-50">
+                        {identityStatus ? "Retomar verificación" : "Verificar mi identidad"}
+                    </button>
+                    <div id="identityMsg" class="hidden rounded-lg px-4 py-3 text-sm font-medium"></div>
+                </div>
+            )}
+            {!canEditOrg && identityStatus !== "approved" && (
+                <p class="text-sm text-gray-500">La verificación la hace el dueño o un administrador de la organización.</p>
+            )}
+        </section>
+
         <!-- Bank / Payout Section -->
         <section id="datos-bancarios" class="space-y-6 pt-6 scroll-mt-24">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-gray-100 pb-4">
@@ -159,7 +213,11 @@ const ACCOUNT_TYPES = ["Cuenta Corriente", "Cuenta Vista / CuentaRUT", "Cuenta d
                 {holdActive && holdUntil && (
                     <p class="font-medium">Por seguridad, los retiros quedan habilitados desde el {holdUntil.toLocaleString("es-CL", { timeZone: "America/Santiago", dateStyle: "medium", timeStyle: "short" })}.</p>
                 )}
+                {holderMismatch && (
+                    <p class="font-medium text-red-700" data-testid="holder-mismatch">La cuenta no está a nombre de la persona o empresa verificada: los retiros quedan bloqueados hasta que AI Tickets la revise.</p>
+                )}
                 <p class="mt-1">
+                    La cuenta debe estar a nombre de la persona verificada o de la empresa que representa: no transferimos a cuentas de terceros.
                     Cambiar los datos bancarios requiere una nueva verificación de AI Tickets y bloquea los retiros durante {BANK_CHANGE_HOLD_HOURS} horas.
                     Nunca compartas tu número de cuenta por chat: ingrésalo solo aquí.
                 </p>
@@ -251,6 +309,37 @@ const ACCOUNT_TYPES = ["Cuenta Corriente", "Cuenta Vista / CuentaRUT", "Cuenta d
       (saveOrgBtn as HTMLButtonElement).disabled = false;
       saveOrgBtn.textContent = 'Guardar Cambios';
     }
+  });
+
+  // Identity verification (Didit)
+  const startIdentityBtn = document.getElementById('startIdentityBtn') as HTMLButtonElement | null;
+  const identityMsg = document.getElementById('identityMsg');
+  startIdentityBtn?.addEventListener('click', async () => {
+    const consent = (document.getElementById('identityConsent') as HTMLInputElement | null)?.checked === true;
+    if (!consent) {
+      showMsg(identityMsg, 'Para continuar debes autorizar el tratamiento de tus datos biométricos.', true);
+      return;
+    }
+    const idleText = startIdentityBtn.textContent;
+    startIdentityBtn.disabled = true;
+    startIdentityBtn.textContent = 'Abriendo verificación...';
+    try {
+      const res = await fetch('/api/identity/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ consent: true }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      showMsg(identityMsg, data.message || 'No pudimos iniciar la verificación', true);
+    } catch {
+      showMsg(identityMsg, 'Error de conexión', true);
+    }
+    startIdentityBtn.disabled = false;
+    startIdentityBtn.textContent = idleText;
   });
 
   // Bank data save
