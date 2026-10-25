@@ -5,6 +5,7 @@
 // Uso:
 //   node --env-file=.env scripts/notify-identity-verification.mjs            dry-run: lista destinatarios, no envía
 //   node --env-file=.env scripts/notify-identity-verification.mjs --send     envía (idempotente por organización)
+//   --org <id>[,<id>]   solo esas organizaciones
 //
 // Destinatarios: usuarios activos con rol admin o producer de cada organización; si no hay, el correo de la organización.
 // Variables: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY (solo con --send), SITE_URL.
@@ -13,6 +14,8 @@ import { sendEmail, isValidEmail, SITE_URL } from '../netlify/lib/mailer.mjs'
 import { renderIdentityVerificationRequestEmail } from '../netlify/lib/emails/index.mjs'
 
 const send = process.argv.includes('--send')
+const orgArg = process.argv[process.argv.indexOf('--org') + 1]
+const onlyOrgs = process.argv.includes('--org') ? new Set(String(orgArg || '').split(',').map(Number).filter(Boolean)) : null
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
 
 const { data: events, error } = await supabase
@@ -41,7 +44,7 @@ const { data: users, error: userError } = await supabase
   .in('role', ['admin', 'producer'])
 if (userError) throw userError
 
-const pending = (orgs || []).filter((o) => o.identity_status !== 'approved')
+const pending = (orgs || []).filter((o) => o.identity_status !== 'approved' && (!onlyOrgs || onlyOrgs.has(o.id)))
 const settingsUrl = `${SITE_URL}/dashboard/settings#identidad`
 let sent = 0
 
