@@ -34,7 +34,7 @@ const RUT = '77.893.286-5'
 const REPRESENTATIVE = 'Sebastián Schuchhardt'
 const DEFAULT_ADDRESS = 'Lican Ray 6742, Vitacura, Región Metropolitana, Chile'
 const DEFAULT_PHONE = '+56 9 8234 7140'
-const DEFAULT_LEGAL_EMAIL = 'legal@aitickets.cl'
+const DEFAULT_LEGAL_EMAIL = 'contacto@aitickets.cl'
 
 const legalAddress = () => env('LEGAL_ADDRESS') || DEFAULT_ADDRESS
 const legalEmail = () => env('LEGAL_CONTACT_EMAIL') || DEFAULT_LEGAL_EMAIL

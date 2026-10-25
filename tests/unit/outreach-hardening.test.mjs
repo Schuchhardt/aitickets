@@ -77,7 +77,7 @@ describe('interruptor de emergencia: pausa de la campaña de Instantly', () => {
     instantlyEnv()
     vi.stubEnv('OUTREACH_WEBHOOK_SECRET', 's')
     vi.stubEnv('LEGAL_ADDRESS', 'Dirección 123')
-    vi.stubEnv('LEGAL_CONTACT_EMAIL', 'legal@aitickets.cl')
+    vi.stubEnv('LEGAL_CONTACT_EMAIL', 'contacto@aitickets.cl')
     const calls = recordFetch()
     const cfg = { ...getOutreachConfig(), enabled: true, dryRun: false, liaApproved: true, provider: 'instantly' }
     // Estado desconocido (la campaña la maneja el equipo): no se toca.
@@ -135,7 +135,7 @@ describe('canReply: política única para responder (auto y aprobación)', () =>
   const cfg = () => ({ ...getOutreachConfig(), enabled: true, dryRun: false, liaApproved: true, provider: 'instantly' })
   const legal = () => {
     vi.stubEnv('LEGAL_ADDRESS', 'Dirección 123')
-    vi.stubEnv('LEGAL_CONTACT_EMAIL', 'legal@aitickets.cl')
+    vi.stubEnv('LEGAL_CONTACT_EMAIL', 'contacto@aitickets.cl')
   }
   const tables = (paused = false) => ({ aitickets_outreach_state: [{ key: 'paused', value: { paused } }], aitickets_suppressions: [], organizations: [] })
   // Sábado de noche: fuera de la ventana de envío, que no aplica a respuestas.
@@ -174,7 +174,7 @@ describe('respuesta automática a "interested" respeta la pausa', () => {
     vi.stubEnv('OUTREACH_UNSUB_SECRET', 'u')
     vi.stubEnv('LEAD_TOKEN_SECRET', 'l')
     vi.stubEnv('LEGAL_ADDRESS', 'Dirección 123')
-    vi.stubEnv('LEGAL_CONTACT_EMAIL', 'legal@aitickets.cl')
+    vi.stubEnv('LEGAL_CONTACT_EMAIL', 'contacto@aitickets.cl')
     const calls = recordFetch()
     const lead = { id: 'l1', email: 'contacto@teatro.cl', domain: 'teatro.cl', status: 'replied', country: 'CL', org_name: 'Teatro' }
     const inbound = { id: 'in-1', provider: 'instantly', provider_message_id: 'em-1', mailbox: 'hola@outreach.cl', thread_id: 't', body_text: 'Sí, me interesa' }

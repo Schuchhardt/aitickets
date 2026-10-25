@@ -2,11 +2,11 @@
 
 > **Borrador para revisión legal.** Este documento debe ser revisado y firmado por el responsable
 > (Servicios Informáticos Sebastián Schuchhardt EIRL) antes de activar el envío real. El código exige `OUTREACH_LIA_APPROVED=true`, además
-> de `legalReady()` (dirección postal y correo legal; por defecto Lican Ray 6742, Vitacura, y legal@aitickets.cl), para enviar cualquier correo en frío.
+> de `legalReady()` (dirección postal y correo de contacto; por defecto Lican Ray 6742, Vitacura, y contacto@aitickets.cl), para enviar cualquier correo en frío.
 
 | Campo | Valor |
 | --- | --- |
-| Responsable | Servicios Informáticos Sebastián Schuchhardt EIRL (RUT 77.893.286-5; domicilio Lican Ray 6742, Vitacura, Región Metropolitana, Chile; legal@aitickets.cl), operadora de AI Tickets en Chile |
+| Responsable | Servicios Informáticos Sebastián Schuchhardt EIRL (RUT 77.893.286-5; domicilio Lican Ray 6742, Vitacura, Región Metropolitana, Chile; contacto@aitickets.cl), operadora de AI Tickets en Chile |
 | Tratamiento | Contacto comercial por correo a productoras, salas y centros culturales |
 | Base de licitud | Interés legítimo (Ley 21.719, vigente desde el 1 de diciembre de 2026; confirmar el artículo con el abogado) |
 | Normas relacionadas | Ley 19.496 art. 28 B (comunicaciones promocionales), CAN-SPAM Act (EE.UU.) |

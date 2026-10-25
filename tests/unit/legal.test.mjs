@@ -29,14 +29,14 @@ describe('legalReady', () => {
     const { legalReady, LEGAL } = await loadLegal({ LEGAL_ADDRESS: '   ', LEGAL_CONTACT_EMAIL: '  ' })
     expect(legalReady()).toBe(true)
     expect(LEGAL.address).toContain('Lican Ray 6742')
-    expect(LEGAL.legalEmail).toBe('legal@aitickets.cl')
+    expect(LEGAL.legalEmail).toBe('contacto@aitickets.cl')
   })
 
   it('el entorno sobrescribe dirección y correo legal (o su alias LEGAL_CONTACT_EMAIL)', async () => {
-    let { LEGAL } = await loadLegal({ LEGAL_ADDRESS: '8 The Green, Dover, DE 19901, EE.UU.', LEGAL_CONTACT_EMAIL: 'legal@aitickets.cl' })
+    let { LEGAL } = await loadLegal({ LEGAL_ADDRESS: '8 The Green, Dover, DE 19901, EE.UU.', LEGAL_CONTACT_EMAIL: 'contacto@aitickets.cl' })
     expect(LEGAL.address).toBe('8 The Green, Dover, DE 19901, EE.UU.')
-    expect(LEGAL.legalEmail).toBe('legal@aitickets.cl')
-    expect(LEGAL.privacyEmail).toBe('legal@aitickets.cl')
+    expect(LEGAL.legalEmail).toBe('contacto@aitickets.cl')
+    expect(LEGAL.privacyEmail).toBe('contacto@aitickets.cl')
     vi.unstubAllEnvs()
     ;({ LEGAL } = await loadLegal({ LEGAL_CONTACT_EMAIL: 'otro@aitickets.cl' }))
     expect(LEGAL.legalEmail).toBe('otro@aitickets.cl')
@@ -54,8 +54,8 @@ describe('LEGAL por defecto (Servicios Informáticos Sebastián Schuchhardt EIRL
     expect(LEGAL.phone).toBe('+56 9 8234 7140')
     expect(LEGAL.address).toBe('Lican Ray 6742, Vitacura, Región Metropolitana, Chile')
     expect(LEGAL.addressLine).toBe(LEGAL.address)
-    expect(LEGAL.legalEmail).toBe('legal@aitickets.cl')
-    expect(LEGAL.privacyEmail).toBe('legal@aitickets.cl')
+    expect(LEGAL.legalEmail).toBe('contacto@aitickets.cl')
+    expect(LEGAL.privacyEmail).toBe('contacto@aitickets.cl')
     expect(LEGAL.supportEmail).toBe('soporte@aitickets.cl')
     expect(LEGAL.flowMerchantName).toBe('AI Tickets')
     expect(JSON.stringify(LEGAL)).not.toMatch(/Chanium|Delaware|LLC/)
@@ -145,7 +145,7 @@ describe('outreachFooterText', () => {
     })
     expect(footer.startsWith('--\n')).toBe(true)
     // compose.mjs / instantly.mjs exigen que el pie contenga la marca y el domicilio (LEGAL.address)
-    expect(footer).toContain('AI Tickets · Lican Ray 6742, Vitacura, Región Metropolitana, Chile · legal@aitickets.cl')
+    expect(footer).toContain('AI Tickets · Lican Ray 6742, Vitacura, Región Metropolitana, Chile · contacto@aitickets.cl')
     expect(footer).not.toContain('EIRL')
     expect(footer).toContain('teatro.cl')
     expect(footer).toContain('https://aitickets.cl/api/outreach/unsubscribe?t=abc')
@@ -155,10 +155,10 @@ describe('outreachFooterText', () => {
 
   it('usa la dirección y el correo del entorno si se sobrescriben', async () => {
     const ADDRESS = '8 The Green, Dover, DE 19901, EE.UU.'
-    const { outreachFooterText } = await loadLegal({ LEGAL_ADDRESS: ADDRESS, LEGAL_CONTACT_EMAIL: 'legal@aitickets.cl' })
+    const { outreachFooterText } = await loadLegal({ LEGAL_ADDRESS: ADDRESS, LEGAL_CONTACT_EMAIL: 'contacto@aitickets.cl' })
     const footer = outreachFooterText({})
     expect(footer).toContain(ADDRESS)
-    expect(footer).toContain('legal@aitickets.cl')
+    expect(footer).toContain('contacto@aitickets.cl')
   })
 
   it('sin enlace de baja igual explica cómo darse de baja', async () => {
