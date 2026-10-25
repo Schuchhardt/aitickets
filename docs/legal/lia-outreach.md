@@ -1,12 +1,12 @@
 # Evaluación de interés legítimo: contacto comercial B2B (outreach)
 
 > **Borrador para revisión legal.** Este documento debe ser revisado y firmado por el responsable
-> (Chanium LLC) antes de activar el envío real. El código exige `OUTREACH_LIA_APPROVED=true`, además
-> de `legalReady()` (dirección postal y correo legal; por defecto Lican Ray 6742, Vitacura, y hello@chanium.com), para enviar cualquier correo en frío.
+> (Servicios Informáticos Sebastián Schuchhardt EIRL) antes de activar el envío real. El código exige `OUTREACH_LIA_APPROVED=true`, además
+> de `legalReady()` (dirección postal y correo legal; por defecto Lican Ray 6742, Vitacura, y legal@aitickets.cl), para enviar cualquier correo en frío.
 
 | Campo | Valor |
 | --- | --- |
-| Responsable | Chanium, LLC (Delaware LLC, archivo N° 10669971; domicilio comercial Lican Ray 6742, Vitacura, Región Metropolitana, Chile; hello@chanium.com), operadora de AI Tickets |
+| Responsable | Servicios Informáticos Sebastián Schuchhardt EIRL (RUT 77.893.286-5; domicilio Lican Ray 6742, Vitacura, Región Metropolitana, Chile; legal@aitickets.cl), operadora de AI Tickets en Chile |
 | Tratamiento | Contacto comercial por correo a productoras, salas y centros culturales |
 | Base de licitud | Interés legítimo (Ley 21.719, vigente desde el 1 de diciembre de 2026; confirmar el artículo con el abogado) |
 | Normas relacionadas | Ley 19.496 art. 28 B (comunicaciones promocionales), CAN-SPAM Act (EE.UU.) |
@@ -48,7 +48,7 @@ Organismos públicos, colegios, universidades y correos personales de artistas s
 - **Impacto:** bajo. Un correo breve, personalizado, sin seguimiento de aperturas ni píxeles, con a lo
   más un enlace a aitickets.cl.
 - **Salvaguardas:**
-  - Cada correo identifica al remitente (Chanium LLC, dirección postal), indica que es comercial, dice
+  - Cada correo identifica al remitente (marca AI Tickets, dirección postal y correo legal; la razón social está en el aviso de privacidad), indica que es comercial, dice
     dónde se obtuvo el contacto e incluye cómo darse de baja (responder "NO" o enlace de baja de un clic,
     RFC 8058).
   - La baja se registra de inmediato y es permanente (`aitickets_suppressions` nunca se borra).

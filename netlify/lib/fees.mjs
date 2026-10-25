@@ -1,4 +1,4 @@
-// Fuente única del cargo por servicio al comprador. Decisión del dueño (Chanium LLC, sep 2026:
+// Fuente única del cargo por servicio al comprador. Decisión del dueño (sep 2026:
 // baja de 10% a 8%):
 //   cargo neto = 8% del subtotal de entradas, redondeado a pesos,
 //   IVA del cargo = 19% del cargo neto, redondeado a pesos,

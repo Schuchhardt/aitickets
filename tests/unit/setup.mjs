@@ -8,7 +8,7 @@ import { afterEach, beforeEach, vi } from 'vitest'
 const RUN_LLM_EVALS = process.env.RUN_LLM_EVALS === '1' && Boolean(process.env.ANTHROPIC_API_KEY)
 
 const SCRUB_PREFIXES = [
-  'FLOW_', 'OUTREACH_', 'CHANIUM_', 'LEGAL_', 'SITES_', 'INSTANTLY_', 'NETLIFY_', 'CLOUDFLARE_',
+  'FLOW_', 'OUTREACH_', 'LEGAL_', 'SITES_', 'INSTANTLY_', 'NETLIFY_', 'CLOUDFLARE_',
   'MAILGUN_', 'TURNSTILE_', 'SUPABASE_', 'GOOGLE_', 'LEADS_', 'SLACK_', 'DOMAIN_', 'FIRECRAWL_',
 ]
 const SCRUB_NAMES = [

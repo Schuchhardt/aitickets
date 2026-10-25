@@ -6,7 +6,7 @@
 // Mientras un punto no esté aprobado, se incluye en los borradores para Slack pero no en respuestas automáticas.
 
 export const SALES_KB = Object.freeze({
-  product: 'AI Tickets, plataforma de venta de entradas para productores de eventos (servicio de Chanium LLC).',
+  product: 'AI Tickets, plataforma de venta de entradas para productores de eventos.',
   facts: Object.freeze([
     { key: 'producer_fee', approved: true, text: 'El productor paga 0% de comisión.' },
     { key: 'buyer_fee', approved: true, text: 'El comprador paga un cargo por servicio de 8% + IVA sobre el valor de la entrada.' },

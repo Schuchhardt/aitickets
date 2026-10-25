@@ -3,7 +3,7 @@
 //   que vimos. Sin API key (o sin presupuesto) se usa una plantilla fija.
 // - Seguimientos (pasos 1 y 2) y la respuesta a "interested": plantillas FIJAS (sin LLM).
 // Todo correo pasa por validateOutgoing(): largo, enlaces solo a aitickets.cl, sin precios inventados y
-// pie legal obligatorio (Chanium LLC + baja).
+// pie legal obligatorio (marca, domicilio y baja).
 import { LEGAL, outreachFooterText } from '../legal.mjs'
 import { getOutreachConfig } from './config.mjs'
 import { normalizeHost } from './domains.mjs'
@@ -133,7 +133,7 @@ export function validateOutgoing(text, { requireFooter = true, maxWords = MAX_WO
   if (requireFooter) {
     if (!footer) errors.push('falta el pie legal')
     else {
-      if (!footer.includes(LEGAL.entity)) errors.push('el pie no identifica a Chanium LLC')
+      if (!footer.includes(LEGAL.brand) || !footer.includes(LEGAL.address)) errors.push('el pie no identifica al remitente (marca y domicilio)')
       if (!/Si no quieres recibir más correos/.test(footer)) errors.push('el pie no explica cómo darse de baja')
       if (!/\/api\/outreach\/unsubscribe\?t=/.test(footer)) errors.push('falta el enlace de baja')
     }

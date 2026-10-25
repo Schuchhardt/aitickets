@@ -3,7 +3,7 @@
 // sin configurar JSX en ninguno de los dos. Solo servidor.
 //
 // Diseño: tarjeta blanca sobre fondo gris claro, franja negra con el logo de AI Tickets, acento lima
-// (#9AE600), botones negros, tipografía Prompt con respaldo Arial, preheader y pie legal (Chanium LLC).
+// (#9AE600), botones negros, tipografía Prompt con respaldo Arial, preheader y pie legal (solo la marca AI Tickets).
 import * as React from 'react'
 import {
   Html,
@@ -270,7 +270,7 @@ export function Divider() {
 // ---------- Pie legal ----------
 
 /**
- * Pie mínimo: "AI Tickets · Chanium LLC". Solo agrega el enlace de baja cuando el correo lo requiere
+ * Pie mínimo: "AI Tickets". Solo agrega el enlace de baja cuando el correo lo requiere
  * (unsubscribeUrl); `reason` se acepta por compatibilidad pero ya no se muestra.
  */
 export function LegalFooter({ unsubscribeUrl } = {}) {
@@ -283,7 +283,7 @@ export function LegalFooter({ unsubscribeUrl } = {}) {
     h(
       Text,
       { style: line },
-      `${LEGAL.brand} · ${LEGAL.entity}`,
+      LEGAL.brand,
       unsub ? ' · ' : null,
       unsub ? h(Link, { href: unsub, style: link }, 'Darme de baja') : null
     )

@@ -4,7 +4,11 @@
 import { SERVICE_FEE_PERCENT_LABEL, IVA_PERCENT_LABEL, computeFeeSplit } from "../../netlify/lib/fees.mjs";
 import { PAYOUT_SCHEDULE_TEXT } from "../../netlify/lib/legal.mjs";
 
-export type FaqItem = { q: string; a: string };
+/** terms: la respuesta promete algo condicionado (pagos, devoluciones) y termina con "*Se aplican términos y condiciones". */
+export type FaqItem = { q: string; a: string; terms?: boolean };
+
+/** Enlace de la nota "*Se aplican términos y condiciones" (el detalle está en los términos para productores). */
+export const TERMS_NOTE = { text: "*Se aplican términos y condiciones", href: "/terminos-productores" };
 
 const clp = (n: number) => `$${Math.round(n).toLocaleString("es-CL")}`;
 const absorbed = computeFeeSplit(10000, { absorbed: true });
@@ -17,6 +21,7 @@ export const PRODUCER_FAQ: FaqItem[] = [
     {
         q: "¿Cuándo recibo el dinero de mis ventas?",
         a: `${PAYOUT_SCHEDULE_TEXT} Para retirar necesitas registrar una cuenta bancaria, que AI Tickets verifica normalmente en 1 día hábil.`,
+        terms: true,
     },
     {
         q: "¿Puedo absorber el cargo por servicio?",
@@ -36,7 +41,8 @@ export const PRODUCER_FAQ: FaqItem[] = [
     },
     {
         q: "¿Qué pasa si tengo que cambiar o cancelar una función?",
-        a: "Si cambias la fecha u horario de un evento publicado, avisamos por email a quienes ya compraron. Si cancelas, los compradores reciben la devolución de sus entradas y del cargo por servicio según los términos para productores.",
+        a: "Si cambias la fecha u horario de un evento publicado, avisamos por email a quienes ya compraron. Si cancelas, los compradores reciben la devolución de sus entradas y del cargo por servicio.",
+        terms: true,
     },
     {
         q: "¿Me ayudan a publicar mi primer evento?",

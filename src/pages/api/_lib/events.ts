@@ -1,10 +1,12 @@
 // Lógica compartida de escritura de eventos (contrato C1).
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
-import { computeEventRange, formatLocation, slugify } from "./server-utils";
+import { computeEventRange, formatLocation, slugify, notifySlack } from "./server-utils";
 import { listOrgVenues, isVenueAllowed, insertOrgVenue } from "../../../lib/orgVenues";
 import { sanitizeRichText } from "../../../lib/sanitize";
 import { isDefaultCoverSettings, normalizeCoverSettings } from "../../../lib/eventCover";
 import { isDefaultPageSettings, normalizePageSettings } from "../../../lib/eventPageSettings";
+import { identityPublishBlocker } from "../../../lib/producerIdentity";
+import { refreshEventRisk } from "../../../lib/eventRisk";
 
 /** Guarda la categoría del evento vía category_tags(name) + event_tags (reemplaza las anteriores). */
 export async function syncEventCategory(eventId: number, category: string | null | undefined) {
@@ -319,11 +321,33 @@ export async function setEventStatus(
             throw new EventInputError("Para publicar, el evento debe tener al menos una función (fecha y hora).");
         }
         if (!ticketsCount) throw new EventInputError("Para publicar, el evento debe tener al menos un tipo de entrada.");
+        // Términos para productores §2 bis: entradas pagadas => identidad verificada con Didit
+        const identityBlocker = await identityPublishBlocker(supabaseAdmin, orgId, event.id);
+        if (identityBlocker) throw new EventInputError(identityBlocker);
         if (!event.accessibility) update.accessibility = "public";
         if (datesCount) await refreshEventDenorm(event.id);
     }
 
     const { error } = await supabaseAdmin.from("events").update(update).eq("id", event.id).eq("organization_id", orgId);
     if (error) throw error;
-    return { becamePublished: status === "published" && event.status !== "published" };
+    const becamePublished = status === "published" && event.status !== "published";
+    if (becamePublished) await onEventPublished(supabaseAdmin, event.id);
+    return { becamePublished };
+}
+
+/** Al publicar: recalcula el riesgo (reserva y documentos exigidos) y avisa a Slack si es alto. Nunca lanza. */
+async function onEventPublished(supabaseAdmin: any, eventId: number): Promise<void> {
+    try {
+        const risk = await refreshEventRisk(supabaseAdmin, eventId);
+        if (risk?.level === "high") {
+            const { data: ev } = await supabaseAdmin.from("events").select("id, name, slug, organization_id").eq("id", eventId).maybeSingle();
+            await notifySlack(
+                `⚠️ *Evento de riesgo ALTO publicado*\n• *Evento:* ${ev?.name || eventId} (#${eventId}, org ${ev?.organization_id ?? "?"})\n` +
+                    `• *Score:* ${risk.score} · reserva ${risk.reserve_pct}%${risk.requires_documents ? " · exige documentos" : ""}\n` +
+                    `• *Señales:* ${risk.signals.map((s) => s.label).join(", ") || "—"}\n• *Link:* https://aitickets.cl/eventos/${ev?.slug || ""}`,
+            );
+        }
+    } catch (err: any) {
+        console.error("riesgo del evento al publicar:", err?.message);
+    }
 }

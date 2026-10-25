@@ -165,7 +165,7 @@ const submitForm = async (event) => {
         <span aria-hidden="true" class="hidden sm:inline">|</span>
         <a href="/privacy" class="hover:underline">Aviso de privacidad</a>
       </div>
-      <p class="mt-3 text-xs text-gray-400">© 2026 {{ LEGAL.entity }} · {{ LEGAL.brand }}</p>
+      <p class="mt-3 text-xs text-gray-400">© 2026 {{ LEGAL.brand }}</p>
     </div>
 
   </footer>

@@ -136,7 +136,7 @@ export function buildSystemPrompt({ event, isDemo, feeAbsorbed = false, dates, t
   )
   const faqLines = faqs.map(f => `- P: ${stripHtml(f.question).slice(0, 300)}\n  R: ${stripHtml(f.answer).slice(0, 600)}`)
 
-  return `Eres el asistente virtual de AI Tickets, una plataforma de venta de entradas operada por Chanium LLC. Estás en la página del evento "${event.name}" y ayudas a las personas a resolver dudas sobre este evento y a comprar sus entradas.
+  return `Eres el asistente virtual de AI Tickets, una plataforma chilena de venta de entradas. Estás en la página del evento "${event.name}" y ayudas a las personas a resolver dudas sobre este evento y a comprar sus entradas.
 
 Reglas:
 - Responde en español de Chile, breve y amable. Usa markdown simple y, como máximo, un par de emojis.

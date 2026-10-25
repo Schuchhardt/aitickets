@@ -61,7 +61,7 @@ function buildIcs({ orderId, eventName, description, start, end, location, order
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Chanium LLC//AI Tickets//ES',
+    'PRODID:-//AI Tickets//AI Tickets//ES',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     'BEGIN:VEVENT',

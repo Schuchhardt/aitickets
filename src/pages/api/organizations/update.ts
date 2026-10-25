@@ -2,6 +2,7 @@ import type { APIRoute } from "astro";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { getSessionContext, hasRole, ORG_ADMIN_ROLES, jsonResponse } from "../../../lib/supabaseServer";
 import { notifySlack } from "../_lib/server-utils";
+import { recomputeHolderMatch, syncOrganizerLegalData } from "../../../lib/producerIdentity";
 
 // Campos editables de la organización (public.organizations) y su largo máximo
 const ORG_FIELDS: Record<string, number> = {
@@ -94,6 +95,9 @@ export const POST: APIRoute = async (context) => {
             const bankChanged = ["bank_name", "bank_account_type", "bank_account_number", "bank_account_holder", "bank_account_rut"].some((f) => f in payoutData);
             // El trigger de la BD anula la verificación solo si los datos cambiaron; se avisa a AI Tickets para revisarlos
             if (bankChanged) await notifySlack(`🏦 *Datos bancarios guardados* (org ${dbUser.organization_id}, usuario ${dbUser.id}, banco ${payoutData.bank_name || "—"}). Si cambiaron, verificar la cuenta (organization_payout_accounts.verified_at).`);
+            // Razón social y RUT visibles en la página del evento; titular de la cuenta = identidad verificada (§2 bis)
+            await syncOrganizerLegalData(supabaseAdmin, Number(dbUser.organization_id), payoutData);
+            if (bankChanged || "legal_rut" in payoutData) await recomputeHolderMatch(supabaseAdmin, Number(dbUser.organization_id));
         }
 
         return jsonResponse({ message: "Organización actualizada" }, 200);

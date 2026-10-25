@@ -6,7 +6,7 @@ test("GET /outreach/baja renderiza sin token", async ({ page }) => {
   const response = await page.goto("/outreach/baja");
   expect(response?.status()).toBe(200);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Darse de baja");
-  await expect(page.locator("body")).toContainText("Chanium LLC");
+  await expect(page.locator("body")).toContainText("AI Tickets");
   await expect(page.getByTestId("baja-confirm")).toHaveCount(0);
 });
 

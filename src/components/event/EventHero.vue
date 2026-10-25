@@ -82,6 +82,7 @@ const organizerUrl = computed(() => props.event.organization?.website || "");
         <a v-if="organizerUrl" :href="organizerUrl" target="_blank" rel="noopener" class="organizer-name ev-link">{{ organizer }}</a>
         <strong v-else class="organizer-name">{{ organizer }}</strong>
       </span>
+      <span v-if="event.organization?.verified" class="verified" title="Productor verificado por AI Tickets" aria-label="Productor verificado">✓ Verificado</span>
     </div>
 
     <div class="meta">
@@ -237,6 +238,12 @@ const organizerUrl = computed(() => props.event.organization?.website || "");
   gap: 8px;
   font-size: 14px;
   color: var(--text-2);
+}
+.verified {
+  font-size: 12px;
+  font-weight: 500;
+  color: #15803d;
+  white-space: nowrap;
 }
 .organizer-name {
   color: var(--text-1);

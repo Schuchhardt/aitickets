@@ -665,7 +665,7 @@ async function cancelLiveTickets(ctx: ToolContext, eventId: number) {
     return liveByOrder;
 }
 
-const cancelEvent: ToolDef = {
+export const cancelEvent: ToolDef = {
     name: "cancel_event",
     title: "Cancelar evento",
     description:
@@ -813,7 +813,7 @@ const cancelEvent: ToolDef = {
             notificationQueued = res.ok;
         }
         await notifySlack(
-            `🛑 *Evento ${plan.resuming ? "cancelado (reintento: completando lo pendiente)" : "cancelado"} vía ${ctx.channel === "mcp" ? "MCP" : "API"}*\n• *Evento:* ${plan.event.name} (#${eventId})\n• *Reembolsos a procesar:* ${refundsCreated} por ${clp(refundTotal)}\n` +
+            `🛑 *Evento ${plan.resuming ? "cancelado (reintento: completando lo pendiente)" : "cancelado"} vía ${ctx.channel === "mcp" ? "MCP" : (ctx.channel as string) === "admin" ? "ADMIN (devolución directa, sin autorización del productor)" : "API"}*\n• *Evento:* ${plan.event.name} (#${eventId})\n• *Reembolsos a procesar:* ${refundsCreated} por ${clp(refundTotal)}\n` +
                 `• *Saldo del productor en el evento:* ${clp(plan.balance.available)}\n• *Aviso a compradores:* ${notificationQueued ? "en cola" : "NO enviado"}\n• *Por:* ${ctx.actor.name || ctx.actor.email}`,
         );
         return {

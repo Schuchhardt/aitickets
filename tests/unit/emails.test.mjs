@@ -24,10 +24,11 @@ describe('plantillas de correo', () => {
       expect(html.startsWith('<!DOCTYPE html')).toBe(true)
       expect(html).not.toMatch(/rel="preload"/)
       expect(html).toContain('alt="AI Tickets"')
-      // Pie mínimo: solo marca y operador
-      expect(html).toContain('AI Tickets · Chanium LLC')
+      // Pie mínimo: solo la marca (sin razón social ni RUT)
+      expect(html).toContain('AI Tickets')
+      expect(html).not.toMatch(/EIRL|77\.893\.286|Chanium/)
       expect(html).not.toContain('https://aitickets.cl/terms')
-      expect(text).toContain('Chanium LLC')
+      expect(text).not.toMatch(/EIRL|Chanium/)
       expect(text).not.toContain(LOGO)
       for (const out of [subject, html, text]) {
         expect(out).not.toMatch(/undefined|\bnull\b|NaN|\[object Object\]/)

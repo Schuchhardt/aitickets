@@ -308,7 +308,7 @@ onMounted(() => {
       </template>
     </section>
 
-    <!-- No retracto (solo compras pagadas) -->
+    <!-- Aceptación de términos + no retracto (solo compras pagadas). La identidad del proveedor está en /terms. -->
     <section v-if="!isFree" class="block">
       <div class="check" :class="errors.withdrawal ? shakeClass : ''">
         <input
@@ -322,7 +322,9 @@ onMounted(() => {
           :aria-describedby="errors.withdrawal ? `pay-withdrawal-err-${event.id}` : undefined"
           @change="errors.withdrawal = ''"
         />
-        <label :for="`pay-withdrawal-${event.id}`" class="check-label">Entiendo que las entradas no tienen derecho a retracto.</label>
+        <label :for="`pay-withdrawal-${event.id}`" class="check-label">
+          Acepto los <a href="/terms" target="_blank" rel="noopener">Términos y condiciones</a> vigentes y entiendo que las entradas no tienen derecho a retracto.
+        </label>
       </div>
       <button type="button" class="ev-link conditions-toggle" :aria-expanded="showConditions ? 'true' : 'false'" @click="showConditions = !showConditions">Ver condiciones</button>
       <div class="ev-collapse" :class="{ 'is-open': showConditions }">
@@ -543,6 +545,7 @@ onMounted(() => {
   line-height: 18px;
   color: var(--text-2);
 }
+.check-label a,
 .conditions a,
 .legal a {
   color: var(--text-2);

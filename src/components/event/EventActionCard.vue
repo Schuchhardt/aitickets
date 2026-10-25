@@ -6,6 +6,7 @@ import RsvpForm from "./RsvpForm.vue";
 import NotifyForm from "./NotifyForm.vue";
 import QuantityStepper from "./QuantityStepper.vue";
 import AnimatedNumber from "./AnimatedNumber.vue";
+import EventTrust from "./EventTrust.vue";
 import {
   formatCLP,
   formatSaleStart,
@@ -174,6 +175,8 @@ function buySimple() {
     <button v-if="ordersCount > 0 && !state.startsWith('free')" type="button" class="ev-link orders-link" @click="emit('view-orders')">
       Ver mis entradas ({{ ordersCount }})
     </button>
+
+    <EventTrust :event="event" />
   </section>
 </template>
 
