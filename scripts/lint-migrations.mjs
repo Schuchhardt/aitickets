@@ -137,9 +137,12 @@ export function lintMigration(file, sql) {
     report(m.index, `referencia a ${m[1]}.${m[2]}: solo se permiten FKs (REFERENCES auth.users)`);
   }
 
-  // Objetos nuevos con prefijo aitickets_
-  for (const m of code.matchAll(new RegExp(String.raw`\bCREATE\s+(?:UNLOGGED\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?${NAME}`, 'gi'))) {
-    if (!isAitickets(m[1])) report(m.index, `CREATE TABLE ${m[1]}: las tablas nuevas deben llamarse public.aitickets_*`);
+  // Objetos nuevos con prefijo aitickets_. Excepción: recrear (IF NOT EXISTS) una tabla histórica de AI Tickets
+  // de la allowlist que falte en la base real (p. ej. ad_campaigns, que solo existía en db/schema.sql).
+  for (const m of code.matchAll(new RegExp(String.raw`\bCREATE\s+(?:UNLOGGED\s+)?TABLE\s+(IF\s+NOT\s+EXISTS\s+)?${NAME}`, 'gi'))) {
+    if (isAitickets(m[2])) continue;
+    if (m[1] && AITICKETS_TABLES.includes(normalizeName(m[2]).name) && normalizeName(m[2]).schema === 'public') continue;
+    report(m.index, `CREATE TABLE ${m[2]}: las tablas nuevas deben llamarse public.aitickets_*`);
   }
   for (const m of code.matchAll(new RegExp(String.raw`\bCREATE\s+(?:OR\s+REPLACE\s+)?(FUNCTION|PROCEDURE)\s+${NAME}`, 'gi'))) {
     if (!isAitickets(m[2])) report(m.index, `CREATE ${m[1].toUpperCase()} ${m[2]}: las funciones nuevas deben llamarse public.aitickets_*`);

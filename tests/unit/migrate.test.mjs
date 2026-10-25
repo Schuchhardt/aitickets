@@ -191,6 +191,12 @@ describe('lint de migraciones', () => {
     expect(lintMigration('202609270900_ok.sql', 'create table if not exists public.aitickets_leads (id int);')).toEqual([])
   })
 
+  it('permite recrear con IF NOT EXISTS solo tablas históricas de la allowlist', () => {
+    expect(lintMigration('202609270900_ok.sql', 'create table if not exists public.ad_campaigns (id int);')).toEqual([])
+    expect(lintMigration('202609270900_bad.sql', 'create table public.ad_campaigns (id int);')).toHaveLength(1)
+    expect(lintMigration('202609270900_bad.sql', 'create table if not exists public.profiles (id int);')).toHaveLength(1)
+  })
+
   it('permite FKs a auth.users pero no otras referencias a auth.*', () => {
     expect(lintMigration('202609270900_ok.sql', 'create table public.aitickets_x (uid uuid references auth.users(id));')).toEqual([])
     expect(lintMigration('202609270900_bad.sql', 'select * from auth.users;')).toHaveLength(1)

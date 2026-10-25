@@ -19,6 +19,74 @@
 --    zernio_request: el cuerpo exacto enviado a Zernio (sin secretos). Si la creación se cortó (timeout) la fila queda
 --    'creating' y se reenvía ese mismo cuerpo con la misma Idempotency-Key: Zernio devuelve el anuncio ya creado en
 --    vez de crear otro, así nunca queda un anuncio gastando sin que AI Tickets lo sepa.
+--
+-- 0) La integración directa con Meta nunca llegó a producción: ahí NO existen ad_account_connections ni ad_campaigns
+--    (db/schema.sql sí las trae, por eso el CI no lo detectaba). Se crean con la definición de db/schema.sql si faltan,
+--    con RLS activado sin políticas y sin acceso para anon/authenticated (igual que 20260926_Z_lockdown_rls.sql).
+
+CREATE TABLE IF NOT EXISTS public.ad_account_connections (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  organization_id bigint NOT NULL,
+  platform text NOT NULL DEFAULT 'meta'::text,
+  meta_ad_account_id text,
+  meta_user_id text,
+  account_name text,
+  access_token text,
+  token_expires_at timestamp with time zone,
+  status text NOT NULL DEFAULT 'active'::text,
+  CONSTRAINT ad_account_connections_pkey PRIMARY KEY (id),
+  CONSTRAINT ad_account_connections_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_ad_account_connections_org ON public.ad_account_connections(organization_id);
+
+CREATE TABLE IF NOT EXISTS public.ad_campaigns (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  organization_id bigint NOT NULL,
+  event_id bigint NOT NULL,
+  ad_account_connection_id bigint NOT NULL,
+  meta_campaign_id text,
+  name text NOT NULL,
+  objective text NOT NULL DEFAULT 'OUTCOME_TRAFFIC'::text,
+  status text NOT NULL DEFAULT 'draft'::text,
+  daily_budget numeric NOT NULL DEFAULT 0,
+  total_budget numeric,
+  currency text NOT NULL DEFAULT 'CLP'::text,
+  start_date timestamp with time zone,
+  end_date timestamp with time zone,
+  ad_copy text,
+  headline text,
+  image_urls text[] DEFAULT '{}',
+  call_to_action text DEFAULT 'LEARN_MORE'::text,
+  destination_url text,
+  target_audience jsonb DEFAULT '{}'::jsonb,
+  impressions bigint DEFAULT 0,
+  clicks bigint DEFAULT 0,
+  spend numeric DEFAULT 0,
+  conversions bigint DEFAULT 0,
+  reach bigint DEFAULT 0,
+  cpc numeric DEFAULT 0,
+  cpm numeric DEFAULT 0,
+  last_synced_at timestamp with time zone,
+  meta_adset_id text,
+  meta_ad_id text,
+  error_message text,
+  CONSTRAINT ad_campaigns_pkey PRIMARY KEY (id),
+  CONSTRAINT ad_campaigns_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
+  CONSTRAINT ad_campaigns_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.events(id) ON DELETE CASCADE,
+  CONSTRAINT ad_campaigns_ad_account_connection_id_fkey FOREIGN KEY (ad_account_connection_id) REFERENCES public.ad_account_connections(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_ad_campaigns_org ON public.ad_campaigns(organization_id);
+CREATE INDEX IF NOT EXISTS idx_ad_campaigns_event ON public.ad_campaigns(event_id);
+
+ALTER TABLE public.ad_account_connections ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ad_campaigns ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.ad_account_connections FROM anon, authenticated;
+REVOKE ALL ON TABLE public.ad_campaigns FROM anon, authenticated;
 
 ALTER TABLE public.ad_account_connections
   ADD COLUMN IF NOT EXISTS provider text NOT NULL DEFAULT 'meta_direct',
