@@ -1,5 +1,5 @@
 // Herramientas: cuenta, eventos y lugares.
-import { ToolError, type ToolDef, type ToolContext } from "../registry";
+import { ToolError, type ToolDef, type ToolContext, channelLabel } from "../registry";
 import { SCOPE_LABELS } from "../keys";
 import { PERMISSION_LABELS, ROLE_LABELS, ROLE_PERMISSIONS } from "../permissions";
 import {
@@ -333,7 +333,7 @@ const createEvent: ToolDef = {
             })),
         };
         const created = await createEventGraph({ userId: ctx.actor.userId, orgId: ctx.actor.orgId }, input).catch(rethrowEventInput);
-        await notifySlack(`🤖 *Nuevo evento creado vía ${ctx.channel === "mcp" ? "MCP" : "API"}*\n• *Nombre:* ${created.name}\n• *Link:* /eventos/${created.slug}`);
+        await notifySlack(`🤖 *Nuevo evento creado vía ${channelLabel(ctx.channel)}*\n• *Nombre:* ${created.name}\n• *Link:* /eventos/${created.slug}`);
         let preview: { url: string; expires_at: string | null } | null = null;
         try {
             const p = await createPreviewLink(
@@ -541,7 +541,7 @@ const setStatus: ToolDef = {
         const event = await loadOwnedEvent<any>(ctx, args.event_id, "id, name, slug, status, accessibility, start_date");
         const { becamePublished } = await setEventStatus(event, ctx.actor.orgId, args.status).catch(rethrowEventInput);
         if (becamePublished) {
-            await notifySlack(`🚀 *Evento publicado vía ${ctx.channel === "mcp" ? "MCP" : "API"}*\n• *Evento:* ${event.name}\n• *Por:* ${ctx.actor.name || ctx.actor.email}\n• *Link:* ${eventPublicUrl(ctx, event.slug)}`);
+            await notifySlack(`🚀 *Evento publicado vía ${channelLabel(ctx.channel)}*\n• *Evento:* ${event.name}\n• *Por:* ${ctx.actor.name || ctx.actor.email}\n• *Link:* ${eventPublicUrl(ctx, event.slug)}`);
         }
         return { event_id: Number(event.id), status: args.status, ...eventUrls(ctx, { slug: event.slug, status: args.status }) };
     },

@@ -3,7 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createFakeSupabase } from '../fixtures/fake-supabase.mjs'
 
 let db
+const mocks = vi.hoisted(() => ({ notifySlack: vi.fn(async () => {}) }))
 vi.mock('../../src/lib/auth-helpers', () => ({ getSupabaseAdmin: () => db, getFriendlyErrorMessage: (e) => String(e?.message || e) }))
+vi.mock('../../src/pages/api/_lib/server-utils', async (orig) => ({ ...(await orig()), notifySlack: mocks.notifySlack }))
 
 const { runTool } = await import('../../src/lib/producer-api/registry.ts')
 const { financeTools } = await import('../../src/lib/producer-api/tools/finance.ts')
@@ -64,7 +66,10 @@ const ctx = (role = 'producer', scopes = ['read', 'finance']) => ({
 
 const call = (name, args = {}, c = ctx()) => runTool(tool(name), args, c)
 
-beforeEach(() => seed())
+beforeEach(() => {
+  seed()
+  mocks.notifySlack.mockClear()
+})
 
 describe('ledger', () => {
   it('saldo: disponible tras 48 h, pendiente si no termina, cancelado retenido; sin doble resta de reembolsos totales', async () => {
@@ -187,7 +192,17 @@ describe('saldo y retiros', () => {
     expect(done.ok).toBe(true)
     expect(done.result).toMatchObject({ status: 'requested', amount: 30000, account_last4: '6789' })
     const rows = db.tables.event_withdrawals.filter((w) => w.payout_id === done.result.payout_id)
-    expect(rows).toEqual([expect.objectContaining({ event_id: 10, amount: 30000, status: 'requested', account_number: '000123456789' })])
+    // El reparto por evento guarda solo datos enmascarados (mismo formato que aitickets_mask_* en la BD)
+    expect(rows).toEqual([
+      expect.objectContaining({ event_id: 10, amount: 30000, status: 'requested', account_number: '•••• 6789', account_holder_name: 'A** P****', account_holder_rut: '••••678-9' }),
+    ])
+    expect(JSON.stringify(db.tables.event_withdrawals)).not.toContain('000123456789')
+    // El aviso a AI Tickets trae el SQL para registrar la transferencia
+    const slack = mocks.notifySlack.mock.calls.map((c) => c[0]).join('\n')
+    expect(slack).toContain(`aitickets_set_payout_status('${done.result.payout_id}', 'paid'`)
+    expect(slack).toContain(`aitickets_set_payout_status('${done.result.payout_id}', 'failed'`)
+    expect(slack).toContain('from organization_payout_accounts where organization_id = 7')
+    expect(slack).not.toContain('000123456789')
     expect((await call('get_balance')).result.available).toBe(15000)
 
     // el mismo token no ejecuta dos veces
@@ -199,6 +214,29 @@ describe('saldo y retiros', () => {
     expect(cancel.result.status).toBe('cancelled')
     expect(rows[0].status).toBe('cancelled')
     expect((await call('get_balance')).result.available).toBe(45000)
+  })
+
+  it('cuenta rechazada por AI Tickets: el productor ve el motivo y no puede retirar', async () => {
+    seed({ account: { verified_at: null, verified_by: 'ops', verification_rejected_at: iso(-1 * DAY), verification_notes: 'El RUT del titular no coincide con la cartola' } })
+    const acc = await call('get_payout_account')
+    expect(acc.result.account).toMatchObject({ status: 'rejected', rejection_reason: 'El RUT del titular no coincide con la cartola', can_request_payout: false })
+    const v = await call('get_verification_status')
+    expect(v.result.can_request_payout).toBe(false)
+    expect(v.result.missing).toEqual(
+      expect.arrayContaining([expect.objectContaining({ item: 'bank_verified', rejected: true, rejection_reason: 'El RUT del titular no coincide con la cartola', blocks_payouts: true })]),
+    )
+    expect(v.result.missing.find((m) => m.item === 'bank_verified').label).toMatch(/rechazó la cuenta: El RUT del titular/)
+    const payout = await call('request_payout')
+    expect(payout).toMatchObject({ ok: false, code: 'conflict' })
+    expect(payout.message).toMatch(/rechazó la cuenta bancaria: El RUT del titular/)
+  })
+
+  it('sin columnas de rechazo (BD sin migrar) la cuenta sigue funcionando', async () => {
+    seed()
+    db.failOn('organization_payout_accounts', 'select', { code: '42703', message: 'column verification_rejected_at does not exist' })
+    const v = await call('get_verification_status')
+    expect(v.ok).toBe(true)
+    expect(v.result.can_request_payout).toBe(true)
   })
 
   it('request_payout bloqueado sin verificación o en la espera de 72 h', async () => {

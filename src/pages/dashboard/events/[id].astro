@@ -14,8 +14,9 @@ import TrackingLinkBuilder from "../../../components/dashboard/TrackingLinkBuild
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { EVENT_MANAGER_ROLES } from "../../../lib/supabaseServer";
 import { requireDashboardSession } from "../_lib/guard";
-import { identityApproved, loadOrgIdentity } from "../../../lib/producerIdentity";
+import { identityApproved, loadOrgIdentity, ticketsRequireIdentity, IDENTITY_FREE_PAID_CAPACITY } from "../../../lib/producerIdentity";
 import { canAccessEventByStaff } from "../../../../netlify/lib/event-staff.mjs";
+import { getEventSummary } from "../../../lib/eventAnalytics";
 import {
     Calendar,
     MapPin,
@@ -49,6 +50,7 @@ const loadEvent = (coverColumn: string) => supabaseAdmin
       ticket_name,
       price,
       total_quantity,
+      is_gift,
       status
     ),
     event_dates ( id ),
@@ -72,66 +74,25 @@ if (error || !event) {
     return Astro.redirect("/dashboard/events");
 }
 
-// Calculate Stats
-const totalTickets =
-    event.event_tickets?.reduce(
-        (acc: number, t: any) => acc + (t.total_quantity || t.quantity || 0),
-        0,
-    ) || 0;
-
-// Real ticket sales from event_attendees
-const { count: ticketsSold } = await supabaseAdmin
-    .from("event_attendees")
-    .select("id", { count: "exact", head: true })
-    .eq("event_id", event.id)
-    .or("status.is.null,status.neq.cancelled"); // anuladas (reembolsos) no cuentan
-
-// Real revenue from paid orders
-const { data: ordersData } = await supabaseAdmin
-    .from("event_orders")
-    .select("amount")
-    .eq("event_id", event.id)
-    .eq("status", "paid");
-const totalRevenue = ordersData?.reduce((sum, o) => sum + (o.amount || 0), 0) || 0;
-
-// Per-ticket sales counts
-const { data: ticketSalesData } = await supabaseAdmin
-    .from("event_attendees")
-    .select("event_ticket_id")
-    .eq("event_id", event.id)
-    .or("status.is.null,status.neq.cancelled");
-const ticketSalesMap: Record<string, number> = {};
-ticketSalesData?.forEach((ea: any) => {
-    ticketSalesMap[ea.event_ticket_id] = (ticketSalesMap[ea.event_ticket_id] || 0) + 1;
-});
-
-// Total event page visits
-const { count: totalVisits } = await supabaseAdmin
-    .from("event_visits")
-    .select("id", { count: "exact", head: true })
-    .eq("event_id", event.id);
-
-// Unique visitors (by ip_hash) — fetch distinct hashes
-const { data: uniqueVisitorsData } = await supabaseAdmin
-    .from("event_visits")
-    .select("ip_hash")
-    .eq("event_id", event.id);
-const uniqueVisitors = new Set(uniqueVisitorsData?.map((v: any) => v.ip_hash)).size;
-
-const conversion = totalTickets > 0 ? Math.round(((ticketsSold || 0) / totalTickets) * 100) : 0;
+// Tarjetas: src/lib/eventAnalytics.ts (paginado y con las mismas definiciones que la analítica y la API).
+// Entradas vendidas sin cortesías ni transferencias (las cortesías se muestran aparte); conversión = órdenes ÷
+// visitantes únicos; ocupación = emitidas ÷ capacidad a la venta.
+const summary = await getEventSummary(supabaseAdmin, { id: Number(event.id), status: event.status });
+const fmtPct = (v: number | null) => (v == null ? "—" : `${v.toLocaleString("es-CL")}%`);
+const ticketSalesMap = summary.issued_by_ticket_type_id;
 
 const publicLink = `/eventos/${event.slug}`;
 const siteUrl = (siteUrlFromEnv() || Astro.url.origin).replace(/\/+$/, "");
 const activeTickets = (event.event_tickets || []).filter((t: any) => t.status !== "unavailable");
 const courtesyTickets = activeTickets.map((t: any) => ({ id: t.id, ticket_name: t.ticket_name }));
 const hasDates = (event.event_dates?.length || 0) > 0 || !!event.start_date;
-// Entradas pagadas => identidad verificada (Términos para productores §2 bis; mismo control que setEventStatus)
-const hasPaidTickets = (event.event_tickets || []).some((t: any) => Number(t.price) > 0);
-const identityOk = !hasPaidTickets || identityApproved(await loadOrgIdentity(supabaseAdmin, Number(dbUser.organization_id)).catch(() => null));
+// Más de 10 cupos pagados => identidad verificada (Términos para productores §2 bis; mismo control que setEventStatus)
+const needsIdentity = ticketsRequireIdentity(event.event_tickets || []);
+const identityOk = !needsIdentity || identityApproved(await loadOrgIdentity(supabaseAdmin, Number(dbUser.organization_id)).catch(() => null));
 const publishBlockers = [
     !hasDates ? "Agrega al menos una función (fecha y hora)." : null,
     activeTickets.length === 0 ? "Agrega al menos un tipo de entrada." : null,
-    !identityOk ? "Verifica tu identidad en Configuración > Verificación de identidad: es obligatorio para vender entradas pagadas." : null,
+    !identityOk ? `Verifica tu identidad en Configuración > Verificación de identidad: es obligatorio para vender más de ${IDENTITY_FREE_PAID_CAPACITY} entradas pagadas.` : null,
 ].filter(Boolean);
 ---
 
@@ -239,8 +200,8 @@ const publishBlockers = [
                 </div>
             </div>
             <p class="text-gray-500 text-sm mb-1">Visitas Totales</p>
-            <h3 class="text-xl sm:text-2xl font-bold break-words">{totalVisits || 0}</h3>
-            <p class="text-xs text-gray-400 mt-1">{uniqueVisitors} visitantes únicos</p>
+            <h3 class="text-xl sm:text-2xl font-bold break-words">{summary.visits.toLocaleString("es-CL")}</h3>
+            <p class="text-xs text-gray-400 mt-1">{summary.unique_visitors.toLocaleString("es-CL")} visitantes únicos</p>
         </div>
 
         <div class="bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-sm min-w-0">
@@ -250,7 +211,11 @@ const publishBlockers = [
                 </div>
             </div>
             <p class="text-gray-500 text-sm mb-1">Entradas Vendidas</p>
-            <h3 class="text-xl sm:text-2xl font-bold break-words">{ticketsSold || 0} / {totalTickets}</h3>
+            <h3 class="text-xl sm:text-2xl font-bold break-words">{summary.tickets_sold.toLocaleString("es-CL")}</h3>
+            <p class="text-xs text-gray-400 mt-1">
+                {summary.capacity == null ? "Capacidad sin límite" : `Capacidad: ${summary.capacity.toLocaleString("es-CL")}`}
+                {summary.courtesy_tickets > 0 && ` · + ${summary.courtesy_tickets.toLocaleString("es-CL")} cortesías`}
+            </p>
         </div>
 
         <div class="bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-sm min-w-0">
@@ -260,7 +225,8 @@ const publishBlockers = [
                 </div>
             </div>
             <p class="text-gray-500 text-sm mb-1">Ingresos Totales</p>
-            <h3 class="text-xl sm:text-2xl font-bold break-words">${totalRevenue.toLocaleString()}</h3>
+            <h3 class="text-xl sm:text-2xl font-bold break-words">${summary.revenue_clp.toLocaleString("es-CL")}</h3>
+            <p class="text-xs text-gray-400 mt-1">{summary.paid_orders.toLocaleString("es-CL")} órdenes pagadas</p>
         </div>
         <div class="bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-sm min-w-0">
             <div class="flex justify-between items-start mb-3 sm:mb-4">
@@ -269,7 +235,8 @@ const publishBlockers = [
                 </div>
             </div>
             <p class="text-gray-500 text-sm mb-1">Conversión</p>
-            <h3 class="text-xl sm:text-2xl font-bold break-words">{conversion}%</h3>
+            <h3 class="text-xl sm:text-2xl font-bold break-words">{fmtPct(summary.conversion_pct)}</h3>
+            <p class="text-xs text-gray-400 mt-1">órdenes ÷ visitantes únicos · Ocupación {fmtPct(summary.sell_through_pct)}</p>
         </div>
     </div>
 

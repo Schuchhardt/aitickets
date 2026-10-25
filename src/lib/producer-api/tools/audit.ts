@@ -84,13 +84,24 @@ async function loadMoneyEntries(ctx: ToolContext, args: any, limit: number): Pro
     return out;
 }
 
+/**
+ * Quién hizo la acción. Canal 'admin' con usuario = soporte actuando por pedido de la organización (MCP de admin,
+ * org_*); sin usuario = AI Tickets por su cuenta (devolución directa, src/lib/adminDirectRefund.ts).
+ */
+const SUPPORT_LABEL = "Soporte AI Tickets";
+function entryUser(e: { user_id: number | null; channel: string | null }, names: Map<number, string>): string | null {
+    if (e.channel === "admin") return e.user_id != null ? SUPPORT_LABEL : "AI Tickets";
+    if (e.user_id != null) return names.get(Number(e.user_id)) || `Usuario ${e.user_id}`;
+    return e.channel === "aitickets" ? "AI Tickets" : null;
+}
+
 const listAuditLog: ToolDef = {
     name: "list_audit_log",
     title: "Bitácora de acciones",
     description:
         "Quién hizo qué y cuándo: acciones hechas vía API/MCP (publicar, editar, reembolsar, retirar, invitar…, con usuario, canal y resultado) " +
         "más los movimientos de plata (retiros y reembolsos solicitados, pagados o anulados). Más reciente primero. " +
-        "Las acciones hechas en el panel web solo aparecen si mueven plata.",
+        "Las acciones hechas en el panel web solo aparecen si mueven plata. Las del equipo de AI Tickets (canal admin) aparecen como Soporte AI Tickets.",
     scope: "read",
     permission: "audit.read",
     annotations: { readOnlyHint: true },
@@ -136,7 +147,7 @@ const listAuditLog: ToolDef = {
         }
         return {
             count: entries.length,
-            entries: entries.map((e) => ({ ...e, at_local: fmt(e.at), user: e.user_id != null ? names.get(Number(e.user_id)) || `Usuario ${e.user_id}` : e.channel === "aitickets" ? "AI Tickets" : null })),
+            entries: entries.map((e) => ({ ...e, at_local: fmt(e.at), user: entryUser(e, names) })),
         };
     },
 };
@@ -190,7 +201,8 @@ const exportOrders: ToolDef = {
             }),
             { orders: 0, tickets: 0, total_paid_clp: 0, producer_net_clp: 0, service_fees_clp: 0, discounts_clp: 0, refunded_clp: 0 },
         );
-        const { token, expiresAt } = signExportToken({ org: ctx.actor.orgId, uid: ctx.actor.userId, events: eventIds, from, to });
+        // adm: lo pidió el MCP de admin (usuario de servicio sin organización); /api/exports/orders lo valida aparte
+        const { token, expiresAt } = signExportToken({ org: ctx.actor.orgId, uid: ctx.actor.userId, events: eventIds, from, to, ...(ctx.channel === "admin" ? { adm: true } : {}) });
         return {
             ...(args.event_id ? { event_id: Number(args.event_id) } : {}),
             row_count: rows.length,

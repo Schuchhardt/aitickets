@@ -92,7 +92,7 @@ export type CreatePreviewLinkInput = {
     expiresInHours?: number | null;
     singleUse?: boolean;
     label?: string | null;
-    via?: "dashboard" | "mcp" | "rest";
+    via?: "dashboard" | "mcp" | "rest" | "admin";
     origin: string;
 };
 

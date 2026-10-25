@@ -322,7 +322,8 @@ export async function setEventStatus(
         }
         if (!ticketsCount) throw new EventInputError("Para publicar, el evento debe tener al menos un tipo de entrada.");
         // Términos para productores §2 bis: entradas pagadas => identidad verificada con Didit
-        const identityBlocker = await identityPublishBlocker(supabaseAdmin, orgId, event.id);
+        // Solo al pasar a publicado: los eventos ya publicados antes de esta regla siguen a la venta
+        const identityBlocker = event.status === "published" ? null : await identityPublishBlocker(supabaseAdmin, orgId, event.id);
         if (identityBlocker) throw new EventInputError(identityBlocker);
         if (!event.accessibility) update.accessibility = "public";
         if (datesCount) await refreshEventDenorm(event.id);

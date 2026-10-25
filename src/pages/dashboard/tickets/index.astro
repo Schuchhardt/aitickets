@@ -3,6 +3,8 @@ import DashboardLayout from "../../../layouts/DashboardLayout.astro";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { EVENT_MANAGER_ROLES } from "../../../lib/supabaseServer";
 import { requireDashboardSession } from "../_lib/guard";
+import { getStaffEventIds } from "../../../../netlify/lib/event-staff.mjs";
+import { fetchAll } from "../../../lib/producer-api/tools/common";
 import {
     Ticket,
     Calendar,
@@ -23,9 +25,12 @@ const { dbUser } = guard.session;
 const supabaseAdmin = getSupabaseAdmin();
 
 const now = new Date().toISOString();
+// Equipo asignado a ciertos eventos (aitickets_event_staff): solo ve las entradas de esos eventos
+const staffEventIds = await getStaffEventIds(supabaseAdmin, dbUser.id);
+const onlyStaffEvents = <Q,>(query: Q): Q => (staffEventIds ? (query as any).in("id", staffEventIds) : query);
 
 // Fetch current events (end_date >= now or start_date >= now)
-const { data: currentEvents } = await supabaseAdmin
+const { data: currentEvents } = await onlyStaffEvents(supabaseAdmin
     .from("events")
     .select(
         `
@@ -42,16 +47,17 @@ const { data: currentEvents } = await supabaseAdmin
       ticket_name,
       price,
       total_quantity,
-      status
+      status,
+      is_gift
     )
   `,
     )
-    .eq("organization_id", dbUser.organization_id)
+    .eq("organization_id", dbUser.organization_id))
     .or(`end_date.gte.${now},end_date.is.null`)
     .order("start_date", { ascending: true });
 
 // Fetch past events (end_date < now)
-const { data: pastEvents } = await supabaseAdmin
+const { data: pastEvents } = await onlyStaffEvents(supabaseAdmin
     .from("events")
     .select(
         `
@@ -68,62 +74,52 @@ const { data: pastEvents } = await supabaseAdmin
       ticket_name,
       price,
       total_quantity,
-      status
+      status,
+      is_gift
     )
   `,
     )
-    .eq("organization_id", dbUser.organization_id)
+    .eq("organization_id", dbUser.organization_id))
     .lt("end_date", now)
     .order("end_date", { ascending: false });
 
-// Function to get ticket stats for an event
-async function getTicketStats(eventId: number) {
-    // Get attendees count per ticket type
-    const { data: attendees } = await supabaseAdmin
-        .from("event_attendees")
-        .select("id, event_ticket_id, event_order_id")
-        .eq("event_id", eventId)
-        .or("status.is.null,status.neq.cancelled"); // anuladas (reembolsos) no cuentan como vendidas
+type AttendeeRow = {
+    id: string;
+    name: string;
+    email: string;
+    ticketType: string;
+    price: number;
+    isFree: boolean;
+    isComplimentary: boolean;
+    purchaseDate: string;
+    status: string | null;
+    validated: boolean;
+};
+type TicketStats = {
+    /** Entradas vendidas: vigentes, de órdenes pagadas (o gratis sin orden), sin cortesías. */
+    totalSold: number;
+    /** Cortesías vigentes (se muestran aparte; no son ventas). */
+    courtesy: number;
+    /** Emitidas vigentes por tipo de entrada (incluye cortesías: es el stock usado). */
+    byTicketType: Record<number, number>;
+    /** Ocupación de los tipos a la venta con cupo: emitidas ÷ cupo (sin el tipo "Cortesía" del sistema). */
+    occupancyPct: number;
+};
 
-    // Get paid orders for this event
-    const { data: paidOrders } = await supabaseAdmin
-        .from("event_orders")
-        .select("id")
-        .eq("event_id", eventId)
-        .eq("status", "paid");
-
-    const paidOrderIds = new Set(paidOrders?.map((o) => o.id) || []);
-
-    // Count sold tickets: attendees with paid order OR attendees without order (free tickets)
-    const soldAttendees =
-        attendees?.filter((a) => {
-            if (a.event_order_id === null) return true; // Free ticket
-            return paidOrderIds.has(a.event_order_id); // Paid order
-        }) || [];
-
-    return {
-        totalSold: soldAttendees.length,
-        byTicketType: soldAttendees.reduce(
-            (acc, a) => {
-                const ticketId = a.event_ticket_id;
-                acc[ticketId] = (acc[ticketId] || 0) + 1;
-                return acc;
-            },
-            {} as Record<number, number>,
-        ),
-    };
-}
-
-// Function to get attendee list for an event
-async function getAttendeeList(eventId: number) {
-    // Get all attendees with their ticket and attendee info
-    const { data: eventAttendees } = await supabaseAdmin
-        .from("event_attendees")
-        .select(
-            `
+/**
+ * Entradas de un evento con su listado. Paginado (fetchAll): antes las órdenes pagadas se cortaban en 1000 y las
+ * entradas de órdenes posteriores dejaban de contarse.
+ */
+async function loadEventTickets(event: any): Promise<{ stats: TicketStats; attendees: AttendeeRow[] }> {
+    const [eventAttendeesRows, paidOrders] = await Promise.all([
+        fetchAll<any>(() => supabaseAdmin
+            .from("event_attendees")
+            .select(
+                `
       id,
       created_at,
       event_order_id,
+      event_ticket_id,
       status,
       validated_at,
       is_complimentary,
@@ -139,56 +135,68 @@ async function getAttendeeList(eventId: number) {
         email
       )
     `,
-        )
-        .eq("event_id", eventId)
-        .order("created_at", { ascending: false });
+            )
+            .eq("event_id", event.id)
+            .order("created_at", { ascending: false })
+            .order("id", { ascending: true })),
+        fetchAll<{ id: string }>(() => supabaseAdmin
+            .from("event_orders")
+            .select("id")
+            .eq("event_id", event.id)
+            .eq("status", "paid")
+            .order("id", { ascending: true })),
+    ]);
+    const paidOrderIds = new Set(paidOrders.map((o) => o.id));
 
-    // Get paid orders for filtering
-    const { data: paidOrders } = await supabaseAdmin
-        .from("event_orders")
-        .select("id, created_at, amount")
-        .eq("event_id", eventId)
-        .eq("status", "paid");
+    // Entradas de órdenes pagadas o sin orden (gratis antiguas)
+    const valid = eventAttendeesRows.filter((a: any) => a.event_order_id === null || paidOrderIds.has(a.event_order_id));
+    const active = valid.filter((a: any) => a.status !== "cancelled"); // anuladas (reembolsos) no cuentan
+    const byTicketType: Record<number, number> = {};
+    let courtesy = 0;
+    for (const a of active) {
+        byTicketType[a.event_ticket_id] = (byTicketType[a.event_ticket_id] || 0) + 1;
+        if (a.is_complimentary === true) courtesy += 1;
+    }
+    const limited = (event.event_tickets || []).filter((t: any) => !t.is_gift && t.total_quantity != null);
+    const capacity = limited.reduce((sum: number, t: any) => sum + (Number(t.total_quantity) || 0), 0);
+    const issued = limited.reduce((sum: number, t: any) => sum + (byTicketType[t.id] || 0), 0);
 
-    const paidOrderMap = new Map(paidOrders?.map((o) => [o.id, o]) || []);
-
-    // Filter attendees: those with paid orders OR those without orders (free)
-    const validAttendees =
-        eventAttendees?.filter((a) => {
-            if (a.event_order_id === null) return true;
-            return paidOrderMap.has(a.event_order_id);
-        }) || [];
-
-    return validAttendees.map((a: any) => ({
-        id: a.id,
-        name:
-            `${a.attendees?.first_name || ""} ${a.attendees?.last_name || ""}`.trim() ||
-            "Sin nombre",
-        email: a.attendees?.email || "Sin email",
-        ticketType: a.event_tickets?.ticket_name || "N/A",
-        price: a.event_tickets?.price || 0,
-        isFree: a.event_order_id === null,
-        isComplimentary: a.is_complimentary,
-        purchaseDate: a.created_at,
-        status: a.status,
-        validated: !!a.validated_at,
-    }));
+    return {
+        stats: {
+            totalSold: active.length - courtesy,
+            courtesy,
+            byTicketType,
+            occupancyPct: capacity > 0 ? Math.min(100, Math.round((issued / capacity) * 100)) : 0,
+        },
+        attendees: valid.map((a: any) => ({
+            id: a.id,
+            name:
+                `${a.attendees?.first_name || ""} ${a.attendees?.last_name || ""}`.trim() ||
+                "Sin nombre",
+            email: a.attendees?.email || "Sin email",
+            ticketType: a.event_tickets?.ticket_name || "N/A",
+            price: a.event_tickets?.price || 0,
+            isFree: a.event_order_id === null,
+            isComplimentary: a.is_complimentary,
+            purchaseDate: a.created_at,
+            status: a.status,
+            validated: !!a.validated_at,
+        })),
+    };
 }
 
-// Pre-compute stats for all events
-const eventStats: Record<
-    number,
-    { totalSold: number; byTicketType: Record<number, number> }
-> = {};
-const eventAttendees: Record<
-    number,
-    ReturnType<typeof getAttendeeList> extends Promise<infer T> ? T : never
-> = {};
+// Pre-compute stats for all events (en paralelo, de a 6 eventos)
+const eventStats: Record<number, TicketStats> = {};
+const eventAttendees: Record<number, AttendeeRow[]> = {};
 
 const allEvents = [...(currentEvents || []), ...(pastEvents || [])];
-for (const event of allEvents) {
-    eventStats[event.id] = await getTicketStats(event.id);
-    eventAttendees[event.id] = await getAttendeeList(event.id);
+for (let i = 0; i < allEvents.length; i += 6) {
+    const batch = allEvents.slice(i, i + 6);
+    const loaded = await Promise.all(batch.map((event) => loadEventTickets(event)));
+    batch.forEach((event, j) => {
+        eventStats[event.id] = loaded[j].stats;
+        eventAttendees[event.id] = loaded[j].attendees;
+    });
 }
 
 // Format price
@@ -295,19 +303,7 @@ function formatDate(dateString: string | null): string {
                             {currentEvents.map((event) => {
                                 const stats = eventStats[event.id];
                                 const attendees = eventAttendees[event.id];
-                                const totalTickets =
-                                    event.event_tickets?.reduce(
-                                        (sum, t) =>
-                                            sum + (t.total_quantity || 0),
-                                        0,
-                                    ) || 0;
-                                const soldPercentage =
-                                    totalTickets > 0
-                                        ? Math.round(
-                                              (stats.totalSold / totalTickets) *
-                                                  100,
-                                          )
-                                        : 0;
+                                const soldPercentage = stats.occupancyPct;
 
                                 return (
                                     <div
@@ -368,6 +364,11 @@ function formatDate(dateString: string | null): string {
                                                     <p class="text-xs text-gray-500">
                                                         vendidas
                                                     </p>
+                                                    {stats.courtesy > 0 && (
+                                                        <p class="text-xs text-gray-400">
+                                                            + {stats.courtesy} cortesías
+                                                        </p>
+                                                    )}
                                                 </div>
                                                 <div class="w-12 sm:w-24">
                                                     <div class="flex justify-end sm:justify-between text-xs mb-1">
@@ -406,8 +407,9 @@ function formatDate(dateString: string | null): string {
                                                                     ticket.id
                                                                 ] || 0;
                                                             const available =
-                                                                (ticket.total_quantity ||
-                                                                    0) - sold;
+                                                                ticket.total_quantity == null
+                                                                    ? "Sin límite"
+                                                                    : Math.max(0, ticket.total_quantity - sold);
                                                             const ticketPercentage =
                                                                 ticket.total_quantity
                                                                     ? Math.round(
@@ -452,7 +454,7 @@ function formatDate(dateString: string | null): string {
                                                                     <div class="space-y-2">
                                                                         <div class="flex justify-between text-sm">
                                                                             <span class="text-gray-500">
-                                                                                Vendidas
+                                                                                {ticket.is_gift ? "Emitidas" : "Vendidas"}
                                                                             </span>
                                                                             <span class="font-semibold text-green-600">
                                                                                 {
@@ -671,19 +673,7 @@ function formatDate(dateString: string | null): string {
                             {pastEvents.map((event) => {
                                 const stats = eventStats[event.id];
                                 const attendees = eventAttendees[event.id];
-                                const totalTickets =
-                                    event.event_tickets?.reduce(
-                                        (sum, t) =>
-                                            sum + (t.total_quantity || 0),
-                                        0,
-                                    ) || 0;
-                                const soldPercentage =
-                                    totalTickets > 0
-                                        ? Math.round(
-                                              (stats.totalSold / totalTickets) *
-                                                  100,
-                                          )
-                                        : 0;
+                                const soldPercentage = stats.occupancyPct;
 
                                 return (
                                     <div
@@ -734,6 +724,11 @@ function formatDate(dateString: string | null): string {
                                                     <p class="text-xs text-gray-500">
                                                         vendidas
                                                     </p>
+                                                    {stats.courtesy > 0 && (
+                                                        <p class="text-xs text-gray-400">
+                                                            + {stats.courtesy} cortesías
+                                                        </p>
+                                                    )}
                                                 </div>
                                                 <div class="w-12 sm:w-24">
                                                     <div class="flex justify-end sm:justify-between text-xs mb-1">
@@ -772,8 +767,9 @@ function formatDate(dateString: string | null): string {
                                                                     ticket.id
                                                                 ] || 0;
                                                             const available =
-                                                                (ticket.total_quantity ||
-                                                                    0) - sold;
+                                                                ticket.total_quantity == null
+                                                                    ? "Sin límite"
+                                                                    : Math.max(0, ticket.total_quantity - sold);
                                                             const ticketPercentage =
                                                                 ticket.total_quantity
                                                                     ? Math.round(
@@ -818,7 +814,7 @@ function formatDate(dateString: string | null): string {
                                                                     <div class="space-y-2">
                                                                         <div class="flex justify-between text-sm">
                                                                             <span class="text-gray-500">
-                                                                                Vendidas
+                                                                                {ticket.is_gift ? "Emitidas" : "Vendidas"}
                                                                             </span>
                                                                             <span class="font-semibold text-gray-700">
                                                                                 {

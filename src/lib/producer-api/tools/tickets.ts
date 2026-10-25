@@ -3,12 +3,20 @@ import { ToolError, type ToolDef } from "../registry";
 import { eventIdSchema, loadOwnedEvent, ticketAvailability, presentTicket, TICKET_SELECT, isoOrNull, rejectCourtesyName, clp } from "./common";
 import { normalizeTicket } from "../../../pages/api/_lib/events";
 import { isTransferOrder } from "../../orderKinds";
-import { IDENTITY_REQUIRED_MESSAGE, eventHasPaidTickets, identityApproved, loadOrgIdentity } from "../../producerIdentity";
+import { IDENTITY_REQUIRED_MESSAGE, identityApproved, loadCapacityTickets, loadOrgIdentity, ticketsRequireIdentity } from "../../producerIdentity";
 
-/** Evento publicado y gratuito que pasa a vender entradas pagadas: exige identidad verificada (igual que al publicar). */
-async function assertCanSellPaid(ctx: any, event: any, price: number | undefined) {
-    if (event.status !== "published" || !(Number(price) > 0)) return;
-    if (await eventHasPaidTickets(ctx.supabase, Number(event.id))) return;
+/**
+ * Evento publicado que con este cambio pasa a vender más de 10 cupos pagados: exige identidad verificada (igual que al publicar).
+ * Los eventos que ya superaban el umbral antes de esta regla se pueden seguir editando.
+ */
+async function assertCanSellPaid(ctx: any, event: any, change: { id?: number; price?: number; total_quantity?: number | null }) {
+    if (event.status !== "published") return;
+    const current = await loadCapacityTickets(ctx.supabase, Number(event.id));
+    if (ticketsRequireIdentity(current)) return;
+    const next = change.id
+        ? current.map((t) => (Number(t.id) === Number(change.id) ? { ...t, ...change } : t))
+        : [...current, { ...change, is_gift: false }];
+    if (!ticketsRequireIdentity(next)) return;
     if (!identityApproved(await loadOrgIdentity(ctx.supabase, ctx.actor.orgId))) throw new ToolError("conflict", IDENTITY_REQUIRED_MESSAGE);
 }
 
@@ -69,7 +77,7 @@ const createTicketType: ToolDef = {
         const normalized = normalizeTicket({ name: args.name, price: args.price, quantity: args.quantity ?? null, initDate: args.sales_start, endDate: args.sales_end });
         if (!normalized) throw new ToolError("invalid_input", "Revisa nombre, precio y cantidad.");
         checkWindow(normalized.init_date, normalized.end_date);
-        await assertCanSellPaid(ctx, event, normalized.price);
+        await assertCanSellPaid(ctx, event, { price: normalized.price, total_quantity: normalized.total_quantity });
         const functionId = await resolveFunctionId(ctx, event.id, args.function_id);
         const { data, error } = await ctx.supabase
             .from("event_tickets")
@@ -122,7 +130,6 @@ const updateTicketType: ToolDef = {
             patch.ticket_name = args.name.slice(0, 120);
         }
         if (args.price !== undefined) {
-            if (!(Number(ticket.price) > 0)) await assertCanSellPaid(ctx, event, args.price);
             patch.price = Math.round(args.price);
         }
         if (args.max_per_order !== undefined) patch.max_quantity = args.max_per_order;
@@ -142,6 +149,12 @@ const updateTicketType: ToolDef = {
             patch.total_quantity = args.quantity;
         }
         if (!Object.keys(patch).length) throw new ToolError("invalid_input", "No enviaste cambios.");
+        if (patch.price !== undefined || patch.total_quantity !== undefined) {
+            const change: { id: number; price?: number; total_quantity?: number | null } = { id: Number(ticket.id) };
+            if (patch.price !== undefined) change.price = patch.price as number;
+            if (patch.total_quantity !== undefined) change.total_quantity = patch.total_quantity as number | null;
+            await assertCanSellPaid(ctx, event, change);
+        }
         const { data, error } = await ctx.supabase
             .from("event_tickets")
             .update(patch)

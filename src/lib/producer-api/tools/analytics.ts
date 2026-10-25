@@ -1,29 +1,22 @@
 // Herramientas: rendimiento de eventos (ventas, tráfico, conversión, canales). Agrupa por día en hora de Chile.
+// Los cálculos viven en src/lib/eventAnalytics.ts (los mismos que muestra el panel).
 import type { ToolDef, ToolContext } from "../registry";
-import { eventIdSchema, loadOwnedEvent, eventPublicUrl, ticketAvailability, presentTicket, TICKET_SELECT, fetchAll, localDay, eventUrls, scopeToEvents, eventDateFields, DATES_NOTE } from "./common";
-import { isCourtesyOrder, isTransferOrder, lineSoldQty, orderLines, orderSoldQty } from "../../orderKinds";
+import { eventIdSchema, loadOwnedEvent, eventPublicUrl, fetchAll, localDay, eventUrls, scopeToEvents, eventDateFields, DATES_NOTE } from "./common";
+import { isCourtesyOrder, isTransferOrder, orderSoldQty } from "../../orderKinds";
+import {
+    categorizeReferrer,
+    channelConversion,
+    dailySeries,
+    eventCapacity,
+    loadEventVisits,
+    loadPaidOrders,
+    summarizeSales,
+    summarizeTraffic,
+} from "../../eventAnalytics";
 
-const MAX_VISITS = 50000;
-
-export function categorizeReferrer(referrer: string | null, utmSource: string | null): string {
-    if (utmSource) return utmSource;
-    if (!referrer) return "Directo";
-    const url = referrer.toLowerCase();
-    if (url.includes("google")) return "Google";
-    if (url.includes("facebook") || url.includes("fb.")) return "Facebook";
-    if (url.includes("instagram")) return "Instagram";
-    if (url.includes("twitter") || url.includes("x.com")) return "X/Twitter";
-    if (url.includes("tiktok")) return "TikTok";
-    if (url.includes("linkedin")) return "LinkedIn";
-    if (url.includes("whatsapp")) return "WhatsApp";
-    return "Otro";
-}
+export { categorizeReferrer };
 
 const pct = (part: number, total: number) => (total > 0 ? Math.round((part / total) * 1000) / 10 : null);
-
-function topN(map: Map<string, any>, n: number, key: string) {
-    return [...map.values()].sort((a, b) => b[key] - a[key]).slice(0, n);
-}
 
 /** Lista de días YYYY-MM-DD (hora de Chile) de los últimos `days` días, terminando hoy. */
 function lastDays(days: number, now = new Date()): string[] {
@@ -36,87 +29,25 @@ export async function eventPerformance(ctx: ToolContext, eventId: number, days: 
     const event = await loadOwnedEvent<any>(ctx, eventId, "id, name, slug, status, start_date, end_date");
     const now = new Date();
 
-    const [orders, visits, { count: refunded }, { data: tickets }] = await Promise.all([
-        fetchAll<any>(() =>
-            ctx.supabase.from("event_orders")
-                .select("created_at, amount, ticket_qty, discount_amount, discount_code, ticket_details, ref, utm_source, utm_medium, utm_campaign, payment_provider")
-                .eq("event_id", event.id).eq("status", "paid").order("created_at", { ascending: true })),
-        fetchAll<any>(() =>
-            ctx.supabase.from("event_visits").select("created_at, ip_hash, referrer, utm_source").eq("event_id", event.id).order("created_at", { ascending: true }),
-            { max: MAX_VISITS }),
+    const [orders, { visits, truncated, refTracked }, { count: refunded }, capacity] = await Promise.all([
+        loadPaidOrders(ctx.supabase, event.id),
+        loadEventVisits(ctx.supabase, event.id),
         ctx.supabase.from("event_orders").select("id", { count: "exact", head: true }).eq("event_id", event.id).eq("status", "refunded"),
-        ctx.supabase.from("event_tickets").select(TICKET_SELECT).eq("event_id", event.id),
+        eventCapacity(ctx.supabase, event),
     ]);
 
     // Ventas: sin cortesías ni transferencias (src/lib/orderKinds.ts). Las entradas transferidas siguen contando
     // como vendidas en su orden de origen (transferred_out).
-    const sales = orders.filter((o) => !isCourtesyOrder(o) && !isTransferOrder(o));
-    const courtesyTickets = orders.filter((o) => isCourtesyOrder(o) && !isTransferOrder(o)).reduce((n, o) => n + orderSoldQty(o), 0);
-    let revenue = 0, ticketsSold = 0, discountTotal = 0;
-    const byType = new Map<string, { name: string; tickets: number; gross_revenue_clp: number }>();
-    const channels = new Map<string, { channel: string; orders: number; tickets: number; revenue_clp: number }>();
-    const codes = new Map<string, { code: string; orders: number; discount_clp: number }>();
-    for (const o of sales) {
-        const qty = orderSoldQty(o);
-        revenue += Number(o.amount) || 0;
-        ticketsSold += qty;
-        discountTotal += Number(o.discount_amount) || 0;
-        for (const l of orderLines(o)) {
-            const name = l?.name || "Entrada";
-            const row = byType.get(name) || { name, tickets: 0, gross_revenue_clp: 0 };
-            row.tickets += lineSoldQty(l);
-            row.gross_revenue_clp += (Number(l?.price) || 0) * lineSoldQty(l);
-            byType.set(name, row);
-        }
-        const channel = o.ref ? `ref:${o.ref}` : [o.utm_source, o.utm_medium, o.utm_campaign].filter(Boolean).join(" / ") || "Directo / sin seguimiento";
-        const ch = channels.get(channel) || { channel, orders: 0, tickets: 0, revenue_clp: 0 };
-        ch.orders += 1; ch.tickets += qty; ch.revenue_clp += Number(o.amount) || 0;
-        channels.set(channel, ch);
-        if (o.discount_code) {
-            const c = codes.get(o.discount_code) || { code: o.discount_code, orders: 0, discount_clp: 0 };
-            c.orders += 1; c.discount_clp += Number(o.discount_amount) || 0;
-            codes.set(o.discount_code, c);
-        }
-    }
-    const paidOrders = sales.length;
-
-    // Capacidad (stock real: emitidas + en checkout)
-    const availability = await ticketAvailability(ctx, event.id, (tickets || []).map((t: any) => Number(t.id)));
-    const ticketTypes = (tickets || []).map((t: any) => presentTicket(t, availability.get(Number(t.id)), event));
-    // El tipo de cortesía del sistema no es capacidad a la venta
-    const forSale = ticketTypes.filter((t: any) => !t.is_system);
-    const unlimited = forSale.some((t: any) => t.quantity == null);
-    const capacity = unlimited ? null : forSale.reduce((s: number, t: any) => s + (t.quantity || 0), 0);
-    const issued = forSale.reduce((s: number, t: any) => s + t.sold, 0);
-
-    // Tráfico
-    const unique = new Set(visits.map((v) => v.ip_hash)).size;
-    const sources = new Map<string, { source: string; visits: number }>();
-    for (const v of visits) {
-        const s = categorizeReferrer(v.referrer, v.utm_source);
-        const row = sources.get(s) || { source: s, visits: 0 };
-        row.visits += 1;
-        sources.set(s, row);
-    }
-
-    // Serie diaria
-    const series = new Map(lastDays(days, now).map((d) => [d, { date: d, visits: 0, tickets: 0, revenue_clp: 0 }]));
-    for (const v of visits) {
-        const row = series.get(localDay(v.created_at));
-        if (row) row.visits += 1;
-    }
-    for (const o of sales) {
-        const row = series.get(localDay(o.created_at));
-        if (row) { row.tickets += orderSoldQty(o); row.revenue_clp += Number(o.amount) || 0; }
-    }
+    const s = summarizeSales(orders);
+    const { sales, paidOrders, ticketsSold, courtesyTickets, revenue, discountTotal } = s;
+    const traffic = summarizeTraffic(visits);
 
     // Ritmo: últimos 7 días vs 7 anteriores
     const since = (d: number) => now.getTime() - d * 86400000;
     const inRange = (o: any, from: number, to: number) => { const t = new Date(o.created_at).getTime(); return t >= from && t < to; };
-    const sum = (list: any[]) => list.reduce((s, o) => s + orderSoldQty(o), 0);
+    const sum = (list: any[]) => list.reduce((n, o) => n + orderSoldQty(o), 0);
     const last7 = sum(sales.filter((o) => inRange(o, since(7), now.getTime() + 1)));
     const prev7 = sum(sales.filter((o) => inRange(o, since(14), since(7))));
-    const lastSale = sales.length ? sales[sales.length - 1].created_at : null;
     const daysUntil = event.start_date ? Math.ceil((new Date(event.start_date).getTime() - now.getTime()) / 86400000) : null;
 
     return {
@@ -136,15 +67,15 @@ export async function eventPerformance(ctx: ToolContext, eventId: number, days: 
             average_order_clp: paidOrders ? Math.round(revenue / paidOrders) : 0,
             average_ticket_clp: ticketsSold ? Math.round(revenue / ticketsSold) : 0,
             refunded_orders: refunded || 0,
-            last_sale_at: lastSale,
+            last_sale_at: s.lastSaleAt,
             note: "revenue_clp = monto de entradas para el productor (ya con descuentos, sin cargo por servicio). Las cortesías (courtesy_tickets) y las transferencias de titular no cuentan como ventas.",
         },
         capacity: {
-            total: capacity,
-            unlimited_ticket_types: unlimited,
-            issued_tickets: issued,
+            total: capacity.capacity,
+            unlimited_ticket_types: capacity.unlimited,
+            issued_tickets: capacity.issued,
             courtesy_tickets_issued: courtesyTickets,
-            sell_through_pct: capacity ? pct(issued, capacity) : null,
+            sell_through_pct: capacity.sellThroughPct,
         },
         pace: {
             tickets_last_7_days: last7,
@@ -154,17 +85,21 @@ export async function eventPerformance(ctx: ToolContext, eventId: number, days: 
             projected_additional_tickets_until_event: daysUntil && daysUntil > 0 ? Math.round((last7 / 7) * daysUntil) : null,
         },
         traffic: {
-            visits: visits.length,
-            unique_visitors: unique,
-            conversion_pct: pct(paidOrders, unique),
-            truncated: visits.length >= MAX_VISITS,
-            top_sources: topN(sources, 8, "visits"),
+            visits: traffic.visits,
+            unique_visitors: traffic.uniqueVisitors,
+            conversion_pct: pct(paidOrders, traffic.uniqueVisitors),
+            truncated,
+            top_sources: traffic.sources,
+            top_locations: traffic.locations.map(({ location, visits: n, percentage }) => ({ location, visits: n, percentage })),
+            peak_hours_local: traffic.peakHours.map((n, hour) => ({ hour, visits: n })).filter((h) => h.visits > 0).sort((a, b) => b.visits - a.visits).slice(0, 5),
         },
-        ticket_types: ticketTypes,
-        sales_by_ticket_type: topN(byType, 30, "tickets"),
-        sales_channels: topN(channels, 10, "revenue_clp"),
-        discount_codes_used: topN(codes, 20, "orders"),
-        daily: [...series.values()],
+        ticket_types: capacity.ticketTypes,
+        sales_by_ticket_type: s.byType.slice(0, 30),
+        sales_channels: s.channels.slice(0, 10),
+        channel_conversion: channelConversion(visits, sales, { refTracked, top: 10 }),
+        sales_by_payment_provider: s.providers,
+        discount_codes_used: s.codes.slice(0, 20),
+        daily: dailySeries(lastDays(days, now), visits, sales),
     };
 }
 
@@ -173,7 +108,8 @@ const getEventPerformance: ToolDef = {
     title: "Rendimiento del evento",
     description:
         "¿Cómo le va al evento? Ventas, ingresos, capacidad vendida, ritmo de venta (últimos 7 días vs anteriores y proyección), " +
-        "visitas, conversión, fuentes de tráfico, canales de venta (ref/UTM), códigos usados y serie diaria. " +
+        "visitas, conversión, fuentes de tráfico, ubicación de visitantes, horas pico, canales de venta (ref/UTM) con su conversión, " +
+            "medios de pago, códigos usados y serie diaria. " +
         "Ideal para diagnosticar y recomendar acciones (subir precio, crear descuento, reforzar un canal).",
     scope: "read",
     annotations: { readOnlyHint: true },
