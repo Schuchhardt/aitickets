@@ -2,7 +2,7 @@ import type { APIRoute } from "astro";
 import { getSupabaseAdmin, getFriendlyErrorMessage } from "../../../lib/auth-helpers";
 import { getSessionContext, getOwnedEvent, hasRole, EVENT_MANAGER_ROLES, jsonResponse } from "../../../lib/supabaseServer";
 import { callInternalFunction, notifySlack, siteUrl } from "../_lib/server-utils";
-import { IDENTITY_REQUIRED_MESSAGE, eventHasPaidTickets, identityApproved, loadOrgIdentity } from "../../../lib/producerIdentity";
+import { IDENTITY_REQUIRED_MESSAGE, eventRequiresIdentity, identityApproved, loadOrgIdentity, ticketsRequireIdentity } from "../../../lib/producerIdentity";
 import { syncEventCategory, refreshEventDenorm, normalizeTicket, isClientTempId, isValidDateInput, resolveTicketDateId, setEventStatus, EventInputError, saveCoverSettings, savePageSettings } from "../_lib/events";
 import { sanitizeRichText } from "../../../lib/sanitize";
 import { listOrgVenues, isVenueAllowed, insertOrgVenue } from "../../../lib/orgVenues";
@@ -95,9 +95,13 @@ export const POST: APIRoute = async (context) => {
         if (normalizedTickets.some((t: any) => !t.data)) {
             return jsonResponse({ message: "Revisa las entradas: nombre, precio y cantidad deben ser válidos" }, 400);
         }
-        // Evento publicado y gratuito: pasar a vender entradas pagadas exige identidad verificada (igual que al publicar).
-        // Los eventos que ya vendían entradas pagadas antes de esta regla se pueden seguir editando.
-        if (event.status === "published" && normalizedTickets.some((t: any) => Number(t.data?.price) > 0) && !(await eventHasPaidTickets(supabaseAdmin, event.id))) {
+        // Evento publicado: pasar a más de 10 cupos pagados exige identidad verificada (igual que al publicar).
+        // Los eventos que ya superaban el umbral antes de esta regla se pueden seguir editando.
+        if (
+            event.status === "published" &&
+            ticketsRequireIdentity(normalizedTickets.map((t: any) => t.data)) &&
+            !(await eventRequiresIdentity(supabaseAdmin, event.id))
+        ) {
             if (!identityApproved(await loadOrgIdentity(supabaseAdmin, Number(dbUser.organization_id)))) {
                 return jsonResponse({ message: IDENTITY_REQUIRED_MESSAGE }, 400);
             }

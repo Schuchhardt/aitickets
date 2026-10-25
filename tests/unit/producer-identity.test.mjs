@@ -28,7 +28,7 @@ vi.mock('../../src/pages/api/_lib/server-utils', async (importOriginal) => ({
   },
 }))
 
-const { applyDiditDecision, recomputeHolderMatch, identityPublishBlocker } = await import('../../src/lib/producerIdentity.ts')
+const { applyDiditDecision, recomputeHolderMatch, identityPublishBlocker, paidCapacity, ticketsRequireIdentity } = await import('../../src/lib/producerIdentity.ts')
 const { setEventStatus, EventInputError } = await import('../../src/pages/api/_lib/events.ts')
 
 describe('RUT', () => {
@@ -188,6 +188,11 @@ describe('publicar exige identidad verificada si hay entradas pagadas', () => {
     await expect(setEventStatus(ev, 7, 'published')).rejects.toBeInstanceOf(EventInputError)
     expect(db.tables.events[0].status).toBe('draft')
   })
+  it('evento pagado de hasta 10 cupos se publica sin identidad', async () => {
+    seed({ tickets: [{ id: 1, event_id: 10, price: 5000, is_gift: false, total_quantity: 10 }] })
+    await setEventStatus(ev, 7, 'published')
+    expect(db.tables.events[0].status).toBe('published')
+  })
   it('evento gratuito se publica sin identidad', async () => {
     seed({ tickets: [{ id: 1, event_id: 10, price: 0, is_gift: false }] })
     await setEventStatus(ev, 7, 'published')
@@ -202,5 +207,18 @@ describe('publicar exige identidad verificada si hay entradas pagadas', () => {
     seed()
     await setEventStatus({ ...ev, status: 'published' }, 7, 'draft')
     expect(db.tables.events[0].status).toBe('draft')
+  })
+})
+
+describe('umbral de 10 cupos pagados', () => {
+  it('suma solo entradas pagadas sin cortesías; sin límite = null', () => {
+    expect(paidCapacity([{ price: 5000, total_quantity: 6 }, { price: 0, total_quantity: 500 }, { price: 3000, total_quantity: 4, is_gift: true }])).toBe(6)
+    expect(paidCapacity([{ price: 5000, total_quantity: null }])).toBeNull()
+  })
+  it('hasta 10 cupos pagados no exige identidad; más de 10 o sin límite sí', () => {
+    expect(ticketsRequireIdentity([{ price: 0, total_quantity: null }])).toBe(false)
+    expect(ticketsRequireIdentity([{ price: 5000, total_quantity: 4 }, { price: 8000, total_quantity: 6 }])).toBe(false)
+    expect(ticketsRequireIdentity([{ price: 5000, total_quantity: 11 }])).toBe(true)
+    expect(ticketsRequireIdentity([{ price: 5000, total_quantity: null }])).toBe(true)
   })
 })
