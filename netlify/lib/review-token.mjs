@@ -6,6 +6,8 @@
 //   sin v = correo).
 // - Baja de invitaciones: {p:'io', o:organizationId, m:email}, sin vencimiento (el enlace de baja debe seguir
 //   funcionando siempre, Ley 19.496 art. 28 B).
+// - Baja del reporte semanal a productores: {p:'wr', u:userId} (public.users.id), sin vencimiento. Sirve para darse de
+//   baja y para volver a suscribirse desde la misma página.
 // Clave: REVIEW_TOKEN_SECRET o, si no existe, derivada de EMAIL_VERIFY_SECRET / INTERNAL_API_SECRET / service role
 // con una etiqueta propia (un token de otro tipo nunca sirve aquí). Sin ninguna, sign* devuelve '' y verify* null.
 import { tokenSigner } from './signed-token.mjs'
@@ -48,4 +50,18 @@ export function verifyInviteOptoutToken(token, { now = new Date() } = {}) {
   const payload = verify(token, 'io', now)
   if (!payload || !Number.isSafeInteger(payload.o) || typeof payload.m !== 'string' || !payload.m) return null
   return { organizationId: payload.o, email: payload.m }
+}
+
+/** Token del enlace de baja del reporte semanal de una persona del equipo de una productora. */
+export function signWeeklyReportOptoutToken({ userId }) {
+  const id = Number(userId)
+  if (!Number.isSafeInteger(id) || id <= 0) return ''
+  return sign({ p: 'wr', u: id })
+}
+
+/** @returns {{ userId: number } | null} */
+export function verifyWeeklyReportOptoutToken(token, { now = new Date() } = {}) {
+  const payload = verify(token, 'wr', now)
+  if (!payload || !Number.isSafeInteger(payload.u) || payload.u <= 0) return null
+  return { userId: payload.u }
 }

@@ -70,9 +70,7 @@ interface AiticketsEnv {
 
   // Redes / ads
   readonly ZERNIO_API_KEY: string
-  readonly META_APP_ID: string
-  readonly META_APP_SECRET: string
-  readonly META_ADS_ENABLED: string
+  readonly ADS_ENABLED?: string
   readonly TOKEN_ENCRYPTION_KEY: string
 
   // BD / migraciones

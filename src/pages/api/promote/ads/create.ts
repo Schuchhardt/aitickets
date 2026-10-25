@@ -1,294 +1,160 @@
+// Crea un anuncio en Meta (Facebook e Instagram) vía Zernio para un evento publicado: uno nuevo con imagen y texto
+// (type 'standalone') o promocionando un post ya publicado desde AI Tickets (type 'boost').
+// Gasta dinero de la productora (Meta le cobra a su cuenta publicitaria), por eso:
+//   * solo dueños/administradores (ORG_ADMIN_ROLES);
+//   * presupuesto, duración y público se validan aquí (validateAdInput) y el gasto máximo (diario × días) debe venir
+//     confirmado por la productora con el mismo total;
+//   * la fila se guarda ANTES de llamar a Zernio (su id va en el link: utm_campaign=ad-<id>) con el cuerpo exacto del
+//     request, y la llamada lleva Idempotency-Key: si se corta, se reintenta sin duplicar (recoverCreatingAd);
+//   * dos envíos iguales seguidos (doble clic) devuelven el primero.
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin } from "../../../../lib/auth-helpers";
-import { getSessionContext, hasRole, EVENT_MANAGER_ROLES } from "../../../../lib/supabaseServer";
-import { decryptToken } from "../../../../lib/crypto";
+import { getSessionContext, hasRole, ORG_ADMIN_ROLES, jsonResponse } from "../../../../lib/supabaseServer";
+import { adsJsonError } from "../../../../lib/ads";
 import { canAccessEventByStaff } from "../../../../../netlify/lib/event-staff.mjs";
+import { adTrackingUrl, adsEnabled, buildAdRequest, formatBudget, submitAdRequest, validateAdInput } from "../../../../../netlify/lib/zernio-ads.mjs";
+
+const DUPLICATE_WINDOW_MS = 2 * 60 * 1000;
 
 export const POST: APIRoute = async (context) => {
     const session = await getSessionContext(context);
-    if (!session) {
-        return new Response(JSON.stringify({ error: "No autorizado" }), { status: 401 });
-    }
-    if (!hasRole(session.dbUser, EVENT_MANAGER_ROLES)) {
-        return new Response(JSON.stringify({ message: "No tienes permisos para esta acción" }), { status: 403, headers: { "Content-Type": "application/json" } });
-    }
-    const user = session.authUser;
+    if (!session) return adsJsonError("No autorizado", 401);
+    if (!hasRole(session.dbUser, ORG_ADMIN_ROLES)) return adsJsonError("Solo el dueño o un administrador de la productora puede crear anuncios pagados.", 403);
+    if (!adsEnabled()) return adsJsonError("Los anuncios no están disponibles en este momento.", 503);
 
-    // Meta Ads deshabilitado temporalmente ("Próximamente"). La implementación de abajo tiene errores
-    // conocidos (multiplica el presupuesto CLP por 100, envía daily y lifetime budget a la vez y no
-    // define page_id) y no debe ejecutarse hasta corregirlos.
-    if (import.meta.env.META_ADS_ENABLED !== "true") {
-        return new Response(JSON.stringify({ message: "Próximamente: la creación de campañas en Meta Ads estará disponible pronto." }), {
-            status: 503,
-            headers: { "Content-Type": "application/json" },
-        });
-    }
-
+    let body: any;
     try {
-        const body = await context.request.json();
-        const {
-            eventId, adConnectionId, name, objective, dailyBudget, totalBudget,
-            startDate, endDate, adCopy, headline, imageUrls,
-            callToAction, destinationUrl, targetAudience
-        } = body;
+        body = await context.request.json();
+    } catch {
+        return adsJsonError("Solicitud inválida", 400);
+    }
+    const orgId = Number(session.dbUser.organization_id);
+    const userId = Number(session.dbUser.id);
+    const eventId = Number(body?.eventId);
+    const connectionId = Number(body?.connectionId);
+    if (!Number.isSafeInteger(eventId) || !Number.isSafeInteger(connectionId)) return adsJsonError("Elige el evento y la cuenta publicitaria.", 400);
 
-        if (!eventId || !name || !dailyBudget || !adCopy || !destinationUrl) {
-            return new Response(JSON.stringify({ message: "Faltan datos requeridos" }), { status: 400 });
-        }
-
-        if (dailyBudget < 1000) { // Min $1000 CLP ~= $1 USD
-            return new Response(JSON.stringify({ message: "El presupuesto diario mínimo es $1.000 CLP" }), { status: 400 });
-        }
-
-        const supabaseAdmin = getSupabaseAdmin();
-
-        const dbUser = session.dbUser;
-
-        if (!dbUser?.organization_id) {
-            return new Response(JSON.stringify({ message: "Organización no encontrada" }), { status: 404 });
-        }
-
-        // Verify event ownership
-        const { data: event } = await supabaseAdmin
+    const supabase = getSupabaseAdmin();
+    const now = new Date();
+    try {
+        const { data: event } = await supabase
             .from("events")
-            .select("id, slug")
+            .select("id, name, title, slug, status, start_date, end_date, image_url, organization_id")
             .eq("id", eventId)
-            .eq("organization_id", dbUser.organization_id)
-            .single();
+            .eq("organization_id", orgId)
+            .maybeSingle();
+        if (!event || !(await canAccessEventByStaff(supabase, userId, eventId))) return adsJsonError("Evento no encontrado", 404);
+        if (event.status !== "published") return adsJsonError("Publica el evento antes de anunciarlo: su página tiene que estar visible.", 400);
+        if (event.end_date && Date.parse(event.end_date) <= now.getTime()) return adsJsonError("El evento ya terminó.", 400);
 
-        if (!event || !(await canAccessEventByStaff(getSupabaseAdmin(), dbUser.id, eventId))) {
-            return new Response(JSON.stringify({ message: "Evento no encontrado" }), { status: 404 });
-        }
-
-        // Get connected Meta ad account (specific or first active)
-        let adConnectionQuery = supabaseAdmin
+        const { data: connection } = await supabase
             .from("ad_account_connections")
-            .select("*")
-            .eq("organization_id", dbUser.organization_id)
-            .eq("platform", "meta")
-            .eq("status", "active");
+            .select("id, organization_id, provider, status, zernio_account_id, meta_ad_account_id, currency, minimum_daily_budget, account_name")
+            .eq("id", connectionId)
+            .eq("organization_id", orgId)
+            .eq("provider", "zernio")
+            .maybeSingle();
+        if (!connection || connection.status !== "active" || !connection.zernio_account_id) return adsJsonError("Esa cuenta publicitaria no está disponible. Vuelve a conectarla.", 400);
 
-        if (adConnectionId) {
-            adConnectionQuery = adConnectionQuery.eq("id", adConnectionId);
+        let post: any = null;
+        let boostAccountId: string | null = null;
+        if (body?.type === "boost") {
+            const { data } = await supabase
+                .from("social_posts")
+                .select("id, event_id, status, zernio_post_id, platforms, content, image_urls")
+                .eq("id", Number(body?.socialPostId))
+                .eq("organization_id", orgId)
+                .maybeSingle();
+            if (!data || Number(data.event_id) !== eventId) return adsJsonError("Post no encontrado", 404);
+            post = data;
+            // El boost corre desde la cuenta donde se publicó (Facebook primero: Instagram necesita su página vinculada)
+            const platform = (post.platforms || []).includes("facebook") ? "facebook" : "instagram";
+            const { data: account } = await supabase
+                .from("social_accounts")
+                .select("zernio_account_id")
+                .eq("organization_id", orgId)
+                .eq("platform", platform)
+                .eq("status", "active")
+                .limit(1)
+                .maybeSingle();
+            boostAccountId = account?.zernio_account_id || null;
+            if (!boostAccountId) return adsJsonError("La cuenta donde se publicó ese post ya no está conectada.", 400);
         }
 
-        const { data: adConnection } = await adConnectionQuery.limit(1).single();
+        const check = validateAdInput(body, { connection, event, post, now });
+        if (!check.ok) return jsonResponse({ message: check.errors[0], errors: check.errors }, 400);
+        const value = check.value;
 
-        if (!adConnection) {
-            return new Response(JSON.stringify({ message: "No hay cuenta de Meta Ads conectada" }), { status: 400 });
-        }
+        // Doble clic: el mismo anuncio recién creado se devuelve en vez de crear otro
+        const { data: recent } = await supabase
+            .from("ad_campaigns")
+            .select("id, status, created_at")
+            .eq("organization_id", orgId)
+            .eq("event_id", eventId)
+            .eq("provider", "zernio")
+            .eq("ad_type", value.type)
+            .eq("daily_budget", value.dailyBudget)
+            .eq("duration_days", value.days)
+            .gte("created_at", new Date(now.getTime() - DUPLICATE_WINDOW_MS).toISOString())
+            .limit(1)
+            .maybeSingle();
+        if (recent) return jsonResponse({ id: recent.id, status: recent.status, duplicate: true, message: "Ya creaste este anuncio hace un momento." }, 409);
 
-        // Check token expiration
-        if (adConnection.token_expires_at && new Date(adConnection.token_expires_at) < new Date()) {
-            await supabaseAdmin
-                .from("ad_account_connections")
-                .update({ status: "expired" })
-                .eq("id", adConnection.id);
-            return new Response(JSON.stringify({ message: "Token de Meta expirado. Reconecta tu cuenta." }), { status: 401 });
-        }
-
-        const accessToken = decryptToken(adConnection.access_token);
-        const adAccountId = adConnection.meta_ad_account_id;
-
-        // 1. Create Campaign in Meta
-        const campaignRes = await fetch(`https://graph.facebook.com/v21.0/${adAccountId}/campaigns`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                name: name,
-                objective: objective || "OUTCOME_TRAFFIC",
-                status: "PAUSED",
-                special_ad_categories: [],
-                access_token: accessToken,
-            }),
-        });
-
-        if (!campaignRes.ok) {
-            const err = await campaignRes.json().catch(() => ({}));
-            console.error("Meta campaign create error:", err);
-            // Save as draft anyway
-            const { data: campaign } = await supabaseAdmin
-                .from("ad_campaigns")
-                .insert({
-                    organization_id: dbUser.organization_id,
-                    event_id: eventId,
-                    ad_account_connection_id: adConnection.id,
-                    name, objective: objective || "OUTCOME_TRAFFIC",
-                    status: "rejected",
-                    daily_budget: dailyBudget, total_budget: totalBudget,
-                    currency: "CLP", start_date: startDate, end_date: endDate,
-                    ad_copy: adCopy, headline, image_urls: imageUrls || [],
-                    call_to_action: callToAction || "LEARN_MORE",
-                    destination_url: destinationUrl,
-                    target_audience: targetAudience || {},
-                    error_message: err.error?.message || "Error al crear campaña en Meta",
-                })
-                .select()
-                .single();
-
-            return new Response(JSON.stringify({ 
-                message: "Error al crear campaña en Meta. Guardada como borrador.",
-                id: campaign?.id,
-                error: err.error?.message
-            }), { status: 502 });
-        }
-
-        const campaignData = await campaignRes.json();
-        const metaCampaignId = campaignData.id;
-
-        // 2. Create Ad Set
-        const budgetCents = Math.round(dailyBudget * 100); // Meta uses cents
-        const adSetPayload: Record<string, any> = {
-            name: `${name} - AdSet`,
-            campaign_id: metaCampaignId,
-            daily_budget: budgetCents,
-            billing_event: "IMPRESSIONS",
-            optimization_goal: "LINK_CLICKS",
-            bid_strategy: "LOWEST_COST_WITHOUT_CAP",
-            status: "PAUSED",
-            access_token: accessToken,
-            targeting: buildMetaTargeting(targetAudience),
-        };
-
-        if (startDate) adSetPayload.start_time = new Date(startDate).toISOString();
-        if (endDate) adSetPayload.end_time = new Date(endDate).toISOString();
-        if (totalBudget) adSetPayload.lifetime_budget = Math.round(totalBudget * 100);
-
-        const adSetRes = await fetch(`https://graph.facebook.com/v21.0/${adAccountId}/adsets`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(adSetPayload),
-        });
-
-        let metaAdsetId = null;
-        if (adSetRes.ok) {
-            const adSetData = await adSetRes.json();
-            metaAdsetId = adSetData.id;
-        } else {
-            console.error("Meta adset error:", await adSetRes.json().catch(() => ({})));
-        }
-
-        // 3. Create Ad Creative + Ad (if adset was created)
-        let metaAdId = null;
-        if (metaAdsetId) {
-            // Create creative
-            const creativePayload: Record<string, any> = {
-                name: `${name} - Creative`,
-                object_story_spec: {
-                    link_data: {
-                        message: adCopy,
-                        link: destinationUrl,
-                        name: headline || name,
-                        call_to_action: { type: callToAction || "LEARN_MORE" },
-                    },
-                    // page_id will need to be set if available
-                },
-                access_token: accessToken,
-            };
-
-            if (imageUrls?.length > 0) {
-                creativePayload.object_story_spec.link_data.picture = imageUrls[0];
-            }
-
-            const creativeRes = await fetch(`https://graph.facebook.com/v21.0/${adAccountId}/adcreatives`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(creativePayload),
-            });
-
-            if (creativeRes.ok) {
-                const creativeData = await creativeRes.json();
-
-                // Create ad
-                const adRes = await fetch(`https://graph.facebook.com/v21.0/${adAccountId}/ads`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        name: `${name} - Ad`,
-                        adset_id: metaAdsetId,
-                        creative: { creative_id: creativeData.id },
-                        status: "PAUSED",
-                        access_token: accessToken,
-                    }),
-                });
-
-                if (adRes.ok) {
-                    const adData = await adRes.json();
-                    metaAdId = adData.id;
-                }
-            }
-        }
-
-        // Save campaign to DB
-        const { data: campaign, error: dbError } = await supabaseAdmin
+        const { data: row, error: insError } = await supabase
             .from("ad_campaigns")
             .insert({
-                organization_id: dbUser.organization_id,
+                organization_id: orgId,
                 event_id: eventId,
-                ad_account_connection_id: adConnection.id,
-                meta_campaign_id: metaCampaignId,
-                meta_adset_id: metaAdsetId,
-                meta_ad_id: metaAdId,
-                name, objective: objective || "OUTCOME_TRAFFIC",
-                status: "paused", // Created as paused, user activates
-                daily_budget: dailyBudget, total_budget: totalBudget,
-                currency: "CLP", start_date: startDate, end_date: endDate,
-                ad_copy: adCopy, headline, image_urls: imageUrls || [],
-                call_to_action: callToAction || "LEARN_MORE",
-                destination_url: destinationUrl,
-                target_audience: targetAudience || {},
+                ad_account_connection_id: connection.id,
+                provider: "zernio",
+                ad_type: value.type,
+                social_post_id: post?.id ?? null,
+                name: String(event.title || event.name || "Evento").slice(0, 200),
+                objective: "OUTCOME_TRAFFIC",
+                status: "creating",
+                daily_budget: value.dailyBudget,
+                total_budget: value.totalBudget,
+                currency: value.currency,
+                start_date: value.startDate.toISOString(),
+                end_date: value.endDate.toISOString(),
+                duration_days: value.days,
+                ad_copy: value.type === "boost" ? String(post?.content || "").slice(0, 1000) : value.body,
+                headline: value.type === "boost" ? null : value.headline,
+                image_urls: value.type === "boost" ? post?.image_urls || [] : [value.imageUrl],
+                call_to_action: value.callToAction,
+                target_audience: { geo: value.geo, ageMin: value.ageMin, ageMax: value.ageMax },
+                created_by: userId,
             })
-            .select()
+            .select("id, organization_id, created_at")
             .single();
+        if (insError || !row) throw insError || new Error("No se pudo guardar el anuncio");
 
-        if (dbError) {
-            console.error("DB campaign save error:", dbError);
-            return new Response(JSON.stringify({ message: "Campaña creada en Meta pero error al guardar localmente" }), { status: 500 });
+        const request = buildAdRequest({ adCampaignId: row.id, value, connection, event, post, boostAccountId });
+        await supabase
+            .from("ad_campaigns")
+            .update({ zernio_request: request, destination_url: adTrackingUrl(event.slug, row.id) })
+            .eq("id", row.id)
+            .eq("organization_id", orgId);
+
+        const result = await submitAdRequest(supabase, { ...row, zernio_request: request }, { now });
+        if (!result.ok) {
+            return jsonResponse(
+                result.pending
+                    ? { id: row.id, status: "creating", message: "Meta está tardando en confirmar el anuncio. Revisa en unos minutos: lo terminamos de crear sin duplicarlo." }
+                    : { id: row.id, status: "error", message: result.message },
+                result.pending ? 202 : 502,
+            );
         }
-
-        return new Response(JSON.stringify({ 
-            message: "Campaña creada exitosamente (pausada)", 
-            id: campaign.id,
-            meta_campaign_id: metaCampaignId
-        }), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
+        const spend = formatBudget(value.totalBudget, value.currency);
+        return jsonResponse({
+            id: row.id,
+            status: result.row.status,
+            message: value.launch === "paused"
+                ? `Anuncio creado y pausado. Cuando lo actives, gastará hasta ${spend}.`
+                : `Anuncio enviado a Meta. Lo revisan en unas horas y después empieza a mostrarse (gasto máximo ${spend}).`,
         });
-    } catch (error) {
-        console.error("Create campaign error:", error);
-        return new Response(JSON.stringify({ message: "Error interno del servidor" }), { status: 500 });
+    } catch (err: any) {
+        console.error("[ads/create]", err?.message);
+        return adsJsonError("No se pudo crear el anuncio. Intenta de nuevo.", 500);
     }
 };
-
-function buildMetaTargeting(audience: any): Record<string, any> {
-    const targeting: Record<string, any> = {};
-
-    if (audience?.age_min) targeting.age_min = audience.age_min;
-    if (audience?.age_max) targeting.age_max = audience.age_max;
-    if (audience?.genders?.length) targeting.genders = audience.genders; // [1] = male, [2] = female
-
-    if (audience?.locations?.length) {
-        targeting.geo_locations = {
-            cities: audience.locations.map((loc: any) => ({
-                key: loc.key || loc.id,
-                name: loc.name,
-            })),
-        };
-    } else {
-        // Default: Chile
-        targeting.geo_locations = {
-            countries: ["CL"],
-        };
-    }
-
-    if (audience?.interests?.length) {
-        targeting.flexible_spec = [{
-            interests: audience.interests.map((i: any) => ({
-                id: i.id,
-                name: i.name,
-            })),
-        }];
-    }
-
-    return targeting;
-}

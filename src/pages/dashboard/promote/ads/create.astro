@@ -1,10 +1,64 @@
 ---
-// Meta Ads está deshabilitado temporalmente ("Próximamente").
-// El código de campañas (components/dashboard/promote/*Ad*.vue, api/promote/ads/*) se conserva
-// pero no se expone en el dashboard hasta corregir presupuesto (CLP), budgets y page_id.
+// Asistente para crear un anuncio en Meta (Facebook e Instagram) vía Zernio. Solo dueños/administradores: el gasto
+// se le cobra a la cuenta publicitaria de la productora. ?event=<id> preselecciona el evento; ?post=<id> un post a
+// promocionar.
+import DashboardLayout from "../../../../layouts/DashboardLayout.astro";
+import { ORG_ADMIN_ROLES } from "../../../../lib/supabaseServer";
 import { requireDashboardSession } from "../../_lib/guard";
+import { getSupabaseAdmin } from "../../../../lib/auth-helpers";
+import { loadAdConnections } from "../../../../lib/ads";
+import CreateAdCampaign from "../../../../components/dashboard/promote/CreateAdCampaign.vue";
+import { getStaffEventIds } from "../../../../../netlify/lib/event-staff.mjs";
+import { AD_CALLS_TO_ACTION, AD_LIMITS, adsEnabled } from "../../../../../netlify/lib/zernio-ads.mjs";
 
-const guard = await requireDashboardSession(Astro);
+const guard = await requireDashboardSession(Astro, ORG_ADMIN_ROLES);
 if (!guard.ok) return guard.response;
-return Astro.redirect("/dashboard/promote");
+if (!adsEnabled()) return Astro.redirect("/dashboard/promote?tab=ads");
+const { dbUser } = guard.session;
+const orgId = Number(dbUser.organization_id);
+const supabaseAdmin = getSupabaseAdmin();
+
+// Eventos publicados que todavía no terminan (los que tiene asignados, si el usuario está restringido)
+const { data: rawEvents } = await supabaseAdmin
+  .from("events")
+  .select("id, name, title, slug, image_url, start_date, end_date, event_locations ( venues ( city ) )")
+  .eq("organization_id", orgId)
+  .eq("status", "published")
+  .gt("end_date", new Date().toISOString())
+  .order("start_date", { ascending: true })
+  .limit(100);
+const allowed = await getStaffEventIds(supabaseAdmin, dbUser.id);
+const events = (rawEvents || [])
+  .filter((e: any) => !allowed || allowed.includes(Number(e.id)))
+  .map(({ event_locations, ...e }: any) => ({ ...e, city: event_locations?.[0]?.venues?.city || null }));
+
+const connections = await loadAdConnections(supabaseAdmin, orgId);
+
+// Posts publicados desde AI Tickets (se pueden promocionar)
+const eventIds = events.map((e: any) => e.id);
+const { data: posts } = eventIds.length
+  ? await supabaseAdmin
+      .from("social_posts")
+      .select("id, event_id, content, image_urls, platforms, status, zernio_post_id, published_at")
+      .eq("organization_id", orgId)
+      .eq("status", "published")
+      .not("zernio_post_id", "is", null)
+      .in("event_id", eventIds)
+      .order("published_at", { ascending: false })
+      .limit(50)
+  : { data: [] };
+
+const limits = { cityRadiiKm: AD_LIMITS.cityRadiiKm, callsToAction: AD_CALLS_TO_ACTION };
 ---
+
+<DashboardLayout title="Crear anuncio">
+  <CreateAdCampaign
+    client:only="vue"
+    eventsJson={JSON.stringify(events)}
+    connectionsJson={JSON.stringify(connections)}
+    postsJson={JSON.stringify(posts || [])}
+    preSelectedEventId={Astro.url.searchParams.get("event") || ""}
+    preSelectedPostId={Astro.url.searchParams.get("post") || ""}
+    limitsJson={JSON.stringify(limits)}
+  />
+</DashboardLayout>
