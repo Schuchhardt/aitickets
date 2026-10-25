@@ -197,3 +197,38 @@ export async function renderInboundLeadConfirmEmail({ orgName, url } = {}) {
   )
   return renderEmail(subject, element)
 }
+
+/**
+ * Aviso a productores con eventos pagados ya publicados: verificar identidad (Didit) para poder retirar.
+ * Sus eventos siguen a la venta; solo se retiene lo recaudado hasta verificar (Términos para productores §2 bis).
+ * @param {{ orgName?: string, settingsUrl: string }} opts
+ */
+export async function renderIdentityVerificationRequestEmail({ orgName, settingsUrl } = {}) {
+  const subject = 'Verifica tu identidad para recibir lo que recaudas en AI Tickets'
+  const element = h(
+    EmailLayout,
+    {
+      preview: 'Tus eventos siguen a la venta. Para transferirte el dinero necesitamos verificar tu identidad.',
+      footer: { reason: 'Recibes este correo porque tienes eventos con entradas pagadas publicados en AI Tickets.' },
+    },
+    h(Badge, null, 'Acción requerida'),
+    h(Title, null, 'Verifica tu identidad para poder retirar'),
+    h(Paragraph, null, `Hola ${oneLine(orgName) || 'equipo'}:`),
+    h(
+      Paragraph,
+      null,
+      'Para proteger a productores y compradores, desde ahora verificamos la identidad de quien recibe el dinero de las entradas. ',
+      'La verificación se hace con Didit: una foto de tu carnet y una selfie, y toma un par de minutos.'
+    ),
+    h(
+      Panel,
+      { tone: 'outline' },
+      h(Paragraph, { small: true, style: { margin: 0 } }, '• Tus eventos siguen publicados y vendiendo con normalidad: no tienes que hacer nada con ellos.'),
+      h(Paragraph, { small: true, style: { margin: 0 } }, '• Para solicitar retiros necesitas tener la identidad verificada.'),
+      h(Paragraph, { small: true, style: { margin: 0 } }, '• Tu cuenta bancaria debe estar a tu nombre o al de tu empresa: no transferimos a cuentas de terceros.')
+    ),
+    h(PrimaryButton, { href: settingsUrl }, 'Verificar mi identidad'),
+    h(Paragraph, { small: true, muted: true }, '¿Dudas? Responde este correo y te ayudamos.')
+  )
+  return renderEmail(subject, element)
+}
