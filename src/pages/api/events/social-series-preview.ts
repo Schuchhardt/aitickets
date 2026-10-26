@@ -4,7 +4,7 @@
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { getOwnedEvent, getSessionContext, hasRole, EVENT_MANAGER_ROLES } from "../../../lib/supabaseServer";
-import { anchorFor, baseImageUrlFor, loadBaseImage, loadCadenceConfig, loadLatestSeries, loadSeriesEvent, pieceDataFor } from "../../../lib/socialSeries";
+import { anchorFor, baseImageOptionsFor, baseImageUrlFor, loadBaseImage, loadCadenceConfig, loadLatestSeries, loadSeriesEvent, pieceDataFor } from "../../../lib/socialSeries";
 import { renderPiece } from "../../../lib/socialSeriesRender";
 import { loadSharp } from "../../../lib/imageOptimize";
 
@@ -32,7 +32,7 @@ export const GET: APIRoute = async (context) => {
     const anchor = series?.anchor_starts_at ? new Date(series.anchor_starts_at) : anchorFor(event);
     try {
         const data = await pieceDataFor(supabase, series, event, { kind, variant, days_to_event: days }, config, anchor);
-        const full = await renderPiece(data, await loadBaseImage(baseImageUrlFor(series, event)));
+        const full = await renderPiece(data, await loadBaseImage(baseImageUrlFor(series, event)), baseImageOptionsFor(series, event));
         const sharp = await loadSharp();
         const small = sharp ? await sharp(full).resize({ width: PREVIEW_WIDTH }).jpeg({ quality: 78 }).toBuffer() : full;
         return new Response(new Uint8Array(small), { status: 200, headers: { "Content-Type": "image/jpeg", "Cache-Control": "private, max-age=300" } });

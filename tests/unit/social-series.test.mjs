@@ -24,7 +24,7 @@ vi.mock('../../netlify/lib/zernio-ads.mjs', async (orig) => {
 })
 
 const { planSlots, choosePublishTime, normalizeCadence, nextFunctionStart, DEFAULT_CADENCE, stageOf } = await import('../../src/lib/socialSeriesCadence.ts')
-const { pieceText } = await import('../../src/lib/socialSeriesRender.ts')
+const { pieceText, backgroundMode, renderPiece } = await import('../../src/lib/socialSeriesRender.ts')
 const S = await import('../../src/lib/socialSeries.ts')
 const { runTool } = await import('../../src/lib/producer-api/registry.ts')
 const { getTool } = await import('../../src/lib/producer-api/tools/index.ts')
@@ -214,6 +214,36 @@ describe('textos de las piezas', () => {
     expect(pieceText({ ...base, kind: 'feed_post', variant: 'countdown', daysToEvent: 4 }).cta).toBe('Comenta ENTRADAS y te mandamos el link')
     expect(pieceText({ ...base, kind: 'story', variant: 'sold_out', daysToEvent: 2 })).toMatchObject({ bigLines: ['Agotado'], cta: null })
   })
+})
+
+describe('fondo: la portada o una versión de ella', () => {
+  it('llena el formato solo si la proporción calza (±10%); si no, o si el productor la quiere completa, va completa sobre su versión difuminada', () => {
+    expect(backgroundMode(1080 / 1920, 'story')).toBe('fill')
+    expect(backgroundMode(1080 / 1920, 'story', 'contain')).toBe('framed')
+    expect(backgroundMode(1200 / 630, 'story')).toBe('framed') // portada horizontal
+    expect(backgroundMode(1240 / 1754, 'story')).toBe('framed') // afiche A4
+    expect(backgroundMode(1080 / 1350, 'story')).toBe('framed') // flyer 4:5
+    expect(backgroundMode(1080 / 1350, 'feed_post')).toBe('fill')
+    expect(backgroundMode(1, 'feed_post')).toBe('framed')
+  })
+
+  it('usa el encuadre de la portada en móvil solo cuando la foto base es la portada', () => {
+    const event = { image_url: 'https://x/cover.jpg', cover_settings: { mobile: { fit: 'contain', position_y: 20, height: 300 } } }
+    expect(S.baseImageOptionsFor(null, event)).toEqual({ fit: 'contain', positionY: 20 })
+    expect(S.baseImageOptionsFor({ base_image_url: 'https://x/otra.jpg' }, event)).toEqual({})
+    expect(S.baseImageOptionsFor(null, { image_url: 'https://x/cover.jpg' })).toEqual({ fit: 'cover', positionY: 50 })
+    expect(S.baseImageUrlFor(null, { image_url: null, cover_video: { poster_url: 'https://x/poster.jpg' } })).toBe('https://x/poster.jpg')
+  })
+
+  it('renderiza con portada horizontal, vertical y sin foto en el tamaño de cada formato', async () => {
+    const sharp = (await import('sharp')).default
+    const photo = (w, hgt) => sharp({ create: { width: w, height: hgt, channels: 3, background: '#7c3aed' } }).jpeg().toBuffer()
+    const d = { kind: 'story', variant: 'countdown', daysToEvent: 5, eventName: 'Concierto de Primavera', dateLabel: 'domingo 8 de noviembre', startTime: '12:00', venue: 'Escuela de Música del Dire', keyword: 'ENTRADAS', remaining: null, styleIndex: 0 }
+    for (const [piece, img] of [[d, await photo(1600, 840)], [d, await photo(1080, 1920)], [d, null], [{ ...d, kind: 'feed_post' }, await photo(1600, 840)]]) {
+      const meta = await sharp(await renderPiece(piece, img, { positionY: 30 })).metadata()
+      expect([meta.format, meta.width, meta.height]).toEqual(['jpeg', 1080, piece.kind === 'story' ? 1920 : 1350])
+    }
+  }, 30_000)
 })
 
 describe('preparar y aprobar', () => {

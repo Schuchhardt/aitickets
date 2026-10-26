@@ -26,7 +26,8 @@ import { IMAGE_BUCKET } from "./imageStorage";
 import { isCourtesyOrder, isTransferOrder } from "./orderKinds";
 import { siteUrl as orgSiteUrl } from "./sites";
 import { choosePublishTime, normalizeCadence, nextFunctionStart, planSlots, type CadenceConfig, type PlannedSlot } from "./socialSeriesCadence";
-import { longDateLabel, renderPiece, type PieceData } from "./socialSeriesRender";
+import { longDateLabel, renderPiece, type BaseImageOptions, type PieceData } from "./socialSeriesRender";
+import { normalizeCoverSettings } from "./eventCover";
 import { zernioRequest, ZernioError } from "../../netlify/lib/zernio-ads.mjs";
 import { sendEmail } from "../../netlify/lib/mailer.mjs";
 import { escapeHtml } from "../../netlify/lib/supabase.mjs";
@@ -71,13 +72,15 @@ export class SeriesError extends Error {
 // ---------------------------------------------------------------------------
 
 export const SERIES_EVENT_SELECT =
-    "id, name, title, slug, status, organization_id, description, start_date, end_date, image_url, cover_video, cancelled_at, archived_at, location, " +
+    "id, name, title, slug, status, organization_id, description, start_date, end_date, image_url, cover_video, cover_settings, cancelled_at, archived_at, location, " +
     "event_dates(date, start_time, end_time), event_locations(venues(name, city))";
 
 export async function loadSeriesEvent(supabase: any, eventId: number): Promise<any | null> {
     let { data, error } = await supabase.from("events").select(SERIES_EVENT_SELECT).eq("id", eventId).maybeSingle();
-    // Deploy sin la migración de cover_video
-    if (error && isMissing(error)) ({ data, error } = await supabase.from("events").select(SERIES_EVENT_SELECT.replace("cover_video, ", "")).eq("id", eventId).maybeSingle());
+    // Deploy sin las migraciones de cover_video / cover_settings
+    if (error && isMissing(error)) {
+        ({ data, error } = await supabase.from("events").select(SERIES_EVENT_SELECT.replace("cover_video, cover_settings, ", "")).eq("id", eventId).maybeSingle());
+    }
     if (error) throw error;
     return data || null;
 }
@@ -176,6 +179,16 @@ export const anchorFor = (event: any, now = new Date()) => nextFunctionStart(eve
 /** Foto base: la elegida para la serie, la portada o el fotograma del video de portada. */
 export const baseImageUrlFor = (series: any, event: any): string | null =>
     series?.base_image_url || event?.image_url || event?.cover_video?.poster_url || null;
+
+/**
+ * Encuadre de la portada en móvil (cover_settings.mobile) cuando la foto base ES la portada: la historia la muestra
+ * como la página (recortada a la misma altura relativa, o completa sobre su versión difuminada si eligió 'contain').
+ */
+export function baseImageOptionsFor(series: any, event: any): BaseImageOptions {
+    if (series?.base_image_url || !event?.image_url) return {};
+    const mobile = normalizeCoverSettings(event.cover_settings).mobile;
+    return { fit: mobile.fit, positionY: mobile.position_y };
+}
 
 // ---------------------------------------------------------------------------
 // DM y links
@@ -834,7 +847,7 @@ async function dispatchSlot(supabase: any, series: any, event: any, slot: any, o
     const config = normalizeCadence(series.cadence_config);
     const anchor = slot.anchor_starts_at ? new Date(slot.anchor_starts_at) : series.anchor_starts_at ? new Date(series.anchor_starts_at) : anchorFor(event, now);
     const data = await pieceDataFor(supabase, series, event, slot, config, anchor);
-    const image = await renderPiece(data, await loadBaseImage(baseImageUrlFor(series, event)));
+    const image = await renderPiece(data, await loadBaseImage(baseImageUrlFor(series, event)), baseImageOptionsFor(series, event));
     const imageUrl = await uploadPiece(supabase, series, slot, image);
     const caption = slot.kind === "feed_post" ? await seriesCaption(supabase, event, slot, data.keyword, previousCaptions, anchor) : null;
     await supabase.from(SLOTS_TABLE).update({ image_url: imageUrl, caption, rendered_at: nowIso(), updated_at: nowIso() }).eq("id", slot.id);

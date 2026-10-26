@@ -84,7 +84,14 @@ Concierto de Primavera (activado el 26-oct, evento el 8-nov a las 12:00): histor
 - **Render tardío:** la imagen se genera unas 2 h antes de publicar con los datos vigentes. La vista previa usa los de ese momento.
 - **Caption del post:** Claude desde la descripción del evento (cambia el ángulo respecto de los anteriores; sin hashtags ni
   links inventados) y siempre termina en "Comenta ENTRADAS y te mandamos el link 📩". Sin IA configurada, texto fijo.
-- Foto base: la elegida para la serie, la portada o el fotograma del video de portada; sin ninguna, fondo liso (la tarjeta lo avisa).
+- **Fondo = la portada del evento o una versión de ella** (o la foto base elegida para la serie; sin portada, el
+  fotograma del video de portada; sin nada, fondo liso y la tarjeta lo avisa):
+  - Si la portada calza con el formato (±10%: vertical 9:16 en la historia, 4:5 en el post), es el fondo a pantalla
+    completa con el encuadre vertical que el productor eligió para la portada en móvil (`cover_settings.mobile`). La
+    parte de arriba queda limpia y la información va en la franja de abajo.
+  - Si no calza (portada horizontal, afiche A4, flyer 4:5 en una historia) o el productor eligió "mostrar completa" en
+    móvil, la portada va **completa** como tarjeta sobre una versión difuminada y oscurecida de sí misma: nunca se corta
+    el texto de un afiche ni media portada.
 
 ## 6. Link por DM (comment-automations de Zernio)
 
