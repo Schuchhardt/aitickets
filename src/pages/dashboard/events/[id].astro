@@ -11,6 +11,7 @@ import EventGalleryManager from "../../../components/dashboard/EventGalleryManag
 import EventReviewsManager from "../../../components/dashboard/EventReviewsManager.vue";
 import EventCommunityManager from "../../../components/dashboard/EventCommunityManager.vue";
 import TrackingLinkBuilder from "../../../components/dashboard/TrackingLinkBuilder.vue";
+import SocialSeriesCard from "../../../components/dashboard/SocialSeriesCard.vue";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { EVENT_MANAGER_ROLES } from "../../../lib/supabaseServer";
 import { requireDashboardSession } from "../_lib/guard";
@@ -252,6 +253,9 @@ const publishBlockers = [
                 imageUrl={event.image_url || ""}
                 coverSettings={event.cover_settings || null}
             />
+
+            <!-- Difusión automática: historias y posts en Instagram hasta el evento (docs/specs/historias-automaticas.md) -->
+            {event.status === "published" && <SocialSeriesCard client:visible eventId={Number(event.id)} eventName={event.name} />}
 
             <!-- Tickets Section -->
             <section

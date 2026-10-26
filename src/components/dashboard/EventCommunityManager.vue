@@ -108,7 +108,7 @@ const togglePost = async (p) => {
       <!-- Mensajes -->
       <div v-if="tab === 'messages'" class="p-4 md:p-6">
         <p v-if="!messages.length" class="text-sm text-gray-500">Todavía no te han escrito.</p>
-        <ul v-else class="space-y-3">
+        <ul v-else class="space-y-3" data-track-mask>
           <li v-for="m in messages" :key="m.id" class="rounded-lg border p-4" :class="m.read_at ? 'border-gray-200' : 'border-lime-400 bg-lime-50/40'">
             <div class="flex flex-wrap items-baseline justify-between gap-2">
               <p class="text-sm"><strong>{{ m.name || 'Asistente' }}</strong> <span class="text-gray-500 break-all">· {{ m.email }}</span></p>
@@ -132,7 +132,7 @@ const togglePost = async (p) => {
           <span v-for="r in data.reactions" :key="r.emoji" class="rounded-full border border-gray-200 px-3 py-1 text-sm">{{ r.emoji }} <span class="tabular-nums text-gray-600">{{ r.count }}</span></span>
         </div>
         <p v-if="!posts.length" class="text-sm text-gray-500">Nadie ha reaccionado todavía. El muro aparece en la página de la entrada de cada asistente.</p>
-        <ul v-else class="divide-y divide-gray-100">
+        <ul v-else class="divide-y divide-gray-100" data-track-mask>
           <li v-for="p in posts" :key="p.id" class="py-3 flex items-start gap-3" :class="p.status === 'hidden' ? 'opacity-50' : ''">
             <span class="text-2xl leading-none" aria-hidden="true">{{ p.emoji }}</span>
             <div class="min-w-0 flex-1">

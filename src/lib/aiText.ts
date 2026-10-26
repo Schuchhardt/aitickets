@@ -113,3 +113,21 @@ export async function generateAdCopy(eventContext: string, guide?: string): Prom
     const clean = (v: unknown, max: number) => String(v || "").replace(/https?:\/\/\S+/g, "").replace(/#\S+/g, "").replace(/\s+/g, " ").trim().slice(0, max);
     return { headline: clean(parsed.headline, 40), body: clean(parsed.body, 1000) };
 }
+
+/**
+ * Caption de un post de feed de las historias automáticas (src/lib/socialSeries.ts): 2 a 4 frases desde la
+ * descripción del evento, distinto según los días que faltan. Sin links ni hashtags inventados: el cierre fijo
+ * ("Comenta ENTRADAS y te mandamos el link") lo agrega quien llama.
+ */
+export async function generateSeriesCaption(eventContext: string, daysToEvent: number, previous: string[] = []): Promise<string> {
+    const when = daysToEvent <= 0 ? "hoy" : daysToEvent === 1 ? "mañana" : `en ${daysToEvent} días`;
+    const text = await ask(
+        "Eres community manager de una ticketera chilena. Escribes el texto de un post de Instagram para vender entradas de un evento, " +
+            "en español de Chile, cercano y concreto: 2 a 4 frases cortas, máximo 2 emojis, sin hashtags, sin links y sin inventar artistas, " +
+            "precios, descuentos ni beneficios que no estén en la información entregada. Menciona cuándo es (el evento es " + when + "). " +
+            "No termines con un llamado a comentar: eso se agrega después. Responde solo con el texto del post.",
+        `Información del evento:\n${eventContext}` +
+            (previous.length ? `\n\nPosts anteriores de esta misma serie (no los repitas, cambia el ángulo):\n- ${previous.slice(-3).join("\n- ")}` : ""),
+    );
+    return text.replace(/https?:\/\/\S+/g, "").replace(/#\S+/g, "").replace(/[ \t]+/g, " ").trim().slice(0, 1500);
+}

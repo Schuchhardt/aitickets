@@ -20,6 +20,7 @@ se conserva hasta que termine: **retención por litigio**).
 | Datos bancarios del productor | `organization_payout_accounts` | Mientras la cuenta esté activa y 6 años después del último retiro | Tributario y prueba de pago |
 | Logs técnicos (Netlify, Sentry) | Proveedores | 30 a 90 días según el proveedor | Seguridad; exportar si hay requerimiento abierto |
 | Analítica | Google Analytics, `event_visits` | 14 meses | Interés legítimo, anonimizada después |
+| Uso del panel de productores | `aitickets_producer_activity` | 12 meses (borrado diario: `purge-producer-activity`) | Soporte y mejora del servicio; sin valores de formularios (`docs/specs/bitacora-panel.md`) |
 
 ## Requerimiento de una autoridad
 

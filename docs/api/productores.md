@@ -62,6 +62,7 @@ embeber (`frame-ancestors 'none'`).
 | Analítica | `get_event_performance`, `get_sales_overview` |
 | Reseñas | `list_event_reviews` (attendees), `update_review_settings`, `invite_past_attendees` (publish, con confirmación) |
 | Marketing | `get_marketing_kit`, `create_tracking_link`, `upload_image`, `set_event_video`, `generate_image`, `create_social_post`, `list_social_posts`, `publish_social_post` (publish) |
+| Difusión automática (Instagram) | `get_social_series`, `prepare_social_series` (borrador), `approve_social_series` (publish, confirmación), `pause_social_series`, `resume_social_series` (confirmación), `cancel_social_series` (confirmación). Ver `docs/specs/historias-automaticas.md` |
 
 El servidor MCP además entrega `instructions` (reglas de uso para el modelo) y 3 prompts:
 `lanzar_evento`, `reporte_de_ventas`, `campana_redes`.

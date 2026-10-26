@@ -1,0 +1,395 @@
+<script setup>
+import { ref, computed, onMounted } from 'vue'
+import { Instagram, CalendarClock, Pause, Play, X, RefreshCw, ImagePlus, MessageCircle, Check, AlertTriangle } from 'lucide-vue-next'
+
+// Difusión automática en Instagram (docs/specs/historias-automaticas.md): el productor aprueba una vez y AI Tickets
+// publica historias (y posts la última semana) hasta el día del evento, con el link por DM a quien responda la
+// palabra clave. Habla con /api/events/social-series (herramientas *_social_series de la API de productores).
+
+const props = defineProps({
+  eventId: { type: Number, required: true },
+  eventName: { type: String, default: '' },
+})
+
+const view = ref(null)
+const loading = ref(true)
+const busy = ref('')
+const error = ref('')
+const configuring = ref(false)
+const previewVersion = ref(Date.now())
+const form = ref({ feed_posts_enabled: true, sold_out_story_enabled: false, keyword: 'ENTRADAS', dm_message: '', base_image_url: '' })
+
+const series = computed(() => view.value?.series || null)
+const status = computed(() => series.value?.status || 'none')
+const isLive = computed(() => status.value === 'active' || status.value === 'paused')
+const plan = computed(() => view.value?.plan || null)
+
+const STATUS_CLASS = {
+  active: 'bg-green-100 text-green-700',
+  paused: 'bg-amber-100 text-amber-700',
+  draft: 'bg-gray-100 text-gray-600',
+  completed: 'bg-gray-100 text-gray-600',
+  cancelled: 'bg-gray-100 text-gray-500',
+}
+const SLOT_CLASS = {
+  published: 'bg-green-100 text-green-700',
+  queued: 'bg-blue-100 text-blue-700',
+  rendering: 'bg-blue-100 text-blue-700',
+  planned: 'bg-gray-100 text-gray-600',
+  failed: 'bg-red-100 text-red-700',
+  skipped: 'bg-gray-100 text-gray-400',
+}
+const fmt = (local) => {
+  if (!local) return ''
+  const [date, time] = local.split('T')
+  const d = new Date(`${date}T12:00:00Z`)
+  return `${d.toLocaleDateString('es-CL', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' })} · ${time}`
+}
+const clp = (n) => `$${Math.round(Number(n) || 0).toLocaleString('es-CL')}`
+const previewUrl = (s) =>
+  `/api/events/social-series-preview?event_id=${props.eventId}&kind=${s.kind}&days=${s.days_to_event}${s.variant === 'sold_out' ? '&variant=sold_out' : ''}&v=${previewVersion.value}`
+const track = (name, data) => { try { window.aitTrack?.(name, data) } catch { /* bitácora opcional */ } }
+
+const api = async (method, body) => {
+  const res = await fetch(method === 'GET' ? `/api/events/social-series?event_id=${props.eventId}` : '/api/events/social-series', {
+    method,
+    headers: method === 'GET' ? undefined : { 'Content-Type': 'application/json' },
+    body: method === 'GET' ? undefined : JSON.stringify({ event_id: props.eventId, ...body }),
+  })
+  const json = await res.json().catch(() => ({}))
+  if (!res.ok || !json.ok) throw new Error(json.error?.message || 'No se pudo completar la acción.')
+  return json.data
+}
+
+const load = async () => {
+  loading.value = true
+  error.value = ''
+  try {
+    view.value = await api('GET')
+    const s = view.value.series
+    if (s && s.status === 'draft') {
+      form.value = {
+        feed_posts_enabled: s.feed_posts_enabled,
+        sold_out_story_enabled: s.sold_out_story_enabled,
+        keyword: s.keyword,
+        dm_message: s.dm_message || '',
+        base_image_url: s.base_image_url || '',
+      }
+    }
+  } catch (e) {
+    error.value = e.message
+  } finally {
+    loading.value = false
+  }
+}
+onMounted(load)
+
+/** Guarda el borrador con la configuración del formulario y refresca el calendario. */
+const savePreview = async () => {
+  busy.value = 'prepare'
+  error.value = ''
+  try {
+    view.value = await api('POST', {
+      action: 'prepare',
+      feed_posts_enabled: form.value.feed_posts_enabled,
+      sold_out_story_enabled: form.value.sold_out_story_enabled,
+      keyword: form.value.keyword.trim().toUpperCase(),
+      dm_message: form.value.dm_message.trim(),
+      base_image_url: form.value.base_image_url,
+    })
+    previewVersion.value = Date.now()
+    track('difusion_preview', { piezas: view.value.plan?.slots?.length || 0 })
+  } catch (e) {
+    error.value = e.message
+  } finally {
+    busy.value = ''
+  }
+}
+
+const start = async () => {
+  configuring.value = true
+  track('difusion_configurar')
+  if (!series.value || series.value.status !== 'draft') await savePreview()
+}
+
+/** Acciones con confirmación en el servidor: primero el resumen, luego se repite con el token. */
+const confirmAction = async (action, eventName) => {
+  busy.value = action
+  error.value = ''
+  try {
+    const first = await api('POST', { action })
+    if (first?.status === 'confirmation_required') {
+      const lines = [first.summary, ...(first.warnings || []).map((w) => `⚠️ ${w}`)].join('\n\n')
+      if (!window.confirm(lines)) {
+        track(`${eventName}_cancelado`)
+        return
+      }
+      view.value = await api('POST', { action, confirmation_token: first.confirmation_token })
+    } else view.value = first
+    configuring.value = false
+    previewVersion.value = Date.now()
+    track(eventName, { estado: view.value?.series?.status })
+  } catch (e) {
+    error.value = e.message
+  } finally {
+    busy.value = ''
+  }
+}
+
+const pause = async () => {
+  busy.value = 'pause'
+  error.value = ''
+  try {
+    view.value = await api('POST', { action: 'pause' })
+    track('difusion_pausada')
+  } catch (e) {
+    error.value = e.message
+  } finally {
+    busy.value = ''
+  }
+}
+
+const uploadPhoto = async (event) => {
+  const file = event.target.files?.[0]
+  event.target.value = ''
+  if (!file) return
+  busy.value = 'photo'
+  error.value = ''
+  try {
+    const fd = new FormData()
+    fd.append('file', file)
+    const res = await fetch('/api/promote/upload-image', { method: 'POST', body: fd })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok || !data.url) throw new Error(data.message || 'No se pudo subir la foto')
+    form.value.base_image_url = data.url
+    await savePreview()
+    track('difusion_foto_cambiada')
+  } catch (e) {
+    error.value = e.message
+  } finally {
+    if (busy.value === 'photo') busy.value = ''
+  }
+}
+
+const upcoming = computed(() => (view.value?.slots || []).filter((s) => ['planned', 'rendering', 'queued'].includes(s.status)))
+const done = computed(() => (view.value?.slots || []).filter((s) => ['published', 'failed'].includes(s.status)).reverse())
+</script>
+
+<template>
+  <section class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden" data-track-section="Difusión automática" data-testid="social-series">
+    <div class="p-4 sm:p-6 border-b border-gray-100 flex items-start justify-between gap-3">
+      <div class="min-w-0">
+        <h3 class="font-bold text-lg flex items-center gap-2"><Instagram :size="18" /> Difusión automática</h3>
+        <p class="text-sm text-gray-500 mt-1">
+          Historias en tu Instagram hasta el día del evento, sin que tengas que hacer nada. Quien responde la historia recibe el link por DM.
+        </p>
+      </div>
+      <span v-if="series && status !== 'draft'" class="px-2 py-1 rounded text-xs font-medium shrink-0" :class="STATUS_CLASS[status]">{{ series.status_label }}</span>
+    </div>
+
+    <div class="p-4 sm:p-6 space-y-4">
+      <p v-if="loading" class="text-sm text-gray-500">Cargando…</p>
+
+      <template v-else-if="view">
+        <div v-if="series?.notice" class="flex gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-900" role="status">
+          <AlertTriangle :size="16" class="shrink-0 mt-0.5" /> <span>{{ series.notice }}</span>
+        </div>
+
+        <!-- Sin activar -->
+        <template v-if="!isLive">
+          <div v-if="view.blockers.length" class="space-y-2">
+            <p v-for="b in view.blockers" :key="b" class="text-sm text-gray-700 flex gap-2"><span class="text-gray-400">•</span>{{ b }}</p>
+            <a
+              v-if="!view.instagram.connected"
+              href="/dashboard/promote"
+              data-track="Conectar Instagram (difusión)"
+              class="inline-flex items-center gap-2 px-4 py-2 bg-black text-white rounded-lg text-sm font-medium hover:bg-gray-900"
+            >
+              <Instagram :size="16" /> Conectar Instagram
+            </a>
+          </div>
+
+          <div v-else-if="!configuring" class="space-y-3">
+            <p v-if="plan" class="text-sm text-gray-700">
+              Se publicarían <strong>{{ plan.stories }} historias</strong><template v-if="plan.feed_posts"> y <strong>{{ plan.feed_posts }} posts</strong></template>
+              en <strong>{{ view.instagram.account || 'tu Instagram' }}</strong>, cada vez más seguido a medida que se acerca el evento, a las {{ plan.publish_time }}.
+            </p>
+            <p v-if="status === 'completed' || status === 'cancelled'" class="text-xs text-gray-500">La difusión anterior quedó {{ series.status_label.toLowerCase() }}.</p>
+            <button
+              type="button"
+              data-track="Activar historias automáticas"
+              :disabled="busy !== ''"
+              @click="start"
+              class="w-full py-2.5 bg-black text-white rounded-lg font-medium text-sm hover:bg-gray-900 transition disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              <CalendarClock :size="16" /> {{ busy === 'prepare' ? 'Preparando…' : 'Activar historias automáticas' }}
+            </button>
+          </div>
+
+          <!-- Configuración mínima + vista previa -->
+          <div v-else class="space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label class="block">
+                <span class="block text-xs font-bold text-gray-500 uppercase mb-1">Palabra clave del DM</span>
+                <input v-model="form.keyword" maxlength="30" class="w-full bg-gray-50 border border-gray-200 text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-black uppercase" />
+              </label>
+              <div class="flex flex-col justify-end gap-2 text-sm text-gray-700">
+                <label class="flex items-center gap-2 cursor-pointer"><input v-model="form.feed_posts_enabled" type="checkbox" /> Posts de feed la última semana</label>
+                <label class="flex items-center gap-2 cursor-pointer"><input v-model="form.sold_out_story_enabled" type="checkbox" /> Historia "agotado" si se agota</label>
+              </div>
+            </div>
+            <label class="block">
+              <span class="block text-xs font-bold text-gray-500 uppercase mb-1">Mensaje del DM (opcional)</span>
+              <textarea
+                v-model="form.dm_message"
+                rows="2"
+                maxlength="600"
+                :placeholder="view.dm_preview"
+                class="w-full bg-gray-50 border border-gray-200 text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-black"
+              ></textarea>
+              <span class="block text-xs text-gray-400 mt-1">Escribe {link} donde va el link (si no, va al final). Vacío = el mensaje de ejemplo.</span>
+            </label>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <label class="inline-flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm cursor-pointer hover:bg-gray-50" data-track="Cambiar foto base">
+                <ImagePlus :size="16" /> {{ busy === 'photo' ? 'Subiendo…' : 'Cambiar foto base' }}
+                <input type="file" accept="image/jpeg,image/png,image/webp" class="hidden" @change="uploadPhoto" />
+              </label>
+              <button type="button" data-track="Regenerar vista previa" :disabled="busy !== ''" @click="savePreview" class="inline-flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-60">
+                <RefreshCw :size="16" /> {{ busy === 'prepare' ? 'Generando…' : 'Regenerar vista previa' }}
+              </button>
+              <span class="text-xs text-gray-500">Foto: {{ view.base_image?.source || 'sin foto (fondo liso)' }}</span>
+            </div>
+
+            <div v-if="plan" class="space-y-2">
+              <p class="text-sm text-gray-700">
+                <strong>{{ plan.stories }} historias</strong><template v-if="plan.feed_posts"> y <strong>{{ plan.feed_posts }} posts</strong></template>
+                a las {{ plan.publish_time }} <span class="text-gray-500">({{ plan.publish_time_source }})</span>.
+                La cuenta de entradas se actualiza al publicar.
+              </p>
+              <div class="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1" data-track-section="Calendario de la difusión">
+                <figure v-for="(s, i) in plan.slots" :key="`${s.kind}-${s.publish_at}`" class="shrink-0 w-28">
+                  <img
+                    :src="previewUrl(s)"
+                    :alt="`${s.kind_label} ${s.stage}`"
+                    loading="lazy"
+                    class="w-28 rounded-lg border border-gray-200 bg-gray-100"
+                    :class="s.kind === 'story' ? 'aspect-[9/16]' : 'aspect-[4/5]'"
+                  />
+                  <figcaption class="mt-1 text-[11px] leading-tight text-gray-600">
+                    <span class="font-semibold text-gray-800">{{ s.kind_label }}</span><br />{{ fmt(s.publish_local) }}
+                    <details v-if="s.caption_example" class="mt-1">
+                      <summary class="cursor-pointer text-gray-500">Caption</summary>
+                      <p class="whitespace-pre-line text-gray-600">{{ s.caption_example }}</p>
+                    </details>
+                  </figcaption>
+                </figure>
+              </div>
+              <p class="text-xs text-gray-500 flex gap-1"><MessageCircle :size="14" class="shrink-0" /> DM: "{{ view.dm_preview }}"</p>
+            </div>
+
+            <div class="flex flex-col sm:flex-row gap-2">
+              <button
+                type="button"
+                data-track="Aprobar y programar difusión"
+                :disabled="busy !== '' || !plan?.slots?.length"
+                @click="confirmAction('approve', 'difusion_aprobada')"
+                class="flex-1 py-2.5 bg-black text-white rounded-lg font-medium text-sm hover:bg-gray-900 transition disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                <Check :size="16" /> {{ busy === 'approve' ? 'Programando…' : 'Aprobar y programar' }}
+              </button>
+              <button type="button" data-track="Cerrar configuración de difusión" @click="configuring = false" class="py-2.5 px-4 border border-gray-200 rounded-lg text-sm hover:bg-gray-50">Ahora no</button>
+            </div>
+          </div>
+        </template>
+
+        <!-- Activa o pausada -->
+        <template v-else>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+            <div class="p-3 rounded-lg bg-gray-50">
+              <p class="text-xl font-bold">{{ view.slot_counts.published || 0 }}</p>
+              <p class="text-xs text-gray-500">Publicadas</p>
+            </div>
+            <div class="p-3 rounded-lg bg-gray-50">
+              <p class="text-xl font-bold">{{ upcoming.length }}</p>
+              <p class="text-xs text-gray-500">Por publicar</p>
+            </div>
+            <div class="p-3 rounded-lg bg-gray-50">
+              <p class="text-xl font-bold">{{ view.dms?.sent ?? '—' }}</p>
+              <p class="text-xs text-gray-500">DMs enviados</p>
+            </div>
+            <div class="p-3 rounded-lg bg-gray-50">
+              <p class="text-xl font-bold">{{ view.attributed_sales.tickets }}</p>
+              <p class="text-xs text-gray-500">Entradas por DM</p>
+            </div>
+          </div>
+          <p v-if="view.attributed_sales.orders" class="text-xs text-gray-500">
+            {{ view.attributed_sales.orders }} compras por el link del DM ({{ clp(view.attributed_sales.gross_clp) }}). Aparecen como canales ig-story-dm e ig-post-dm en la analítica.
+          </p>
+
+          <div v-if="view.next_slot && status === 'active'" class="flex items-center gap-3 p-3 rounded-lg border border-gray-200">
+            <img :src="view.next_slot.image_url || previewUrl(view.next_slot)" alt="Próxima publicación" class="w-14 rounded border border-gray-200" :class="view.next_slot.kind === 'story' ? 'aspect-[9/16]' : 'aspect-[4/5]'" />
+            <div class="text-sm">
+              <p class="font-semibold">Próxima: {{ view.next_slot.kind_label }} · {{ view.next_slot.stage }}</p>
+              <p class="text-gray-500">{{ fmt(view.next_slot.publish_local) }} · {{ view.next_slot.status_label }}</p>
+            </div>
+          </div>
+
+          <details class="text-sm">
+            <summary class="cursor-pointer font-medium">Calendario ({{ view.slots.length }} piezas)</summary>
+            <ul class="mt-2 divide-y divide-gray-100">
+              <li v-for="s in [...done, ...upcoming]" :key="s.id" class="py-2 flex items-center justify-between gap-2">
+                <div class="min-w-0">
+                  <p class="font-medium text-gray-800">{{ s.kind_label }} · {{ s.stage }}</p>
+                  <p class="text-xs text-gray-500">{{ fmt(s.publish_local) }}<template v-if="s.error"> · <span class="text-red-600">{{ s.error }}</span></template></p>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                  <a v-if="s.post_url" :href="s.post_url" target="_blank" rel="noopener" class="text-xs underline">Ver</a>
+                  <span class="px-2 py-0.5 rounded text-xs font-medium" :class="SLOT_CLASS[s.status]">{{ s.status_label }}</span>
+                </div>
+              </li>
+            </ul>
+          </details>
+
+          <p class="text-xs text-gray-500">
+            Palabra clave: <strong>{{ series.keyword }}</strong> · a las {{ series.publish_time }} · DM: "{{ view.dm_preview }}"
+          </p>
+
+          <div class="flex flex-col sm:flex-row gap-2">
+            <button
+              v-if="status === 'active'"
+              type="button"
+              data-track="Pausar difusión"
+              :disabled="busy !== ''"
+              @click="pause"
+              class="flex-1 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              <Pause :size="16" /> {{ busy === 'pause' ? 'Pausando…' : 'Pausar' }}
+            </button>
+            <button
+              v-else
+              type="button"
+              data-track="Reanudar difusión"
+              :disabled="busy !== ''"
+              @click="confirmAction('resume', 'difusion_reanudada')"
+              class="flex-1 py-2 bg-black text-white rounded-lg text-sm font-medium hover:bg-gray-900 disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              <Play :size="16" /> {{ busy === 'resume' ? 'Reanudando…' : 'Reanudar desde hoy' }}
+            </button>
+            <button
+              type="button"
+              data-track="Cancelar difusión"
+              :disabled="busy !== ''"
+              @click="confirmAction('cancel', 'difusion_cancelada')"
+              class="py-2 px-4 border border-red-200 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50 disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              <X :size="16" /> Cancelar
+            </button>
+          </div>
+        </template>
+      </template>
+
+      <p v-if="error" class="text-sm text-red-600" role="alert">{{ error }}</p>
+    </div>
+  </section>
+</template>
