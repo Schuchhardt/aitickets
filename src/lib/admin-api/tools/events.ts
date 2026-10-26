@@ -4,6 +4,7 @@ import { ToolError } from "../../producer-api/registry";
 import { eventVisitCounts, getEventAnalytics } from "../../eventAnalytics";
 import { isDemoEventSlug } from "../../demoEvent.mjs";
 import type { AdminToolDef } from "../registry";
+import { seriesSummaryForEvent } from "../../socialSeries";
 import { emptyTotals, loadPaidOrders, loadPlatformEvents, pct, totalsByEvent } from "../metrics";
 import { organizationIdSchema } from "./organizations";
 
@@ -135,7 +136,8 @@ const getEventAnalyticsTool: AdminToolDef = {
         "La misma vista de analítica que ve el productor en su panel, para cualquier evento de la plataforma (la organización se infiere del evento): " +
         "visitas y visitantes únicos, conversión (órdenes ÷ visitantes únicos), ocupación (emitidas ÷ capacidad), serie diaria en hora de Chile, " +
         "horas pico, fuentes de tráfico, ubicación de visitantes, ventas y conversión por canal (ref/UTM), por medio de pago y por tipo de entrada, " +
-        "reembolsos, más el resumen de check-in y de reseñas (sin datos personales). Ventas sin cortesías ni transferencias.",
+        "reembolsos, más el resumen de check-in, de reseñas (sin datos personales) y de la difusión automática en Instagram (piezas publicadas, " +
+        "DMs y ventas por DM). Ventas sin cortesías ni transferencias.",
     readOnly: true,
     inputSchema: {
         type: "object",
@@ -156,7 +158,7 @@ const getEventAnalyticsTool: AdminToolDef = {
         if (isDemoEventSlug(event.slug) && !args.include_demo) {
             throw new ToolError("invalid_input", `El evento ${args.event_id} es un evento demo. Pasa include_demo = true si de verdad quieres su analítica.`);
         }
-        const [analytics, { data: org }, attendees, reviews] = await Promise.all([
+        const [analytics, { data: org }, attendees, reviews, socialSeries] = await Promise.all([
             getEventAnalytics(supabase, { id: Number(event.id), status: event.status }),
             supabase.from("organizations").select("id, public_name").eq("id", event.organization_id).maybeSingle(),
             fetchAll<any>(() => supabase.from("event_attendees").select("id, status, validated_at, is_complimentary").eq("event_id", event.id).order("id", { ascending: true })).catch((err: any) => {
@@ -167,6 +169,7 @@ const getEventAnalyticsTool: AdminToolDef = {
                 if (isMissing(err)) return [];
                 throw err;
             }),
+            seriesSummaryForEvent(supabase, Number(event.id)).catch(() => null),
         ]);
         const active = attendees.filter((a: any) => a.status !== "cancelled");
         const checkedIn = active.filter((a: any) => a.validated_at || a.status === "validated").length;
@@ -196,6 +199,7 @@ const getEventAnalyticsTool: AdminToolDef = {
                 average: ratings.length ? Math.round((ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length) * 10) / 10 : null,
                 distribution,
             },
+            social_series: socialSeries,
             definitions:
                 "Ventas sin cortesías ni transferencias; revenue_clp = neto del productor. Conversión = órdenes vendidas ÷ visitantes únicos; " +
                 "ocupación = emitidas ÷ capacidad a la venta. Días y horas en hora de Chile.",

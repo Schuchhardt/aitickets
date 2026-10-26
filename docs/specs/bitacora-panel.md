@@ -130,9 +130,10 @@ mejorar la calidad de los datos:
 - `data-track-ignore`: no se registran clics ni campos de ese bloque.
 - `window.aitTrack?.("serie_aprobada", { piezas: 17 })`: un hito propio (props: hasta 10 claves simples).
 
-Ejemplo, la tarjeta de "Difusión automática" (spec de historias automáticas): `data-track-section` en la tarjeta,
-`data-track` en Aprobar / Pausar / Cancelar y `aitTrack("serie_aprobada")` al aprobar, para medir cuántos la
-abren, cuántos aprueban y dónde abandonan.
+Ejemplo ya instrumentado: la tarjeta "Difusión automática" (`SocialSeriesCard.vue`, `docs/specs/historias-automaticas.md`)
+lleva `data-track-section` y `data-track` en Activar / Aprobar / Pausar / Reanudar / Cancelar, y `aitTrack` en
+`difusion_configurar`, `difusion_preview`, `difusion_aprobada` (y `_cancelado` si no confirma), `difusion_pausada`,
+`difusion_reanudada` y `difusion_cancelada`: así se mide cuántos la abren, cuántos aprueban y dónde abandonan.
 
 ## 7. Operación
 

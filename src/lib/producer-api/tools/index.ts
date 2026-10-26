@@ -5,6 +5,7 @@ import { ticketTools } from "./tickets";
 import { discountTools } from "./discounts";
 import { analyticsTools } from "./analytics";
 import { marketingTools } from "./marketing";
+import { socialSeriesTools } from "./socialSeries";
 import { financeTools } from "./finance";
 import { teamTools } from "./team";
 import { guestTools } from "./guests";
@@ -18,7 +19,7 @@ import { reviewTools } from "./reviews";
 import { complianceTools } from "./compliance";
 
 export const TOOLS: ToolDef[] = [
-    ...eventTools, ...scheduleTools, ...ticketTools, ...discountTools, ...analyticsTools, ...marketingTools,
+    ...eventTools, ...scheduleTools, ...ticketTools, ...discountTools, ...analyticsTools, ...marketingTools, ...socialSeriesTools,
     ...financeTools, ...complianceTools, ...teamTools, ...guestTools, ...accessTools, ...postsaleTools,
     ...messagingTools, ...reviewTools, ...lifecycleTools, ...auditTools,
 ];

@@ -5,6 +5,7 @@ import { isCourtesyOrder, isTransferOrder } from "../../orderKinds";
 import { ACTIVE_REFUND_STATUSES } from "../../producer-api/ledger";
 import { addDays } from "../../../../netlify/lib/dates.mjs";
 import type { AdminToolDef } from "../registry";
+import { platformSeriesStats } from "../../socialSeries";
 import {
     SEGMENTS,
     SEGMENT_LABELS,
@@ -172,7 +173,8 @@ const getPlatformOverview: AdminToolDef = {
         "KPIs de toda la plataforma en un período (por defecto 30 días) comparados con el período anterior del mismo largo: plata (ventas brutas, " +
         "ingreso de AI Tickets = cargo neto, IVA del cargo, costo de Flow, margen, neto a productores), actividad (órdenes, entradas, ticket promedio, " +
         "eventos y productores con ventas, productores nuevos, eventos creados, visitas, visitantes únicos y conversión), reembolsos, top 5 eventos y " +
-        "productores, y contadores de la bandeja de operación. Sin eventos demo. Montos en CLP.",
+        "productores, contadores de la bandeja de operación y difusión automática en Instagram (series activas, % de eventos próximos con serie y " +
+        "ventas atribuidas al DM). Sin eventos demo. Montos en CLP.",
     readOnly: true,
     inputSchema: { type: "object", additionalProperties: false, properties: { ...periodSchema } },
     async handler(args, actx) {
@@ -182,7 +184,7 @@ const getPlatformOverview: AdminToolDef = {
         const eventIds = events.map((e) => Number(e.id));
         const eventById = new Map(events.map((e) => [Number(e.id), e]));
 
-        const [orders, prevOrders, refunds, prevRefunds, visits, newOrgs, verifiedOrgs, pending] = await Promise.all([
+        const [orders, prevOrders, refunds, prevRefunds, visits, newOrgs, verifiedOrgs, pending, socialSeries] = await Promise.all([
             loadPaidOrders(supabase, eventIds, current),
             previous ? loadPaidOrders(supabase, eventIds, previous) : Promise.resolve([]),
             loadActiveRefunds(supabase, current, eventIds),
@@ -191,6 +193,7 @@ const getPlatformOverview: AdminToolDef = {
             tolerantAll<any>(() => supabase.from("organizations").select("id, created_at").gte("created_at", current.fromIso).lt("created_at", current.toIso).order("id", { ascending: true })),
             tolerantAll<any>(() => supabase.from("organizations").select("id").gte("email_verified_at", current.fromIso).lt("email_verified_at", current.toIso).order("id", { ascending: true })),
             pendingCounters(supabase),
+            platformSeriesStats(supabase, current, events).catch(() => null),
         ]);
 
         const totals = totalsFromOrders(orders);
@@ -247,6 +250,7 @@ const getPlatformOverview: AdminToolDef = {
                     : {}),
                 note: "events_created_and_published = eventos creados en el período que hoy están publicados (no se guarda la fecha de publicación). producers_verified = correo verificado en el período.",
             },
+            social_series: socialSeries,
             refunds: {
                 count: refunds.length,
                 total_clp: sumBy(refunds, "total_amount"),

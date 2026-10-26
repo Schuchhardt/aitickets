@@ -51,6 +51,7 @@ Empieza siempre con `get_admin_context`. Prompts listos: `ayudar_productor`, `re
 | Familia | Herramientas |
 | --- | --- |
 | Plataforma | `get_platform_overview`, `get_platform_timeseries`, `rank_producers`, `get_producer_funnel`, `list_platform_activity`, `get_system_health` |
+| Difusión automática | `list_social_series` (todas las series, fallas y ventas por DM), `update_social_series_config` (bandas y horas, escritura con `reason`) y `org_*_social_series`. Métricas en `get_platform_overview` y `get_event_analytics` (`social_series`). Ver [`docs/runbooks/historias-automaticas.md`](../runbooks/historias-automaticas.md) |
 | Uso del panel | `get_producer_activity` (una productora: sesiones, tiempo por sección, clics, acciones, errores y dónde se trabó; `session_id` para el detalle clic a clic), `list_dashboard_issues` (errores y fricción de todos). Ver [`docs/specs/bitacora-panel.md`](../specs/bitacora-panel.md) |
 | Productores | `search_organizations`, `get_organization`, `search_users`, `list_organization_notes` |
 | Eventos | `search_events`, `get_event_analytics` |
