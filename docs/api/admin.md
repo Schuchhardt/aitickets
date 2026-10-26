@@ -45,12 +45,13 @@ claude mcp add --scope user --transport http aitickets-admin https://aitickets.c
 
 ## 3. Qué puedes hacer
 
-Empieza siempre con `get_admin_context`. Prompts listos: `ayudar_productor`, `revisar_productor`, `pagar_retiros`,
-`bandeja_operacion`, `cierre_mensual` y `reporte_plataforma`.
+Empieza siempre con `get_admin_context`. Prompts listos: `ayudar_productor`, `revisar_productor`, `diagnosticar_panel`,
+`pagar_retiros`, `bandeja_operacion`, `cierre_mensual` y `reporte_plataforma`.
 
 | Familia | Herramientas |
 | --- | --- |
 | Plataforma | `get_platform_overview`, `get_platform_timeseries`, `rank_producers`, `get_producer_funnel`, `list_platform_activity`, `get_system_health` |
+| Uso del panel | `get_producer_activity` (una productora: sesiones, tiempo por sección, clics, acciones, errores y dónde se trabó; `session_id` para el detalle clic a clic), `list_dashboard_issues` (errores y fricción de todos). Ver [`docs/specs/bitacora-panel.md`](../specs/bitacora-panel.md) |
 | Productores | `search_organizations`, `get_organization`, `search_users`, `list_organization_notes` |
 | Eventos | `search_events`, `get_event_analytics` |
 | Compradores y órdenes | `search_orders`, `get_order_timeline` |
@@ -83,3 +84,5 @@ Cada llamada guarda la huella de la llave (los primeros 8 caracteres del hash) e
 - **`aitickets_api_audit` del productor**: lo que se hace con `org_*`. El productor lo ve en su bitácora como
   **Soporte AI Tickets** (canal `admin`), sin el motivo.
 - **Slack**: avisa cuando alguien supera 10 intentos con llave inválida en 15 minutos.
+- **`aitickets_producer_activity`** (no es del MCP, pero se lee desde aquí): el uso del panel de cada productor.
+  Qué guarda y qué no: [`docs/specs/bitacora-panel.md`](../specs/bitacora-panel.md).

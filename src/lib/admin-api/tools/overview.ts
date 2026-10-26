@@ -46,6 +46,8 @@ const getAdminContext: AdminToolDef = {
             tool_families: {
                 platform: "search_organizations, get_organization, search_events y el resto de herramientas de plataforma: ven todas las organizaciones.",
                 operations: "Escrituras de AI Tickets (verificar cuentas, registrar retiros y reembolsos…): exigen reason y, si mueven plata, confirmación.",
+                dashboard_usage:
+                    "get_producer_activity (cómo usa el panel una productora: sesiones, tiempo por sección, clics, errores y dónde se trabó) y list_dashboard_issues (errores y fricción de todos).",
                 act_as_producer: `org_<herramienta>: las herramientas del MCP de productores sobre la organización indicada (organization_id, o inferida del event_id). Quedan en la bitácora del productor firmadas por "${SUPPORT_ACTOR_NAME}".`,
             },
             spec: "docs/specs/mcp-admin.md",

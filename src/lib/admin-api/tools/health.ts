@@ -183,7 +183,7 @@ const getSystemHealth: AdminToolDef = {
     title: "Salud de los procesos",
     description:
         "Última actividad observada de cada proceso de fondo (recordatorios, solicitudes de reseña, mensajes programados, revisión de dominios, " +
-        "passline-watch, outreach, expiración de órdenes), errores de la API/MCP de productores en 24 h por código, órdenes atascadas y correos " +
+        "passline-watch, outreach, expiración de órdenes, bitácora del panel), errores de la API/MCP de productores en 24 h por código, órdenes atascadas y correos " +
         "fallidos. Se infiere de las tablas: un proceso sin filas recientes puede ser normal (p. ej. sin eventos mañana), revísalo con su note.",
     readOnly: true,
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
@@ -198,7 +198,7 @@ const getSystemHealth: AdminToolDef = {
                 return q.order(column, { ascending: false, nullsFirst: false }).limit(1);
             }).then((r) => ({ at: r.data[0]?.[column] ?? null, missing: r.missing }));
 
-        const [reminders, reviewRequests, schedSent, schedOverdue, schedStuck, domainCheck, passline, outreachEvent, outreachPaused, pendingOverdue, processingStuck, apiErrors, emails] = await Promise.all([
+        const [reminders, reviewRequests, schedSent, schedOverdue, schedStuck, domainCheck, passline, outreachEvent, outreachPaused, pendingOverdue, processingStuck, apiErrors, emails, panelViews, panelClient] = await Promise.all([
             last("notification_log", "created_at", (q) => q.eq("type", "reminder_24h")),
             last("notification_log", "created_at", (q) => q.eq("type", "review_request")),
             last("aitickets_scheduled_messages", "sent_at", (q) => q.eq("status", "sent")),
@@ -213,6 +213,9 @@ const getSystemHealth: AdminToolDef = {
             headCount(() => supabase.from("event_orders").select("id", { count: "exact", head: true }).eq("status", "processing").lt("processing_started_at", ago(30 * MIN))),
             rows(() => supabase.from("aitickets_api_audit").select("tool, error_code, channel").eq("ok", false).gte("created_at", since24).limit(5000)),
             rows(() => supabase.from("aitickets_email_log").select("status").gte("created_at", since24).limit(20000)),
+            // Bitácora del panel: page_view lo escribe el servidor; el resto, el rastreador del navegador
+            last("aitickets_producer_activity", "created_at", (q) => q.eq("type", "page_view")),
+            last("aitickets_producer_activity", "created_at", (q) => q.neq("type", "page_view")),
         ]);
 
         const errorsByCode: Record<string, number> = {};
@@ -246,6 +249,9 @@ const getSystemHealth: AdminToolDef = {
         const totalApiErrors = apiErrors.data.length;
         const internalErrors = errorsByCode.internal || 0;
         if (internalErrors > 0) alerts.push(`${internalErrors} error(es) internos de la API/MCP de productores en 24 h.`);
+        if (panelViews.at && (hoursSince(panelViews.at) || 0) < 6 && (!panelClient.at || (hoursSince(panelClient.at) || 0) > 24)) {
+            alerts.push("El panel registra visitas pero el rastreador del navegador no manda datos hace más de 24 h: revisa src/lib/producerActivityClient.js y /api/dashboard/journal.");
+        }
 
         return {
             generated_at: new Date().toISOString(),
@@ -266,6 +272,10 @@ const getSystemHealth: AdminToolDef = {
                 },
                 { ...proc("outreach", outreachEvent.at, 24, "Solo con OUTREACH_ENABLED=true.", outreachEvent.missing), paused: pausedValue?.paused ?? false },
                 { process: "expire-pending-orders", pending_overdue: pendingOverdue, processing_stuck: processingStuck, note: "Corre cada 10 min: concilia con Flow y expira pendientes." },
+                {
+                    ...proc("bitácora del panel (rastreador del navegador)", panelClient.at, 24, "Datos de uso del panel que manda el navegador; solo escribe si algún productor usa el panel.", panelClient.missing),
+                    last_page_view_at: panelViews.at,
+                },
             ],
             producer_api_errors_24h: { total: totalApiErrors, by_code: errorsByCode, by_tool: errorsByTool },
             ticket_emails_24h: emails.missing ? null : emailByStatus,

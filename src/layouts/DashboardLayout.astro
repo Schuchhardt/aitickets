@@ -8,6 +8,7 @@ import SetPasswordModal from "../components/auth/SetPasswordModal.vue";
 import { PW_RESET_COOKIE, verifyPwResetCookie } from "../lib/magic-link";
 import { getSupabaseAdmin } from "../lib/auth-helpers";
 import { needsIdentityForPublishedEvents } from "../lib/producerIdentity";
+import { recordDashboardPageView } from "../lib/producerActivity";
 
 const { title = "Dashboard" } = Astro.props;
 
@@ -40,6 +41,10 @@ const showIdentityNotice =
   !!session &&
   !Astro.url.pathname.startsWith("/dashboard/settings") &&
   (await needsIdentityForPublishedEvents(getSupabaseAdmin(), Number(session.dbUser.organization_id)).catch(() => false));
+
+// Bitácora de uso del panel (MCP de admin: get_producer_activity): registra esta página y le pasa su id al
+// rastreador del navegador (src/lib/producerActivityClient.js). Sin sesión o con la bitácora apagada no hay id.
+const activityPage = await recordDashboardPageView(Astro, session).catch(() => null);
 ---
 
 <!doctype html>
@@ -60,7 +65,11 @@ const showIdentityNotice =
       rel="stylesheet"
     />
   </head>
-  <body class="bg-gray-50 min-h-screen font-[Prompt]">
+  <body class="bg-gray-50 min-h-screen font-[Prompt]" data-ait-pv={activityPage?.id} data-ait-route={activityPage?.route}>
+    <script>
+      import { startProducerActivity } from "../lib/producerActivityClient.js";
+      startProducerActivity();
+    </script>
     <div class="flex flex-col md:flex-row h-dvh overflow-hidden">
       <!-- Barra superior (mobile): abre el menú lateral como cajón -->
       <header class="md:hidden flex items-center gap-3 h-14 px-3 bg-white border-b border-gray-200 shrink-0 pt-[env(safe-area-inset-top)] box-content">

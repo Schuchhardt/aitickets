@@ -6,6 +6,8 @@ export const toastBus = mitt();
 // Función helper para mostrar toasts
 export function showToast(message, type = 'info', duration = 3000) {
   toastBus.emit('toast', { message, type, duration });
+  // La bitácora del panel (src/lib/producerActivityClient.js) registra los avisos que vio el productor
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('aitickets:toast', { detail: { message, type } }));
 }
 
 // Helpers específicos

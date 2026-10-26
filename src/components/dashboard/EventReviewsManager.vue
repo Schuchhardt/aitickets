@@ -309,7 +309,7 @@ const sendInvite = async () => {
           {{ data.ended ? 'Aún no hay reseñas. Llegan a partir de 24 h después de que termina cada función.' : 'Las reseñas llegarán cuando termine el evento.' }}
         </p>
         <p v-else-if="!reviews.length" class="text-sm text-gray-500 py-4">No hay reseñas con ese filtro.</p>
-        <ul v-else class="divide-y divide-gray-100">
+        <ul v-else class="divide-y divide-gray-100" data-track-mask>
           <li v-for="r in reviews" :key="r.id" class="py-4 space-y-2">
             <div class="flex flex-wrap items-baseline justify-between gap-2">
               <p class="text-sm">
@@ -394,7 +394,7 @@ const sendInvite = async () => {
         </form>
         <div v-if="data.invitations?.length" class="pt-2">
           <p class="text-xs font-bold text-gray-500 uppercase mb-1">Invitaciones enviadas</p>
-          <ul class="text-sm divide-y divide-gray-100">
+          <ul class="text-sm divide-y divide-gray-100" data-track-mask>
             <li v-for="m in data.invitations" :key="m.id" class="py-2 flex flex-wrap justify-between gap-2">
               <span class="min-w-0">{{ m.target_event_name || m.subject }} <span class="text-gray-400">· {{ fmtDate(m.created_at) }}</span></span>
               <span class="text-xs text-gray-500">{{ STATUS_LABELS[m.status] || m.status }}<template v-if="m.recipients_count != null"> · {{ m.recipients_count - (m.failed_count || 0) }} enviados</template></span>

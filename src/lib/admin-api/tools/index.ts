@@ -7,6 +7,7 @@ import { eventTools } from "./events";
 import { analyticsTools } from "./analytics";
 import { supportTools } from "./support";
 import { activityTools } from "./activity";
+import { dashboardActivityTools } from "./dashboardActivity";
 import { financeTools } from "./finance";
 import { operationTools } from "./operations";
 import { healthTools } from "./health";
@@ -19,6 +20,7 @@ export const ADMIN_TOOLS: AdminToolDef[] = [
     ...eventTools,
     ...supportTools,
     ...activityTools,
+    ...dashboardActivityTools,
     ...financeTools,
     ...operationTools,
     ...healthTools,
