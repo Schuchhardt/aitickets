@@ -187,9 +187,16 @@ const showBar = computed(() => {
   if (state.value === "free") return !cardVisible.value && !["success", "confirmed", "waitlist_ok", "already"].includes(rsvpState.value);
   return false;
 });
+// Varias funciones (§4.9b): la barra dice cuántas hay en vez de la nota del cargo. Con un solo tipo de entrada
+// (paid_simple) se mantienen el precio exacto y "Comprar": el checkout va directo a Tus datos
+const functionsCount = computed(() => upcomingFunctions(props.event).length);
+const priceNote = computed(() => {
+  if (functionsCount.value > 1) return `${functionsCount.value} funciones`;
+  return props.event.fee_absorbed ? "precio final por entrada" : "por entrada, incluye cargo";
+});
 const bar = computed(() => {
-  if (state.value === "paid_simple") return { price: formatCLP(fromPrice.value), note: props.event.fee_absorbed ? "precio final por entrada" : "por entrada, incluye cargo", cta: "Comprar" };
-  if (state.value === "paid_multi") return { price: `Desde ${formatCLP(fromPrice.value)}`, note: props.event.fee_absorbed ? "precio final por entrada" : "por entrada, incluye cargo", cta: "Elegir entradas" };
+  if (state.value === "paid_simple") return { price: formatCLP(fromPrice.value), note: priceNote.value, cta: "Comprar" };
+  if (state.value === "paid_multi") return { price: `Desde ${formatCLP(fromPrice.value)}`, note: priceNote.value, cta: "Elegir entradas" };
   return { price: "Gratis", note: stock.value?.few ? `Quedan ${stock.value.remaining} cupos` : "", warning: Boolean(stock.value?.few), cta: "Confirmar asistencia" };
 });
 function onBarAction() {
@@ -379,7 +386,7 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value && !cardHasChips.va
             :show-organizer="pageSettings.show_organizer"
             :thumb="layout === 'compact' ? coverSrc || '' : ''"
             :thumb-srcset="layout === 'compact' ? coverSrcset : undefined"
-            @show-functions="scrollToId('funciones')"
+            @show-functions="goToSection('funciones')"
             @show-location="scrollToId('ubicacion')"
             @open-image="showImage = true"
           />

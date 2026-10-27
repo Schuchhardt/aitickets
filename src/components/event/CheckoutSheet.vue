@@ -7,7 +7,7 @@ import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from "vue"
 import CheckoutStepChoose from "./CheckoutStepChoose.vue";
 import CheckoutStepPay from "./CheckoutStepPay.vue";
 import AnimatedNumber from "./AnimatedNumber.vue";
-import { checkoutFunctions, ticketRowsFor, readCheckoutParams, writeCheckoutParams, formatCLP, upcomingFunctions } from "./eventView.js";
+import { checkoutFunctions, functionOnSale, ticketRowsFor, readCheckoutParams, writeCheckoutParams, formatCLP, upcomingFunctions } from "./eventView.js";
 import { trackFunnel } from "./checkoutApi.js";
 import {
   buildSelectedLines,
@@ -48,6 +48,7 @@ const detailsOpen = ref(false);
 const demoResult = ref(null);
 const buyerPrefill = ref(null);
 const payStep = ref(null);
+const chooseStep = ref(null);
 const panel = ref(null);
 const body = ref(null);
 const visible = ref(false);
@@ -62,11 +63,18 @@ function initSelection() {
   if (m.needsFunction) {
     const wanted = init.functionId ? m.functions.find((f) => String(f.id) === String(init.functionId)) : null;
     if (init.functionId && (!wanted || wanted.status === "sold_out")) notice.value = "Esa función se agotó. Elige otra:";
-    const available = m.functions.filter((f) => f.status !== "sold_out");
+    // Varias funciones (§4.9b): con la pedida agotada, el selector queda en su lugar; con una válida (?funcion=,
+    // chip o "Elegir" de la lista) el foco va a las entradas. Con una sola función, igual que siempre
+    const many = m.functions.length > 1;
+    if (many && wanted?.status === "sold_out") place.value = wanted.place;
+    // Una función con la venta por abrir se puede pedir (sus entradas dicen "Disponible desde el…"), pero no se
+    // preselecciona sola
+    const available = m.functions.filter(functionOnSale);
     const chosen = wanted && wanted.status !== "sold_out" ? wanted : available.length === 1 ? available[0] : null;
     if (chosen) {
       functionId.value = String(chosen.id);
       place.value = chosen.place;
+      focusTickets = many && chosen === wanted;
     }
   }
   if (!place.value && m.places.length) place.value = m.places[0].key;
@@ -97,6 +105,9 @@ function initSelection() {
   if (isSimple.value && !totals.value.quantity) selection.value = { [onSale[0].id]: 1 };
 }
 
+// Se llegó con una función válida (?funcion=, chip o lista de funciones): al abrir, el foco va a las entradas
+let focusTickets = false;
+
 // Si hay un solo tipo de entrada disponible para la función, se preselecciona 1
 function preselectSingle() {
   if (Object.keys(selection.value).length) return;
@@ -122,7 +133,7 @@ watch(place, (key) => {
   if (!ready || !model.value.needsFunction) return;
   const current = model.value.functions.find((f) => String(f.id) === String(functionId.value));
   if (current && current.place === key) return;
-  const options = model.value.functions.filter((f) => f.place === key && f.status !== "sold_out");
+  const options = model.value.functions.filter((f) => f.place === key && functionOnSale(f));
   functionId.value = options.length === 1 ? String(options[0].id) : null;
 });
 
@@ -228,6 +239,10 @@ function focusStep() {
       const root = body.value;
       if (!root) return;
       body.value.scrollTop = 0;
+      if (step.value === 1 && focusTickets) {
+        focusTickets = false;
+        if (chooseStep.value?.focusTickets()) return;
+      }
       const target = root.querySelector('[aria-checked="true"]') || root.querySelector('input:not([type="hidden"]):not([readonly]), [role="radio"], button:not([disabled])');
       (target || panel.value)?.focus({ preventScroll: true });
     }, 60),
@@ -413,6 +428,7 @@ onBeforeUnmount(() => {
                 <CheckoutStepChoose
                   v-if="step === 1"
                   key="choose"
+                  ref="chooseStep"
                   v-model:place="place"
                   v-model:function-id="functionId"
                   v-model:selection="selection"

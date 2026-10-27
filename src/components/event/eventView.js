@@ -63,6 +63,27 @@ export function miniCalendar(date) {
 /** "Sáb 25 oct · 21:00" */
 export const formatFunctionShort = (fn) => [formatShortDate(fn?.date), hhmm(fn?.start_time)].filter(Boolean).join(" · ");
 
+/** "Octubre" ("Enero de 2027" si no es el año en curso): encabezado de mes en las listas largas de funciones. */
+export function formatMonthLabel(date, { now = new Date() } = {}) {
+  const p = dateParts(date);
+  if (!p) return "";
+  const month = MONTHS_LONG[p.m - 1];
+  const label = month.charAt(0).toLocaleUpperCase("es-CL") + month.slice(1);
+  return p.y !== now.getFullYear() ? `${label} de ${p.y}` : label;
+}
+
+/** Funciones (en orden) agrupadas por mes: [{ key: "2026-10", label: "Octubre", items }] */
+export function groupByMonth(functions, { now = new Date() } = {}) {
+  const groups = new Map();
+  for (const fn of functions || []) {
+    const p = dateParts(fn?.date);
+    const key = p ? `${p.y}-${p.m}` : "x";
+    if (!groups.has(key)) groups.set(key, { key, label: p ? formatMonthLabel(fn.date, { now }) : "", items: [] });
+    groups.get(key).items.push(fn);
+  }
+  return [...groups.values()];
+}
+
 /** "Vie 24 · 21:00" (chips de próximas funciones de la card de acción). */
 export function formatChipDate(fn) {
   const p = dateParts(fn?.date);
@@ -226,7 +247,7 @@ export function cardLabel(event, state, { rsvpStatus = "idle", now = new Date() 
 export function cardFunctionChips(event, { limit = 3, now = new Date() } = {}) {
   const model = checkoutFunctions(event, now);
   if (!model.needsFunction || upcomingFunctions(event, now).length < 2) return { chips: [], more: 0 };
-  const available = model.functions.filter((f) => f.status !== "sold_out");
+  const available = model.functions.filter(functionOnSale);
   const manyPlaces = model.places.length > 1;
   // La comuna basta para distinguir los lugares ("Providencia", "Ñuñoa"); si dos comparten comuna, el nombre
   const byCity = new Set(model.places.map((p) => p.city || p.name)).size === model.places.length;
@@ -238,6 +259,72 @@ export function cardFunctionChips(event, { limit = 3, now = new Date() } = {}) {
     few: f.status === "few",
   }));
   return { chips, more: available.length - chips.length };
+}
+
+/** Funciones que se muestran en la sección "Funciones" antes de "Ver las N funciones" (§4.9b). */
+export const FUNCTION_LIST_LIMIT = 6;
+
+/**
+ * Sección "Funciones" v2 (§4.9b): las funciones que no han terminado, agrupadas por lugar (el encabezado solo si hay
+ * más de uno) y, dentro de cada lugar, por mes si tiene más de `monthThreshold`.
+ * Cada fila trae su estado de venta, el desde-precio de esa función si difiere del general (minFinalPrice) y su
+ * posición en orden cronológico (`order`), para mostrar solo las primeras mientras la lista está colapsada.
+ * status (el de checkoutFunctions): 'available' | 'few' | 'sold_out' | 'upcoming' (con `opens`: "1 nov, 10:00"), o
+ * null cuando no hay estado por función:
+ *  - el evento no está a la venta ni agotado (la venta aún no abre: las funciones no están agotadas);
+ *  - las entradas sirven para cualquier función (no se elige función en el checkout): estado general, solo "Agotada";
+ *  - la función no tiene entradas propias en un evento que sí las amarra (el checkout no la ofrece).
+ * Solo las que tienen entradas a la venta (functionOnSale) se pueden elegir.
+ * @returns {{ total: number, manyPlaces: boolean, groups: Array<{ key, title, address, months: Array<{ key, label, items }> }> }}
+ */
+export function functionListModel(event, { now = new Date(), monthThreshold = 8 } = {}) {
+  const functions = upcomingFunctions(event, now);
+  const model = checkoutFunctions(event, now);
+  const byId = new Map(model.functions.map((f) => [String(f.id), f]));
+  const withStatus = event?.sale_state === "on_sale" || event?.sale_state === "sold_out";
+  const soldOut = event?.sale_state === "sold_out" ? "sold_out" : null;
+  const general = minFinalPrice(event);
+  const onSale = event?.tickets || [];
+
+  // Desde-precio de una función: entradas a la venta amarradas a ella o válidas para cualquier función
+  const priceOf = (fn) => {
+    if (!model.needsFunction || fn.id == null) return "";
+    const prices = onSale
+      .filter((t) => t.event_date_id == null || String(t.event_date_id) === String(fn.id))
+      .map((t) => Number(t.final_price ?? t.price) || 0);
+    if (!prices.length) return "";
+    const min = Math.min(...prices);
+    if (min === general) return "";
+    return new Set(prices).size > 1 ? `Desde ${formatCLP(min)}` : formatCLP(min);
+  };
+
+  const groups = new Map();
+  functions.forEach((fn, order) => {
+    const key = placeKey(fn.venue) || "—";
+    if (!groups.has(key)) {
+      const v = fn.venue || {};
+      const title = [v.city, v.name].filter(Boolean).join(" · ") || v.address || "";
+      groups.set(key, { key, title, address: v.address && v.address !== title ? v.address : "", items: [] });
+    }
+    const own = model.needsFunction ? byId.get(String(fn.id)) : null;
+    const status = withStatus ? own?.status || soldOut : null;
+    groups.get(key).items.push({
+      id: fn.id ?? null,
+      date: fn.date,
+      label: formatFunctionShort(fn),
+      place: fn.venue?.city || fn.venue?.name || "",
+      status,
+      opens: status === "upcoming" && own.salesStart ? formatSaleStart(own.salesStart, event.timezone) : "",
+      price: functionOnSale({ status }) ? priceOf(fn) : "",
+      order,
+    });
+  });
+
+  const list = [...groups.values()].map(({ items, ...group }) => ({
+    ...group,
+    months: items.length > monthThreshold ? groupByMonth(items, { now }) : [{ key: "all", label: "", items }],
+  }));
+  return { total: functions.length, manyPlaces: list.length > 1, groups: list };
 }
 
 /**
@@ -256,8 +343,9 @@ export function attendeeFeedUrl(orders) {
 /**
  * Funciones elegibles en el checkout. Solo hay que elegir función si alguna entrada está amarrada a una
  * función (event_date_id); las entradas sin función sirven para cualquiera y se compran sin elegirla.
- * @returns {{ needsFunction: boolean, functions: Array<{id, date, start_time, end_time, venue, place, status}>, places: Array }}
- *   status: 'available' | 'few' | 'sold_out'
+ * @returns {{ needsFunction: boolean, functions: Array<{id, date, start_time, end_time, venue, place, status, salesStart}>, places: Array }}
+ *   status: 'available' | 'few' | 'sold_out' | 'upcoming' (sin entradas a la venta, pero alguna abre más adelante:
+ *   salesStart es la más próxima, para "Disponible desde el {fecha}")
  */
 export function checkoutFunctions(event, now = new Date()) {
   const onSale = event?.tickets || [];
@@ -271,15 +359,26 @@ export function checkoutFunctions(event, now = new Date()) {
       const tied = onSale.filter((t) => String(t.event_date_id) === String(d.id));
       const pool = [...tied, ...untiedOnSale];
       let status = "available";
-      if (!pool.length) status = "sold_out";
-      else if (pool.every((t) => t.remaining !== null && t.remaining !== undefined)) {
+      let salesStart = null;
+      if (!pool.length) {
+        // Sin entradas a la venta: agotada, salvo que alguna de las suyas aún no abra (no es lo mismo)
+        const opening = unavailable
+          .filter((t) => t.reason === "upcoming" && String(t.event_date_id) === String(d.id))
+          .map((t) => t.sales_start)
+          .sort((a, b) => new Date(a || 0) - new Date(b || 0));
+        status = opening.length ? "upcoming" : "sold_out";
+        salesStart = opening.find(Boolean) || null;
+      } else if (pool.every((t) => t.remaining !== null && t.remaining !== undefined)) {
         const left = pool.reduce((s, t) => s + (Number(t.remaining) || 0), 0);
         if (left <= 10) status = "few";
       }
-      return { ...d, place: placeKey(d.venue), status };
+      return { ...d, place: placeKey(d.venue), status, salesStart };
     });
   return { needsFunction: functions.length > 0, functions, places: placesOf(functions) };
 }
+
+/** La función tiene entradas a la venta (ni agotada ni con la venta por abrir). */
+export const functionOnSale = (fn) => fn?.status === "available" || fn?.status === "few";
 
 /** Filas de entradas para una función (o todas si no hace falta elegir función). */
 export function ticketRowsFor(event, functionId) {

@@ -45,6 +45,35 @@ const TOUR = {
   unavailable: [{ id: 9111, ticket_name: "General", price: 6000, fn: 0, reason: "sold_out" }],
 };
 
+/**
+ * Temporada de 9 funciones en un solo lugar, cada una con su entrada; la última con una VIP más cara (desde-precio
+ * propio en la lista). La sección Funciones muestra las 6 próximas y "Ver las 9 funciones" (§4.9b).
+ */
+const SEASON = {
+  functions: Array.from({ length: 9 }, (_, i) => ({ days: 30 + i * 2, venue: VENUE_PROVIDENCIA })),
+  tickets: [
+    ...Array.from({ length: 8 }, (_, i) => ({ id: 9120 + i, ticket_name: "General", price: 6000, max_quantity: null, total_quantity: null, fn: i })),
+    { id: 9128, ticket_name: "VIP", price: 15000, max_quantity: null, total_quantity: null, fn: 8 },
+    { id: 9129, ticket_name: "Platea", price: 9000, max_quantity: null, total_quantity: null, fn: 8 },
+  ],
+};
+
+/**
+ * La misma gira, pero la entrada de la última función sale a la venta en 5 días (reason "upcoming"): en la lista
+ * dice "Disponible desde el …", no "Agotada".
+ */
+const TOUR_OPENING_LATER = {
+  ...TOUR,
+  tickets: TOUR.tickets.filter((t) => t.fn !== 4),
+  unavailable: [...TOUR.unavailable, { id: 9115, ticket_name: "General", price: 6000, fn: 4, reason: "upcoming", salesStartsInDays: 5 }],
+};
+
+/** 3 funciones con una sola entrada válida para cualquiera (sin event_date_id): no se elige función al comprar. */
+const RUN_ANY_FUNCTION = {
+  functions: [{ days: 30, venue: VENUE_PROVIDENCIA }, { days: 31, venue: VENUE_PROVIDENCIA }, { days: 32, venue: VENUE_PROVIDENCIA }],
+  tickets: [TICKETS.general],
+};
+
 /** layout: diseño elegido por el productor (sin imagen el diseño siempre es compacto). */
 export const SCENARIOS = {
   "poster-una-entrada": { layout: "poster", tickets: [TICKETS.general] },
@@ -66,6 +95,10 @@ export const SCENARIOS = {
   "gratis-lleno": { layout: "poster", tickets: [], unavailable: [{ ...TICKETS.free, reason: "sold_out" }], saleState: "sold_out" },
   "pagado-ultimas": { layout: "poster", tickets: [TICKETS.generalLast] },
   "varias-funciones": { layout: "poster", ...TOUR },
+  // Funciones v2 (tests/e2e/event-functions.spec.ts)
+  "muchas-funciones": { layout: "poster", ...SEASON },
+  "funciones-venta-por-abrir": { layout: "poster", ...TOUR_OPENING_LATER },
+  "funciones-entrada-general": { layout: "poster", ...RUN_ANY_FUNCTION },
   "venta-por-abrir": { layout: "poster", tickets: [], unavailable: [{ ...TICKETS.general, reason: "upcoming" }], saleState: "upcoming", saleStartsInDays: 3 },
   agotado: { layout: "poster", tickets: [], unavailable: [{ ...TICKETS.general, reason: "sold_out" }], saleState: "sold_out" },
   "terminado-sin-resenas": { layout: "poster", tickets: [], ended: true },
@@ -173,7 +206,14 @@ export function fixtureEvent(name, { toPublicTicket, now = new Date() }) {
     tickets: scenario.tickets.map((t) =>
       toPublicTicket({ ...t, init_date: null, end_date: null, event_date_id: functionId(t) }, { remaining: t.total_quantity ?? null, feeAbsorbed: false }),
     ),
-    unavailable_tickets: (scenario.unavailable || []).map((t) => ({ id: t.id, ticket_name: t.ticket_name, price: t.price, event_date_id: functionId(t), reason: t.reason })),
+    unavailable_tickets: (scenario.unavailable || []).map((t) => ({
+      id: t.id,
+      ticket_name: t.ticket_name,
+      price: t.price,
+      event_date_id: functionId(t),
+      reason: t.reason,
+      sales_start: t.salesStartsInDays ? new Date(now.getTime() + t.salesStartsInDays * 24 * 3600 * 1000).toISOString() : null,
+    })),
     theme: image ? { tint: "75 60% 94%", poster_width: 1200, poster_height: 630 } : null,
     sale_state: scenario.saleState || (scenario.tickets.length ? "on_sale" : "closed"),
     reviews: scenario.reviews ? FIXTURE_REVIEWS : null,
