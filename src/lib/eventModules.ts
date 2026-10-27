@@ -20,6 +20,8 @@ export type EventModuleContext = {
     functionCount: number;
     ticketTypeCount: number;
     phase: EventPhase;
+    // Hay entradas emitidas (vendidas o cortesías): sin asistentes no hay mensajes ni reseñas que ver
+    hasAttendees: boolean;
     // Evento masivo (Ley 21.659) o con documentos exigidos por AI Tickets (events.is_massive, requires_documents)
     isMassive: boolean;
 };
@@ -106,13 +108,19 @@ export const EVENT_MODULES: EventModule[] = [
         tab: "pagina",
         suggest: (ctx) => ctx.isMassive,
     },
-    { id: "community", title: "Mensajes y muro de asistentes", description: "Mensajes de quienes compraron y reacciones.", tab: "despues" },
+    {
+        id: "community",
+        title: "Mensajes y muro de asistentes",
+        description: "Mensajes de quienes compraron y reacciones.",
+        tab: "despues",
+        when: (ctx) => ctx.status === "published" || ctx.hasAttendees,
+    },
     {
         id: "reviews",
         title: "Reseñas",
         description: "Calificaciones, fotos de asistentes e invitación al próximo evento.",
         tab: "despues",
-        when: (ctx) => ctx.phase === "after",
+        when: (ctx) => ctx.phase === "after" && ctx.hasAttendees,
     },
 ];
 

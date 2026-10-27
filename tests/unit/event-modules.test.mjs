@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 const { eventProfile, eventPhase, normalizeAddedModules, resolveModules, panelTabs, defaultTab, isAddableModule } = await import('../../src/lib/eventModules.ts')
 
-const ctx = (over = {}) => ({ profile: 'general', status: 'published', functionCount: 1, ticketTypeCount: 1, phase: 'before', isMassive: false, ...over })
+const ctx = (over = {}) => ({ profile: 'general', status: 'published', functionCount: 1, ticketTypeCount: 1, phase: 'before', hasAttendees: true, isMassive: false, ...over })
 const byId = (mods) => Object.fromEntries(mods.map((m) => [m.id, m]))
 
 describe('eventProfile', () => {
@@ -40,6 +40,12 @@ describe('resolveModules', () => {
   it('los permisos solo vienen en eventos masivos o con documentos exigidos; si no, quedan para agregar', () => {
     expect(byId(resolveModules(ctx({ profile: 'noche', isMassive: true }))).documents.enabled).toBe(true)
     expect(byId(resolveModules(ctx({ profile: 'noche' }))).documents).toMatchObject({ enabled: false, suggested: false })
+  })
+  it('un borrador que nunca tuvo asistentes no muestra mensajes ni reseñas', () => {
+    const neverSold = byId(resolveModules(ctx({ status: 'draft', phase: 'after', hasAttendees: false })))
+    expect(neverSold.community).toBeUndefined()
+    expect(neverSold.reviews).toBeUndefined()
+    expect(byId(resolveModules(ctx({ status: 'draft', phase: 'after' }))).reviews.enabled).toBe(true)
   })
   it('las reseñas solo aparecen cuando el evento terminó', () => {
     expect(byId(resolveModules(ctx()))['reviews']).toBeUndefined()
