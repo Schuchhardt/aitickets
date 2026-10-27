@@ -6,7 +6,7 @@ const PAGES: { path: string; h1: RegExp; competitorPayout?: boolean }[] = [
   { path: "/", h1: /Tu próxima función/ },
   { path: "/organizadores", h1: /merece vender más/ },
   { path: "/ticketera-stand-up", h1: /Tú haz el show/ },
-  { path: "/ticketera-teatro", h1: /funciones de tu obra/i },
+  { path: "/ticketera-teatro", h1: /Que suba el telón/ },
   { path: "/ticketera-musica-en-vivo", h1: /Tú pon la música/ },
   { path: "/ticketera-talleres", h1: /talleres/i },
   { path: "/academias", h1: /El día de la muestra/ },
@@ -54,7 +54,7 @@ test("el sitemap incluye las páginas SEO", async ({ request }) => {
   const res = await request.get("/sitemap.xml");
   expect(res.status()).toBe(200);
   const xml = await res.text();
-  for (const path of ["/ticketera-stand-up", "/ticketera-musica-en-vivo", "/academias", "/ventas-por-promotor", "/ticketeras-en-chile", "/guias/como-hacer-check-in-con-qr"]) {
+  for (const path of ["/ticketera-stand-up", "/ticketera-musica-en-vivo", "/ticketera-teatro", "/academias", "/ventas-por-promotor", "/ticketeras-en-chile", "/guias/como-hacer-check-in-con-qr"]) {
     expect(xml).toContain(`${path}</loc>`);
   }
 });

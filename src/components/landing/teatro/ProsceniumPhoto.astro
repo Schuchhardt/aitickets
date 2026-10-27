@@ -1,0 +1,37 @@
+---
+// Foto de la landing de teatro (SPEC_landing_teatro §1 y §7): <picture> con AVIF/WebP a varios anchos, ancho y alto
+// reservados (CLS) y lazy-load salvo la del hero (priority: eager, fetchpriority="high" y sin decoding="async", LCP).
+// arch: arco de proscenio (solo arriba) con doble filete dorado; vignette: viñeta de foco que funde los bordes al azul
+// de sala. Todo el tratamiento es CSS (.te-arch / .te-vignette en landing-teatro.css): no hay archivos procesados.
+interface Props {
+  photo: { src: string; width: number; height: number; sources: { type: string; srcset: string }[] };
+  alt: string;
+  /** Ancho que ocupa la foto en pantalla (atributo sizes) */
+  sizes: string;
+  arch?: boolean;
+  vignette?: boolean;
+  class?: string;
+  /** object-position */
+  position?: string;
+  priority?: boolean;
+}
+
+const { photo, alt, sizes, arch = false, vignette = true, class: className, position, priority = false } = Astro.props;
+---
+
+<div class:list={["te-photo", { "te-arch": arch, "te-vignette": vignette }, className]}>
+  <picture>
+    {photo.sources.map((source) => <source type={source.type} srcset={source.srcset} sizes={sizes} />)}
+    <img
+      class="te-photo-img"
+      src={photo.src}
+      alt={alt}
+      width={photo.width}
+      height={photo.height}
+      loading={priority ? "eager" : "lazy"}
+      fetchpriority={priority ? "high" : undefined}
+      decoding={priority ? undefined : "async"}
+      style={position ? `object-position: ${position}` : undefined}
+    />
+  </picture>
+</div>

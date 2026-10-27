@@ -1,0 +1,176 @@
+---
+// 4 · Acto II · La temporada (SPEC_landing_teatro §4.4, ancla #temporada, firma de la página): encabezado y la isla
+// de la cartelera con el fader (SeasonBoard + LightFader). Los textos de cada momento se arman aquí con las constantes
+// del código y llegan por props (no se cargan esos módulos en el navegador):
+//   reseñas → REVIEW_REQUEST_DELAY_HOURS (netlify/lib/reviews.mjs); en la página pública se muestran cuando el evento
+//             terminó (EventDetail.vue, showReviews): mostrarlas durante la temporada va con "Pronto"
+//   cobro → PAYOUT_SHORT_TEXT (legal.mjs) con el asterisco de TERMS_NOTE (reserva por riesgo, Preguntas abiertas 1)
+//   Instagram → DEFAULT_KEYWORD (socialSeriesCadence.ts): con funciones cada semana la próxima siempre está a menos de
+//               daily_from_days días, así que la historia sale diaria toda la temporada (socialSeries.ts)
+//   invitar a la próxima obra → INVITE_AUDIENCES (reviews.mjs); duplicar → eventDuplicate.ts (no copia funciones)
+//   ocupación por función en una vista → no existe ("Pronto"; hoy, emitidas / cupo por tipo de entrada)
+// La isla hidrata antes de verse (rootMargin) para volver al paso 0 fuera de pantalla. Sin JS, debajo de la cartelera
+// (que queda en el paso 4) va la lista con los cinco momentos dentro de un <noscript>: con JS no ocupa espacio, así
+// que hidratar no mueve el contenido de abajo (CLS, §7).
+import ActEyebrow from "./ActEyebrow.astro";
+import SeasonBoard from "./SeasonBoard.vue";
+import SoonBadge from "../../ui/SoonBadge.vue";
+import { INVITE_AUDIENCE_TEXT } from "../../../data/teatroFaq";
+import { TERMS_NOTE } from "../../../data/producerFaq";
+import { PAYOUT_SHORT_TEXT } from "../../../../netlify/lib/legal.mjs";
+import { REVIEW_REQUEST_DELAY_HOURS } from "../../../../netlify/lib/reviews.mjs";
+import { DEFAULT_KEYWORD } from "../../../lib/socialSeriesCadence";
+import { SEASON_STEPS } from "./teatroLanding.js";
+
+const items = [
+  [
+    { icon: "ticket", title: "Estreno lleno, prensa adentro.", text: "Las cortesías entran con su QR y no se cuentan como venta." },
+    { icon: "activity", title: "Cada compra, al instante en tu panel.", text: "Con el link que la trajo." },
+    { icon: "mail", title: "Recordatorio el día antes.", text: "Cada persona recibe un correo con su entrada para su función." },
+  ],
+  [
+    {
+      icon: "star",
+      title: "El público opina.",
+      text: `${REVIEW_REQUEST_DELAY_HOURS} h después de cada función les llega un correo para calificar con estrellas, comentar y subir fotos. Tú lo ves en el panel.`,
+    },
+    { icon: "wallet", title: "Lo de la semana 1, disponible.", text: `${PAYOUT_SHORT_TEXT}.*` },
+    { icon: "quote", title: "Mostrar las reseñas en la página mientras la obra sigue en cartelera", text: "", soon: true },
+  ],
+  [
+    {
+      icon: "tag",
+      title: "¿El jueves se afloja?",
+      text: "Una entrada \"Jueves popular\" amarrada a esas funciones, con su precio y su cupo, o un código con fecha de término para toda la obra.",
+    },
+    {
+      icon: "phone",
+      title: "Tu Instagram, todos los días.",
+      text: `Una historia diaria con la próxima función y el link por DM a quien responde ${DEFAULT_KEYWORD}.`,
+    },
+    { icon: "chart", title: "Ves qué canal vende.", text: "Ventas por link, ciudades y horas; cada domingo, un reporte con la semana." },
+  ],
+  [
+    { icon: "soldout", title: "Agotada, sin que nadie te escriba.", text: "La función aparece agotada y tu público elige otra." },
+    { icon: "schedule", title: "Cambio de horario, todos avisados.", text: "Si mueves una función, avisamos por correo a quienes compraron." },
+    { icon: "grid", title: "Ocupación de cada función en una vista", text: "Hoy ves emitidas y cupo de cada tipo de entrada.", soon: true },
+  ],
+  [
+    {
+      icon: "send",
+      title: "Invita a tu público a la próxima obra.",
+      text: `Un correo a ${INVITE_AUDIENCE_TEXT}.`,
+    },
+    {
+      icon: "copy",
+      title: "La reposición, en minutos.",
+      text: "Duplicas la obra con su descripción, imagen, lugar, entradas y preguntas, y agregas las nuevas funciones.",
+    },
+    {
+      icon: "quote",
+      title: "Las reseñas, en la página.",
+      text: "Ahora que terminó, la página muestra las calificaciones, comentarios y fotos del público.",
+    },
+  ],
+];
+const moments = SEASON_STEPS.map((s, i) => ({ title: s.label, items: items[i] }));
+---
+
+<section id="temporada" class="te-section ts" aria-labelledby="te-season-title" data-te-section="temporada">
+  <div class="te-wrap">
+    <div class="te-act-head ts-head" data-lp-reveal>
+      <span class="te-foco" aria-hidden="true"></span>
+      <ActEyebrow text="Acto II" />
+      <h2 id="te-season-title" class="te-h2 ts-title" data-lp-step>
+        Una temporada se vende <span class="te-gold ts-line">función a función.</span>
+      </h2>
+      <p class="te-lead ts-lead" data-lp-step>
+        El estreno se llena con prensa e invitados. La segunda semana, con lo que el público cuenta. Los jueves cuestan.
+        Y las últimas funciones se agotan solas. Mueve la consola y mira qué hace AI Tickets en cada momento.
+      </p>
+    </div>
+    <div class="ts-board">
+      <SeasonBoard client:visible={{ rootMargin: "600px" }} moments={moments} />
+      <noscript>
+        <ol class="ts-moments" data-testid="theatre-season-moments">
+          {
+            moments.map((m) => (
+              <li class="ts-moment">
+                <p class="ts-moment-tag">{m.title}</p>
+                <ul>
+                  {m.items.map((item) => (
+                    <li>
+                      <strong>{item.title}</strong>
+                      {item.soon && <SoonBadge dark class="ts-soon" />}
+                      {item.text && <span> {item.text}</span>}
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))
+          }
+        </ol>
+      </noscript>
+    </div>
+    <p class="ts-terms"><a href={TERMS_NOTE.href} class="te-link">{TERMS_NOTE.text}</a></p>
+  </div>
+</section>
+
+<style>
+  .ts-head {
+    max-width: 860px;
+    margin: 0 auto;
+    text-align: center;
+  }
+  .ts-title {
+    margin-top: 20px;
+  }
+  .ts-line {
+    display: block;
+  }
+  .ts-lead {
+    max-width: 680px;
+    margin: 20px auto 0;
+  }
+  .ts-board {
+    margin-top: 48px;
+  }
+  .ts-moments {
+    display: grid;
+    gap: 16px;
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid var(--te-line);
+    font-size: 15px;
+    line-height: 23px;
+    color: var(--te-text-2);
+  }
+  .ts-moment-tag {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--te-oro);
+  }
+  .ts-moment ul {
+    display: grid;
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .ts-moment strong {
+    color: var(--te-text-1);
+  }
+  .ts-moments :global(.ts-soon) {
+    margin-left: 6px;
+  }
+  .ts-terms {
+    margin-top: 24px;
+    font-size: 12px;
+    color: var(--te-text-3);
+  }
+  @media (min-width: 1024px) {
+    .ts-board {
+      margin-top: 72px;
+    }
+  }
+</style>

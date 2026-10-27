@@ -1,0 +1,57 @@
+---
+// Analítica de la landing de teatro (SPEC_landing_teatro §10), con prefijo te_ como mu_ en música y su_ en stand-up:
+//   te_view                     carga de la página
+//   te_cta_click {position}     clic en un CTA ([data-cta="publish"] y el de la web gratis de #salas,
+//                               position = data-section: hero, closing, header, mobile_bar, salas)
+//   te_web_click                clic en "Arma la web de tu sala" (#salas → /web-gratis)
+//   te_demo_click {position}    clic en la obra de ejemplo ([data-cta="demo"])
+//   te_whatsapp_click {position}
+//   te_faq_open {question}      abre una pregunta (el botón todavía dice aria-expanded="false" en la fase de captura)
+//   te_section_view {section}   cada [data-te-section] entra en pantalla (una vez)
+// Los propios (te_reparto_click, te_function_pick, te_season_step, te_scanner_toggle, te_calc_change) los mandan las
+// islas y Reparto. CtaTracking sigue midiendo producer_cta_clicked.
+---
+
+<script>
+  import { trackEvent } from "../../../composables/useGoogleAnalytics.js";
+
+  const CTA_EVENTS: Record<string, string> = {
+    publish: "te_cta_click",
+    web: "te_cta_click",
+    demo: "te_demo_click",
+    whatsapp: "te_whatsapp_click",
+  };
+
+  trackEvent("te_view", { page: location.pathname });
+
+  document.addEventListener(
+    "click",
+    (e) => {
+      const target = e.target as Element | null;
+      const cta = target?.closest?.("[data-cta]");
+      const kind = cta?.getAttribute("data-cta") || "";
+      const name = cta && CTA_EVENTS[kind];
+      if (cta && name) trackEvent(name, { position: cta.getAttribute("data-section") || "" });
+      if (kind === "web") trackEvent("te_web_click");
+
+      const question = target?.closest?.('[data-testid="landing-faq"] button[aria-expanded="false"]');
+      if (question) trackEvent("te_faq_open", { question: question.textContent?.trim().slice(0, 100) || "" });
+    },
+    { capture: true },
+  );
+
+  if ("IntersectionObserver" in window) {
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          trackEvent("te_section_view", { section: (entry.target as HTMLElement).dataset.teSection });
+          io.unobserve(entry.target);
+        }
+      },
+      // Con margen y no con umbral de área: una sección más alta que la pantalla nunca llegaría al 25%
+      { rootMargin: "0px 0px -40% 0px", threshold: 0 },
+    );
+    document.querySelectorAll("[data-te-section]").forEach((section) => io.observe(section));
+  }
+</script>

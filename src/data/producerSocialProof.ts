@@ -43,3 +43,10 @@ export const ACADEMY_TESTIMONIAL: AcademyTestimonial | null = null;
  * null: la sección no se renderiza.
  */
 export const MUSIC_TESTIMONIAL: ProducerTestimonial | null = null;
+
+/**
+ * Cita con formato de crítica de /ticketera-teatro (SPEC_landing_teatro §4.9 y §0.8): solo si es real, con nombre,
+ * compañía o sala, ciudad y foto autorizados por escrito. company = "Compañía o sala · ciudad". null: la sección no se
+ * renderiza.
+ */
+export const THEATRE_TESTIMONIAL: ProducerTestimonial | null = null;

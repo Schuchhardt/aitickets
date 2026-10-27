@@ -1,0 +1,562 @@
+/* ------------------------------------------------------------------------------------------------
+ * Tema de la landing de teatro (/ticketera-teatro, docs/specs/rediseno/SPEC_landing_teatro_aitickets.md §1):
+ * "programa de mano y luz de sala". Azul noche de sala, un solo foco cálido (solo en gradientes), terciopelo burdeo en
+ * el entreacto y el telón, marfil del programa de mano en el precio y dorado de palco en filetes, rombos, números de
+ * acto y estrellas. Bodoni Moda redonda (nunca cursiva) en titulares y cifras; Prompt en el cuerpo y en los metadatos
+ * (mayúsculas espaciadas entre filetes dorados). Composición simétrica y centrada, como un escenario a la italiana.
+ * Scope en [data-theme="teatro"]: no toca los tokens globales; los tokens puente (surface/text/border) hacen que los
+ * componentes compartidos (FAQ, badge "Pronto", barra mobile) se vean en el azul de sala, como en música y academias.
+ * El lima va solo en acciones y confirmaciones ("✓ Válida", "Lista para retirar", "La compañía recibe"), nunca pegado
+ * al dorado en piezas de menos de 24 px. Prefijo te-. Se carga junto a landing.css (.lp-sr-only y LandingMotion).
+ * ---------------------------------------------------------------------------------------------- */
+/* Bodoni Moda variable (eje wght, un solo archivo para 500 y 700: 26 KB, menos que los dos estáticos). La hoja de
+ * fontsource declara todos los subconjuntos con unicode-range: con texto en español el navegador baja solo el latin.
+ * Por eso en Bodoni no van ★, ✓ ni flechas (caerían en el subconjunto de símbolos): esos van en Prompt. La página
+ * precarga el latin (Layout, slot head-extra). */
+@import "@fontsource-variable/bodoni-moda/wght.css";
+
+/* Respaldo con métricas aproximadas a Bodoni Moda (ancho medio y ascendentes medidos sobre Georgia, que está en macOS,
+ * iOS y Windows) para que el swap no mueva el hero (CLS, §7). Ajustar si se cambia la fuente de acento (Preguntas
+ * abiertas 8). */
+@font-face {
+  font-family: "Bodoni Moda Fallback";
+  src: local("Georgia");
+  size-adjust: 107%;
+  ascent-override: 105%;
+  descent-override: 37%;
+  line-gap-override: 0%;
+}
+
+[data-theme="teatro"] {
+  --te-sala: #0c1220; /* fondo principal (azul noche de sala) */
+  --te-sala-2: #131b2d; /* secciones alternas, cards */
+  --te-sala-3: #1c2740; /* inputs, chips, filas */
+  --te-sala-off: #070a12; /* "se apaga la sala" (Acto III) */
+  --te-line: rgba(240, 232, 216, 0.12);
+  --te-line-strong: rgba(240, 232, 216, 0.22);
+  --te-text-1: #f0e8d8; /* marfil */
+  --te-text-2: #c9c1b1;
+  --te-text-3: #a49d8e; /* meta, eyebrows (≈ 6,8:1 sobre sala) */
+  --te-oro: #d4af6a; /* dorado de palco (≈ 9:1 sobre sala) */
+  --te-oro-ink: #7a5a1e; /* dorado para texto sobre marfil (AA) */
+  --te-velvet: #5a1426; /* terciopelo (entreacto, telón) */
+  --te-velvet-2: #3e0c1a; /* pliegue oscuro del terciopelo */
+  --te-programa: #f4eee2; /* marfil del programa de mano */
+  --te-programa-2: #e8e0d0; /* controles sobre marfil */
+  --te-ink: #161a24; /* texto sobre marfil */
+  --te-ink-2: #444a57;
+  --te-ink-3: #5e6370; /* meta sobre marfil (≥ 5:1) */
+  --te-foco: rgba(255, 233, 184, 0.22); /* luz de foco (solo en gradientes) */
+  --te-display: "Bodoni Moda Variable", "Bodoni Moda Fallback", "Bodoni 72", Didot, "Bodoni MT", Georgia, serif;
+  /* Pliegues del terciopelo: piernas del telón, bambalina y fondo del entreacto (CSS puro, sin imágenes) */
+  --te-velvet-folds: repeating-linear-gradient(
+    90deg,
+    var(--te-velvet-2) 0 14px,
+    var(--te-velvet) 14px 30px,
+    var(--te-velvet-2) 30px 44px
+  );
+
+  /* Componentes compartidos dentro del tema (LandingFaq, LandingMobileBar, SoonBadge) */
+  --surface-0: var(--te-sala);
+  --surface-1: var(--te-sala-2);
+  --surface-2: var(--te-sala-3);
+  --border: var(--te-line);
+  --border-strong: var(--te-line-strong);
+  --text-1: var(--te-text-1);
+  --text-2: var(--te-text-2);
+  --text-3: var(--te-text-3);
+
+  font-family: "Prompt", system-ui, sans-serif;
+  color: var(--te-text-1);
+  background: var(--te-sala);
+  -webkit-font-smoothing: antialiased;
+}
+/* §1: la cursiva es la firma de stand-up y academias. Nada en esta página va en cursiva. */
+[data-theme="teatro"] :is(em, i, cite, blockquote) {
+  font-style: normal;
+}
+
+.te-wrap {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-inline: 20px;
+}
+@media (min-width: 768px) {
+  .te-wrap {
+    padding-inline: 40px;
+  }
+}
+.te {
+  /* Los focos y el telón son más anchos que la pantalla: nunca scroll horizontal (clip no rompe los sticky) */
+  overflow-x: clip;
+}
+.te [id] {
+  scroll-margin-top: 88px;
+}
+/* Ritmo de actos (§5): 72 px de padding vertical en mobile, 136 en desktop */
+.te-section {
+  position: relative;
+  padding-block: 72px;
+}
+@media (min-width: 1024px) {
+  .te-section {
+    padding-block: 136px;
+  }
+}
+.te-on-sala-2 {
+  background: var(--te-sala-2);
+}
+/* Programa de mano (precio): marfil, texto tinta y tokens puente en claro para lo compartido */
+.te-on-programa {
+  --text-1: var(--te-ink);
+  --text-2: var(--te-ink-2);
+  --text-3: var(--te-ink-3);
+  --surface-2: var(--te-programa-2);
+  background: var(--te-programa);
+  color: var(--te-ink);
+}
+/* Terciopelo (entreacto): texto marfil (≈ 10:1) y "Pronto" sobre burdeo */
+.te-on-velvet {
+  --surface-2: rgba(240, 232, 216, 0.14);
+  background: var(--te-velvet);
+  color: var(--te-text-1);
+}
+
+/* ---------- Tipografía ----------
+ * Bodoni Moda redonda en caja alta y baja, tracking −0,01em; nunca bajo 20 px (los filetes finos desaparecen). La
+ * segunda parte del titular va en dorado. Cifras con numerales de línea tabulares. */
+.te-h1,
+.te-h2,
+.te-h3,
+.te-display {
+  font-family: var(--te-display);
+  font-style: normal;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  font-variant-numeric: lining-nums tabular-nums;
+  overflow-wrap: break-word;
+}
+.te-h1 {
+  font-size: 48px;
+  line-height: 50px;
+  font-weight: 700;
+}
+.te-h1-sub {
+  display: block;
+  font-size: 34px;
+  line-height: 40px;
+  font-weight: 500;
+}
+.te-h2 {
+  font-size: 36px;
+  line-height: 40px;
+  text-wrap: balance;
+}
+.te-h3 {
+  font-size: 24px;
+  line-height: 30px;
+  text-wrap: balance;
+}
+@media (min-width: 1024px) {
+  .te-h1 {
+    font-size: clamp(80px, 7.6vw, 104px);
+    line-height: 1;
+  }
+  .te-h1-sub {
+    font-size: clamp(52px, 5.2vw, 72px);
+    line-height: 1.11;
+  }
+  .te-h2 {
+    font-size: clamp(52px, 4.8vw, 64px);
+    line-height: 1.06;
+  }
+  .te-h3 {
+    font-size: 32px;
+    line-height: 38px;
+  }
+}
+.te-gold {
+  color: var(--te-oro);
+}
+.te-on-programa .te-gold {
+  color: var(--te-oro-ink);
+}
+/* Énfasis alternativo (§1): versalitas falsas, Bodoni 500 en mayúsculas al 72 % con tracking .12em */
+.te-smallcaps {
+  font-family: var(--te-display);
+  font-weight: 500;
+  font-size: 0.72em;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.te-center {
+  text-align: center;
+}
+.te-lead {
+  font-size: 16px;
+  line-height: 25px;
+  color: var(--te-text-2);
+}
+.te-on-programa .te-lead {
+  color: var(--te-ink-2);
+}
+@media (min-width: 1024px) {
+  .te-lead {
+    font-size: 18px;
+    line-height: 29px;
+  }
+}
+/* Metadatos: Prompt en mayúsculas espaciadas */
+.te-meta {
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+/* Rótulo "ejemplo" de las cards con datos (§0.9) */
+.te-example {
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--te-text-3);
+}
+.te-on-programa .te-example {
+  color: var(--te-ink-3);
+}
+
+/* ---------- Eyebrow de acto: —— ◆ ACTO I ◆ —— (§1) ----------
+ * Filetes dorados de 40 px y rombo de 5 px, todo CSS y aria-hidden (el lector lee solo "Acto I"). T6: los filetes
+ * crecen desde el rombo hacia afuera cuando su bloque se revela. */
+.te-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--te-oro);
+}
+@media (min-width: 1024px) {
+  .te-eyebrow {
+    font-size: 13px;
+  }
+}
+.te-on-programa .te-eyebrow {
+  color: var(--te-oro-ink);
+}
+.te-eyebrow-text {
+  /* Compensa el tracking del último carácter para que quede centrado entre los rombos */
+  margin-right: -0.24em;
+}
+.te-rule {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 1px;
+  background: currentColor;
+}
+@media (min-width: 640px) {
+  .te-rule {
+    width: 40px;
+  }
+}
+.te-rule-l {
+  transform-origin: right center;
+}
+.te-rule-r {
+  transform-origin: left center;
+}
+.te-diamond {
+  flex: 0 0 auto;
+  width: 5px;
+  height: 5px;
+  background: currentColor;
+  transform: rotate(45deg);
+}
+
+/* ---------- Foco de cada acto (§1, T5) ----------
+ * Gradiente radial cálido sobre la parte alta de la sección: nunca color de texto ni fondo plano. */
+.te-act-head {
+  position: relative;
+}
+.te-act-head > :not(.te-foco) {
+  position: relative;
+  z-index: 1;
+}
+.te-foco {
+  position: absolute;
+  left: 50%;
+  top: -72px;
+  z-index: 0;
+  width: min(1100px, 140vw);
+  height: 520px;
+  transform: translateX(-50%);
+  transform-origin: 50% 0;
+  background: radial-gradient(ellipse 60% 70% at 50% 0%, var(--te-foco), transparent 70%);
+  pointer-events: none;
+}
+@media (min-width: 1024px) {
+  .te-foco {
+    top: -136px;
+  }
+}
+
+/* ---------- Botones (CTA lima en píldora; el resto recto de 8 px con filete dorado) ---------- */
+.te-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 0 24px;
+  border-radius: 8px;
+  font-family: "Prompt", system-ui, sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.1;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform var(--dur-1) var(--ease-out), background-color var(--dur-1) var(--ease-out),
+    border-color var(--dur-1) var(--ease-out), box-shadow var(--dur-2) var(--ease-out);
+  -webkit-tap-highlight-color: transparent;
+}
+.te-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--te-sala), 0 0 0 6px var(--brand-lime);
+}
+.te-btn-lime {
+  border: 0;
+  border-radius: 999px;
+  background: var(--brand-lime);
+  color: var(--te-ink);
+}
+.te-btn-lime:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+}
+.te-btn-line {
+  border: 1px solid rgba(212, 175, 106, 0.7);
+  background: rgba(12, 18, 32, 0.35);
+  color: var(--te-text-1);
+  font-weight: 500;
+}
+.te-btn-line:hover {
+  border-color: var(--te-oro);
+  background: rgba(212, 175, 106, 0.1);
+}
+.te-btn-line:focus-visible {
+  box-shadow: 0 0 0 3px var(--te-sala), 0 0 0 5px var(--te-oro);
+}
+.te-btn:active {
+  transform: scale(0.98);
+}
+@media (min-width: 1024px) {
+  .te-btn {
+    min-height: 56px;
+    padding: 0 28px;
+    font-size: 17px;
+  }
+}
+.te-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--te-text-1);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-color: rgba(212, 175, 106, 0.55);
+  border-radius: 2px;
+}
+.te-link:hover {
+  text-decoration-color: var(--te-oro);
+}
+.te-on-programa .te-link {
+  color: var(--te-ink);
+  text-decoration-color: rgba(122, 90, 30, 0.6);
+}
+.te-link:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+
+/* ---------- Chips con filete dorado y lista con rombos ---------- */
+.te-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid rgba(212, 175, 106, 0.45);
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--te-text-2);
+}
+.te-bullet {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  margin-top: 9px;
+  background: var(--te-oro);
+  transform: rotate(45deg);
+}
+.te-on-programa .te-bullet {
+  background: var(--te-oro-ink);
+}
+
+/* ---------- Arco de proscenio y viñeta de foco (§1) ----------
+ * Arco solo arriba, con un doble filete dorado adentro (inset 10 px). La viñeta funde los bordes al azul de sala y la
+ * foto baja la saturación: todo CSS, sin procesar archivos. */
+.te-arch {
+  --te-arch: 50% 50% 0 0 / 14% 14% 0 0;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: var(--te-arch);
+  background: var(--te-sala);
+}
+@media (min-width: 768px) {
+  .te-arch {
+    --te-arch: 50% 50% 0 0 / 22% 22% 0 0;
+  }
+}
+.te-arch::after {
+  content: "";
+  position: absolute;
+  inset: 10px;
+  z-index: 2;
+  border: 1px solid rgba(212, 175, 106, 0.6);
+  border-bottom: 0;
+  border-radius: var(--te-arch);
+  box-shadow: inset 0 0 0 4px transparent, inset 0 0 0 5px rgba(212, 175, 106, 0.35);
+  pointer-events: none;
+}
+.te-photo picture,
+.te-photo .te-photo-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.te-photo-img {
+  object-fit: cover;
+  filter: saturate(0.85);
+}
+.te-vignette {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.te-vignette::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: radial-gradient(ellipse at 50% 35%, transparent 35%, var(--te-sala) 95%);
+  pointer-events: none;
+}
+
+/* ---------- Línea de puntos de reparto: Rol ········· Quién (§1) ----------
+ * Puntos de 2 px dibujados con un gradiente que se repite (y no con border dotted) para que el reparto pueda
+ * "recorrerlos" moviendo background-position (T7). Alineada a la línea base de los dos textos. */
+.te-leader {
+  --te-dot: rgba(212, 175, 106, 0.75);
+  flex: 1 1 24px;
+  min-width: 24px;
+  height: 2px;
+  margin: 0 12px 0.34em;
+  align-self: flex-end;
+  background: linear-gradient(90deg, var(--te-dot) 0 2px, transparent 2px) 0 0 / 7px 2px repeat-x;
+}
+.te-on-programa .te-leader {
+  --te-dot: rgba(122, 90, 30, 0.65);
+}
+
+/* ---------- Rangos (fader y calculadora) ---------- */
+.te-range {
+  width: 100%;
+  height: 28px;
+  margin: 0;
+  accent-color: var(--te-ink);
+  cursor: pointer;
+}
+.te-range:focus-visible {
+  outline: 2px solid var(--te-oro-ink);
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+
+/* ---------- Movimiento (§6) ----------
+ * Igual que las otras landings: todo cuelga de html.lp-motion (LandingMotion.astro: JS, IntersectionObserver y sin
+ * "reducir movimiento"); sin la clase cada elemento queda en su estado final (telón abierto, focos encendidos, sin
+ * loops). Solo transform, opacity y clip-path. */
+@keyframes te-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+@keyframes te-up-24 {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+@keyframes te-line-in {
+  from {
+    opacity: 0;
+    clip-path: inset(0 0 100% 0);
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(-0.2em -0.1em -0.3em -0.1em);
+    transform: none;
+  }
+}
+@keyframes te-foco-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) scaleY(0.6);
+  }
+}
+@keyframes te-grow-x {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes te-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Reveal genérico: fade + translateY 24 px */
+.lp-motion .te .is-in [data-lp-step],
+.lp-motion .te .is-in[data-lp-step] {
+  animation: te-up-24 700ms var(--ease-out) var(--lp-d, 0ms) both;
+}
+/* T5: el foco de cada acto se enciende desde arriba al revelar su encabezado */
+.lp-motion .te-act-head:not(.is-in) .te-foco {
+  opacity: 0;
+}
+.lp-motion .te-act-head.is-in .te-foco {
+  animation: te-foco-in 700ms var(--ease-out) both;
+}
+/* T6: los filetes del eyebrow crecen desde el rombo hacia afuera */
+.lp-motion [data-lp-reveal]:not(.is-in) .te-rule {
+  transform: scaleX(0);
+}
+.lp-motion .is-in .te-rule {
+  animation: te-grow-x 500ms var(--ease-out) calc(var(--lp-d, 0ms) + 120ms) both;
+}
+
+/* Fondo del documento (rebote del scroll en iOS y macOS) del mismo color que la página */
+html:has(body [data-theme="teatro"]) {
+  background: #0c1220;
+}

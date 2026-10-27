@@ -1,0 +1,106 @@
+---
+// Telón de terciopelo (SPEC_landing_teatro §1): bambalina arriba y dos piernas laterales, CSS puro (pliegues con
+// repeating-linear-gradient y un gradiente vertical de sombra), sin imágenes y decorativo (aria-hidden).
+// variant="hero" (T1): sin JS el telón ya está abierto; con html.lp-motion las piernas parten en scaleX(2.4) desde su
+// borde exterior (cubren ~22vw cada una, el centro con el H1 siempre queda a la vista) y vuelven a scaleX(1) en 1,4 s;
+// la bambalina sube 12 px. Piernas de 9vw, ocultas en mobile (queda la bambalina de 28 px).
+// variant="closing" (T18): piernas de 12vw que entran de scaleX(0) a scaleX(1) desde los bordes al revelar el cierre:
+// el telón "baja" al final. Va dentro de un [data-lp-reveal] (TheatreClosing).
+interface Props {
+  variant?: "hero" | "closing";
+}
+const { variant = "hero" } = Astro.props;
+---
+
+<div class:list={["cu", `cu-${variant}`]} aria-hidden="true">
+  <span class="cu-border"></span>
+  <span class="cu-leg cu-leg-l"></span>
+  <span class="cu-leg cu-leg-r"></span>
+</div>
+
+<style>
+  .cu {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+  }
+  .cu-border,
+  .cu-leg {
+    position: absolute;
+    background:
+      linear-gradient(180deg, rgba(7, 10, 18, 0.15) 0%, rgba(7, 10, 18, 0) 30%, rgba(7, 10, 18, 0.55) 100%),
+      var(--te-velvet-folds);
+  }
+  /* Bambalina: franja de terciopelo arriba con su borde dorado */
+  .cu-border {
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1;
+    height: 28px;
+    border-bottom: 1px solid rgba(212, 175, 106, 0.55);
+    box-shadow: 0 10px 24px rgba(7, 10, 18, 0.55);
+  }
+  .cu-leg {
+    top: 0;
+    bottom: 0;
+    width: 9vw;
+    display: none;
+  }
+  .cu-leg-l {
+    left: 0;
+    transform-origin: left center;
+    box-shadow: 12px 0 30px rgba(7, 10, 18, 0.6);
+  }
+  .cu-leg-r {
+    right: 0;
+    transform-origin: right center;
+    box-shadow: -12px 0 30px rgba(7, 10, 18, 0.6);
+  }
+  @media (min-width: 1024px) {
+    .cu-border {
+      height: 48px;
+    }
+    .cu-leg {
+      display: block;
+    }
+  }
+  .cu-closing .cu-leg {
+    display: block;
+    width: 12vw;
+  }
+  .cu-closing .cu-border {
+    height: 40px;
+  }
+
+  /* T1: el telón del hero se abre al cargar */
+  @keyframes cu-open {
+    from {
+      transform: scaleX(2.4);
+    }
+  }
+  @keyframes cu-rise {
+    from {
+      transform: translateY(12px);
+    }
+  }
+  :global(.lp-motion) .cu-hero .cu-leg {
+    animation: cu-open 1400ms cubic-bezier(0.7, 0, 0.2, 1) both;
+  }
+  :global(.lp-motion) .cu-hero .cu-border {
+    animation: cu-rise 1400ms cubic-bezier(0.7, 0, 0.2, 1) both;
+  }
+  /* T18: el telón del cierre baja al revelarse */
+  @keyframes cu-close {
+    from {
+      transform: scaleX(0);
+    }
+  }
+  :global(.lp-motion) :global([data-lp-reveal]:not(.is-in)) .cu-closing .cu-leg {
+    transform: scaleX(0);
+  }
+  :global(.lp-motion) :global(.is-in) .cu-closing .cu-leg {
+    animation: cu-close 1000ms var(--ease-out) both;
+  }
+</style>

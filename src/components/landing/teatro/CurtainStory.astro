@@ -1,0 +1,195 @@
+---
+// Historia de ejemplo del entreacto (SPEC_landing_teatro §4.5): teléfono de 200 × 400 (marco negro de radio 28, el único
+// radio grande de la página porque es un teléfono) con la foto de dos intérpretes bajo un foco. Mockup genérico: sin
+// interfaz ni logos de Instagram; la compañía y la sala son ficticias. Los textos son los de las historias reales del
+// día de la función (socialSeriesRender.ts, etapa "hoy": dice "Hoy", no "Esta noche" como la spec) y el link llega por DM a quien responde con la palabra clave
+// (DEFAULT_KEYWORD). La historia del día de la función sale a las DEFAULT_CADENCE.event_day_time (la spec decía 19:30,
+// que es la hora por defecto de los otros días: manda la cadencia del código, igual que en música).
+// T13: la segunda barra se llena en 5 s, en loop, solo mientras se ve ([data-te-play], ver la página) y nunca con
+// "reducir movimiento". En mobile se dibuja a 160 px de ancho con transform, para no rearmar el mockup.
+import ProsceniumPhoto from "./ProsceniumPhoto.astro";
+import { PLAY_DEMO, THEATRE_PHOTOS } from "./teatroLanding.js";
+import { DEFAULT_CADENCE, DEFAULT_KEYWORD } from "../../../lib/socialSeriesCadence";
+---
+
+<figure class="cs-frame" aria-label={`Historia de ejemplo: ${PLAY_DEMO.title}, hoy a las 20:30`} data-te-play>
+  <div class="cs-phone" aria-hidden="true">
+    <div class="cs-screen">
+      <ProsceniumPhoto photo={THEATRE_PHOTOS.telon} alt="" sizes="200px" class="cs-photo" />
+      <div class="cs-shade"></div>
+      <div class="cs-bars">
+        <span class="cs-bar is-done"></span>
+        <span class="cs-bar"><span class="cs-bar-fill"></span></span>
+        <span class="cs-bar"></span>
+      </div>
+      <p class="cs-account">
+        <span class="cs-avatar">LG</span>
+        <span class="cs-who">
+          <span class="cs-handle">{PLAY_DEMO.handle}</span>
+          <span class="cs-when">programada {DEFAULT_CADENCE.event_day_time}</span>
+        </span>
+      </p>
+      <div class="cs-bottom">
+        <p class="te-display cs-big">Hoy<br />20:30</p>
+        <p class="cs-sticker">{PLAY_DEMO.title} · {PLAY_DEMO.venue}</p>
+        <p class="cs-dm">Responde {DEFAULT_KEYWORD} y te llega el link</p>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<style>
+  .cs-frame {
+    flex: 0 0 auto;
+    width: 160px;
+    height: 320px;
+    margin: 0 auto;
+  }
+  .cs-phone {
+    width: 200px;
+    height: 400px;
+    padding: 6px;
+    border-radius: 28px;
+    background: #000;
+    box-shadow: 0 30px 70px rgba(7, 10, 18, 0.6);
+    transform: scale(0.8);
+    transform-origin: top left;
+  }
+  .cs-screen {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    border-radius: 22px;
+    color: var(--te-text-1);
+  }
+  .cs-screen :global(.cs-photo) {
+    position: absolute;
+    inset: 0;
+  }
+  .cs-shade {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    background: linear-gradient(180deg, rgba(7, 10, 18, 0.5) 0%, rgba(7, 10, 18, 0) 22%, rgba(7, 10, 18, 0) 40%, rgba(7, 10, 18, 0.8) 100%);
+  }
+  .cs-bars,
+  .cs-account,
+  .cs-bottom {
+    position: absolute;
+    z-index: 3;
+  }
+  .cs-bars {
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    display: flex;
+    gap: 3px;
+  }
+  .cs-bar {
+    flex: 1;
+    height: 2px;
+    background: rgba(240, 232, 216, 0.35);
+    overflow: hidden;
+  }
+  .cs-bar.is-done {
+    background: var(--te-text-1);
+  }
+  .cs-bar-fill {
+    display: block;
+    height: 100%;
+    background: var(--te-text-1);
+    transform: scaleX(0.6);
+    transform-origin: left;
+  }
+  .cs-account {
+    top: 20px;
+    left: 10px;
+    right: 10px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    line-height: 14px;
+  }
+  .cs-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 1px solid var(--te-oro);
+    background: var(--te-velvet);
+    font-size: 8px;
+    font-weight: 700;
+  }
+  .cs-who {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .cs-handle {
+    font-weight: 600;
+  }
+  .cs-when {
+    font-size: 9px;
+    line-height: 12px;
+    color: rgba(240, 232, 216, 0.8);
+  }
+  .cs-bottom {
+    left: 12px;
+    right: 12px;
+    bottom: 16px;
+  }
+  .cs-big {
+    font-size: 48px;
+    line-height: 48px;
+  }
+  .cs-sticker {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 5px 8px;
+    border-radius: 4px;
+    background: var(--te-programa);
+    color: var(--te-ink);
+    font-size: 11px;
+    font-weight: 600;
+    transform: rotate(-3deg);
+  }
+  .cs-dm {
+    margin-top: 10px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: var(--brand-lime);
+    color: var(--te-ink);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 15px;
+  }
+  @media (min-width: 1024px) {
+    .cs-frame {
+      width: 200px;
+      height: 400px;
+    }
+    .cs-phone {
+      transform: none;
+    }
+  }
+  @keyframes cs-fill {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+  :global(.lp-motion) .cs-bar-fill {
+    animation: cs-fill 5s linear infinite;
+    animation-play-state: paused;
+  }
+  :global(.lp-motion) .cs-frame:global(.is-playing) .cs-bar-fill {
+    animation-play-state: running;
+  }
+</style>

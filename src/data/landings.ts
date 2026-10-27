@@ -112,32 +112,21 @@ export const LANDINGS: Landing[] = [
         slug: "ticketera-teatro",
         kind: "vertical",
         card: { title: "Teatro independiente", text: "Una obra, muchas funciones: cartelera, prensa e invitados en un solo evento." },
-        title: "Venta de entradas para teatro independiente | AI Tickets",
-        description: "Publica tu obra con todas sus funciones, vende entradas por función con Webpay y tarjetas, maneja cortesías de prensa y valida con QR. Sin mensualidad.",
-        eyebrow: "Para compañías y productoras de teatro",
-        h1: "Vende las funciones de tu obra sin rehacer el evento cada semana",
+        title: "Ticketera para teatro en Chile: vende tu temporada · 0% de comisión | AI Tickets",
+        description:
+            "Vende las entradas de tu obra: todas las funciones en una página, aforo por función, cortesías de prensa con QR y cobro por función. 0% de comisión.",
+        eyebrow: "Para compañías de teatro y salas",
+        h1: "Que suba el telón. La boletería de tu obra ya está lista.",
         intro:
-            "Una obra en cartelera son muchas funciones con el mismo elenco, la misma sala y el mismo público objetivo. En AI Tickets publicas la obra una vez y agregas sus funciones; cada entrada queda asociada a su fecha y la sala sabe exactamente quién llega.",
-        highlights: ["Todas las funciones en una sola página", "Cortesías de prensa e invitados con QR", "Cobras función por función"],
-        sections: [
-            {
-                heading: "Una página para toda la temporada",
-                body:
-                    "Agrega hasta 60 funciones a la obra. El público elige la fecha en la misma página y recibe su entrada para esa función. Si cambia un horario, avisamos por email a quienes ya compraron para esa fecha.",
-            },
-            {
-                heading: "Prensa, elenco e invitados",
-                items: [
-                    { title: "Cortesías en un minuto", text: "Envía cortesías por email desde el panel, con la cantidad de entradas que necesites. No cuentan como venta." },
-                    { title: "Equipo con su rol", text: "Producción, boletería y difusión con permisos distintos: Puerta, Marketing, Finanzas o Solo lectura." },
-                    { title: "Preguntas del público", text: "La página de la obra tiene un asistente que responde dudas de duración, edad recomendada o accesos con la información que cargaste." },
-                ],
-            },
-            {
-                heading: "Cobras cada función, no al cierre de la temporada",
-                body: `${payout} Así puedes pagar sala, técnica y elenco mientras la obra sigue en cartelera.`,
-            },
-        ],
+            `Una obra en cartelera son muchas funciones con el mismo elenco, la misma sala y el mismo público. En AI Tickets publicas la obra una vez con todas sus funciones, cada una con su aforo; mandas las cortesías de prensa con su QR y lo de cada función queda disponible ${PAYOUT_RELEASE_HOURS} h después de que termina.`,
+        highlights: ["Todas las funciones en una sola página", "Cortesías de prensa con QR", "Aforo por función"],
+        // Plata: la spec (§9) pide "cobro función por función" y el highlight "Cobras función por función*"; con
+        // dedicated nada pinta los highlights (ni el asterisco de TERMS_NOTE), y el cobro por función depende de la
+        // reserva por riesgo (Preguntas abiertas 1), así que aquí va solo lo de legal.mjs, sin promesa con asterisco.
+        // La página es propia (src/pages/ticketera-teatro.astro, SPEC_landing_teatro): las secciones viven en
+        // src/components/landing/teatro y las preguntas en src/data/teatroFaq.ts (que toma de aquí estas dos). La de
+        // "¿Cuánto paga el público?" queda cubierta por las de costo y cargo absorbido de PRODUCER_FAQ.
+        sections: [],
         faq: [
             {
                 q: "¿Puedo tener entradas generales y precios distintos por función?",
@@ -145,16 +134,13 @@ export const LANDINGS: Landing[] = [
             },
             {
                 q: "¿Funciona si la obra es en una sala que no tiene ticketera propia?",
-                a: "Sí. AI Tickets te da la página de venta, el cobro y el control de acceso con QR desde el celular; no necesitas equipos especiales.",
-            },
-            {
-                q: "¿Cuánto paga el público?",
-                a: `El valor de la entrada más un cargo por servicio de ${fee}. En una entrada de ${clp(10000)}, el comprador paga ${clp(ex.total)} y tú recibes ${clp(ex.producerNet)}. También puedes absorber el cargo.`,
+                a: "Sí. AI Tickets te da la boletería online de tu obra, el cobro y el control de acceso con QR desde el celular, en Santiago, Valparaíso, Concepción o cualquier ciudad de Chile; no necesitas equipos especiales.",
             },
         ],
         demo: { url: "/eventos/evento-demo-teatro", label: "Ver una obra de ejemplo" },
         cta: { label: "Publicar mi obra", campaign: "vertical_teatro" },
         related: ["entradas-con-qr", "academias", "guias/como-hacer-una-preventa"],
+        dedicated: true,
     },
     {
         slug: "ticketera-musica-en-vivo",

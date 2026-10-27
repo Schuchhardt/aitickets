@@ -7,7 +7,8 @@ import { LEGAL } from "../lib/legal";
 const props = defineProps({
   /**
    * 'dark': versión oscura para las landings con tema oscuro (/ticketera-stand-up); 'paper': fondo papel de la landing
-   * de academias (/academias). Mismos enlaces, otros colores.
+   * de academias (/academias); 'sala': azul noche de sala de la landing de teatro (/ticketera-teatro), mismas clases
+   * que 'dark' con otros colores. Mismos enlaces, otros colores.
    */
   tone: { type: String, required: false },
 });
@@ -25,6 +26,19 @@ const toneClasses = computed(() =>
         input: "border-[#1b1712]/20 bg-white text-[#3e372f] focus:ring-[#1b1712]/20",
         success: "text-green-700",
         error: "text-red-600",
+      }
+    : props.tone === 'sala'
+    ? {
+        footer: "bg-[#0c1220] border-white/10",
+        logo: "invert",
+        muted: "text-[#a49d8e]",
+        icon: "invert",
+        title: "text-[#f0e8d8]",
+        list: "text-[#a49d8e]",
+        link: "hover:text-white hover:underline",
+        input: "border-white/20 bg-transparent text-[#f0e8d8] placeholder:text-[#8a8478] focus:ring-white/30",
+        success: "text-lime-400",
+        error: "text-red-400",
       }
     : props.tone === 'dark'
     ? {

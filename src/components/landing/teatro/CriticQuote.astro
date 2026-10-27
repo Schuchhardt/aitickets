@@ -1,0 +1,80 @@
+---
+// 9 · La crítica (SPEC_landing_teatro §4.9): testimonio con formato de crítica, solo con una cita real, con nombre,
+// compañía o sala, ciudad y foto autorizados (THEATRE_TESTIMONIAL en src/data/producerSocialProof.ts). Sin datos no se
+// renderiza nada, ni el contenedor: nunca se inventa. Cita en Bodoni redonda (nunca cursiva) entre comillas « » doradas.
+import { THEATRE_TESTIMONIAL } from "../../../data/producerSocialProof";
+
+const t = THEATRE_TESTIMONIAL;
+---
+
+{t && (
+  <section class="te-section cq" aria-label="Lo que dice una compañía o sala" data-te-section="testimonial" data-te-testimonial>
+    <figure class="te-wrap cq-inner" data-lp-reveal>
+      <p class="te-meta te-gold cq-eyebrow" data-lp-step>La crítica</p>
+      <blockquote class="te-display cq-quote" data-lp-step>
+        <span class="cq-mark" aria-hidden="true">«</span>{t.quote}<span class="cq-mark" aria-hidden="true">»</span>
+      </blockquote>
+      <figcaption class="cq-author" data-lp-step>
+        <span class="te-vignette cq-photo">
+          <img src={t.photo.src} alt="" width={t.photo.width} height={t.photo.height} loading="lazy" decoding="async" class="te-photo-img" />
+        </span>
+        <span class="cq-who">
+          <span class="cq-name">{t.name}</span>
+          <span class="cq-company">{t.company}</span>
+        </span>
+      </figcaption>
+    </figure>
+  </section>
+)}
+
+<style>
+  .cq-inner {
+    max-width: 960px;
+    text-align: center;
+  }
+  .cq-quote {
+    margin-top: 20px;
+    font-size: 26px;
+    line-height: 36px;
+  }
+  .cq-mark {
+    color: var(--te-oro);
+    font-size: 1.4em;
+    line-height: 0;
+    vertical-align: -0.12em;
+    margin-inline: 0.12em;
+  }
+  .cq-author {
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 28px;
+    text-align: left;
+  }
+  .cq-photo {
+    flex: 0 0 64px;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+  }
+  .cq-photo img {
+    width: 100%;
+    height: 100%;
+  }
+  .cq-name {
+    display: block;
+    font-weight: 600;
+  }
+  .cq-company {
+    display: block;
+    margin-top: 2px;
+    font-size: 14px;
+    color: var(--te-text-3);
+  }
+  @media (min-width: 1024px) {
+    .cq-quote {
+      font-size: 36px;
+      line-height: 48px;
+    }
+  }
+</style>

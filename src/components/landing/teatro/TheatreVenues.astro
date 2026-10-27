@@ -1,0 +1,126 @@
+---
+// 8 · Para salas (SPEC_landing_teatro §4.8, ancla #salas): la web gratis con la cartelera (sites.ts, /web-gratis),
+// cada compañía programada como una obra con sus funciones, acceso de Solo lectura limitado a su obra (ROLE_LABELS;
+// limitar a un evento hoy solo desde el asistente de IA, assign_event_staff) y CSV de órdenes por obra
+// (/api/events/orders-csv). El borderó por función para liquidar con la sala no existe: "Pronto".
+// Analítica: te_cta_click { position: salas } y te_web_click (TheatreTracking, data-cta="web").
+import ActEyebrow from "./ActEyebrow.astro";
+import VenueBill from "./VenueBill.astro";
+import SoonBadge from "../../ui/SoonBadge.vue";
+---
+
+<section id="salas" class="te-section te-on-sala-2 vn" aria-labelledby="te-venues-title" data-te-section="salas">
+  <div class="te-wrap">
+    <div class="te-act-head vn-head" data-lp-reveal>
+      <span class="te-foco" aria-hidden="true"></span>
+      <ActEyebrow text="Para salas" />
+      <h2 id="te-venues-title" class="te-h2 vn-title" data-lp-step>
+        ¿Tienes una sala? <span class="te-gold vn-line">Toda tu cartelera, en tu propia web.</span>
+      </h2>
+    </div>
+
+    <div class="vn-grid">
+      <div class="vn-mock" data-lp-reveal>
+        <div data-lp-step><VenueBill /></div>
+      </div>
+      <div class="vn-copy" data-lp-reveal>
+        <ul class="vn-items">
+          <li class="vn-item" data-lp-step>
+            <span class="te-bullet" aria-hidden="true"></span>
+            <p>
+              <strong class="vn-item-title">Tu web gratis, con tu cartelera.</strong> Una página en aitickets.cl/o/tu-sala
+              con la cartelera de teatro de tu sala vendiendo entradas, con plantillas y, si quieres, tu dominio.
+            </p>
+          </li>
+          <li class="vn-item" data-lp-step>
+            <span class="te-bullet" aria-hidden="true"></span>
+            <p>
+              <strong class="vn-item-title">Cada obra, con sus funciones.</strong> Si llevas una sala de teatro
+              independiente, cada compañía que programas es una obra con su aforo, sus precios y su puerta.
+            </p>
+          </li>
+          <li class="vn-item" data-lp-step>
+            <span class="te-bullet" aria-hidden="true"></span>
+            <p>
+              <strong class="vn-item-title">Cada compañía ve lo suyo.</strong> Le das acceso de Solo lectura limitado a su
+              obra, para que siga sus ventas sin ver las demás. Hoy se asigna desde tu asistente de IA.
+            </p>
+          </li>
+          <li class="vn-item" data-lp-step>
+            <span class="te-bullet" aria-hidden="true"></span>
+            <p>
+              <strong class="vn-item-title">Para liquidar con cada compañía.</strong> Descargas las órdenes de cada obra en
+              CSV, con fecha, entradas y montos.
+              <span class="vn-soon">Borderó por función <SoonBadge dark /></span>
+            </p>
+          </li>
+        </ul>
+        <p class="vn-cta" data-lp-step>
+          <a href="/web-gratis" class="te-btn te-btn-line" data-cta="web" data-section="salas">
+            Arma la web de tu sala <span aria-hidden="true">→</span>
+          </a>
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .vn-head {
+    max-width: 860px;
+    margin: 0 auto;
+    text-align: center;
+  }
+  .vn-title {
+    margin-top: 20px;
+  }
+  .vn-line {
+    display: block;
+  }
+  .vn-grid {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 40px;
+    margin-top: 48px;
+  }
+  .vn-items {
+    display: grid;
+    gap: 18px;
+  }
+  .vn-item {
+    display: flex;
+    gap: 14px;
+    font-size: 16px;
+    line-height: 25px;
+    color: var(--te-text-2);
+  }
+  .vn-item-title {
+    display: block;
+    font-weight: 600;
+    color: var(--te-text-1);
+  }
+  .vn-soon {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+    color: var(--te-text-1);
+    font-weight: 500;
+  }
+  .vn-cta {
+    margin-top: 28px;
+  }
+  @media (min-width: 1024px) {
+    .vn-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      align-items: center;
+      gap: 72px;
+      margin-top: 72px;
+    }
+    .vn-item {
+      font-size: 18px;
+      line-height: 29px;
+    }
+  }
+</style>

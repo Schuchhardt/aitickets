@@ -1,0 +1,242 @@
+---
+// 2 · Reparto (SPEC_landing_teatro §4.2, ancla #reparto): quién hace qué, como el reparto de un programa de mano.
+// Lista de definiciones (<dl>, legible sin JS) con líneas de puntos doradas; cada fila es un link a su escena. Las
+// cifras salen del código: el tope de funciones de MAX_EVENT_FUNCTIONS (producerFaq.ts) y el asterisco de "La plata"
+// lleva a TERMS_NOTE (el cobro por función depende de la reserva por riesgo, Preguntas abiertas 1).
+// T7: las filas entran con stagger de 70 ms; al pasar el mouse o enfocar una fila, se ilumina (foco en elipse detrás,
+// rol en dorado) y sus puntos se recorren de izquierda a derecha. En táctil la fila tocada queda iluminada (foco del
+// link) mientras la página se desplaza a su escena. Analítica: te_reparto_click { role }.
+import ActEyebrow from "./ActEyebrow.astro";
+import { REPARTO, REPARTO_KINDS } from "./teatroLanding.js";
+import { MAX_EVENT_FUNCTIONS, TERMS_NOTE } from "../../../data/producerFaq";
+
+const rows = REPARTO.map((r) => ({ ...r, who: r.who.replace("{maxFunctions}", String(MAX_EVENT_FUNCTIONS)) }));
+---
+
+<section id="reparto" class="te-section rp" aria-labelledby="te-reparto-title" data-te-section="reparto">
+  <div class="te-wrap">
+    <div class="te-act-head rp-head" data-lp-reveal>
+      <span class="te-foco" aria-hidden="true"></span>
+      <ActEyebrow text="Reparto" />
+      <h2 id="te-reparto-title" class="te-h2 rp-title" data-lp-step>
+        Cada uno en su papel. <span class="te-gold rp-line">La boletería, en el nuestro.</span>
+      </h2>
+    </div>
+
+    <div class="rp-program" data-lp-reveal>
+      <dl class="rp-list" data-testid="theatre-reparto">
+        {
+          rows.map((r, i) => (
+            <div class="rp-row" data-lp-step={String(i * 70)}>
+              <dt class="rp-role">
+                <a href={r.href} class="rp-link" data-te-role={r.id}>
+                  {r.role}
+                </a>
+              </dt>
+              <dd class="rp-who">
+                <span class="te-leader rp-leader" aria-hidden="true" />
+                <span class="rp-who-text">{r.who}{r.star && <span aria-hidden="true">*</span>}</span>
+              </dd>
+            </div>
+          ))
+        }
+      </dl>
+      <p class="rp-terms" data-lp-step><a href={TERMS_NOTE.href} class="te-link">{TERMS_NOTE.text}</a></p>
+
+      <ul class="rp-kinds" aria-label="Para quién es" data-lp-step>
+        {REPARTO_KINDS.map((k) => <li class="te-chip">{k}</li>)}
+      </ul>
+      <p class="rp-academias" data-lp-step>
+        <a href="/academias" class="te-link">¿Escuela o academia de teatro? Mira la página para muestras <span aria-hidden="true">→</span></a>
+      </p>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { trackEvent } from "../../../composables/useGoogleAnalytics.js";
+
+  document.querySelectorAll<HTMLAnchorElement>("[data-te-role]").forEach((link) => {
+    link.addEventListener("click", () => trackEvent("te_reparto_click", { role: link.dataset.teRole || "" }));
+  });
+</script>
+
+<style>
+  .rp-head {
+    text-align: center;
+  }
+  .rp-title {
+    margin-top: 20px;
+  }
+  .rp-line {
+    display: block;
+  }
+  .rp-program {
+    max-width: 720px;
+    margin: 40px auto 0;
+  }
+  .rp-row {
+    position: relative;
+    isolation: isolate;
+    padding: 14px 0;
+  }
+  /* Filete dorado corto entre filas (mobile) */
+  .rp-row + .rp-row::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 40px;
+    height: 1px;
+    background: rgba(212, 175, 106, 0.45);
+  }
+  /* Foco en elipse detrás de la fila (T7) */
+  .rp-row::before {
+    content: "";
+    position: absolute;
+    inset: -6px -24px;
+    z-index: -1;
+    background: radial-gradient(ellipse 60% 80% at 50% 50%, var(--te-foco), transparent 72%);
+    opacity: 0;
+    transition: opacity 200ms var(--ease-out);
+    pointer-events: none;
+  }
+  .rp-role {
+    font-family: var(--te-display);
+    font-size: 22px;
+    line-height: 28px;
+    font-weight: 500;
+  }
+  .rp-link {
+    color: var(--te-text-1);
+    text-decoration: none;
+    transition: color 200ms var(--ease-out);
+  }
+  /* Toda la fila es el link (la escena a la que lleva) */
+  .rp-link::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+  }
+  .rp-link:focus-visible {
+    outline: none;
+  }
+  .rp-row:has(.rp-link:focus-visible) {
+    outline: 2px solid var(--te-oro);
+    outline-offset: 4px;
+    border-radius: 4px;
+  }
+  .rp-leader {
+    display: none;
+  }
+  .rp-who {
+    margin-top: 2px;
+    font-size: 15px;
+    line-height: 22px;
+    color: var(--te-text-2);
+  }
+  .rp-row:hover::before,
+  .rp-row:focus-within::before {
+    opacity: 1;
+  }
+  .rp-row:hover .rp-link,
+  .rp-row:focus-within .rp-link {
+    color: var(--te-oro);
+  }
+  .rp-terms {
+    margin-top: 16px;
+    font-size: 12px;
+    color: var(--te-text-3);
+  }
+  .rp-kinds {
+    display: flex;
+    gap: 8px;
+    margin: 32px -20px 0;
+    padding: 0 20px 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .rp-kinds::-webkit-scrollbar {
+    display: none;
+  }
+  .rp-kinds .te-chip {
+    flex: 0 0 auto;
+    min-height: 36px;
+  }
+  .rp-academias {
+    margin-top: 20px;
+    font-size: 15px;
+  }
+  /* El link largo se parte en dos líneas: inline para que la flecha siga al texto */
+  .rp-academias .te-link {
+    display: inline;
+  }
+  @media (min-width: 768px) {
+    .rp-row {
+      display: flex;
+      align-items: baseline;
+      padding: 12px 0;
+    }
+    .rp-row + .rp-row::after {
+      display: none;
+    }
+    .rp-role {
+      flex: 0 0 auto;
+      font-size: 26px;
+      line-height: 34px;
+    }
+    .rp-leader {
+      display: block;
+    }
+    .rp-who-text {
+      flex: 0 1 auto;
+    }
+    .rp-who {
+      flex: 1 1 auto;
+      display: flex;
+      align-items: baseline;
+      margin-top: 0;
+      font-size: 18px;
+      line-height: 26px;
+      text-align: right;
+    }
+    .rp-kinds {
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-inline: 0;
+      padding: 0;
+      overflow: visible;
+    }
+    .rp-academias,
+    .rp-terms {
+      text-align: center;
+    }
+  }
+  @media (min-width: 1024px) {
+    .rp-program {
+      margin-top: 56px;
+    }
+  }
+  /* T7: los puntos se recorren de izquierda a derecha al iluminar la fila */
+  @keyframes rp-dots {
+    from {
+      background-position-x: -70px;
+    }
+  }
+  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    .rp-row:hover .rp-leader {
+      animation: rp-dots 600ms var(--ease-out);
+    }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .rp-row:focus-within .rp-leader {
+      animation: rp-dots 600ms var(--ease-out);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .rp-row::before,
+    .rp-link {
+      transition-duration: 1ms;
+    }
+  }
+</style>

@@ -1,0 +1,103 @@
+---
+// "Ventas por link · ejemplo" (SPEC_landing_teatro §4.3, Escena 3): mini tabla con una barra dorada por link (elenco,
+// sala, medio) y la venta directa, con la etiqueta real de las métricas (DIRECT_CHANNEL de src/lib/eventAnalytics.ts).
+// La fila que más vendió va en marfil. T10: las barras crecen de scaleX(0) a su valor (900 ms, stagger 90 ms) con
+// [data-lp-grow] de LandingMotion; sin movimiento quedan llenas.
+import { LINK_SALES, LINK_SALES_DIRECT, linkScales } from "./teatroLanding.js";
+import { DIRECT_CHANNEL } from "../../../lib/eventAnalytics";
+
+const scales = linkScales();
+const rows = [
+  ...LINK_SALES.map((r, i) => ({ name: r.name, tickets: r.tickets, scale: scales.rows[i] })),
+  { name: DIRECT_CHANNEL, tickets: LINK_SALES_DIRECT, scale: scales.direct },
+];
+const top = Math.max(...rows.map((r) => r.tickets));
+---
+
+<div class="ls" data-testid="theatre-link-sales">
+  <p class="te-example ls-title">Ventas por link · ejemplo</p>
+  <table class="ls-table">
+    <caption class="lp-sr-only">Entradas vendidas por cada link, ejemplo</caption>
+    <thead class="lp-sr-only">
+      <tr><th scope="col">Link</th><th scope="col">Entradas</th></tr>
+    </thead>
+    <tbody>
+      {
+        rows.map((r, i) => (
+          <tr class:list={["ls-row", { "is-top": r.tickets === top }]}>
+            <th scope="row" class="ls-name">
+              {r.name}
+              <span class="ls-bar" aria-hidden="true">
+                <span class="ls-fill" data-lp-grow style={`--lp-scale: ${r.scale.toFixed(3)}; --lp-d: ${i * 90}ms`} />
+              </span>
+            </th>
+            <td class="te-display ls-n">{r.tickets}</td>
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
+</div>
+
+<style>
+  .ls {
+    width: 100%;
+    max-width: 560px;
+    margin-inline: auto;
+    padding: 18px 20px 12px;
+    border-radius: 10px;
+    border-top: 1px solid rgba(212, 175, 106, 0.5);
+    background: var(--te-sala-3);
+    text-align: left;
+  }
+  .ls-table {
+    width: 100%;
+    margin-top: 8px;
+    border-collapse: collapse;
+  }
+  .ls-row {
+    border-bottom: 1px solid var(--te-line);
+  }
+  .ls-row:last-child {
+    border-bottom: 0;
+  }
+  .ls-name {
+    padding: 10px 12px 10px 0;
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 500;
+    color: var(--te-text-2);
+    text-align: left;
+  }
+  .ls-row.is-top .ls-name {
+    color: var(--te-text-1);
+  }
+  .ls-bar {
+    display: block;
+    height: 4px;
+    margin-top: 6px;
+    background: rgba(240, 232, 216, 0.08);
+  }
+  .ls-fill {
+    display: block;
+    height: 100%;
+    background: rgba(212, 175, 106, 0.6);
+    /* El valor va en --lp-scale (como .lp-bar): la animación de entrada parte de scaleX(0) */
+    transform: scaleX(var(--lp-scale, 1));
+    transform-origin: left center;
+  }
+  .ls-row.is-top .ls-fill {
+    background: var(--te-oro);
+  }
+  .ls-n {
+    width: 56px;
+    padding: 10px 0;
+    font-size: 24px;
+    text-align: right;
+    vertical-align: middle;
+    color: var(--te-text-2);
+  }
+  .ls-row.is-top .ls-n {
+    color: var(--te-text-1);
+  }
+</style>
