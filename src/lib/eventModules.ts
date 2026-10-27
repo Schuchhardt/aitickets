@@ -57,7 +57,15 @@ export const EVENT_MODULES: EventModule[] = [
     { id: "tickets", title: "Tipos de entrada", description: "Precios, cupos y entradas emitidas.", tab: "ventas", core: true },
     { id: "courtesy", title: "Entradas de cortesía", description: "Emite entradas sin costo con su QR.", tab: "ventas" },
     { id: "discounts", title: "Códigos de descuento", description: "Descuentos del evento y de la organización.", tab: "ventas" },
-    { id: "public-link", title: "Link público", description: "El link para vender entradas.", tab: "difusion", core: true },
+    // En borrador el link público da error: ahí se comparte con los links de vista previa
+    {
+        id: "public-link",
+        title: "Link público",
+        description: "El link para vender entradas.",
+        tab: "difusion",
+        core: true,
+        when: (ctx) => ctx.status === "published",
+    },
     {
         id: "social-series",
         title: "Difusión automática en Instagram",
@@ -72,7 +80,13 @@ export const EVENT_MODULES: EventModule[] = [
         tab: "difusion",
         when: (ctx) => ctx.status === "published" && ctx.phase !== "after",
     },
-    { id: "tracking-links", title: "Links con seguimiento", description: "Un link por canal o promotor para medir ventas.", tab: "difusion" },
+    {
+        id: "tracking-links",
+        title: "Links con seguimiento",
+        description: "Un link por canal o promotor para medir ventas.",
+        tab: "difusion",
+        when: (ctx) => ctx.status === "published",
+    },
     // Solo en borrador: publicado, el link público ya muestra la página
     {
         id: "preview-links",

@@ -409,7 +409,7 @@ const canCreateAds = adsEnabled() && hasRole(dbUser, ORG_ADMIN_ROLES);
                     <span class="text-sm text-gray-500 group-open:hidden">Ver</span>
                     <span class="text-sm text-gray-500 hidden group-open:inline">Cerrar</span>
                 </summary>
-                <p class="px-4 -mt-2 pb-2 text-xs text-gray-500">Herramientas que no suelen usarse en {PROFILE_LABELS[moduleCtx.profile]}. Al agregar una, queda en esta pestaña.</p>
+                <p class="px-4 -mt-2 pb-2 text-xs text-gray-500">No vienen activas para este evento ({PROFILE_LABELS[moduleCtx.profile]}). Al agregar una, queda en esta pestaña.</p>
                 <ul class="divide-y divide-gray-100 border-t border-gray-100">
                     {t.modules.filter((m) => !m.core).map((m) => (
                         <li data-add-item={m.id} hidden={m.enabled} class="flex items-center justify-between gap-4 p-4">
@@ -450,9 +450,14 @@ const canCreateAds = adsEnabled() && hasRole(dbUser, ORG_ADMIN_ROLES);
     }),
   );
   // Llegando con #pestaña (p. ej. desde Promocionar): el id no existe como ancla, así que se baja a las pestañas a mano
-  if (location.hash && showTab(location.hash.slice(1))) {
-    requestAnimationFrame(() => document.querySelector('[role="tablist"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
-  }
+  const openFromHash = () => {
+    if (location.hash && showTab(location.hash.slice(1))) {
+      requestAnimationFrame(() => document.querySelector('[role="tablist"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    }
+  };
+  openFromHash();
+  // Un link a #pestaña dentro de la misma página no recarga: solo cambia el hash
+  window.addEventListener('hashchange', openFromHash);
 
   // Agregar una herramienta (events.panel_modules vía /api/events/modules): su tarjeta aparece al instante, se baja a
   // ella para configurarla y se guarda en segundo plano (si falla, vuelve a "Más herramientas").

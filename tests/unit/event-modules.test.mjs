@@ -59,9 +59,15 @@ describe('resolveModules', () => {
     expect(byId(resolveModules(ctx({ phase: 'after' })))['social-series']).toBeUndefined()
     expect(byId(resolveModules(ctx()))['social-series'].enabled).toBe(true)
   })
-  it('los links de vista previa solo aplican en borrador', () => {
-    expect(byId(resolveModules(ctx()))['preview-links']).toBeUndefined()
-    expect(byId(resolveModules(ctx({ status: 'draft' })))['preview-links'].enabled).toBe(true)
+  it('en borrador se comparte con vista previa; publicado, con el link público y los de seguimiento', () => {
+    const published = byId(resolveModules(ctx()))
+    expect(published['preview-links']).toBeUndefined()
+    expect(published['public-link'].enabled).toBe(true)
+    expect(published['tracking-links'].enabled).toBe(true)
+    const draft = byId(resolveModules(ctx({ status: 'draft' })))
+    expect(draft['preview-links'].enabled).toBe(true)
+    expect(draft['public-link']).toBeUndefined()
+    expect(draft['tracking-links']).toBeUndefined()
   })
   it('los atajos a posts y anuncios solo aplican con el evento a la venta', () => {
     expect(byId(resolveModules(ctx({ status: 'draft' }))).promote).toBeUndefined()
