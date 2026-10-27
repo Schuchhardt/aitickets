@@ -1,0 +1,102 @@
+---
+// 7 · Tu fecha en Instagram + anuncios (SPEC_landing_musica §4.8, ancla #difusion): historia de ejemplo, la serie en el
+// tiempo calculada con DEFAULT_CADENCE y la demo de anuncios (Meta vía Zernio, días según AD_LIMITS). El texto es el
+// de ORGANIZADORES_FAQ (vista previa y aprobación, se ajusta o se detiene sola). Hoy la serie publica solo en
+// Instagram: Facebook, TikTok y reels van con "Pronto" (SeriesTimeline), igual que segmentar anuncios por gustos
+// musicales (MusicAdsDemo). AD_LIMITS se lee aquí (zernio-ads.mjs importa módulos de servidor) y pasa por props.
+// Mobile: la historia a 160 px con un resumen de la serie al lado, la línea de tiempo con scroll horizontal y la card
+// de anuncios con un solo slider.
+import GigStoryMockup from "./GigStoryMockup.astro";
+import SeriesTimeline from "./SeriesTimeline.vue";
+import MusicAdsDemo from "./MusicAdsDemo.vue";
+import { DEFAULT_CADENCE, DEFAULT_KEYWORD } from "../../../lib/socialSeriesCadence";
+import { AD_LIMITS } from "../../../../netlify/lib/zernio-ads.mjs";
+---
+
+<section id="difusion" class="mu-section mu-on-stage-2 df" aria-labelledby="mu-diffusion-title" data-mu-section="marketing">
+  <div class="mu-wrap">
+    <div class="df-head" data-lp-reveal>
+      <p class="mu-mono mu-eyebrow" data-lp-step><span aria-hidden="true">07 —</span> Difusión automática</p>
+      <h2 id="mu-diffusion-title" class="mu-h2 df-title" data-lp-step>Tu fecha en Instagram <span class="mu-red">hasta el día del show.</span></h2>
+      <p class="mu-lead df-lead" data-lp-step>
+        Conectas tu Instagram una vez y apruebas la serie con una vista previa de cada pieza. Con el afiche y los datos de
+        tu evento armamos historias con cuenta regresiva y posts para el feed, y se publican solos. Si se agota, cambias la
+        fecha o cancelas, la serie se ajusta o se detiene sola.
+      </p>
+    </div>
+
+    <div class="df-grid">
+      <div class="df-story" data-lp-reveal>
+        <GigStoryMockup />
+        <ul class="df-side" data-lp-step>
+          <li>Historias con cuenta regresiva, diarias la última semana</li>
+          <li>Un post diario en el feed esa semana</li>
+          <li>Responden {DEFAULT_KEYWORD} y les llega el link por DM</li>
+        </ul>
+      </div>
+      <div class="df-cards">
+        <div data-lp-reveal>
+          <SeriesTimeline cadence={DEFAULT_CADENCE} />
+        </div>
+        <div data-lp-reveal>
+          <div data-lp-step><MusicAdsDemo client:visible minDays={AD_LIMITS.minDays} maxDays={AD_LIMITS.maxDays} /></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .df-head {
+    max-width: 900px;
+    margin-bottom: 40px;
+  }
+  .df-title {
+    margin-top: 22px;
+  }
+  .df-lead {
+    max-width: 680px;
+    margin-top: 20px;
+  }
+  .df-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+  .df-story {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+  }
+  .df-side {
+    display: grid;
+    gap: 12px;
+    padding-top: 8px;
+    font-size: 14px;
+    line-height: 21px;
+    color: var(--mu-text-2);
+  }
+  .df-side li {
+    padding-left: 14px;
+    border-left: 2px solid var(--mu-red);
+  }
+  .df-cards {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+    min-width: 0;
+  }
+  @media (min-width: 1024px) {
+    .df-head {
+      margin-bottom: 64px;
+    }
+    .df-grid {
+      grid-template-columns: 280px minmax(0, 1fr);
+      gap: 56px;
+      align-items: start;
+    }
+    .df-side {
+      display: none;
+    }
+  }
+</style>

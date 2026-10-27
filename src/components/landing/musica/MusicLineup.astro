@@ -1,0 +1,66 @@
+---
+// 5 · El cartel, con un link por banda (SPEC_landing_musica §4.5): links con seguimiento (TrackingLinkBuilder.vue,
+// utm_*) y ventas por link en las métricas del evento, con la venta directa como DIRECT_CHANNEL (eventAnalytics.ts).
+// La regla de atribución (misma visita) es la de PRODUCER_FAQ. Para la banda: exportar a CSV o compartir la tabla (la
+// misma respuesta de la FAQ de stand-up); un acceso propio por banda no existe y no se promete (§0.6). Links internos
+// (§9): la landing de ventas por promotor y la guía.
+import LineupPoster from "./LineupPoster.vue";
+import { MUSIC_PHOTOS } from "./musicaLanding.js";
+import { DIRECT_CHANNEL } from "../../../lib/eventAnalytics";
+---
+
+<section class="mu-section mu-on-stage-2 lnp" aria-labelledby="mu-lineup-title" data-mu-section="lineup">
+  <div class="mu-wrap" data-lp-reveal>
+    <div class="lnp-head">
+      <p class="mu-mono mu-eyebrow" data-lp-step><span aria-hidden="true">04 —</span> Links con seguimiento</p>
+      <h2 id="mu-lineup-title" class="mu-h2 lnp-title" data-lp-step>Cada banda del cartel, <span class="mu-red">con su link.</span></h2>
+      <p class="mu-lead lnp-lead" data-lp-step>
+        Creas un link para cada banda, para el medio que te entrevistó o para tu campaña, y cada uno lo comparte en sus
+        redes. En las métricas del evento ves las órdenes, entradas e ingresos que trajo cada link, comparados con la venta
+        directa. La venta se asocia al link cuando la persona compra en la misma visita en que llegó con él.
+      </p>
+    </div>
+    <div data-lp-step>
+      <LineupPoster client:visible directLabel={DIRECT_CHANNEL} photo={{ src: MUSIC_PHOTOS.publico.src, sources: MUSIC_PHOTOS.publico.sources }} />
+    </div>
+    <p class="lnp-note" data-lp-step>
+      ¿La banda quiere saber cuánto vendió? Exporta las órdenes a CSV o comparte la tabla de ventas por canal.
+      <span class="lnp-links">
+        <a href="/ventas-por-promotor" class="mu-link mu-mono">Ventas por promotor</a>
+        <a href="/guias/como-medir-ventas-por-promotor" class="mu-link mu-mono">Guía: cómo medir ventas por promotor <span aria-hidden="true">→</span></a>
+      </span>
+    </p>
+  </div>
+</section>
+
+<style>
+  .lnp-head {
+    max-width: 900px;
+    margin-bottom: 40px;
+  }
+  .lnp-title {
+    margin-top: 22px;
+  }
+  .lnp-lead {
+    max-width: 680px;
+    margin-top: 20px;
+  }
+  .lnp-note {
+    max-width: 680px;
+    margin-top: 32px;
+    font-size: 15px;
+    line-height: 24px;
+    color: var(--mu-text-2);
+  }
+  .lnp-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    margin-top: 10px;
+  }
+  @media (min-width: 1024px) {
+    .lnp-head {
+      margin-bottom: 64px;
+    }
+  }
+</style>

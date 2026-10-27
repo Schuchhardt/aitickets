@@ -1,0 +1,18 @@
+---
+// Sello de goma de la landing de música (SPEC_landing_musica §1): "AGOTADA" / "AGOTADO" en Anton, borde doble,
+// rotado y con textura de tinta (.mu-stamp en landing-musica.css). reveal: cae con un pop cuando su bloque
+// [data-lp-reveal] entra en pantalla (M4, M11); sin movimiento queda puesto. ink: tinta en vez de rojo (sobre el rojo
+// a sangre o sobre papel).
+interface Props {
+  label: string;
+  ink?: boolean;
+  reveal?: boolean;
+  /** Rotación (entre -8 y -12 grados) */
+  rotate?: number;
+  class?: string;
+}
+
+const { label, ink = false, reveal = false, rotate = -10, class: className } = Astro.props;
+---
+
+<span class:list={["mu-stamp", { "mu-stamp-ink": ink, "mu-stamp-reveal": reveal }, className]} style={`--mu-stamp-rot: ${rotate}deg`}>{label}</span>

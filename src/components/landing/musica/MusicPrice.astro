@@ -1,0 +1,87 @@
+---
+// 8 · Precio (SPEC_landing_musica §4.9, fondo papel, ancla #precio): el texto se arma con las constantes como el
+// priceLead de stand-up (fees.mjs, ABSORB_FEE_ACTIVATION de producerFaq.ts) y las garantías llevan PAYOUT_SHORT_TEXT de
+// legal.mjs. El talón calculadora usa la fórmula del checkout (priceQuote → computeFeeSplit).
+import TicketCalculator from "./TicketCalculator.vue";
+import { ABSORB_FEE_ACTIVATION, TERMS_NOTE } from "../../../data/producerFaq";
+import { IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL } from "../../../../netlify/lib/fees.mjs";
+import { PAYOUT_SHORT_TEXT } from "../../../../netlify/lib/legal.mjs";
+
+const priceLead =
+  `Para ti, 0% de comisión. El comprador paga un cargo por servicio de ${SERVICE_FEE_PERCENT_LABEL} más IVA ` +
+  `(${IVA_PERCENT_LABEL}) sobre ese cargo. Si prefieres un precio final redondo, lo absorbes tú, por evento. ` +
+  `${ABSORB_FEE_ACTIVATION} Las tocatas gratis no pagan nada.`;
+const guarantees = ["Sin mensualidad", "Sin permanencia", PAYOUT_SHORT_TEXT];
+---
+
+<section id="precio" class="mu-section mu-on-paper mu-grain pr" aria-labelledby="mu-price-title" data-mu-section="pricing">
+  <div class="mu-wrap pr-grid">
+    <div class="pr-copy" data-lp-reveal>
+      <p class="mu-mono mu-eyebrow" data-lp-step><span class="pr-num" aria-hidden="true">08 —</span> Precio</p>
+      <h2 id="mu-price-title" class="mu-h2 pr-title" data-lp-step>Tú cobras el 100% <span class="mu-red">de tu entrada.</span></h2>
+      <p class="mu-lead pr-lead" data-lp-step>{priceLead}</p>
+      <p class="mu-mono pr-guarantees" data-lp-step>
+        {guarantees.map((g, i) => (i ? <><span aria-hidden="true"> · </span>{g}</> : g))}
+      </p>
+    </div>
+    <div class="pr-calc" data-lp-reveal>
+      <div data-lp-step><TicketCalculator client:visible /></div>
+      <p class="pr-free" data-lp-step>
+        <span class="mu-mono pr-free-tag">Tocata gratis</span>
+        <span>Inscripción con QR para cada persona. $0 para todos.</span>
+      </p>
+      <p class="pr-terms" data-lp-step><a href={TERMS_NOTE.href} class="mu-link">{TERMS_NOTE.text}</a></p>
+    </div>
+  </div>
+</section>
+
+<style>
+  .pr-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 40px;
+  }
+  .pr-num {
+    color: rgba(17, 16, 19, 0.5);
+  }
+  .pr-title {
+    margin-top: 22px;
+  }
+  .pr-lead {
+    max-width: 560px;
+    margin-top: 20px;
+  }
+  .pr-guarantees {
+    margin-top: 24px;
+    color: var(--mu-ink);
+    font-weight: 700;
+  }
+  .pr-free {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px 14px;
+    margin-top: 20px;
+    padding: 14px 0;
+    border-top: 2px solid var(--mu-ink);
+    border-bottom: 1px solid rgba(17, 16, 19, 0.2);
+    font-size: 15px;
+    line-height: 22px;
+    color: var(--mu-ink-2);
+  }
+  .pr-free-tag {
+    font-weight: 700;
+    color: var(--mu-ink);
+  }
+  .pr-terms {
+    margin-top: 14px;
+    font-size: 12px;
+  }
+  @media (min-width: 1024px) {
+    .pr-grid {
+      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+      align-items: center;
+      gap: 72px;
+    }
+  }
+</style>

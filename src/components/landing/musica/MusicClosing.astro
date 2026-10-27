@@ -1,0 +1,147 @@
+---
+// 11 · Cierre (SPEC_landing_musica §4.12): foto del público con las manos arriba a pantalla completa, en duotono, con
+// overlay radial y el ecualizador abajo (como el hero). data-final-cta: la barra flotante de mobile se esconde aquí.
+// CTAs con los mismos destinos que stand-up (registro, WhatsApp y demo de 15 min) y los links internos a /organizadores
+// y a las landings de stand-up y teatro (SEO §9).
+// La foto de referencia es vertical y llega solo a 896 px: en desktop se ve ampliada hasta que llegue la real (§8).
+import DuotonePhoto from "./DuotonePhoto.astro";
+import EqBars from "./EqBars.astro";
+import { MUSIC_PHOTOS } from "./musicaLanding.js";
+import { DEMO_CALL_URL, publishUrl, whatsappUrl } from "../links.js";
+
+interface Props {
+  ctaLabel: string;
+}
+const { ctaLabel } = Astro.props;
+---
+
+<section class="mc mu-grain" aria-labelledby="mu-closing-title" data-final-cta data-mu-section="closing">
+  <div class="mc-media">
+    <DuotonePhoto photo={MUSIC_PHOTOS.publico} alt="Público con las manos arriba frente al escenario" sizes="100vw" position="50% 30%" class="mc-photo" />
+  </div>
+  <div class="mc-shade" aria-hidden="true"></div>
+  <div class="mu-wrap mc-inner" data-lp-reveal>
+    <h2 id="mu-closing-title" class="mu-h2 mc-title" data-lp-step>
+      La próxima fecha <span class="mu-red mc-line">empieza con un link.</span>
+    </h2>
+    <p class="mu-lead mc-lead" data-lp-step>Publícala hoy. Crear tu cuenta es gratis y no hay costos fijos. Si quieres, la armamos contigo.</p>
+    <div class="mc-ctas" data-lp-step>
+      <a href={publishUrl("musica_closing")} class="mu-btn mu-btn-lime" data-cta="publish" data-section="closing">
+        {ctaLabel} <span aria-hidden="true">→</span>
+      </a>
+      <a
+        href={whatsappUrl("Hola, quiero vender entradas para mi concierto con AI Tickets")}
+        class="mu-btn mu-btn-line"
+        target="_blank"
+        rel="noopener noreferrer"
+        data-cta="whatsapp"
+        data-section="closing"
+      >
+        Hablar por WhatsApp
+      </a>
+    </div>
+    <p class="mc-help" data-lp-step>
+      <a href={DEMO_CALL_URL} class="mu-link" target="_blank" rel="noopener noreferrer" data-cta="demo_call" data-section="closing">Agenda una demo de 15 min</a>
+      ·
+      <a href="/organizadores" class="mu-link" data-cta="organizadores" data-section="closing">Todo lo que hace AI Tickets</a>
+    </p>
+    <p class="mc-help mc-also" data-lp-step>
+      También para <a href="/ticketera-stand-up" class="mu-link">stand-up</a> y <a href="/ticketera-teatro" class="mu-link">teatro</a>.
+    </p>
+  </div>
+  <EqBars class="mc-eq" />
+</section>
+
+<style>
+  .mc {
+    position: relative;
+    min-height: 600px;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    background: var(--mu-stage);
+  }
+  .mc-media {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+  }
+  .mc-media :global(.mc-photo) {
+    width: 100%;
+    height: 100%;
+  }
+  .mc-shade {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background: radial-gradient(ellipse at center, rgba(10, 10, 13, 0.7) 0%, rgba(10, 10, 13, 0.82) 60%, var(--mu-stage) 100%);
+  }
+  .mc-inner {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    padding-block: 96px 120px;
+    text-align: center;
+  }
+  .mc-title {
+    font-size: 56px;
+    line-height: 54px;
+  }
+  .mc-line {
+    display: block;
+  }
+  .mc-lead {
+    max-width: 560px;
+    margin: 20px auto 0;
+    color: var(--mu-text-1);
+  }
+  .mc-ctas {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 32px;
+  }
+  .mc-help {
+    margin-top: 24px;
+    font-size: 14px;
+    line-height: 22px;
+    color: var(--mu-text-3);
+  }
+  .mc-also {
+    margin-top: 8px;
+  }
+  .mc :global(.mc-eq) {
+    position: absolute;
+    z-index: 2;
+    left: 20px;
+    right: 20px;
+    bottom: 0;
+  }
+  @media (min-width: 640px) {
+    .mc-ctas {
+      flex-direction: row;
+      justify-content: center;
+    }
+  }
+  @media (min-width: 768px) {
+    .mc :global(.mc-eq) {
+      left: 40px;
+      right: 40px;
+    }
+  }
+  @media (min-width: 1024px) {
+    .mc {
+      min-height: 760px;
+    }
+    .mc-title {
+      font-size: clamp(80px, 8.4vw, 120px);
+      line-height: 0.92;
+    }
+    .mc-lead {
+      margin-top: 28px;
+    }
+    .mc-ctas {
+      margin-top: 40px;
+    }
+  }
+</style>

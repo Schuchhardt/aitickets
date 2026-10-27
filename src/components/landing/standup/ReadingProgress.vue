@@ -1,7 +1,12 @@
 <script setup>
 // Barra de progreso de lectura (SPEC_landing_standup §3 y S16): 2 px lima fija arriba, transform: scaleX(progreso).
 // Se actualiza una vez por frame mientras hay scroll. Decorativa: los lectores de pantalla no la anuncian.
+// color: otro color para la barra (la landing de música la usa en rojo de sala, SPEC_landing_musica §3).
 import { onBeforeUnmount, onMounted, ref } from 'vue'
+
+const props = defineProps({
+  color: { type: String, required: false },
+})
 
 const progress = ref(0)
 let frame = 0
@@ -28,7 +33,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="rp" aria-hidden="true" :style="{ transform: `scaleX(${progress.toFixed(4)})` }"></div>
+  <div class="rp" aria-hidden="true" :style="{ transform: `scaleX(${progress.toFixed(4)})`, background: props.color }"></div>
 </template>
 
 <style scoped>

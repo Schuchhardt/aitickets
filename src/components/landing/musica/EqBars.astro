@@ -1,0 +1,67 @@
+---
+// Ecualizador decorativo del borde inferior del hero y del cierre (SPEC_landing_musica §1 y M5): 32 barras finas en
+// rojo al 70 %, de 8 a 64 px, que suben y bajan con scaleY, cada una con su duración (0,9-1,6 s) y desfase. Las alturas
+// y tiempos salen de una fórmula fija (los mismos en el servidor y en cada visita). Solo se mueve con html.lp-motion y
+// mientras está en pantalla ([data-mu-play], ver la página); con "reducir movimiento" queda quieto en sus alturas.
+interface Props {
+  class?: string;
+}
+const { class: className } = Astro.props;
+
+const BARS = 32;
+const bars = Array.from({ length: BARS }, (_, i) => {
+  const wave = (Math.sin(i * 1.7) + Math.sin(i * 0.53 + 1) + 2) / 4; // 0-1, sin patrón visible
+  return {
+    height: Math.round(8 + wave * 56),
+    duration: 900 + ((i * 211) % 700),
+    delay: -((i * 137) % 900),
+    low: (0.25 + ((i * 29) % 40) / 100).toFixed(2),
+  };
+});
+---
+
+<div class:list={["mu-eq", className]} aria-hidden="true" data-mu-play>
+  {
+    bars.map((bar) => (
+      <span
+        class="mu-eq-bar"
+        style={`height: ${bar.height}px; --eq-d: ${bar.duration}ms; --eq-delay: ${bar.delay}ms; --eq-lo: ${bar.low}`}
+      />
+    ))
+  }
+</div>
+
+<style>
+  .mu-eq {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 4px;
+    height: 64px;
+    pointer-events: none;
+  }
+  .mu-eq-bar {
+    flex: 0 0 6px;
+    background: var(--mu-red);
+    opacity: 0.7;
+    transform-origin: bottom;
+  }
+  :global(.lp-motion) .mu-eq-bar {
+    animation: mu-eq var(--eq-d) ease-in-out var(--eq-delay) infinite;
+    animation-play-state: paused;
+  }
+  :global(.lp-motion) .mu-eq:global(.is-playing) .mu-eq-bar {
+    animation-play-state: running;
+    will-change: transform;
+  }
+  @media (max-width: 767px) {
+    .mu-eq {
+      gap: 3px;
+      height: 48px;
+    }
+    .mu-eq-bar {
+      flex-basis: 4px;
+      max-height: 48px;
+    }
+  }
+</style>

@@ -160,46 +160,28 @@ export const LANDINGS: Landing[] = [
         slug: "ticketera-musica-en-vivo",
         kind: "vertical",
         card: { title: "Música en vivo", text: "Preventas, tipos de entrada con cupo y difusión medida por canal." },
-        title: "Plataforma para vender entradas de conciertos | AI Tickets",
-        description: "Vende entradas para tus tocatas y conciertos: preventa, tipos de entrada con cupo, códigos de descuento, links por canal y check-in con QR. 0% de comisión para el productor.",
-        eyebrow: "Para bandas, salas y productores de música",
-        h1: "Entradas para tus conciertos, con preventa y difusión medida",
+        title: "Ticketera para conciertos y tocatas en Chile · 0% de comisión | AI Tickets",
+        description:
+            "Vende entradas para tus conciertos, tocatas y giras: preventa por tandas con cupo, un link por banda del cartel, check-in con QR aunque no haya señal y cobro por fecha. 0% de comisión para bandas, productoras y salas.",
+        eyebrow: "Para bandas, solistas, productoras y salas",
+        h1: "Tú pon la música. La boletería corre por nuestra cuenta.",
         intro:
-            "En música la venta se juega en las primeras horas y en la última semana. AI Tickets te ayuda a armar la preventa, ver qué canal de difusión vende y llegar a la puerta con todo ordenado.",
-        highlights: ["Preventa con cupo limitado", "Links para cada banda, medio o campaña", "Check-in con QR aunque no haya señal"],
-        sections: [
-            {
-                heading: "Preventa que se agota de verdad",
-                items: [
-                    { title: "Tipos de entrada con cupo", text: "Crea una entrada \"Preventa\" con menos unidades y menor precio; cuando se agota, queda la general." },
-                    { title: "Códigos con fecha límite", text: "Descuentos por porcentaje o monto, con usos máximos, límite por comprador y fecha de término." },
-                    { title: "Varias fechas", text: "¿Gira o doble fecha? Hasta 60 funciones por evento, cada una con sus entradas." },
-                ],
-            },
-            {
-                heading: "Mide la difusión",
-                body:
-                    "Arma un link con seguimiento para cada banda del cartel, medio o campaña pagada. En las métricas del evento ves visitas, conversión y ventas por canal, y también desde qué ciudades te visitan y a qué hora se vende más.",
-            },
-            {
-                heading: "Posts con IA para cada anuncio",
-                body: "Genera textos e imágenes para Instagram y Facebook a partir de tu evento y publícalos desde el panel cuando conectes tus cuentas.",
-            },
-        ],
+            "En música la venta se juega en las primeras horas de la preventa y en la última semana. AI Tickets te ayuda a armar las tandas, ver qué banda o canal vende y llegar a la puerta con todo ordenado.",
+        highlights: ["Preventa por tandas con cupo", "Un link para cada banda, medio o campaña", "Check-in con QR aunque no haya señal"],
+        // La página es propia (src/pages/ticketera-musica-en-vivo.astro, SPEC_landing_musica): las secciones viven en
+        // src/components/landing/musica y las preguntas en src/data/musicaFaq.ts (que toma de aquí la de zonas). Las de
+        // cobro por fecha y costo que tenía la landing genérica quedan cubiertas por las de PRODUCER_FAQ.
+        sections: [],
         faq: [
             {
                 q: "¿Puedo vender entradas de distintas zonas o precios?",
                 a: "Sí, con tipos de entrada distintos, cada uno con su precio y su cupo. AI Tickets no tiene mapa de asientos numerados.",
             },
-            { q: "¿Cómo cobro si hago varias fechas?", a: payout, terms: true },
-            {
-                q: "¿Hay costo por usar la plataforma?",
-                a: `No hay mensualidad ni costo por publicar. El comprador paga un cargo por servicio de ${fee} por entrada pagada.`,
-            },
         ],
         demo: { url: "/eventos/evento-demo-concierto", label: "Ver un concierto de ejemplo" },
         cta: { label: "Publicar mi próximo concierto", campaign: "vertical_musica" },
         related: ["ventas-por-promotor", "academias", "guias/como-hacer-una-preventa"],
+        dedicated: true,
     },
     {
         slug: "ticketera-talleres",

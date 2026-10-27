@@ -4,27 +4,16 @@
 // en la cuenta publicitaria de la productora. Segmentar por intereses ("Comedia y stand-up") no existe: va con "Pronto".
 // Es una demostración: no se crea nada y no se muestran alcances ni resultados estimados. Al impulsar se mide
 // su_ads_demo { budget, days }. En mobile: un solo slider (presupuesto) y "Impulsar N días · total".
-import { computed, nextTick, ref } from 'vue'
 import SoonBadge from '../../ui/SoonBadge.vue'
 import { trackEvent } from '../../../composables/useGoogleAnalytics.js'
+import { useAdsDemo } from '../../../composables/useAdsDemo.js'
 import { formatCLP } from '../producerLanding.js'
 
-const budget = ref(10000)
-const days = ref(3)
-const launched = ref(false)
-const total = computed(() => budget.value * days.value)
-const daysLabel = computed(() => `${days.value} ${days.value === 1 ? 'día' : 'días'}`)
-
-// El botón con foco se desmonta al cambiar de estado: el foco pasa al botón del otro estado (no cae al <body>)
-const launchButton = ref(null)
-const pauseButton = ref(null)
-async function setLaunched(value) {
-  launched.value = value
-  if (value) trackEvent('su_ads_demo', { budget: budget.value, days: days.value })
-  await nextTick()
-  const next = value ? pauseButton.value : launchButton.value
-  next?.focus()
-}
+const { budget, days, launched, total, daysLabel, launchButton, pauseButton, setLaunched } = useAdsDemo({
+  budget: 10000,
+  days: 3,
+  onLaunch: (params) => trackEvent('su_ads_demo', params),
+})
 </script>
 
 <template>
