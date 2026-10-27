@@ -20,6 +20,8 @@ export type EventModuleContext = {
     functionCount: number;
     ticketTypeCount: number;
     phase: EventPhase;
+    // Personas en la lista de espera (aitickets_event_waitlist)
+    waitlistCount: number;
     // Hay entradas emitidas (vendidas o cortesías): sin asistentes no hay mensajes ni reseñas que ver
     hasAttendees: boolean;
     // Evento masivo (Ley 21.659) o con documentos exigidos por AI Tickets (events.is_massive, requires_documents)
@@ -57,6 +59,14 @@ export const TABS: { id: EventTab; label: string }[] = [
 // Orden de la lista = orden dentro de cada pestaña
 export const EVENT_MODULES: EventModule[] = [
     { id: "tickets", title: "Tipos de entrada", description: "Precios, cupos y entradas emitidas.", tab: "ventas", core: true },
+    // Solo si alguien se anotó: sin anotados no hay nada que ver
+    {
+        id: "waitlist",
+        title: "Lista de espera",
+        description: "Quiénes pidieron aviso y si ya se les avisó.",
+        tab: "ventas",
+        when: (ctx) => ctx.waitlistCount > 0,
+    },
     { id: "courtesy", title: "Entradas de cortesía", description: "Emite entradas sin costo con su QR.", tab: "ventas" },
     { id: "discounts", title: "Códigos de descuento", description: "Descuentos del evento y de la organización.", tab: "ventas" },
     // En borrador el link público da error: ahí se comparte con los links de vista previa

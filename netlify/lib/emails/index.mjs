@@ -24,4 +24,5 @@ export {
   STAR_PLACEHOLDERS,
 } from './reviews.mjs'
 export { renderWeeklyReportEmail, weeklyReportSubject } from './weekly-report.mjs'
+export { renderWaitlistOpenEmail } from './waitlist.mjs'
 export { logoUrl, siteUrl } from './layout.mjs'

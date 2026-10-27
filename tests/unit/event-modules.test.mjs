@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 const { eventProfile, eventPhase, normalizeAddedModules, resolveModules, panelTabs, defaultTab, isAddableModule } = await import('../../src/lib/eventModules.ts')
 
-const ctx = (over = {}) => ({ profile: 'general', status: 'published', functionCount: 1, ticketTypeCount: 1, phase: 'before', hasAttendees: true, isMassive: false, ...over })
+const ctx = (over = {}) => ({ profile: 'general', status: 'published', functionCount: 1, ticketTypeCount: 1, phase: 'before', waitlistCount: 0, hasAttendees: true, isMassive: false, ...over })
 const byId = (mods) => Object.fromEntries(mods.map((m) => [m.id, m]))
 
 describe('eventProfile', () => {
@@ -46,6 +46,10 @@ describe('resolveModules', () => {
     expect(neverSold.community).toBeUndefined()
     expect(neverSold.reviews).toBeUndefined()
     expect(byId(resolveModules(ctx({ status: 'draft', phase: 'after' }))).reviews.enabled).toBe(true)
+  })
+  it('la lista de espera aparece solo si alguien se anotó', () => {
+    expect(byId(resolveModules(ctx())).waitlist).toBeUndefined()
+    expect(byId(resolveModules(ctx({ waitlistCount: 3 }))).waitlist).toMatchObject({ tab: 'ventas', enabled: true })
   })
   it('las reseñas solo aparecen cuando el evento terminó', () => {
     expect(byId(resolveModules(ctx()))['reviews']).toBeUndefined()

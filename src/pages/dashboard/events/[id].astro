@@ -12,9 +12,11 @@ import EventReviewsManager from "../../../components/dashboard/EventReviewsManag
 import EventCommunityManager from "../../../components/dashboard/EventCommunityManager.vue";
 import TrackingLinkBuilder from "../../../components/dashboard/TrackingLinkBuilder.vue";
 import SocialSeriesCard from "../../../components/dashboard/SocialSeriesCard.vue";
+import EventWaitlistManager from "../../../components/dashboard/EventWaitlistManager.vue";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { EVENT_MANAGER_ROLES, ORG_ADMIN_ROLES, hasRole } from "../../../lib/supabaseServer";
 import { adsEnabled } from "../../../../netlify/lib/zernio-ads.mjs";
+import { WAITLIST_TABLE } from "../../../../netlify/lib/waitlist.mjs";
 import { requireDashboardSession } from "../_lib/guard";
 import { identityApproved, loadOrgIdentity, ticketsRequireIdentity, IDENTITY_FREE_PAID_CAPACITY } from "../../../lib/producerIdentity";
 import { canAccessEventByStaff } from "../../../../netlify/lib/event-staff.mjs";
@@ -106,6 +108,9 @@ const publishBlockers = [
     !identityOk ? `Verifica tu identidad en Configuración > Verificación de identidad: es obligatorio para vender más de ${IDENTITY_FREE_PAID_CAPACITY} entradas pagadas.` : null,
 ].filter(Boolean);
 
+// Lista de espera (sin la tabla, 0)
+const { count: waitlistCount } = await supabaseAdmin.from(WAITLIST_TABLE).select("id", { count: "exact", head: true }).eq("event_id", event.id);
+
 // Módulos del panel por perfil (categoría), condiciones del evento y los que el productor agregó: src/lib/eventModules.ts
 const categoryTag = event.event_tags?.[0]?.category_tags;
 const moduleCtx = {
@@ -114,6 +119,7 @@ const moduleCtx = {
     functionCount: event.event_dates?.length || 0,
     ticketTypeCount: activeTickets.length,
     phase: eventPhase(event.start_date, event.end_date),
+    waitlistCount: waitlistCount || 0,
     hasAttendees: Object.values(ticketSalesMap).some((n) => Number(n) > 0),
     isMassive: event.is_massive === true || event.requires_documents === true,
 };
@@ -317,6 +323,7 @@ const canCreateAds = adsEnabled() && hasRole(dbUser, ORG_ADMIN_ROLES);
                             </div>
                         </section>
                     )}
+                    {m.id === "waitlist" && <EventWaitlistManager client:visible eventId={Number(event.id)} />}
                     {m.id === "courtesy" && <CourtesyTicketsForm client:visible eventId={Number(event.id)} tickets={courtesyTickets} />}
                     {/* Códigos de descuento (del evento + los de toda la organización) */}
                     {m.id === "discounts" && <DiscountCodesManager client:visible eventId={Number(event.id)} />}
