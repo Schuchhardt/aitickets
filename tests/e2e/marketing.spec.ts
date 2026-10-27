@@ -69,3 +69,13 @@ test("los términos dicen que en una cancelación se devuelve el cargo con su IV
   await page.goto("/precios");
   await expect(page.locator("body")).not.toContainText("IVA del cargo no se devuelve");
 });
+
+test("la portada muestra los ocho nichos y cada card lleva a su landing", async ({ page }) => {
+  await page.goto("/");
+  const cards = page.locator('[data-cta="niche"]');
+  await expect(cards).toHaveCount(8);
+  for (const href of ["/ticketera-stand-up", "/ticketera-teatro", "/ticketera-musica-en-vivo", "/ticketera-discotecas", "/ticketera-fiestas", "/ticketera-talleres", "/ticketera-seminarios", "/academias"]) {
+    await expect(page.locator(`[data-cta="niche"][href="${href}"]`)).toHaveCount(1);
+  }
+  await expect(page.locator("#precios")).toBeVisible();
+});

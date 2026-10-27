@@ -1,0 +1,41 @@
+---
+// Foto de la portada: <picture> con AVIF/WebP a varios anchos y ancho/alto reservados (CLS). Lazy por defecto: el LCP
+// de la portada es el H1, no una foto.
+interface Props {
+  photo: { src: string; width: number; height: number; sources: { type: string; srcset: string }[] };
+  /** Vacío = decorativa */
+  alt?: string;
+  /** Ancho que ocupa la foto en pantalla (atributo sizes) */
+  sizes: string;
+  class?: string;
+  /** object-position */
+  position?: string;
+}
+const { photo, alt = "", sizes, class: className, position } = Astro.props;
+---
+
+<picture class:list={["hp", className]}>
+  {photo.sources.map((source) => <source type={source.type} srcset={source.srcset} sizes={sizes} />)}
+  <img
+    src={photo.src}
+    alt={alt}
+    width={photo.width}
+    height={photo.height}
+    loading="lazy"
+    decoding="async"
+    style={position ? `object-position: ${position}` : undefined}
+  />
+</picture>
+
+<style>
+  .hp {
+    display: block;
+    overflow: hidden;
+  }
+  .hp img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+</style>

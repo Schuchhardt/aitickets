@@ -1,0 +1,87 @@
+---
+// Cinta con los nombres de los nichos que pasa de lado a lado, como la marquesina de una sala. Decorativa: los nichos
+// con enlace están en "Elige tu escenario". Quieta con "reducir movimiento".
+import { HOME_NICHES } from "./homeLanding.js";
+
+const names = HOME_NICHES.map((niche) => niche.name);
+---
+
+<div class="hm" aria-hidden="true">
+  <div class="hm-track">
+    {[0, 1].map(() => (
+      <p class="hm-row">
+        {names.map((name) => (
+          <span class="hm-item">
+            {name}
+            <span class="hm-star">✦</span>
+          </span>
+        ))}
+      </p>
+    ))}
+  </div>
+</div>
+
+<style>
+  .hm {
+    overflow: hidden;
+    background: var(--brand-ink);
+    color: #fff;
+    padding-block: 18px;
+    border-block: 1px solid #1f1f22;
+  }
+  .hm-track {
+    display: flex;
+    width: max-content;
+  }
+  .hm-row {
+    display: flex;
+    flex-shrink: 0;
+  }
+  .hm-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 28px;
+    padding-right: 28px;
+    font-family: "Unbounded", system-ui, sans-serif;
+    font-weight: 700;
+    font-size: 22px;
+    line-height: 28px;
+    letter-spacing: -0.01em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .hm-item:nth-child(odd) {
+    color: transparent;
+    -webkit-text-stroke: 1px rgba(255, 255, 255, 0.7);
+  }
+  .hm-star {
+    color: var(--brand-lime);
+    -webkit-text-stroke: 0;
+    font-size: 16px;
+  }
+  @media (min-width: 1024px) {
+    .hm {
+      padding-block: 24px;
+    }
+    .hm-item {
+      font-size: 32px;
+      line-height: 38px;
+      gap: 36px;
+      padding-right: 36px;
+    }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    :global(.lp-motion) .hm-track {
+      animation: hm-run 40s linear infinite;
+      will-change: transform;
+    }
+    .hm:hover .hm-track {
+      animation-play-state: paused;
+    }
+  }
+  @keyframes hm-run {
+    to {
+      transform: translateX(-50%);
+    }
+  }
+</style>

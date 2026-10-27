@@ -1,0 +1,127 @@
+---
+// Precio de la portada (ancla #precios del header): un ejemplo fijo de $10.000 con las dos formas de cobrar el cargo,
+// calculado con la misma función que el checkout (computeFeeSplit), y la calculadora de /organizadores para probar con
+// tus números. Cómo se absorbe el cargo, desde producerFaq.ts.
+import PriceCalculator from "../PriceCalculator.vue";
+import { computeFeeSplit, IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL } from "../../../../netlify/lib/fees.mjs";
+import { ABSORB_FEE_ACTIVATION } from "../../../data/producerFaq";
+import { formatCLP } from "../producerLanding.js";
+
+const PRICE = 10000;
+const buyer = computeFeeSplit(PRICE);
+const absorbed = computeFeeSplit(PRICE, { absorbed: true });
+---
+
+<section id="precios" class="lp-section lp-surface hp-price" aria-labelledby="precios-title" data-lp-section="pricing">
+  <div class="lp-wrap" data-lp-reveal>
+    <div class="pr-head">
+      <p class="lp-eyebrow" data-lp-step>Precio</p>
+      <h2 id="precios-title" class="lp-h2 pr-title" data-lp-step>Sin mensualidad. Se cobra solo cuando vendes.</h2>
+      <p class="lp-lead pr-lead" data-lp-step>
+        Para ti, 0% de comisión. El comprador paga un cargo por servicio de {SERVICE_FEE_PERCENT_LABEL} sobre el valor de la
+        entrada, más IVA ({IVA_PERCENT_LABEL}) sobre ese cargo. Si prefieres mostrar un precio final, lo absorbes tú, por
+        evento. {ABSORB_FEE_ACTIVATION} Las entradas gratis no pagan cargo.
+      </p>
+    </div>
+
+    <div class="pr-examples" data-lp-step>
+      <div class="pr-ex pr-ex-dark">
+        <p class="pr-ex-kicker">Entrada de {formatCLP(PRICE)} · el comprador paga el cargo</p>
+        <p class="pr-ex-line">Paga el comprador <strong class="ev-tabular">{formatCLP(buyer.total)}</strong></p>
+        <p class="pr-ex-big ev-tabular">Recibes {formatCLP(buyer.producerNet)}</p>
+      </div>
+      <div class="pr-ex">
+        <p class="pr-ex-kicker">Entrada de {formatCLP(PRICE)} · absorbes el cargo</p>
+        <p class="pr-ex-line">Paga el comprador <strong class="ev-tabular">{formatCLP(absorbed.total)}</strong></p>
+        <p class="pr-ex-big ev-tabular">Recibes {formatCLP(absorbed.producerNet)}</p>
+      </div>
+    </div>
+
+    <div class="pr-calc" data-lp-step>
+      <PriceCalculator client:visible />
+    </div>
+    <p class="pr-more" data-lp-step><a href="/precios" class="lp-link" data-cta="pricing" data-section="pricing">Ver precios en detalle <span aria-hidden="true">→</span></a></p>
+  </div>
+</section>
+
+<style>
+  .pr-head {
+    max-width: 720px;
+  }
+  .pr-title {
+    margin-top: 10px;
+  }
+  .pr-lead {
+    margin-top: 12px;
+  }
+  .pr-examples {
+    margin-top: 28px;
+    display: grid;
+    gap: 12px;
+  }
+  .pr-ex {
+    padding: 18px 20px;
+    border-radius: 20px;
+    background: var(--surface-0);
+    border: 1px solid var(--border);
+  }
+  .pr-ex-dark {
+    background: var(--brand-ink);
+    color: #fff;
+    border-color: transparent;
+  }
+  .pr-ex-kicker {
+    font-size: 13px;
+    color: var(--text-3);
+  }
+  .pr-ex-dark .pr-ex-kicker {
+    color: var(--lp-on-dark-3);
+  }
+  .pr-ex-line {
+    margin-top: 6px;
+    font-size: 15px;
+  }
+  .pr-ex-big {
+    margin-top: 4px;
+    font-family: "Unbounded", system-ui, sans-serif;
+    font-weight: 700;
+    font-size: 22px;
+    line-height: 28px;
+  }
+  .pr-ex-dark .pr-ex-big {
+    color: var(--brand-lime);
+  }
+  .pr-calc {
+    margin-top: 20px;
+    /* Reserva el alto de la calculadora antes de hidratar (CLS) */
+    min-height: 420px;
+  }
+  .pr-more {
+    margin-top: 24px;
+  }
+  @media (min-width: 768px) {
+    .pr-examples {
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+  }
+  @media (min-width: 900px) {
+    .pr-calc {
+      min-height: 360px;
+    }
+  }
+  @media (min-width: 1024px) {
+    .pr-title {
+      margin-top: 14px;
+    }
+    .pr-lead {
+      margin-top: 18px;
+    }
+    .pr-examples {
+      margin-top: 44px;
+    }
+    .pr-calc {
+      margin-top: 24px;
+    }
+  }
+</style>

@@ -1,0 +1,126 @@
+---
+// Cierre de la portada (fondo oscuro): un abanico de fotos de cinco nichos que se abre al entrar y la pregunta de
+// siempre. data-final-cta: la barra CTA mobile se esconde cuando entra.
+import HomePhoto from "./HomePhoto.astro";
+import { HOME_CLOSING_PHOTOS } from "./homeLanding.js";
+import { DEMO_CALL_URL, DEMO_EVENT_URL, publishUrl, whatsappUrl } from "../links.js";
+---
+
+<section class="lp-section lp-dark hc" aria-labelledby="home-closing-title" data-final-cta data-lp-section="closing">
+  <div class="lp-wrap" data-lp-reveal>
+    <div class="hc-fan" aria-hidden="true">
+      {HOME_CLOSING_PHOTOS.map((photo, i) => (
+        <span class="hc-card" style={`--hc-i: ${i - 2}`}>
+          <HomePhoto photo={photo} sizes="160px" />
+        </span>
+      ))}
+    </div>
+    <h2 id="home-closing-title" class="lp-h2 hc-title" data-lp-step>¿Cuándo es tu próxima función?</h2>
+    <p class="hc-lead" data-lp-step>Stand-up, obra, tocata, fiesta o seminario: publícala hoy. Crear tu cuenta es gratis y no hay costos fijos.</p>
+    <div class="hc-ctas" data-lp-step>
+      <a href={publishUrl("home_final")} class="ev-btn lp-btn-lime lp-btn-lg" data-cta="publish" data-section="final_cta">
+        Publicar mi próxima función <span aria-hidden="true">→</span>
+      </a>
+      <a href={whatsappUrl()} class="ev-btn lp-btn-ghost lp-btn-lg" target="_blank" rel="noopener noreferrer" data-cta="whatsapp" data-section="final_cta">
+        Hablar por WhatsApp
+      </a>
+    </div>
+    <p class="hc-help" data-lp-step>
+      ¿Prefieres verlo antes?
+      <a href={DEMO_CALL_URL} class="lp-inline-link" target="_blank" rel="noopener noreferrer" data-cta="demo_call" data-section="final_cta">Agenda una demo de 15 min</a>
+      ·
+      <a href={DEMO_EVENT_URL} class="lp-inline-link" data-cta="demo_event" data-section="final_cta">Mira un evento de ejemplo</a>
+    </p>
+    <p class="hc-guarantees" data-lp-step>Sin mensualidad · Sin permanencia · Sin costos fijos</p>
+  </div>
+</section>
+
+<style>
+  .hc {
+    text-align: center;
+    overflow: hidden;
+  }
+  .hc-fan {
+    position: relative;
+    height: 170px;
+    margin: 0 auto 36px;
+    max-width: 520px;
+  }
+  .hc-card {
+    position: absolute;
+    left: 50%;
+    top: 10px;
+    width: 104px;
+    margin-left: -52px;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 3px solid #fff;
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.5);
+    transform: translateX(calc(var(--hc-i) * 64px)) rotate(calc(var(--hc-i) * 7deg));
+    z-index: calc(10 - var(--hc-i) * var(--hc-i));
+  }
+  .hc-card :global(.hp) {
+    aspect-ratio: 4 / 5;
+  }
+  .hc-title {
+    margin-inline: auto;
+    max-width: 18ch;
+  }
+  .hc-lead {
+    margin: 14px auto 0;
+    max-width: 36rem;
+    color: var(--lp-on-dark-2);
+    font-size: 17px;
+    line-height: 26px;
+  }
+  .hc-ctas {
+    margin-top: 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  .hc-ctas .ev-btn {
+    width: 100%;
+    max-width: 360px;
+  }
+  .hc-help {
+    margin-top: 20px;
+    color: var(--lp-on-dark-2);
+    font-size: 14px;
+  }
+  .hc-guarantees {
+    margin-top: 14px;
+    color: var(--lp-on-dark-3);
+    font-size: 13px;
+  }
+  @media (min-width: 640px) {
+    .hc-ctas {
+      flex-direction: row;
+      justify-content: center;
+    }
+    .hc-ctas .ev-btn {
+      width: auto;
+    }
+  }
+  @media (min-width: 1024px) {
+    .hc-fan {
+      height: 220px;
+    }
+    .hc-card {
+      width: 140px;
+      margin-left: -70px;
+      transform: translateX(calc(var(--hc-i) * 92px)) rotate(calc(var(--hc-i) * 7deg));
+    }
+  }
+  /* Al entrar, el abanico se abre desde el centro */
+  :global(.lp-motion) [data-lp-reveal]:not(:global(.is-in)) .hc-card {
+    transform: translateX(0) rotate(0deg) scale(0.9);
+    opacity: 0;
+  }
+  :global(.lp-motion) :global(.is-in) .hc-card {
+    transition:
+      transform 900ms var(--ease-out, ease-out) 120ms,
+      opacity 400ms ease-out 120ms;
+  }
+</style>

@@ -1,0 +1,366 @@
+---
+// Hero de la portada: la promesa para cualquier tipo de evento, una palabra que rota por cada nicho ("Para tu
+// stand-up / obra de teatro / …") y un mosaico de fotos de todos los nichos que se desliza despacio. El H1 se pinta sin
+// fundido (es el LCP); el mosaico es decorativo y lazy. Sin JS o con "reducir movimiento", la palabra queda fija en el
+// primer nicho y el mosaico quieto.
+import HomePhoto from "./HomePhoto.astro";
+import { HOME_MOSAIC, HOME_ROTATING_WORDS } from "./homeLanding.js";
+import { formatCLP } from "../producerLanding.js";
+import { publishUrl, whatsappUrl } from "../links.js";
+import { SERVICE_FEE_PERCENT_LABEL } from "../../../../netlify/lib/fees.mjs";
+import { PAYOUT_RELEASE_HOURS } from "../../../../netlify/lib/legal.mjs";
+
+const words = HOME_ROTATING_WORDS;
+---
+
+<section class="hh lp-wrap" aria-labelledby="home-title" data-lp-section="hero">
+  <div class="hh-copy">
+    <p class="lp-eyebrow">Ticketera para productores · Sin mensualidad · 0% de comisión para ti</p>
+    <h1 id="home-title" class="lp-h1 hh-title">Tu próxima función, sea cual sea el escenario.</h1>
+    <p class="hh-rot-line" aria-hidden="true">
+      <span class="hh-rot-pre">Para tu</span>
+      <span class="hh-rot" style={`--hh-n: ${words.length}`}>
+        {words.map((word, i) => <span class="hh-word" style={`--hh-i: ${i}`}>{word}</span>)}
+      </span>
+    </p>
+    <p class="lp-sr-only">Para stand-up, teatro, música en vivo, clubs, fiestas, talleres, seminarios y academias.</p>
+    <p class="hh-lead">
+      Publica tus fechas, vende con un link por promotor, abre la puerta con QR y cobra lo de cada función: queda
+      disponible {PAYOUT_RELEASE_HOURS} horas después de que termina.
+    </p>
+    <div class="hh-ctas" data-hero-cta>
+      <a href={publishUrl("hero")} class="ev-btn ev-btn-primary lp-btn-lg" data-cta="publish" data-section="hero">
+        Publicar mi próxima función <span aria-hidden="true">→</span>
+      </a>
+      <a href="#escenarios" class="ev-btn ev-btn-secondary lp-btn-lg" data-cta="niches" data-section="hero">
+        Elige tu tipo de evento <span aria-hidden="true">↓</span>
+      </a>
+    </div>
+    <p class="lp-small hh-micro">
+      Crear tu cuenta es gratis. El comprador paga un cargo de {SERVICE_FEE_PERCENT_LABEL} + IVA, o lo absorbes tú.
+      <a href={whatsappUrl()} class="lp-inline-link" target="_blank" rel="noopener noreferrer" data-cta="whatsapp" data-section="hero">¿Hablamos por WhatsApp?</a>
+    </p>
+  </div>
+
+  <div class="hh-stage" aria-hidden="true">
+    <div class="hh-mosaic">
+      {HOME_MOSAIC.map((column, c) => (
+        <div class:list={["hh-col", `hh-col-${c}`]}>
+          <div class="hh-track">
+            {[0, 1].map((copy) =>
+              column.map((tile) => (
+                <figure class="hh-tile" data-copy={copy}>
+                  <HomePhoto photo={tile.photo} sizes="(min-width: 1024px) 180px, 34vw" />
+                  <figcaption>{tile.label}</figcaption>
+                </figure>
+              )),
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+    <div class="hh-float hh-float-sold">
+      <p class="hh-float-kicker">Viernes · 21:00</p>
+      <p class="hh-float-main ev-tabular">142 de 200 vendidas</p>
+      <div class="lp-bar-track hh-float-track"><div class="lp-bar" style="--lp-scale: 0.71"></div></div>
+    </div>
+    <div class="hh-float hh-float-door">
+      <span class="hh-float-check">✓</span>
+      <div>
+        <p class="hh-float-kicker">Check-in · Puerta</p>
+        <p class="hh-float-main">Entrada válida</p>
+      </div>
+    </div>
+    <div class="hh-float hh-float-paid">
+      <p class="hh-float-kicker">Pago disponible · función del jueves</p>
+      <p class="hh-float-main ev-tabular">{formatCLP(1296000)}</p>
+    </div>
+  </div>
+  <p class="lp-small hh-note">Fotos y datos de ejemplo</p>
+</section>
+
+<style>
+  .hh {
+    display: grid;
+    gap: 28px;
+    padding-top: 28px;
+    padding-bottom: 32px;
+  }
+  .hh-title {
+    margin-top: 14px;
+    max-width: 14ch;
+  }
+  .hh-rot-line {
+    margin-top: 14px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 0.35em;
+    font-family: "Unbounded", system-ui, sans-serif;
+    font-weight: 700;
+    font-size: 22px;
+    line-height: 30px;
+    letter-spacing: -0.01em;
+  }
+  .hh-rot-pre {
+    color: var(--text-2);
+  }
+  /* Todas las palabras en la misma celda: el alto queda fijo y no salta nada al rotar (CLS) */
+  .hh-rot {
+    display: inline-grid;
+    color: var(--lp-lime-ink);
+  }
+  .hh-word {
+    grid-area: 1 / 1;
+    white-space: nowrap;
+  }
+  .hh-word:not(:first-child) {
+    visibility: hidden;
+  }
+  .hh-lead {
+    margin-top: 16px;
+    max-width: 34rem;
+    font-size: 17px;
+    line-height: 26px;
+    color: var(--text-2);
+  }
+  .hh-ctas {
+    margin-top: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .hh-micro {
+    margin-top: 14px;
+    max-width: 34rem;
+  }
+
+  /* ---------- Mosaico ---------- */
+  .hh-stage {
+    position: relative;
+    height: 360px;
+  }
+  .hh-mosaic {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    overflow: hidden;
+    border-radius: 24px;
+    -webkit-mask-image: linear-gradient(to bottom, transparent, #000 12%, #000 88%, transparent);
+    mask-image: linear-gradient(to bottom, transparent, #000 12%, #000 88%, transparent);
+  }
+  .hh-col {
+    overflow: hidden;
+  }
+  .hh-col-1 .hh-track {
+    margin-top: -60px;
+  }
+  .hh-track {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .hh-tile {
+    position: relative;
+    margin: 0;
+    aspect-ratio: 4 / 5;
+    border-radius: 16px;
+    overflow: hidden;
+    background: var(--surface-2);
+  }
+  .hh-tile :global(.hp) {
+    width: 100%;
+    height: 100%;
+  }
+  .hh-tile figcaption {
+    position: absolute;
+    left: 8px;
+    bottom: 8px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: rgba(10, 10, 11, 0.72);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+  }
+
+  /* Cards flotantes: lo que pasa detrás de cada foto */
+  .hh-float {
+    position: absolute;
+    z-index: 2;
+    padding: 10px 14px;
+    border-radius: 16px;
+    background: var(--surface-0);
+    border: 1px solid var(--border);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 16px 40px rgba(0, 0, 0, 0.16);
+    font-size: 12px;
+  }
+  .hh-float-kicker {
+    color: var(--text-3);
+    font-size: 11px;
+    line-height: 16px;
+  }
+  .hh-float-main {
+    font-weight: 700;
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--text-1);
+  }
+  .hh-float-sold {
+    left: -4px;
+    top: 34px;
+    width: 196px;
+  }
+  .hh-float-track {
+    margin-top: 6px;
+    height: 6px;
+  }
+  .hh-float-door {
+    right: -4px;
+    top: 46%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .hh-float-check {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--brand-lime);
+    color: var(--brand-ink);
+    font-weight: 800;
+  }
+  .hh-float-paid {
+    left: 8%;
+    bottom: 110px;
+  }
+  .hh-note {
+    margin-top: -16px;
+    text-align: right;
+  }
+
+  @media (min-width: 640px) {
+    .hh-ctas {
+      flex-direction: row;
+      flex-wrap: wrap;
+    }
+  }
+  @media (min-width: 768px) {
+    .hh-rot-line {
+      font-size: 26px;
+      line-height: 34px;
+    }
+    .hh-stage {
+      height: 480px;
+    }
+  }
+  @media (min-width: 1024px) {
+    .hh {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      align-items: center;
+      gap: 56px;
+      padding-top: 48px;
+      padding-bottom: 56px;
+    }
+    .hh-rot-line {
+      font-size: 30px;
+      line-height: 38px;
+    }
+    .hh-lead {
+      font-size: 18px;
+      line-height: 28px;
+    }
+    .hh-stage {
+      height: 600px;
+    }
+    .hh-float-sold {
+      left: -28px;
+    }
+    .hh-float-door {
+      right: -24px;
+    }
+    .hh-note {
+      grid-column: 2;
+      margin-top: -40px;
+    }
+  }
+
+  /* ---------- Movimiento (solo sin "reducir movimiento") ---------- */
+  @media (prefers-reduced-motion: no-preference) {
+    /* La palabra rota: cada una se ve 2,4 s en un ciclo de 2,4 s × n */
+    :global(.lp-motion) .hh-word {
+      visibility: visible;
+      opacity: 0;
+      animation: hh-word calc(var(--hh-n) * 2.4s) var(--ease-out, ease-out) calc(var(--hh-i) * 2.4s) infinite;
+    }
+    /* El mosaico baja y sube despacio; la copia duplicada hace el loop sin corte */
+    :global(.lp-motion) .hh-track {
+      animation: hh-scroll 48s linear infinite;
+      will-change: transform;
+    }
+    :global(.lp-motion) .hh-col-1 .hh-track {
+      animation-direction: reverse;
+      animation-duration: 56s;
+    }
+    :global(.lp-motion) .hh-col-2 .hh-track {
+      animation-duration: 44s;
+    }
+    :global(.lp-motion) .hh-float {
+      animation:
+        hh-in 600ms var(--ease-out, ease-out) both,
+        hh-bob 6s ease-in-out 600ms infinite;
+    }
+    :global(.lp-motion) .hh-float-door {
+      animation-delay: 400ms, 1400ms;
+    }
+    :global(.lp-motion) .hh-float-paid {
+      animation-delay: 800ms, 2200ms;
+    }
+    :global(.lp-motion) .hh-float-sold .lp-bar {
+      animation: lp-grow-x 1200ms var(--ease-out, ease-out) 400ms both;
+    }
+    .hh-stage:hover .hh-track {
+      animation-play-state: paused;
+    }
+  }
+  /* Porcentajes para 8 palabras (HOME_ROTATING_WORDS): cada una tiene 12,5% del ciclo */
+  @keyframes hh-word {
+    0% {
+      opacity: 0;
+      transform: translateY(0.5em);
+    }
+    2%,
+    11% {
+      opacity: 1;
+      transform: none;
+    }
+    12.5%,
+    100% {
+      opacity: 0;
+      transform: translateY(-0.5em);
+    }
+  }
+  @keyframes hh-scroll {
+    to {
+      transform: translateY(calc(-50% - 5px));
+    }
+  }
+  @keyframes hh-in {
+    from {
+      opacity: 0;
+      transform: translateY(12px) scale(0.96);
+    }
+  }
+  @keyframes hh-bob {
+    50% {
+      transform: translateY(-6px);
+    }
+  }
+</style>

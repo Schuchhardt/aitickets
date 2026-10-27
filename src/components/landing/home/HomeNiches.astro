@@ -1,0 +1,188 @@
+---
+// "Elige tu escenario": una card por nicho, vestida con los colores de su landing y con la frase de su H1. En mobile es
+// un carrusel con scroll-snap (8 cards apiladas serían 8 pantallas); desde 768 px, una grilla. Cada card mide el clic
+// con data-cta="niche" y data-niche (HomeTracking.astro).
+import HomePhoto from "./HomePhoto.astro";
+import { HOME_NICHES } from "./homeLanding.js";
+---
+
+<section id="escenarios" class="lp-section hn" aria-labelledby="escenarios-title" data-lp-section="niches">
+  <div class="lp-wrap" data-lp-reveal>
+    <div class="hn-head">
+      <p class="lp-eyebrow" data-lp-step>Elige tu escenario</p>
+      <h2 id="escenarios-title" class="lp-h2 hn-title" data-lp-step>Una ticketera, ocho maneras de llenar la sala.</h2>
+      <p class="lp-lead hn-lead" data-lp-step>
+        Cada tipo de evento vende distinto. Por eso armamos una página para cada uno, con lo que de verdad le sirve.
+      </p>
+    </div>
+    <ul class="hn-grid" role="list">
+      {HOME_NICHES.map((niche) => (
+        <li data-lp-step>
+          <a
+            href={niche.href}
+            class="hn-card"
+            style={`--hn-bg: ${niche.bg}; --hn-fg: ${niche.fg}; --hn-accent: ${niche.accent}`}
+            data-cta="niche"
+            data-section="niches"
+            data-niche={niche.key}
+          >
+            <span class="hn-photo">
+              <HomePhoto photo={niche.photo} alt={niche.alt} sizes="(min-width: 1024px) 260px, (min-width: 768px) 45vw, 78vw" />
+            </span>
+            <span class="hn-body">
+              <span class="hn-name">{niche.name}</span>
+              <span class="hn-tagline">{niche.tagline}</span>
+              <span class="hn-text">{niche.text}</span>
+              <span class="hn-go">Ver la ticketera <span aria-hidden="true">→</span><span class="lp-sr-only"> para {niche.name.toLowerCase()}</span></span>
+            </span>
+          </a>
+        </li>
+      ))}
+    </ul>
+    <p class="lp-small hn-other" data-lp-step>
+      ¿Lo tuyo es otra cosa? Ferias, charlas, catas, tours: si tiene fecha y entradas, se vende igual.
+      <a href="/organizadores" class="lp-inline-link" data-cta="organizadores" data-section="niches">Mira todo lo que incluye</a>
+    </p>
+  </div>
+</section>
+
+<style>
+  .hn-head {
+    max-width: 720px;
+  }
+  .hn-title {
+    margin-top: 10px;
+  }
+  .hn-lead {
+    margin-top: 12px;
+  }
+  .hn-grid {
+    margin: 28px -16px 0;
+    padding: 4px 16px 12px;
+    list-style: none;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 78%;
+    gap: 14px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: 16px;
+    scrollbar-width: none;
+  }
+  .hn-grid::-webkit-scrollbar {
+    display: none;
+  }
+  .hn-grid > li {
+    scroll-snap-align: start;
+    display: flex;
+  }
+  .hn-card {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    border-radius: 22px;
+    overflow: hidden;
+    background: var(--hn-bg);
+    color: var(--hn-fg);
+    text-decoration: none;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+    transition:
+      transform var(--dur-3, 240ms) var(--ease-out, ease-out),
+      box-shadow var(--dur-3, 240ms) var(--ease-out, ease-out);
+  }
+  .hn-photo {
+    display: block;
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+  }
+  .hn-photo :global(.hp) {
+    width: 100%;
+    height: 100%;
+  }
+  .hn-photo :global(img) {
+    transition: transform 700ms var(--ease-out, ease-out);
+  }
+  .hn-body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 6px;
+    padding: 16px 18px 18px;
+  }
+  .hn-name {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--hn-accent);
+  }
+  .hn-tagline {
+    font-family: "Unbounded", system-ui, sans-serif;
+    font-weight: 700;
+    font-size: 20px;
+    line-height: 25px;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  .hn-text {
+    font-size: 14px;
+    line-height: 21px;
+    opacity: 0.86;
+  }
+  .hn-go {
+    margin-top: auto;
+    padding-top: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--hn-fg) 35%, transparent);
+    text-underline-offset: 4px;
+  }
+  .hn-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
+  }
+  .hn-card:hover .hn-photo :global(img) {
+    transform: scale(1.05);
+  }
+  .hn-card:hover .hn-go {
+    text-decoration-color: currentColor;
+  }
+  .hn-card:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px #fff, 0 0 0 6px var(--brand-lime);
+  }
+  .hn-other {
+    margin-top: 20px;
+  }
+
+  @media (min-width: 768px) {
+    .hn-grid {
+      margin: 36px 0 0;
+      padding: 0;
+      grid-auto-flow: row;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      overflow: visible;
+      gap: 18px;
+    }
+  }
+  @media (min-width: 1024px) {
+    .hn-title {
+      margin-top: 14px;
+    }
+    .hn-lead {
+      margin-top: 18px;
+    }
+    .hn-grid {
+      margin-top: 48px;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    /* Ritmo de afiche: las cards pares bajan un poco */
+    .hn-grid > li:nth-child(even) {
+      transform: translateY(28px);
+    }
+    .hn-other {
+      margin-top: 52px;
+    }
+  }
+</style>
