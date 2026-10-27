@@ -6,7 +6,7 @@
 //   1. when(ctx): condición del evento (estado, número de funciones, fase). Si no se cumple, el módulo no aplica y
 //      no aparece ni en "Más herramientas".
 //   2. profiles: perfiles (derivados de la categoría) donde viene activo por defecto. Sin profiles = todos.
-//   3. events.panel_modules: lo que el productor activó o apagó a mano en "Más herramientas" ({ id: boolean }).
+//   3. events.panel_modules: lo que el productor agregó ("Más herramientas" de cada pestaña) u ocultó ({ id: boolean }).
 // Los módulos core siempre se ven y no se pueden apagar.
 
 export type EventProfile = "noche" | "musica" | "funciones" | "formacion" | "general";
@@ -147,9 +147,10 @@ export function resolveModules(ctx: EventModuleContext, overrides: PanelModuleOv
     });
 }
 
-/** Pestañas con al menos un módulo visible, cada una con sus módulos en orden. */
-export function visibleTabs(modules: ResolvedModule[]): { id: EventTab; label: string; modules: ResolvedModule[] }[] {
-    return TABS.map((t) => ({ ...t, modules: modules.filter((m) => m.enabled && m.tab === t.id) })).filter((t) => t.modules.length > 0);
+/** Pestañas con al menos un módulo que aplica, cada una con sus módulos en orden (los apagados también: se muestran
+ *  en "Más herramientas" de esa pestaña para volver a agregarlos). */
+export function panelTabs(modules: ResolvedModule[]): { id: EventTab; label: string; modules: ResolvedModule[] }[] {
+    return TABS.map((t) => ({ ...t, modules: modules.filter((m) => m.tab === t.id) })).filter((t) => t.modules.length > 0);
 }
 
 /** Pestaña que se abre por defecto: después del evento importan los asistentes; antes, las ventas. */

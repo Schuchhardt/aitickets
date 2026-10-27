@@ -2,7 +2,7 @@
 // lo que el productor activa a mano y pestañas visibles.
 import { describe, expect, it } from 'vitest'
 
-const { eventProfile, eventPhase, normalizeOverrides, resolveModules, visibleTabs, defaultTab, isToggleableModule } = await import('../../src/lib/eventModules.ts')
+const { eventProfile, eventPhase, normalizeOverrides, resolveModules, panelTabs, defaultTab, isToggleableModule } = await import('../../src/lib/eventModules.ts')
 
 const ctx = (over = {}) => ({ profile: 'general', status: 'published', functionCount: 1, ticketTypeCount: 1, phase: 'before', ...over })
 const byId = (mods) => Object.fromEntries(mods.map((m) => [m.id, m]))
@@ -77,15 +77,15 @@ describe('normalizeOverrides', () => {
 })
 
 describe('pestañas', () => {
-  it('omite pestañas vacías y abre ventas antes y asistentes después', () => {
-    const tabs = visibleTabs(resolveModules(ctx()))
+  it('omite pestañas sin módulos y abre ventas antes y asistentes después', () => {
+    const tabs = panelTabs(resolveModules(ctx()))
     expect(tabs.map((t) => t.id)).toEqual(['ventas', 'difusion', 'pagina', 'despues'])
     expect(defaultTab(ctx(), tabs)).toBe('ventas')
     expect(defaultTab(ctx({ phase: 'after' }), tabs)).toBe('despues')
   })
-  it('si se apaga todo lo de una pestaña, desaparece', () => {
-    const tabs = visibleTabs(resolveModules(ctx(), { community: false, reviews: false, gallery: false }))
-    expect(tabs.map((t) => t.id)).not.toContain('despues')
-    expect(defaultTab(ctx({ phase: 'after' }), tabs)).toBe('ventas')
+  it('una pestaña con todo oculto se mantiene para volver a agregar sus herramientas', () => {
+    const tabs = panelTabs(resolveModules(ctx(), { community: false, reviews: false, gallery: false }))
+    const after = tabs.find((t) => t.id === 'despues')
+    expect(after.modules.map((m) => [m.id, m.enabled])).toEqual([['community', false], ['reviews', false], ['gallery', false]])
   })
 })

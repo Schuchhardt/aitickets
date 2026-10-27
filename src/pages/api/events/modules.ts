@@ -16,18 +16,31 @@ export const POST: APIRoute = async (context) => {
     if (!isToggleableModule(moduleId)) return jsonResponse({ message: "Herramienta no válida" }, 400);
     if (body.enabled !== null && typeof body.enabled !== "boolean") return jsonResponse({ message: "Valor no válido" }, 400);
 
-    const event = await getOwnedEvent<{ id: number; panel_modules: unknown }>(Number(body.eventId), dbUser.organization_id, "id, panel_modules", dbUser.id);
+    const event = await getOwnedEvent<{ id: number }>(Number(body.eventId), dbUser.organization_id, "id", dbUser.id);
     if (!event) return jsonResponse({ message: "Evento no encontrado" }, 404);
 
-    const overrides = normalizeOverrides(event.panel_modules);
+    // La columna llega con la migración 202610280300 (los deploy previews y local comparten la BD de producción)
+    const missingColumn = (error: any) => error?.code === "42703" || error?.code === "PGRST204";
+    const unavailable = () => jsonResponse({ message: "Esta opción estará disponible después del próximo deploy." }, 503);
+
+    const supabase = getSupabaseAdmin();
+    const { data: current, error: readError } = await supabase.from("events").select("panel_modules").eq("id", event.id).single();
+    if (missingColumn(readError)) return unavailable();
+    if (readError) {
+        console.error("events/modules:", readError.message);
+        return jsonResponse({ message: "No se pudo guardar" }, 500);
+    }
+
+    const overrides = normalizeOverrides(current?.panel_modules);
     if (body.enabled === null) delete overrides[moduleId];
     else overrides[moduleId] = body.enabled;
 
-    const { error } = await getSupabaseAdmin()
+    const { error } = await supabase
         .from("events")
         .update({ panel_modules: Object.keys(overrides).length ? overrides : null })
         .eq("id", event.id)
         .eq("organization_id", dbUser.organization_id);
+    if (missingColumn(error)) return unavailable();
     if (error) {
         console.error("events/modules:", error.message);
         return jsonResponse({ message: "No se pudo guardar" }, 500);

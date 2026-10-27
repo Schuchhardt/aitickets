@@ -12,7 +12,6 @@ import EventReviewsManager from "../../../components/dashboard/EventReviewsManag
 import EventCommunityManager from "../../../components/dashboard/EventCommunityManager.vue";
 import TrackingLinkBuilder from "../../../components/dashboard/TrackingLinkBuilder.vue";
 import SocialSeriesCard from "../../../components/dashboard/SocialSeriesCard.vue";
-import EventModulesPanel from "../../../components/dashboard/EventModulesPanel.vue";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { EVENT_MANAGER_ROLES, ORG_ADMIN_ROLES, hasRole } from "../../../lib/supabaseServer";
 import { adsEnabled } from "../../../../netlify/lib/zernio-ads.mjs";
@@ -20,7 +19,7 @@ import { requireDashboardSession } from "../_lib/guard";
 import { identityApproved, loadOrgIdentity, ticketsRequireIdentity, IDENTITY_FREE_PAID_CAPACITY } from "../../../lib/producerIdentity";
 import { canAccessEventByStaff } from "../../../../netlify/lib/event-staff.mjs";
 import { getEventSummary } from "../../../lib/eventAnalytics";
-import { TABS, PROFILE_LABELS, eventProfile, eventPhase, normalizeOverrides, resolveModules, visibleTabs, defaultTab } from "../../../lib/eventModules";
+import { PROFILE_LABELS, eventProfile, eventPhase, normalizeOverrides, resolveModules, panelTabs, defaultTab } from "../../../lib/eventModules";
 import {
     Calendar,
     MapPin,
@@ -112,11 +111,9 @@ const moduleCtx = {
     phase: eventPhase(event.start_date, event.end_date),
 };
 const modules = resolveModules(moduleCtx, normalizeOverrides(event.panel_modules));
-const tabs = visibleTabs(modules);
+const tabs = panelTabs(modules);
 const activeTab = defaultTab(moduleCtx, tabs);
 const canCreateAds = adsEnabled() && hasRole(dbUser, ORG_ADMIN_ROLES);
-const tabLabel = Object.fromEntries(TABS.map((t) => [t.id, t.label]));
-const optionalModules = modules.filter((m) => !m.core).map((m) => ({ id: m.id, title: m.title, description: m.description, tabLabel: tabLabel[m.tab], enabled: m.enabled, suggested: m.suggested }));
 ---
 
 <DashboardLayout title={event.name}>
@@ -283,7 +280,7 @@ const optionalModules = modules.filter((m) => !m.core).map((m) => ({ id: m.id, t
     {tabs.map((t) => (
         <div role="tabpanel" data-tab-panel={t.id} hidden={t.id !== activeTab} class="max-w-4xl space-y-6 md:space-y-8 mb-8">
             {t.modules.map((m) => (
-                <>
+                <div data-module={m.id} data-suggested={m.suggested ? "true" : "false"} hidden={!m.enabled} class="space-y-2 rounded-xl transition-shadow">
                     {m.id === "tickets" && (
                         <section class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                             <div class="p-4 sm:p-6 border-b border-gray-100 flex justify-between items-center gap-3">
@@ -396,16 +393,46 @@ const optionalModules = modules.filter((m) => !m.core).map((m) => ({ id: m.id, t
                     {m.id === "reviews" && <EventReviewsManager client:visible eventId={Number(event.id)} publicUrl={publicLink} />}
                     {/* Galería (al final de la página pública del evento) */}
                     {m.id === "gallery" && <EventGalleryManager client:visible eventId={Number(event.id)} publicUrl={publicLink} />}
-                </>
+                    {!m.core && (
+                        <div class="flex justify-end">
+                            <button type="button" data-hide-module={m.id} class="text-xs text-gray-400 hover:text-gray-700 hover:underline">
+                                Ocultar de este evento
+                            </button>
+                        </div>
+                    )}
+                </div>
             ))}
+
+            {/* Más herramientas de esta pestaña: solo las que están ocultas; al agregar una se muestra al tiro su tarjeta */}
+            <details data-more-tools={t.id} hidden={!t.modules.some((m) => !m.core && !m.enabled)} class="group rounded-xl border border-dashed border-gray-300 bg-white/60">
+                <summary class="flex items-center justify-between gap-3 p-4 cursor-pointer list-none">
+                    <span class="font-medium text-gray-700">Más herramientas</span>
+                    <span class="text-sm text-gray-500 group-open:hidden">Ver</span>
+                    <span class="text-sm text-gray-500 hidden group-open:inline">Cerrar</span>
+                </summary>
+                <p class="px-4 -mt-2 pb-2 text-xs text-gray-500">Las que no suelen usarse en {PROFILE_LABELS[moduleCtx.profile]}.</p>
+                <ul class="divide-y divide-gray-100 border-t border-gray-100">
+                    {t.modules.filter((m) => !m.core).map((m) => (
+                        <li data-add-item={m.id} hidden={m.enabled} class="flex items-center justify-between gap-4 p-4">
+                            <div class="min-w-0">
+                                <p class="font-medium text-gray-900">{m.title}</p>
+                                <p class="text-sm text-gray-500">{m.description}</p>
+                            </div>
+                            <button
+                                type="button"
+                                data-add-module={m.id}
+                                class="shrink-0 px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-sm font-medium hover:bg-gray-50"
+                            >
+                                Agregar
+                            </button>
+                        </li>
+                    ))}
+                </ul>
+            </details>
         </div>
     ))}
 
-    {optionalModules.length > 0 && (
-        <div class="max-w-4xl">
-            <EventModulesPanel client:visible eventId={Number(event.id)} profileLabel={PROFILE_LABELS[moduleCtx.profile]} modules={optionalModules} />
-        </div>
-    )}
+    <p id="modulesToast" hidden role="alert" class="fixed bottom-4 left-4 right-4 sm:left-auto sm:max-w-sm z-50 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 shadow-lg"></p>
 </DashboardLayout>
 
 <script>
@@ -427,6 +454,46 @@ const optionalModules = modules.filter((m) => !m.core).map((m) => ({ id: m.id, t
   if (location.hash && showTab(location.hash.slice(1))) {
     requestAnimationFrame(() => document.querySelector('[role="tablist"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   }
+
+  // Agregar u ocultar herramientas (events.panel_modules vía /api/events/modules): el cambio se ve al instante y se
+  // deshace si no se pudo guardar. Al agregar, se baja a la tarjeta para configurarla.
+  const panelEventId = Number(document.getElementById('toggleStatusBtn')?.dataset.eventId);
+  const toast = document.getElementById('modulesToast');
+  const applyModule = (id: string, enabled: boolean) => {
+    const slot = document.querySelector<HTMLElement>(`[data-module="${id}"]`);
+    if (slot) slot.hidden = !enabled;
+    const item = document.querySelector<HTMLElement>(`[data-add-item="${id}"]`);
+    if (item) item.hidden = enabled;
+    const more = item?.closest<HTMLDetailsElement>('[data-more-tools]');
+    if (more) more.hidden = !more.querySelector('[data-add-item]:not([hidden])');
+    return slot;
+  };
+  const setModule = async (id: string, enabled: boolean) => {
+    const slot = applyModule(id, enabled);
+    if (enabled && slot) {
+      slot.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      slot.classList.add('ring-2', 'ring-black', 'ring-offset-4');
+      setTimeout(() => slot.classList.remove('ring-2', 'ring-black', 'ring-offset-4'), 1600);
+    }
+    try {
+      const res = await fetch('/api/events/modules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // Volver al valor sugerido no guarda nada: si cambia la categoría, el módulo sigue al perfil nuevo
+        body: JSON.stringify({ eventId: panelEventId, moduleId: id, enabled: String(enabled) === slot?.dataset.suggested ? null : enabled }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'No se pudo guardar');
+    } catch (e: any) {
+      applyModule(id, !enabled);
+      if (toast) {
+        toast.textContent = e?.message || 'Error de conexión';
+        toast.hidden = false;
+        setTimeout(() => (toast.hidden = true), 5000);
+      }
+    }
+  };
+  document.querySelectorAll<HTMLButtonElement>('[data-add-module]').forEach((b) => b.addEventListener('click', () => setModule(b.dataset.addModule!, true)));
+  document.querySelectorAll<HTMLButtonElement>('[data-hide-module]').forEach((b) => b.addEventListener('click', () => setModule(b.dataset.hideModule!, false)));
 
   const copyBtn = document.getElementById('copyLinkBtn');
   copyBtn?.addEventListener('click', async () => {
