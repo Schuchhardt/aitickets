@@ -127,6 +127,13 @@ describe('registro y autorización', () => {
     expect(foreign.redirectError.error).toBe('invalid_target')
   })
 
+  it('acepta el resource del MCP de administración', async () => {
+    const { client_id } = await registerPublicClient()
+    const admin = await oauth.validateAuthorizeParams(db, authorizeParams(client_id, { resource: `${ORIGIN}/api/admin/mcp` }), ORIGIN)
+    expect(admin.ok).toBe(true)
+    expect(admin.req.resource).toBe(`${ORIGIN}/api/admin/mcp`)
+  })
+
   it('Client ID Metadata Document: client_id https con sus redirect_uris', async () => {
     const url = 'https://8.8.8.8/oauth/client.json'
     const fetchImpl = async () => new Response(JSON.stringify({ client_id: url, client_name: 'Claude', redirect_uris: [REDIRECT] }), { status: 200 })

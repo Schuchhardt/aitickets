@@ -31,6 +31,7 @@ const sha256 = (v: string) => createHash("sha256").update(v).digest("hex");
 const randomToken = (prefix: string) => prefix + randomBytes(32).toString("base64url");
 
 export const mcpResource = (origin: string) => `${origin}/api/mcp`;
+export const adminMcpResource = (origin: string) => `${origin}/api/admin/mcp`;
 
 // ---------------------------------------------------------------------------
 // Metadatos (RFC 8414 y RFC 9728)
@@ -72,7 +73,7 @@ export const adminResourceMetadataUrl = (origin: string) => `${origin}/.well-kno
 
 export function adminProtectedResourceMetadata(origin: string) {
     return {
-        resource: `${origin}/api/admin/mcp`,
+        resource: adminMcpResource(origin),
         authorization_servers: [origin],
         scopes_supported: [...API_SCOPES],
         bearer_methods_supported: ["header"],
@@ -278,7 +279,9 @@ export async function validateAuthorizeParams(
         return fail("invalid_request", "PKCE es obligatorio (code_challenge con code_challenge_method=S256).");
     }
     const resource = params.get("resource");
-    if (resource && resource.replace(/\/+$/, "") !== mcpResource(origin) && resource.replace(/\/+$/, "") !== origin) {
+    // Recursos de este servidor: el MCP de productores, el de administración (acceso según ADMIN_MCP_EMAILS) o el origen
+    const validResources = [mcpResource(origin), adminMcpResource(origin), origin];
+    if (resource && !validResources.includes(resource.replace(/\/+$/, ""))) {
         return fail("invalid_target", "resource no corresponde a este servidor.");
     }
     return { ok: true, req: { client, redirectUri, state, codeChallenge: challenge, scopes: parseScope(params.get("scope")), resource } };
