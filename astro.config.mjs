@@ -21,7 +21,9 @@ const e2eFixtures = {
 
 export default defineConfig({
   output: 'server',
-  adapter: netlify(),
+  // satori (historias automáticas, src/lib/socialSeriesRender.ts) carga harfbuzzjs/hb.wasm desde disco: el bundler
+  // de funciones no lo traza y sin él la función se cae (ENOENT → unhandled rejection → 502).
+  adapter: netlify({ includeFiles: ['./node_modules/harfbuzzjs/hb.wasm'] }),
   // Páginas estáticas como /precios.html (no /precios/index.html): Netlify las sirve en /precios con 200,
   // igual que el canonical y el sitemap. Con el formato por carpeta redirigía /precios → /precios/ (301).
   build: { format: 'file' },

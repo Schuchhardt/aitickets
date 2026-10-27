@@ -13,7 +13,6 @@
 //   - "framed": si no (portada horizontal, flyer 4:5 en una historia) o si el productor eligió mostrarla completa
 //     (fit 'contain'), va ENTERA como tarjeta sobre una versión difuminada y oscurecida de sí misma. Así nunca se
 //     pierde el texto de un flyer ni media portada por el recorte.
-import satori from "satori";
 import { loadSharp } from "./imageOptimize";
 import { stageOf } from "./socialSeriesCadence";
 import unboundedBold from "@fontsource/unbounded/files/unbounded-latin-700-normal.woff?inline";
@@ -235,6 +234,9 @@ function overlay(d: PieceData, layout: Layout, frame: Frame | null = null): Node
 /** SVG de la capa de texto (transparente), con la portada completa embebida en el modo "framed". */
 export async function renderOverlaySvg(d: PieceData, layout: Layout = "plain", frame: Frame | null = null): Promise<string> {
     const { width, height } = PIECE_SIZE[d.kind];
+    // Import diferido: satori carga harfbuzzjs (wasm) al importarse, y este módulo llega por el registro de
+    // herramientas a /api/mcp y /api/admin/mcp. Así solo se carga al renderizar una pieza.
+    const { default: satori } = await import("satori");
     return satori(overlay(d, layout, frame) as any, { width, height, fonts: fonts() });
 }
 
