@@ -309,6 +309,14 @@ describe('preparar y aprobar', () => {
     const bad = await runTool(getTool('prepare_social_series'), { event_id: 2296, base_image_url: 'https://evil.com/x.jpg' }, ctx())
     expect(bad).toMatchObject({ ok: false, code: 'invalid_input' })
   })
+
+  it('la foto base vacía (lo que manda el panel sin foto propia) vuelve a la portada del evento', async () => {
+    setNow(ACTIVATION)
+    const out = await runTool(getTool('prepare_social_series'), { event_id: 2296, base_image_url: '' }, ctx())
+    expect(out).toMatchObject({ ok: true })
+    const bad = await runTool(getTool('prepare_social_series'), { event_id: 2296, base_image_url: 'http://x/y.jpg' }, ctx())
+    expect(bad).toMatchObject({ ok: false, code: 'invalid_input' })
+  })
 })
 
 describe('despacho a Zernio (render tardío)', () => {
