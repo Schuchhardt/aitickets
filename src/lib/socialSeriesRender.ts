@@ -67,8 +67,16 @@ export function backgroundMode(imageRatio: number, kind: PieceKind, fit?: string
 
 type Frame = { src: string; width: number; height: number };
 
+// Emojis, banderas, tonos de piel, selectores de variación y uniones: las fuentes de la pieza no los tienen y satori
+// dibuja un cuadrado. El caption de Instagram sí los conserva.
+const EMOJI = /[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\u{1F3FB}-\u{1F3FF}\u{FE0F}\u{200D}\u{20E3}]/gu;
+
+/** Texto sin emojis, con los espacios que quedan colapsados. */
+export const withoutEmoji = (s: string) => s.replace(EMOJI, "").replace(/\s{2,}/g, " ").trim();
+
 /** Textos de la pieza según la etapa (pura: la usan el render, la vista previa y los tests). */
-export function pieceText(d: PieceData): PieceText {
+export function pieceText(raw: PieceData): PieceText {
+    const d = { ...raw, eventName: withoutEmoji(raw.eventName), venue: raw.venue ? withoutEmoji(raw.venue) || null : null };
     const when = [d.dateLabel, d.startTime ? `${d.startTime} h` : null].filter(Boolean).join(" · ");
     const where = d.venue || null;
     const reply = d.kind === "story" ? "Responde" : "Comenta";
