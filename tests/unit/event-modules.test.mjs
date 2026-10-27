@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 const { eventProfile, eventPhase, normalizeAddedModules, resolveModules, panelTabs, defaultTab, isAddableModule } = await import('../../src/lib/eventModules.ts')
 
-const ctx = (over = {}) => ({ profile: 'general', status: 'published', functionCount: 1, ticketTypeCount: 1, phase: 'before', ...over })
+const ctx = (over = {}) => ({ profile: 'general', status: 'published', functionCount: 1, ticketTypeCount: 1, phase: 'before', isMassive: false, ...over })
 const byId = (mods) => Object.fromEntries(mods.map((m) => [m.id, m]))
 
 describe('eventProfile', () => {
@@ -37,10 +37,14 @@ describe('eventPhase', () => {
 })
 
 describe('resolveModules', () => {
-  it('los permisos vienen activos en fiestas y apagados en teatro', () => {
-    expect(byId(resolveModules(ctx({ profile: 'noche' }))).documents.enabled).toBe(true)
-    const theatre = byId(resolveModules(ctx({ profile: 'funciones' }))).documents
-    expect(theatre).toMatchObject({ enabled: false, suggested: false })
+  it('los permisos solo vienen en eventos masivos o con documentos exigidos; si no, quedan para agregar', () => {
+    expect(byId(resolveModules(ctx({ profile: 'noche', isMassive: true }))).documents.enabled).toBe(true)
+    expect(byId(resolveModules(ctx({ profile: 'noche' }))).documents).toMatchObject({ enabled: false, suggested: false })
+  })
+  it('las reseñas solo aparecen cuando el evento terminó', () => {
+    expect(byId(resolveModules(ctx()))['reviews']).toBeUndefined()
+    expect(byId(resolveModules(ctx({ phase: 'during' })))['reviews']).toBeUndefined()
+    expect(byId(resolveModules(ctx({ phase: 'after' }))).reviews.enabled).toBe(true)
   })
   it('lo agregado desde Más herramientas se suma a lo del tipo de evento', () => {
     expect(byId(resolveModules(ctx({ profile: 'funciones' }), ['documents'])).documents).toMatchObject({ enabled: true, suggested: false })
@@ -68,7 +72,7 @@ describe('resolveModules', () => {
 
 describe('normalizeAddedModules', () => {
   it('deja solo ids opcionales conocidos, sin repetir y en el orden del registro', () => {
-    expect(normalizeAddedModules(['gallery', 'tickets', 'x', 'documents', 'gallery'])).toEqual(['documents', 'gallery'])
+    expect(normalizeAddedModules(['gallery', 'tickets', 'x', 'documents', 'gallery'])).toEqual(['gallery', 'documents'])
     expect(normalizeAddedModules(null)).toEqual([])
     expect(normalizeAddedModules({ documents: true })).toEqual([])
   })
@@ -83,6 +87,6 @@ describe('pestañas', () => {
   })
   it('cada pestaña trae también las herramientas que no vienen para el tipo de evento (para Más herramientas)', () => {
     const page = panelTabs(resolveModules(ctx({ profile: 'funciones' }))).find((t) => t.id === 'pagina')
-    expect(page.modules.map((m) => [m.id, m.enabled])).toEqual([['cover', true], ['faq', true], ['documents', false]])
+    expect(page.modules.map((m) => [m.id, m.enabled])).toEqual([['cover', true], ['faq', true], ['gallery', true], ['documents', false]])
   })
 })

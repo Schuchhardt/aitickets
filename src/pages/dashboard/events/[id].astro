@@ -72,9 +72,14 @@ const loadEvent = (coverColumn: string) => supabaseAdmin
     .eq("id", id)
     .eq("organization_id", dbUser.organization_id)
     .single();
-let { data: event, error }: { data: any; error: any } = await loadEvent(" cover_settings, panel_modules,");
-// Deploy previews: las migraciones de cover_settings o panel_modules pueden no estar aplicadas todavía
-if (error?.code === "42703") ({ data: event, error } = await loadEvent(""));
+// Deploy previews y local comparten la BD de producción: las columnas más nuevas pueden no existir todavía, así que
+// se van soltando de a una (de la más nueva a la más antigua) en vez de perderlas todas
+const optionalColumns = ["panel_modules", "cover_settings", "is_massive, requires_documents"];
+let { data: event, error }: { data: any; error: any } = await loadEvent(` ${optionalColumns.join(", ")},`);
+for (let i = 1; error?.code === "42703" && i <= optionalColumns.length; i++) {
+    const rest = optionalColumns.slice(i);
+    ({ data: event, error } = await loadEvent(rest.length ? ` ${rest.join(", ")},` : ""));
+}
 
 if (error || !event) {
     return Astro.redirect("/dashboard/events");
@@ -109,6 +114,7 @@ const moduleCtx = {
     functionCount: event.event_dates?.length || 0,
     ticketTypeCount: activeTickets.length,
     phase: eventPhase(event.start_date, event.end_date),
+    isMassive: event.is_massive === true || event.requires_documents === true,
 };
 const modules = resolveModules(moduleCtx, normalizeAddedModules(event.panel_modules));
 const tabs = panelTabs(modules);

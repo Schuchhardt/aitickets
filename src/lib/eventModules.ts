@@ -5,7 +5,8 @@
 // Tres capas deciden si un módulo se ve:
 //   1. when(ctx): condición del evento (estado, número de funciones, fase). Si no se cumple, el módulo no aplica y
 //      no aparece ni en "Más herramientas".
-//   2. profiles: perfiles (derivados de la categoría) a los que les sirve. Sin profiles = todos.
+//   2. suggest(ctx) o profiles: si le sirve a este evento (por un dato del evento, o por los perfiles derivados de la
+//      categoría). Sin ninguno = a todos. Si no le sirve, queda en "Más herramientas" de su pestaña.
 //   3. events.panel_modules: los que el productor agregó desde "Más herramientas" de cada pestaña (lista de ids).
 // Lo que se muestra no se quita del panel: "Más herramientas" solo suma lo que no viene para este tipo de evento.
 
@@ -19,6 +20,8 @@ export type EventModuleContext = {
     functionCount: number;
     ticketTypeCount: number;
     phase: EventPhase;
+    // Evento masivo (Ley 21.659) o con documentos exigidos por AI Tickets (events.is_massive, requires_documents)
+    isMassive: boolean;
 };
 
 export type EventModule = {
@@ -28,6 +31,7 @@ export type EventModule = {
     tab: EventTab;
     core?: boolean;
     profiles?: EventProfile[];
+    suggest?: (ctx: EventModuleContext) => boolean;
     when?: (ctx: EventModuleContext) => boolean;
 };
 
@@ -79,16 +83,23 @@ export const EVENT_MODULES: EventModule[] = [
     },
     { id: "cover", title: "Portada", description: "Imagen de la página, ajuste por dispositivo y generación con IA.", tab: "pagina", core: true },
     { id: "faq", title: "Preguntas frecuentes", description: "Respuestas que se muestran en la página del evento.", tab: "pagina" },
+    { id: "gallery", title: "Galería", description: "Fotos y video al final de la página del evento.", tab: "pagina" },
+    // Fuera de un evento masivo queda en Más herramientas: desde la tarjeta se marca "Es un evento masivo"
     {
         id: "documents",
         title: "Permisos y documentos",
         description: "Autorización de evento masivo, contrato del lugar y póliza.",
         tab: "pagina",
-        profiles: ["noche", "musica", "general"],
+        suggest: (ctx) => ctx.isMassive,
     },
     { id: "community", title: "Mensajes y muro de asistentes", description: "Mensajes de quienes compraron y reacciones.", tab: "despues" },
-    { id: "reviews", title: "Reseñas", description: "Calificaciones, fotos de asistentes e invitación al próximo evento.", tab: "despues" },
-    { id: "gallery", title: "Galería", description: "Fotos y video al final de la página del evento.", tab: "despues" },
+    {
+        id: "reviews",
+        title: "Reseñas",
+        description: "Calificaciones, fotos de asistentes e invitación al próximo evento.",
+        tab: "despues",
+        when: (ctx) => ctx.phase === "after",
+    },
 ];
 
 const normalize = (s: string) =>
@@ -128,14 +139,15 @@ export function normalizeAddedModules(raw: unknown): string[] {
 
 export const isAddableModule = (id: string) => EVENT_MODULES.some((m) => m.id === id && !m.core);
 
-const suggestedFor = (m: EventModule, profile: EventProfile) => !m.profiles || m.profiles.includes(profile);
+const suggestedFor = (m: EventModule, ctx: EventModuleContext) =>
+    m.suggest ? m.suggest(ctx) : !m.profiles || m.profiles.includes(ctx.profile);
 
 export type ResolvedModule = EventModule & { enabled: boolean; suggested: boolean };
 
 /** Módulos que aplican a este evento, con si se muestran (enabled) y si le sirven a su tipo (suggested). */
 export function resolveModules(ctx: EventModuleContext, added: string[] = []): ResolvedModule[] {
     return EVENT_MODULES.filter((m) => !m.when || m.when(ctx)).map((m) => {
-        const suggested = !!m.core || suggestedFor(m, ctx.profile);
+        const suggested = !!m.core || suggestedFor(m, ctx);
         return { ...m, enabled: suggested || added.includes(m.id), suggested };
     });
 }
