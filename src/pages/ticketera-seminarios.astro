@@ -44,7 +44,7 @@ import WayfindingSign from "../components/landing/seminarios/WayfindingSign.astr
 import Layout from "../layouts/Layout.astro";
 import { HelpCircle } from "lucide-vue-next";
 import { publishUrl } from "../components/landing/links.js";
-import { SEMINAR_CAPACITY, SEMINAR_NAME, SEMINAR_PHOTOS, SEMINAR_VENUE, STORY_FRAMES, formatById, isScarce, seminarSchedule } from "../components/landing/seminarios/seminariosLanding.js";
+import { SEMINAR_CAPACITY, SEMINAR_NAME, SEMINAR_VENUE, STORY_FRAMES, formatById, isScarce, seminarSchedule } from "../components/landing/seminarios/seminariosLanding.js";
 import { getLanding } from "../data/landings";
 import { SEMINARIOS_FAQ } from "../data/seminariosFaq";
 import { DEFAULT_CADENCE, DEFAULT_KEYWORD } from "../lib/socialSeriesCadence";
@@ -120,7 +120,7 @@ const jsonLd = [
 ];
 ---
 
-<Layout title={landing.title} description={landing.description} canonical={`/${landing.slug}`} image={SEMINAR_PHOTOS.hero.src}>
+<Layout title={landing.title} description={landing.description} canonical={`/${landing.slug}`}>
   <link slot="head-extra" rel="preload" as="font" type="font/woff2" href={archivoWoff2} crossorigin />
   <LandingMotion />
   <div class="se" data-theme="seminarios">

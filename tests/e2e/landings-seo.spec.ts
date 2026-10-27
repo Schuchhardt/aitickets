@@ -1,19 +1,20 @@
-// Lo transversal de las landings (docs/specs/rediseno/README.md, commit 13): SEO de cada página (Open Graph con la foto
-// del hero, JSON-LD), fotos servidas en AVIF/WebP con tamaño reservado, el hub de /organizadores y el footer enlazando
-// todas las landings por tipo de evento, y la analítica lp_ de /organizadores (SPEC_landing_productores §11).
+// Lo transversal de las landings (docs/specs/rediseno/README.md, commit 13): SEO de cada página (Open Graph con su
+// tarjeta 1200×630 de src/lib/ogPages.ts, JSON-LD), fotos servidas en AVIF/WebP con tamaño reservado, el hub de
+// /organizadores y el footer enlazando todas las landings por tipo de evento, y la analítica lp_ de /organizadores
+// (SPEC_landing_productores §11).
 import { expect, test, type Page } from "@playwright/test";
 import { captureAnalytics, playModalVideo, trackedEvents as events, waitForIsland } from "./env";
 
 const LANDINGS: { path: string; schemas: string[]; ogImage: RegExp }[] = [
-  { path: "/organizadores", schemas: ["Organization", "SoftwareApplication", "FAQPage"], ogImage: /\/aitickets_preview\.png$/ },
-  { path: "/ticketera-stand-up", schemas: ["BreadcrumbList", "SoftwareApplication", "FAQPage"], ogImage: /\/landing\/aitk-hero-standup\.jpg$/ },
-  { path: "/academias", schemas: ["BreadcrumbList", "SoftwareApplication", "FAQPage"], ogImage: /\/landing\/aitk-acad-recital\.jpg$/ },
-  { path: "/ticketera-musica-en-vivo", schemas: ["BreadcrumbList", "SoftwareApplication", "FAQPage"], ogImage: /\/landing\/aitk-musica-sala\.jpg$/ },
-  { path: "/ticketera-teatro", schemas: ["BreadcrumbList", "SoftwareApplication", "FAQPage"], ogImage: /\/landing\/aitk-teatro-funcion\.jpg$/ },
-  { path: "/ticketera-talleres", schemas: ["BreadcrumbList", "SoftwareApplication", "FAQPage"], ogImage: /\/landing\/aitk-taller-clase\.jpg$/ },
-  { path: "/ticketera-discotecas", schemas: ["BreadcrumbList", "SoftwareApplication", "FAQPage"], ogImage: /\/landing\/aitk-club-pista\.jpg$/ },
-  { path: "/ticketera-fiestas", schemas: ["BreadcrumbList", "SoftwareApplication", "FAQPage"], ogImage: /\/landing\/aitk-fiesta-pista\.jpg$/ },
-  { path: "/ticketera-seminarios", schemas: ["BreadcrumbList", "SoftwareApplication", "FAQPage"], ogImage: /\/landing\/aitk-seminario-sala\.jpg$/ },
+  { path: "/organizadores", schemas: ["Organization", "SoftwareApplication", "FAQPage"], ogImage: /\/og\/paginas\/organizadores\.jpg\?v=[0-9a-f]{12}$/ },
+  { path: "/ticketera-stand-up", schemas: ["BreadcrumbList", "SoftwareApplication", "FAQPage"], ogImage: /\/og\/paginas\/ticketera-stand-up\.jpg\?v=[0-9a-f]{12}$/ },
+  { path: "/academias", schemas: ["BreadcrumbList", "SoftwareApplication", "FAQPage"], ogImage: /\/og\/paginas\/academias\.jpg\?v=[0-9a-f]{12}$/ },
+  { path: "/ticketera-musica-en-vivo", schemas: ["BreadcrumbList", "SoftwareApplication", "FAQPage"], ogImage: /\/og\/paginas\/ticketera-musica-en-vivo\.jpg\?v=[0-9a-f]{12}$/ },
+  { path: "/ticketera-teatro", schemas: ["BreadcrumbList", "SoftwareApplication", "FAQPage"], ogImage: /\/og\/paginas\/ticketera-teatro\.jpg\?v=[0-9a-f]{12}$/ },
+  { path: "/ticketera-talleres", schemas: ["BreadcrumbList", "SoftwareApplication", "FAQPage"], ogImage: /\/og\/paginas\/ticketera-talleres\.jpg\?v=[0-9a-f]{12}$/ },
+  { path: "/ticketera-discotecas", schemas: ["BreadcrumbList", "SoftwareApplication", "FAQPage"], ogImage: /\/og\/paginas\/ticketera-discotecas\.jpg\?v=[0-9a-f]{12}$/ },
+  { path: "/ticketera-fiestas", schemas: ["BreadcrumbList", "SoftwareApplication", "FAQPage"], ogImage: /\/og\/paginas\/ticketera-fiestas\.jpg\?v=[0-9a-f]{12}$/ },
+  { path: "/ticketera-seminarios", schemas: ["BreadcrumbList", "SoftwareApplication", "FAQPage"], ogImage: /\/og\/paginas\/ticketera-seminarios\.jpg\?v=[0-9a-f]{12}$/ },
 ];
 
 const VERTICALS = [

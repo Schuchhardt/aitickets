@@ -26,7 +26,6 @@ import AcademyClosing from "../components/landing/academias/AcademyClosing.astro
 import AcademyTracking from "../components/landing/academias/AcademyTracking.astro";
 import Layout from "../layouts/Layout.astro";
 import { publishUrl } from "../components/landing/links.js";
-import { ACADEMY_PHOTOS } from "../components/landing/academias/academiasLanding.js";
 import { getLanding } from "../data/landings";
 import { IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL } from "../../netlify/lib/fees.mjs";
 import "../styles/global.css";
@@ -77,7 +76,7 @@ const jsonLd = [
 ];
 ---
 
-<Layout title={landing.title} description={landing.description} canonical={`/${landing.slug}`} image={ACADEMY_PHOTOS.recital.src}>
+<Layout title={landing.title} description={landing.description} canonical={`/${landing.slug}`}>
   <LandingMotion />
   <div class="ac" data-theme="academias">
     <AcademyHeader client:idle publishHref={publishUrl("academias_header")} />

@@ -23,6 +23,7 @@ vi.mock('../../src/lib/safe-fetch', () => ({ fetchPublic: (...args) => fetchPubl
 const gallery = await import('../../src/pages/api/events/gallery.ts')
 const og = await import('../../src/pages/og/eventos/[id].jpg.ts')
 const { ogImageVersion } = await import('../../src/lib/ogImage.ts')
+const { defaultOgImagePath } = await import('../../src/lib/ogPages.ts')
 const { GALLERY_MAX_IMAGES } = await import('../../src/lib/eventGallery.ts')
 
 const uuid = (n) => `00000000-0000-0000-0000-${String(n).padStart(12, '0')}`
@@ -138,13 +139,13 @@ describe('/og/eventos/<id>.jpg', () => {
     setup()
     const res = await call(4, 'cualquiera')
     expect(res.status).toBe(302)
-    expect(res.headers.get('location')).toBe('/aitickets_preview.png')
+    expect(res.headers.get('location')).toBe(defaultOgImagePath())
   })
 
   it('sin portada o inexistente: imagen genérica; si falla la descarga: la portada original', async () => {
     setup()
-    expect((await call(9)).headers.get('location')).toBe('/aitickets_preview.png')
-    expect((await call(999)).headers.get('location')).toBe('/aitickets_preview.png')
+    expect((await call(9)).headers.get('location')).toBe(defaultOgImagePath())
+    expect((await call(999)).headers.get('location')).toBe(defaultOgImagePath())
     fetchPublicImpl = async () => { throw new Error('timeout') }
     const res = await call(3, ogImageVersion(`${BASE}event-covers/a.jpg`))
     expect(res.status).toBe(302)

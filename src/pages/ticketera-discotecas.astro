@@ -37,7 +37,6 @@ import ClubClosing from "../components/landing/clubs/ClubClosing.astro";
 import ClubTracking from "../components/landing/clubs/ClubTracking.astro";
 import Layout from "../layouts/Layout.astro";
 import { publishUrl } from "../components/landing/links.js";
-import { CLUB_PHOTOS } from "../components/landing/clubs/clubsLanding.js";
 import { getLanding } from "../data/landings";
 import { CLUBS_FAQ } from "../data/clubsFaq";
 import { IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL } from "../../netlify/lib/fees.mjs";
@@ -89,7 +88,7 @@ const jsonLd = [
 ];
 ---
 
-<Layout title={landing.title} description={landing.description} canonical={`/${landing.slug}`} image={CLUB_PHOTOS.hero.src}>
+<Layout title={landing.title} description={landing.description} canonical={`/${landing.slug}`}>
   <LandingMotion />
   <div class="cl" data-theme="clubs">
     <ClubHeader client:idle publishHref={publishUrl("clubs_header")} />

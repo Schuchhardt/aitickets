@@ -38,7 +38,6 @@ import WorkshopTracking from "../components/landing/talleres/WorkshopTracking.as
 import SectionTab from "../components/landing/talleres/SectionTab.astro";
 import Layout from "../layouts/Layout.astro";
 import { publishUrl } from "../components/landing/links.js";
-import { WORKSHOP_PHOTOS } from "../components/landing/talleres/talleresLanding.js";
 import { getLanding } from "../data/landings";
 import { TALLERES_FAQ } from "../data/talleresFaq";
 import { IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL } from "../../netlify/lib/fees.mjs";
@@ -96,7 +95,7 @@ const jsonLd = [
 ];
 ---
 
-<Layout title={landing.title} description={landing.description} canonical={`/${landing.slug}`} image={WORKSHOP_PHOTOS.hero.src}>
+<Layout title={landing.title} description={landing.description} canonical={`/${landing.slug}`}>
   <link slot="head-extra" rel="preload" as="font" type="font/woff2" href={bricolageWoff2} crossorigin />
   <style slot="head-extra" is:inline set:html={caveatFace} />
   <LandingMotion />

@@ -6,7 +6,7 @@ import Clasico from "../../../components/sites/templates/Clasico.vue";
 import Nocturno from "../../../components/sites/templates/Nocturno.vue";
 import Minimal from "../../../components/sites/templates/Minimal.vue";
 import Festival from "../../../components/sites/templates/Festival.vue";
-import { getSiteBanners, getSiteEvents, publicSiteProps, siteUrl } from "../../../lib/sites";
+import { getSiteBanners, getSiteEvents, publicSiteProps, siteShareImageSource, siteUrl } from "../../../lib/sites";
 import { sanitizeRichText } from "../../../lib/sanitize";
 import { stripHtml, truncate } from "../../../lib/eventPage";
 import { loadSiteForPage } from "../_site";
@@ -37,7 +37,7 @@ const description = truncate(
     `Próximos eventos de ${props.name}. Compra tus entradas online de forma segura.`,
   158
 );
-const ogImage = site.seo?.og_image || props.theme.hero_image_url || banners[0]?.image_url || events[0]?.image_url || null;
+const ogImage = await siteShareImageSource(site, { banners, events });
 const noindex = preview || site.is_demo || events.length === 0;
 
 const jsonLd = JSON.stringify({
@@ -56,6 +56,7 @@ const jsonLd = JSON.stringify({
     description={description}
     canonicalUrl={canonicalUrl}
     siteName={props.name}
+    siteSlug={site.slug}
     imageUrl={ogImage}
     noindex={noindex}
     jsonLd={jsonLd}

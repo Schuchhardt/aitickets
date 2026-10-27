@@ -15,12 +15,14 @@ interface Props {
 
 import { LEGAL } from "../lib/legal";
 import { eventOgImagePath } from "../lib/ogImage";
+import { defaultOgImagePath, DEFAULT_OG_CARD } from "../lib/ogPages";
 import { OG_HEIGHT, OG_WIDTH } from "../lib/imageOptimize";
 import { cdnImage, cdnSrcset, EVENT_COVER_SIZES } from "../lib/imageCdn.js";
 
 const { event, title, description, canonicalPath, noindex = false } = Astro.props;
 const siteUrl = (import.meta.env.SITE_URL || "https://aitickets.cl").replace(/\/$/, "");
-const fallbackImagePath = "/aitickets_preview.png";
+// Sin portada: la tarjeta genérica de AI Tickets (1200×630 JPEG, src/lib/ogPages.ts)
+const fallbackImagePath = defaultOgImagePath();
 
 const buildAbsoluteUrl = (path?: string | null) => {
   if (!path) return `${siteUrl}${fallbackImagePath}`;
@@ -47,8 +49,8 @@ const canonicalUrl = `${siteUrl}${canonicalPath}`;
 const imageUrl = buildAbsoluteUrl(event?.image_url);
 const ogPath = event?.id ? eventOgImagePath(event.id, event.image_url) : null;
 const shareImageUrl = ogPath ? `${siteUrl}${ogPath}` : `${siteUrl}${fallbackImagePath}`;
-const shareImageType = ogPath ? "image/jpeg" : "image/png";
-const shareImageAlt = event?.name ? `Portada de ${event.name}` : "AI Tickets";
+const shareImageType = "image/jpeg";
+const shareImageAlt = ogPath && event?.name ? `Portada de ${event.name}` : DEFAULT_OG_CARD.alt;
 
 const buildPlace = (venue: any) => {
   if (!venue) {

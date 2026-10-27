@@ -9,15 +9,25 @@ interface Props {
   description: string;
   canonicalUrl: string;
   siteName: string;
+  /** Slug del sitio: la imagen para compartir se sirve recortada en /og/sitios/<slug>.jpg. */
+  siteSlug: string;
+  /** Foto original para compartir (siteShareImageSource). Sin foto: la tarjeta genérica de AI Tickets. */
   imageUrl?: string | null;
   noindex?: boolean;
   /** JSON-LD ya serializado (opcional). */
   jsonLd?: string | null;
 }
 
-const { title, description, canonicalUrl, siteName, imageUrl, noindex = false, jsonLd } = Astro.props;
+import { OG_HEIGHT, OG_WIDTH } from "../../lib/imageOptimize";
+import { siteOgImagePath } from "../../lib/ogImage";
+import { DEFAULT_OG_CARD, defaultOgImagePath } from "../../lib/ogPages";
+
+const { title, description, canonicalUrl, siteName, siteSlug, imageUrl, noindex = false, jsonLd } = Astro.props;
 const mainUrl = (import.meta.env.SITE_URL || "https://aitickets.cl").replace(/\/$/, "");
-const image = imageUrl && /^https?:\/\//i.test(imageUrl) ? imageUrl : `${mainUrl}/aitickets_preview.png`;
+// 1200×630 JPEG < 300 KB (WhatsApp no muestra la vista previa con imágenes pesadas o de otra proporción)
+const sitePath = siteOgImagePath(siteSlug, imageUrl);
+const image = `${mainUrl}${sitePath ?? defaultOgImagePath()}`;
+const imageAlt = sitePath ? siteName : DEFAULT_OG_CARD.alt;
 ---
 
 <title>{title}</title>
@@ -32,10 +42,16 @@ const image = imageUrl && /^https?:\/\//i.test(imageUrl) ? imageUrl : `${mainUrl
 <meta property="og:title" content={title} />
 <meta property="og:description" content={description} />
 <meta property="og:image" content={image} />
+<meta property="og:image:secure_url" content={image} />
+<meta property="og:image:type" content="image/jpeg" />
+<meta property="og:image:width" content={String(OG_WIDTH)} />
+<meta property="og:image:height" content={String(OG_HEIGHT)} />
+<meta property="og:image:alt" content={imageAlt} />
 
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content={title} />
 <meta name="twitter:description" content={description} />
 <meta name="twitter:image" content={image} />
+<meta name="twitter:image:alt" content={imageAlt} />
 
 {jsonLd && !noindex && <script is:inline type="application/ld+json" set:html={jsonLd}></script>}

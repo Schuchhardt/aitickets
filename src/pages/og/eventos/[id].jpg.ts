@@ -11,11 +11,13 @@ import type { APIRoute } from "astro";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { renderOgImage } from "../../../lib/imageOptimize";
 import { eventOgImagePath, ogImageVersion } from "../../../lib/ogImage";
+import { defaultOgImagePath } from "../../../lib/ogPages";
 import { fetchPublic } from "../../../lib/safe-fetch";
 
 export const prerender = false;
 
-const FALLBACK_IMAGE = "/aitickets_preview.png";
+// Tarjeta genérica de AI Tickets (estática, generada en el build)
+const FALLBACK_IMAGE = defaultOgImagePath();
 const MAX_SOURCE_BYTES = 15 * 1024 * 1024;
 
 const redirect = (location: string, status = 302, maxAge = 300) =>

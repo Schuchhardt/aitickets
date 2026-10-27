@@ -516,6 +516,24 @@ export async function getSiteBanners(site: SiteRecord): Promise<SiteBanner[]> {
     }));
 }
 
+/**
+ * Foto para compartir el sitio (og:image): la elegida en SEO, la del hero, el primer banner o la portada del próximo
+ * evento. Recibe los banners y eventos si la página ya los cargó; si no, los lee solo cuando hacen falta.
+ * La sirve recortada a 1200×630 src/pages/og/sitios/[slug].jpg.ts.
+ */
+export async function siteShareImageSource(
+  site: SiteRecord,
+  loaded: { banners?: SiteBanner[]; events?: SiteEventCard[] } = {}
+): Promise<string | null> {
+  const direct = [site.seo?.og_image, resolveTheme(site).hero_image_url].find((u) => isSafeHttpUrl(u));
+  if (direct) return direct as string;
+  const banners = loaded.banners ?? (await getSiteBanners(site));
+  if (banners[0]?.image_url) return banners[0].image_url;
+  const events = loaded.events ?? (await getSiteEvents(site, 1));
+  const cover = events[0]?.image_url;
+  return isSafeHttpUrl(cover) ? cover : null;
+}
+
 // ---------------------------------------------------------------------------
 // URLs
 // ---------------------------------------------------------------------------

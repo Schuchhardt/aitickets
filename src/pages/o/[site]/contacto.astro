@@ -7,7 +7,7 @@ import SiteMetaTags from "../../../components/sites/SiteMetaTags.astro";
 import SiteHeader from "../../../components/sites/SiteHeader.vue";
 import SiteFooter from "../../../components/sites/SiteFooter.vue";
 import ContactForm from "../../../components/sites/ContactForm.vue";
-import { getSiteEvents, isUnderRootDomain, publicSiteProps, siteUrl } from "../../../lib/sites";
+import { getSiteEvents, isUnderRootDomain, publicSiteProps, siteShareImageSource, siteUrl } from "../../../lib/sites";
 import { loadSiteForPage } from "../_site";
 
 import { notFound } from "../../../lib/notFound";
@@ -27,6 +27,7 @@ const turnstileSiteKey =
 
 const events = await getSiteEvents(site, 1);
 const noindex = preview || !!site.is_demo || events.length === 0;
+const ogImage = await siteShareImageSource(site, { events });
 ---
 <SiteLayout theme={props.theme} preview={preview} favicon={props.theme.logo_url}>
   <SiteMetaTags
@@ -35,7 +36,8 @@ const noindex = preview || !!site.is_demo || events.length === 0;
     description={`Escríbele a ${props.name}: consultas, prensa y colaboraciones.`}
     canonicalUrl={siteUrl(site, "/contacto")}
     siteName={props.name}
-    imageUrl={props.theme.hero_image_url || null}
+    siteSlug={site.slug}
+    imageUrl={ogImage}
     noindex={noindex}
   />
   {turnstileSiteKey && (

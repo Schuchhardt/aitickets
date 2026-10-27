@@ -32,7 +32,6 @@ import MusicClosing from "../components/landing/musica/MusicClosing.astro";
 import MusicTracking from "../components/landing/musica/MusicTracking.astro";
 import Layout from "../layouts/Layout.astro";
 import { publishUrl } from "../components/landing/links.js";
-import { MUSIC_PHOTOS } from "../components/landing/musica/musicaLanding.js";
 import { getLanding } from "../data/landings";
 import { MUSICA_FAQ } from "../data/musicaFaq";
 import { IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL } from "../../netlify/lib/fees.mjs";
@@ -85,7 +84,7 @@ const jsonLd = [
 ];
 ---
 
-<Layout title={landing.title} description={landing.description} canonical={`/${landing.slug}`} image={MUSIC_PHOTOS.hero.src}>
+<Layout title={landing.title} description={landing.description} canonical={`/${landing.slug}`}>
   <link slot="head-extra" rel="preload" as="font" type="font/woff2" href={antonWoff2} crossorigin />
   <LandingMotion />
   <div class="mu" data-theme="musica">

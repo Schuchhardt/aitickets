@@ -1,14 +1,23 @@
 ---
 import ToastContainer from '../components/ui/ToastContainer.vue';
 import ChunkReload from '../components/ChunkReload.astro';
+import { OG_HEIGHT, OG_WIDTH } from '../lib/imageOptimize';
+import { DEFAULT_OG_CARD, ogCardForPath, ogCardImagePath, ogPageKey, type OgCard } from '../lib/ogPages';
 
 interface Props {
 	title?: string;
 	description?: string;
 	/** Ruta ("/eventos") o URL absoluta. Por defecto: la ruta actual sin query string. */
 	canonical?: string;
-	/** Ruta o URL absoluta de la imagen para compartir */
+	/**
+	 * Ruta o URL absoluta de la imagen para compartir. Por defecto, la tarjeta 1200×630 de la ruta canónica
+	 * (src/lib/ogPages.ts) o, si la página no tiene una, la de la portada.
+	 */
 	image?: string;
+	/** Texto alternativo de `image`. */
+	imageAlt?: string;
+	/** Tarjeta de una página que no está en el registro de ogPages.ts (p. ej. una guía); también se genera en el build. */
+	ogCard?: OgCard;
 	noindex?: boolean;
 	ogType?: string;
 	/**
@@ -21,7 +30,6 @@ interface Props {
 const SITE_URL = (import.meta.env.SITE_URL || 'https://aitickets.cl').replace(/\/$/, '');
 const DEFAULT_TITLE = 'AI Tickets – Venta de entradas para eventos en Chile';
 const DEFAULT_DESCRIPTION = 'Vende entradas para tus eventos en Chile con 0% de comisión para el productor. Página del evento, pagos, QR y check-in en un solo lugar.';
-const DEFAULT_IMAGE = '/aitickets_preview.png';
 
 const absolute = (pathOrUrl: string) =>
 	/^https?:\/\//i.test(pathOrUrl) ? pathOrUrl : `${SITE_URL}${pathOrUrl.startsWith('/') ? '' : '/'}${pathOrUrl}`;
@@ -30,14 +38,21 @@ const {
 	title = DEFAULT_TITLE,
 	description = DEFAULT_DESCRIPTION,
 	canonical,
-	image = DEFAULT_IMAGE,
+	image,
+	imageAlt,
+	ogCard,
 	noindex = false,
 	ogType = 'website',
 	analytics = true,
 } = Astro.props;
 
 const canonicalUrl = absolute(canonical ?? Astro.url.pathname);
-const imageUrl = absolute(image);
+// Imagen para compartir: la tarjeta de la página (generada en el build, 1200×630 JPEG < 300 KB) o la de la portada
+const canonicalPath = new URL(canonicalUrl).pathname;
+const pageCard = image ? null : ogCard ?? ogCardForPath(canonicalPath);
+const shareCard = image ? null : pageCard ?? DEFAULT_OG_CARD;
+const imageUrl = absolute(image ?? ogCardImagePath(pageCard ? ogPageKey(canonicalPath) : 'inicio', shareCard!));
+const imageAltText = imageAlt ?? shareCard?.alt ?? title;
 const hasCustomHead = Astro.slots.has('head');
 ---
 <!doctype html>
@@ -63,6 +78,13 @@ const hasCustomHead = Astro.slots.has('head');
 				<meta property="og:site_name" content="AI Tickets">
 				<meta property="og:locale" content="es_CL">
 				<meta property="og:image" content={imageUrl}>
+				<meta property="og:image:secure_url" content={imageUrl}>
+				{shareCard && <>
+					<meta property="og:image:type" content="image/jpeg">
+					<meta property="og:image:width" content={String(OG_WIDTH)}>
+					<meta property="og:image:height" content={String(OG_HEIGHT)}>
+				</>}
+				<meta property="og:image:alt" content={imageAltText}>
 				<!-- Twitter -->
 				<meta name="twitter:card" content="summary_large_image">
 				<meta name="twitter:title" content={title}>
@@ -71,6 +93,7 @@ const hasCustomHead = Astro.slots.has('head');
 				<meta name="twitter:site" content="@aitickets">
 				<meta name="twitter:creator" content="@aitickets">
 				<meta name="twitter:image" content={imageUrl}>
+				<meta name="twitter:image:alt" content={imageAltText}>
 			</>
 		)}
 		{/* Extras de una página puntual (p. ej. precargar su fuente de acento) sin reemplazar el head por defecto */}

@@ -37,7 +37,6 @@ import TheatreTracking from "../components/landing/teatro/TheatreTracking.astro"
 import ActEyebrow from "../components/landing/teatro/ActEyebrow.astro";
 import Layout from "../layouts/Layout.astro";
 import { publishUrl } from "../components/landing/links.js";
-import { THEATRE_PHOTOS } from "../components/landing/teatro/teatroLanding.js";
 import { getLanding } from "../data/landings";
 import { TEATRO_FAQ } from "../data/teatroFaq";
 import { IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL } from "../../netlify/lib/fees.mjs";
@@ -90,7 +89,7 @@ const jsonLd = [
 ];
 ---
 
-<Layout title={landing.title} description={landing.description} canonical={`/${landing.slug}`} image={THEATRE_PHOTOS.hero.src}>
+<Layout title={landing.title} description={landing.description} canonical={`/${landing.slug}`}>
   <link slot="head-extra" rel="preload" as="font" type="font/woff2" href={bodoniWoff2} crossorigin />
   <LandingMotion />
   <div class="te" data-theme="teatro">

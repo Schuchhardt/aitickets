@@ -41,7 +41,7 @@ import PartyTracking from "../components/landing/fiestas/PartyTracking.astro";
 import Wristband from "../components/landing/fiestas/Wristband.astro";
 import Layout from "../layouts/Layout.astro";
 import { publishUrl } from "../components/landing/links.js";
-import { PARTY_NAME, PARTY_PHOTOS, PARTY_START, PARTY_VENUE, STORY_FRAMES, partySchedule } from "../components/landing/fiestas/fiestasLanding.js";
+import { PARTY_NAME, PARTY_START, PARTY_VENUE, STORY_FRAMES, partySchedule } from "../components/landing/fiestas/fiestasLanding.js";
 import { getLanding } from "../data/landings";
 import { FIESTAS_FAQ } from "../data/fiestasFaq";
 import { DEFAULT_CADENCE, DEFAULT_KEYWORD } from "../lib/socialSeriesCadence";
@@ -120,7 +120,7 @@ const jsonLd = [
 ];
 ---
 
-<Layout title={landing.title} description={landing.description} canonical={`/${landing.slug}`} image={PARTY_PHOTOS.hero.src}>
+<Layout title={landing.title} description={landing.description} canonical={`/${landing.slug}`}>
   <link slot="head-extra" rel="preload" as="font" type="font/woff2" href={bagelWoff2} crossorigin />
   <LandingMotion />
   <div class="fi" data-theme="fiestas">
