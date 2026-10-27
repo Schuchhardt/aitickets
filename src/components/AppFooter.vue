@@ -4,6 +4,50 @@ import iconArrowGreen from "../images/icon-arrow-green.png";
 import { ref, onMounted } from "vue";
 import { LEGAL } from "../lib/legal";
 
+// Enlaces internos del sitio por columna (no quitar ninguno: sostienen el SEO de las landings y guías)
+const columns = [
+  {
+    title: "Producto",
+    links: [
+      { href: "/eventos", label: "Eventos" },
+      { href: "/organizadores", label: "Para organizadores" },
+      { href: "/organizadores/registro", label: "Crear cuenta de productor" },
+      { href: "/precios", label: "Precios" },
+      { href: "/web-gratis", label: "Web de eventos gratis" },
+      { href: "/organizadores#ia", label: "Conecta tu IA" },
+      { href: "/presentacion", label: "Presentación" },
+    ],
+  },
+  {
+    title: "Para quién",
+    links: [
+      { href: "/ticketera-stand-up", label: "Stand-up" },
+      { href: "/ticketera-teatro", label: "Teatro" },
+      { href: "/ticketera-musica-en-vivo", label: "Música en vivo" },
+      { href: "/ticketera-talleres", label: "Talleres" },
+    ],
+  },
+  {
+    title: "Recursos",
+    links: [
+      { href: "/guias", label: "Guías" },
+      { href: "/vender-entradas-online", label: "Vender entradas online" },
+      { href: "/entradas-con-qr", label: "Entradas con QR" },
+      { href: "/ventas-por-promotor", label: "Ventas por promotor" },
+      { href: "/ticketeras-en-chile", label: "Ticketeras en Chile" },
+    ],
+    newsletter: true,
+  },
+  {
+    title: "Legal",
+    links: [
+      { href: "/terms", label: "Términos y condiciones" },
+      { href: "/terminos-productores", label: "Términos para productores" },
+      { href: "/privacy", label: "Aviso de privacidad" },
+    ],
+  },
+];
+
 // Estado del formulario
 const email = ref("");
 const isFocused = ref(false);
@@ -76,98 +120,64 @@ const submitForm = async (event) => {
 </script>
 
 <template>
-  <footer class="bg-white py-6 border-t border-gray-200">
-    <div class="container mx-auto flex flex-col lg:flex-row items-center justify-between space-y-6 lg:space-y-0 px-6">
-      
-      <!-- Logo con enlace al root -->
-      <div class="flex justify-center lg:justify-start w-full lg:w-auto">
-        <a href="/" class="cursor-pointer">
-          <img :src="logoLight.src" alt="AI Tickets" class="h-8" />
+  <!-- Cuatro columnas en desktop (rediseño, SPEC_landing_productores §5.10): Producto · Para quién · Recursos · Legal.
+       Mismos enlaces internos de siempre (valor SEO); el formulario de la comunidad va en Recursos. -->
+  <footer class="bg-white border-t border-gray-200 font-['Prompt']">
+    <div class="max-w-[1120px] mx-auto px-4 md:px-8 pt-14 pb-10 grid gap-10 grid-cols-2 lg:grid-cols-5 text-sm">
+      <div class="col-span-2 lg:col-span-1">
+        <a href="/" class="inline-block cursor-pointer">
+          <img :src="logoLight.src" alt="AI Tickets" class="h-8 w-auto" width="152" height="32" />
         </a>
-      </div>
-
-      <!-- Formulario de suscripción o mensaje de éxito -->
-      <div class="flex flex-col items-center lg:items-end w-full lg:w-auto">
-        <p class="text-gray-900 font-bold text-sm font-['Unbounded']">
-          Únete a la comunidad AI 🔥
-        </p>
-        <div v-if="!successMessage" class="relative mt-2">
-          <form @submit.prevent="submitForm" class="flex">
-            <input 
-              v-model="email" 
-              type="email"
-              name="email" 
-              placeholder="Ingresa tu correo"
-              @focus="isFocused = true"
-              @blur="isFocused = false"
-              class="w-64 lg:w-80 border border-gray-300 py-2 pl-4 pr-16 rounded-full text-gray-600 font-['Prompt'] focus:outline-none focus:ring-2 focus:ring-gray-300 cursor-pointer"
-              required
-            />
-            <button 
-              type="submit"
-              class="absolute right-2 top-1/2 transform -translate-y-1/2 w-10 h-10 rounded-full transition-transform duration-300 cursor-pointer flex items-center justify-center"
-              :class="{ 'rotate-45': isFocused || email.length > 0 }"
-              aria-label="Enviar" 
-              >
-              <img :src="iconArrowGreen.src" alt="Enviar" class="w-6 h-6 transition-transform duration-300" />
-            </button>
-          </form>
+        <p class="mt-3 text-xs text-gray-500">© 2026 {{ LEGAL.brand }}</p>
+        <div class="flex space-x-4 mt-4">
+          <a href="https://www.facebook.com/profile.php?id=61573771138631" target="_blank" rel="noopener noreferrer" class="cursor-pointer">
+            <img src="https://cdn.simpleicons.org/facebook/000000" alt="Facebook" class="w-6 h-6" loading="lazy" width="24" height="24" />
+          </a>
+          <a href="https://www.linkedin.com/company/ai-tickets" target="_blank" rel="noopener noreferrer" class="cursor-pointer">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/8/81/LinkedIn_icon.svg" alt="LinkedIn" class="w-6 h-6" loading="lazy" width="24" height="24" />
+          </a>
         </div>
-
-        <!-- Mensaje de confirmación -->
-        <p v-else class="text-green-600 font-bold mt-2 font-['Prompt']">{{ successMessage }}</p>
-
-        <!-- Mensaje de error -->
-        <p v-if="errorMessage" class="text-red-500 mt-2 text-sm font-['Prompt']">{{ errorMessage }}</p>
       </div>
 
+      <nav v-for="col in columns" :key="col.title" :aria-label="col.title" class="min-w-0">
+        <p class="font-semibold text-gray-900">{{ col.title }}</p>
+        <ul class="mt-3 flex flex-col gap-2.5 text-gray-600">
+          <li v-for="link in col.links" :key="link.href"><a :href="link.href" class="hover:text-gray-900 hover:underline">{{ link.label }}</a></li>
+        </ul>
+
+        <!-- Formulario de suscripción o mensaje de éxito (columna Recursos) -->
+        <div v-if="col.newsletter" class="mt-6">
+          <p class="text-gray-900 font-semibold">Únete a la comunidad AI 🔥</p>
+          <div v-if="!successMessage" class="relative mt-2">
+            <form @submit.prevent="submitForm" class="flex">
+              <input
+                v-model="email"
+                type="email"
+                name="email"
+                placeholder="Ingresa tu correo"
+                aria-label="Tu correo"
+                @focus="isFocused = true"
+                @blur="isFocused = false"
+                class="w-full max-w-64 border border-gray-300 py-2 pl-4 pr-12 rounded-full text-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                required
+              />
+              <button
+                type="submit"
+                class="absolute right-1 top-1/2 transform -translate-y-1/2 w-9 h-9 rounded-full transition-transform duration-300 cursor-pointer flex items-center justify-center"
+                :class="{ 'rotate-45': isFocused || email.length > 0 }"
+                aria-label="Enviar"
+              >
+                <img :src="iconArrowGreen.src" alt="" class="w-5 h-5 transition-transform duration-300" />
+              </button>
+            </form>
+          </div>
+          <!-- Mensaje de confirmación -->
+          <p v-else class="text-green-700 font-semibold mt-2">{{ successMessage }}</p>
+          <!-- Mensaje de error -->
+          <p v-if="errorMessage" class="text-red-600 mt-2 text-sm">{{ errorMessage }}</p>
+        </div>
+      </nav>
     </div>
-
-    <!-- Redes sociales -->
-    <div class="flex justify-center space-x-4 mt-4">
-  <a href="https://www.facebook.com/profile.php?id=61573771138631" target="_blank" rel="noopener noreferrer" class="cursor-pointer">
-    <img src="https://cdn.simpleicons.org/facebook/000000" alt="Facebook" class="w-6 h-6" loading="lazy" width="24" height="24" />
-  </a>
-  <a href="https://www.linkedin.com/company/ai-tickets" target="_blank" rel="noopener noreferrer" class="cursor-pointer">
-    <img src="https://upload.wikimedia.org/wikipedia/commons/8/81/LinkedIn_icon.svg" alt="LinkedIn" class="w-6 h-6" loading="lazy" width="24" height="24" />
-  </a>
-</div>
-
-
-    <!-- Links internos -->
-    <nav aria-label="Enlaces del sitio" class="mt-6 text-center text-gray-600 text-sm font-['Prompt']">
-      <ul class="flex flex-wrap justify-center gap-x-6 gap-y-2 px-6">
-        <li><a href="/eventos" class="hover:underline">Eventos</a></li>
-        <li><a href="/organizadores" class="hover:underline">Para organizadores</a></li>
-        <li><a href="/organizadores/registro" class="hover:underline">Crear cuenta de productor</a></li>
-        <li><a href="/precios" class="hover:underline">Precios</a></li>
-        <li><a href="/web-gratis" class="hover:underline">Web de eventos gratis</a></li>
-        <li><a href="/presentacion" class="hover:underline">Presentación</a></li>
-        <li><a href="/guias" class="hover:underline">Guías</a></li>
-        <li><a href="/ticketeras-en-chile" class="hover:underline">Ticketeras en Chile</a></li>
-      </ul>
-      <ul class="flex flex-wrap justify-center gap-x-6 gap-y-2 px-6 mt-2 text-gray-500">
-        <li><a href="/ticketera-stand-up" class="hover:underline">Stand-up</a></li>
-        <li><a href="/ticketera-teatro" class="hover:underline">Teatro</a></li>
-        <li><a href="/ticketera-musica-en-vivo" class="hover:underline">Música en vivo</a></li>
-        <li><a href="/ticketera-talleres" class="hover:underline">Talleres</a></li>
-        <li><a href="/vender-entradas-online" class="hover:underline">Vender entradas online</a></li>
-        <li><a href="/entradas-con-qr" class="hover:underline">Entradas con QR</a></li>
-      </ul>
-    </nav>
-
-    <!-- Links de términos y condiciones -->
-    <div class="mt-4 text-center text-gray-500 text-sm font-['Prompt']">
-      <div class="flex flex-wrap justify-center gap-x-4 gap-y-2 px-6">
-        <a href="/terms" class="hover:underline">Términos y condiciones</a>
-        <span aria-hidden="true" class="hidden sm:inline">|</span>
-        <a href="/terminos-productores" class="hover:underline">Términos para productores</a>
-        <span aria-hidden="true" class="hidden sm:inline">|</span>
-        <a href="/privacy" class="hover:underline">Aviso de privacidad</a>
-      </div>
-      <p class="mt-3 text-xs text-gray-400">© 2026 {{ LEGAL.brand }}</p>
-    </div>
-
   </footer>
 </template>
 

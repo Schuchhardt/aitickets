@@ -1,0 +1,149 @@
+---
+// 7 · Tu ticketera, dentro de tu IA (SPEC_landing_productores §5.7): opcional, a la mitad de alto que antes y con el
+// chat en blanco/gris. Las herramientas nombradas existen en la API de productores (src/lib/producer-api/tools).
+// Enlaces de registro/login hacia /dashboard/ia, los mismos de AIConnectSection.vue.
+const signupUrl = "/organizadores/registro?next=%2Fdashboard%2Fia&utm_source=aitickets&utm_medium=landing&utm_campaign=organizadores_ia";
+const clients = ["Claude", "ChatGPT", "Claude Code", "Cursor", "n8n / Zapier"];
+const steps = ["Crea tu cuenta", "Copia la URL del conector", "Pégala en Claude o ChatGPT"];
+---
+
+<section id="ia" class="lp-section" aria-labelledby="ai-title">
+  <div class="lp-wrap ai">
+    <div class="ai-copy">
+      <p class="lp-eyebrow">Opcional · Claude y ChatGPT</p>
+      <h2 id="ai-title" class="lp-h2 ai-title">Tu ticketera, dentro de tu IA.</h2>
+      <p class="lp-lead ai-lead">
+        Conecta AI Tickets a Claude o ChatGPT y gestiona tus eventos conversando: cómo van las ventas, códigos de descuento,
+        posts. Publicar, cobrar o enviar mensajes siempre te pide confirmación. No es obligatorio: todo funciona también
+        desde el panel.
+      </p>
+      <ol class="ai-steps">
+        {steps.map((step, i) => (
+          <li><strong>{i + 1}</strong> {step}</li>
+        ))}
+      </ol>
+      <a href={signupUrl} class="lp-link ai-cta" data-cta="connect_ai" data-section="ai">Conecta tu IA <span aria-hidden="true">→</span></a>
+      <ul class="ai-chips" aria-label="Funciona con">
+        {clients.map((c) => <li class="lp-chip">{c}</li>)}
+      </ul>
+    </div>
+
+    <figure class="ai-chat lp-card" aria-label="Conversación de ejemplo con un asistente conectado a AI Tickets">
+      <figcaption class="ai-chat-head"><span>Tu asistente · conectado a AI Tickets</span><span>Datos de ejemplo</span></figcaption>
+      <p class="msg msg-me">¿Cómo va la venta de “Stand-up de Viernes”?</p>
+      <div class="msg msg-ai">
+        <p>
+          Vas en <strong>142 de 200</strong> entradas (71%) y <strong>$1.136.000</strong> vendidos. El link de campaña de
+          Instagram es el que más vende. Faltan 9 días: te propongo un código de última semana.
+        </p>
+        <p class="msg-tools">get_event_performance ✓</p>
+      </div>
+      <p class="msg msg-me">Dale. 15% hasta el jueves, y arma un post para Instagram.</p>
+      <div class="msg msg-ai">
+        <p>
+          Listo: creé <strong>ULTIMASEMANA15</strong> (15%, vence el jueves 23:59) y dejé el post en borrador con imagen y
+          link de seguimiento. ¿Lo publico?
+        </p>
+        <p class="msg-tools">create_discount_code ✓ · generate_image ✓ · create_social_post ✓</p>
+      </div>
+    </figure>
+  </div>
+</section>
+
+<style>
+  .ai {
+    display: grid;
+    gap: 32px;
+  }
+  .ai-title {
+    margin-top: 10px;
+  }
+  .ai-lead {
+    margin-top: 12px;
+  }
+  .ai-steps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 22px;
+    margin-top: 24px;
+    font-size: 15px;
+  }
+  .ai-steps li + li::before {
+    content: "→";
+    margin-right: 22px;
+    color: var(--text-3);
+  }
+  .ai-steps strong {
+    font-family: "Unbounded", system-ui, sans-serif;
+  }
+  .ai-cta {
+    margin-top: 24px;
+    font-weight: 600;
+  }
+  .ai-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 18px;
+  }
+  .ai-chat {
+    margin: 0;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .ai-chat-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text-3);
+  }
+  .msg {
+    max-width: 86%;
+    padding: 12px 14px;
+    font-size: 14px;
+    line-height: 21px;
+  }
+  .msg-me {
+    align-self: flex-end;
+    max-width: 78%;
+    border-radius: 16px 16px 4px 16px;
+    background: var(--brand-ink);
+    color: #fff;
+  }
+  .msg-ai {
+    align-self: flex-start;
+    border-radius: 16px 16px 16px 4px;
+    background: var(--surface-1);
+  }
+  .msg-ai strong {
+    font-weight: 600;
+  }
+  .msg-tools {
+    margin-top: 8px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px;
+    color: var(--text-3);
+    overflow-wrap: anywhere;
+  }
+  @media (min-width: 1024px) {
+    .ai {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 64px;
+      align-items: center;
+    }
+    .ai-title {
+      margin-top: 14px;
+    }
+    .ai-lead {
+      margin-top: 18px;
+    }
+    .ai-chat {
+      padding: 22px;
+    }
+  }
+</style>

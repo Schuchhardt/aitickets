@@ -1,0 +1,207 @@
+---
+// 2 · Cómo funciona (SPEC_landing_productores §5.2): tres pasos con un mini-mockup cada uno. En mobile van apilados
+// (la spec prefiere apilados a un carrusel por accesibilidad) y sin los mockups, como en el prototipo.
+import { LANDING_MEDIA } from "../producerLanding.js";
+import { PAYOUT_RELEASE_HOURS } from "../../../../netlify/lib/legal.mjs";
+
+const steps = [
+  { title: "Publica", text: "Todas las fechas en un solo evento. Para la próxima temporada, lo duplicas." },
+  { title: "Comparte", text: "Un link para cada comediante, promotor o campaña, y posts listos con IA." },
+  {
+    title: "Cobra",
+    text: `Tu equipo valida con QR desde el celular y lo de cada función queda disponible ${PAYOUT_RELEASE_HOURS}\u00a0h después de que termina.`,
+  },
+];
+---
+
+<section class="how lp-wrap" aria-labelledby="how-title">
+  <p class="lp-eyebrow">Cómo funciona</p>
+  <h2 id="how-title" class="lp-h2 how-title">De la fecha a la puerta, en un solo lugar.</h2>
+
+  <ol class="how-steps">
+    {steps.map((step, i) => (
+      <li class="how-step">
+        <div class="how-mock lp-tile" aria-hidden="true">
+          {i === 0 && (
+            <>
+              <p class="how-mock-title">Funciones · Stand-up de Viernes</p>
+              <p class="lp-row"><span>Vie 23 oct · 21:00</span><span class="how-muted">Providencia</span></p>
+              <p class="lp-row"><span>Sáb 24 oct · 21:00</span><span class="how-muted">Providencia</span></p>
+              <p class="lp-row"><span>Sáb 31 oct · 20:00</span><span class="how-muted">Ñuñoa</span></p>
+              <p class="how-add">+ Agregar función</p>
+            </>
+          )}
+          {i === 1 && (
+            <>
+              <p class="how-mock-title">Links de venta</p>
+              <p class="lp-row"><span>aitickets.cl/…?ref=pedro</span><strong>23</strong></p>
+              <p class="lp-row"><span>aitickets.cl/…?ref=ana</span><strong>11</strong></p>
+              <p class="lp-row"><span>aitickets.cl/…?ref=ig-ads</span><strong>37</strong></p>
+              <p class="how-mock-foot">+ Post para Instagram listo con IA</p>
+            </>
+          )}
+          {i === 2 && (
+            <div class="how-scan">
+              <span class="how-scan-ok">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>
+              </span>
+              <p class="how-scan-title">Válida</p>
+              <p class="how-scan-sub">General · Sebastián P.</p>
+            </div>
+          )}
+        </div>
+        <div class="how-text">
+          <p class="lp-step-num" aria-hidden="true">{String(i + 1).padStart(2, "0")}</p>
+          <div>
+            <h3 class="lp-h3 how-step-title">{step.title}</h3>
+            <p class="lp-body how-step-text">{step.text}</p>
+          </div>
+        </div>
+      </li>
+    ))}
+  </ol>
+
+  <p class="how-more">
+    <a href={LANDING_MEDIA.demoVideo} class="lp-link" data-video-open data-cta="video" data-section="how">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"></path></svg>
+      Ver el video completo
+    </a>
+    <a href="/guias/como-vender-entradas-online" class="lp-link" data-cta="learn_sell_online" data-section="how">
+      Guía: cómo vender entradas online <span aria-hidden="true">→</span>
+    </a>
+  </p>
+</section>
+
+<style>
+  .how {
+    padding-top: 72px;
+    padding-bottom: 80px;
+  }
+  .how-title {
+    margin-top: 10px;
+    max-width: 640px;
+  }
+  .how-steps {
+    display: grid;
+    gap: 22px;
+    margin-top: 26px;
+  }
+  .how-mock {
+    display: none;
+  }
+  .how-text {
+    display: flex;
+    gap: 14px;
+  }
+  .how-text .lp-step-num {
+    width: 26px;
+    flex: 0 0 auto;
+    line-height: 26px;
+  }
+  .how-step-title {
+    font-size: 17px;
+    line-height: 26px;
+    font-family: "Prompt", system-ui, sans-serif;
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+  .how-step-text {
+    margin-top: 2px;
+    font-size: 15px;
+    line-height: 23px;
+  }
+  .how-more {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 28px;
+    margin-top: 28px;
+  }
+  .how-mock-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-2);
+  }
+  .how-muted {
+    color: var(--text-2);
+  }
+  .how-add {
+    padding: 9px 12px;
+    border: 1px dashed var(--border-strong);
+    border-radius: 10px;
+    font-size: 13px;
+    color: var(--text-2);
+  }
+  .how-mock-foot {
+    margin-top: auto;
+    font-size: 12px;
+    color: var(--text-2);
+  }
+  .how-scan {
+    width: 170px;
+    margin: auto;
+    padding: 14px;
+    border-radius: 18px;
+    background: var(--brand-ink);
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .how-scan-ok {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--brand-lime);
+    color: var(--brand-ink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .how-scan-title {
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .how-scan-sub {
+    font-size: 12px;
+    color: var(--lp-on-dark-3);
+  }
+
+  @media (min-width: 768px) {
+    .how-steps {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 24px;
+      margin-top: 48px;
+    }
+    .how-mock {
+      height: 240px;
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .how-text {
+      display: block;
+      margin-top: 22px;
+    }
+    .how-step-title {
+      margin-top: 6px;
+      font-family: "Unbounded", system-ui, sans-serif;
+      font-size: 20px;
+      line-height: 26px;
+      font-weight: 700;
+    }
+    .how-step-text {
+      margin-top: 8px;
+      font-size: 16px;
+      line-height: 25px;
+    }
+  }
+  @media (min-width: 1024px) {
+    .how {
+      padding-top: 48px;
+      padding-bottom: 128px;
+    }
+  }
+</style>

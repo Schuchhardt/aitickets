@@ -1,0 +1,498 @@
+---
+// 1 · Hero + prueba social (SPEC_landing_productores §5.1). El teléfono muestra la página del evento con la portada en
+// video; el póster carga como imagen prioritaria y el video se monta después (LandingCoverVideo) para no ser el LCP.
+// La prueba social solo se muestra con datos reales (src/data/producerSocialProof.ts).
+import LandingCoverVideo from "../LandingCoverVideo.vue";
+import { DEMO_EVENT_URL, publishUrl, whatsappUrl } from "../links.js";
+import { DEMO_EVENT_NAME, LANDING_MEDIA, formatCLP } from "../producerLanding.js";
+import { SERVICE_FEE_PERCENT_LABEL } from "../../../../netlify/lib/fees.mjs";
+import { PAYOUT_RELEASE_HOURS } from "../../../../netlify/lib/legal.mjs";
+import { PRODUCER_LOGOS, PRODUCER_STATS } from "../../../data/producerSocialProof";
+
+const hasProof = PRODUCER_LOGOS.length > 0 || PRODUCER_STATS.length > 0;
+---
+
+<section class="hero lp-wrap" aria-labelledby="hero-title">
+  <div class="hero-copy">
+    <p class="lp-eyebrow">Para productores · Sin mensualidad · 0% de comisión para ti</p>
+    <h1 id="hero-title" class="lp-h1 hero-title">Tu próxima función merece vender más.</h1>
+    <p class="hero-lead">
+      Publica tus fechas en minutos, mide qué promotor vende y cobra lo de cada función: queda disponible
+      {PAYOUT_RELEASE_HOURS} horas después de que termina.
+    </p>
+    <div class="hero-ctas" data-hero-cta>
+      <a href={publishUrl("organizadores_hero")} class="ev-btn ev-btn-primary lp-btn-lg hero-primary" data-cta="publish" data-section="hero">
+        Publicar mi próxima función <span aria-hidden="true">→</span>
+      </a>
+      <a href={LANDING_MEDIA.demoVideo} class="hero-play" data-video-open data-cta="video" data-section="hero">
+        <span class="hero-play-icon" aria-hidden="true">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l12-7.5z"></path></svg>
+        </span>
+        Ver cómo funciona · {LANDING_MEDIA.demoDurationLabel}
+      </a>
+    </div>
+    <p class="lp-small hero-micro">
+      Crear tu cuenta es gratis. El comprador paga un cargo de {SERVICE_FEE_PERCENT_LABEL} + IVA, o lo absorbes tú.
+    </p>
+    <p class="hero-help">
+      ¿Prefieres hablar?
+      <a href={whatsappUrl()} class="lp-inline-link" target="_blank" rel="noopener noreferrer" data-cta="whatsapp" data-section="hero">Escríbenos por WhatsApp</a>
+      ·
+      <a href={DEMO_EVENT_URL} class="lp-inline-link" data-cta="demo_event" data-section="hero">Mira un evento de ejemplo</a>
+    </p>
+  </div>
+
+  <div class="stage" role="img" aria-label={`Ejemplo de la página de un evento en el celular, con ventas y pagos de ${DEMO_EVENT_NAME}`}>
+    <div class="stage-phone lp-phone" aria-hidden="true">
+      <div class="lp-phone-screen phone-screen">
+        <div class="phone-notch"><span></span></div>
+        <div class="phone-cover-wrap">
+          <div class="phone-cover">
+            <LandingCoverVideo
+              client:idle
+              src={LANDING_MEDIA.coverVideo}
+              poster={LANDING_MEDIA.coverPoster}
+              posterWidth={LANDING_MEDIA.coverPosterWidth}
+              posterHeight={LANDING_MEDIA.coverPosterHeight}
+              priority
+              sound={false}
+            />
+            <div class="phone-cover-shade"></div>
+            <p class="phone-cover-title">STAND-UP<br />DE VIERNES</p>
+          </div>
+        </div>
+        <div class="phone-info">
+          <p class="phone-name">{DEMO_EVENT_NAME}</p>
+          <p class="phone-meta">Vie 23 oct · 21:00 · y 5 funciones más</p>
+          <p class="phone-meta">Providencia y Ñuñoa</p>
+          <div class="phone-card">
+            <p class="phone-price"><span>Desde</span><strong class="ev-tabular">{formatCLP(8000)}</strong></p>
+            <p class="phone-buy">Elegir entradas</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="float float-sold" aria-hidden="true">
+      <p class="float-kicker">{DEMO_EVENT_NAME}</p>
+      <p class="float-main ev-tabular">142 de 200 vendidas</p>
+      <div class="float-track"><div class="float-fill"></div></div>
+    </div>
+    <div class="float float-link" aria-hidden="true">
+      <p class="float-kicker float-split"><span>Link de Pedro</span><span>Comediante</span></p>
+      <p class="float-main ev-tabular">23 entradas · {formatCLP(184000)}</p>
+    </div>
+    <div class="float float-paid" aria-hidden="true">
+      <span class="float-check">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>
+      </span>
+      <div>
+        <p class="float-kicker">Pago disponible · función del jueves</p>
+        <p class="float-main ev-tabular">{formatCLP(1296000)}</p>
+      </div>
+    </div>
+    <p class="lp-example stage-note">Datos de ejemplo</p>
+  </div>
+</section>
+
+{hasProof && (
+  <section class="proof lp-wrap" aria-label="Productores que ya venden con AI Tickets">
+    <div class="proof-inner">
+      {PRODUCER_LOGOS.length > 0 && (
+        <div class="proof-logos">
+          <p class="lp-small">Productores que ya venden con AI Tickets</p>
+          <ul>
+            {PRODUCER_LOGOS.map((logo) => (
+              <li><img src={logo.src} alt={logo.name} width={logo.width} height={logo.height} loading="lazy" decoding="async" /></li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {PRODUCER_STATS.length > 0 && (
+        <dl class="proof-stats">
+          {PRODUCER_STATS.map((stat) => (
+            <div>
+              <dt class="lp-small">{stat.label}</dt>
+              <dd class="lp-display">{stat.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </div>
+  </section>
+)}
+
+<style>
+  .hero {
+    display: grid;
+    gap: 28px;
+    padding-top: 28px;
+    padding-bottom: 8px;
+  }
+  .hero-title {
+    margin-top: 14px;
+  }
+  .hero-lead {
+    margin-top: 16px;
+    max-width: 34rem;
+    font-size: 17px;
+    line-height: 26px;
+    color: var(--text-2);
+  }
+  .hero-ctas {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: 24px;
+  }
+  .hero-primary {
+    text-decoration: none;
+  }
+  .hero-play {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 48px;
+    padding: 0 16px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-md);
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text-1);
+    text-decoration: none;
+    transition: border-color var(--dur-1) var(--ease-out);
+  }
+  .hero-play:hover {
+    border-color: var(--text-1);
+  }
+  .hero-play:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px #fff, 0 0 0 6px var(--brand-lime);
+  }
+  .hero-play-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .hero-micro {
+    margin-top: 16px;
+    text-align: center;
+  }
+  .hero-help {
+    margin-top: 10px;
+    font-size: 14px;
+    line-height: 22px;
+    color: var(--text-2);
+    text-align: center;
+  }
+
+  /* Composición: en mobile, recorte de 360 px sobre --surface-1; en desktop, el teléfono completo con 3 cards */
+  .stage {
+    position: relative;
+    height: 360px;
+    border-radius: var(--r-xl);
+    background: var(--surface-1);
+    overflow: hidden;
+  }
+  .stage-phone {
+    position: absolute;
+    left: 50%;
+    top: 32px;
+    width: 300px;
+    height: 620px;
+    transform: translateX(-50%) scale(0.77);
+    transform-origin: top center;
+  }
+  .phone-screen {
+    display: flex;
+    flex-direction: column;
+  }
+  .phone-notch {
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .phone-notch span {
+    width: 90px;
+    height: 22px;
+    border-radius: 12px;
+    background: var(--brand-ink);
+  }
+  .phone-cover-wrap {
+    padding: 6px 14px 0;
+    background: #eee9f7;
+  }
+  .phone-cover {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    border-radius: var(--r-lg);
+    overflow: hidden;
+    background: #24163f;
+  }
+  .phone-cover-shade {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.45) 0%, rgba(0, 0, 0, 0) 45%);
+    pointer-events: none;
+  }
+  .phone-cover-title {
+    position: absolute;
+    left: 16px;
+    top: 16px;
+    font-family: "Unbounded", system-ui, sans-serif;
+    font-size: 24px;
+    line-height: 1;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: #fff;
+  }
+  .phone-info {
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .phone-name {
+    font-family: "Unbounded", system-ui, sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .phone-meta {
+    font-size: 12px;
+    color: var(--text-2);
+  }
+  .phone-card {
+    margin-top: 8px;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .phone-price {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 11px;
+    color: var(--text-2);
+  }
+  .phone-price strong {
+    font-family: "Unbounded", system-ui, sans-serif;
+    font-size: 15px;
+    color: var(--text-1);
+  }
+  .phone-buy {
+    height: 36px;
+    border-radius: 10px;
+    background: var(--brand-ink);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .float {
+    position: absolute;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--surface-0);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 12px 32px rgba(0, 0, 0, 0.1);
+  }
+  .float-kicker {
+    font-size: 12px;
+    color: var(--text-2);
+  }
+  .float-split {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .float-main {
+    margin-top: 2px;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .float-track {
+    height: 6px;
+    margin-top: 10px;
+    border-radius: 3px;
+    background: var(--surface-2);
+    overflow: hidden;
+  }
+  .float-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: var(--brand-lime);
+    transform: scaleX(0.71);
+    transform-origin: left;
+  }
+  /* Mobile: solo la card de vendidas, abajo y a lo ancho */
+  .float-sold {
+    left: 14px;
+    right: 14px;
+    bottom: 18px;
+  }
+  .float-link,
+  .float-paid {
+    display: none;
+  }
+  .float-paid {
+    border: 0;
+    background: var(--brand-ink);
+    color: #fff;
+    gap: 12px;
+    align-items: center;
+  }
+  .float-paid .float-kicker {
+    color: var(--lp-on-dark-3);
+  }
+  .float-check {
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--brand-lime);
+    color: var(--brand-ink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .stage-note {
+    position: absolute;
+    right: 14px;
+    top: 12px;
+  }
+
+  .proof {
+    padding-top: 28px;
+  }
+  .proof-inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px 32px;
+    padding-top: 28px;
+    border-top: 1px solid var(--border);
+  }
+  .proof-logos ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 24px;
+    margin-top: 12px;
+  }
+  .proof-logos img {
+    height: 32px;
+    width: auto;
+    filter: grayscale(1);
+    opacity: 0.6;
+    transition: opacity var(--dur-2) var(--ease-out);
+  }
+  .proof-logos img:hover {
+    opacity: 1;
+  }
+  .proof-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px 40px;
+  }
+  .proof-stats div {
+    display: flex;
+    flex-direction: column-reverse;
+  }
+  .proof-stats dd {
+    font-size: 28px;
+    line-height: 34px;
+  }
+
+  @media (min-width: 640px) {
+    .hero-ctas {
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 20px;
+    }
+    .hero-play {
+      min-height: 0;
+      padding: 0;
+      border: 0;
+    }
+    .hero-play-icon {
+      width: 36px;
+      height: 36px;
+      border: 1px solid var(--border-strong);
+      border-radius: 50%;
+    }
+    .hero-micro,
+    .hero-help {
+      text-align: left;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .hero {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      align-items: center;
+      gap: 48px;
+      min-height: 640px;
+      padding-top: 40px;
+    }
+    .hero-lead {
+      margin-top: 24px;
+      font-size: 19px;
+      line-height: 30px;
+    }
+    .hero-ctas {
+      margin-top: 36px;
+    }
+    .hero-micro {
+      margin-top: 18px;
+    }
+    .stage {
+      height: 640px;
+      border-radius: 0;
+      background: none;
+      overflow: visible;
+    }
+    .stage-phone {
+      top: 10px;
+      transform: translateX(-50%);
+    }
+    .phone-cover-title {
+      font-size: 28px;
+    }
+    .float-sold {
+      left: 0;
+      right: auto;
+      top: 92px;
+      bottom: auto;
+      width: 236px;
+    }
+    .float-link {
+      display: block;
+      right: 0;
+      top: 300px;
+      width: 220px;
+    }
+    .float-paid {
+      display: flex;
+      left: 24px;
+      bottom: 56px;
+      width: 250px;
+    }
+    .stage-note {
+      top: auto;
+      right: 8px;
+      bottom: 8px;
+    }
+    .proof {
+      padding-top: 24px;
+    }
+  }
+</style>

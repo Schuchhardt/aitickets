@@ -1,0 +1,61 @@
+---
+// 3 · Precio con calculadora (SPEC_landing_productores §5.3, ancla #precios). Copy y montos desde fees.mjs; cómo se
+// absorbe el cargo, desde producerFaq.ts (hoy no es un switch del panel: se pide por evento a la IA o por WhatsApp).
+import PriceCalculator from "../PriceCalculator.vue";
+import { IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL } from "../../../../netlify/lib/fees.mjs";
+import { ABSORB_FEE_ACTIVATION } from "../../../data/producerFaq";
+---
+
+<section id="precios" class="lp-section lp-surface" aria-labelledby="precios-title">
+  <div class="lp-wrap">
+    <div class="price-head">
+      <p class="lp-eyebrow">Precio</p>
+      <h2 id="precios-title" class="lp-h2 price-title">Sin mensualidad. Se cobra solo cuando vendes.</h2>
+      <p class="lp-lead price-lead">
+        Para ti, 0% de comisión. El comprador paga un cargo por servicio de {SERVICE_FEE_PERCENT_LABEL} sobre el valor de la
+        entrada, más IVA ({IVA_PERCENT_LABEL}) sobre ese cargo. Si prefieres mostrar un precio final, lo absorbes tú, por
+        evento. {ABSORB_FEE_ACTIVATION} Las entradas gratis no pagan cargo.
+      </p>
+    </div>
+    <div class="price-calc">
+      <PriceCalculator client:visible />
+    </div>
+    <a href="/precios" class="lp-link price-more" data-cta="pricing" data-section="pricing">Ver precios en detalle <span aria-hidden="true">→</span></a>
+  </div>
+</section>
+
+<style>
+  .price-head {
+    max-width: 720px;
+  }
+  .price-title {
+    margin-top: 10px;
+  }
+  .price-lead {
+    margin-top: 12px;
+  }
+  .price-calc {
+    margin-top: 28px;
+    /* Reserva el alto de la calculadora antes de hidratar (CLS) */
+    min-height: 420px;
+  }
+  .price-more {
+    margin-top: 24px;
+  }
+  @media (min-width: 900px) {
+    .price-calc {
+      min-height: 360px;
+    }
+  }
+  @media (min-width: 1024px) {
+    .price-title {
+      margin-top: 14px;
+    }
+    .price-lead {
+      margin-top: 18px;
+    }
+    .price-calc {
+      margin-top: 44px;
+    }
+  }
+</style>
