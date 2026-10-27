@@ -1,0 +1,84 @@
+---
+// 8 · Testimonio (SPEC_landing_standup §4.8): solo con una cita real, con nombre, productora y foto autorizados
+// (STANDUP_TESTIMONIAL en src/data/producerSocialProof.ts). Sin datos no se renderiza nada: nunca se inventa.
+import { STANDUP_TESTIMONIAL } from "../../../data/producerSocialProof";
+
+const t = STANDUP_TESTIMONIAL;
+---
+
+{t && (
+  <section class="su-wrap tm" aria-label="Lo que dice un productor" data-su-section="testimonial">
+    <figure class="tm-inner" data-lp-reveal>
+      <p class="tm-mark" aria-hidden="true">“</p>
+      <blockquote class="tm-quote su-serif" data-lp-step>{t.quote}</blockquote>
+      <figcaption class="tm-author" data-lp-step>
+        <img src={t.photo.src} alt="" width={t.photo.width} height={t.photo.height} loading="lazy" decoding="async" />
+        <span>
+          <span class="tm-name">{t.name}</span>
+          <span class="tm-company">{t.company}</span>
+        </span>
+      </figcaption>
+    </figure>
+  </section>
+)}
+
+<style>
+  .tm {
+    padding-top: 96px;
+    padding-bottom: 72px;
+    text-align: center;
+  }
+  .tm-inner {
+    max-width: 1020px;
+    margin: 0 auto;
+  }
+  .tm-mark {
+    font-family: "Fraunces", Georgia, serif;
+    font-size: 96px;
+    line-height: 48px;
+    color: var(--brand-lime);
+  }
+  .tm-quote {
+    margin-top: 20px;
+    font-size: 28px;
+    line-height: 38px;
+    color: var(--sb-text-1);
+  }
+  .tm-author {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    margin-top: 32px;
+    text-align: left;
+  }
+  .tm-author img {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+  .tm-name {
+    display: block;
+    font-weight: 600;
+  }
+  .tm-company {
+    display: block;
+    font-size: 14px;
+    color: var(--sb-text-3);
+  }
+  @media (min-width: 1024px) {
+    .tm {
+      padding-top: 160px;
+      padding-bottom: 120px;
+    }
+    .tm-mark {
+      font-size: 120px;
+      line-height: 60px;
+    }
+    .tm-quote {
+      font-size: 46px;
+      line-height: 58px;
+    }
+  }
+</style>

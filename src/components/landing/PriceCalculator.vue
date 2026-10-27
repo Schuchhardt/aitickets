@@ -2,22 +2,24 @@
 // Calculadora de la landing de productores (SPEC_landing_productores §5.3). Los montos salen de fees.mjs (priceQuote →
 // computeFeeSplit), la misma regla del checkout: cargo 8% redondeado a pesos + IVA 19% del cargo, que paga el
 // comprador o absorbe el productor. Ej.: $10.000 → comprador $10.952 / recibes $10.000; absorbido → recibes $9.048.
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import AnimatedNumber from '../event/AnimatedNumber.vue'
 import { IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL } from '../../../netlify/lib/fees.mjs'
 import { CALC_PRICE, CALC_QTY, formatCLP, parseAmount, priceQuote } from './producerLanding.js'
+import { useDelayedAnnouncement, usePayerToggle } from '../../composables/usePriceCalculator.js'
 
 const price = ref(CALC_PRICE.default)
 const priceText = ref(CALC_PRICE.default.toLocaleString('es-CL'))
 const qty = ref(CALC_QTY.default)
-const payer = ref('buyer')
 const breakdownOpen = ref(false)
 
-const quote = computed(() => priceQuote(price.value, payer.value, qty.value))
 const payers = [
   { value: 'buyer', label: 'El comprador' },
   { value: 'producer', label: 'Yo lo absorbo' },
 ]
+// Segmented control como radiogroup: flechas cambian la opción (y el foco)
+const { payer, segButtons, onSegKey } = usePayerToggle(payers)
+const quote = computed(() => priceQuote(price.value, payer.value, qty.value))
 
 function onPriceText(e) {
   const n = parseAmount(e.target.value, CALC_PRICE.inputMax)
@@ -35,29 +37,11 @@ function onQtyRange(e) {
   qty.value = Number(e.target.value)
 }
 
-// Segmented control como radiogroup: flechas cambian la opción (y el foco)
-const segButtons = ref([])
-function onSegKey(e, i) {
-  if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return
-  e.preventDefault()
-  const next = (i + (e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 1) + payers.length) % payers.length
-  payer.value = payers[next].value
-  segButtons.value[next]?.focus()
-}
-
 // Total anunciado a lectores de pantalla con 400 ms de pausa (no a cada paso del slider)
-const announced = ref('')
-let announceTimer = null
-watch(
+const announced = useDelayedAnnouncement(
   () => quote.value.total,
-  (total) => {
-    clearTimeout(announceTimer)
-    announceTimer = setTimeout(() => {
-      announced.value = `Tú recibes en total ${formatCLP(total)}`
-    }, 400)
-  },
+  (total) => `Tú recibes en total ${formatCLP(total)}`,
 )
-onBeforeUnmount(() => clearTimeout(announceTimer))
 </script>
 
 <template>

@@ -1,0 +1,31 @@
+---
+// Foto de la landing de stand-up (SPEC_landing_standup §1 y §6): <picture> con AVIF/WebP a varios anchos, siempre con
+// object-fit: cover, ancho y alto reservados (CLS) y lazy-load salvo que sea la del hero.
+interface Props {
+  photo: { src: string; width: number; height: number; sources: { type: string; srcset: string }[] };
+  alt: string;
+  /** Ancho que ocupa la foto en pantalla (atributo sizes) */
+  sizes: string;
+  class?: string;
+  /** object-position */
+  position?: string;
+  priority?: boolean;
+}
+
+const { photo, alt, sizes, class: className, position, priority = false } = Astro.props;
+---
+
+<picture>
+  {photo.sources.map((source) => <source type={source.type} srcset={source.srcset} sizes={sizes} />)}
+  <img
+    class:list={["su-photo-img", className]}
+    src={photo.src}
+    alt={alt}
+    width={photo.width}
+    height={photo.height}
+    loading={priority ? "eager" : "lazy"}
+    fetchpriority={priority ? "high" : undefined}
+    decoding="async"
+    style={position ? `object-position: ${position}` : undefined}
+  />
+</picture>

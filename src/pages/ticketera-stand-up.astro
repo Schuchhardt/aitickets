@@ -1,0 +1,217 @@
+---
+// Landing especializada para productores de stand-up (docs/specs/rediseno/SPEC_landing_standup_aitickets.md, fases 1 a 3).
+// Misma URL que la landing SEO anterior (src/data/landings.ts la marca dedicated: [landing].astro ya no la genera, y
+// la tarjeta, el sitemap y las relacionadas siguen leyendo de ahí). Tema propio oscuro y cálido ([data-theme="standup"],
+// src/styles/landing-standup.css) sin tocar los tokens globales.
+// Reutiliza de /organizadores la fórmula de precios (priceQuote → fees.mjs), el modal de video, el FAQ, la barra CTA
+// mobile y el movimiento (LandingMotion). Montos y plazos: fees.mjs, legal.mjs y producerFaq.ts; lo que no existe en el
+// producto (Facebook, TikTok, reels, segmentar por intereses) va con "Pronto".
+// Fase 4 (contenido real) queda fuera del código: fotos de shows reales con autorización, testimonio
+// (STANDUP_TESTIMONIAL, hoy null: la sección no se muestra) y video con subtítulos.
+export const prerender = true;
+import AppFooter from "../components/AppFooter.vue";
+import LandingFaq from "../components/landing/LandingFaq.vue";
+import LandingMobileBar from "../components/landing/LandingMobileBar.vue";
+import VideoModal from "../components/landing/VideoModal.vue";
+import CtaTracking from "../components/landing/CtaTracking.astro";
+import LandingMotion from "../components/landing/LandingMotion.astro";
+import StandupHeader from "../components/landing/standup/StandupHeader.vue";
+import StandupHero from "../components/landing/standup/StandupHero.astro";
+import FormatMarquee from "../components/landing/standup/FormatMarquee.astro";
+import WeekChapters from "../components/landing/standup/WeekChapters.astro";
+import StandupMarketing from "../components/landing/standup/StandupMarketing.astro";
+import SeatMap from "../components/landing/standup/SeatMap.vue";
+import FormatTiles from "../components/landing/standup/FormatTiles.astro";
+import PriceSentence from "../components/landing/standup/PriceSentence.vue";
+import Testimonial from "../components/landing/standup/Testimonial.astro";
+import StandupAi from "../components/landing/standup/StandupAi.astro";
+import StandupClosing from "../components/landing/standup/StandupClosing.astro";
+import StandupTracking from "../components/landing/standup/StandupTracking.astro";
+import Layout from "../layouts/Layout.astro";
+import { publishUrl } from "../components/landing/links.js";
+import { LANDING_MEDIA } from "../components/landing/producerLanding.js";
+import { getLanding } from "../data/landings";
+import { STANDUP_FAQ } from "../data/standupFaq";
+import { ABSORB_FEE_ACTIVATION } from "../data/producerFaq";
+import { IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL } from "../../netlify/lib/fees.mjs";
+import { PAYOUT_SHORT_TEXT } from "../../netlify/lib/legal.mjs";
+import "../styles/global.css";
+import "../styles/landing.css";
+import "../styles/landing-standup.css";
+
+const landing = getLanding("ticketera-stand-up");
+if (!landing) throw new Error("Falta la landing ticketera-stand-up en src/data/landings.ts");
+
+const priceLead =
+  `Para ti, 0% de comisión. El comprador paga un cargo por servicio de ${SERVICE_FEE_PERCENT_LABEL} más IVA ` +
+  `(${IVA_PERCENT_LABEL}) sobre ese cargo. Si prefieres un precio final redondo, lo absorbes tú, por evento. ` +
+  `${ABSORB_FEE_ACTIVATION} Las entradas gratis no pagan nada.`;
+const guarantees = ["Sin mensualidad", "Sin permanencia", PAYOUT_SHORT_TEXT];
+
+const SITE_URL = (import.meta.env.SITE_URL || "https://aitickets.cl").replace(/\/$/, "");
+const url = `${SITE_URL}/${landing.slug}`;
+const jsonLd = [
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "AI Tickets", item: SITE_URL },
+      { "@type": "ListItem", position: 2, name: "Para organizadores", item: `${SITE_URL}/organizadores` },
+      { "@type": "ListItem", position: 3, name: landing.card.title, item: url },
+    ],
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "AI Tickets para stand-up",
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Web",
+    url,
+    description: landing.description,
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "CLP",
+      description: `Sin mensualidad y 0% de comisión para el productor. El comprador paga un cargo por servicio de ${SERVICE_FEE_PERCENT_LABEL} + IVA (${IVA_PERCENT_LABEL}) sobre ese cargo, o lo absorbe el productor.`,
+    },
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: STANDUP_FAQ.map((f) => ({
+      "@type": "Question",
+      name: f.q,
+      acceptedAnswer: { "@type": "Answer", text: f.a },
+    })),
+  },
+];
+---
+
+<Layout title={landing.title} description={landing.description} canonical={`/${landing.slug}`}>
+  <LandingMotion />
+  <div class="su" data-theme="standup">
+    <StandupHeader client:idle publishHref={publishUrl("standup_header")} />
+    <main class="ev-motion">
+      <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+      <StandupHero />
+      <FormatMarquee />
+      <WeekChapters />
+      <StandupMarketing />
+
+      <section class="seats" aria-labelledby="seats-title" data-su-section="seats">
+        <div class="su-wrap seats-grid" data-lp-reveal>
+          <div class="seats-copy">
+            <p class="su-eyebrow" data-lp-step>En tiempo real</p>
+            <h2 id="seats-title" class="su-h2 seats-title" data-lp-step>Mira cómo <span class="su-serif">se llena.</span></h2>
+            <p class="su-lead seats-lead" data-lp-step>
+              Cada entrada vendida aparece al instante en tu panel, con el link que la trajo. Si una función se afloja, lo
+              ves a tiempo para lanzar un código de última semana.
+            </p>
+          </div>
+          <SeatMap client:idle rows={10} cols={20} aisleIndex={10} mobileRows={8} mobileCols={12} mobileAisleIndex={6} />
+        </div>
+      </section>
+
+      <FormatTiles />
+
+      <section id="precio" class="price" aria-labelledby="precio-title" data-su-section="pricing">
+        <div class="su-wrap" data-lp-reveal>
+          <div data-lp-step><PriceSentence client:visible lead={priceLead} guarantees={guarantees} /></div>
+        </div>
+      </section>
+
+      <Testimonial />
+      <div class="after-price">
+        <StandupAi />
+      </div>
+
+      <section class="su-wrap faq" aria-labelledby="faq-title" data-su-section="faq">
+        <div class="faq-inner" data-lp-reveal>
+          <h2 id="faq-title" class="su-h2 faq-title" data-lp-step>Preguntas frecuentes</h2>
+          <div data-lp-step><LandingFaq client:visible items={STANDUP_FAQ} idPrefix="su-faq" /></div>
+        </div>
+      </section>
+
+      <StandupClosing />
+    </main>
+    <AppFooter client:idle tone="dark" />
+    <LandingMobileBar client:idle variant="pill" publishHref={publishUrl("standup_mobile_bar")} />
+  </div>
+  <VideoModal
+    client:load
+    src={LANDING_MEDIA.demoVideo}
+    poster={LANDING_MEDIA.demoPoster}
+    captions={LANDING_MEDIA.demoCaptions}
+    title="Video: así vendes tu próxima función"
+  />
+  <CtaTracking />
+  <StandupTracking />
+</Layout>
+
+<style>
+  .seats {
+    padding-block: 80px;
+    border-block: 1px solid rgba(244, 237, 228, 0.08);
+    background: var(--sb-surface);
+  }
+  /* El mapa ("plan") y el contador ("count") son de SeatMap; mobile: texto, mapa y contador */
+  .seats-grid {
+    display: grid;
+    grid-template-areas: "copy" "plan" "count";
+    gap: 32px;
+  }
+  .seats-copy {
+    grid-area: copy;
+  }
+  .seats-title {
+    margin-top: 14px;
+  }
+  .seats-lead {
+    max-width: 440px;
+    margin-top: 16px;
+  }
+  .price {
+    padding-block: 80px;
+    background: var(--sb-paper);
+  }
+  .after-price {
+    padding-top: 96px;
+  }
+  .faq {
+    padding-bottom: 96px;
+  }
+  .faq-inner {
+    max-width: 860px;
+  }
+  .faq-title {
+    margin-bottom: 16px;
+  }
+  @media (min-width: 1024px) {
+    .seats,
+    .price {
+      padding-block: 140px;
+    }
+    .seats-grid {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+      grid-template-areas: "copy plan" "count plan";
+      grid-template-rows: auto 1fr;
+      align-items: center;
+      gap: 40px 80px;
+    }
+    .seats-title {
+      margin-top: 18px;
+    }
+    .seats-lead {
+      margin-top: 22px;
+    }
+    .after-price {
+      padding-top: 140px;
+    }
+    .faq {
+      padding-bottom: 140px;
+    }
+    .faq-title {
+      margin-bottom: 24px;
+    }
+  }
+</style>

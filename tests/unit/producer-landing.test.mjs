@@ -47,6 +47,14 @@ describe('marketingWeek', () => {
     expect(marketingPostCount(week)).toBe(MK_SHOW + 1 + MK_SHOW)
   })
 
+  it('con dos funciones (viernes y sábado), cada una con su historia de la mañana y posts hasta antes de la primera', () => {
+    const week = marketingWeek({ story: true, post: true }, times, [MK_SHOW, MK_SHOW + 1])
+    expect(week[MK_SHOW + 1].isShow).toBe(true)
+    expect(week[MK_SHOW + 1].slots).toEqual([{ kind: 'story', label: 'Historia', time: '09:00', state: 'future' }])
+    expect(week[MK_SHOW + 2].slots).toEqual([])
+    expect(marketingPostCount(week)).toBe(MK_SHOW + 2 + MK_SHOW)
+  })
+
   it('los switches quitan sus publicaciones', () => {
     expect(marketingPostCount(marketingWeek({ story: false, post: true }, times))).toBe(MK_SHOW)
     expect(marketingPostCount(marketingWeek({ story: false, post: false }, times))).toBe(0)

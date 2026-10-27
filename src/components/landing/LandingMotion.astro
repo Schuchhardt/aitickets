@@ -9,7 +9,8 @@
 //     [data-lp-step]        entra con fade + translateY 16px (L7), 60 ms después del anterior; data-lp-step="120"
 //                           fija el retraso a mano (L8: 120 ms entre las columnas de "Cómo funciona").
 //     [data-lp-grow]        barra que crece de scaleX(0) a su valor (L12, L21); el retraso va en --lp-d.
-//     [data-lp-count="23"]  número que cuenta de 0 al valor (L12), con el retraso de --lp-d.
+//     [data-lp-count="23"]  número que cuenta de 0 al valor (L12), con el retraso de --lp-d; data-lp-count-ms cambia
+//                           la duración (900 ms por defecto).
 //   No anidar [data-lp-reveal]: los pasos se revelan con el más cercano que tenga .is-in.
 //   Si el foco del teclado entra a un bloque que todavía no se reveló (Tab deja el elemento enfocado en el borde de
 //   abajo, dentro del 20% que el observer ignora), se revela en ese momento: el foco nunca queda sobre algo invisible
@@ -41,12 +42,13 @@
 
   function countUp(el: HTMLElement) {
     const to = Number(el.dataset.lpCount) || 0;
+    const duration = Number(el.dataset.lpCountMs) || COUNT_MS;
     const delay = parseFloat(getComputedStyle(el).getPropertyValue("--lp-d")) || 0;
     el.textContent = "0";
     window.setTimeout(() => {
       const start = performance.now();
       const step = (now: number) => {
-        const t = Math.min(1, (now - start) / COUNT_MS);
+        const t = Math.min(1, (now - start) / duration);
         el.textContent = Math.round(to * easeOut(t)).toLocaleString("es-CL");
         if (t < 1) requestAnimationFrame(step);
       };

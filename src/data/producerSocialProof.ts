@@ -9,3 +9,15 @@ export type ProducerStat = { value: string; label: string };
 
 export const PRODUCER_LOGOS: ProducerLogo[] = [];
 export const PRODUCER_STATS: ProducerStat[] = [];
+
+/** Cita de un productor con nombre, productora y foto, todo autorizado por escrito (foto en public/landing/...). */
+export type ProducerTestimonial = {
+  quote: string;
+  name: string;
+  /** Productora y ciudad ("Risas Producciones · Santiago") */
+  company: string;
+  photo: { src: string; width: number; height: number };
+};
+
+/** Testimonio de /ticketera-stand-up (SPEC_landing_standup §4.8). null: la sección no se renderiza. */
+export const STANDUP_TESTIMONIAL: ProducerTestimonial | null = null;

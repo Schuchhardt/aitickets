@@ -7,8 +7,9 @@
 // "reducir movimiento", quieto.
 // §9 (LCP): si llegan posterSources, el póster va en un <picture> con AVIF/WebP a varios anchos; `posterSizes` dice qué
 // ancho ocupa la imagen ya recortada por object-fit: cover, para que el navegador no baje más de lo que se ve.
+// `pausable`: botón para pausar y reanudar el loop (WCAG 2.2.2), para videos de fondo que no tienen botón de sonido.
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { Volume2, VolumeX } from 'lucide-vue-next'
+import { Pause, Play, Volume2, VolumeX } from 'lucide-vue-next'
 
 const props = defineProps({
   src: { type: String, required: true },
@@ -25,8 +26,11 @@ const props = defineProps({
   sound: { type: Boolean, required: false },
   /** Póster prioritario (arriba del pliegue): sin lazy-load */
   priority: { type: Boolean, required: false },
-  /** Esquina del botón de sonido: 'bottom' (por defecto) o 'top' */
+  /** Esquina del botón de sonido: 'bottom' (por defecto) o 'top'; sin sonido, 'none' oculta también el parlante tachado
+   *  (video de fondo a pantalla completa, como el hero de /ticketera-stand-up) */
   soundPosition: { type: String, required: false },
+  /** Muestra el botón de pausa del video (abajo a la derecha; la página lo puede reubicar con .lcv-pause) */
+  pausable: { type: Boolean, required: false },
 })
 const emit = defineEmits(['sound'])
 
@@ -35,6 +39,8 @@ const root = ref(null)
 const video = ref(null)
 const active = ref(false)
 const muted = ref(true)
+// Pausado a mano: el IntersectionObserver no lo vuelve a reproducir al entrar en pantalla
+const paused = ref(false)
 // Ken Burns del póster cuando no hay video, pausado fuera de pantalla
 const kenBurns = ref(false)
 const visible = ref(false)
@@ -60,7 +66,7 @@ function start() {
     v.defaultMuted = true
     observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) play()
+        if (entry.isIntersecting && !paused.value) play()
         else v.pause()
       },
       { threshold: 0.25 },
@@ -89,6 +95,14 @@ function scheduleStart() {
 }
 function onLoad() {
   scheduleStart()
+}
+
+function togglePause() {
+  const v = video.value
+  paused.value = !paused.value
+  if (!v) return
+  if (paused.value) v.pause()
+  else play()
 }
 
 function toggleSound() {
@@ -171,7 +185,18 @@ onBeforeUnmount(() => {
       <VolumeX v-if="muted" :size="18" aria-hidden="true" />
       <Volume2 v-else :size="18" aria-hidden="true" />
     </button>
-    <span v-else-if="!props.sound" class="lcv-sound lcv-sound-deco" :class="`lcv-${position}`" aria-hidden="true">
+    <button
+      v-if="props.pausable && active"
+      type="button"
+      class="lcv-sound lcv-pause"
+      :aria-label="paused ? 'Reproducir el video de fondo' : 'Pausar el video de fondo'"
+      data-testid="cover-pause"
+      @click="togglePause"
+    >
+      <Play v-if="paused" :size="16" aria-hidden="true" />
+      <Pause v-else :size="16" aria-hidden="true" />
+    </button>
+    <span v-if="!props.sound && props.soundPosition !== 'none'" class="lcv-sound lcv-sound-deco" :class="`lcv-${position}`" aria-hidden="true">
       <VolumeX :size="14" />
     </span>
   </div>
@@ -234,6 +259,9 @@ onBeforeUnmount(() => {
   top: 14px;
 }
 .lcv-bottom {
+  bottom: 14px;
+}
+.lcv-pause {
   bottom: 14px;
 }
 .lcv-sound-deco {

@@ -5,7 +5,7 @@ import { expect, test } from "@playwright/test";
 const PAGES: { path: string; h1: RegExp; competitorPayout?: boolean }[] = [
   { path: "/", h1: /Tu próxima función/ },
   { path: "/organizadores", h1: /merece vender más/ },
-  { path: "/ticketera-stand-up", h1: /stand-up/i },
+  { path: "/ticketera-stand-up", h1: /Tú haz el show/ },
   { path: "/ticketera-teatro", h1: /funciones de tu obra/i },
   { path: "/ticketera-musica-en-vivo", h1: /conciertos/i },
   { path: "/ticketera-talleres", h1: /talleres/i },

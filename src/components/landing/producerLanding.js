@@ -84,15 +84,21 @@ export const MK_SHOW = 4
 
 /**
  * Días de la semana de ejemplo con sus publicaciones. on = { story, post }; times = { daily, eventDay } (HH:MM).
+ * showDays: índices de MK_WEEK con función (por defecto solo el viernes). Con varias funciones la serie se replanifica
+ * hacia la siguiente cuando pasa una (socialSeries.ts, "siguiente función"): cada día con función tiene su historia de
+ * la mañana, el día entre dos funciones sigue la historia diaria y los posts de feed terminan antes de la primera.
  * Cada slot: { kind, label, time, state: 'past' | 'today' | 'future' }.
  */
-export function marketingWeek(on, times) {
+export function marketingWeek(on, times, showDays = [MK_SHOW]) {
+  const firstShow = Math.min(...showDays)
+  const lastShow = Math.max(...showDays)
   return MK_WEEK.map((day, i) => {
     const slots = []
+    const isShow = showDays.includes(i)
     const state = i < MK_TODAY ? 'past' : i === MK_TODAY ? 'today' : 'future'
-    if (on.story && i <= MK_SHOW) slots.push({ kind: 'story', label: 'Historia', time: i === MK_SHOW ? times.eventDay : times.daily, state })
-    if (on.post && i < MK_SHOW) slots.push({ kind: 'post', label: 'Post', time: times.daily, state })
-    return { ...day, isToday: i === MK_TODAY, isShow: i === MK_SHOW, slots }
+    if (on.story && i <= lastShow) slots.push({ kind: 'story', label: 'Historia', time: isShow ? times.eventDay : times.daily, state })
+    if (on.post && i < firstShow) slots.push({ kind: 'post', label: 'Post', time: times.daily, state })
+    return { ...day, isToday: i === MK_TODAY, isShow, slots }
   })
 }
 

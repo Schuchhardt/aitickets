@@ -1,0 +1,273 @@
+---
+// 1 · Hero a pantalla completa (SPEC_landing_standup §4.1). La foto del comediante es el LCP: AVIF/WebP con srcset y
+// fetchpriority alto; el clip de la misma escena (cover-standup.mp4) se monta encima recién después de `load`, sin
+// sonido y en loop (LandingCoverVideo: nunca con Save-Data ni "reducir movimiento"), con botón para pausarlo (WCAG
+// 2.2.2). La spec pide solo la foto con Ken Burns (S1): el video es un agregado y la foto sigue siendo el LCP.
+// El overlay va dentro de la capa de la foto para que el botón de pausa (z-index 2 en LandingCoverVideo) quede encima;
+// el texto deja pasar los clics fuera de sus bloques. Alto mínimo 720/900 px (no fijo): con zoom de texto crece.
+// Bajada: "tu show en redes hasta el día de la función", no "todos los días" como la spec, porque la serie es diaria
+// solo la última semana (socialSeriesCadence.ts). El plazo de pago sale de legal.mjs:
+// lo de cada función queda disponible PAYOUT_RELEASE_HOURS después de que termina (no "la plata 48 h después").
+// Movimiento al cargar (solo con html.lp-motion): S1 Ken Burns de la foto, S2 líneas del H1, S3 bajada y CTAs, S4 card.
+import LandingCoverVideo from "../LandingCoverVideo.vue";
+import { publishUrl } from "../links.js";
+import { DEMO_EVENT_NAME, LANDING_MEDIA } from "../producerLanding.js";
+import { HERO_SEATS, STANDUP_PHOTOS, heroSeatSold } from "./standupLanding.js";
+import { PAYOUT_RELEASE_HOURS } from "../../../../netlify/lib/legal.mjs";
+
+const hero = STANDUP_PHOTOS.hero;
+const seats = Array.from({ length: HERO_SEATS.total }, (_, i) => heroSeatSold(i));
+---
+
+<section class="su-hero" aria-labelledby="su-hero-title" data-su-section="hero">
+  <div class="su-hero-media su-kb">
+    <LandingCoverVideo
+      client:idle
+      src={LANDING_MEDIA.coverVideo}
+      poster={hero.src}
+      posterWidth={hero.width}
+      posterHeight={hero.height}
+      posterSources={hero.sources}
+      posterSizes="100vw"
+      label="Comediante en el escenario de un bar, con el público riéndose"
+      priority
+      sound={false}
+      soundPosition="none"
+      pausable
+    />
+    <div class="su-hero-shade" aria-hidden="true"></div>
+  </div>
+
+  <div class="su-wrap su-hero-inner">
+    <div class="su-hero-copy">
+      <p class="su-eyebrow su-hero-eyebrow su-fade-1">Para productores de stand-up</p>
+      <h1 id="su-hero-title" class="su-h1 su-hero-title">
+        <span class="su-hero-line su-rise-1">Tú haz el show.</span>
+        <span class="su-hero-line su-serif su-rise-2">Del resto nos encargamos.</span>
+      </h1>
+      <p class="su-hero-lead su-fade-1">
+        Entradas para cada función, un link por comediante del line-up, tu show en redes hasta el día de la función y lo
+        de cada función disponible {PAYOUT_RELEASE_HOURS} horas después del show. 0% de comisión para ti.
+      </p>
+      <div class="su-hero-ctas su-fade-2" data-hero-cta>
+        <a href={publishUrl("standup_hero")} class="su-btn su-btn-lime" data-cta="publish" data-section="hero">
+          Publicar mi próxima función <span aria-hidden="true">→</span>
+        </a>
+        <a href={LANDING_MEDIA.demoVideo} class="su-btn su-btn-line" data-video-open data-cta="video" data-section="hero">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"></path></svg>
+          Míralo en {LANDING_MEDIA.demoDurationLabel}
+        </a>
+      </div>
+    </div>
+
+    <div class="su-hero-card su-card-in">
+      <p class="su-hero-card-live"><span class="su-hero-dot su-live-dot" aria-hidden="true"></span>Vendiendo ahora · ejemplo</p>
+      <p class="su-hero-card-name">{DEMO_EVENT_NAME}</p>
+      <p class="su-hero-card-meta">Vie 23 oct · 21:00 · Providencia</p>
+      <div class="su-hero-seats" aria-hidden="true">
+        {seats.map((sold) => <span class:list={["su-hero-seat", { "is-sold": sold }]}></span>)}
+      </div>
+      <p class="su-hero-card-sold">
+        <span>Vendidas</span><span class="ev-tabular">{HERO_SEATS.sold} de {HERO_SEATS.total}</span>
+      </p>
+    </div>
+  </div>
+</section>
+
+<style>
+  .su-hero {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-height: 720px;
+    overflow: hidden;
+    isolation: isolate;
+  }
+  .su-hero-media {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+  }
+  /* Pausa del video: arriba a la derecha, bajo el header fijo */
+  .su-hero-media :global(.lcv-pause) {
+    top: 80px;
+    right: 16px;
+    bottom: auto;
+  }
+  .su-hero-media :global(.lcv) {
+    background: var(--sb-ground);
+  }
+  .su-hero-media :global(.lcv-media) {
+    object-position: 50% 30%;
+  }
+  /* En mobile el texto empieza más arriba: el overlay oscurece antes */
+  .su-hero-shade {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      180deg,
+      rgba(14, 11, 9, 0.55) 0%,
+      rgba(14, 11, 9, 0.05) 18%,
+      rgba(14, 11, 9, 0.6) 38%,
+      rgba(14, 11, 9, 0.92) 70%,
+      var(--sb-ground) 100%
+    );
+  }
+  @media (min-width: 1024px) {
+    .su-hero-shade {
+      background: linear-gradient(
+        180deg,
+        rgba(14, 11, 9, 0.55) 0%,
+        rgba(14, 11, 9, 0) 22%,
+        rgba(14, 11, 9, 0.25) 45%,
+        rgba(14, 11, 9, 0.92) 80%,
+        var(--sb-ground) 100%
+      );
+    }
+  }
+  .su-hero-inner {
+    flex: 1;
+    width: 100%;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 48px;
+    padding-top: 128px;
+    padding-bottom: 40px;
+    pointer-events: none;
+  }
+  .su-hero-copy,
+  .su-hero-card {
+    pointer-events: auto;
+  }
+  .su-hero-copy {
+    max-width: 840px;
+  }
+  .su-hero-title {
+    margin-top: 14px;
+  }
+  .su-hero-line {
+    display: block;
+  }
+  .su-hero-line.su-serif {
+    margin-top: 4px;
+    font-size: 31px;
+    line-height: 36px;
+    letter-spacing: -0.02em;
+  }
+  .su-hero-lead {
+    max-width: 600px;
+    margin-top: 18px;
+    font-size: 16px;
+    line-height: 25px;
+    color: #d9d0c5;
+  }
+  .su-hero-eyebrow {
+    color: #d9d0c5;
+  }
+  .su-hero-ctas {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 24px;
+  }
+  .su-hero-card {
+    display: none;
+    flex: 0 0 300px;
+    padding: 20px;
+    border: 1px solid rgba(244, 237, 228, 0.14);
+    border-radius: 22px;
+    background: rgba(23, 18, 15, 0.78);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+  }
+  .su-hero-card-live {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--sb-text-3);
+  }
+  .su-hero-dot {
+    position: relative;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--brand-lime);
+  }
+  .su-hero-card-name {
+    margin-top: 10px;
+    font-family: "Unbounded", system-ui, sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .su-hero-card-meta {
+    font-size: 13px;
+    color: var(--sb-text-3);
+  }
+  .su-hero-seats {
+    display: grid;
+    grid-template-columns: repeat(20, minmax(0, 1fr));
+    gap: 3px;
+    margin-top: 14px;
+  }
+  .su-hero-seat {
+    aspect-ratio: 1 / 1;
+    border-radius: 2px;
+    background: rgba(244, 237, 228, 0.16);
+  }
+  .su-hero-seat.is-sold {
+    background: var(--brand-lime);
+  }
+  .su-hero-card-sold {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 14px;
+    font-size: 14px;
+  }
+  .su-hero-card-sold span:first-child {
+    color: var(--sb-text-3);
+  }
+  .su-hero-card-sold span:last-child {
+    font-weight: 600;
+  }
+  @media (min-width: 640px) {
+    .su-hero-ctas {
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+  }
+  @media (min-width: 1024px) {
+    .su-hero {
+      min-height: 900px;
+    }
+    .su-hero-media :global(.lcv-pause) {
+      top: 96px;
+      right: 40px;
+    }
+    .su-hero-inner {
+      padding-top: 152px;
+      padding-bottom: 72px;
+    }
+    .su-hero-title {
+      margin-top: 18px;
+    }
+    .su-hero-line.su-serif {
+      font-size: 68px;
+      line-height: 74px;
+    }
+    .su-hero-lead {
+      margin-top: 26px;
+      font-size: 19px;
+      line-height: 30px;
+    }
+    .su-hero-ctas {
+      margin-top: 34px;
+    }
+    .su-hero-card {
+      display: block;
+    }
+  }
+</style>

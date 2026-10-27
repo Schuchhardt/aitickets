@@ -1,8 +1,41 @@
 <script setup is:client>
 import logoLight from "../images/logo.png";
 import iconArrowGreen from "../images/icon-arrow-green.png";
-import { ref, onMounted } from "vue";
+import { computed, ref, onMounted } from "vue";
 import { LEGAL } from "../lib/legal";
+
+const props = defineProps({
+  /** 'dark': versión oscura para las landings con tema oscuro (/ticketera-stand-up): mismos enlaces, otros colores. */
+  tone: { type: String, required: false },
+});
+// Clases que cambian con el tono (el resto del footer es igual en los dos)
+const toneClasses = computed(() =>
+  props.tone === 'dark'
+    ? {
+        footer: "bg-[#0e0b09] border-white/10",
+        logo: "invert",
+        muted: "text-[#b5aba0]",
+        icon: "invert",
+        title: "text-[#f4ede4]",
+        list: "text-[#b5aba0]",
+        link: "hover:text-white hover:underline",
+        input: "border-white/20 bg-transparent text-[#f4ede4] placeholder:text-[#8e8378] focus:ring-white/30",
+        success: "text-lime-400",
+        error: "text-red-400",
+      }
+    : {
+        footer: "bg-white border-gray-200",
+        logo: "",
+        muted: "text-gray-500",
+        icon: "",
+        title: "text-gray-900",
+        list: "text-gray-600",
+        link: "hover:text-gray-900 hover:underline",
+        input: "border-gray-300 text-gray-600 focus:ring-gray-300",
+        success: "text-green-700",
+        error: "text-red-600",
+      },
+);
 
 // Enlaces internos del sitio por columna (no quitar ninguno: sostienen el SEO de las landings y guías)
 const columns = [
@@ -122,16 +155,16 @@ const submitForm = async (event) => {
 <template>
   <!-- Cuatro columnas en desktop (rediseño, SPEC_landing_productores §5.10): Producto · Para quién · Recursos · Legal.
        Mismos enlaces internos de siempre (valor SEO); el formulario de la comunidad va en Recursos. -->
-  <footer class="bg-white border-t border-gray-200 font-['Prompt']">
+  <footer class="border-t font-['Prompt']" :class="toneClasses.footer">
     <div class="max-w-[1120px] mx-auto px-4 md:px-8 pt-14 pb-10 grid gap-10 grid-cols-2 lg:grid-cols-5 text-sm">
       <div class="col-span-2 lg:col-span-1">
         <a href="/" class="inline-block cursor-pointer">
-          <img :src="logoLight.src" alt="AI Tickets" class="h-8 w-auto" width="152" height="32" />
+          <img :src="logoLight.src" alt="AI Tickets" class="h-8 w-auto" :class="toneClasses.logo" width="152" height="32" />
         </a>
-        <p class="mt-3 text-xs text-gray-500">© 2026 {{ LEGAL.brand }}</p>
+        <p class="mt-3 text-xs" :class="toneClasses.muted">© 2026 {{ LEGAL.brand }}</p>
         <div class="flex space-x-4 mt-4">
           <a href="https://www.facebook.com/profile.php?id=61573771138631" target="_blank" rel="noopener noreferrer" class="cursor-pointer">
-            <img src="https://cdn.simpleicons.org/facebook/000000" alt="Facebook" class="w-6 h-6" loading="lazy" width="24" height="24" />
+            <img src="https://cdn.simpleicons.org/facebook/000000" alt="Facebook" class="w-6 h-6" :class="toneClasses.icon" loading="lazy" width="24" height="24" />
           </a>
           <a href="https://www.linkedin.com/company/ai-tickets" target="_blank" rel="noopener noreferrer" class="cursor-pointer">
             <img src="https://upload.wikimedia.org/wikipedia/commons/8/81/LinkedIn_icon.svg" alt="LinkedIn" class="w-6 h-6" loading="lazy" width="24" height="24" />
@@ -140,14 +173,14 @@ const submitForm = async (event) => {
       </div>
 
       <nav v-for="col in columns" :key="col.title" :aria-label="col.title" class="min-w-0">
-        <p class="font-semibold text-gray-900">{{ col.title }}</p>
-        <ul class="mt-3 flex flex-col gap-2.5 text-gray-600">
-          <li v-for="link in col.links" :key="link.href"><a :href="link.href" class="hover:text-gray-900 hover:underline">{{ link.label }}</a></li>
+        <p class="font-semibold" :class="toneClasses.title">{{ col.title }}</p>
+        <ul class="mt-3 flex flex-col gap-2.5" :class="toneClasses.list">
+          <li v-for="link in col.links" :key="link.href"><a :href="link.href" :class="toneClasses.link">{{ link.label }}</a></li>
         </ul>
 
         <!-- Formulario de suscripción o mensaje de éxito (columna Recursos) -->
         <div v-if="col.newsletter" class="mt-6">
-          <p class="text-gray-900 font-semibold">Únete a la comunidad AI 🔥</p>
+          <p class="font-semibold" :class="toneClasses.title">Únete a la comunidad AI 🔥</p>
           <div v-if="!successMessage" class="relative mt-2">
             <form @submit.prevent="submitForm" class="flex">
               <input
@@ -158,7 +191,8 @@ const submitForm = async (event) => {
                 aria-label="Tu correo"
                 @focus="isFocused = true"
                 @blur="isFocused = false"
-                class="w-full max-w-64 border border-gray-300 py-2 pl-4 pr-12 rounded-full text-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                class="w-full max-w-64 border py-2 pl-4 pr-12 rounded-full focus:outline-none focus:ring-2"
+                :class="toneClasses.input"
                 required
               />
               <button
@@ -172,9 +206,9 @@ const submitForm = async (event) => {
             </form>
           </div>
           <!-- Mensaje de confirmación -->
-          <p v-else class="text-green-700 font-semibold mt-2">{{ successMessage }}</p>
+          <p v-else class="font-semibold mt-2" :class="toneClasses.success">{{ successMessage }}</p>
           <!-- Mensaje de error -->
-          <p v-if="errorMessage" class="text-red-600 mt-2 text-sm">{{ errorMessage }}</p>
+          <p v-if="errorMessage" class="mt-2 text-sm" :class="toneClasses.error">{{ errorMessage }}</p>
         </div>
       </nav>
     </div>

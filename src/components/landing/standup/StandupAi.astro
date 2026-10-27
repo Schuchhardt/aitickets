@@ -1,0 +1,111 @@
+---
+// 9 · IA, opcional (SPEC_landing_standup §4.9): card con borde, link a conectar la IA (registro → /dashboard/ia, como
+// AiSection de /organizadores) y tres burbujas de ejemplo. Las acciones nombradas existen en la API de productores
+// (src/lib/producer-api/tools); publicar, cobrar o enviar mensajes siempre piden confirmación.
+const signupUrl = "/organizadores/registro?next=%2Fdashboard%2Fia&utm_source=aitickets&utm_medium=landing&utm_campaign=standup_ia";
+---
+
+<section class="su-wrap ai" aria-labelledby="su-ai-title" data-su-section="ai">
+  <div class="ai-card" data-lp-reveal>
+    <div class="ai-copy">
+      <p class="su-eyebrow" data-lp-step>Opcional · Claude y ChatGPT</p>
+      <h2 id="su-ai-title" class="su-h2 ai-title" data-lp-step>¿Prefieres conversar? <span class="su-serif">Tu ticketera también.</span></h2>
+      <p class="su-lead ai-lead" data-lp-step>
+        Conecta AI Tickets a Claude o ChatGPT y pregunta cómo va tu evento, crea códigos de descuento o prepara posts. Todo
+        lo importante te pide confirmación.
+      </p>
+      <p class="ai-cta" data-lp-step>
+        <a href={signupUrl} class="ai-link" data-cta="connect_ai" data-section="ai">Conecta tu IA <span aria-hidden="true">→</span></a>
+      </p>
+    </div>
+    <figure class="ai-chat" aria-label="Conversación de ejemplo con un asistente conectado a AI Tickets" data-lp-step>
+      <p class="ai-msg ai-me">¿Cómo va el Stand-up de Viernes?</p>
+      <p class="ai-msg ai-bot">Vas en 142 de 200 entradas. El link de Pedro trae el 30% de las ventas. Faltan 9 días: ¿te armo un código de última semana?</p>
+      <p class="ai-msg ai-me">Dale, 15% hasta el jueves.</p>
+      <figcaption class="su-example">Datos de ejemplo</figcaption>
+    </figure>
+  </div>
+</section>
+
+<style>
+  .ai {
+    padding-bottom: 96px;
+  }
+  .ai-card {
+    display: grid;
+    gap: 32px;
+    padding: 28px 20px;
+    border: 1px solid var(--sb-line);
+    border-radius: 24px;
+    background: var(--sb-surface);
+  }
+  .ai-title {
+    margin-top: 14px;
+    font-size: 26px;
+    line-height: 31px;
+  }
+  .ai-lead {
+    margin-top: 14px;
+  }
+  .ai-cta {
+    margin-top: 20px;
+  }
+  .ai-link {
+    font-weight: 600;
+    color: var(--brand-lime);
+    text-decoration: none;
+    border-radius: 4px;
+  }
+  .ai-link:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .ai-link:focus-visible {
+    outline: 2px solid var(--brand-lime);
+    outline-offset: 2px;
+  }
+  .ai-chat {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 0;
+  }
+  .ai-msg {
+    padding: 14px 16px;
+    font-size: 15px;
+    line-height: 22px;
+  }
+  .ai-me {
+    align-self: flex-end;
+    max-width: 80%;
+    border-radius: 20px 20px 6px 20px;
+    background: var(--sb-paper);
+    color: var(--sb-ground);
+  }
+  .ai-bot {
+    align-self: flex-start;
+    max-width: 86%;
+    border: 1px solid rgba(244, 237, 228, 0.1);
+    border-radius: 20px 20px 20px 6px;
+    background: var(--sb-surface-2);
+  }
+  .ai-chat .su-example {
+    align-self: flex-end;
+  }
+  @media (min-width: 1024px) {
+    .ai {
+      padding-bottom: 140px;
+    }
+    .ai-card {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: center;
+      gap: 56px;
+      padding: 56px;
+      border-radius: 32px;
+    }
+    .ai-title {
+      font-size: 36px;
+      line-height: 42px;
+    }
+  }
+</style>

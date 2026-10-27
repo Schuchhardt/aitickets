@@ -1,13 +1,14 @@
 ---
 // Landings SEO de productores en la raíz (/ticketera-stand-up, /vender-entradas-online, ...).
-// Solo existen los slugs de src/data/landings.ts; cualquier otra ruta da 404.
+// Solo existen los slugs de src/data/landings.ts; cualquier otra ruta da 404. Las que tienen página propia
+// (dedicated, p. ej. src/pages/ticketera-stand-up.astro) se generan allá con la misma URL.
 export const prerender = true;
 import LandingPage from "../components/seo/LandingPage.astro";
 import { LANDINGS, type Landing } from "../data/landings";
 import { relatedLinks } from "../lib/seoLinks";
 
 export function getStaticPaths() {
-    return LANDINGS.map((landing) => ({ params: { landing: landing.slug }, props: { landing } }));
+    return LANDINGS.filter((landing) => !landing.dedicated).map((landing) => ({ params: { landing: landing.slug }, props: { landing } }));
 }
 
 const { landing } = Astro.props as { landing: Landing };

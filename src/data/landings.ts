@@ -35,6 +35,12 @@ export type Landing = {
     demo?: { url: string; label: string };
     cta: { label: string; campaign: string };
     related: string[];
+    /**
+     * La landing tiene página propia con diseño especializado en src/pages/<slug>.astro (por ejemplo
+     * /ticketera-stand-up, docs/specs/rediseno/SPEC_landing_standup_aitickets.md): [landing].astro no la genera, pero
+     * la tarjeta, el sitemap, las relacionadas y las guías siguen leyendo estos datos.
+     */
+    dedicated?: boolean;
 };
 
 const clp = (n: number) => `$${Math.round(n).toLocaleString("es-CL")}`;
@@ -47,8 +53,8 @@ export const LANDINGS: Landing[] = [
         slug: "ticketera-stand-up",
         kind: "vertical",
         card: { title: "Stand-up y comedia", text: "Funciones semanales, line-up que promociona y un link por comediante." },
-        title: "Ticketera para stand-up y comedia en Chile | AI Tickets",
-        description: "Vende entradas para tus shows de stand-up: funciones semanales, un link de venta por comediante para saber quién vende, check-in con QR y 0% de comisión para el productor.",
+        title: "Vende entradas para stand-up en Chile · 0% de comisión | AI Tickets",
+        description: "Ticketera para stand-up: vende entradas para tus shows de comedia y open mics, con un link por comediante para saber quién vende, difusión automática en Instagram, check-in con QR y 0% de comisión para ti.",
         eyebrow: "Para productores de comedia",
         h1: "La ticketera para el stand-up que se presenta todas las semanas",
         intro:
@@ -92,6 +98,7 @@ export const LANDINGS: Landing[] = [
         demo: { url: "/eventos/evento-demo-aitickets", label: "Ver un evento de stand-up de ejemplo" },
         cta: { label: "Publicar mi próximo show", campaign: "vertical_standup" },
         related: ["ventas-por-promotor", "entradas-con-qr", "guias/como-medir-ventas-por-promotor"],
+        dedicated: true,
     },
     {
         slug: "ticketera-teatro",
