@@ -70,7 +70,14 @@ export const EVENT_MODULES: EventModule[] = [
         when: (ctx) => ctx.status === "published" && ctx.phase !== "after",
     },
     { id: "tracking-links", title: "Links con seguimiento", description: "Un link por canal o promotor para medir ventas.", tab: "difusion" },
-    { id: "preview-links", title: "Links de vista previa", description: "Muestra el evento sin publicarlo.", tab: "difusion" },
+    // Solo en borrador: publicado, el link público ya muestra la página
+    {
+        id: "preview-links",
+        title: "Links de vista previa",
+        description: "Muestra el evento sin publicarlo.",
+        tab: "difusion",
+        when: (ctx) => ctx.status !== "published",
+    },
     { id: "cover", title: "Portada", description: "Imagen de la página, ajuste por dispositivo y generación con IA.", tab: "pagina", core: true },
     { id: "faq", title: "Preguntas frecuentes", description: "Respuestas que se muestran en la página del evento.", tab: "pagina" },
     {

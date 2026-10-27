@@ -57,6 +57,10 @@ describe('resolveModules', () => {
     expect(byId(resolveModules(ctx({ phase: 'after' })))['social-series']).toBeUndefined()
     expect(byId(resolveModules(ctx()))['social-series'].enabled).toBe(true)
   })
+  it('los links de vista previa solo aplican en borrador', () => {
+    expect(byId(resolveModules(ctx()))['preview-links']).toBeUndefined()
+    expect(byId(resolveModules(ctx({ status: 'draft' })))['preview-links'].enabled).toBe(true)
+  })
   it('los atajos a posts y anuncios solo aplican con el evento a la venta', () => {
     expect(byId(resolveModules(ctx({ status: 'draft' }))).promote).toBeUndefined()
     expect(byId(resolveModules(ctx({ phase: 'after' }))).promote).toBeUndefined()
