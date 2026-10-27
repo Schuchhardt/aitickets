@@ -1,0 +1,176 @@
+---
+// 6 · La puerta, por dentro (SPEC_landing_clubs §4.6, VIE 23:30): foto de la puerta en cápsula con fuga magenta, la card
+// lima "✓ VÁLIDA" del escáner y el timbre UV (linterna en desktop, barrido en mobile). Todo verificado en ValidateQR.vue:
+// offline con sincronización, un QR entra una vez ("Este ticket ya fue validado"), muestra nombre y tipo de entrada,
+// contador de validadas sobre el total, búsqueda por nombre y reenvío al correo (/api/orders/resend); rol Puerta
+// (permissions.ts) o link de escáner que vence solo (/puerta/<token>, hoy desde el asistente de IA: tools/access.ts).
+// "Pronto": rechazar la lista después de su hora (hoy solo se cierra la inscripción). El aviso de "entrada de otra
+// noche" no se promete (Preguntas abiertas 8: getFunctionCheck compara la fecha y no la ventana de la función).
+// El escaneo cuenta para el pago (ledger.ts, CHECKIN_RELEASE_THRESHOLD: check-ins de la función o acreditar que se
+// realizó), con "*" de términos.
+// Desktop: grid 5fr 6fr (foto a la izquierda). Mobile: foto 3:4 con radio 48 arriba y el texto debajo.
+import CapsulePhoto from "./CapsulePhoto.astro";
+import LedHeading from "./LedHeading.astro";
+import NightHour from "./NightHour.astro";
+import UvStamp from "./UvStamp.astro";
+import SoonBadge from "../../ui/SoonBadge.vue";
+import { CLUB_PHOTOS, LIVE_NIGHT } from "./clubsLanding.js";
+import { TERMS_NOTE } from "../../../data/producerFaq";
+
+const items = [
+  { title: "Escaneas con el celular, aunque no haya señal.", text: "La lista se descarga antes y se sincroniza cuando vuelve la conexión." },
+  { title: "Un QR entra una sola vez.", text: "Si alguien comparte el pantallazo de su entrada, el segundo que la muestra no entra." },
+  { title: "La puerta ve qué entrada es.", text: "Lista, cover, mesa o cortesía, con el nombre de quien la compró.", soon: "Rechazar la lista después de su hora" },
+  { title: "Ves cuántos han entrado.", text: "El escáner cuenta las entradas validadas sobre el total, en vivo." },
+  {
+    title: "Tu equipo de puerta no necesita tu cuenta.",
+    text: "Le das el rol Puerta, o un link de escáner que vence solo (lo creas desde tu asistente de IA).",
+  },
+  { title: "¿Llegó sin la entrada en el celular?", text: "Se busca por nombre en la lista y se le reenvía al correo." },
+];
+---
+
+<section id="puerta" class="cl-section cl-on-noche-2" aria-labelledby="cl-door-title" data-cl-section="door">
+  <span class="cl-halo cl-halo-fluor cdo-halo" aria-hidden="true"></span>
+  <div class="cl-wrap cdo-grid" data-lp-reveal>
+    <div class="cdo-media" data-lp-step data-uv-area>
+      <CapsulePhoto
+        photo={CLUB_PHOTOS.puerta}
+        alt="Persona del equipo escaneando el QR de una entrada en la puerta de un club, con fila detrás del cordón"
+        sizes="(min-width: 1024px) 40vw, 100vw"
+        leak="magenta"
+        position="50% 40%"
+        class="cdo-photo"
+      />
+      <p class="cdo-valid" data-testid="club-door-valid">
+        <span aria-hidden="true">✓</span> Válida · Cover · Entrada 1 de 2 · 00:47
+      </p>
+      <UvStamp where="door" size={104} class="cdo-uv" />
+    </div>
+
+    <div class="cdo-copy">
+      <NightHour time={`VIE ${LIVE_NIGHT.start}`} label="Abre la puerta" />
+      <LedHeading id="cl-door-title" text="La fila avanza." lit="Los pantallazos no pasan." />
+      <ol class="cl-items cdo-items">
+        {
+          items.map((item, i) => (
+            <li class="cl-item" data-lp-step>
+              <span class="cl-item-num" aria-hidden="true">{i + 1}</span>
+              <div>
+                <h3 class="cl-item-title">{item.title}</h3>
+                <p class="cl-item-text">{item.text}</p>
+                {item.soon && (
+                  <p class="cdo-soon">
+                    {item.soon} <SoonBadge dark />
+                  </p>
+                )}
+              </div>
+            </li>
+          ))
+        }
+      </ol>
+      <p class="cl-note cdo-note" data-lp-step>
+        *Escanear también cuenta para tu pago: los check-ins de la puerta acreditan que la noche se realizó, una de las
+        condiciones para liberar lo de cada noche. <a href={TERMS_NOTE.href} class="cl-link">{TERMS_NOTE.text}</a>
+      </p>
+      <p class="cdo-links" data-lp-step>
+        <a href="/guias/como-hacer-check-in-con-qr" class="cl-link">Guía: check-in con QR →</a>
+        <a href="/entradas-con-qr" class="cl-link">Entradas con QR →</a>
+      </p>
+    </div>
+  </div>
+</section>
+
+<style>
+  .cdo-halo {
+    --size: 640px;
+    left: -240px;
+    bottom: -200px;
+  }
+  .cdo-grid {
+    display: grid;
+    gap: 40px;
+  }
+  .cdo-media {
+    position: relative;
+    max-width: 520px;
+    padding-bottom: 28px;
+  }
+  .cdo-media :global(.cdo-photo) {
+    aspect-ratio: 3 / 4;
+    width: 100%;
+  }
+  /* Card lima del escáner, pegada abajo a la derecha de la foto (tinta sobre lima) */
+  .cdo-valid {
+    position: absolute;
+    z-index: 2;
+    right: 8px;
+    bottom: 0;
+    max-width: calc(100% - 120px);
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: var(--brand-lime);
+    color: var(--cl-ink);
+    font-size: 13px;
+    line-height: 18px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-variant-numeric: tabular-nums;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+  }
+  .cdo-media :global(.cdo-uv) {
+    position: absolute;
+    z-index: 2;
+    left: 4px;
+    bottom: 0;
+  }
+  .cdo-items {
+    margin-top: 32px;
+  }
+  .cdo-soon {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+    margin-top: 6px;
+    font-size: 13px;
+    color: var(--cl-text-3);
+  }
+  .cdo-note {
+    max-width: 620px;
+    margin-top: 28px;
+  }
+  .cdo-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 20px;
+    margin-top: 14px;
+    font-size: 14px;
+  }
+  .cdo-links .cl-link {
+    min-height: 44px;
+  }
+  @media (min-width: 1024px) {
+    .cdo-grid {
+      grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+      gap: 72px;
+      align-items: center;
+    }
+    .cdo-media :global(.cdo-photo) {
+      aspect-ratio: 4 / 5;
+    }
+    .cdo-media {
+      max-width: none;
+    }
+    .cdo-valid {
+      right: -24px;
+      bottom: 40px;
+      max-width: calc(100% - 96px);
+    }
+    .cdo-media :global(.cdo-uv) {
+      left: -20px;
+      bottom: 24px;
+    }
+  }
+</style>

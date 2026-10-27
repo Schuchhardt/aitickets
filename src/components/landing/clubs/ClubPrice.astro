@@ -1,0 +1,114 @@
+---
+// 8 · Se prenden las luces (SPEC_landing_clubs §4.8, 05:00): corte duro del negro a las luces de servicio (blanco frío),
+// con los tubos que se encienden y el texto en tinta. Plata y plazos solo de constantes: el texto, como el priceLead de
+// stand-up, con SERVICE_FEE_PERCENT_LABEL / IVA_PERCENT_LABEL (fees.mjs) y ABSORB_FEE_ACTIVATION (producerFaq.ts); las
+// garantías con PAYOUT_SHORT_TEXT y el cobro con PAYOUT_SCHEDULE_TEXT / PAYOUT_RELEASE_HOURS (legal.mjs), con "*" y
+// TERMS_NOTE. La calculadora es la isla CashCloseCalculator (priceQuote → fees.mjs).
+import CashCloseCalculator from "./CashCloseCalculator.vue";
+import LedHeading from "./LedHeading.astro";
+import NightHour from "./NightHour.astro";
+import ServiceLights from "./ServiceLights.astro";
+import { LIVE_NIGHT } from "./clubsLanding.js";
+import { IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL } from "../../../../netlify/lib/fees.mjs";
+import { PAYOUT_RELEASE_HOURS, PAYOUT_SCHEDULE_TEXT, PAYOUT_SHORT_TEXT } from "../../../../netlify/lib/legal.mjs";
+import { ABSORB_FEE_ACTIVATION, TERMS_NOTE } from "../../../data/producerFaq";
+---
+
+<section id="precio" class="cl-section cl-on-servicio cp" aria-labelledby="cl-price-title" data-cl-section="price">
+  <div class="cl-wrap" data-lp-reveal>
+    <ServiceLights />
+    <div class="cp-grid">
+      <div class="cp-copy">
+        <NightHour time="05:00" label="Se prenden las luces" />
+        <LedHeading id="cl-price-title" text="Tú recibes el 100%" lit="de cada entrada." class="cp-title" />
+        <p class="cl-lead cp-lead" data-lp-step>
+          Para el club, 0% de comisión. El comprador paga un cargo por servicio de {SERVICE_FEE_PERCENT_LABEL} más IVA
+          ({IVA_PERCENT_LABEL}) sobre ese cargo. Si prefieres un cover redondo, lo absorbes tú, por evento.
+          {ABSORB_FEE_ACTIVATION} La lista free no paga nada.
+        </p>
+        <p class="cl-meta cp-guarantees" data-lp-step>Sin mensualidad · Sin permanencia · {PAYOUT_SHORT_TEXT}*</p>
+        <div class="cp-payout" data-lp-step>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"
+            ><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg
+          >
+          <p>
+            <span class="cp-payout-title">Cobro de la noche.</span>
+            {PAYOUT_SCHEDULE_TEXT}* Si la noche termina a las {LIVE_NIGHT.end}, las {PAYOUT_RELEASE_HOURS} h cuentan desde las
+            {LIVE_NIGHT.end}.
+          </p>
+        </div>
+        <p class="cl-note cp-terms" data-lp-step>
+          <a href={TERMS_NOTE.href} class="cl-link">{TERMS_NOTE.text}</a>
+        </p>
+      </div>
+      <div class="cp-calc" data-lp-step>
+        <CashCloseCalculator client:visible />
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  /* Corte duro: sin degradado desde la sección anterior */
+  .cp {
+    border-top: 1px solid var(--cl-servicio-2);
+  }
+  .cp :global(.cp-title .cl-lit) {
+    color: var(--cl-fluor-ink);
+  }
+  .cp :global(.cp-title .cl-glow::after),
+  .cp :global(.cp-title .cl-led-grid) {
+    display: none;
+  }
+  .cp-lead {
+    max-width: 620px;
+    margin-top: 20px;
+  }
+  .cp-guarantees {
+    margin-top: 20px;
+    color: var(--cl-ink-2);
+  }
+  .cp-payout {
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr);
+    gap: 12px;
+    max-width: 620px;
+    margin-top: 24px;
+    padding: 14px 16px;
+    border: 1px solid var(--cl-servicio-2);
+    border-radius: 12px;
+    background: #fff;
+    font-size: 15px;
+    line-height: 23px;
+    color: var(--cl-ink-2);
+  }
+  .cp-payout svg {
+    margin-top: 1px;
+    color: var(--cl-ink);
+  }
+  .cp-payout-title {
+    font-weight: 600;
+    color: var(--cl-ink);
+  }
+  .cp-terms {
+    margin-top: 14px;
+  }
+  .cp-grid {
+    display: grid;
+    gap: 36px;
+  }
+  .cp-calc {
+    min-width: 0;
+  }
+  @media (min-width: 1024px) {
+    .cp-grid {
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+      gap: 64px;
+      align-items: start;
+    }
+    .cp-calc {
+      position: sticky;
+      top: 104px;
+    }
+  }
+</style>

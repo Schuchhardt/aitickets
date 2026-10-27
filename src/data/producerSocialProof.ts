@@ -58,3 +58,9 @@ export const THEATRE_TESTIMONIAL: ProducerTestimonial | null = null;
  */
 export type WorkshopTestimonial = ProducerTestimonial & { highlight?: string };
 export const WORKSHOP_TESTIMONIAL: WorkshopTestimonial | null = null;
+
+/**
+ * Cita de /ticketera-discotecas (SPEC_landing_clubs §4.10 y §0.8): solo si es real, con nombre, club o productora,
+ * ciudad y foto autorizados por escrito. company = "Club o productora · ciudad". null: la sección no se renderiza.
+ */
+export const CLUB_TESTIMONIAL: ProducerTestimonial | null = null;

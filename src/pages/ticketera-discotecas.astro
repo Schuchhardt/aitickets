@@ -1,0 +1,170 @@
+---
+// Landing especializada para clubs y discotecas (docs/specs/rediseno/SPEC_landing_clubs_aitickets.md, fases 1 a 3):
+// clubs nocturnos, discotecas, bares con pista y productoras de noche con noches que se repiten (lista free, cover,
+// mesas, RRPP y puerta). Ruta nueva /ticketera-discotecas, registrada en src/data/landings.ts como dedicated: [landing].astro
+// no la genera, y la tarjeta, el sitemap, las relacionadas y "Según lo que produces" de /organizadores leen de ahí;
+// /ticketera-clubs y /ticketera-clubes redirigen con 301 (astro.config.mjs) y el footer la enlaza en "Para quién".
+// Tema propio "luz negra" ([data-theme="clubs"], src/styles/landing-clubs.css) sin tocar los tokens globales ni repetir el
+// lenguaje de las otras landings: Doto (LED de puntos), rosa fluor, violeta UV, luces de servicio en el precio. La página
+// se ordena como una semana del club: cada sección abre con su hora LED y el header lleva el reloj de la noche. Sin
+// preload de Doto (a diferencia de música, teatro y talleres): el woff2 latin 800 pesa menos que assetsInlineLimit
+// (4 KB) y Vite lo inlinea en el CSS de la página, así que ya llega con la hoja.
+// Reutiliza la fórmula de precios (priceQuote → fees.mjs), el FAQ, la barra CTA mobile, el movimiento (LandingMotion), la
+// lógica de la demo de anuncios (useAdsDemo) y la serie de redes (seriesMarks de música). Montos y plazos: fees.mjs,
+// legal.mjs y producerFaq.ts; cadencia de redes: DEFAULT_CADENCE; lo que no existe en el producto (validar la hora de
+// ingreso de la lista, check-ins y acceso por RRPP, una entrada por invitado de la mesa, vista de aforo en el panel,
+// Facebook/TikTok/reels, segmentar por gustos) va con "Pronto".
+// Fase 4 (contenido real) queda fuera del código: fotos reales con autorización (§8), testimonio (CLUB_TESTIMONIAL, hoy
+// null: la sección no se muestra), evento de ejemplo de club y revisión de los nombres de ejemplo.
+export const prerender = true;
+import AppFooter from "../components/AppFooter.vue";
+import LandingFaq from "../components/landing/LandingFaq.vue";
+import LandingMobileBar from "../components/landing/LandingMobileBar.vue";
+import CtaTracking from "../components/landing/CtaTracking.astro";
+import LandingMotion from "../components/landing/LandingMotion.astro";
+import ClubHeader from "../components/landing/clubs/ClubHeader.vue";
+import ClubHero from "../components/landing/clubs/ClubHero.astro";
+import ClubNights from "../components/landing/clubs/ClubNights.astro";
+import ClubDiffusion from "../components/landing/clubs/ClubDiffusion.astro";
+import ClubList from "../components/landing/clubs/ClubList.astro";
+import ClubLive from "../components/landing/clubs/ClubLive.astro";
+import ClubDoor from "../components/landing/clubs/ClubDoor.astro";
+import ClubTables from "../components/landing/clubs/ClubTables.astro";
+import ClubPrice from "../components/landing/clubs/ClubPrice.astro";
+import NextNight from "../components/landing/clubs/NextNight.astro";
+import ClubQuote from "../components/landing/clubs/ClubQuote.astro";
+import ClubClosing from "../components/landing/clubs/ClubClosing.astro";
+import ClubTracking from "../components/landing/clubs/ClubTracking.astro";
+import Layout from "../layouts/Layout.astro";
+import { publishUrl } from "../components/landing/links.js";
+import { CLUB_PHOTOS } from "../components/landing/clubs/clubsLanding.js";
+import { getLanding } from "../data/landings";
+import { CLUBS_FAQ } from "../data/clubsFaq";
+import { IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL } from "../../netlify/lib/fees.mjs";
+import "../styles/global.css";
+import "../styles/landing.css";
+import "../styles/landing-clubs.css";
+
+const landing = getLanding("ticketera-discotecas");
+if (!landing) throw new Error("Falta la landing ticketera-discotecas en src/data/landings.ts");
+const demoHref = landing.demo?.url ?? "/eventos";
+const demoLabel = landing.demo?.label ?? "Ver eventos";
+
+const SITE_URL = (import.meta.env.SITE_URL || "https://aitickets.cl").replace(/\/$/, "");
+const url = `${SITE_URL}/${landing.slug}`;
+const jsonLd = [
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "AI Tickets", item: SITE_URL },
+      { "@type": "ListItem", position: 2, name: "Para organizadores", item: `${SITE_URL}/organizadores` },
+      { "@type": "ListItem", position: 3, name: landing.card.title, item: url },
+    ],
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "AI Tickets para clubs y discotecas",
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Web",
+    url,
+    description: landing.description,
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "CLP",
+      description: `Sin mensualidad y 0% de comisión para el club. El comprador paga un cargo por servicio de ${SERVICE_FEE_PERCENT_LABEL} + IVA (${IVA_PERCENT_LABEL}) sobre ese cargo, o lo absorbe el club. La lista free no paga cargo.`,
+    },
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: CLUBS_FAQ.map((f) => ({
+      "@type": "Question",
+      name: f.q,
+      acceptedAnswer: { "@type": "Answer", text: f.a },
+    })),
+  },
+];
+---
+
+<Layout title={landing.title} description={landing.description} canonical={`/${landing.slug}`} image={CLUB_PHOTOS.hero.src}>
+  <LandingMotion />
+  <div class="cl" data-theme="clubs">
+    <ClubHeader client:idle publishHref={publishUrl("clubs_header")} />
+    <main>
+      <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+      <ClubHero ctaLabel={landing.cta.label} demoHref={demoHref} demoLabel={demoLabel} />
+      <ClubNights />
+      <ClubDiffusion />
+      <ClubList />
+      <ClubLive />
+      <ClubDoor />
+      <ClubTables />
+      <ClubPrice />
+      <NextNight />
+      <ClubQuote />
+
+      <section class="cl-section faq" aria-labelledby="cl-faq-title" data-cl-section="faq">
+        <div class="cl-wrap faq-inner" data-lp-reveal>
+          <h2 id="cl-faq-title" class="cl-h2 faq-title" data-lp-step>Preguntas frecuentes</h2>
+          <div class="faq-list" data-lp-step><LandingFaq client:visible items={CLUBS_FAQ} idPrefix="cl-faq" /></div>
+        </div>
+      </section>
+
+      <ClubClosing ctaLabel={landing.cta.label} />
+    </main>
+    <AppFooter client:idle tone="dark" />
+    <LandingMobileBar
+      client:idle
+      variant="pill"
+      title="Gratis para publicar"
+      subtitle="0% de comisión para el club"
+      ctaLabel="Publicar mi noche"
+      publishHref={publishUrl("clubs_mobile_bar")}
+    />
+  </div>
+  <CtaTracking />
+  <ClubTracking />
+</Layout>
+
+<style>
+  .faq-inner {
+    max-width: 960px;
+  }
+  .faq-title {
+    margin-bottom: 20px;
+  }
+  /* §4.11: pregunta en Prompt 600; el "+" es un punto LED fluor que se convierte en "–" (3 puntos) al abrir */
+  .faq-list :global(.lf-q) {
+    font-weight: 600;
+  }
+  .faq-list :global(.lf-icon) {
+    display: none;
+  }
+  .faq-list :global(.lf-q)::after {
+    content: "";
+    flex: 0 0 auto;
+    width: 18px;
+    height: 18px;
+    background:
+      radial-gradient(circle at 50% 50%, var(--cl-fluor) 1.8px, transparent 2.3px),
+      radial-gradient(circle at 50% 14%, var(--cl-fluor) 1.8px, transparent 2.3px),
+      radial-gradient(circle at 50% 86%, var(--cl-fluor) 1.8px, transparent 2.3px),
+      radial-gradient(circle at 14% 50%, var(--cl-fluor) 1.8px, transparent 2.3px),
+      radial-gradient(circle at 86% 50%, var(--cl-fluor) 1.8px, transparent 2.3px);
+    filter: drop-shadow(0 0 3px rgba(255, 79, 184, 0.7));
+  }
+  .faq-list :global(.lf-q[aria-expanded="true"])::after {
+    background:
+      radial-gradient(circle at 14% 50%, var(--cl-fluor) 1.8px, transparent 2.3px),
+      radial-gradient(circle at 50% 50%, var(--cl-fluor) 1.8px, transparent 2.3px),
+      radial-gradient(circle at 86% 50%, var(--cl-fluor) 1.8px, transparent 2.3px);
+  }
+  @media (min-width: 1024px) {
+    .faq-title {
+      margin-bottom: 32px;
+    }
+  }
+</style>

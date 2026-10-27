@@ -1,0 +1,100 @@
+---
+// 9 · La próxima noche se llena con esta (SPEC_landing_clubs §4.9, DOM 12:00): reseñas con fotos entre
+// REVIEW_REQUEST_DELAY_HOURS y REVIEW_REQUEST_WINDOW_HOURS después (reviews.mjs, con código de premio opcional),
+// invitar a la próxima noche a quienes entraron o calificaron con 4 o 5 estrellas (INVITE_AUDIENCES: checked_in y
+// promoters) y el reporte semanal de los domingos (send-weekly-reports). Mobile: carrusel con scroll-snap (card al 86%).
+import LedHeading from "./LedHeading.astro";
+import NightHour from "./NightHour.astro";
+import { REVIEW_REQUEST_DELAY_HOURS, REVIEW_REQUEST_WINDOW_HOURS } from "../../../../netlify/lib/reviews.mjs";
+
+const cards = [
+  {
+    title: "Fotos y estrellas de tu público.",
+    text: `Entre ${REVIEW_REQUEST_DELAY_HOURS} y ${REVIEW_REQUEST_WINDOW_HOURS} h después de la noche les llega un correo para calificar y subir fotos. Si quieres, premias con un código para la próxima.`,
+  },
+  {
+    title: "Invita solo a los que vinieron.",
+    text: "Con un clic mandas un correo a quienes entraron por la puerta (o a quienes calificaron con 4 o 5 estrellas) con el link de tu próxima noche.",
+  },
+  {
+    title: "Tu reporte del domingo.",
+    text: "Cada domingo te llega por correo cómo vendió la semana y qué hacer en la próxima.",
+  },
+];
+---
+
+<section class="cl-section cl-on-noche-2" aria-labelledby="cl-next-title" data-cl-section="next">
+  <div class="cl-wrap" data-lp-reveal>
+    <NightHour time="DOM 12:00" label="La próxima noche" />
+    <LedHeading id="cl-next-title" text="El domingo" lit="ya estás vendiendo el viernes." />
+    <ol class="nn-cards">
+      {
+        cards.map((card, i) => (
+          <li class="nn-card cl-card" data-lp-step>
+            <span class="cl-item-num nn-num" aria-hidden="true">
+              {i + 1}
+            </span>
+            <h3 class="nn-title">{card.title}</h3>
+            <p class="nn-text">{card.text}</p>
+          </li>
+        ))
+      }
+    </ol>
+  </div>
+</section>
+
+<style>
+  .nn-cards {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 86%;
+    gap: 12px;
+    margin: 32px -20px 0;
+    padding: 0 20px 8px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: 20px;
+    scrollbar-width: none;
+  }
+  .nn-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 22px;
+    scroll-snap-align: start;
+  }
+  .nn-num {
+    font-size: 40px;
+    line-height: 44px;
+  }
+  .nn-title {
+    font-size: 19px;
+    line-height: 26px;
+    font-weight: 700;
+  }
+  .nn-text {
+    font-size: 15px;
+    line-height: 23px;
+    color: var(--cl-text-2);
+  }
+  @media (min-width: 768px) {
+    .nn-cards {
+      margin-inline: -40px;
+      padding-inline: 40px;
+      scroll-padding-inline: 40px;
+    }
+  }
+  @media (min-width: 1024px) {
+    .nn-cards {
+      grid-auto-flow: row;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 24px;
+      margin: 48px 0 0;
+      padding: 0;
+      overflow: visible;
+    }
+    .nn-card {
+      padding: 28px;
+    }
+  }
+</style>

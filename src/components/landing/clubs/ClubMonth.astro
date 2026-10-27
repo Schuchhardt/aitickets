@@ -1,0 +1,376 @@
+---
+// Mes del club (SPEC_landing_clubs §4.2, C8): calendario de ejemplo de 5 semanas × 7 días (L a D) con las noches de
+// jueves, viernes y sábado en cápsulas con punto fluor. Semanas pasadas en gris ("Realizada"), la actual con borde que
+// brilla (pulsa una vez al revelarse) y las futuras con "Quedan N". Cada noche es un botón: al pasar el puntero, al
+// enfocarla o al tocarla muestra su horario, sus entradas y desde cuándo queda disponible lo vendido (payoutAt: término
+// + PAYOUT_RELEASE_HOURS, cruzando la medianoche como ledger.ts), con "*" de términos (TERMS_NOTE va al final de la
+// sección, ClubNights). El tooltip está siempre en el HTML (aria-describedby): sin JS se lee igual. Mobile: cada semana
+// muestra solo jueves a sábado y un "+" despliega la semana completa.
+// Analítica: cl_month_night { weekday } al abrir una noche.
+import { clubMonth, nightTooltip, WEEKDAYS } from "./clubsLanding.js";
+
+const weeks = clubMonth();
+const stateLabel: Record<string, string> = { past: "Realizada", current: "Esta semana", future: "" };
+---
+
+<div class="cm cl-card" data-lp-step data-testid="club-month" data-cl-month>
+  <div class="cm-head">
+    <p class="cl-meta">Mes del club</p>
+    <p class="cl-example">ejemplo</p>
+  </div>
+  <ol class="cm-weekdays" aria-hidden="true">
+    {WEEKDAYS.map((d) => <li>{d.slice(0, 1)}</li>)}
+  </ol>
+  <ol class="cm-weeks">
+    {
+      weeks.map((w) => (
+        <li class:list={["cm-week", `is-${w.state}`]} data-week={w.week}>
+          <p class="lp-sr-only">Semana {w.week + 1}</p>
+          <button
+            type="button"
+            class="cm-more"
+            aria-expanded="false"
+            aria-controls={`cm-week-${w.week}`}
+            aria-label={`Ver la semana ${w.week + 1} completa`}
+          >
+            <span aria-hidden="true">+</span>
+          </button>
+          <ol class="cm-days" id={`cm-week-${w.week}`}>
+            {w.days.map((d) => (
+              <li class:list={["cm-day", d.night && "has-night", d.outside && "is-outside"]} style={`--d: ${w.week * 7 + d.weekday}`}>
+                <span class="cm-num cl-tabular">
+                  <span class="cm-wd">{d.label} </span>
+                  {d.day}
+                </span>
+                {d.night && (
+                  <>
+                    <button
+                      type="button"
+                      class="cm-night"
+                      aria-expanded="false"
+                      aria-describedby={`cm-tip-${w.week}-${d.weekday}`}
+                      data-weekday={d.label}
+                    >
+                      <span class="cm-dot" aria-hidden="true" />
+                      <span class="cm-name">{d.night.name}</span>
+                      <span class="cm-state">
+                        {w.state === "future" && d.night.left !== null ? `Quedan ${d.night.left}` : stateLabel[w.state]}
+                      </span>
+                    </button>
+                    <span class="cm-tip" role="tooltip" id={`cm-tip-${w.week}-${d.weekday}`}>
+                      {nightTooltip(d)}*
+                    </span>
+                  </>
+                )}
+              </li>
+            ))}
+          </ol>
+        </li>
+      ))
+    }
+  </ol>
+</div>
+
+<script>
+  import { trackEvent } from "../../../composables/useGoogleAnalytics.js";
+
+  // Tocar una noche abre su tooltip (y cierra el anterior); "+" despliega la semana en mobile; Escape cierra
+  const month = document.querySelector<HTMLElement>("[data-cl-month]");
+  if (month) {
+    const closeAll = (except?: Element) =>
+      month.querySelectorAll(".cm-night[aria-expanded='true']").forEach((b) => b !== except && b.setAttribute("aria-expanded", "false"));
+    month.addEventListener("click", (e) => {
+      const target = e.target as Element;
+      const night = target.closest<HTMLElement>(".cm-night");
+      if (night) {
+        const open = night.getAttribute("aria-expanded") !== "true";
+        closeAll(night);
+        night.setAttribute("aria-expanded", String(open));
+        if (open) trackEvent("cl_month_night", { weekday: night.dataset.weekday });
+        return;
+      }
+      const more = target.closest<HTMLElement>(".cm-more");
+      if (more) {
+        const open = more.getAttribute("aria-expanded") !== "true";
+        more.setAttribute("aria-expanded", String(open));
+        more.closest(".cm-week")?.classList.toggle("is-open", open);
+        more.setAttribute("aria-label", more.getAttribute("aria-label")!.replace(open ? "Ver" : "Ocultar", open ? "Ocultar" : "Ver"));
+      }
+    });
+    month.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeAll();
+    });
+    document.addEventListener("click", (e) => {
+      if (!month.contains(e.target as Node)) closeAll();
+    });
+  }
+</script>
+
+<style>
+  .cm {
+    padding: 16px;
+  }
+  .cm-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 12px;
+  }
+  .cm-weekdays {
+    display: none;
+  }
+  .cm-weeks {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .cm-week {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 44px;
+    gap: 8px;
+    align-items: start;
+  }
+  .cm-more {
+    grid-column: 2;
+    grid-row: 1;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--cl-line-strong);
+    border-radius: 12px;
+    background: var(--cl-noche-2);
+    color: var(--cl-text-1);
+    font: 600 20px/1 "Prompt", system-ui, sans-serif;
+    cursor: pointer;
+  }
+  .cm-more[aria-expanded="true"] span {
+    display: inline-block;
+    transform: rotate(45deg);
+  }
+  .cm-more:focus-visible,
+  .cm-night:focus-visible {
+    outline: 2px solid var(--cl-uv-soft);
+    outline-offset: 2px;
+  }
+  .cm-days {
+    grid-column: 1;
+    grid-row: 1;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .cm-day {
+    position: relative;
+    display: none;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+  .cm-day.has-night,
+  .cm-week.is-open .cm-day {
+    display: flex;
+  }
+  .cm-week.is-open .cm-day:not(.has-night) {
+    min-height: 44px;
+    justify-content: center;
+    padding: 4px 8px;
+    border: 1px dashed var(--cl-line);
+    border-radius: 12px;
+  }
+  .cm-num {
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--cl-text-3);
+  }
+  .cm-wd {
+    font-weight: 600;
+    letter-spacing: 0.06em;
+  }
+  .cm-day.is-outside .cm-num {
+    opacity: 0.55;
+  }
+  .cm-night {
+    position: relative;
+    display: grid;
+    grid-template-columns: 8px minmax(0, 1fr);
+    column-gap: 6px;
+    align-items: center;
+    width: 100%;
+    min-height: 44px;
+    padding: 6px 10px;
+    border: 1px solid var(--cl-line);
+    border-radius: 999px;
+    background: var(--cl-noche-2);
+    color: var(--cl-text-1);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .cm-dot {
+    grid-row: 1 / span 2;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--cl-fluor);
+    box-shadow: 0 0 6px rgba(255, 79, 184, 0.7);
+  }
+  /* Mobile: la celda ya dice "VIE 19"; el nombre de la noche queda solo para lectores de pantalla */
+  .cm-name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+  .cm-state {
+    font-size: 11px;
+    line-height: 14px;
+    color: var(--cl-text-3);
+  }
+  .cm-week.is-past .cm-night {
+    color: var(--cl-text-3);
+    background: transparent;
+  }
+  .cm-week.is-past .cm-dot {
+    background: var(--cl-text-3);
+    box-shadow: none;
+  }
+  .cm-week.is-current .cm-night {
+    border-color: var(--cl-line-glow);
+    box-shadow: 0 0 0 1px var(--cl-line-glow);
+  }
+  /* Brillo extra de la semana actual: pulsa una vez (C8) con opacidad */
+  .cm-week.is-current .cm-night::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    box-shadow: 0 0 0 1px var(--cl-uv), 0 0 22px rgba(138, 92, 255, 0.55);
+    opacity: 0;
+    pointer-events: none;
+  }
+  /* Tooltip: con hover (puntero fino), con foco o al tocar (aria-expanded) */
+  .cm-tip {
+    position: absolute;
+    z-index: 5;
+    left: 0;
+    bottom: calc(100% + 8px);
+    width: max-content;
+    max-width: 240px;
+    padding: 8px 10px;
+    border: 1px solid var(--cl-line-glow);
+    border-radius: 10px;
+    background: #000;
+    font-size: 12px;
+    line-height: 17px;
+    font-weight: 600;
+    color: var(--cl-text-1);
+    font-variant-numeric: tabular-nums;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity var(--dur-2) var(--ease-out), visibility var(--dur-2);
+  }
+  .cm-day:nth-child(3n) .cm-tip {
+    left: auto;
+    right: 0;
+  }
+  .cm-day:nth-child(3n + 2) .cm-tip {
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  .cm-night[aria-expanded="true"] + .cm-tip,
+  .cm-night:focus-visible + .cm-tip {
+    opacity: 1;
+    visibility: visible;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .cm-night:hover + .cm-tip {
+      opacity: 1;
+      visibility: visible;
+    }
+  }
+
+  /* Desktop: grilla de 7 columnas con todos los días y sin "+" */
+  @media (min-width: 900px) {
+    .cm {
+      padding: 20px;
+    }
+    .cm-weekdays {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 6px;
+      margin-bottom: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--cl-text-3);
+      text-align: center;
+    }
+    .cm-week {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .cm-more,
+    .cm-wd {
+      display: none;
+    }
+    .cm-days {
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+    }
+    .cm-day,
+    .cm-week.is-open .cm-day {
+      display: flex;
+      min-height: 76px;
+      padding: 6px;
+      border: 1px solid var(--cl-line);
+      border-radius: 12px;
+    }
+    .cm-week.is-open .cm-day:not(.has-night) {
+      border-style: solid;
+      justify-content: flex-start;
+    }
+    .cm-night {
+      grid-template-columns: 8px minmax(0, 1fr);
+      padding: 6px 8px;
+      border-radius: 16px;
+    }
+    .cm-name {
+      position: static;
+      width: auto;
+      height: auto;
+      clip: auto;
+      white-space: normal;
+      font-size: 12px;
+      line-height: 15px;
+      font-weight: 600;
+      overflow-wrap: anywhere;
+    }
+    .cm-day:nth-child(3n) .cm-tip,
+    .cm-day:nth-child(3n + 2) .cm-tip {
+      left: 0;
+      right: auto;
+      transform: none;
+    }
+    .cm-day:nth-child(7n) .cm-tip,
+    .cm-day:nth-child(7n - 1) .cm-tip {
+      left: auto;
+      right: 0;
+    }
+  }
+
+  /* C8: las noches aparecen con stagger de 30 ms por día; la semana actual pulsa una vez */
+  :global(.lp-motion) :global([data-lp-reveal]:not(.is-in)) .cm-night {
+    opacity: 0;
+  }
+  :global(.lp-motion) :global(.is-in) .cm-night {
+    animation: cl-pop 360ms var(--ease-out) calc(300ms + var(--d) * 30ms) both;
+  }
+  :global(.lp-motion) :global(.is-in) .cm-week.is-current .cm-night::after {
+    animation: cl-glow-once 900ms var(--ease-in-out) 1600ms 1 both;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cm-tip {
+      transition: none;
+    }
+  }
+</style>

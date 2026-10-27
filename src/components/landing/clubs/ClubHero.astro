@@ -1,0 +1,319 @@
+---
+// 1 · Hero (SPEC_landing_clubs §4.1): foto de la pista en color de club con fuga de luz violeta arriba a la derecha y
+// overlay negro violáceo abajo a la izquierda, halo detrás del H1 LED, bajada armada con el plazo de pago (legal.mjs) y
+// la nota de términos (TERMS_NOTE), CTAs y la card "Esta noche" con el letrero LED, los tres tipos de entrada (el cargo
+// con SERVICE_FEE_NOTE de fees.mjs) y el timbre UV. La foto es el LCP: AVIF/WebP con srcset y fetchpriority alto, sin
+// lazy-load. Alto min(100svh, 900px) en desktop y 780 px en mobile (mínimos: con zoom de texto crece).
+// Movimiento al cargar (solo con html.lp-motion): C1 foto (scale 1.06 → 1 y la fuga de luz entra), C2 H1 que se
+// enciende por columnas, C3 bajada y CTAs, C4 card (y su letrero rota cada 3 s), C5 linterna UV, C7 deriva del halo.
+import LedHeading from "./LedHeading.astro";
+import LedSign from "./LedSign.astro";
+import UvStamp from "./UvStamp.astro";
+import { CLUB_NAME, CLUB_PHOTOS, HERO_ROWS, HERO_SIGN, LIVE_NIGHT, NIGHT_NAME } from "./clubsLanding.js";
+import { formatCLP } from "../producerLanding.js";
+import { publishUrl } from "../links.js";
+import { PAYOUT_RELEASE_HOURS } from "../../../../netlify/lib/legal.mjs";
+import { SERVICE_FEE_NOTE } from "../../../../netlify/lib/fees.mjs";
+import { TERMS_NOTE } from "../../../data/producerFaq";
+
+interface Props {
+  ctaLabel: string;
+  demoHref: string;
+  demoLabel: string;
+}
+const { ctaLabel, demoHref, demoLabel } = Astro.props;
+const photo = CLUB_PHOTOS.hero;
+---
+
+<section class="chh" aria-labelledby="cl-hero-title" data-cl-section="hero" data-cl-play>
+  <div class="chh-media cl-leak" style="--leak-x: 90%; --leak-y: 6%">
+    <picture>
+      {photo.sources.map((source) => <source type={source.type} srcset={source.srcset} sizes="100vw" />)}
+      <img
+        class="cl-photo-img chh-photo"
+        src={photo.src}
+        alt="Pista de baile llena frente a la cabina del DJ con luces magenta"
+        width={photo.width}
+        height={photo.height}
+        loading="eager"
+        fetchpriority="high"
+      />
+    </picture>
+  </div>
+  <div class="chh-shade" aria-hidden="true"></div>
+  <span class="cl-halo cl-halo-drift chh-halo" aria-hidden="true"></span>
+
+  <div class="cl-wrap chh-inner">
+    <div class="chh-head">
+      <p class="cl-meta chh-eyebrow chh-fade-0">Para clubs, discotecas y productoras de noche</p>
+      <LedHeading tag="h1" id="cl-hero-title" text="Abre la puerta." lit="Nosotros llevamos la lista." motion="load" />
+    </div>
+    <div class="chh-copy">
+      <p class="cl-lead chh-lead chh-fade-1">
+        Lista free con QR para cada RRPP, cover y mesas pagados antes de llegar, check-in en la puerta aunque no haya
+        señal y lo de cada noche disponible {PAYOUT_RELEASE_HOURS} h después de que termina*. 0% de comisión para el club.
+      </p>
+      <div class="chh-ctas chh-fade-2" data-hero-cta>
+        <a href={publishUrl("clubs_hero")} class="cl-btn cl-btn-lime" data-cta="publish" data-section="hero">
+          {ctaLabel} <span aria-hidden="true">→</span>
+        </a>
+        <a href={demoHref} class="cl-btn cl-btn-line" data-cta="demo" data-section="hero">{demoLabel}</a>
+      </div>
+      <p class="cl-meta chh-micro chh-fade-2">Sin mensualidad · Sin permanencia · La lista free no paga nada</p>
+    </div>
+
+    <div class="cl-card cl-card-glow chh-card" data-uv-area aria-label="Esta noche, ejemplo" role="group" data-testid="club-hero-card">
+      <LedSign messages={HERO_SIGN} twoLines />
+      <div class="chh-card-meta">
+        <p class="cl-meta">{NIGHT_NAME} · {CLUB_NAME} · ejemplo</p>
+        <p class="cl-meta">VIE {LIVE_NIGHT.start} → {LIVE_NIGHT.end} · Providencia</p>
+      </div>
+      <ul class="chh-rows">
+        {
+          HERO_ROWS.map((row) => (
+            <li class="chh-row">
+              <span class="chh-row-name">{row.name}</span>
+              <span class="chh-row-price cl-tabular">{formatCLP(row.price)}</span>
+              <span class="chh-row-state">{row.fee ? <span class="chh-row-fee">{SERVICE_FEE_NOTE}</span> : row.state}</span>
+            </li>
+          ))
+        }
+      </ul>
+      <div class="chh-card-foot">
+        <p class="cl-note chh-uv-hint">Pasa el cursor: el timbre aparece con luz negra</p>
+        <UvStamp where="hero" size={96} class="chh-uv" />
+      </div>
+    </div>
+  </div>
+
+  <p class="cl-wrap cl-note chh-terms">
+    <a href={TERMS_NOTE.href} class="cl-link">{TERMS_NOTE.text}</a>
+  </p>
+</section>
+
+<style>
+  .chh {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    min-height: 780px;
+    padding-top: 112px;
+    overflow: hidden;
+    background: var(--cl-noche);
+  }
+  .chh-media {
+    position: absolute;
+    inset: 0 0 auto;
+    height: 520px;
+    z-index: -2;
+    overflow: hidden;
+  }
+  .chh-media picture {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  .chh-photo {
+    object-position: 55% 40%;
+  }
+  .chh-shade {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background:
+      linear-gradient(180deg, rgba(7, 6, 11, 0.45) 0%, rgba(7, 6, 11, 0.2) 22%, rgba(7, 6, 11, 0.8) 52%, var(--cl-noche) 66%),
+      radial-gradient(ellipse at 0% 100%, rgba(7, 6, 11, 0.8) 0%, transparent 60%);
+  }
+  .chh-halo {
+    --size: 640px;
+    left: -220px;
+    top: 220px;
+    z-index: -1;
+  }
+  .chh-inner {
+    position: relative;
+    display: grid;
+    grid-template-areas: "head" "copy" "card";
+    gap: 40px;
+    width: 100%;
+    padding-bottom: 32px;
+  }
+  .chh-head {
+    grid-area: head;
+  }
+  .chh-copy {
+    grid-area: copy;
+    margin-top: -18px;
+  }
+  .chh-card {
+    grid-area: card;
+  }
+  .chh-eyebrow {
+    margin-bottom: 18px;
+    color: var(--cl-text-2);
+  }
+  .chh-lead {
+    max-width: 600px;
+    color: var(--cl-text-1);
+  }
+  .chh-ctas {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 28px;
+  }
+  .chh-micro {
+    margin-top: 18px;
+    font-size: 12px;
+  }
+  .chh-terms {
+    position: relative;
+    width: 100%;
+    padding-bottom: 28px;
+  }
+
+  /* Card "Esta noche": vidrio oscuro con borde que brilla */
+  .chh-card {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 18px;
+    background: rgba(26, 23, 38, 0.88);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+  }
+  .chh-card-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .chh-card-meta .cl-meta {
+    font-size: 12px;
+  }
+  .chh-rows {
+    display: flex;
+    flex-direction: column;
+    border-top: 1px solid var(--cl-line);
+  }
+  .chh-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "name price" "state state";
+    column-gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--cl-line);
+    font-size: 15px;
+    line-height: 22px;
+  }
+  .chh-row-name {
+    grid-area: name;
+  }
+  .chh-row-price {
+    grid-area: price;
+    font-weight: 600;
+  }
+  .chh-row-state {
+    grid-area: state;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 8px;
+    font-size: 13px;
+    color: var(--cl-text-3);
+  }
+  .chh-row-fee {
+    font-size: 11px;
+  }
+  .chh-card-foot {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  /* La frase de la linterna solo con puntero fino (en touch el timbre se revela solo) */
+  .chh-uv-hint {
+    display: none;
+    max-width: 18ch;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .chh-uv-hint {
+      display: block;
+    }
+  }
+  .chh-card-foot :global(.chh-uv) {
+    margin-left: auto;
+  }
+
+  @media (min-width: 640px) {
+    .chh-ctas {
+      flex-direction: row;
+      flex-wrap: wrap;
+    }
+    .chh-row {
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      grid-template-areas: "name price state";
+      align-items: baseline;
+    }
+    .chh-row-state {
+      flex-direction: column;
+      align-items: flex-end;
+      text-align: right;
+    }
+  }
+  @media (min-width: 1024px) {
+    .chh {
+      min-height: min(100svh, 900px);
+      padding-top: 120px;
+    }
+    .chh-media {
+      height: 100%;
+      inset: 0;
+    }
+    .chh-shade {
+      background:
+        radial-gradient(ellipse at 0% 100%, rgba(7, 6, 11, 0.8) 0%, rgba(7, 6, 11, 0.55) 45%, transparent 75%),
+        linear-gradient(180deg, rgba(7, 6, 11, 0.5) 0%, rgba(7, 6, 11, 0) 30%, rgba(7, 6, 11, 0.35) 70%, var(--cl-noche) 100%);
+    }
+    .chh-halo {
+      --size: 880px;
+      left: -260px;
+      top: auto;
+      bottom: -300px;
+    }
+    .chh-inner {
+      grid-template-columns: minmax(0, 1fr) 360px;
+      grid-template-areas: "head head" "copy card";
+      align-items: end;
+      gap: 32px 56px;
+      padding-bottom: 40px;
+    }
+    .chh-copy {
+      margin-top: 0;
+    }
+    .chh-card {
+      padding: 20px;
+    }
+  }
+
+  /* ---------- Movimiento al cargar (C1-C4), solo con html.lp-motion ---------- */
+  :global(.lp-motion) .chh-photo {
+    animation: cl-photo-in 1800ms var(--ease-out) both;
+  }
+  :global(.lp-motion) .chh-media::after {
+    animation: cl-fade 1200ms var(--ease-out) 200ms both;
+  }
+  :global(.lp-motion) .chh-fade-1 {
+    animation: cl-up 600ms var(--ease-out) 700ms both;
+  }
+  :global(.lp-motion) .chh-fade-0 {
+    animation: cl-up 600ms var(--ease-out) both;
+  }
+  :global(.lp-motion) .chh-fade-2 {
+    animation: cl-up 600ms var(--ease-out) 850ms both;
+  }
+  :global(.lp-motion) .chh-card {
+    animation: cl-up-20 700ms var(--ease-out) 1000ms both;
+  }
+</style>

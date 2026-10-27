@@ -1,0 +1,32 @@
+---
+// Hora LED con que abre cada sección (SPEC_landing_clubs §1 y §2): cápsula con la hora en Doto fluor de 28 px y una
+// etiqueta en Prompt al lado ("VIE 23:30 · ABRE LA PUERTA"), seguida de la tira LED (línea punteada fluor) que cruza la
+// sección. C6: los caracteres de la hora "se encienden" uno a uno y la tira crece al revelarse el bloque. La flecha de
+// "23:30 → 05:00" va en Prompt (Doto no la trae). Los caracteres sueltos van con aria-hidden y la hora completa en una
+// copia lp-sr-only, para que el lector de pantalla no la deletree.
+interface Props {
+  /** "MAR 16:00" */
+  time: string;
+  /** Hora de término opcional: "VIE 23:30 → 05:00" */
+  to?: string;
+  label: string;
+  class?: string;
+}
+const { time, to, label, class: className } = Astro.props;
+const chars = (text: string, offset = 0) => [...text].map((ch, i) => ({ ch, i: i + offset }));
+const start = chars(time);
+const end = to ? chars(to, start.length + 1) : [];
+---
+
+<p class:list={["cl-hour", className]} data-lp-step>
+  <span class="cl-hour-pill">
+    <span class="cl-hour-time" aria-hidden="true">
+      {start.map(({ ch, i }) => <span class="cl-hour-digit" style={`--i: ${i}`}>{ch}</span>)}
+      {to && <span class="cl-hour-arrow"> → </span>}
+      {end.map(({ ch, i }) => <span class="cl-hour-digit" style={`--i: ${i}`}>{ch}</span>)}
+    </span>
+    <span class="lp-sr-only">{to ? `${time} a ${to}` : time}</span>
+    <span class="cl-meta cl-hour-label">· {label}</span>
+  </span>
+  <span class="cl-strip" aria-hidden="true"></span>
+</p>

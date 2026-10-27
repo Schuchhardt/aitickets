@@ -1,0 +1,23 @@
+---
+// Titular LED de la landing de clubs (SPEC_landing_clubs §1): Doto en mayúsculas sobre la grilla de LEDs apagados, con
+// la segunda línea "encendida" (rosa fluor con resplandor). El texto va escrito normal (lo leen así los lectores y los
+// tests) y el CSS lo pasa a mayúsculas; el resplandor es una copia sin texto accesible (.cl-glow, data-glow).
+// motion: "reveal" (C2 al revelarse su bloque [data-lp-reveal], H2 y cierre), "load" (C2 al cargar, H1 del hero) o
+// "none".
+interface Props {
+  tag?: "h1" | "h2";
+  id: string;
+  text: string;
+  lit: string;
+  class?: string;
+  motion?: "reveal" | "load" | "none";
+}
+const { tag: Tag = "h2", id, text, lit, class: className, motion = "reveal" } = Astro.props;
+const lineClass = motion === "reveal" ? "cl-led-on" : motion === "load" ? "cl-led-load" : "";
+---
+
+<Tag id={id} class:list={[Tag === "h1" ? "cl-h1" : "cl-h2", className]}>
+  <span class="cl-led-grid" aria-hidden="true"></span>
+  <span class:list={["cl-line", lineClass]}>{text}</span>{" "}
+  <span class:list={["cl-line cl-lit cl-glow", lineClass]} data-glow={lit} style="--cl-line-d: 180ms">{lit}</span>
+</Tag>

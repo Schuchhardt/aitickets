@@ -170,6 +170,60 @@ export const LANDINGS: Landing[] = [
         dedicated: true,
     },
     {
+        // Ruta "discotecas" y no "clubs": en Chile se busca más "ticketera para discotecas" / "lista free discoteca"
+        // (SPEC_landing_clubs, Preguntas abiertas 1). /ticketera-clubs y /ticketera-clubes redirigen aquí con 301
+        // (astro.config.mjs); el sitemap lista solo esta URL.
+        slug: "ticketera-discotecas",
+        kind: "vertical",
+        card: { title: "Clubs y discotecas", text: "Lista free por RRPP, cover y mesas pagadas antes de llegar, y la puerta con QR." },
+        title: "Ticketera para discotecas y clubs en Chile: lista free, cover y mesas · 0% de comisión | AI Tickets",
+        description:
+            "Vende entradas para tu discoteca o club: lista free con QR para cada RRPP, cover y mesas VIP con pago online, check-in en la puerta aunque no haya señal y cobro por noche. 0% de comisión para el club.",
+        eyebrow: "Para clubs, discotecas y productoras de noche",
+        h1: "Abre la puerta. Nosotros llevamos la lista.",
+        intro: `Lista free con QR para cada RRPP, cover y mesas pagados antes de llegar y check-in en la puerta aunque no haya señal. Lo de cada noche queda disponible ${PAYOUT_RELEASE_HOURS} h después de que termina. 0% de comisión para el club.`,
+        highlights: ["Lista free con QR para cada RRPP", "Cover y mesas pagados antes de llegar", "Check-in en la puerta aunque no haya señal"],
+        // La página es propia (src/pages/ticketera-discotecas.astro, SPEC_landing_clubs): las secciones viven en
+        // src/components/landing/clubs y las preguntas en src/data/clubsFaq.ts, que toma de aquí estas seis (las propias
+        // de clubs; las de dinero, plazos, redes y anuncios vienen de PRODUCER_FAQ y ORGANIZADORES_FAQ). Verificado:
+        //   lista con hora de cierre → ventana de venta por entrada (isTicketOnSale), hoy desde tools/tickets.ts
+        //   mesas → un QR por unidad (buildAttendeeRows); cortesías → CourtesyTicketsForm.vue
+        //   transferir una entrada → transfer_ticket (tools/postsale.ts); lista de invitados → tools/guests.ts
+        //   sin preguntas en el checkout (edad, RUT) ni venta en la puerta (POS)
+        sections: [],
+        faq: [
+            {
+                q: "¿Cómo armo la lista free?",
+                a: "Creas un tipo de entrada de $0 llamado, por ejemplo, \"Lista free\", con su cupo. Cada persona se inscribe con su nombre y correo y le llega su QR. Si quieres que la inscripción se cierre a una hora, hoy se programa desde tu asistente de IA conectado o escribiéndonos por WhatsApp. En la puerta, tu equipo ve que es una entrada de lista al escanearla.",
+            },
+            {
+                q: "¿Cómo vendo mesas?",
+                a: "Cada mesa es un tipo de entrada con su precio, su cupo y la descripción de lo que incluye. Quien la compra recibe un QR para la mesa. Si quieres que cada invitado tenga su propia entrada, envíaselas como cortesías. No hay plano para elegir mesa.",
+            },
+            {
+                q: "¿Puedo pedir que sean mayores de 18?",
+                a: "Hoy AI Tickets no verifica la edad al comprar. Indícalo en la descripción del evento y en el nombre de la entrada (\"+18\"): el asistente de la página lo responde a quien pregunte, y tu equipo revisa el carnet en la puerta.",
+            },
+            {
+                q: "¿Qué pasa si alguien comparte el pantallazo de su QR?",
+                a: "Cada QR entra una sola vez. Si el pantallazo ya se usó, el escáner lo marca como validado y no pasa. Si una persona no puede ir, tu equipo le transfiere la entrada a otra persona desde tu asistente de IA: el QR anterior deja de servir.",
+            },
+            {
+                q: "¿Puedo tener lista de invitados y cortesías?",
+                a: "Sí. Las cortesías se envían desde el panel por correo, cada una con su QR, y no cuentan como venta. La lista de invitados del club, con acompañantes, la manejas desde tu asistente de IA: les manda el link por correo o te deja los WhatsApp listos para enviar.",
+            },
+            {
+                q: "¿Se puede pagar el cover en la puerta?",
+                a: "AI Tickets vende online: tu público compra desde el celular en la página de la noche, mientras haya cupo y la venta esté abierta. No hay cobro en efectivo ni con máquina en la puerta.",
+            },
+        ],
+        // No hay un evento de ejemplo de club en demoEvent.mjs (Preguntas abiertas 3): mientras tanto, el concierto
+        demo: { url: "/eventos/evento-demo-concierto", label: "Ver un evento de ejemplo" },
+        cta: { label: "Publicar mi próxima noche", campaign: "vertical_clubs" },
+        related: ["ventas-por-promotor", "entradas-con-qr", "ticketera-musica-en-vivo"],
+        dedicated: true,
+    },
+    {
         slug: "ticketera-talleres",
         kind: "vertical",
         // Sin "charlas": quedan para la futura landing de seminarios (SPEC_landing_talleres, Preguntas abiertas 8)

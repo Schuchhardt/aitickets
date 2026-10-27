@@ -87,6 +87,7 @@ const columns = [
       { href: "/ticketera-stand-up", label: "Stand-up" },
       { href: "/ticketera-teatro", label: "Teatro" },
       { href: "/ticketera-musica-en-vivo", label: "Música en vivo" },
+      { href: "/ticketera-discotecas", label: "Clubs y discotecas" },
       { href: "/ticketera-talleres", label: "Talleres" },
       { href: "/academias", label: "Academias" },
     ],

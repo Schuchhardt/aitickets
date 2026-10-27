@@ -1,0 +1,54 @@
+---
+// Analítica de la landing de clubs (SPEC_landing_clubs §10), con prefijo cl_ como mu_ en música:
+//   cl_view                     carga de la página
+//   cl_cta_click {position}     clic en un CTA de publicar ([data-cta="publish"], position = data-section: hero,
+//                               closing, header, mobile_bar)
+//   cl_demo_click {position}    clic en el evento de ejemplo ([data-cta="demo"])
+//   cl_whatsapp_click {position}
+//   cl_faq_open {question}      abre una pregunta (el botón todavía dice aria-expanded="false" en la fase de captura)
+//   cl_section_view {section}   cada [data-cl-section] entra en pantalla (una vez)
+// Los propios los mandan las islas y los scripts de cada pieza: cl_uv_reveal (UvStamp), cl_month_night (ClubMonth),
+// cl_rrpp_sort / cl_rrpp_select / cl_link_copy (RrppBoard), cl_night_scrub / cl_night_replay (NightLive), cl_ads_demo
+// (ClubAdsDemo), cl_calc_preset / cl_calc_change (CashCloseCalculator). CtaTracking sigue midiendo producer_cta_clicked.
+---
+
+<script>
+  import { trackEvent } from "../../../composables/useGoogleAnalytics.js";
+
+  const CTA_EVENTS: Record<string, string> = {
+    publish: "cl_cta_click",
+    demo: "cl_demo_click",
+    whatsapp: "cl_whatsapp_click",
+  };
+
+  trackEvent("cl_view", { page: location.pathname });
+
+  document.addEventListener(
+    "click",
+    (e) => {
+      const target = e.target as Element | null;
+      const cta = target?.closest?.("[data-cta]");
+      const name = cta && CTA_EVENTS[cta.getAttribute("data-cta") || ""];
+      if (cta && name) trackEvent(name, { position: cta.getAttribute("data-section") || "" });
+
+      const question = target?.closest?.('[data-testid="landing-faq"] button[aria-expanded="false"]');
+      if (question) trackEvent("cl_faq_open", { question: question.textContent?.trim().slice(0, 100) || "" });
+    },
+    { capture: true },
+  );
+
+  if ("IntersectionObserver" in window) {
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          trackEvent("cl_section_view", { section: (entry.target as HTMLElement).dataset.clSection });
+          io.unobserve(entry.target);
+        }
+      },
+      // Con margen y no con umbral de área: una sección más alta que la pantalla nunca llegaría al 25%
+      { rootMargin: "0px 0px -40% 0px", threshold: 0 },
+    );
+    document.querySelectorAll("[data-cl-section]").forEach((section) => io.observe(section));
+  }
+</script>

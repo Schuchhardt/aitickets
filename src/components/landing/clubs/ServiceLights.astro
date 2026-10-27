@@ -1,0 +1,48 @@
+---
+// "Se prenden las luces" (SPEC_landing_clubs §4.8, C12): fila de seis tubos fluorescentes (barras blancas de 4 px con
+// brillo) arriba del bloque de precio. Al revelarse parpadean dos veces (opacity a 0,3, desfasados) y quedan encendidos;
+// el fondo ya es claro desde el principio (sin transición de color). Con "reducir movimiento" o sin JS, encendidos.
+---
+
+<div class="sl" aria-hidden="true">
+  {Array.from({ length: 6 }, (_, i) => <span class="sl-tube" style={`--i: ${i}`} />)}
+</div>
+
+<style>
+  .sl {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 48px;
+  }
+  /* Tubo de 4 px dentro de su carcasa, con el brillo frío hacia abajo */
+  .sl-tube {
+    height: 4px;
+    border-radius: 2px;
+    background: #fff;
+    box-shadow:
+      0 0 0 4px var(--cl-servicio-2),
+      0 0 0 5px rgba(20, 18, 28, 0.1),
+      0 10px 22px 2px rgba(160, 175, 255, 0.55);
+  }
+  @keyframes sl-flicker {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    15%,
+    55% {
+      opacity: 0.3;
+    }
+    30%,
+    70% {
+      opacity: 1;
+    }
+  }
+  :global(.lp-motion) :global([data-lp-reveal]:not(.is-in)) .sl-tube {
+    opacity: 0.3;
+  }
+  :global(.lp-motion) :global(.is-in) .sl-tube {
+    animation: sl-flicker 400ms steps(2) calc(var(--i) * 70ms) both;
+  }
+</style>
