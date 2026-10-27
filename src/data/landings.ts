@@ -6,10 +6,13 @@
 //   códigos de descuento → netlify/lib/discounts.mjs · links con ref/UTM → TrackingLinkBuilder.vue
 //   métricas por canal → dashboard/events/[id]/analytics.astro · check-in offline → ValidateQR.vue
 //   link de puerta sin cuenta → tools/access.ts (hoy solo desde el conector de IA)
+//   máximo por compra → event_tickets.max_quantity (DEFAULT_MAX_PER_PURCHASE; hoy se cambia desde tools/tickets.ts)
+//   búsqueda por nombre y reenvío de entradas en la puerta → ValidateQR.vue (/api/orders/resend)
 // Si cambia el producto, actualizar aquí y en src/data/producerFaq.ts.
-import { SERVICE_FEE_PERCENT_LABEL, computeFeeSplit } from "../../netlify/lib/fees.mjs";
+import { IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL, computeFeeSplit } from "../../netlify/lib/fees.mjs";
 import { PAYOUT_RELEASE_HOURS, PAYOUT_BUSINESS_DAYS } from "../../netlify/lib/legal.mjs";
-import type { FaqItem } from "./producerFaq";
+import { DEFAULT_MAX_PER_PURCHASE } from "../components/Reservation/pricing.js";
+import { ABSORB_FEE_ACTIVATION, PRODUCER_FAQ, type FaqItem } from "./producerFaq";
 
 export type LandingSection = {
     heading: string;
@@ -47,6 +50,11 @@ const clp = (n: number) => `$${Math.round(n).toLocaleString("es-CL")}`;
 const fee = `${SERVICE_FEE_PERCENT_LABEL} + IVA`;
 const ex = computeFeeSplit(10000);
 const payout = `Lo de cada función queda disponible ${PAYOUT_RELEASE_HOURS} h después de que termina; pides el retiro y llega en hasta ${PAYOUT_BUSINESS_DAYS} días hábiles.`;
+const producerFaq = (q: string): FaqItem => {
+    const item = PRODUCER_FAQ.find((f) => f.q === q);
+    if (!item) throw new Error(`Falta la pregunta "${q}" en PRODUCER_FAQ`);
+    return item;
+};
 
 export const LANDINGS: Landing[] = [
     {
@@ -146,7 +154,7 @@ export const LANDINGS: Landing[] = [
         ],
         demo: { url: "/eventos/evento-demo-teatro", label: "Ver una obra de ejemplo" },
         cta: { label: "Publicar mi obra", campaign: "vertical_teatro" },
-        related: ["entradas-con-qr", "vender-entradas-online", "guias/como-hacer-una-preventa"],
+        related: ["entradas-con-qr", "academias", "guias/como-hacer-una-preventa"],
     },
     {
         slug: "ticketera-musica-en-vivo",
@@ -191,7 +199,7 @@ export const LANDINGS: Landing[] = [
         ],
         demo: { url: "/eventos/evento-demo-concierto", label: "Ver un concierto de ejemplo" },
         cta: { label: "Publicar mi próximo concierto", campaign: "vertical_musica" },
-        related: ["ventas-por-promotor", "guias/como-hacer-una-preventa", "vender-entradas-online"],
+        related: ["ventas-por-promotor", "academias", "guias/como-hacer-una-preventa"],
     },
     {
         slug: "ticketera-talleres",
@@ -237,7 +245,62 @@ export const LANDINGS: Landing[] = [
         ],
         demo: { url: "/eventos/evento-demo-gratis", label: "Ver una inscripción gratuita de ejemplo" },
         cta: { label: "Publicar mi taller", campaign: "vertical_talleres" },
-        related: ["vender-entradas-online", "entradas-con-qr", "guias/como-vender-entradas-online"],
+        related: ["academias", "entradas-con-qr", "guias/como-vender-entradas-online"],
+    },
+    {
+        slug: "academias",
+        kind: "vertical",
+        card: { title: "Academias", text: "Muestras y recitales de fin de año, gratis o con entrada, con el QR en el celular de cada familia." },
+        title: "Entradas para muestras y recitales de academias · Gratis o con venta | AI Tickets",
+        description:
+            "Venta y reserva de entradas para la muestra de fin de año de tu academia de música, danza o teatro: un link para los apoderados, entrada con QR al celular y control de acceso desde el celular. Gratis si la muestra es gratis.",
+        eyebrow: "Para academias de música, danza y teatro",
+        h1: "El día de la muestra, preocúpate solo del escenario",
+        intro:
+            "Las familias compran o reservan con un link, reciben su entrada en el celular y entran con QR. Sin planillas, sin transferencias que revisar, sin entradas impresas y sin caja en la puerta.",
+        highlights: [
+            "Gratis si tu muestra es gratis",
+            "Un link por curso para saber cuántas entradas compró cada uno",
+            `0% de comisión para la academia; la familia paga ${fee}`,
+        ],
+        // La página es propia (src/pages/academias.astro): las secciones viven en src/components/landing/academias
+        sections: [],
+        faq: [
+            {
+                q: "¿Cuánto cuesta?",
+                a: `Si tu muestra es gratis, nada. Si cobras entrada, la academia no paga comisión: la familia paga un cargo por servicio de ${SERVICE_FEE_PERCENT_LABEL} más IVA (${IVA_PERCENT_LABEL}) sobre ese cargo, o lo absorbe la academia para mostrar un precio redondo. ${ABSORB_FEE_ACTIVATION}`,
+            },
+            {
+                q: "¿Las familias tienen que descargar una app?",
+                a: "No. Compran o reservan desde el navegador del celular y reciben su entrada con QR por correo.",
+            },
+            {
+                q: "¿Puedo tener dos funciones, en la mañana y en la tarde?",
+                a: "Sí. Cada función tiene su propio cupo y cada familia elige la suya al comprar.",
+            },
+            {
+                q: "¿Puedo limitar cuántas entradas compra cada familia?",
+                a: `Sí. Cada tipo de entrada tiene un máximo por compra (${DEFAULT_MAX_PER_PURCHASE} si no lo cambias), para que alcance para todos. Hoy se ajusta desde tu asistente de IA conectado o escribiéndonos por WhatsApp.`,
+            },
+            {
+                q: "¿Cómo sé cuántas entradas compró cada curso?",
+                a: "Creas un link con seguimiento por curso y lo compartes en el grupo de cada uno. En las métricas del evento ves las órdenes, entradas e ingresos que trajo cada link.",
+            },
+            {
+                q: "¿Y si una familia pierde su entrada?",
+                a: "Se la reenvías a su correo desde el panel. En la puerta también se puede buscar por nombre.",
+            },
+            { q: "¿Cuándo recibo lo recaudado?", a: producerFaq("¿Cuándo recibo el dinero de mis ventas?").a, terms: true },
+            {
+                q: "¿Me ayudan con la primera muestra?",
+                a: "Sí. Escríbenos por WhatsApp o agenda una videollamada de 15 minutos y la dejamos lista contigo.",
+            },
+        ],
+        // Hasta que haya una muestra real enlazada (SPEC_landing_academias Fase 3): la inscripción gratuita de ejemplo
+        demo: { url: "/eventos/evento-demo-gratis", label: "Ver un evento de ejemplo" },
+        cta: { label: "Crear mi muestra gratis", campaign: "vertical_academias" },
+        related: ["ticketera-teatro", "ticketera-talleres", "entradas-con-qr"],
+        dedicated: true,
     },
     {
         slug: "vender-entradas-online",

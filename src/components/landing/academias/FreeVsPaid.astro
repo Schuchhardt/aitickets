@@ -1,0 +1,187 @@
+---
+// 5 · Gratis o con entrada (SPEC_landing_academias §3.6, ancla #precio): card blanca "Muestra gratuita" y card tinta
+// "Muestra con entrada" con la mini calculadora (AcademyCalculator, priceQuote → fees.mjs). Fondo arena en desktop; en
+// mobile la sección va en tinta (§3.10).
+// Textos de dinero y plazos desde el código: cargo (fees.mjs), cómo se activa el cargo absorbido (producerFaq.ts) y el
+// plazo de pago (legal.mjs: disponible PAYOUT_RELEASE_HOURS después de cada función, no "recibes todo 48 h después").
+// Entradas gratis sin cargo (computeServiceFee de un subtotal 0 es 0).
+import AcademyCalculator from "./AcademyCalculator.vue";
+import { ABSORB_FEE_ACTIVATION } from "../../../data/producerFaq";
+import { SERVICE_FEE_PERCENT_LABEL } from "../../../../netlify/lib/fees.mjs";
+import { PAYOUT_RELEASE_HOURS } from "../../../../netlify/lib/legal.mjs";
+---
+
+<section id="precio" class="price" aria-labelledby="ac-price-title" data-ac-section="pricing">
+  <div class="ac-wrap">
+    <div class="price-head" data-lp-reveal>
+      <p class="ac-eyebrow price-eyebrow" data-lp-step>Gratis o con entrada</p>
+      <h2 id="ac-price-title" class="ac-h2 price-title" data-lp-step>Funciona igual <span class="ac-serif price-serif">si cobras o no.</span></h2>
+    </div>
+
+    <div class="price-grid" data-lp-reveal>
+      <article class="price-free" data-lp-step aria-labelledby="ac-price-free">
+        <p class="price-pill price-pill-lime">Muestra gratuita</p>
+        <h3 id="ac-price-free" class="ac-h3 price-card-title">Las familias reservan su lugar.</h3>
+        <p class="price-text">
+          Pones un cupo por función y nadie queda parado al fondo. Cada familia recibe su QR igual que si hubiera pagado.
+        </p>
+        <p class="price-zero"><span class="price-zero-n">$0</span> para todos</p>
+      </article>
+
+      <article class="price-paid" data-lp-step aria-labelledby="ac-price-paid">
+        <div class="price-paid-copy">
+          <p class="price-pill price-pill-paper">Muestra con entrada</p>
+          <h3 id="ac-price-paid" class="ac-h3 price-card-title">Para la academia, el viaje de fin de año o la beca.</h3>
+          <p class="price-text price-text-ink">
+            0% de comisión para la academia. La familia paga un cargo de {SERVICE_FEE_PERCENT_LABEL} + IVA, o lo absorbes
+            tú y muestras un precio redondo. Lo de cada función queda disponible para retirar {PAYOUT_RELEASE_HOURS} horas
+            después.
+          </p>
+          <p class="price-small">¿Prefieres absorber el cargo? {ABSORB_FEE_ACTIVATION}</p>
+        </div>
+        <AcademyCalculator client:visible />
+      </article>
+    </div>
+  </div>
+</section>
+
+<style>
+  .price {
+    padding-block: 48px;
+    background: var(--ac-ink);
+    color: var(--ac-on-ink-1);
+  }
+  .price-eyebrow {
+    color: var(--ac-on-ink-3);
+  }
+  .price-title {
+    margin-top: 10px;
+  }
+  .price-serif {
+    color: #f1e3cf;
+  }
+  .price-grid {
+    display: grid;
+    gap: 16px;
+    margin-top: 24px;
+  }
+  .price-free,
+  .price-paid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 20px;
+    border-radius: 22px;
+  }
+  .price-free {
+    background: var(--ac-card);
+    color: var(--ac-ink);
+  }
+  .price-paid {
+    gap: 20px;
+    padding: 0;
+    background: var(--ac-ink);
+  }
+  .price-paid-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .price-pill {
+    align-self: flex-start;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .price-pill-lime {
+    background: var(--brand-lime);
+    color: var(--ac-ink);
+  }
+  .price-pill-paper {
+    background: var(--ac-paper);
+    color: var(--ac-ink);
+  }
+  .price-card-title {
+    margin-top: 2px;
+  }
+  .price-text {
+    font-size: 15px;
+    line-height: 23px;
+    color: var(--ac-text-2);
+  }
+  .price-text-ink {
+    color: var(--ac-on-ink-2);
+  }
+  .price-small {
+    font-size: 13px;
+    line-height: 19px;
+    color: var(--ac-on-ink-3);
+  }
+  .price-zero {
+    margin-top: auto;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--ac-text-4);
+  }
+  .price-zero-n {
+    font-family: "Unbounded", system-ui, sans-serif;
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--ac-ink);
+  }
+  @media (min-width: 768px) {
+    .price {
+      padding-block: 96px;
+      background: var(--ac-sand);
+      color: var(--ac-ink);
+    }
+    .price-eyebrow {
+      color: var(--ac-text-3);
+    }
+    .price-serif {
+      color: var(--ac-serif);
+    }
+    .price-free,
+    .price-paid {
+      padding: 32px;
+      border-radius: 28px;
+    }
+    .price-paid {
+      color: var(--ac-on-ink-1);
+    }
+    .price-text {
+      font-size: 16px;
+      line-height: 25px;
+    }
+    .price-zero-n {
+      font-size: 40px;
+    }
+  }
+  @media (min-width: 1024px) {
+    .price {
+      padding-block: 120px;
+    }
+    .price-head {
+      max-width: 760px;
+    }
+    .price-title {
+      margin-top: 16px;
+    }
+    .price-grid {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+      gap: 24px;
+      margin-top: 48px;
+    }
+    .price-paid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 28px;
+      align-items: start;
+    }
+    .price-text-ink {
+      font-size: 15px;
+      line-height: 23px;
+    }
+  }
+</style>

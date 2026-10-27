@@ -1,0 +1,74 @@
+---
+// 6 · Hecho para + testimonio (SPEC_landing_academias §3.7): foto 4:5 de una directora en su sala, chips con los tipos de
+// academia y, solo si hay una real, la cita (Testimonial.astro). En producción la foto debe ser real y autorizada.
+import StandupPhoto from "../standup/StandupPhoto.astro";
+import Testimonial from "./Testimonial.astro";
+import { ACADEMY_FOR_WHO, ACADEMY_PHOTOS } from "./academiasLanding.js";
+---
+
+<section class="ac-wrap who" aria-labelledby="ac-who-title" data-ac-section="for_who">
+  <div class="who-media" data-lp-reveal>
+    <div class="ac-photo who-photo" data-lp-step>
+      <StandupPhoto
+        photo={ACADEMY_PHOTOS.directora}
+        alt="Directora de una academia de música revisando su celular en una sala con piano"
+        sizes="(min-width: 1024px) 500px, 100vw"
+        position="50% 35%"
+        class="ac-photo-img"
+      />
+    </div>
+  </div>
+  <div class="who-copy" data-lp-reveal>
+    <h2 id="ac-who-title" class="ac-eyebrow" data-lp-step>Hecho para</h2>
+    <ul class="who-chips" data-lp-step>
+      {ACADEMY_FOR_WHO.map((label) => <li class="who-chip">{label}</li>)}
+    </ul>
+    <Testimonial />
+  </div>
+</section>
+
+<style>
+  .who {
+    display: grid;
+    gap: 24px;
+    padding-top: 56px;
+    padding-bottom: 56px;
+  }
+  .who-photo {
+    aspect-ratio: 4 / 4.2;
+  }
+  .who-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+  }
+  .who-chip {
+    padding: 7px 14px;
+    border: 1px solid var(--ac-line-strong);
+    border-radius: 999px;
+    background: var(--ac-card);
+    font-size: 14px;
+  }
+  @media (min-width: 768px) {
+    .who-photo {
+      aspect-ratio: 4 / 5;
+    }
+    .who-chip {
+      padding: 8px 16px;
+      font-size: 15px;
+    }
+  }
+  @media (min-width: 1024px) {
+    .who {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+      align-items: center;
+      gap: 72px;
+      padding-top: 128px;
+      padding-bottom: 128px;
+    }
+    .who-chips {
+      margin-top: 16px;
+    }
+  }
+</style>

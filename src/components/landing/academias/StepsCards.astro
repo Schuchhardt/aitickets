@@ -1,0 +1,154 @@
+---
+// 3 · Cómo funciona (SPEC_landing_academias §3.4, ancla #como): tres cards con número, etiqueta de tiempo, título, texto
+// y un tip. AC9: entran con stagger de 120 ms. En mobile se apilan.
+// Verificado: cada función con su cupo (entradas por función, hasta 60 funciones por evento), links con seguimiento
+// por curso (métricas por canal), reenvío de entradas desde el check-in del panel (/api/orders/resend). Plazo de pago
+// de legal.mjs (disponible PAYOUT_RELEASE_HOURS después de cada función; se retira desde el panel).
+import { PAYOUT_RELEASE_HOURS } from "../../../../netlify/lib/legal.mjs";
+
+const steps = [
+  {
+    when: "10 minutos",
+    title: "Creas la muestra",
+    text: "Fecha, uno o dos horarios, el lugar y cuántos caben. Gratis o con entrada.",
+    tip: "¿Dos funciones, 11:00 y 17:00? Cada una con su propio cupo.",
+  },
+  {
+    when: "Un mensaje",
+    title: "Compartes un link",
+    text: "En el grupo de apoderados, por correo o en tu Instagram. Las familias compran o reservan desde el celular.",
+    tip: "Con un link por curso sabes cuántas entradas compró cada uno.",
+  },
+  {
+    when: "El día de la muestra",
+    title: "Recibes a las familias",
+    text: `Tu equipo escanea los QR en la puerta. Si cobraste, ${PAYOUT_RELEASE_HOURS} horas después de cada función lo tienes disponible para retirar.`,
+    tip: "¿Alguien perdió su entrada? Se la reenvías desde el panel en un toque.",
+  },
+];
+---
+
+<section id="como" class="ac-wrap how" aria-labelledby="ac-how-title" data-ac-section="how">
+  <div class="how-head" data-lp-reveal>
+    <p class="ac-eyebrow" data-lp-step>Cómo funciona</p>
+    <h2 id="ac-how-title" class="ac-h2 how-title" data-lp-step>Tres pasos, <span class="ac-serif">y cero filas en secretaría.</span></h2>
+  </div>
+  <ol class="how-steps" data-lp-reveal>
+    {steps.map((step, i) => (
+      <li class="how-step" data-lp-step={String(120 + i * 120)}>
+        <div class="how-step-top">
+          <span class="how-step-n" aria-hidden="true">{i + 1}</span>
+          <span class="how-step-when">{step.when}</span>
+        </div>
+        <h3 class="ac-h3 how-step-title"><span class="lp-sr-only">Paso {i + 1}: </span>{step.title}</h3>
+        <p class="how-step-text">{step.text}</p>
+        <p class="how-step-tip">{step.tip}</p>
+      </li>
+    ))}
+  </ol>
+</section>
+
+<style>
+  .how {
+    padding-top: 56px;
+    padding-bottom: 56px;
+  }
+  .how-head {
+    max-width: 760px;
+  }
+  .how-title {
+    margin-top: 10px;
+  }
+  .how-steps {
+    display: grid;
+    gap: 12px;
+    margin-top: 24px;
+  }
+  .how-step {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 20px;
+    border: 1px solid rgba(27, 23, 18, 0.06);
+    border-radius: 22px;
+    background: var(--ac-card);
+  }
+  .how-step-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .how-step-n {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--ac-sand);
+    font-family: "Unbounded", system-ui, sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+  }
+  .how-step-when {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ac-text-4);
+  }
+  .how-step-title {
+    margin-top: 4px;
+  }
+  .how-step-text {
+    font-size: 15px;
+    line-height: 23px;
+    color: var(--ac-text-2);
+  }
+  .how-step-tip {
+    margin-top: auto;
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: var(--ac-paper);
+    font-size: 13px;
+    line-height: 19px;
+    color: var(--ac-text-3);
+  }
+  @media (min-width: 768px) {
+    .how-steps {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 24px;
+    }
+    .how-step {
+      gap: 14px;
+      padding: 28px;
+      border-radius: 28px;
+    }
+    .how-step-n {
+      width: 44px;
+      height: 44px;
+      font-size: 16px;
+    }
+    .how-step-text {
+      font-size: 16px;
+      line-height: 25px;
+    }
+    .how-step-tip {
+      padding: 14px;
+      border-radius: 16px;
+    }
+  }
+  @media (min-width: 1024px) {
+    .how {
+      padding-top: 128px;
+      padding-bottom: 112px;
+    }
+    .how-title {
+      margin-top: 16px;
+    }
+    .how-steps {
+      margin-top: 56px;
+    }
+  }
+</style>

@@ -1,0 +1,47 @@
+---
+// Cita de la sección "Hecho para" (SPEC_landing_academias §3.7 y §0.4): solo con una cita real, con nombre y academia
+// autorizados (ACADEMY_TESTIMONIAL en src/data/producerSocialProof.ts). Sin datos no se renderiza nada: nunca se
+// inventa ni se deja un texto de relleno.
+import { ACADEMY_TESTIMONIAL } from "../../../data/producerSocialProof";
+
+const t = ACADEMY_TESTIMONIAL;
+---
+
+{t && (
+  <figure class="atm" data-lp-step data-ac-testimonial>
+    <blockquote class="ac-serif atm-quote">“{t.quote}”</blockquote>
+    <figcaption class="atm-author">
+      <strong>{t.name}</strong> <span class="atm-academy">· {t.academy}</span>
+    </figcaption>
+  </figure>
+)}
+
+<style>
+  .atm {
+    margin-top: 36px;
+  }
+  .atm-quote {
+    font-size: 24px;
+    line-height: 32px;
+    color: var(--ac-ink);
+  }
+  .atm-author {
+    margin-top: 16px;
+    font-size: 15px;
+  }
+  .atm-academy {
+    color: var(--ac-text-4);
+  }
+  @media (min-width: 1024px) {
+    .atm {
+      margin-top: 48px;
+    }
+    .atm-quote {
+      font-size: 34px;
+      line-height: 44px;
+    }
+    .atm-author {
+      margin-top: 20px;
+    }
+  }
+</style>

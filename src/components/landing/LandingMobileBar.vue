@@ -3,12 +3,17 @@
 // el CTA del hero ([data-hero-cta]) sale de la pantalla y se esconde cuando el cierre ([data-final-cta]) entra, para no
 // duplicar el CTA; sigue escondida pasado el cierre, para no tapar el footer. Solo bajo 768 px.
 // variant="pill": la versión flotante y oscura de la landing de stand-up (SPEC_landing_standup §3), con el CTA lima.
+// variant="pill-light": la misma píldora en blanco con el CTA tinta, para la landing de academias
+// (SPEC_landing_academias §3.10). title, subtitle y ctaLabel cambian los textos (por defecto, los de publicar).
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 
 const props = defineProps({
   publishHref: { type: String, required: true },
-  /** 'bar' (por defecto, barra blanca a todo el ancho) | 'pill' (flotante, oscura) */
+  /** 'bar' (por defecto, barra blanca a todo el ancho) | 'pill' (flotante, oscura) | 'pill-light' (flotante, blanca) */
   variant: { type: String, required: false },
+  title: { type: String, required: false },
+  subtitle: { type: String, required: false },
+  ctaLabel: { type: String, required: false },
 })
 
 const heroGone = ref(false)
@@ -34,18 +39,23 @@ onBeforeUnmount(() => observer?.disconnect())
 
 <template>
   <Transition name="lmb">
-    <div v-if="heroGone && !finalVisible" class="lmb" :class="{ 'lmb-pill': props.variant === 'pill' }" data-testid="landing-mobile-bar">
+    <div
+      v-if="heroGone && !finalVisible"
+      class="lmb"
+      :class="{ 'lmb-pill': props.variant === 'pill', 'lmb-pill lmb-pill-light': props.variant === 'pill-light' }"
+      data-testid="landing-mobile-bar"
+    >
       <div class="lmb-copy">
-        <p class="lmb-title">Gratis para publicar</p>
-        <p class="lmb-sub">0% de comisión para ti</p>
+        <p class="lmb-title">{{ props.title || 'Gratis para publicar' }}</p>
+        <p class="lmb-sub">{{ props.subtitle || '0% de comisión para ti' }}</p>
       </div>
       <a
         :href="props.publishHref"
         class="ev-btn lmb-cta"
-        :class="props.variant === 'pill' ? 'lmb-cta-lime' : 'ev-btn-primary'"
+        :class="props.variant === 'pill' ? 'lmb-cta-lime' : props.variant === 'pill-light' ? 'lmb-cta-ink' : 'ev-btn-primary'"
         data-cta="publish"
         data-section="mobile_bar"
-      >Publicar función</a>
+      >{{ props.ctaLabel || 'Publicar función' }}</a>
     </div>
   </Transition>
 </template>
@@ -108,6 +118,28 @@ onBeforeUnmount(() => observer?.disconnect())
 }
 .lmb-cta-lime:focus-visible {
   box-shadow: 0 0 0 3px #0e0b09, 0 0 0 6px var(--brand-lime);
+}
+.lmb-pill-light {
+  border-color: rgba(27, 23, 18, 0.1);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 10px 30px rgba(27, 23, 18, 0.12);
+}
+.lmb-pill-light .lmb-title {
+  font-size: 13px;
+  color: #1b1712;
+}
+.lmb-pill-light .lmb-sub {
+  color: #6f665c;
+}
+.lmb-cta-ink {
+  min-height: 48px;
+  border: 0;
+  border-radius: 999px;
+  background: #1b1712;
+  color: #fbf7f0;
+}
+.lmb-cta-ink:focus-visible {
+  box-shadow: 0 0 0 3px #fff, 0 0 0 5px #1b1712;
 }
 .lmb-pill.lmb-enter-from,
 .lmb-pill.lmb-leave-to {

@@ -21,3 +21,18 @@ export type ProducerTestimonial = {
 
 /** Testimonio de /ticketera-stand-up (SPEC_landing_standup §4.8). null: la sección no se renderiza. */
 export const STANDUP_TESTIMONIAL: ProducerTestimonial | null = null;
+
+/**
+ * Cita de una directora o director de academia (SPEC_landing_academias §3.7 y §0.4): solo si es real y autorizada por
+ * escrito. La foto de la sección es la de la academia (también autorizada). null: no se muestra la cita y quedan los
+ * chips "Hecho para".
+ */
+export type AcademyTestimonial = {
+  quote: string;
+  name: string;
+  /** Academia y ciudad ("Academia de Música Allegro · Valparaíso") */
+  academy: string;
+};
+
+/** Testimonio de /academias. null: la cita no se renderiza. */
+export const ACADEMY_TESTIMONIAL: AcademyTestimonial | null = null;

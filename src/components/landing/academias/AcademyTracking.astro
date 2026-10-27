@@ -1,0 +1,50 @@
+---
+// Analítica de la landing de academias (SPEC_landing_academias §6), con prefijo ac_ como su_ en stand-up:
+//   ac_view                    carga de la página
+//   ac_cta_click {position}    clic en un CTA de crear muestra ([data-cta="publish"], position = data-section)
+//   ac_whatsapp_click {position}
+//   ac_faq_open {question}     abre una pregunta (el botón todavía dice aria-expanded="false" en la fase de captura)
+//   ac_section_view {section}  cada [data-ac-section] entra en pantalla (una vez)
+// ac_compare_toggle y ac_calc_change los mandan las islas del comparador y la calculadora. CtaTracking sigue midiendo
+// producer_cta_clicked.
+---
+
+<script>
+  import { trackEvent } from "../../../composables/useGoogleAnalytics.js";
+
+  const CTA_EVENTS: Record<string, string> = {
+    publish: "ac_cta_click",
+    whatsapp: "ac_whatsapp_click",
+  };
+
+  trackEvent("ac_view", { page: location.pathname });
+
+  document.addEventListener(
+    "click",
+    (e) => {
+      const target = e.target as Element | null;
+      const cta = target?.closest?.("[data-cta]");
+      const name = cta && CTA_EVENTS[cta.getAttribute("data-cta") || ""];
+      if (cta && name) trackEvent(name, { position: cta.getAttribute("data-section") || "" });
+
+      const question = target?.closest?.('[data-testid="landing-faq"] button[aria-expanded="false"]');
+      if (question) trackEvent("ac_faq_open", { question: question.textContent?.trim().slice(0, 100) || "" });
+    },
+    { capture: true },
+  );
+
+  if ("IntersectionObserver" in window) {
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          trackEvent("ac_section_view", { section: (entry.target as HTMLElement).dataset.acSection });
+          io.unobserve(entry.target);
+        }
+      },
+      // Con margen y no con umbral de área: una sección más alta que la pantalla nunca llegaría al 25%
+      { rootMargin: "0px 0px -40% 0px", threshold: 0 },
+    );
+    document.querySelectorAll("[data-ac-section]").forEach((section) => io.observe(section));
+  }
+</script>

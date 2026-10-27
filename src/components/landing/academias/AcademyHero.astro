@@ -1,0 +1,220 @@
+---
+// 1 · Hero (SPEC_landing_academias §3.2): texto a la izquierda y foto 5:4 de la muestra con dos cards flotantes de
+// ejemplo. En mobile la foto va debajo de los CTA con una sola card (la de entradas, dentro de la foto, §3.10).
+// La foto es el LCP: AVIF/WebP con srcset y fetchpriority alto.
+// Microcopy de precio con fees.mjs (SERVICE_FEE_PERCENT_LABEL). El CTA de ejemplo (texto y link) sale de `demo` en
+// src/data/landings.ts: hoy "Ver un evento de ejemplo" a la inscripción gratuita de ejemplo; cuando haya una muestra
+// real enlazada (Fase 3) vuelve a "Ver una muestra de ejemplo" como pide §3.2, cambiando solo esa entrada.
+// Movimiento al cargar (solo con html.lp-motion): AC1 rise/fade con stagger, AC2 foto, AC3 cards con pop y flotación.
+import StandupPhoto from "../standup/StandupPhoto.astro";
+import { publishUrl } from "../links.js";
+import { ACADEMY_DEMO, ACADEMY_PHOTOS } from "./academiasLanding.js";
+import { SERVICE_FEE_PERCENT_LABEL } from "../../../../netlify/lib/fees.mjs";
+
+interface Props {
+  demoHref: string;
+  demoLabel: string;
+}
+const { demoHref, demoLabel } = Astro.props;
+const fill = ACADEMY_DEMO.sold / ACADEMY_DEMO.capacity;
+---
+
+<section class="ac-wrap hero" aria-labelledby="ac-hero-title" data-ac-section="hero">
+  <div class="hero-copy">
+    <p class="ac-eyebrow ac-rise-1">Para academias de música, danza y teatro</p>
+    <h1 id="ac-hero-title" class="ac-h1 hero-title ac-rise-2">
+      El día de la muestra, preocúpate <span class="ac-serif">solo del escenario.</span>
+    </h1>
+    <p class="ac-lead hero-lead ac-fade-1">
+      Las familias compran o reservan con un link, reciben su entrada en el celular y entran con QR. Sin planillas, sin
+      transferencias que revisar, sin entradas impresas y sin caja en la puerta.
+    </p>
+    <div class="hero-ctas ac-fade-2" data-hero-cta>
+      <a href={publishUrl("academias_hero")} class="ac-btn ac-btn-ink" data-cta="publish" data-section="hero">
+        Crear mi muestra gratis <span aria-hidden="true">→</span>
+      </a>
+      <a href={demoHref} class="ac-btn ac-btn-line" data-cta="demo_event" data-section="hero">{demoLabel}</a>
+    </div>
+    <p class="hero-note ac-fade-2">
+      Si tu muestra es gratis, no pagas nada. Si cobras entrada, la familia paga un cargo de {SERVICE_FEE_PERCENT_LABEL} +
+      IVA, o lo absorbe la academia.
+    </p>
+  </div>
+
+  <div class="hero-media">
+    <div class="ac-photo hero-photo ac-photo-in">
+      <StandupPhoto
+        photo={ACADEMY_PHOTOS.recital}
+        alt="Muestra de fin de año de una academia de música, con familias en el público grabando con sus celulares"
+        sizes="(min-width: 1024px) 600px, 100vw"
+        position="38% 50%"
+        class="ac-photo-img"
+        priority
+      />
+    </div>
+
+    <div class="ac-card hero-card hero-card-tickets ac-pop-1">
+      <p class="ac-example">{ACADEMY_DEMO.name} · ejemplo</p>
+      <p class="hero-card-when">{ACADEMY_DEMO.when}</p>
+      <div class="ac-bar-track hero-card-track" aria-hidden="true">
+        <div class="ac-bar" style={`--lp-scale: ${fill.toFixed(3)}`}></div>
+      </div>
+      <p class="hero-card-row">
+        <span>Entradas</span><span class="ev-tabular">{ACADEMY_DEMO.sold} de {ACADEMY_DEMO.capacity}</span>
+      </p>
+    </div>
+
+    <div class="hero-card hero-card-sent ac-pop-2">
+      <span class="ac-check hero-card-check" aria-hidden="true">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>
+      </span>
+      <p>
+        <span class="hero-card-family">{ACADEMY_DEMO.family} · {ACADEMY_DEMO.familyTickets} entradas</span>
+        <span class="hero-card-sub">Enviadas a su correo con QR</span>
+      </p>
+    </div>
+  </div>
+</section>
+
+<style>
+  .hero {
+    display: grid;
+    gap: 28px;
+    padding-top: 16px;
+    padding-bottom: 56px;
+  }
+  .hero-title {
+    margin-top: 12px;
+  }
+  .hero-lead {
+    max-width: 520px;
+    margin-top: 16px;
+  }
+  .hero-ctas {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 24px;
+  }
+  .hero-note {
+    max-width: 520px;
+    margin-top: 16px;
+    font-size: 13px;
+    line-height: 20px;
+    color: var(--ac-text-4);
+  }
+  .hero-media {
+    position: relative;
+  }
+  .hero-photo {
+    aspect-ratio: 4 / 3.4;
+  }
+  .hero-card {
+    position: absolute;
+  }
+  /* Mobile: una sola card, dentro de la foto */
+  .hero-card-tickets {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    padding: 12px 14px;
+    border-radius: 16px;
+  }
+  .hero-card-when {
+    font-family: "Unbounded", system-ui, sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    margin-top: 2px;
+  }
+  .hero-card-track {
+    height: 6px;
+    margin-top: 10px;
+  }
+  .hero-card-row {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+    font-size: 13px;
+  }
+  .hero-card-row span:first-child {
+    color: var(--ac-text-4);
+  }
+  .hero-card-row span:last-child {
+    font-weight: 600;
+  }
+  .hero-card-sent {
+    display: none;
+  }
+  @media (min-width: 640px) {
+    .hero-ctas {
+      flex-direction: row;
+      flex-wrap: wrap;
+    }
+  }
+  @media (min-width: 1024px) {
+    .hero {
+      grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+      align-items: center;
+      gap: 56px;
+      padding-top: 56px;
+      padding-bottom: 96px;
+    }
+    .hero-title {
+      margin-top: 20px;
+    }
+    .hero-lead {
+      margin-top: 24px;
+    }
+    .hero-ctas {
+      margin-top: 32px;
+    }
+    .hero-note {
+      margin-top: 18px;
+    }
+    .hero-photo {
+      aspect-ratio: 5 / 4;
+    }
+    .hero-card-tickets {
+      left: -36px;
+      right: auto;
+      bottom: 56px;
+      width: 270px;
+      padding: 18px;
+      border-radius: 20px;
+    }
+    .hero-card-when {
+      font-size: 15px;
+    }
+    .hero-card-track {
+      height: 8px;
+      margin-top: 12px;
+    }
+    .hero-card-sent {
+      top: 32px;
+      right: -24px;
+      width: 250px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: var(--ac-ink);
+      color: var(--ac-on-ink-1);
+      box-shadow: 0 16px 40px rgba(27, 23, 18, 0.25);
+      font-size: 13px;
+      line-height: 18px;
+    }
+    .hero-card-check {
+      width: 34px;
+      height: 34px;
+    }
+    .hero-card-family {
+      display: block;
+      font-weight: 600;
+    }
+    .hero-card-sub {
+      display: block;
+      color: var(--ac-on-ink-2);
+    }
+  }
+</style>

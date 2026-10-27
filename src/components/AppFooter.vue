@@ -5,12 +5,28 @@ import { computed, ref, onMounted } from "vue";
 import { LEGAL } from "../lib/legal";
 
 const props = defineProps({
-  /** 'dark': versión oscura para las landings con tema oscuro (/ticketera-stand-up): mismos enlaces, otros colores. */
+  /**
+   * 'dark': versión oscura para las landings con tema oscuro (/ticketera-stand-up); 'paper': fondo papel de la landing
+   * de academias (/academias). Mismos enlaces, otros colores.
+   */
   tone: { type: String, required: false },
 });
-// Clases que cambian con el tono (el resto del footer es igual en los dos)
+// Clases que cambian con el tono (el resto del footer es igual en todos)
 const toneClasses = computed(() =>
-  props.tone === 'dark'
+  props.tone === 'paper'
+    ? {
+        footer: "bg-[#fbf7f0] border-[#1b1712]/10",
+        logo: "",
+        muted: "text-[#6f665c]",
+        icon: "",
+        title: "text-[#1b1712]",
+        list: "text-[#5e554b]",
+        link: "hover:text-[#1b1712] hover:underline",
+        input: "border-[#1b1712]/20 bg-white text-[#3e372f] focus:ring-[#1b1712]/20",
+        success: "text-green-700",
+        error: "text-red-600",
+      }
+    : props.tone === 'dark'
     ? {
         footer: "bg-[#0e0b09] border-white/10",
         logo: "invert",
@@ -58,6 +74,7 @@ const columns = [
       { href: "/ticketera-teatro", label: "Teatro" },
       { href: "/ticketera-musica-en-vivo", label: "Música en vivo" },
       { href: "/ticketera-talleres", label: "Talleres" },
+      { href: "/academias", label: "Academias" },
     ],
   },
   {
