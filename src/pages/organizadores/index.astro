@@ -35,6 +35,8 @@ import { LANDING_MEDIA } from "../../components/landing/producerLanding.js";
 import { ORGANIZADORES_FAQ } from "../../data/organizadoresFaq";
 import { LEGAL } from "../../lib/legal";
 import { IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL } from "../../../netlify/lib/fees.mjs";
+// Fuente del H1 del hero: precargada para que el cambio de fuente no mueva el teléfono del hero (CLS, §9)
+import unboundedWoff2 from "@fontsource/unbounded/files/unbounded-latin-700-normal.woff2?url";
 import "../../styles/global.css";
 import "../../styles/landing.css";
 
@@ -82,6 +84,7 @@ const jsonLd = [
   description={`Ticketera para productores de eventos en Chile: publica tus funciones, vende entradas con 0% de comisión para ti, mide qué promotor vende y valida con QR. Sin mensualidad.`}
   canonical="/organizadores"
 >
+  <link slot="head-extra" rel="preload" as="font" type="font/woff2" href={unboundedWoff2} crossorigin />
   <LandingMotion />
   <LandingHeader client:idle publishHref={publishUrl("organizadores_header")} />
   <main class="lp ev-motion">

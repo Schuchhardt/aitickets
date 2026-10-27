@@ -57,6 +57,7 @@ const visible = ref(false)
 let observer = null
 let posterObserver = null
 let idleHandle = null
+let unmounted = false
 
 function play() {
   const v = video.value
@@ -102,7 +103,13 @@ function onVideoError() {
 
 function scheduleStart() {
   const idle = window.requestIdleCallback || ((cb) => window.setTimeout(cb, 200))
-  idleHandle = idle(start)
+  // Recién después del primer pintado (dos frames): si el navegador lo atrasa, el <video> montado antes pasaba a ser
+  // el LCP en vez del póster (§9)
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      if (!unmounted) idleHandle = idle(start)
+    }),
+  )
 }
 function onLoad() {
   scheduleStart()
@@ -140,6 +147,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  unmounted = true
   window.removeEventListener('load', onLoad)
   if (idleHandle != null) (window.cancelIdleCallback || window.clearTimeout)(idleHandle)
   observer?.disconnect()

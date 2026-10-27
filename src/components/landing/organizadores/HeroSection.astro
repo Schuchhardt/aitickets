@@ -427,6 +427,17 @@ const hasProof = PRODUCER_LOGOS.length > 0 || PRODUCER_STATS.length > 0;
   :global(.lp-motion) .hero-copy > * {
     animation: lp-up-12 480ms var(--ease-out) both;
   }
+  /* El H1 y la bajada son el LCP en mobile: entran solo con el desplazamiento, sin partir de opacity 0 (un texto
+     invisible no cuenta para el LCP y lo atrasaba ~1 s en Lighthouse mobile; §9 pide LCP < 2,5 s) */
+  @keyframes hero-rise {
+    from {
+      transform: translateY(12px);
+    }
+  }
+  :global(.lp-motion) .hero-copy > .hero-title,
+  :global(.lp-motion) .hero-copy > .hero-lead {
+    animation-name: hero-rise;
+  }
   :global(.lp-motion) .hero-copy > :nth-child(2) {
     animation-delay: 60ms;
   }
