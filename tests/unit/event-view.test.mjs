@@ -22,6 +22,11 @@ import {
   initialsOf,
   ticketMax,
   formatSaleStart,
+  cardLabel,
+  cardFunctionChips,
+  formatChipDate,
+  formatWaitingDate,
+  attendeeFeedUrl,
 } from '../../src/components/event/eventView.js'
 import { suggestEmail, levenshtein } from '../../src/components/event/emailSuggest.js'
 import { dominantColor, pastelTint, tintContrast } from '../../src/lib/eventTint.js'
@@ -76,6 +81,91 @@ describe('estado de la card de acción', () => {
     expect(stockSummary({ tickets: [{ remaining: 14, total_quantity: 100 }] }).few).toBe(true)
     expect(stockSummary({ tickets: [{ remaining: 40, total_quantity: 100 }] }).few).toBe(false)
     expect(stockSummary({ tickets: [{ remaining: null }] })).toBeNull()
+  })
+})
+
+describe('card de acción v2: rótulo de estado (§4.4b)', () => {
+  const base = { dates: [future('2026-11-08', 1)], unavailable_tickets: [] }
+  const label = (event, state, opts = {}) => cardLabel(event, state, { now: NOW, ...opts })
+  const free = { ...base, sale_state: 'on_sale', tickets: [{ id: 1, price: 0, remaining: null }] }
+  const paid = { ...base, sale_state: 'on_sale', tickets: [{ id: 1, price: 4000, remaining: null }] }
+
+  it('gratis: con cupos, pocos cupos, confirmado, ya inscrito y lleno', () => {
+    expect(label(free, 'free')).toEqual({ text: 'Gratis', tone: 'neutral' })
+    const few = { ...free, tickets: [{ id: 1, price: 0, remaining: 8, total_quantity: 100 }] }
+    expect(label(few, 'free')).toEqual({ text: 'Gratis · Quedan 8 cupos', tone: 'warning' })
+    expect(label({ ...free, tickets: [{ id: 1, price: 0, remaining: 1, total_quantity: 100 }] }, 'free').text).toBe('Gratis · Queda 1 cupo')
+    expect(label(free, 'free', { rsvpStatus: 'confirmed' })).toEqual({ text: 'Asistencia confirmada', tone: 'positive' })
+    expect(label(free, 'free', { rsvpStatus: 'success' })).toEqual({ text: 'Asistencia confirmada', tone: 'positive' })
+    expect(label(free, 'free', { rsvpStatus: 'already' })).toEqual({ text: 'Ya estás inscrito', tone: 'neutral' })
+    expect(label(free, 'free', { rsvpStatus: 'full' }).text).toBe('Gratis · Cupos llenos')
+    expect(label({ ...base, tickets: [] }, 'free_full', { rsvpStatus: 'full' }).text).toBe('Gratis · Cupos llenos')
+    expect(label({ ...base, tickets: [] }, 'free_full', { rsvpStatus: 'waitlist_ok' }).text).toBe('Gratis · Cupos llenos')
+  })
+
+  it('pagado: el precio abre la card salvo últimas entradas o varias funciones', () => {
+    expect(label(paid, 'paid_simple')).toBeNull()
+    const multiTypes = { ...paid, tickets: [{ id: 1, price: 4000, remaining: null }, { id: 2, price: 9000, remaining: null }] }
+    expect(label(multiTypes, 'paid_multi')).toBeNull()
+    const lastOnes = { ...paid, tickets: [{ id: 1, price: 4000, remaining: 5, total_quantity: 100 }] }
+    expect(label(lastOnes, 'paid_simple')).toEqual({ text: 'Últimas entradas', tone: 'warning' })
+    const nunoa = { name: 'Teatro Ñuñoa', city: 'Ñuñoa' }
+    const tour = { ...multiTypes, dates: [future('2026-10-24', 1), future('2026-10-25', 2), future('2026-11-01', 3, nunoa)] }
+    expect(label(tour, 'paid_multi')).toEqual({ text: '3 funciones · 2 lugares', tone: 'neutral' })
+    expect(label({ ...tour, dates: tour.dates.slice(0, 2) }, 'paid_multi').text).toBe('2 funciones')
+  })
+
+  it('sin venta: abre, agotado, finalizado, vista previa y cerrada', () => {
+    expect(label({ ...base, sale_starts_at: '2026-10-20T13:00:00Z' }, 'upcoming').text).toBe('Venta abre el 20 oct, 10:00')
+    expect(label(base, 'upcoming').text).toBe('Venta próximamente')
+    expect(label(base, 'sold_out')).toEqual({ text: 'Agotado', tone: 'neutral' })
+    expect(label(base, 'ended').text).toBe('Evento finalizado')
+    expect(label(base, 'preview').text).toBe('Vista previa')
+    expect(label(base, 'closed').text).toBe('Venta cerrada')
+  })
+})
+
+describe('card de acción v2: chips de próximas funciones', () => {
+  const nunoa = { name: 'Teatro Ñuñoa', city: 'Ñuñoa' }
+  const dates = [future('2026-10-23', 1), future('2026-10-24', 2), future('2026-10-30', 3, nunoa), future('2026-10-31', 4, nunoa), future('2026-11-06', 5, nunoa)]
+  const tied = (id, extra = {}) => ({ id: 100 + id, price: 4000, event_date_id: id, remaining: null, ...extra })
+
+  it('hasta 3 próximas disponibles, sin agotadas, con el lugar si hay varios y "+ N"', () => {
+    const event = {
+      dates,
+      tickets: [tied(2, { remaining: 4 }), tied(3), tied(4), tied(5)],
+      unavailable_tickets: [{ id: 101, price: 4000, event_date_id: 1, reason: 'sold_out' }],
+    }
+    const { chips, more } = cardFunctionChips(event, { now: NOW })
+    expect(chips).toEqual([
+      { id: '2', label: 'Sáb 24 · 21:00', place: 'Providencia', few: true },
+      { id: '3', label: 'Vie 30 · 21:00', place: 'Ñuñoa', few: false },
+      { id: '4', label: 'Sáb 31 · 21:00', place: 'Ñuñoa', few: false },
+    ])
+    expect(more).toBe(1)
+  })
+
+  it('un solo lugar: sin lugar en el chip', () => {
+    const event = { dates: dates.slice(0, 2), tickets: [tied(1), tied(2)], unavailable_tickets: [] }
+    expect(cardFunctionChips(event, { now: NOW }).chips.map((c) => c.place)).toEqual(['', ''])
+  })
+
+  it('entradas válidas para cualquier función (o una sola función): sin chips', () => {
+    expect(cardFunctionChips({ dates, tickets: [{ id: 1, price: 4000 }], unavailable_tickets: [] }, { now: NOW })).toEqual({ chips: [], more: 0 })
+    expect(cardFunctionChips({ dates: dates.slice(0, 1), tickets: [tied(1)], unavailable_tickets: [] }, { now: NOW })).toEqual({ chips: [], more: 0 })
+  })
+
+  it('formatos de fecha de chips y "Te esperamos…"', () => {
+    expect(formatChipDate({ date: '2026-10-24', start_time: '21:00:00' })).toBe('Sáb 24 · 21:00')
+    expect(formatWaitingDate({ date: '2026-10-24', start_time: '20:00:00' }, { now: NOW })).toBe('el sábado 24, 20:00')
+    expect(formatWaitingDate({ date: '2026-11-08', start_time: '20:00:00' }, { now: NOW })).toBe('el domingo 8 de noviembre, 20:00')
+    expect(formatWaitingDate({ date: '2026-11-08' }, { now: NOW })).toBe('el domingo 8 de noviembre')
+  })
+
+  it('"Ver quiénes van": la orden más reciente de este navegador con id', () => {
+    expect(attendeeFeedUrl([{ orderId: 'a' }, { orderId: 'b' }, { amount: 0 }])).toBe('/order/b#quienes-van')
+    expect(attendeeFeedUrl([])).toBe('')
+    expect(attendeeFeedUrl(undefined)).toBe('')
   })
 })
 

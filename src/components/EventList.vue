@@ -8,7 +8,8 @@ import { categoryIcon } from "./event/categoryIcons.js";
 // desde `eventos/index.astro`. Buscador, filtros (categoría, cuándo, precio), "Ocultar eventos de ejemplo" y
 // grilla masonry. Los filtros viven en la URL (?q=&categoria=&cuando=&precio=&sin_ejemplos=1) para compartirlos.
 const props = defineProps({
-  events: { type: Array, default: () => [] },
+  // required en vez de `default: () => []`: el chequeo de tipos de Astro corta defineProps en el primer ")"
+  events: { type: Array, required: true },
   // Hoy en Chile (YYYY-MM-DD), para "Esta semana" / "Este mes"
   today: { type: String, default: "" },
 });

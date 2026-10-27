@@ -1,6 +1,7 @@
 <script setup>
 // Registro de un evento GRATIS dentro de la card de acción (estilo Luma): sin modal ni pasos.
 // Máquina de estados: idle → submitting → success | already | error ; full → waitlist_ok.
+// confirmed: ya confirmó en este navegador (orden gratis guardada; card v2, §4.4b).
 // El servidor (/api/purchase-ticket) crea la orden de $0 y envía la entrada con QR igual que antes.
 import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from "vue";
 import AutoHeight from "./AutoHeight.vue";
@@ -8,7 +9,7 @@ import SuccessCheck from "./SuccessCheck.vue";
 import QuantityStepper from "./QuantityStepper.vue";
 import { suggestEmail } from "./emailSuggest.js";
 import { fireConfetti } from "./confetti.js";
-import { firstNameOf, ticketMax, formatFunctionShort } from "./eventView.js";
+import { firstNameOf, ticketMax, formatFunctionShort, formatWaitingDate, upcomingFunctions } from "./eventView.js";
 import { addToCalendar, shareEvent } from "./shareActions.js";
 import {
   createOrder,
@@ -23,6 +24,7 @@ import {
 } from "./checkoutApi.js";
 import { useTurnstile } from "./useTurnstile.js";
 import { isValidEmail } from "../Reservation/pricing.js";
+import { maskEmail } from "../../../netlify/lib/reviews.mjs";
 import { trackPurchase } from "../../composables/useGoogleAnalytics.js";
 import { eventBus } from "../../utils/eventbus.js";
 
@@ -45,8 +47,7 @@ const errorKind = ref(""); // 'network' | 'server' | 'message'
 const remembered = ref(null);
 const quantity = ref(1);
 const showGuests = ref(false);
-const result = ref({ orderId: null, quantity: 1, name: "", email: "" });
-const alreadyFromStorage = ref(false);
+const result = ref({ orderId: null, quantity: 1, name: "", email: "", functionId: null });
 const resendState = ref(""); // '' | 'sending' | 'sent'
 const waitlistNote = ref("");
 const liveMessage = ref("");
@@ -79,6 +80,20 @@ const ctaLabel = computed(() => {
 const shakeClass = computed(() => (shake.value ? (shake.value % 2 ? "ev-shake-a" : "ev-shake-b") : ""));
 const firstName = computed(() => firstNameOf(result.value.name || name.value));
 const orderUrl = computed(() => (result.value.orderId ? `/order/${result.value.orderId}` : ""));
+
+// Ya confirmado en este navegador: "Te esperamos el sábado 8, 20:00." con la función de la entrada (o la única).
+// Solo funciones que no han pasado: si la de su entrada ya ocurrió (quedan otras), queda "Te esperamos."
+const confirmedFunction = computed(() => {
+  const upcoming = upcomingFunctions(props.event);
+  const fid = result.value.functionId;
+  if (fid != null) return upcoming.find((d) => String(d.id) === String(fid)) || null;
+  return upcoming.length === 1 ? upcoming[0] : null;
+});
+const waitingLine = computed(() => {
+  const when = confirmedFunction.value ? formatWaitingDate(confirmedFunction.value) : "";
+  return when ? `Te esperamos ${when}.` : "Te esperamos.";
+});
+const maskedEmail = computed(() => maskEmail(result.value.email));
 
 function validateName() {
   errors.value.name = name.value.trim().length >= 2 ? "" : "Escribe tu nombre.";
@@ -165,7 +180,13 @@ async function submit() {
 
   if (res.ok && res.data?.orderId) {
     trackPurchase(res.data.orderId, props.event.id, props.event.name, quantity.value, 0);
-    rememberOrder(props.event, { orderId: res.data.orderId, quantity: quantity.value, email: email.value.trim(), name: name.value.trim() });
+    rememberOrder(props.event, {
+      orderId: res.data.orderId,
+      quantity: quantity.value,
+      email: email.value.trim(),
+      name: name.value.trim(),
+      functionId: selectedTicket.value.event_date_id ?? null,
+    });
     succeed({ orderId: res.data.orderId });
     return;
   }
@@ -197,7 +218,7 @@ async function submit() {
 }
 
 async function succeed({ orderId }) {
-  result.value = { orderId, quantity: quantity.value, name: name.value.trim(), email: email.value.trim() };
+  result.value = { orderId, quantity: quantity.value, name: name.value.trim(), email: email.value.trim(), functionId: selectedTicket.value?.event_date_id ?? null };
   rememberBuyer(name.value.trim(), email.value.trim());
   trackFunnel("rsvp_success", props.event, { quantity: quantity.value });
   status.value = "success";
@@ -269,12 +290,18 @@ onMounted(() => {
     email.value = remembered.value.email;
   }
   waitEmail.value = remembered.value?.email || "";
-  // Ya confirmó en este navegador: mostrar el estado de éxito directamente
+  // Ya confirmó en este navegador: la card muestra "Asistencia confirmada" directamente (§4.4b), aunque después
+  // se hayan llenado los cupos
   const previous = storedOrders(props.event.id).filter((o) => !(Number(o.amount) > 0)).at(-1);
-  if (previous && status.value === "idle") {
-    alreadyFromStorage.value = true;
-    result.value = { orderId: previous.orderId, quantity: previous.ticketsCount || 1, name: previous.name || remembered.value?.name || "", email: previous.email || remembered.value?.email || "" };
-    status.value = "success";
+  if (previous && (status.value === "idle" || status.value === "full")) {
+    result.value = {
+      orderId: previous.orderId,
+      quantity: previous.ticketsCount || 1,
+      name: previous.name || remembered.value?.name || "",
+      email: previous.email || remembered.value?.email || "",
+      functionId: previous.functionId ?? null,
+    };
+    status.value = "confirmed";
   }
   eventBus.on("fill-buyer-info", handleAssistantFill);
   emit("state", status.value);
@@ -455,12 +482,9 @@ watch(status, (s) => s !== "idle" && stopNudge());
       <!-- Éxito -->
       <div v-else-if="status === 'success'" key="success" class="success" role="status">
         <SuccessCheck />
-        <h3 ref="successTitle" class="success-title" tabindex="-1">
-          <template v-if="alreadyFromStorage">Ya confirmaste tu asistencia.</template>
-          <template v-else>¡Listo{{ firstName ? `, ${firstName}` : "" }}! Estás dentro.</template>
-        </h3>
+        <h3 ref="successTitle" class="success-title" tabindex="-1">¡Listo{{ firstName ? `, ${firstName}` : "" }}! Estás dentro.</h3>
         <p v-if="result.email" class="success-body">
-          {{ alreadyFromStorage ? "Tu entrada con QR llegó a" : `Te enviamos ${result.quantity > 1 ? "tus entradas" : "tu entrada"} con QR a` }}<br />
+          Te enviamos {{ result.quantity > 1 ? "tus entradas" : "tu entrada" }} con QR a<br />
           <strong>{{ result.email }}</strong>
         </p>
         <p v-if="event.is_demo" class="demo-note">Demostración: no se creó ninguna entrada ni se envió un correo.</p>
@@ -477,7 +501,23 @@ watch(status, (s) => s !== "idle" && stopNudge());
         <a v-if="orderUrl" :href="orderUrl" class="ev-link success-link">Ver mi entrada →</a>
       </div>
 
-      <!-- Ya inscrito con ese email -->
+      <!-- Ya confirmó en este navegador (card v2): cuándo es, a qué email llegó la entrada y cómo verla -->
+      <div v-else-if="status === 'confirmed'" key="confirmed" class="confirmed" data-testid="rsvp-confirmed">
+        <div>
+          <p class="info-title">{{ waitingLine }}</p>
+          <p v-if="maskedEmail" class="info-sub">Tu entrada con QR llegó a {{ maskedEmail }}</p>
+        </div>
+        <a v-if="orderUrl" :href="orderUrl" class="ev-btn ev-btn-primary w-full">Ver mi entrada</a>
+        <div class="confirmed-links">
+          <button type="button" class="confirmed-link" @click="addToCalendar(event)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+            Añadir al calendario
+          </button>
+          <a v-if="orderUrl" :href="`${orderUrl}#quienes-van`" class="confirmed-link">Ver quiénes van →</a>
+        </div>
+      </div>
+
+      <!-- Ya inscrito con ese email (igual que antes; la card v2 solo agrega el rótulo "Ya estás inscrito" arriba) -->
       <div v-else-if="status === 'already'" key="already" class="info" role="status">
         <div class="info-row">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 8v5M12 16h.01" /></svg>
@@ -715,6 +755,7 @@ watch(status, (s) => s !== "idle" && stopNudge());
   font-size: 16px;
   font-weight: 600;
   line-height: 22px;
+  word-break: break-word;
 }
 .info-sub {
   font-size: 14px;
@@ -742,6 +783,44 @@ watch(status, (s) => s !== "idle" && stopNudge());
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Ya confirmado en este navegador: datos a la izquierda, como el resto de los estados de la card */
+.confirmed {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.confirmed-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0 20px;
+  margin-top: -4px;
+}
+.confirmed-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 4px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text-2);
+  text-decoration: none;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color var(--dur-1);
+}
+.confirmed-link:hover {
+  color: var(--text-1);
+}
+.confirmed-link:focus-visible {
+  outline: 2px solid var(--text-1);
+  outline-offset: 2px;
 }
 
 /* A18: el contenido viejo se desvanece y el nuevo entra desde abajo mientras la card ajusta su alto */

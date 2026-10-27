@@ -63,6 +63,23 @@ export function miniCalendar(date) {
 /** "Sáb 25 oct · 21:00" */
 export const formatFunctionShort = (fn) => [formatShortDate(fn?.date), hhmm(fn?.start_time)].filter(Boolean).join(" · ");
 
+/** "Vie 24 · 21:00" (chips de próximas funciones de la card de acción). */
+export function formatChipDate(fn) {
+  const p = dateParts(fn?.date);
+  if (!p) return "";
+  return [`${WEEKDAYS_SHORT[p.weekday]} ${p.d}`, hhmm(fn?.start_time)].filter(Boolean).join(" · ");
+}
+
+/** "el sábado 8, 20:00" ("el sábado 8 de noviembre, 20:00" si no es este mes). Para "Te esperamos…". */
+export function formatWaitingDate(fn, { now = new Date() } = {}) {
+  const p = dateParts(fn?.date);
+  if (!p) return "";
+  const sameMonth = p.y === now.getFullYear() && p.m === now.getMonth() + 1;
+  const day = `el ${WEEKDAYS_LONG[p.weekday].toLocaleLowerCase("es-CL")} ${p.d}${sameMonth ? "" : ` de ${MONTHS_LONG[p.m - 1]}`}`;
+  const time = hhmm(fn?.start_time);
+  return time ? `${day}, ${time}` : day;
+}
+
 export const formatCLP = (value) => `$${Math.round(Number(value) || 0).toLocaleString("es-CL")}`;
 
 /** "20 oct, 10:00" a partir de un ISO (hora de Chile). */
@@ -165,6 +182,71 @@ export function cardState(event, now = new Date()) {
   if (event.sale_state === "sold_out") return free ? "free_full" : "sold_out";
   if (event.sale_state === "upcoming") return "upcoming";
   return "closed";
+}
+
+/**
+ * Rótulo de estado de la card de acción v2 (§4.4b a): la línea en mayúsculas que abre cada estado.
+ * El texto va en minúsculas normales (lo lee bien un lector de pantalla); la card lo pasa a mayúsculas con CSS.
+ * @param {string} state cardState(event)
+ * @param {{ rsvpStatus?: string, now?: Date }} opts rsvpStatus: estado de RsvpForm en los eventos gratis
+ * @returns {{ text: string, tone: 'neutral' | 'positive' | 'warning' } | null} null = el estado abre con el precio
+ */
+export function cardLabel(event, state, { rsvpStatus = "idle", now = new Date() } = {}) {
+  const neutral = (text) => ({ text, tone: "neutral" });
+  const stock = stockSummary(event);
+
+  if (state === "free" || state === "free_full") {
+    if (rsvpStatus === "success" || rsvpStatus === "confirmed") return { text: "Asistencia confirmada", tone: "positive" };
+    if (rsvpStatus === "already") return neutral("Ya estás inscrito");
+    if (state === "free_full" || rsvpStatus === "full" || rsvpStatus === "waitlist_ok") return neutral("Gratis · Cupos llenos");
+    if (stock?.few) return { text: `Gratis · ${stock.remaining === 1 ? "Queda 1 cupo" : `Quedan ${stock.remaining} cupos`}`, tone: "warning" };
+    return neutral("Gratis");
+  }
+  if (state === "paid_simple" || state === "paid_multi") {
+    if (stock?.few) return { text: "Últimas entradas", tone: "warning" };
+    if (state === "paid_simple") return null;
+    const functions = upcomingFunctions(event, now);
+    if (functions.length < 2) return null;
+    const places = placesOf(functions);
+    return neutral([`${functions.length} funciones`, places.length > 1 ? `${places.length} lugares` : ""].filter(Boolean).join(" · "));
+  }
+  if (state === "upcoming") return neutral(event?.sale_starts_at ? `Venta abre el ${formatSaleStart(event.sale_starts_at, event.timezone)}` : "Venta próximamente");
+  if (state === "sold_out") return neutral("Agotado");
+  if (state === "ended") return neutral("Evento finalizado");
+  if (state === "preview") return neutral("Vista previa");
+  return neutral("Venta cerrada");
+}
+
+/**
+ * Chips de próximas funciones de la card (§4.4b c): hasta `limit` funciones con entradas a la venta, en orden.
+ * Solo si hay que elegir función en el checkout (entradas amarradas a una función, ver checkoutFunctions): si las
+ * entradas sirven para cualquier función, preseleccionar una no tendría efecto.
+ * @returns {{ chips: Array<{ id: string, label: string, place: string, few: boolean }>, more: number }}
+ */
+export function cardFunctionChips(event, { limit = 3, now = new Date() } = {}) {
+  const model = checkoutFunctions(event, now);
+  if (!model.needsFunction || upcomingFunctions(event, now).length < 2) return { chips: [], more: 0 };
+  const available = model.functions.filter((f) => f.status !== "sold_out");
+  const manyPlaces = model.places.length > 1;
+  // La comuna basta para distinguir los lugares ("Providencia", "Ñuñoa"); si dos comparten comuna, el nombre
+  const byCity = new Set(model.places.map((p) => p.city || p.name)).size === model.places.length;
+  const placeOf = (venue) => (byCity ? venue?.city || venue?.name : venue?.name || venue?.city) || "";
+  const chips = available.slice(0, limit).map((f) => ({
+    id: String(f.id),
+    label: formatChipDate(f),
+    place: manyPlaces ? placeOf(f.venue) : "",
+    few: f.status === "few",
+  }));
+  return { chips, more: available.length - chips.length };
+}
+
+/**
+ * "Ver quiénes van →" (§4.4b d): el muro de asistentes (AttendeeFeed) vive en la página de la orden; el link lleva a
+ * la orden más reciente guardada en este navegador (storedOrders). "" si no hay ninguna con id.
+ */
+export function attendeeFeedUrl(orders) {
+  const last = [...(orders || [])].reverse().find((o) => o?.orderId);
+  return last ? `/order/${last.orderId}#quienes-van` : "";
 }
 
 // ---------------------------------------------------------------------------------------------------------

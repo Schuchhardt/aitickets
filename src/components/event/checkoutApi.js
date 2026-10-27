@@ -43,7 +43,8 @@ export const storedOrders = (eventId) => {
   return Array.isArray(orders) ? orders : orders ? [orders] : [];
 };
 
-export function rememberOrder(event, { orderId, quantity, amount = 0, email = "", name = "" }) {
+// functionId: función de la entrada (si está amarrada a una), para "Te esperamos el sábado 8, 20:00."
+export function rememberOrder(event, { orderId, quantity, amount = 0, email = "", name = "", functionId = null }) {
   const key = `purchase_event_${event.id}`;
   const orders = storedOrders(event.id);
   if (!orders.some((o) => o.orderId === orderId)) {
@@ -58,6 +59,7 @@ export function rememberOrder(event, { orderId, quantity, amount = 0, email = ""
       tickets: [],
       email,
       name,
+      functionId,
     });
     safeSet(key, orders);
   }

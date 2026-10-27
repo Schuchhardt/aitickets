@@ -2,6 +2,7 @@
 // Muro de asistentes: quien tiene entrada reacciona al evento con un emoji y, si quiere, un mensaje corto que ven los
 // demás asistentes (solo en las páginas de orden/entrada). Una reacción por persona: publicar de nuevo la actualiza.
 // API: /api/orders/feed (con el id de la orden). Sin orderId (página de una entrada suelta) es solo lectura.
+// #quienes-van: destino del link "Ver quiénes van →" de la card de la página del evento.
 import { ref, computed, nextTick } from "vue";
 
 const EMOJIS = ["🔥", "🙌", "🎉", "❤️", "😍", "🤘", "💃", "🥳"];
@@ -87,7 +88,7 @@ function edit() {
 </script>
 
 <template>
-  <section class="rounded-2xl bg-white border border-gray-200 p-5 font-[Prompt]" aria-labelledby="feed-title">
+  <section id="quienes-van" class="scroll-mt-6 rounded-2xl bg-white border border-gray-200 p-5 font-[Prompt]" aria-labelledby="feed-title">
     <div class="flex items-baseline justify-between gap-3">
       <h2 id="feed-title" class="font-semibold font-[Unbounded] text-gray-900">{{ ended ? "Así lo vivieron" : "Quiénes van" }}</h2>
       <p v-if="feed.total" class="text-xs text-gray-500">{{ feed.total }} {{ feed.total === 1 ? "reacción" : "reacciones" }}</p>
