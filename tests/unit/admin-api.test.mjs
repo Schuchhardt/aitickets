@@ -151,10 +151,10 @@ describe('autenticación', () => {
 })
 
 describe('servidor MCP', () => {
-  it('initialize, tools/list y sin CORS', async () => {
+  it('initialize, tools/list y CORS', async () => {
     const init = await adminRoute.POST({ request: req(rpc('initialize', { protocolVersion: '2025-06-18' })) })
     expect(init.status).toBe(200)
-    expect(init.headers.get('access-control-allow-origin')).toBeNull()
+    expect(init.headers.get('access-control-allow-origin')).toBe('*')
     expect((await init.json()).result.serverInfo.name).toBe('aitickets-admin')
 
     const list = await (await adminRoute.POST({ request: req(rpc('tools/list')) })).json()
