@@ -1,0 +1,88 @@
+---
+// 9 · Cierre (SPEC_landing_productores §5.9, fondo oscuro). data-final-cta: la barra CTA mobile se esconde cuando entra.
+// Entra como las demás secciones (L7).
+import { DEMO_CALL_URL, DEMO_EVENT_URL, publishUrl, whatsappUrl } from "../links.js";
+---
+
+<section class="lp-section lp-dark closing" aria-labelledby="closing-title" data-final-cta data-lp-section="closing">
+  <div class="lp-wrap" data-lp-reveal>
+    <h2 id="closing-title" class="lp-h2 closing-title" data-lp-step>¿Cuándo es tu próxima función?</h2>
+    <p class="closing-lead" data-lp-step>Publícala hoy. Crear tu cuenta es gratis y no hay costos fijos.</p>
+    <div class="closing-ctas" data-lp-step>
+      <a href={publishUrl("organizadores_final")} class="ev-btn lp-btn-lime lp-btn-lg closing-btn" data-cta="publish" data-section="final_cta">
+        Publicar mi próxima función <span aria-hidden="true">→</span>
+      </a>
+      <a href={whatsappUrl()} class="ev-btn lp-btn-ghost lp-btn-lg closing-btn" target="_blank" rel="noopener noreferrer" data-cta="whatsapp" data-section="final_cta">
+        Hablar por WhatsApp
+      </a>
+    </div>
+    <p class="closing-help" data-lp-step>
+      ¿Prefieres verlo antes?
+      <a href={DEMO_CALL_URL} class="lp-inline-link" target="_blank" rel="noopener noreferrer" data-cta="demo_call" data-section="final_cta">Agenda una demo de 15 min</a>
+      ·
+      <a href={DEMO_EVENT_URL} class="lp-inline-link" data-cta="demo_event" data-section="final_cta">Mira un evento de ejemplo</a>
+    </p>
+    <p class="closing-guarantees" data-lp-step>Sin mensualidad · Sin permanencia · Sin costos fijos</p>
+  </div>
+</section>
+
+<style>
+  .closing {
+    text-align: center;
+  }
+  .closing-title {
+    max-width: 820px;
+    margin: 0 auto;
+    font-size: 36px;
+    line-height: 40px;
+    letter-spacing: -0.03em;
+  }
+  .closing-lead {
+    margin-top: 14px;
+    font-size: 16px;
+    line-height: 24px;
+    color: var(--lp-on-dark-2);
+  }
+  .closing-ctas {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 26px;
+  }
+  .closing-btn {
+    text-decoration: none;
+  }
+  .closing-help {
+    margin-top: 20px;
+    font-size: 14px;
+    line-height: 22px;
+    color: var(--lp-on-dark-3);
+  }
+  .closing-guarantees {
+    margin-top: 14px;
+    font-size: 13px;
+    color: var(--lp-on-dark-3);
+  }
+  @media (min-width: 640px) {
+    .closing-ctas {
+      flex-direction: row;
+      justify-content: center;
+      gap: 12px;
+      margin-top: 36px;
+    }
+  }
+  @media (min-width: 1024px) {
+    .closing-title {
+      font-size: 56px;
+      line-height: 60px;
+    }
+    .closing-lead {
+      margin-top: 20px;
+      font-size: 18px;
+      line-height: 28px;
+    }
+    .closing-help {
+      margin-top: 24px;
+    }
+  }
+</style>

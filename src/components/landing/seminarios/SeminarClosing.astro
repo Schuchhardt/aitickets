@@ -1,0 +1,157 @@
+---
+// 12 · Cierre (SPEC_landing_seminarios §4.12, auditorio): la sala a oscuras y, al centro, la última lámina "proyectada"
+// (blanca al 96% con un halo turquesa, máx. 960 px, 16:9 en desktop y 4:5 en mobile, pie 12 / 12) con el H2, la bajada y
+// los CTAs con los mismos destinos que stand-up y fiestas (registro, WhatsApp y demo de 15 min). Debajo, "También para"
+// talleres, academias y teatro. data-final-cta: la barra flotante de mobile se esconde aquí.
+// C17 (html.lp-motion): la sala se oscurece al entrar (overlay .4 → 0) y la lámina se enciende como C2 (observeDim).
+import SeminarHeading from "./SeminarHeading.astro";
+import Slide from "./Slide.astro";
+import { DEMO_CALL_URL, publishUrl, whatsappUrl } from "../links.js";
+
+interface Props {
+  ctaLabel: string;
+}
+const { ctaLabel } = Astro.props;
+---
+
+<section class="se-section se-bg-auditorio se-on-dark secl" aria-labelledby="se-closing-title" data-final-cta data-se-section="closing" data-se-screen="Cierre" data-se-dim>
+  <span class="secl-dim" aria-hidden="true"></span>
+  <div class="se-wrap secl-inner" data-lp-reveal>
+    <Slide number="12 / 12" ratio="auto" class="secl-slide">
+      <div class="secl-body">
+        <SeminarHeading id="se-closing-title" text="Tu próximo seminario," emphasis="con inscripciones abiertas hoy." class="secl-title" />
+        <p class="se-lead secl-lead">Crear tu cuenta es gratis y no hay costos fijos. Si quieres, armamos el primero contigo.</p>
+        <div class="secl-ctas">
+          <a href={publishUrl("seminarios_closing")} class="se-btn se-btn-solid" data-cta="publish" data-section="closing">
+            {ctaLabel} <span class="se-btn-arrow" aria-hidden="true">→</span>
+          </a>
+          <a
+            href={whatsappUrl("Hola, quiero abrir inscripciones para mi seminario con AI Tickets")}
+            class="se-btn se-btn-line secl-line"
+            target="_blank"
+            rel="noopener noreferrer"
+            data-cta="whatsapp"
+            data-section="closing"
+          >
+            Hablar por WhatsApp
+          </a>
+        </div>
+        <p class="secl-help">
+          <a href={DEMO_CALL_URL} class="se-link" target="_blank" rel="noopener noreferrer" data-cta="demo_call" data-section="closing">Agenda una demo de 15 min</a>
+          ·
+          <a href="/organizadores" class="se-link" data-cta="organizadores" data-section="closing">Todo lo que hace AI Tickets</a>
+        </p>
+      </div>
+    </Slide>
+    <p class="se-meta secl-also">
+      También para <a href="/ticketera-talleres" class="se-link">talleres</a> · <a href="/academias" class="se-link">academias</a> ·
+      <a href="/ticketera-teatro" class="se-link">teatro</a> · ¿Comparando? <a href="/ticketeras-en-chile" class="se-link">Ticketeras en Chile</a>
+    </p>
+  </div>
+</section>
+
+<style>
+  .secl {
+    isolation: isolate;
+  }
+  .secl-dim {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background: #000000;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .secl-inner {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .secl-inner :global(.secl-slide) {
+    width: 100%;
+    max-width: 960px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 0 120px rgba(79, 209, 197, 0.18);
+  }
+  .secl-body {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 100%;
+    color: var(--se-grafito);
+  }
+  .secl-inner :global(.secl-title) {
+    font-size: 40px;
+    line-height: 42px;
+    color: var(--se-grafito);
+  }
+  .secl-inner :global(.secl-title .se-em) {
+    color: var(--se-cordon-ink);
+  }
+  .secl-lead {
+    max-width: 560px;
+    margin-top: 20px;
+    color: var(--se-text-2) !important;
+  }
+  .secl-ctas {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 24px;
+  }
+  .secl-line {
+    justify-content: center;
+  }
+  .secl-help {
+    margin-top: 16px;
+    font-size: 15px;
+    line-height: 24px;
+  }
+  .secl-also {
+    margin-top: 28px;
+    text-align: center;
+    color: var(--se-text-dark-3);
+  }
+  .secl-also .se-link {
+    color: #ffffff;
+  }
+  /* La lámina: 4:5 en mobile, 16:9 desde tablet (alto mínimo: el contenido nunca se corta) */
+  .secl-inner :global(.secl-slide .se-slide-body) {
+    min-height: calc((100vw - 40px) * 1.25 - 28px);
+  }
+  @media (min-width: 640px) {
+    .secl-ctas {
+      flex-direction: row;
+      flex-wrap: wrap;
+    }
+  }
+  @media (min-width: 768px) {
+    .secl-inner :global(.secl-slide) {
+      aspect-ratio: 16 / 9;
+    }
+    .secl-inner :global(.secl-slide .se-slide-body) {
+      min-height: 0;
+    }
+  }
+  @media (min-width: 1024px) {
+    .secl-inner :global(.secl-title) {
+      font-size: clamp(56px, 5.6vw, 80px);
+      line-height: 1;
+    }
+  }
+  /* C17: la sala se oscurece al entrar y la lámina se enciende */
+  :global(.lp-motion) .secl:not(.is-on) .secl-dim {
+    opacity: 0.4;
+  }
+  :global(.lp-motion) .secl.is-on .secl-dim {
+    animation: se-dim 700ms ease-out both;
+  }
+  :global(.lp-motion) .secl:not(.is-on) .secl-inner :global(.secl-slide) {
+    opacity: 0;
+  }
+  :global(.lp-motion) .secl.is-on .secl-inner :global(.secl-slide) {
+    animation: se-power-full 240ms linear 300ms both;
+  }
+</style>

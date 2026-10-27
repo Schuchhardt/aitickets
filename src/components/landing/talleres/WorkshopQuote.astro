@@ -1,0 +1,87 @@
+---
+// 10 · Testimonio (SPEC_landing_talleres §4.10): solo si hay una cita real y autorizada (WORKSHOP_TESTIMONIAL en
+// producerSocialProof.ts). Formato "nota pegada": ficha con renglones, giro −1°, clip; la frase clave con destacador y,
+// debajo, la foto impresa cuadrada de 72 px (no circular), el nombre y "taller o espacio · ciudad". Con null no se
+// renderiza nada, ni el contenedor.
+import Highlight from "./Highlight.astro";
+import { WORKSHOP_TESTIMONIAL } from "../../../data/producerSocialProof";
+
+const quote = WORKSHOP_TESTIMONIAL;
+const [before, after] = quote?.highlight && quote.quote.includes(quote.highlight) ? quote.quote.split(quote.highlight) : [quote?.quote ?? "", ""];
+const hasHighlight = Boolean(quote?.highlight && quote.quote.includes(quote.highlight));
+---
+
+{
+  quote && (
+    <section class="tl-section tl-quote" aria-label="Testimonio" data-tl-section="testimonio">
+      <div class="tl-wrap" data-lp-reveal>
+        <figure class="tl-card tl-quote-card" style="--tilt: -1deg" data-lp-step>
+          <svg class="tl-clip" viewBox="0 0 22 48" aria-hidden="true">
+            <path d="M7 40 V8 a4 4 0 0 1 8 0 V36 a6 6 0 0 1 -12 0 V12" />
+          </svg>
+          <blockquote class="tl-display tl-quote-text">
+            «{before}
+            {hasHighlight && <Highlight>{quote.highlight}</Highlight>}
+            {after}»
+          </blockquote>
+          <figcaption class="tl-quote-by">
+            <picture>
+              {quote.photo.sources.map((source) => <source type={source.type} srcset={source.srcset} sizes="72px" />)}
+              <img class="tl-quote-photo" src={quote.photo.src} width={quote.photo.width} height={quote.photo.height} alt="" loading="lazy" decoding="async" />
+            </picture>
+            <span>
+              <span class="tl-quote-name">{quote.name}</span>
+              <span class="tl-quote-company">{quote.company}</span>
+            </span>
+          </figcaption>
+        </figure>
+      </div>
+    </section>
+  )
+}
+
+<style>
+  .tl-quote-card {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 56px 24px 28px;
+  }
+  .tl-quote-text {
+    font-size: 22px;
+    line-height: 30px;
+    font-weight: 600;
+  }
+  .tl-quote-by {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 24px;
+  }
+  .tl-quote-photo {
+    width: 72px;
+    height: 72px;
+    padding: 4px;
+    border-radius: 2px;
+    background: #fff;
+    box-shadow: var(--tl-sombra-papel);
+    object-fit: cover;
+  }
+  .tl-quote-name {
+    display: block;
+    font-weight: 600;
+  }
+  .tl-quote-company {
+    display: block;
+    font-size: 14px;
+    color: var(--tl-grafito-3);
+  }
+  @media (min-width: 1024px) {
+    .tl-quote-card {
+      padding: 64px 48px 36px;
+    }
+    .tl-quote-text {
+      font-size: 28px;
+      line-height: 38px;
+    }
+  }
+</style>

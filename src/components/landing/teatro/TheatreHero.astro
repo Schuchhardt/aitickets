@@ -1,0 +1,424 @@
+---
+// 1 · Obertura (SPEC_landing_teatro §4.1): foto de la función a sangre con viñeta de foco, telón de terciopelo
+// (Curtain), H1 centrado en Bodoni (segunda línea en dorado), bajada armada con el plazo de legal.mjs, CTAs, microcopy
+// del cargo (fees.mjs) y la marquesina con cuatro funciones de una temporada de ejemplo, con los mismos estados que la
+// página real (Agotada, Últimas, Disponible). La foto es el LCP: AVIF/WebP con srcset y fetchpriority alto, sin
+// lazy-load; el telón y la luz de sala son capas CSS encima, con el centro siempre descubierto (§7).
+// Microcopy: "Cargo por servicio 8% + IVA: lo paga el público" en vez de pegar SERVICE_FEE_NOTE ("+ cargo por
+// servicio…") delante de "lo paga el público", que no se lee bien (mismo criterio que música); el porcentaje sale igual
+// de fees.mjs.
+// Bajada: la spec (§4.1) dice "cobra cada función {PAYOUT_RELEASE_HOURS} horas después de que termina"; manda el código
+// (PAYOUT_SCHEDULE_TEXT de legal.mjs: a esa hora queda disponible para retirar y la transferencia llega después), con el
+// asterisco de TERMS_NOTE porque una temporada larga puede quedar con reserva por riesgo (Preguntas abiertas 1).
+// Mobile: la foto 4:5 recortada arriba (62svh) y el texto debajo, sobre el azul de sala; la marquesina pasa a una lista
+// vertical de tres funciones.
+// Movimiento al cargar (solo con html.lp-motion): T1 telón (Curtain), T2 luz de sala (la capa oscura de la foto baja
+// de .55 a .25 mientras se enciende el foco sobre el H1), T3 líneas del H1 con clip-path, T4 bajada, CTAs y
+// marquesina (funciones con stagger de 80 ms).
+import Curtain from "./Curtain.astro";
+import ProsceniumPhoto from "./ProsceniumPhoto.astro";
+import ActEyebrow from "./ActEyebrow.astro";
+import { PLAY_DEMO, SEASON_FUNCTIONS, THEATRE_PHOTOS } from "./teatroLanding.js";
+import { publishUrl } from "../links.js";
+import { PAYOUT_RELEASE_HOURS } from "../../../../netlify/lib/legal.mjs";
+import { SERVICE_FEE_PERCENT_LABEL } from "../../../../netlify/lib/fees.mjs";
+import { TERMS_NOTE } from "../../../data/producerFaq";
+
+interface Props {
+  ctaLabel: string;
+  demoHref: string;
+  demoLabel: string;
+}
+const { ctaLabel, demoHref, demoLabel } = Astro.props;
+
+// Marquesina: las cuatro funciones de la primera semana (en mobile, sin la del domingo)
+const marquee = [
+  { fn: SEASON_FUNCTIONS[0], state: "soldout", tag: "Estreno" },
+  { fn: SEASON_FUNCTIONS[1], state: "last" },
+  { fn: SEASON_FUNCTIONS[2], state: "available" },
+  { fn: SEASON_FUNCTIONS[3], state: "available" },
+];
+const STATE_TEXT: Record<string, string> = { soldout: "Agotada", last: "Últimas", available: "Disponible" };
+const moreDesktop = SEASON_FUNCTIONS.length - marquee.length;
+const moreMobile = SEASON_FUNCTIONS.length - (marquee.length - 1);
+---
+
+<section class="th" aria-labelledby="te-hero-title" data-te-section="hero">
+  <div class="th-media">
+    <ProsceniumPhoto
+      photo={THEATRE_PHOTOS.hero}
+      alt="Dos intérpretes en escena bajo un foco en una sala a oscuras, con el público de espaldas"
+      sizes="100vw"
+      class="th-photo"
+      priority
+    />
+    <div class="th-house" aria-hidden="true"></div>
+    <div class="th-shade" aria-hidden="true"></div>
+  </div>
+  <Curtain variant="hero" />
+  <div class="th-spot" aria-hidden="true"></div>
+
+  <div class="te-wrap th-inner">
+    <div class="th-fade-0">
+      <ActEyebrow text="Para compañías de teatro y salas" step={false} />
+    </div>
+    <h1 id="te-hero-title" class="te-h1 th-title">
+      <span class="th-line th-line-1">Que suba el telón.</span>
+      <span class="te-h1-sub te-gold th-line th-line-2">La boletería de tu obra ya está lista.</span>
+    </h1>
+    <p class="te-lead th-lead th-fade-1">
+      Publica la obra una vez con todas sus funciones, deja que tu público elija la suya y manda las cortesías de prensa
+      con su QR. Lo de cada función queda disponible para retirar {PAYOUT_RELEASE_HOURS} h después de que termina.<span
+        aria-hidden="true">*</span> 0% de comisión para la compañía.
+    </p>
+    <div class="th-ctas th-fade-2" data-hero-cta>
+      <a href={publishUrl("teatro_hero")} class="te-btn te-btn-lime" data-cta="publish" data-section="hero">
+        {ctaLabel} <span aria-hidden="true">→</span>
+      </a>
+      <a href={demoHref} class="te-btn te-btn-line" data-cta="demo" data-section="hero">{demoLabel}</a>
+    </div>
+    <p class="th-micro th-fade-2">
+      Sin mensualidad · Sin permanencia · Cargo por servicio {SERVICE_FEE_PERCENT_LABEL} + IVA: lo paga el público
+    </p>
+    <p class="th-terms th-fade-2"><a href={TERMS_NOTE.href} class="te-link">{TERMS_NOTE.text}</a></p>
+
+    <div class="th-marquee th-fade-3" data-testid="theatre-marquee">
+      <p class="th-play">
+        <span class="th-play-title">{PLAY_DEMO.title}</span> · {PLAY_DEMO.company} · {PLAY_DEMO.venue}, {PLAY_DEMO.city}
+      </p>
+      <div class="th-board">
+        <p class="te-example th-board-label">Temporada de ejemplo</p>
+        <ul class="th-list" aria-label={`Funciones de ${PLAY_DEMO.title}, temporada de ejemplo`}>
+          {
+            marquee.map((m, i) => (
+              <li class:list={["th-fn", `is-${m.state}`, { "th-fn-desktop": i === 3 }]} style={`--i: ${i}`}>
+                <span class="te-display th-fn-date">{m.fn.label}</span>
+                <span class="th-fn-meta">
+                  {m.tag && <span class="th-fn-tag">{m.tag}</span>}
+                  <span class:list={["th-chip", `th-chip-${m.state}`]}>
+                    {m.state === "soldout" ? <s>{STATE_TEXT[m.state]}</s> : STATE_TEXT[m.state]}
+                  </span>
+                </span>
+              </li>
+            ))
+          }
+        </ul>
+        <a href="#temporada" class="te-link th-more">
+          <span class="th-more-desktop">y {moreDesktop} funciones más</span>
+          <span class="th-more-mobile">y {moreMobile} funciones más</span>
+          <span aria-hidden="true">→</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .th {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--te-sala);
+  }
+  /* Mobile: la foto arriba (4:5 recortada a 62svh) y el texto debajo, sobre el azul */
+  .th-media {
+    position: relative;
+    z-index: 0;
+    height: 62svh;
+    min-height: 360px;
+  }
+  .th-media :global(.th-photo) {
+    width: 100%;
+    height: 100%;
+  }
+  .th-media :global(.te-photo-img) {
+    object-position: 52% 30%;
+  }
+  /* T2: luz de sala. Capa oscura sobre la foto que queda en .25 (sin movimiento, estado final) */
+  .th-house {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    background: var(--te-sala);
+    opacity: 0.25;
+    pointer-events: none;
+  }
+  .th-shade {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    background: linear-gradient(180deg, rgba(12, 18, 32, 0.45) 0%, rgba(12, 18, 32, 0) 22%, rgba(12, 18, 32, 0) 60%, var(--te-sala) 100%);
+  }
+  /* Foco radial sobre el H1 (se enciende en T2) */
+  .th-spot {
+    position: absolute;
+    left: 50%;
+    top: 30%;
+    z-index: 3;
+    width: min(1100px, 160vw);
+    height: 70%;
+    transform: translateX(-50%);
+    background: radial-gradient(ellipse 50% 60% at 50% 40%, var(--te-foco), transparent 70%);
+    pointer-events: none;
+  }
+  .th-inner {
+    position: relative;
+    z-index: 4;
+    width: 100%;
+    margin-top: -48px;
+    padding-bottom: 72px;
+    text-align: center;
+  }
+  .th-title {
+    margin-top: 20px;
+    color: var(--te-text-1);
+  }
+  .th-line {
+    display: block;
+  }
+  .th-title .te-h1-sub {
+    margin-top: 10px;
+  }
+  .th-lead {
+    max-width: 640px;
+    margin: 20px auto 0;
+    color: var(--te-text-1);
+  }
+  .th-ctas {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 28px;
+  }
+  .th-micro {
+    margin-top: 16px;
+    font-size: 13px;
+    line-height: 19px;
+    color: var(--te-text-3);
+  }
+  .th-terms {
+    margin-top: 4px;
+    font-size: 12px;
+    line-height: 18px;
+    color: var(--te-text-3);
+  }
+
+  /* ---- Marquesina de funciones ---- */
+  .th-marquee {
+    max-width: 880px;
+    margin: 40px auto 0;
+  }
+  .th-play {
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--te-text-2);
+  }
+  .th-play-title {
+    font-family: var(--te-display);
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--te-text-1);
+  }
+  .th-board {
+    margin-top: 14px;
+    padding: 14px 16px;
+    border-top: 1px solid rgba(212, 175, 106, 0.6);
+    border-bottom: 1px solid rgba(212, 175, 106, 0.6);
+    background: rgba(19, 27, 45, 0.88);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    text-align: left;
+  }
+  .th-board-label {
+    margin-bottom: 6px;
+  }
+  .th-list {
+    display: flex;
+    flex-direction: column;
+  }
+  .th-fn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 48px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--te-line);
+  }
+  .th-fn-desktop {
+    display: none;
+  }
+  .th-fn-date {
+    font-size: 22px;
+    line-height: 28px;
+    white-space: nowrap;
+  }
+  .th-fn.is-soldout .th-fn-date {
+    color: var(--te-text-3);
+  }
+  .th-fn-meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .th-fn-tag {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--te-oro);
+  }
+  .th-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 26px;
+    padding: 2px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    line-height: 18px;
+    color: var(--te-text-2);
+  }
+  .th-chip-soldout {
+    background: var(--te-velvet);
+    color: var(--te-text-1);
+  }
+  .th-chip-last {
+    border: 1px solid var(--te-oro);
+    color: var(--te-oro);
+  }
+  .th-more {
+    margin-top: 12px;
+    font-size: 14px;
+  }
+  .th-more-desktop {
+    display: none;
+  }
+  @media (min-width: 640px) {
+    .th-ctas {
+      flex-direction: row;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+  }
+  @media (min-width: 1024px) {
+    .th {
+      min-height: min(100svh, 940px);
+      justify-content: flex-end;
+    }
+    .th-media {
+      position: absolute;
+      inset: 0;
+      height: auto;
+    }
+    .th-media :global(.te-photo-img) {
+      object-position: 50% 30%;
+    }
+    /* §4.1: gradiente de --te-sala de 0 a 92 % hacia abajo, detrás del texto centrado en el tercio inferior */
+    .th-shade {
+      background: linear-gradient(180deg, rgba(12, 18, 32, 0.35) 0%, rgba(12, 18, 32, 0) 18%, rgba(12, 18, 32, 0) 34%, rgba(12, 18, 32, 0.92) 72%, var(--te-sala) 100%);
+    }
+    .th-inner {
+      margin-top: 0;
+      padding-top: 200px;
+      padding-bottom: 64px;
+    }
+    .th-title {
+      margin-top: 28px;
+    }
+    .th-title .te-h1-sub {
+      margin-top: 14px;
+    }
+    .th-lead {
+      max-width: 720px;
+      margin-top: 28px;
+    }
+    .th-ctas {
+      margin-top: 36px;
+    }
+    .th-marquee {
+      margin-top: 44px;
+    }
+    .th-board {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      gap: 8px 20px;
+      padding: 14px 20px;
+    }
+    .th-board-label {
+      margin-bottom: 0;
+      max-width: 88px;
+    }
+    .th-list {
+      flex-direction: row;
+    }
+    .th-fn,
+    .th-fn-desktop {
+      display: flex;
+      flex: 1 1 0;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      padding: 4px 8px;
+      border-bottom: 0;
+      border-left: 1px solid var(--te-line);
+      text-align: center;
+    }
+    .th-fn-meta {
+      justify-content: center;
+    }
+    .th-more {
+      grid-column: 1 / -1;
+      justify-self: end;
+      margin-top: 0;
+      white-space: nowrap;
+    }
+    .th-more-desktop {
+      display: inline;
+    }
+    .th-more-mobile {
+      display: none;
+    }
+  }
+
+  /* T2: se apagan las luces de sala (capa oscura .55 → .25) y se enciende el escenario (foco 0 → 1) */
+  @keyframes th-house {
+    from {
+      opacity: 0.55;
+    }
+  }
+  :global(.lp-motion) .th-house {
+    animation: th-house 1600ms ease both;
+  }
+  :global(.lp-motion) .th-spot {
+    animation: te-fade 1600ms ease both;
+  }
+  /* T3: cada línea del H1 entra con clip-path y 12 px, stagger 180 ms desde 400 ms */
+  :global(.lp-motion) .th-line-1 {
+    animation: te-line-in 700ms var(--ease-out) 400ms both;
+  }
+  :global(.lp-motion) .th-line-2 {
+    animation: te-line-in 700ms var(--ease-out) 580ms both;
+  }
+  /* T4: bajada, CTAs y marquesina; las funciones de la marquesina con stagger de 80 ms */
+  :global(.lp-motion) .th-fade-0 {
+    animation: te-up 700ms var(--ease-out) 200ms both;
+  }
+  :global(.lp-motion) .th-fade-1 {
+    animation: te-up 700ms var(--ease-out) 750ms both;
+  }
+  :global(.lp-motion) .th-fade-2 {
+    animation: te-up 700ms var(--ease-out) 850ms both;
+  }
+  :global(.lp-motion) .th-fade-3 {
+    animation: te-up 700ms var(--ease-out) 1000ms both;
+  }
+  :global(.lp-motion) .th-fn {
+    animation: te-up 600ms var(--ease-out) calc(1100ms + var(--i) * 80ms) both;
+  }
+</style>

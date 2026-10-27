@@ -1,0 +1,136 @@
+---
+// Cartelera web de ejemplo para salas (SPEC_landing_teatro §4.8): marco de navegador mínimo con la URL de la web gratis
+// (sites.ts, aitickets.cl/o/<slug>) y tres obras en columnas, cada una en un arco de proscenio sin foto (azul con un
+// foco dibujado en CSS y el título en Bodoni). En mobile las obras pasan a un carrusel horizontal con scroll-snap.
+// Nombres ficticios (Preguntas abiertas 9).
+import { VENUE_BILL } from "./teatroLanding.js";
+---
+
+<figure class="vb" data-testid="theatre-venue-bill">
+  <div class="vb-bar" aria-hidden="true">
+    <span class="vb-dots"><span></span><span></span><span></span></span>
+    <span class="vb-url">{VENUE_BILL.url}</span>
+  </div>
+  <div class="vb-page">
+    <p class="vb-kicker">Cartelera · <span class="te-example">ejemplo</span></p>
+    <ul class="vb-plays" aria-label="Obras en cartelera de una sala de ejemplo">
+      {
+        VENUE_BILL.plays.map((p) => (
+          <li class="vb-play">
+            <span class="te-arch vb-arch">
+              <span class="vb-spot" aria-hidden="true" />
+              <span class="te-display vb-title">{p.title}</span>
+            </span>
+            <span class="vb-when">{p.when}</span>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</figure>
+
+<style>
+  .vb {
+    margin: 0;
+    overflow: hidden;
+    border: 1px solid var(--te-line-strong);
+    border-radius: 10px;
+    background: var(--te-sala);
+    box-shadow: 0 30px 60px rgba(7, 10, 18, 0.45);
+  }
+  .vb-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--te-line);
+    background: var(--te-sala-3);
+  }
+  .vb-dots {
+    display: inline-flex;
+    gap: 5px;
+  }
+  .vb-dots span {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(240, 232, 216, 0.25);
+  }
+  .vb-url {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: var(--te-sala);
+    font-size: 12px;
+    color: var(--te-text-2);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .vb-page {
+    padding: 20px 0 22px;
+  }
+  .vb-kicker {
+    padding-inline: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--te-oro);
+  }
+  .vb-plays {
+    display: flex;
+    gap: 14px;
+    margin-top: 14px;
+    padding: 0 20px 6px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: 20px;
+    scrollbar-width: none;
+  }
+  .vb-plays::-webkit-scrollbar {
+    display: none;
+  }
+  .vb-play {
+    flex: 0 0 62%;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    scroll-snap-align: start;
+  }
+  .vb-arch {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    aspect-ratio: 3 / 4;
+    padding: 0 14px 18px;
+    background: var(--te-sala-3);
+    text-align: center;
+  }
+  .vb-spot {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 55% 65% at 50% 0%, rgba(255, 233, 184, 0.35), transparent 72%);
+  }
+  .vb-title {
+    position: relative;
+    z-index: 3;
+    font-size: 20px;
+    line-height: 24px;
+  }
+  .vb-when {
+    margin-top: 6px;
+    font-size: 13px;
+    color: var(--te-text-3);
+  }
+  @media (min-width: 1024px) {
+    .vb-plays {
+      overflow: visible;
+      padding-bottom: 0;
+    }
+    .vb-play {
+      flex: 1 1 0;
+    }
+  }
+</style>

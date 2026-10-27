@@ -10,6 +10,15 @@ export type FaqItem = { q: string; a: string; terms?: boolean };
 /** Enlace de la nota "*Se aplican términos y condiciones" (el detalle está en los términos para productores). */
 export const TERMS_NOTE = { text: "*Se aplican términos y condiciones", href: "/terminos-productores" };
 
+/** Cómo se activa hoy el cargo absorbido (no hay switch en el panel). La usan esta FAQ y el precio de /organizadores. */
+export const ABSORB_FEE_ACTIVATION = "Hoy se activa desde tu asistente de IA conectado o escribiéndonos por WhatsApp.";
+
+/**
+ * Tope de funciones (fechas) por evento: el mismo MAX_FUNCTIONS de src/lib/producer-api/tools/schedule.ts. Ese módulo
+ * carga código de servidor y no se puede importar en las landings; tests/unit/musica-landing.test.mjs revisa que calcen.
+ */
+export const MAX_EVENT_FUNCTIONS = 60;
+
 const clp = (n: number) => `$${Math.round(n).toLocaleString("es-CL")}`;
 const absorbed = computeFeeSplit(10000, { absorbed: true });
 
@@ -25,11 +34,11 @@ export const PRODUCER_FAQ: FaqItem[] = [
     },
     {
         q: "¿Puedo absorber el cargo por servicio?",
-        a: `Sí, por evento. El comprador ve un precio final y el cargo con su IVA se descuenta de tu venta: en una entrada de $10.000 recibes ${clp(absorbed.producerNet)}. Hoy se activa desde tu asistente de IA conectado o escribiéndonos por WhatsApp.`,
+        a: `Sí, por evento. El comprador ve un precio final y el cargo con su IVA se descuenta de tu venta: en una entrada de $10.000 recibes ${clp(absorbed.producerNet)}. ${ABSORB_FEE_ACTIVATION}`,
     },
     {
         q: "¿Puedo publicar varias funciones de una misma obra o show?",
-        a: "Sí. Un evento puede tener hasta 60 funciones, con entradas para una función específica o válidas para todas. Para la semana siguiente también puedes duplicar el evento y solo cambiar las fechas.",
+        a: `Sí. Un evento puede tener hasta ${MAX_EVENT_FUNCTIONS} funciones, con entradas para una función específica o válidas para todas. Para la semana siguiente también puedes duplicar el evento y solo cambiar las fechas.`,
     },
     {
         q: "¿Puedo saber cuántas entradas vende cada promotor?",

@@ -1,17 +1,12 @@
 <script setup>
 // Contenido de la página del evento bajo el póster (§4.8, §4.9): Sobre el evento, Funciones (si hay más de
-// una), Ubicación, Preguntas frecuentes, acceso al asistente y categorías. Sin tabs.
-import { ref, computed, onMounted } from "vue";
+// una, v2 en §4.9b), Ubicación, Preguntas frecuentes, acceso al asistente y categorías. Sin tabs.
+import { ref, computed, onMounted, nextTick } from "vue";
 import { Navigation } from "lucide-vue-next";
 import { categoryIcon } from "./categoryIcons.js";
 import { vReveal } from "./reveal.js";
-import {
-  formatFunctionShort,
-  upcomingFunctions,
-  checkoutFunctions,
-  directionsUrl,
-  placeKey,
-} from "./eventView.js";
+import AutoHeight from "./AutoHeight.vue";
+import { upcomingFunctions, functionListModel, functionOnSale, directionsUrl, FUNCTION_LIST_LIMIT } from "./eventView.js";
 
 const props = defineProps({
   event: { type: Object, required: true },
@@ -27,31 +22,48 @@ const description = computed(() => props.event.description || "");
 const isLong = computed(() => description.value.replace(/<[^>]+>/g, "").length > DESCRIPTION_LIMIT);
 const expanded = ref(false);
 
-// ---- Funciones agrupadas por lugar ----
+// ---- Funciones (§4.9b): por lugar si hay más de uno y por mes si un lugar tiene más de 8 ----
 const functions = computed(() => upcomingFunctions(props.event));
-const fnStatus = computed(() => {
-  const model = checkoutFunctions(props.event);
-  return new Map(model.functions.map((f) => [String(f.id), f.status]));
+const fnList = computed(() => functionListModel(props.event));
+// Lista larga: las 6 próximas y "Ver las N funciones" expande (AutoHeight anima el alto)
+const fnExpanded = ref(false);
+const fnCollapsible = computed(() => fnList.value.total > FUNCTION_LIST_LIMIT);
+const visibleFnGroups = computed(() => {
+  if (fnExpanded.value || !fnCollapsible.value) return fnList.value.groups;
+  const shown = (fn) => fn.order < FUNCTION_LIST_LIMIT;
+  return fnList.value.groups
+    .map((g) => ({ ...g, months: g.months.map((m) => ({ ...m, items: m.items.filter(shown) })).filter((m) => m.items.length) }))
+    .filter((g) => g.months.length);
 });
-const functionGroups = computed(() => {
-  const groups = new Map();
-  for (const fn of functions.value) {
-    const key = placeKey(fn.venue) || "—";
-    if (!groups.has(key)) {
-      const v = fn.venue || {};
-      const title = [v.city, v.name].filter(Boolean).join(" · ") || v.address || "";
-      groups.set(key, { key, title, items: [] });
-    }
-    groups.get(key).items.push(fn);
+// "Ver menos" con la lista ya bajo el borde superior: la página vuelve al título de la sección (si no, salta)
+const fnTitle = ref(null);
+const fnAnnounce = ref("");
+async function toggleFunctions() {
+  fnExpanded.value = !fnExpanded.value;
+  // El foco se queda en el botón (aria-expanded); el lector de pantalla oye cuántas funciones hay ahora (§11)
+  fnAnnounce.value = fnExpanded.value ? `${fnList.value.total} funciones` : "";
+  if (fnExpanded.value) return;
+  await nextTick();
+  const title = fnTitle.value;
+  if (title && title.getBoundingClientRect().top < 0) {
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    title.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
   }
-  return [...groups.values()];
-});
+}
 const statusLabel = (fn) => {
-  const s = fnStatus.value.get(String(fn.id));
-  if (s === "sold_out") return "Agotada";
-  if (s === "few") return "Últimas";
-  return props.canBuy ? "Disponible" : "";
+  if (fn.status === "sold_out") return "Agotada";
+  if (fn.status === "few") return "Últimas";
+  // Sus entradas aún no salen a la venta: no está agotada (§6.3, checkout.available_from)
+  if (fn.status === "upcoming") return fn.opens ? `Disponible desde el ${fn.opens}` : "Venta próximamente";
+  return props.canBuy && fn.status ? "Disponible" : "";
 };
+// Toda la fila es clickeable (el botón "Elegir" es el control para teclado y lector de pantalla). Solo las que
+// tienen entradas a la venta: ni la agotada, ni la que aún no abre, ni las que el checkout no ofrece (status null)
+const canChoose = (fn) => props.canBuy && functionOnSale(fn) && fn.id != null;
+const chooseAria = (fn) => `Elegir ${fn.label}${fnList.value.manyPlaces && fn.place ? `, en ${fn.place}` : ""}${fn.status === "few" ? " (últimas entradas)" : ""}`;
+function chooseFunction(fn) {
+  if (canChoose(fn)) emit("choose-function", fn.id);
+}
 
 // ---- Ubicación ----
 const mapsKey = import.meta.env.PUBLIC_GOOGLE_MAPS_API_KEY;
@@ -123,25 +135,52 @@ function toggleFaq(i) {
       </button>
     </section>
 
-    <section v-if="functions.length > 1" id="funciones" v-reveal class="section" aria-labelledby="funciones-title">
-      <h2 id="funciones-title" class="section-title">Funciones</h2>
-      <div v-for="group in functionGroups" :key="group.key" class="fn-group">
-        <p v-if="group.title && functionGroups.length > 1" class="fn-place">{{ group.title }}</p>
-        <ul class="fn-list">
-          <li v-for="fn in group.items" :key="fn.id ?? fn.date" class="fn-row" :class="{ 'is-out': statusLabel(fn) === 'Agotada' }">
-            <span class="fn-date">{{ formatFunctionShort(fn) }}</span>
-            <span class="fn-status" :class="{ 'is-few': statusLabel(fn) === 'Últimas' }">{{ statusLabel(fn) }}</span>
-            <button
-              v-if="canBuy && statusLabel(fn) !== 'Agotada' && fn.id != null"
-              type="button"
-              class="ev-btn ev-btn-secondary fn-choose"
-              :aria-label="`Elegir ${formatFunctionShort(fn)}`"
-              @click="emit('choose-function', fn.id)"
-            >Elegir</button>
-            <span v-else class="fn-choose-spacer" aria-hidden="true"></span>
-          </li>
-        </ul>
-      </div>
+    <section v-if="fnList.total > 1" id="funciones" v-reveal class="section" aria-labelledby="funciones-title" data-testid="event-functions">
+      <h2 id="funciones-title" ref="fnTitle" class="section-title">Funciones</h2>
+      <AutoHeight>
+        <div id="funciones-lista">
+          <div v-for="group in visibleFnGroups" :key="group.key" class="fn-group">
+            <div v-if="fnList.manyPlaces && group.title" class="fn-place">
+              <p class="fn-place-name">{{ group.title }}</p>
+              <p v-if="group.address" class="fn-place-address">{{ group.address }}</p>
+            </div>
+            <template v-for="month in group.months" :key="month.key">
+              <p v-if="month.label" class="fn-month">{{ month.label }}</p>
+              <ul class="fn-list">
+                <li
+                  v-for="fn in month.items"
+                  :key="fn.id ?? fn.order"
+                  class="fn-row"
+                  :class="{ 'is-out': fn.status === 'sold_out', 'is-clickable': canChoose(fn), 'is-extra': fn.order >= FUNCTION_LIST_LIMIT }"
+                  :style="{ '--j': fn.order - FUNCTION_LIST_LIMIT }"
+                  :data-function-id="fn.id"
+                  @click="chooseFunction(fn)"
+                >
+                  <span class="fn-when">
+                    <span class="fn-date ev-tabular">{{ fn.label }}</span>
+                    <span v-if="fn.price" class="fn-price ev-tabular">{{ fn.price }}</span>
+                  </span>
+                  <span class="fn-status" :class="fn.status && `is-${fn.status}`">{{ statusLabel(fn) }}</span>
+                  <!-- Sin @click propio: el click sube a la fila (un solo handler para la fila y el botón) -->
+                  <button v-if="canChoose(fn)" type="button" class="ev-btn ev-btn-secondary fn-choose" :aria-label="chooseAria(fn)">Elegir</button>
+                  <span v-else class="fn-choose-spacer" aria-hidden="true"></span>
+                </li>
+              </ul>
+            </template>
+          </div>
+        </div>
+      </AutoHeight>
+      <button
+        v-if="fnCollapsible"
+        type="button"
+        class="ev-link fn-more"
+        aria-controls="funciones-lista"
+        :aria-expanded="fnExpanded ? 'true' : 'false'"
+        @click="toggleFunctions"
+      >
+        {{ fnExpanded ? "Ver menos" : `Ver las ${fnList.total} funciones` }}
+      </button>
+      <p class="sr-only" aria-live="polite">{{ fnAnnounce }}</p>
     </section>
 
     <section v-if="mapQuery || event.has_secret_location" id="ubicacion" v-reveal class="section" aria-labelledby="ubicacion-title">
@@ -255,13 +294,25 @@ function toggleFaq(i) {
   padding: 4px 0;
 }
 .fn-group + .fn-group {
-  margin-top: 20px;
+  margin-top: 24px;
 }
 .fn-place {
+  padding-bottom: 6px;
+}
+.fn-place-name {
   font-size: 14px;
   font-weight: 600;
+  color: var(--text-1);
+}
+.fn-place-address {
+  font-size: 13px;
   color: var(--text-2);
-  margin-bottom: 4px;
+}
+.fn-month {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  margin: 14px 0 2px;
 }
 .fn-list {
   display: flex;
@@ -273,11 +324,32 @@ function toggleFaq(i) {
   align-items: center;
   gap: 16px;
   min-height: 56px;
+  padding: 8px 0;
   border-bottom: 1px solid var(--border);
+}
+.fn-row.is-clickable {
+  cursor: pointer;
+}
+.fn-row.is-clickable:hover .fn-choose {
+  border-color: var(--text-1);
+}
+/* Al expandir la lista, las filas nuevas entran escalonadas (30 ms, como A10) */
+.fn-row.is-extra {
+  animation: ev-fade-up var(--dur-2) var(--ease-out) backwards;
+  animation-delay: calc(var(--j, 0) * 30ms);
+}
+.fn-when {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 .fn-date {
   font-size: 15px;
   font-weight: 500;
+}
+.fn-price {
+  font-size: 13px;
+  color: var(--text-2);
 }
 .fn-status {
   font-size: 13px;
@@ -293,12 +365,23 @@ function toggleFaq(i) {
   text-decoration: line-through;
 }
 .fn-choose {
-  min-height: 40px;
-  padding: 0 16px;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: var(--r-pill);
   font-size: 14px;
+  font-weight: 500;
 }
 .fn-choose-spacer {
   width: 0;
+}
+.fn-more {
+  margin-top: 12px;
+  font-size: 15px;
+  font-weight: 500;
+  background: none;
+  border: 0;
+  padding: 4px 0;
+  cursor: pointer;
 }
 .loc-name {
   font-size: 16px;

@@ -37,6 +37,10 @@ export type CadenceConfig = {
     scarcity_threshold_pct: number;
 };
 
+/** Palabra clave por defecto del DM con el link de compra. Vive aquí (sin dependencias de servidor) para que la
+ *  landing de stand-up la muestre sin importar socialSeries.ts; socialSeries.ts la reexporta. */
+export const DEFAULT_KEYWORD = "ENTRADAS";
+
 export const DEFAULT_CADENCE: CadenceConfig = Object.freeze({
     daily_from_days: 7,
     sparse_every_days: 3,

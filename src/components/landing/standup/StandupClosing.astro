@@ -1,0 +1,115 @@
+---
+// 11 · Cierre a pantalla completa (SPEC_landing_standup §4.11): foto del open mic con overlay radial oscuro (decorativa).
+// data-final-cta: la barra flotante de mobile se esconde al llegar aquí. Lleva el link a /organizadores (SEO §7).
+// La foto de referencia del open mic es vertical y llega solo a 896 px: en desktop se ve ampliada hasta que llegue la
+// real (Fase 4, ver STANDUP_PHOTOS).
+import StandupPhoto from "./StandupPhoto.astro";
+import { STANDUP_PHOTOS } from "./standupLanding.js";
+import { DEMO_CALL_URL, publishUrl, whatsappUrl } from "../links.js";
+---
+
+<section class="cl" aria-labelledby="su-closing-title" data-final-cta data-su-section="closing">
+  <div class="cl-media" aria-hidden="true">
+    <StandupPhoto photo={STANDUP_PHOTOS.openmic} alt="" sizes="100vw" position="50% 40%" />
+  </div>
+  <div class="cl-shade" aria-hidden="true"></div>
+  <div class="su-wrap cl-inner" data-lp-reveal>
+    <h2 id="su-closing-title" class="su-h2 cl-title" data-lp-step>¿Cuándo es tu <span class="su-serif">próxima función?</span></h2>
+    <p class="cl-lead" data-lp-step>Publícala hoy. Crear tu cuenta es gratis y no hay costos fijos.</p>
+    <div class="cl-ctas" data-lp-step>
+      <a href={publishUrl("standup_final")} class="su-btn su-btn-lime" data-cta="publish" data-section="final_cta">
+        Publicar mi próxima función <span aria-hidden="true">→</span>
+      </a>
+      <a href={whatsappUrl("Hola, quiero vender entradas para mi show de stand-up con AI Tickets")} class="su-btn su-btn-line" target="_blank" rel="noopener noreferrer" data-cta="whatsapp" data-section="final_cta">
+        Hablar por WhatsApp
+      </a>
+    </div>
+    <p class="cl-help" data-lp-step>
+      ¿Prefieres verlo antes?
+      <a href={DEMO_CALL_URL} class="su-inline-link" target="_blank" rel="noopener noreferrer" data-cta="demo_call" data-section="final_cta">Agenda una demo de 15 min</a>
+      ·
+      <a href="/organizadores" class="su-inline-link" data-cta="organizadores" data-section="final_cta">Todo lo que hace AI Tickets</a>
+    </p>
+  </div>
+</section>
+
+<style>
+  .cl {
+    position: relative;
+    isolation: isolate;
+    min-height: 560px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    text-align: center;
+  }
+  .cl-media {
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+  }
+  .cl-media :global(picture),
+  .cl-media :global(.su-photo-img) {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  .cl-shade {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: radial-gradient(ellipse at center, rgba(14, 11, 9, 0.55) 0%, rgba(14, 11, 9, 0.88) 70%, var(--sb-ground) 100%);
+  }
+  .cl-inner {
+    max-width: 980px;
+    padding-block: 96px;
+  }
+  .cl-title {
+    font-size: 34px;
+    line-height: 38px;
+    letter-spacing: -0.04em;
+  }
+  .cl-lead {
+    margin-top: 16px;
+    font-size: 16px;
+    line-height: 25px;
+    color: #d9d0c5;
+  }
+  .cl-ctas {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 28px;
+  }
+  .cl-help {
+    margin-top: 22px;
+    font-size: 14px;
+    line-height: 22px;
+    color: var(--sb-text-3);
+  }
+  @media (min-width: 640px) {
+    .cl-ctas {
+      flex-direction: row;
+      justify-content: center;
+      gap: 14px;
+    }
+  }
+  @media (min-width: 1024px) {
+    .cl {
+      min-height: 720px;
+    }
+    .cl-title {
+      font-size: 72px;
+      line-height: 76px;
+    }
+    .cl-lead {
+      margin-top: 24px;
+      font-size: 19px;
+      line-height: 30px;
+    }
+    .cl-ctas {
+      margin-top: 36px;
+    }
+  }
+</style>

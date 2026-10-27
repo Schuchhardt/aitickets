@@ -1,24 +1,33 @@
 ---
+// Portada (/): la ticketera para cualquier tipo de evento. Cuenta una historia con las fotos de cada nicho: el hero con
+// un mosaico de todos los escenarios, una card por nicho que lleva a su landing (vestida con sus colores), la semana de
+// una función de principio a fin con fotos de nichos distintos, el precio, la IA, las preguntas frecuentes y el cierre.
+// Misma base que /organizadores (landing.css, LandingHeader, LandingMotion, tokens y movimiento lp-); los montos y
+// plazos salen de fees.mjs / legal.mjs y las respuestas de dinero de PRODUCER_FAQ.
 export const prerender = true;
-import AppHeader from "../components/AppHeader.vue";
 import AppFooter from "../components/AppFooter.vue";
-import HeroSection from "../components/HeroSection.vue";
-import RecurringSection from "../components/landing/RecurringSection.vue";
-import PromotersSection from "../components/landing/PromotersSection.vue";
-import AIConnectSection from "../components/AIConnectSection.vue";
-import VideoSection from "../components/VideoSection.vue";
-import DoorSection from "../components/landing/DoorSection.vue";
-import PricingExampleSection from "../components/landing/PricingExampleSection.vue";
-import ProducerFaq from "../components/landing/ProducerFaq.vue";
-import CallToAction from "../components/CallToAction.vue";
+import LandingHeader from "../components/landing/LandingHeader.vue";
+import LandingMobileBar from "../components/landing/LandingMobileBar.vue";
+import LandingFaq from "../components/landing/LandingFaq.vue";
+import LandingMotion from "../components/landing/LandingMotion.astro";
 import CtaTracking from "../components/landing/CtaTracking.astro";
-import ProducerSessionBanner from "../components/landing/ProducerSessionBanner.vue";
+import AiSection from "../components/landing/organizadores/AiSection.astro";
+import HomeHero from "../components/landing/home/HomeHero.astro";
+import HomeMarquee from "../components/landing/home/HomeMarquee.astro";
+import HomeNiches from "../components/landing/home/HomeNiches.astro";
+import HomeStory from "../components/landing/home/HomeStory.astro";
+import HomePricing from "../components/landing/home/HomePricing.astro";
+import HomeClosing from "../components/landing/home/HomeClosing.astro";
+import HomeTracking from "../components/landing/home/HomeTracking.astro";
 import Layout from '../layouts/Layout.astro';
+import { publishUrl } from "../components/landing/links.js";
 import { PRODUCER_FAQ } from "../data/producerFaq";
 import { LEGAL } from "../lib/legal";
 import { SERVICE_FEE_PERCENT_LABEL } from "../../netlify/lib/fees.mjs";
+// Fuente del H1: precargada para que el cambio de fuente no mueva el hero (CLS)
+import unboundedWoff2 from "@fontsource/unbounded/files/unbounded-latin-700-normal.woff2?url";
 import "../styles/global.css";
-import 'animate.css';
+import "../styles/landing.css";
 
 const SITE_URL = (import.meta.env.SITE_URL || "https://aitickets.cl").replace(/\/$/, "");
 const jsonLd = [
@@ -38,7 +47,7 @@ const jsonLd = [
     applicationCategory: "BusinessApplication",
     operatingSystem: "Web",
     url: SITE_URL,
-    description: "Ticketera online para productores de eventos en Chile: funciones recurrentes, links de venta por promotor, check-in con QR y pago por función.",
+    description: "Ticketera online para productores de eventos en Chile: stand-up, teatro, música en vivo, clubs, fiestas, talleres, seminarios y academias. Varias funciones por evento, links de venta por promotor, check-in con QR y pago por función.",
     offers: {
       "@type": "Offer",
       price: "0",
@@ -51,23 +60,44 @@ const jsonLd = [
 
 <Layout
   title="Ticketera para productores de eventos en Chile | AI Tickets"
-  description="Vende entradas para tus funciones, mide qué promotor vende, controla el check-in con QR y cobra lo de cada función. Sin mensualidad y 0% de comisión para el productor."
+  description="Vende entradas para tu stand-up, obra, tocata, fiesta, taller o seminario. Un link por promotor, check-in con QR y cobro por función. Sin mensualidad y 0% de comisión para el productor."
   canonical="/"
 >
-  <AppHeader client:idle/>
-  <main>
+  <link slot="head-extra" rel="preload" as="font" type="font/woff2" href={unboundedWoff2} crossorigin />
+  <LandingMotion />
+  <LandingHeader client:idle publishHref={publishUrl("home_header")} />
+  <main class="lp ev-motion">
     <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
-    <HeroSection client:idle />
-    <RecurringSection />
-    <PromotersSection />
-    <AIConnectSection />
-    <VideoSection />
-    <DoorSection />
-    <PricingExampleSection />
-    <ProducerFaq items={PRODUCER_FAQ} />
-    <CallToAction campaign="home_final" />
+    <HomeHero />
+    <HomeMarquee />
+    <HomeNiches />
+    <HomeStory />
+    <HomePricing />
+    <AiSection />
+    <section class="lp-section lp-surface faq" aria-labelledby="faq-title" data-lp-section="faq">
+      <div class="lp-wrap faq-wrap" data-lp-reveal>
+        <h2 id="faq-title" class="lp-h2 faq-title" data-lp-step>Preguntas frecuentes</h2>
+        <div data-lp-step><LandingFaq client:visible items={PRODUCER_FAQ} idPrefix="home-faq" /></div>
+      </div>
+    </section>
+    <HomeClosing />
   </main>
-  <AppFooter client:idle/>
+  <AppFooter client:idle />
+  <LandingMobileBar client:idle publishHref={publishUrl("home_mobile_bar")} />
   <CtaTracking />
-  <ProducerSessionBanner client:idle />
+  <HomeTracking />
 </Layout>
+
+<style>
+  .faq-wrap {
+    max-width: 760px;
+  }
+  .faq-title {
+    margin-bottom: 16px;
+  }
+  @media (min-width: 1024px) {
+    .faq-title {
+      margin-bottom: 24px;
+    }
+  }
+</style>

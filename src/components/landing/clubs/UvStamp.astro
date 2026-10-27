@@ -1,0 +1,119 @@
+---
+// Timbre de tinta UV (SPEC_landing_clubs §1, C5): sello circular de borde dentado con "AI TICKETS · VÁLIDA · VIE" en
+// curva y una ✓ al centro, en rosa fluor. Está al 6% hasta que pasa la linterna UV: en desktop con puntero fino, una
+// máscara radial de 140 px que sigue al puntero sobre su card ([data-uv-area]); en touch o con teclado, un barrido de
+// izquierda a derecha al 40% de visibilidad (o al entrar el foco a la card), que lo deja revelado. Con "reducir
+// movimiento" se ve completo (CSS). Decorativo (aria-hidden): lo que dice también está en texto.
+// Rendimiento (§7): un pointermove con requestAnimationFrame que escribe --x/--y, conectado solo mientras la card está
+// en pantalla. Analítica: cl_uv_reveal { where } una vez por timbre.
+interface Props {
+  /** Dónde está ("hero", "door"): id del texto curvo y analítica */
+  where: string;
+  size?: number;
+  class?: string;
+}
+const { where, size = 96, class: className } = Astro.props;
+
+// Borde dentado: 64 dientes alternando radio 58 y 54 (viewBox 120)
+const teeth = Array.from({ length: 128 }, (_, i) => {
+  const r = i % 2 ? 54.5 : 58;
+  const a = (i / 128) * Math.PI * 2;
+  return `${(60 + r * Math.cos(a)).toFixed(2)},${(60 + r * Math.sin(a)).toFixed(2)}`;
+}).join(" ");
+const pathId = `cl-uv-text-${where}`;
+---
+
+<span class:list={["cl-uv", className]} data-uv={where} style={`--uv-size: ${size}px`} aria-hidden="true">
+  {
+    ["cl-uv-base", "cl-uv-lit"].map((layer, n) => (
+      <svg class={layer} viewBox="0 0 120 120" fill="none">
+        {n === 0 && (
+          <defs>
+            <path id={pathId} d="M60 20 a40 40 0 1 1 -0.01 0" />
+          </defs>
+        )}
+        <polygon points={teeth} stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" />
+        <circle cx="60" cy="60" r="48" stroke="currentColor" stroke-width="1.5" />
+        <circle cx="60" cy="60" r="30" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 3" />
+        <text fill="currentColor" font-family="Prompt, system-ui, sans-serif" font-size="10.5" font-weight="700" letter-spacing="1.2">
+          <textPath href={`#${pathId}`} textLength="246" lengthAdjust="spacing">AI TICKETS · VÁLIDA · VIE ·</textPath>
+        </text>
+        <path d="M47 61 l9 9 l18 -20" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+    ))
+  }
+</span>
+
+<script>
+  import { trackEvent } from "../../../composables/useGoogleAnalytics.js";
+
+  const stamps = document.querySelectorAll<HTMLElement>("[data-uv]");
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const finePointer = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+
+  if (stamps.length && !reduced && "IntersectionObserver" in window) {
+    for (const stamp of stamps) {
+      const area = stamp.closest<HTMLElement>("[data-uv-area]") || stamp.parentElement!;
+      let tracked = false;
+      const reveal = () => {
+        if (tracked) return;
+        tracked = true;
+        trackEvent("cl_uv_reveal", { where: stamp.dataset.uv });
+      };
+      // Barrido automático (touch, teclado): una sola vez, queda revelado
+      const sweep = () => {
+        if (stamp.classList.contains("is-sweep") || stamp.classList.contains("is-swept")) return;
+        stamp.classList.add("is-sweep");
+        stamp.addEventListener("animationend", () => stamp.classList.replace("is-sweep", "is-swept"), { once: true });
+        reveal();
+      };
+      area.addEventListener("focusin", sweep);
+
+      if (!finePointer) {
+        const io = new IntersectionObserver(
+          (entries) => {
+            if (entries.some((e) => e.isIntersecting)) {
+              sweep();
+              io.disconnect();
+            }
+          },
+          { threshold: 0.4 },
+        );
+        io.observe(stamp);
+        continue;
+      }
+
+      // Linterna que sigue al puntero sobre la card
+      let frame = 0;
+      let point = { x: 0, y: 0 };
+      const paint = () => {
+        frame = 0;
+        const rect = stamp.getBoundingClientRect();
+        const x = point.x - rect.left;
+        const y = point.y - rect.top;
+        stamp.style.setProperty("--x", `${x}px`);
+        stamp.style.setProperty("--y", `${y}px`);
+        if (Math.hypot(x - rect.width / 2, y - rect.height / 2) < 90) reveal();
+      };
+      const onMove = (e: PointerEvent) => {
+        point = { x: e.clientX, y: e.clientY };
+        if (!frame) frame = requestAnimationFrame(paint);
+      };
+      const onLeave = () => {
+        stamp.style.removeProperty("--x");
+        stamp.style.removeProperty("--y");
+      };
+      new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            area.addEventListener("pointermove", onMove);
+            area.addEventListener("pointerleave", onLeave);
+          } else {
+            area.removeEventListener("pointermove", onMove);
+            area.removeEventListener("pointerleave", onLeave);
+          }
+        }
+      }).observe(area);
+    }
+  }
+</script>

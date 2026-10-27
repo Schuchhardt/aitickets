@@ -1,0 +1,404 @@
+/* ------------------------------------------------------------------------------------------------
+ * Tema de la landing de stand-up (/ticketera-stand-up, docs/specs/rediseno/SPEC_landing_standup_aitickets.md §1).
+ * Oscuro y cálido, con scope en [data-theme="standup"]: no toca los tokens globales. Dentro del scope se redefinen los
+ * tokens de superficie y texto para que los componentes compartidos (FAQ, badge "Pronto") se vean en oscuro.
+ * El lima solo en botones primarios, la barra de lectura, asientos vendidos, "Válida"/"Publicado" y los días de la
+ * semana. Prefijo su-. Se carga junto a landing.css (usa .lp-wrap, .lp-sr-only y el movimiento de LandingMotion).
+ * ---------------------------------------------------------------------------------------------- */
+/* Fraunces solo en cursiva 400 (§6), servida desde el sitio como las demás fuentes (global.css): sin hoja de Google
+ * Fonts que bloquee el render del hero. */
+@import "@fontsource/fraunces/400-italic.css";
+
+[data-theme="standup"] {
+  --sb-ground: #0e0b09;
+  --sb-surface: #17120f;
+  --sb-surface-2: #241d18;
+  --sb-line: rgba(244, 237, 228, 0.12);
+  --sb-text-1: #f4ede4;
+  --sb-text-2: #cfc5ba;
+  --sb-text-3: #b5aba0; /* ≥ 4.5:1 sobre ground */
+  --sb-accent-serif: #e9dccb;
+  --sb-paper: #f4ede4;
+  --sb-ink-2: #3e3731; /* texto secundario sobre paper */
+  --sb-ink-3: #5b534b;
+  --sb-marquee: #6f655b;
+
+  /* Componentes compartidos dentro del tema */
+  --surface-0: var(--sb-ground);
+  --surface-1: var(--sb-surface);
+  --surface-2: var(--sb-surface-2);
+  --border: var(--sb-line);
+  --border-strong: rgba(244, 237, 228, 0.18);
+  --text-1: var(--sb-text-1);
+  --text-2: var(--sb-text-2);
+  --text-3: var(--sb-text-3);
+
+  font-family: "Prompt", system-ui, sans-serif;
+  color: var(--sb-text-1);
+  background: var(--sb-ground);
+  -webkit-font-smoothing: antialiased;
+}
+
+.su-wrap {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding-inline: 16px;
+}
+@media (min-width: 768px) {
+  .su-wrap {
+    padding-inline: 40px;
+  }
+}
+.su [id] {
+  scroll-margin-top: 88px;
+}
+
+/* ---------- Tipografía ----------
+ * Display: Unbounded (la del sitio). La spec escala sobre Sora (H1 96/92, H2 64/66, H3 44/48); Unbounded es ~20% más
+ * ancha, así que se baja la escala en la misma proporción (como en /organizadores). La segunda mitad de cada titular va
+ * en Fraunces cursiva 400. */
+.su-h1,
+.su-h2,
+.su-h3 {
+  font-family: "Unbounded", system-ui, sans-serif;
+  font-weight: 700;
+  color: var(--sb-text-1);
+  text-wrap: balance;
+  overflow-wrap: break-word;
+}
+.su-h1 {
+  font-size: 38px;
+  line-height: 42px;
+  letter-spacing: -0.04em;
+}
+.su-h2 {
+  font-size: 30px;
+  line-height: 35px;
+  letter-spacing: -0.03em;
+}
+.su-h3 {
+  font-size: 24px;
+  line-height: 29px;
+  letter-spacing: -0.02em;
+}
+.su-serif {
+  font-family: "Fraunces", Georgia, serif;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  color: var(--sb-accent-serif);
+}
+.su-eyebrow {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--sb-text-3);
+}
+.su-day {
+  font-family: "Unbounded", system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--brand-lime);
+}
+.su-lead {
+  font-size: 16px;
+  line-height: 25px;
+  color: var(--sb-text-2);
+}
+.su-example {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--sb-text-3);
+}
+@media (min-width: 1024px) {
+  .su-h1 {
+    font-size: 76px;
+    line-height: 78px;
+  }
+  .su-h2 {
+    font-size: 52px;
+    line-height: 58px;
+  }
+  .su-h3 {
+    font-size: 36px;
+    line-height: 42px;
+  }
+  .su-lead {
+    font-size: 18px;
+    line-height: 29px;
+  }
+}
+
+/* ---------- Botones y enlaces ---------- */
+.su-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 0 24px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform var(--dur-1) var(--ease-out), box-shadow var(--dur-2) var(--ease-out),
+    background-color var(--dur-1) var(--ease-out), border-color var(--dur-1) var(--ease-out);
+  -webkit-tap-highlight-color: transparent;
+}
+.su-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--sb-ground), 0 0 0 6px var(--brand-lime);
+}
+.su-btn-lime {
+  border: 0;
+  background: var(--brand-lime);
+  color: var(--sb-ground);
+}
+.su-btn-lime:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(154, 230, 0, 0.25);
+}
+.su-btn-lime:active {
+  transform: scale(0.98);
+}
+.su-btn-line {
+  border: 1px solid rgba(244, 237, 228, 0.28);
+  background: rgba(14, 11, 9, 0.2);
+  color: var(--sb-text-1);
+  font-weight: 500;
+}
+.su-btn-line:hover {
+  background: rgba(244, 237, 228, 0.08);
+  border-color: rgba(244, 237, 228, 0.4);
+}
+@media (min-width: 1024px) {
+  .su-btn {
+    min-height: 56px;
+    padding: 0 28px;
+    font-size: 17px;
+  }
+}
+.su-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--sb-text-1);
+  text-decoration: none;
+  border-radius: 4px;
+}
+.su-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.su-link:focus-visible,
+.su-inline-link:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+.su-inline-link {
+  color: var(--sb-text-1);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: rgba(244, 237, 228, 0.35);
+}
+.su-inline-link:hover {
+  text-decoration-color: currentColor;
+}
+
+/* ---------- Fotos y cards ---------- */
+.su-photo {
+  position: relative;
+  overflow: hidden;
+  border-radius: 22px;
+  background: var(--sb-surface);
+}
+@media (min-width: 768px) {
+  .su-photo {
+    border-radius: 28px;
+  }
+}
+.su-photo-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.su-glass {
+  background: rgba(14, 11, 9, 0.82);
+  border: 1px solid rgba(244, 237, 228, 0.14);
+  border-radius: 18px;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.su-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border: 1px solid rgba(244, 237, 228, 0.2);
+  border-radius: 999px;
+  font-size: 12px;
+}
+.su-bar-track {
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(244, 237, 228, 0.12);
+  overflow: hidden;
+}
+.su-bar {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--brand-lime);
+  transform: scaleX(var(--lp-scale, 1));
+  transform-origin: left;
+}
+/* Rangos (calculadora y anuncios) sobre fondo claro */
+.su-range {
+  width: 100%;
+  height: 28px;
+  margin: 0;
+  accent-color: var(--sb-ground);
+  cursor: pointer;
+}
+.su-range:focus-visible {
+  outline: 2px solid var(--sb-ground);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+/* ---------- Movimiento (SPEC_landing_standup §5) ----------
+ * Igual que /organizadores: todo cuelga de html.lp-motion (LandingMotion.astro: JS, IntersectionObserver y sin "reducir
+ * movimiento"); sin la clase, cada elemento queda en su estado final. Solo transform, opacity y clip-path. */
+@keyframes su-kenburns {
+  from {
+    transform: scale(1.08);
+  }
+}
+@keyframes su-rise {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+}
+@keyframes su-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes su-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.96);
+  }
+}
+@keyframes su-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+@keyframes su-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+@keyframes su-pulse {
+  from {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  to {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+@keyframes su-clip {
+  from {
+    clip-path: inset(12% 12% 12% 12% round 28px);
+  }
+  to {
+    clip-path: inset(0 0 0 0 round 28px);
+  }
+}
+@keyframes su-zoom-out {
+  from {
+    transform: scale(1.12);
+  }
+}
+
+/* S1-S4: hero al cargar. El Ken Burns va en la foto y no en el contenedor: así el contenedor no arma su propio contexto
+ * de apilamiento y el botón de pausa del video queda sobre el overlay (con Save-Data, la foto ya tiene su .lcv-kb). */
+.lp-motion .su-kb img:not(.lcv-kb) {
+  animation: su-kenburns 2400ms var(--ease-out) both;
+}
+.lp-motion .su-rise-1 {
+  animation: su-rise 800ms var(--ease-out) 200ms both;
+}
+.lp-motion .su-rise-2 {
+  animation: su-rise 800ms var(--ease-out) 360ms both;
+}
+.lp-motion .su-fade-1 {
+  animation: su-fade 800ms ease 700ms both;
+}
+.lp-motion .su-fade-2 {
+  animation: su-fade 800ms ease 850ms both;
+}
+.lp-motion .su-card-in {
+  animation: su-card-in 700ms var(--ease-out) 1100ms both;
+}
+
+/* S7: textos que entran al hacer scroll (fade + translateY 24px, 700 ms) */
+.lp-motion .su .is-in [data-lp-step],
+.lp-motion .su .is-in[data-lp-step] {
+  animation: su-up 700ms var(--ease-out) var(--lp-d, 0ms) both;
+}
+
+/* S6: fotos de los capítulos (clip-path + la imagen pasa de scale 1.12 a 1) */
+.lp-motion [data-lp-reveal]:not(.is-in) .su-reveal-photo {
+  clip-path: inset(12% 12% 12% 12% round 28px);
+}
+.lp-motion .is-in .su-reveal-photo {
+  animation: su-clip 1000ms var(--ease-out) both;
+}
+.lp-motion .is-in .su-reveal-photo .su-photo-img {
+  animation: su-zoom-out 1400ms var(--ease-out) both;
+}
+
+/* S8: barras de ventas por link (1,1 s, stagger en --lp-d) */
+.lp-motion .su .is-in [data-lp-grow] {
+  animation-duration: 1100ms;
+}
+
+/* Pop (S13, S14) y punto "en vivo" (S4): solo con movimiento */
+.su-pop {
+  animation: su-pop 420ms var(--ease-spring) both;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .su-live-dot::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: inherit;
+    animation: su-pulse 1.4s ease-out infinite;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .su-pop {
+    animation: none;
+  }
+}
+
+/* Fondo del documento (rebote del scroll en iOS y macOS) del mismo color que la página */
+html:has(body [data-theme="standup"]) {
+  background: #0e0b09;
+}

@@ -1,4 +1,5 @@
-// Escenarios de la página pública del evento para los e2e sin BD (tests/e2e/event-quantity.spec.ts). Los sirve
+// Escenarios de la página pública del evento para los e2e sin BD (tests/e2e/event-quantity.spec.ts,
+// tests/e2e/event-action-card.spec.ts y otros). Los sirve
 // tests/e2e/fixtures/event-fixture-page.astro en FIXTURE_ROUTE/<escenario> (solo en `astro dev` con
 // E2E_FIXTURES=1).
 // Las entradas están como filas de event_tickets en la BD (max_quantity null = el productor no configuró un
@@ -11,6 +12,66 @@ export const TICKETS = {
   vip: { id: 9102, ticket_name: "VIP", price: 9000, max_quantity: null, total_quantity: null },
   // El productor configuró un máximo de 3 por compra
   generalMax3: { id: 9103, ticket_name: "General", price: 4000, max_quantity: 3, total_quantity: null },
+  // Quedan 5 de 100: "Últimas entradas"
+  generalLast: { id: 9104, ticket_name: "General", price: 4000, max_quantity: null, total_quantity: 5 },
+  free: { id: 9105, ticket_name: "Entrada liberada", price: 0, max_quantity: null, total_quantity: null },
+  // Quedan 8 cupos: "Gratis · Quedan 8 cupos"
+  freeFew: { id: 9106, ticket_name: "Entrada liberada", price: 0, max_quantity: null, total_quantity: 8 },
+};
+
+/** Lugares para los eventos con varias funciones (el de una función es "Teatro de Prueba", en fixtureEvent). */
+const VENUE_PROVIDENCIA = { name: "Sala Agustín Siré", address: "Morandé 750", city: "Providencia" };
+const VENUE_NUNOA = { name: "Teatro Ñuñoa", address: "Av. Irarrázaval 1564", city: "Ñuñoa" };
+
+/**
+ * Gira con 5 funciones en 2 lugares, cada una con su entrada (event_date_id). La primera está agotada y a la
+ * segunda le quedan 4: los chips de la card muestran 2.ª, 3.ª y 4.ª y "+ 1 función".
+ */
+const TOUR = {
+  functions: [
+    { days: 30, venue: VENUE_PROVIDENCIA },
+    { days: 31, venue: VENUE_PROVIDENCIA },
+    { days: 37, venue: VENUE_NUNOA },
+    { days: 38, venue: VENUE_NUNOA },
+    { days: 44, venue: VENUE_NUNOA },
+  ],
+  // fn: índice de la función a la que está amarrada la entrada
+  tickets: [
+    { id: 9112, ticket_name: "General", price: 6000, max_quantity: null, total_quantity: 4, fn: 1 },
+    { id: 9113, ticket_name: "General", price: 6000, max_quantity: null, total_quantity: null, fn: 2 },
+    { id: 9114, ticket_name: "General", price: 6000, max_quantity: null, total_quantity: null, fn: 3 },
+    { id: 9115, ticket_name: "General", price: 6000, max_quantity: null, total_quantity: null, fn: 4 },
+  ],
+  unavailable: [{ id: 9111, ticket_name: "General", price: 6000, fn: 0, reason: "sold_out" }],
+};
+
+/**
+ * Temporada de 9 funciones en un solo lugar, cada una con su entrada; la última con una VIP más cara (desde-precio
+ * propio en la lista). La sección Funciones muestra las 6 próximas y "Ver las 9 funciones" (§4.9b).
+ */
+const SEASON = {
+  functions: Array.from({ length: 9 }, (_, i) => ({ days: 30 + i * 2, venue: VENUE_PROVIDENCIA })),
+  tickets: [
+    ...Array.from({ length: 8 }, (_, i) => ({ id: 9120 + i, ticket_name: "General", price: 6000, max_quantity: null, total_quantity: null, fn: i })),
+    { id: 9128, ticket_name: "VIP", price: 15000, max_quantity: null, total_quantity: null, fn: 8 },
+    { id: 9129, ticket_name: "Platea", price: 9000, max_quantity: null, total_quantity: null, fn: 8 },
+  ],
+};
+
+/**
+ * La misma gira, pero la entrada de la última función sale a la venta en 5 días (reason "upcoming"): en la lista
+ * dice "Disponible desde el …", no "Agotada".
+ */
+const TOUR_OPENING_LATER = {
+  ...TOUR,
+  tickets: TOUR.tickets.filter((t) => t.fn !== 4),
+  unavailable: [...TOUR.unavailable, { id: 9115, ticket_name: "General", price: 6000, fn: 4, reason: "upcoming", salesStartsInDays: 5 }],
+};
+
+/** 3 funciones con una sola entrada válida para cualquiera (sin event_date_id): no se elige función al comprar. */
+const RUN_ANY_FUNCTION = {
+  functions: [{ days: 30, venue: VENUE_PROVIDENCIA }, { days: 31, venue: VENUE_PROVIDENCIA }, { days: 32, venue: VENUE_PROVIDENCIA }],
+  tickets: [TICKETS.general],
 };
 
 /** layout: diseño elegido por el productor (sin imagen el diseño siempre es compacto). */
@@ -28,6 +89,22 @@ export const SCENARIOS = {
   "con-video-portada-ancha": { layout: "banner", tickets: [TICKETS.general], coverVideo: true },
   "con-video-portada-compacto": { layout: "compact", tickets: [TICKETS.general], coverVideo: true },
   "con-video-galeria": { layout: "poster", tickets: [TICKETS.general], galleryVideo: true },
+  // Estados de la card de acción v2 (tests/e2e/event-action-card.spec.ts). saleState: eventData.sale_state
+  gratis: { layout: "poster", tickets: [TICKETS.free] },
+  "gratis-pocos-cupos": { layout: "poster", tickets: [TICKETS.freeFew] },
+  "gratis-lleno": { layout: "poster", tickets: [], unavailable: [{ ...TICKETS.free, reason: "sold_out" }], saleState: "sold_out" },
+  "pagado-ultimas": { layout: "poster", tickets: [TICKETS.generalLast] },
+  "varias-funciones": { layout: "poster", ...TOUR },
+  // Funciones v2 (tests/e2e/event-functions.spec.ts)
+  "muchas-funciones": { layout: "poster", ...SEASON },
+  "funciones-venta-por-abrir": { layout: "poster", ...TOUR_OPENING_LATER },
+  "funciones-entrada-general": { layout: "poster", ...RUN_ANY_FUNCTION },
+  "venta-por-abrir": { layout: "poster", tickets: [], unavailable: [{ ...TICKETS.general, reason: "upcoming" }], saleState: "upcoming", saleStartsInDays: 3 },
+  agotado: { layout: "poster", tickets: [], unavailable: [{ ...TICKETS.general, reason: "sold_out" }], saleState: "sold_out" },
+  "terminado-sin-resenas": { layout: "poster", tickets: [], ended: true },
+  "venta-cerrada": { layout: "poster", tickets: [], saleState: "closed" },
+  // Vista previa privada de un borrador (status draft + is_preview, como /eventos/vista-previa/…)
+  "vista-previa": { layout: "poster", tickets: [TICKETS.general], preview: true },
 };
 
 /** Video como lo arma normalizeEventVideo (src/lib/eventVideo.ts), con el MP4 de public/videos. */
@@ -81,12 +158,30 @@ export function fixtureEvent(name, { toPublicTicket, now = new Date() }) {
   const start = `${date}T20:00:00-03:00`;
   const end = `${date}T23:00:00-03:00`;
   const image = scenario.image !== false;
+  // Funciones: una (la de siempre) o las del escenario, con id 9200, 9201…
+  const dates = scenario.functions
+    ? scenario.functions.map((f, i) => {
+        const d = new Date(now.getTime() + f.days * 24 * 3600 * 1000);
+        const ymd = `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+        return {
+          id: 9200 + i,
+          date: ymd,
+          start_time: "21:00:00",
+          end_time: "23:00:00",
+          timezone: "America/Santiago",
+          start_iso: `${ymd}T21:00:00-03:00`,
+          end_iso: `${ymd}T23:00:00-03:00`,
+          venue: { ...venue, ...f.venue },
+        };
+      })
+    : [{ id: 9200, date, start_time: "20:00:00", end_time: "23:00:00", timezone: "America/Santiago", start_iso: start, end_iso: end, venue }];
+  const functionId = (t) => (t.fn === undefined ? null : dates[t.fn].id);
   return {
     id: 9100,
     name: "Concierto de prueba",
     slug: `e2e-${name}`,
     title: "Concierto de prueba",
-    status: "published",
+    status: scenario.preview ? "draft" : "published",
     capacity: null,
     start_date: new Date(start).toISOString(),
     end_date: new Date(end).toISOString(),
@@ -107,20 +202,27 @@ export function fixtureEvent(name, { toPublicTicket, now = new Date() }) {
     gallery: [],
     cover_video: scenario.coverVideo ? FIXTURE_VIDEO : null,
     gallery_video: scenario.galleryVideo ? FIXTURE_VIDEO : null,
-    dates: [{ id: 9200, date, start_time: "20:00:00", end_time: "23:00:00", timezone: "America/Santiago", start_iso: start, end_iso: end, venue }],
+    dates,
     tickets: scenario.tickets.map((t) =>
-      toPublicTicket({ ...t, init_date: null, end_date: null, event_date_id: null }, { remaining: t.total_quantity ?? null, feeAbsorbed: false }),
+      toPublicTicket({ ...t, init_date: null, end_date: null, event_date_id: functionId(t) }, { remaining: t.total_quantity ?? null, feeAbsorbed: false }),
     ),
-    unavailable_tickets: [],
+    unavailable_tickets: (scenario.unavailable || []).map((t) => ({
+      id: t.id,
+      ticket_name: t.ticket_name,
+      price: t.price,
+      event_date_id: functionId(t),
+      reason: t.reason,
+      sales_start: t.salesStartsInDays ? new Date(now.getTime() + t.salesStartsInDays * 24 * 3600 * 1000).toISOString() : null,
+    })),
     theme: image ? { tint: "75 60% 94%", poster_width: 1200, poster_height: 630 } : null,
-    sale_state: scenario.tickets.length ? "on_sale" : "closed",
+    sale_state: scenario.saleState || (scenario.tickets.length ? "on_sale" : "closed"),
     reviews: scenario.reviews ? FIXTURE_REVIEWS : null,
-    sale_starts_at: null,
+    sale_starts_at: scenario.saleStartsInDays ? new Date(now.getTime() + scenario.saleStartsInDays * 24 * 3600 * 1000).toISOString() : null,
     has_secret_location: false,
     organization: { name: "Productora de Prueba", website: null, instagram: null },
     venue,
     page_settings: { layout: scenario.layout, show_organizer: true, background: "none" },
     is_demo: false,
-    is_preview: false,
+    is_preview: Boolean(scenario.preview),
   };
 }

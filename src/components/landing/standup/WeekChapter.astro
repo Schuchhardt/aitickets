@@ -1,0 +1,82 @@
+---
+// Un capítulo de "Una semana con AI Tickets" (SPEC_landing_standup §4.3): foto 4:5 con una card de producto encima
+// (slot "card") y el texto al lado. side="right" pone la foto a la derecha y el texto alineado a la derecha (desktop); en
+// mobile siempre foto arriba y texto abajo. Entra con S6 (la foto se revela con clip-path) y S7 (el texto sube).
+import StandupPhoto from "./StandupPhoto.astro";
+
+interface Props {
+  side: "left" | "right";
+  day: string;
+  title: string;
+  titleSerif: string;
+  text: string;
+  photo: { src: string; width: number; height: number; sources: { type: string; srcset: string }[] };
+  alt: string;
+  position?: string;
+  link?: { href: string; label: string; cta: string };
+}
+
+const { side, day, title, titleSerif, text, photo, alt, position, link } = Astro.props;
+---
+
+<article class:list={["wc", `wc-${side}`]} data-lp-reveal>
+  <div class="wc-photo su-photo su-reveal-photo">
+    <StandupPhoto photo={photo} alt={alt} sizes="(min-width: 1024px) 560px, 100vw" position={position} />
+    <slot name="card" />
+  </div>
+  <div class="wc-copy">
+    <p class="su-day" data-lp-step>{day}</p>
+    <h3 class="su-h3 wc-title" data-lp-step>{title} <span class="su-serif">{titleSerif}</span></h3>
+    <p class="su-lead wc-text" data-lp-step>{text}</p>
+    {link && (
+      <p class="wc-link" data-lp-step>
+        <a href={link.href} class="su-link" data-cta={link.cta} data-section="week">{link.label} <span aria-hidden="true">→</span></a>
+      </p>
+    )}
+  </div>
+</article>
+
+<style>
+  .wc {
+    display: grid;
+    gap: 24px;
+    padding: 28px 0;
+  }
+  .wc-photo {
+    aspect-ratio: 4 / 5;
+  }
+  .wc-title {
+    margin-top: 12px;
+  }
+  .wc-text {
+    max-width: 460px;
+    margin-top: 12px;
+  }
+  .wc-link {
+    margin-top: 16px;
+  }
+  @media (min-width: 900px) {
+    .wc {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: center;
+      gap: 96px;
+      padding: 40px 0;
+    }
+    .wc-right .wc-photo {
+      order: 2;
+    }
+    .wc-right .wc-copy {
+      justify-self: end;
+      text-align: right;
+    }
+    .wc-right .wc-text {
+      margin-left: auto;
+    }
+    .wc-title {
+      margin-top: 14px;
+    }
+    .wc-text {
+      margin-top: 18px;
+    }
+  }
+</style>

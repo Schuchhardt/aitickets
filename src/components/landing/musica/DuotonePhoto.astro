@@ -1,0 +1,36 @@
+---
+// Foto de la landing de música (SPEC_landing_musica §1 y §7): <picture> con AVIF/WebP a varios anchos, ancho y alto
+// reservados (CLS) y lazy-load salvo la del hero (priority: eager, fetchpriority="high" y sin decoding="async", LCP).
+// tone="red": duotono negro + rojo (fondos oscuros); tone="copy": fotocopia en grises (sobre papel). El tratamiento es
+// solo CSS (.mu-duo / .mu-copy en landing-musica.css): no hay archivos teñidos.
+interface Props {
+  photo: { src: string; width: number; height: number; sources: { type: string; srcset: string }[] };
+  alt: string;
+  /** Ancho que ocupa la foto en pantalla (atributo sizes) */
+  sizes: string;
+  tone?: "red" | "copy";
+  class?: string;
+  /** object-position */
+  position?: string;
+  priority?: boolean;
+}
+
+const { photo, alt, sizes, tone = "red", class: className, position, priority = false } = Astro.props;
+---
+
+<div class:list={[tone === "copy" ? "mu-copy" : "mu-duo", className]}>
+  <picture>
+    {photo.sources.map((source) => <source type={source.type} srcset={source.srcset} sizes={sizes} />)}
+    <img
+      class="mu-photo-img"
+      src={photo.src}
+      alt={alt}
+      width={photo.width}
+      height={photo.height}
+      loading={priority ? "eager" : "lazy"}
+      fetchpriority={priority ? "high" : undefined}
+      decoding={priority ? undefined : "async"}
+      style={position ? `object-position: ${position}` : undefined}
+    />
+  </picture>
+</div>

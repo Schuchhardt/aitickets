@@ -1,0 +1,239 @@
+---
+// 7 · La noche (SPEC_landing_fiestas §4.7, la única sección oscura, pulsera SÁB 23:00): la noche en cuatro horas
+// (montaje, abre la puerta, el peak, se prenden las luces), el escáner de ejemplo (isla DoorScanner) y siete ítems.
+// Verificado: escáner en el celular con validación offline y sincronización (ValidateQR.vue), una entrada usada no
+// vuelve a entrar (en ese celular sin señal y en todos con señal: el copy dice "rechaza lo que ya escaneó", Preguntas
+// abiertas 8), tipo de entrada y nombre, búsqueda por nombre y reenvío (/api/orders/resend), rol Puerta
+// (permissions.ts) o link de escáner que vence solo (/puerta/<token>, hoy desde el asistente de IA: tools/access.ts),
+// transferir una entrada (transfer_ticket), cortesías hasta MAX_COURTESY_PER_REQUEST por envío (courtesy.ts) y aforo
+// por tipo de entrada desde el asistente (get_checkin_stats). La vista de aforo en vivo en el panel no existe: "Pronto".
+// La hora de cobro es el término de la fiesta (domingo 05:00) + PAYOUT_RELEASE_HOURS (payoutAt, por props); los
+// check-ins acreditan que se realizó (ledger.ts, CHECKIN_RELEASE_THRESHOLD), con "*" y TERMS_NOTE.
+// F13: las horas se encienden en orden y la foto del montaje hace flash. Confeti estático muy tenue.
+import Confetti from "./Confetti.astro";
+import DisposablePhoto from "./DisposablePhoto.astro";
+import DoorScanner from "./DoorScanner.vue";
+import StickerHeading from "./StickerHeading.astro";
+import Wristband from "./Wristband.astro";
+import SoonBadge from "../../ui/SoonBadge.vue";
+import { NIGHT_CHECKED_IN, PARTY_CAPACITY, PARTY_END, PARTY_PHOTOS, PARTY_START, PHOTO_ALT } from "./fiestasLanding.js";
+import { MAX_COURTESY_PER_REQUEST } from "../../../lib/courtesy";
+import { TERMS_NOTE } from "../../../data/producerFaq";
+
+interface Props {
+  stamp: string;
+  payoutLabel: string;
+}
+const { stamp, payoutLabel } = Astro.props;
+const items = [
+  { title: "Escanean varios celulares a la vez.", text: "Con el rol Puerta o un link de escáner que vence solo." },
+  { title: "Sin señal, igual.", text: "Cada celular valida y rechaza lo que ya escaneó; al volver la conexión se sincroniza con los demás." },
+  { title: "Un QR entra una vez.", text: "El pantallazo compartido que ya entró, no entra de nuevo." },
+  { title: "La puerta ve qué entrada es.", text: "Preventa, General, Alumno o Cortesía, con el nombre de quien la compró." },
+  { title: "¿Se le borró el correo?", text: "Se busca por nombre y se le reenvía." },
+  { title: "¿No puede ir?", text: "Tu equipo le transfiere la entrada a otra persona desde tu asistente de IA: el QR anterior deja de servir." },
+  { title: "DJs, staff e invitados.", text: `Cortesías con su propio QR, hasta ${MAX_COURTESY_PER_REQUEST} por envío; no cuentan como venta.` },
+];
+---
+
+<section
+  id="puerta"
+  class="fi-section fi-bg-noche fi-on-dark fn"
+  aria-labelledby="fi-night-title"
+  data-fi-section="door"
+  data-fi-band-color="amarillo"
+  data-fi-band-label={`Sáb ${PARTY_START}`}
+>
+  <Confetti set="night" dim />
+  <Wristband color="amarillo" label={`Sáb ${PARTY_START}`} serial={6} divider />
+  <div class="fi-wrap" data-lp-reveal>
+    <StickerHeading id="fi-night-title" text="En el galpón no hay señal." sticker="La puerta igual avanza." />
+
+    <div class="fn-grid">
+      <ol class="fn-timeline" aria-label="La noche en cuatro horas">
+        <li class="fn-hour" style="--i: 0">
+          <p class="fn-time fi-display">17:00</p>
+          <div class="fn-body">
+            <p class="fn-title">Montaje.</p>
+            <DisposablePhoto photo={PARTY_PHOTOS.montaje} alt={PHOTO_ALT.montaje} tilt={-3} ratio="4 / 5" stamp={stamp} sizes="220px" class="fn-photo" />
+            <p class="fn-text">Tu equipo de puerta recibe su rol o un link de escáner que vence solo (lo creas desde tu asistente de IA). No necesitan tu cuenta.</p>
+          </div>
+        </li>
+        <li class="fn-hour" style="--i: 1">
+          <p class="fn-time fi-display">{PARTY_START}</p>
+          <div class="fn-body">
+            <p class="fn-title">Abre la puerta.</p>
+            <p class="fn-text">Tres celulares escanean a la vez. La lista se descarga antes: si se cae la señal, cada celular sigue validando y se sincroniza cuando vuelve.</p>
+          </div>
+        </li>
+        <li class="fn-hour" style="--i: 2">
+          <p class="fn-time fi-display">01:30</p>
+          <div class="fn-body">
+            <p class="fn-title">El peak.</p>
+            <p class="fn-text">El contador del escáner dice cuántos entraron. ¿Por tipo de entrada y llegadas cada 15 minutos? Pregúntaselo a tu asistente de IA.</p>
+            <p class="fi-soon-chip fn-soon">Aforo en vivo en el panel <SoonBadge dark /></p>
+          </div>
+        </li>
+        <li class="fn-hour" style="--i: 3">
+          <p class="fn-time fi-display">{PARTY_END}</p>
+          <div class="fn-body">
+            <p class="fn-title">Se prenden las luces.</p>
+            <p class="fn-text">
+              Ingresaron {NIGHT_CHECKED_IN} de {PARTY_CAPACITY} (ejemplo). Lo de tu fiesta queda disponible el
+              <strong data-testid="party-night-payout">{payoutLabel}</strong>*.
+            </p>
+          </div>
+        </li>
+      </ol>
+
+      <div class="fn-scanner" data-lp-step>
+        <DoorScanner client:visible />
+      </div>
+    </div>
+
+    <ol class="fi-items fn-items">
+      {
+        items.map((item, i) => (
+          <li class="fi-item" data-lp-step>
+            <span class="fi-item-num fi-item-num-amarillo" style={`--tilt: ${i % 2 ? 4 : -4}deg`} aria-hidden="true">{i + 1}</span>
+            <div>
+              <p class="fi-item-title">{item.title}</p>
+              <p class="fi-item-text">{item.text}</p>
+            </div>
+          </li>
+        ))
+      }
+    </ol>
+
+    <p class="fi-note fn-terms" data-lp-step>
+      *Escanear también cuenta para tu pago: los check-ins de la puerta acreditan que la fiesta se realizó, una de las
+      condiciones para liberar lo vendido. <a href={TERMS_NOTE.href} class="fi-link">{TERMS_NOTE.text}</a>
+    </p>
+    <p class="fi-links" data-lp-step>
+      <a href="/guias/como-hacer-check-in-con-qr" class="fi-link">Guía: check-in con QR <span class="fi-arrow" aria-hidden="true">→</span></a>
+      <a href="/entradas-con-qr" class="fi-link">Entradas con QR <span class="fi-arrow" aria-hidden="true">→</span></a>
+    </p>
+  </div>
+</section>
+
+<style>
+  .fn :global(.fi-h2) {
+    color: var(--fi-crema);
+  }
+  .fn-grid {
+    display: grid;
+    gap: 48px;
+    margin-top: 44px;
+  }
+  .fn-timeline {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+  .fn-timeline::before {
+    content: "";
+    position: absolute;
+    top: 8px;
+    bottom: 8px;
+    left: 44px;
+    width: 2px;
+    background: repeating-linear-gradient(180deg, rgba(255, 225, 77, 0.5) 0 6px, transparent 6px 12px);
+  }
+  .fn-hour {
+    position: relative;
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr);
+    gap: 16px;
+  }
+  .fn-time {
+    position: relative;
+    z-index: 1;
+    align-self: start;
+    padding: 2px 0;
+    background: var(--fi-noche);
+    font-size: 28px;
+    line-height: 32px;
+    color: var(--fi-amarillo);
+  }
+  .fn-title {
+    font-weight: 700;
+    font-size: 18px;
+    line-height: 24px;
+  }
+  .fn-text {
+    margin-top: 6px;
+    font-size: 15px;
+    line-height: 23px;
+    color: var(--fi-text-night-2);
+  }
+  .fn-text strong {
+    font-weight: 700;
+    color: var(--fi-amarillo);
+  }
+  .fn :global(.fn-photo) {
+    width: 160px;
+    margin: 12px 0 4px;
+    --tilt: -2deg !important;
+  }
+  .fn-soon {
+    margin-top: 10px;
+  }
+  .fn-scanner {
+    min-width: 0;
+  }
+  .fn-items {
+    margin-top: 56px;
+  }
+  .fn-terms {
+    max-width: 760px;
+    margin-top: 32px;
+  }
+  @media (min-width: 768px) {
+    .fn-items {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 26px 40px;
+    }
+  }
+  @media (min-width: 1024px) {
+    .fn-grid {
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+      gap: 64px;
+      align-items: start;
+      margin-top: 64px;
+    }
+    .fn-hour {
+      grid-template-columns: 120px minmax(0, 1fr);
+    }
+    .fn-timeline::before {
+      left: 52px;
+    }
+    .fn-time {
+      font-size: 32px;
+      line-height: 36px;
+    }
+    .fn :global(.fn-photo) {
+      width: 220px;
+      --tilt: -3deg !important;
+    }
+  }
+
+  /* F13: las horas se encienden en orden (stagger 150 ms) y la foto del montaje hace flash, sin giro extra */
+  :global(.lp-motion [data-lp-reveal]:not(.is-in)) .fn-time {
+    opacity: 0.15;
+  }
+  :global(.lp-motion .is-in) .fn-time {
+    animation: fn-on 360ms steps(3) calc(var(--i) * 150ms + 100ms) both;
+  }
+  :global(.lp-motion .is-in) .fn-body {
+    animation: fi-up 520ms var(--ease-out) calc(var(--i) * 150ms + 160ms) both;
+  }
+  :global(.lp-motion .is-in) :global(.fn-photo .fi-photo-flash) {
+    animation: fi-flash 180ms linear 300ms both;
+  }
+  @keyframes fn-on {
+    from {
+      opacity: 0.15;
+    }
+  }
+</style>

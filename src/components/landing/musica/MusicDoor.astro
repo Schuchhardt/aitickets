@@ -1,0 +1,170 @@
+---
+// 6 · La noche del show (SPEC_landing_musica §4.7, ancla #puerta): foto de la puerta en duotono con una "pulsera" lima
+// que cruza la foto (M12: se pega de izquierda a derecha al entrar) y cinco cosas de la puerta, todas verificadas en el
+// código: escáner offline con sincronización (ValidateQR.vue), contador de validadas, cortesías con su QR que no
+// cuentan como venta (CourtesyTicketsForm.vue), rol Puerta (permissions.ts) o link de puerta que vence solo (hoy se
+// crea desde el asistente de IA, tools/access.ts) y búsqueda por nombre con reenvío (/api/orders/resend).
+import DuotonePhoto from "./DuotonePhoto.astro";
+import { MUSIC_PHOTOS } from "./musicaLanding.js";
+
+const items = [
+  {
+    title: "Escaneas con el celular, aunque no haya señal.",
+    text: "La lista se descarga antes y se sincroniza cuando vuelve la conexión. Una entrada usada no vuelve a entrar.",
+  },
+  { title: "Ves cuántos han entrado.", text: "El escáner cuenta las entradas validadas sobre el total, en vivo." },
+  {
+    title: "Prensa, bandas e invitados, con cortesía.",
+    text: "Les mandas su entrada sin costo por correo, con su propio QR. No cuenta como venta.",
+  },
+  {
+    title: "El equipo de puerta no necesita tu cuenta.",
+    text: "Le das el rol Puerta, o un link temporal que vence solo (lo creas desde tu asistente de IA).",
+  },
+  { title: "¿Llegó sin la entrada en el celular?", text: "Se busca por nombre en la lista y se le reenvía al correo." },
+];
+---
+
+<section id="puerta" class="mu-section dr" aria-labelledby="mu-door-title" data-mu-section="door">
+  <div class="mu-wrap dr-grid">
+    <div class="dr-media" data-lp-reveal>
+      <DuotonePhoto
+        photo={MUSIC_PHOTOS.puerta}
+        alt="Persona del equipo escaneando el QR de una entrada en la puerta"
+        sizes="(min-width: 1024px) 520px, 100vw"
+        class="dr-photo"
+      />
+      <p class="mu-mono dr-band" aria-hidden="true">
+        <span class="dr-band-inner">✓ Válida · Preventa 2 · Entrada 1 de 2<span class="dr-band-extra"> · Puerta 21:47</span></span>
+      </p>
+    </div>
+
+    <div class="dr-copy" data-lp-reveal>
+      <p class="mu-mono mu-eyebrow dr-eyebrow" data-lp-step><span class="dr-num" aria-hidden="true">06 —</span> La noche del show</p>
+      <h2 id="mu-door-title" class="mu-h2" data-lp-step>Nadie en la puerta <span class="mu-red">con una lista de papel.</span></h2>
+      <ol class="dr-items">
+        {
+          items.map((item, i) => (
+            <li class="dr-item" data-lp-step>
+              <span class="mu-mono dr-n" aria-hidden="true">{String(i + 1).padStart(2, "0")}</span>
+              <p>
+                <strong class="dr-item-title">{item.title}</strong> {item.text}
+              </p>
+            </li>
+          ))
+        }
+      </ol>
+      <p class="dr-links" data-lp-step>
+        <a href="/entradas-con-qr" class="mu-link mu-mono">Entradas con QR</a>
+        <a href="/guias/como-hacer-check-in-con-qr" class="mu-link mu-mono">Guía: check-in con QR <span aria-hidden="true">→</span></a>
+      </p>
+    </div>
+  </div>
+</section>
+
+<style>
+  .dr-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 40px;
+  }
+  .dr-media {
+    position: relative;
+    overflow: hidden;
+  }
+  .dr-media :global(.dr-photo) {
+    aspect-ratio: 4 / 5;
+  }
+  /* Pulsera de evento: banda lima que cruza la foto en diagonal, texto mono en tinta */
+  .dr-band {
+    position: absolute;
+    left: -6%;
+    right: -6%;
+    top: 58%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 48px;
+    background: var(--brand-lime);
+    color: var(--mu-ink);
+    font-size: 11px;
+    font-weight: 700;
+    transform: rotate(-6deg);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .dr-band-inner {
+    padding-inline: 16px;
+  }
+  /* §4.7 mobile: pulsera más corta */
+  .dr-band-extra {
+    display: none;
+  }
+  .dr-eyebrow {
+    margin-bottom: 22px;
+  }
+  @media (min-width: 1024px) {
+    /* La columna de texto es angosta: el H2 baja de escala para no partirse en cuatro líneas */
+    .dr-copy .mu-h2 {
+      font-size: clamp(56px, 5.4vw, 80px);
+    }
+  }
+  .dr-items {
+    display: grid;
+    gap: 20px;
+    margin-top: 32px;
+  }
+  .dr-item {
+    display: flex;
+    gap: 16px;
+    padding-top: 18px;
+    border-top: 1px solid var(--mu-line);
+    font-size: 16px;
+    line-height: 25px;
+    color: var(--mu-text-2);
+  }
+  .dr-n {
+    flex: 0 0 auto;
+    color: var(--mu-red);
+    font-weight: 700;
+  }
+  .dr-item-title {
+    display: block;
+    font-weight: 600;
+    color: var(--mu-text-1);
+  }
+  .dr-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 24px;
+    margin-top: 28px;
+  }
+  @media (min-width: 1024px) {
+    .dr-grid {
+      grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+      align-items: center;
+      gap: 80px;
+    }
+    .dr-band {
+      height: 64px;
+      font-size: 13px;
+    }
+    .dr-band-extra {
+      display: inline;
+    }
+  }
+  /* M12: la pulsera se pega de izquierda a derecha (scaleX 0 → 1, 500 ms) */
+  @keyframes dr-stick {
+    from {
+      transform: rotate(-6deg) scaleX(0);
+    }
+  }
+  :global(.lp-motion) .dr-media:not(:global(.is-in)) .dr-band {
+    transform: rotate(-6deg) scaleX(0);
+  }
+  :global(.lp-motion) .dr-media:global(.is-in) .dr-band {
+    transform-origin: left center;
+    animation: dr-stick 500ms var(--ease-out) 250ms both;
+  }
+</style>

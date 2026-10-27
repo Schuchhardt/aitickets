@@ -1,0 +1,81 @@
+---
+// 10 · Testimonio (SPEC_landing_clubs §4.10 y §0.8): solo si CLUB_TESTIMONIAL (producerSocialProof.ts) es una cita real
+// con nombre, club o productora, ciudad y foto autorizados por escrito. Si es null no se renderiza nada, ni el
+// contenedor. Cita en Prompt 400 sin cursiva entre comillas Doto fluor de 96 px y foto en cápsula de 72×96.
+import { CLUB_TESTIMONIAL } from "../../../data/producerSocialProof";
+
+const t = CLUB_TESTIMONIAL;
+---
+
+{
+  t && (
+    <section class="cl-section cq" aria-label="Lo que dicen los clubs" data-cl-section="testimonial" data-cl-testimonial>
+      <figure class="cl-wrap cq-inner" data-lp-reveal>
+        <span class="cq-mark" aria-hidden="true" data-lp-step>
+          “
+        </span>
+        <blockquote class="cq-quote" data-lp-step>
+          <p>{t.quote}</p>
+        </blockquote>
+        <figcaption class="cq-by" data-lp-step>
+          <span class="cl-capsule cq-photo">
+            <picture>
+              {t.photo.sources.map((source) => <source type={source.type} srcset={source.srcset} sizes="96px" />)}
+              <img class="cl-photo-img" src={t.photo.src} alt="" width={t.photo.width} height={t.photo.height} loading="lazy" decoding="async" />
+            </picture>
+          </span>
+          <span>
+            <span class="cq-name">{t.name}</span>
+            <span class="cl-meta cq-company">{t.company}</span>
+          </span>
+        </figcaption>
+      </figure>
+    </section>
+  )
+}
+
+<style>
+  .cq-inner {
+    max-width: 960px;
+  }
+  .cq-mark {
+    display: block;
+    height: 64px;
+    font-family: var(--cl-led);
+    font-weight: 800;
+    font-size: 96px;
+    line-height: 1;
+    color: var(--cl-fluor);
+  }
+  .cq-quote {
+    font-size: 22px;
+    line-height: 32px;
+    font-weight: 400;
+  }
+  .cq-by {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: 28px;
+  }
+  .cq-photo {
+    flex: 0 0 auto;
+    width: 72px;
+    height: 96px;
+    border-radius: 999px;
+  }
+  .cq-name {
+    display: block;
+    font-weight: 600;
+  }
+  .cq-company {
+    display: block;
+    margin-top: 2px;
+  }
+  @media (min-width: 1024px) {
+    .cq-quote {
+      font-size: 30px;
+      line-height: 42px;
+    }
+  }
+</style>

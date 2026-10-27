@@ -1,0 +1,20 @@
+---
+// Titular con sticker (SPEC_landing_fiestas §1): H1/H2 en Bagel Fat One con la parte enfatizada dentro de un sticker
+// troquelado (crema, contorno tinta de 3 px, sombra dura, girado −3°) que puede saltar de línea como bloque. El texto
+// completo es un solo <h1>/<h2> (el sticker es un <span>), legible sin CSS. breakBefore: el sticker va en su propia línea.
+interface Props {
+  tag?: "h1" | "h2";
+  id: string;
+  text: string;
+  sticker: string;
+  breakBefore?: boolean;
+  class?: string;
+}
+const { tag: Tag = "h2", id, text, sticker, breakBefore = true, class: className } = Astro.props;
+---
+
+<Tag id={id} class={`${Tag === "h1" ? "fi-h1" : "fi-h2"} ${className ?? ""}`}>
+  <span class="fi-hl-text">{text}</span>{" "}
+  {breakBefore ? <br class="fi-hl-br" /> : null}
+  <span class="fi-hl">{sticker}</span>
+</Tag>

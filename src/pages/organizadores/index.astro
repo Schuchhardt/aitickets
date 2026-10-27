@@ -1,97 +1,139 @@
 ---
-// Hub de productores: enlaza las landings por tipo de evento y por funcionalidad, las guías y la comparativa.
-// Su contenido es distinto al de la portada (/) para no competir por las mismas búsquedas.
+// Landing para productores (docs/specs/rediseno/SPEC_landing_productores_aitickets.md, fases A, B y C). Diez secciones con
+// solo dos fondos oscuros; el precio, la calculadora y los demás montos salen de fees.mjs/legal.mjs y las respuestas de
+// dinero de PRODUCER_FAQ. Lo que enlazaba el hub anterior sigue enlazado: las cuatro guías desde los links de las
+// secciones (Cómo funciona: vender online; Quién vende tus entradas: medir por promotor y preventa; La puerta: check-in
+// con QR), las landings por tipo de evento desde la fila de "Todo lo demás" y el footer, y las de funcionalidad, la
+// web gratis y la comparativa desde el footer.
+// La portada (/) sigue con su diseño y su H1 por ahora (pendiente anotado en el PR). Sin ProducerSessionBanner: con
+// sesión, el header ya cambia a "Ir a mi panel" y el aviso flotante tapaba la barra CTA mobile (§6).
+// Movimiento (§8): LandingMotion va primero en el <body> para marcar html.lp-motion antes de pintar; las secciones
+// marcan con data-lp-reveal / data-lp-step lo que entra al hacer scroll. ev-motion reduce a 1 ms cualquier transición
+// o animación con "reducir movimiento".
 export const prerender = true;
-import { getCollection } from "astro:content";
-import AppHeader from "../../components/AppHeader.vue";
 import AppFooter from "../../components/AppFooter.vue";
-import ProducersHeroSection from "../../components/ProducersHeroSection.vue";
-import PricingExampleSection from "../../components/landing/PricingExampleSection.vue";
-import CallToAction from "../../components/CallToAction.vue";
+import LandingHeader from "../../components/landing/LandingHeader.vue";
+import LandingMobileBar from "../../components/landing/LandingMobileBar.vue";
+import LandingFaq from "../../components/landing/LandingFaq.vue";
+import VideoModal from "../../components/landing/VideoModal.vue";
 import CtaTracking from "../../components/landing/CtaTracking.astro";
-import ProducerSessionBanner from "../../components/landing/ProducerSessionBanner.vue";
+import ProducerTracking from "../../components/landing/organizadores/ProducerTracking.astro";
+import LandingMotion from "../../components/landing/LandingMotion.astro";
+import HeroSection from "../../components/landing/organizadores/HeroSection.astro";
+import HowSection from "../../components/landing/organizadores/HowSection.astro";
+import PricingSection from "../../components/landing/organizadores/PricingSection.astro";
+import PromotersSection from "../../components/landing/organizadores/PromotersSection.astro";
+import MarketingSection from "../../components/landing/organizadores/MarketingSection.astro";
+import DoorSection from "../../components/landing/organizadores/DoorSection.astro";
+import CommunitySection from "../../components/landing/organizadores/CommunitySection.astro";
+import ExtrasSection from "../../components/landing/organizadores/ExtrasSection.astro";
+import AiSection from "../../components/landing/organizadores/AiSection.astro";
+import ClosingSection from "../../components/landing/organizadores/ClosingSection.astro";
 import Layout from "../../layouts/Layout.astro";
-import { LANDINGS } from "../../data/landings";
+import { publishUrl } from "../../components/landing/links.js";
+import { LANDING_MEDIA } from "../../components/landing/producerLanding.js";
+import { ORGANIZADORES_FAQ } from "../../data/organizadoresFaq";
+import { LEGAL } from "../../lib/legal";
+import { IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL } from "../../../netlify/lib/fees.mjs";
+// Fuente del H1 del hero: precargada para que el cambio de fuente no mueva el teléfono del hero (CLS, §9)
+import unboundedWoff2 from "@fontsource/unbounded/files/unbounded-latin-700-normal.woff2?url";
 import "../../styles/global.css";
-import "animate.css";
+import "../../styles/landing.css";
 
-const verticals = LANDINGS.filter((l) => l.kind === "vertical");
-const features = LANDINGS.filter((l) => l.kind === "feature");
-const guides = await getCollection("guias");
+const SITE_URL = (import.meta.env.SITE_URL || "https://aitickets.cl").replace(/\/$/, "");
+const jsonLd = [
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: LEGAL.brand,
+    url: SITE_URL,
+    logo: `${SITE_URL}/apple-touch-icon.png`,
+    email: LEGAL.supportEmail,
+    areaServed: "CL",
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "AI Tickets para productores",
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Web",
+    url: `${SITE_URL}/organizadores`,
+    description:
+      "Ticketera online para productores de eventos en Chile: varias funciones por evento, links de venta por promotor, difusión automática en Instagram, check-in con QR y pago por función.",
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "CLP",
+      description: `Sin mensualidad y 0% de comisión para el productor. El comprador paga un cargo por servicio de ${SERVICE_FEE_PERCENT_LABEL} + IVA (${IVA_PERCENT_LABEL}) sobre ese cargo, o lo absorbe el productor.`,
+    },
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: ORGANIZADORES_FAQ.map((f) => ({
+      "@type": "Question",
+      name: f.q,
+      acceptedAnswer: { "@type": "Answer", text: f.a },
+    })),
+  },
+];
 ---
 
 <Layout
-  title="AI Tickets para productores de eventos | Chile"
-  description="Vende entradas para tus funciones, gestiona promotores, controla el check-in y revisa tus ventas desde una sola plataforma. Sin mensualidad."
+  title="AI Tickets para productores: vende entradas con 0% de comisión | Chile"
+  description={`Ticketera para productores de eventos en Chile: publica tus funciones, vende entradas con 0% de comisión para ti, mide qué promotor vende y valida con QR. Sin mensualidad.`}
   canonical="/organizadores"
 >
-  <AppHeader client:idle />
-  <main class="font-['Prompt']">
-    <ProducersHeroSection client:idle />
-
-    <section class="px-4 py-20 bg-white">
-      <div class="container mx-auto md:px-8 max-w-6xl">
-        <h2 class="text-2xl md:text-3xl font-bold font-['Unbounded'] mb-2">Por tipo de evento</h2>
-        <p class="text-gray-600 mb-8">Cómo se usa AI Tickets según lo que produces.</p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {verticals.map((l) => (
-            <a href={`/${l.slug}`} class="block p-6 rounded-xl bg-black text-white hover:-translate-y-1 transition">
-              <p class="font-semibold font-['Unbounded'] text-lime-400">{l.card.title}</p>
-              <p class="text-sm text-white/70 mt-2">{l.card.text}</p>
-            </a>
-          ))}
-        </div>
+  <link slot="head-extra" rel="preload" as="font" type="font/woff2" href={unboundedWoff2} crossorigin />
+  <LandingMotion />
+  <LandingHeader client:idle publishHref={publishUrl("organizadores_header")} />
+  <main class="lp ev-motion">
+    <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+    <HeroSection />
+    <HowSection />
+    <PricingSection />
+    <PromotersSection />
+    <MarketingSection />
+    <DoorSection />
+    <CommunitySection />
+    <ExtrasSection />
+    <AiSection />
+    <section class="lp-section faq" aria-labelledby="faq-title" data-lp-section="faq">
+      <div class="lp-wrap faq-wrap" data-lp-reveal>
+        <h2 id="faq-title" class="lp-h2 faq-title" data-lp-step>Preguntas frecuentes</h2>
+        <div data-lp-step><LandingFaq client:visible items={ORGANIZADORES_FAQ} idPrefix="org-faq" /></div>
       </div>
     </section>
-
-    <section class="px-4 py-20 bg-gradient-to-b from-slate-200 to-lime-200">
-      <div class="container mx-auto md:px-8 max-w-6xl">
-        <h2 class="text-2xl md:text-3xl font-bold font-['Unbounded'] mb-8">Lo que puedes hacer</h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {features.map((l) => (
-            <a href={`/${l.slug}`} class="block p-6 rounded-xl bg-white border border-gray-100 shadow-sm hover:border-black transition">
-              <p class="font-semibold font-['Unbounded']">{l.card.title}</p>
-              <p class="text-sm text-gray-600 mt-2">{l.card.text}</p>
-            </a>
-          ))}
-          <a href="/#ia" class="block p-6 rounded-xl bg-white border border-gray-100 shadow-sm hover:border-black transition">
-            <p class="font-semibold font-['Unbounded']">Conector para Claude y ChatGPT</p>
-            <p class="text-sm text-gray-600 mt-2">Consulta ventas, prepara posts y crea códigos de descuento conversando.</p>
-          </a>
-          <a href="/web-gratis" class="block p-6 rounded-xl bg-white border border-gray-100 shadow-sm hover:border-black transition">
-            <p class="font-semibold font-['Unbounded']">Web de eventos gratis</p>
-            <p class="text-sm text-gray-600 mt-2">Una web para tu productora con todos tus eventos, con tu propio dominio.</p>
-          </a>
-          <a href="/ticketeras-en-chile" class="block p-6 rounded-xl bg-white border border-gray-100 shadow-sm hover:border-black transition">
-            <p class="font-semibold font-['Unbounded']">Ticketeras en Chile</p>
-            <p class="text-sm text-gray-600 mt-2">Cuánto cobra cada una, con fuentes y fecha de revisión.</p>
-          </a>
-        </div>
-      </div>
-    </section>
-
-    <PricingExampleSection />
-
-    <section class="px-4 py-20 bg-white">
-      <div class="container mx-auto md:px-8 max-w-6xl">
-        <div class="flex items-baseline justify-between gap-4 mb-8">
-          <h2 class="text-2xl md:text-3xl font-bold font-['Unbounded']">Guías para productores</h2>
-          <a href="/guias" class="text-sm font-semibold underline whitespace-nowrap">Ver todas</a>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {guides.map((g) => (
-            <a href={`/guias/${g.id}`} class="block p-6 rounded-xl border border-gray-200 hover:border-black transition">
-              <p class="font-semibold font-['Unbounded']">{g.data.title}</p>
-              <p class="text-sm text-gray-600 mt-2">{g.data.description}</p>
-            </a>
-          ))}
-        </div>
-      </div>
-    </section>
-
-    <CallToAction campaign="organizadores_final" />
+    <ClosingSection />
   </main>
   <AppFooter client:idle />
+  <VideoModal
+    client:load
+    src={LANDING_MEDIA.demoVideo}
+    webmSrc={LANDING_MEDIA.demoVideoWebm}
+    poster={LANDING_MEDIA.demoPoster}
+    captions={LANDING_MEDIA.demoCaptions}
+    title="Video: así vendes tu próxima función"
+    progressEvent="lp_video_progress"
+  />
+  <LandingMobileBar client:idle publishHref={publishUrl("organizadores_mobile_bar")} />
   <CtaTracking />
-  <ProducerSessionBanner client:idle />
+  <ProducerTracking />
 </Layout>
+
+<style>
+  .faq {
+    padding-top: 0;
+  }
+  .faq-wrap {
+    max-width: 760px;
+  }
+  .faq-title {
+    margin-bottom: 16px;
+  }
+  @media (min-width: 1024px) {
+    .faq-title {
+      margin-bottom: 24px;
+    }
+  }
+</style>

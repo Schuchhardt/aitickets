@@ -1,0 +1,53 @@
+---
+// Analítica de la landing de música (SPEC_landing_musica §10), con prefijo mu_ como su_ en stand-up y ac_ en academias:
+//   mu_view                     carga de la página
+//   mu_cta_click {position}     clic en un CTA de publicar ([data-cta="publish"], position = data-section: hero,
+//                               closing, header, mobile_bar)
+//   mu_demo_click {position}    clic en un concierto o gira de ejemplo ([data-cta="demo"])
+//   mu_whatsapp_click {position}
+//   mu_faq_open {question}      abre una pregunta (el botón todavía dice aria-expanded="false" en la fase de captura)
+//   mu_section_view {section}   cada [data-mu-section] entra en pantalla (una vez)
+// Los propios (mu_audience_tab, mu_curve_step, mu_tiers_replay, mu_lineup_select, mu_link_copy, mu_tour_click,
+// mu_ads_demo, mu_calc_change) los mandan las islas y TourDates. CtaTracking sigue midiendo producer_cta_clicked.
+---
+
+<script>
+  import { trackEvent } from "../../../composables/useGoogleAnalytics.js";
+
+  const CTA_EVENTS: Record<string, string> = {
+    publish: "mu_cta_click",
+    demo: "mu_demo_click",
+    whatsapp: "mu_whatsapp_click",
+  };
+
+  trackEvent("mu_view", { page: location.pathname });
+
+  document.addEventListener(
+    "click",
+    (e) => {
+      const target = e.target as Element | null;
+      const cta = target?.closest?.("[data-cta]");
+      const name = cta && CTA_EVENTS[cta.getAttribute("data-cta") || ""];
+      if (cta && name) trackEvent(name, { position: cta.getAttribute("data-section") || "" });
+
+      const question = target?.closest?.('[data-testid="landing-faq"] button[aria-expanded="false"]');
+      if (question) trackEvent("mu_faq_open", { question: question.textContent?.trim().slice(0, 100) || "" });
+    },
+    { capture: true },
+  );
+
+  if ("IntersectionObserver" in window) {
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          trackEvent("mu_section_view", { section: (entry.target as HTMLElement).dataset.muSection });
+          io.unobserve(entry.target);
+        }
+      },
+      // Con margen y no con umbral de área: una sección más alta que la pantalla nunca llegaría al 25%
+      { rootMargin: "0px 0px -40% 0px", threshold: 0 },
+    );
+    document.querySelectorAll("[data-mu-section]").forEach((section) => io.observe(section));
+  }
+</script>

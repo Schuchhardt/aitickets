@@ -1,0 +1,104 @@
+---
+// 4 · Marketing en piloto automático (SPEC_landing_standup §4.4, ancla #redes; Fase 2). Datos reales del producto (como
+// MarketingSection de /organizadores): historias y posts automáticos en Instagram (src/lib/socialSeries.ts) con la
+// cadencia de DEFAULT_CADENCE, link por DM y anuncios de Meta vía Zernio. Facebook, TikTok, reels y segmentar por
+// intereses no existen: van con "Pronto".
+// El H2 es el de la spec ("todos los días"), pero la bajada lo matiza con lo que hace el motor: cada 3 días cuando falta
+// mucho y diario la última semana (DEFAULT_CADENCE.daily_from_days), igual que la FAQ.
+// Desktop: historia de ejemplo (300 px) a la izquierda; a la derecha, el calendario con sus switches y la card de
+// anuncios. Mobile: historia (150 px) y los switches al lado; debajo, los anuncios.
+// Movimiento: S7 título; S10 historia (StoryMockup); S11-S12 calendario; S13 anuncios.
+import StoryMockup from "./StoryMockup.astro";
+import StandupMarketingWeek from "./StandupMarketingWeek.vue";
+import StandupAdsDemo from "./StandupAdsDemo.vue";
+import { DEMO_EVENT_NAME } from "../producerLanding.js";
+import { DEFAULT_CADENCE } from "../../../lib/socialSeriesCadence";
+---
+
+<section id="redes" class="su-wrap mk" aria-labelledby="mk-title" data-su-section="marketing">
+  <div class="mk-head" data-lp-reveal>
+    <div class="mk-head-title">
+      <p class="su-eyebrow" data-lp-step>Marketing en piloto automático</p>
+      <h2 id="mk-title" class="su-h2 mk-title" data-lp-step>Tu show, en redes <span class="su-serif">todos los días.</span></h2>
+    </div>
+    <p class="su-lead mk-lead" data-lp-step>
+      Conecta tu Instagram una vez. Con el póster y los datos de tu evento armamos historias y posts con cuenta regresiva,
+      diarios la última semana, y se publican solos hasta el día de la función.
+    </p>
+  </div>
+
+  <div class="mk-grid" data-lp-reveal>
+    <div class="mk-story" data-lp-step><StoryMockup /></div>
+    <div class="mk-week" data-lp-step>
+      <StandupMarketingWeek
+        client:visible
+        eventName={DEMO_EVENT_NAME}
+        showTime="21:00"
+        dailyTime={DEFAULT_CADENCE.default_time}
+        eventDayTime={DEFAULT_CADENCE.event_day_time}
+      />
+    </div>
+    <div class="mk-ads" data-lp-step><StandupAdsDemo client:visible /></div>
+  </div>
+</section>
+
+<style>
+  .mk {
+    padding-top: 72px;
+    padding-bottom: 96px;
+  }
+  .mk-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 14px 40px;
+  }
+  .mk-head-title {
+    max-width: 760px;
+  }
+  .mk-title {
+    margin-top: 14px;
+  }
+  .mk-lead {
+    max-width: 420px;
+  }
+  .mk-grid {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr);
+    grid-template-areas:
+      "story week"
+      "ads ads";
+    gap: 20px 16px;
+    margin-top: 32px;
+    align-items: start;
+  }
+  .mk-story {
+    grid-area: story;
+  }
+  .mk-week {
+    grid-area: week;
+  }
+  .mk-ads {
+    grid-area: ads;
+  }
+  @media (min-width: 900px) {
+    .mk-grid {
+      grid-template-columns: 300px minmax(0, 1fr);
+      grid-template-areas:
+        "story week"
+        "story ads";
+      gap: 20px 48px;
+      margin-top: 64px;
+    }
+  }
+  @media (min-width: 1024px) {
+    .mk {
+      padding-top: 120px;
+      padding-bottom: 160px;
+    }
+    .mk-title {
+      margin-top: 18px;
+    }
+  }
+</style>

@@ -1,0 +1,178 @@
+---
+// Historia de ejemplo (SPEC_landing_clubs §4.3, C9): un teléfono genérico (sin interfaz ni logos de Instagram) con la
+// foto de la pista recortada en vertical, tres barras de progreso (la segunda se llena en 5 s en loop solo mientras se
+// ve: [data-cl-play] → .is-playing), la cuenta ficticia con la hora programada (DEFAULT_CADENCE.default_time), el
+// letrero LED "HOY 23:30" y dos stickers: los cupos de la lista y la palabra clave del DM (DEFAULT_KEYWORD). Las medidas
+// van en unidades del contenedor para que la misma pieza sirva a 280 px (desktop) y 160 px (mobile). Decorativa: el
+// texto equivalente está en la sección.
+import { CLUB_PHOTOS, LIVE_NIGHT } from "./clubsLanding.js";
+
+interface Props {
+  time: string;
+  keyword: string;
+  class?: string;
+}
+const { time, keyword, class: className } = Astro.props;
+const photo = CLUB_PHOTOS.hero;
+---
+
+<div class:list={["cs", className]} aria-hidden="true" data-cl-play>
+  <div class="cs-frame">
+  <div class="cs-screen">
+    <picture>
+      {photo.sources.map((source) => <source type={source.type} srcset={source.srcset} sizes="280px" />)}
+      <img class="cl-photo-img cs-photo" src={photo.src} alt="" width={photo.width} height={photo.height} loading="lazy" decoding="async" />
+    </picture>
+    <div class="cs-shade"></div>
+    <div class="cs-bars">
+      <span class="cs-bar is-done"></span>
+      <span class="cs-bar is-live"><span></span></span>
+      <span class="cs-bar"></span>
+    </div>
+    <p class="cs-account">
+      <span class="cs-avatar"></span>
+      <span>club.ejemplo · programada {time}</span>
+    </p>
+    <p class="cs-led">Hoy {LIVE_NIGHT.start}</p>
+    <p class="cs-sticker cs-sticker-white">Quedan 40 cupos en la lista</p>
+    <p class="cs-sticker cs-sticker-lime">Responde {keyword} y te llega el link</p>
+  </div>
+  </div>
+</div>
+
+<style>
+  .cs {
+    container-type: inline-size;
+    width: 100%;
+    max-width: 280px;
+  }
+  .cs-frame {
+    aspect-ratio: 1 / 2;
+    padding: 4.3cqw;
+    border-radius: 13cqw;
+    background: #000;
+    box-shadow: 0 0 0 1px var(--cl-line-strong), 0 24px 60px rgba(0, 0, 0, 0.55), 0 0 40px rgba(138, 92, 255, 0.18);
+  }
+  .cs-screen {
+    position: relative;
+    height: 100%;
+    overflow: hidden;
+    border-radius: 10cqw;
+    background: var(--cl-noche-3);
+  }
+  .cs-screen picture,
+  .cs-photo {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+  .cs-photo {
+    object-position: 62% 50%;
+  }
+  .cs-shade {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(7, 6, 11, 0.55) 0%, rgba(7, 6, 11, 0) 22%, rgba(7, 6, 11, 0.15) 50%, rgba(7, 6, 11, 0.85) 100%);
+  }
+  .cs-bars {
+    position: absolute;
+    top: 4cqw;
+    left: 5cqw;
+    right: 5cqw;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2cqw;
+  }
+  .cs-bar {
+    height: max(2px, 1.2cqw);
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.35);
+    overflow: hidden;
+  }
+  .cs-bar.is-done,
+  .cs-bar.is-live span {
+    background: #fff;
+  }
+  .cs-bar.is-live span {
+    display: block;
+    height: 100%;
+    transform-origin: left center;
+    transform: scaleX(0.6);
+  }
+  .cs-account {
+    position: absolute;
+    top: 9cqw;
+    left: 5cqw;
+    right: 5cqw;
+    display: flex;
+    align-items: center;
+    gap: 3cqw;
+    font-size: max(9px, 4.6cqw);
+    line-height: 1.2;
+    font-weight: 600;
+    color: #fff;
+  }
+  .cs-avatar {
+    flex: 0 0 auto;
+    width: 10cqw;
+    height: 10cqw;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, var(--cl-fluor), var(--cl-uv));
+    box-shadow: 0 0 0 1.5px #fff;
+  }
+  .cs-led {
+    position: absolute;
+    left: 5cqw;
+    right: 5cqw;
+    top: 34%;
+    padding: 2cqw 3cqw;
+    border-radius: 3cqw;
+    background-color: rgba(0, 0, 0, 0.82);
+    background-image: radial-gradient(circle, var(--cl-led-off) 1.2px, transparent 1.6px);
+    background-size: 6px 6px;
+    font-family: var(--cl-led);
+    font-weight: 800;
+    font-size: max(28px, 12cqw);
+    line-height: 1.05;
+    text-align: center;
+    text-transform: uppercase;
+    color: var(--cl-fluor);
+    text-shadow: var(--cl-glow);
+    text-wrap: balance;
+  }
+  .cs-sticker {
+    position: absolute;
+    left: 7cqw;
+    right: 7cqw;
+    padding: 2.6cqw 3.4cqw;
+    border-radius: 3.6cqw;
+    font-size: max(9px, 5cqw);
+    line-height: 1.25;
+    font-weight: 700;
+    color: var(--cl-ink);
+    text-align: center;
+  }
+  .cs-sticker-white {
+    bottom: 27%;
+    background: #fff;
+    transform: rotate(-3deg);
+  }
+  .cs-sticker-lime {
+    bottom: 9%;
+    background: var(--brand-lime);
+    transform: rotate(2deg);
+  }
+  /* C9: la barra de la historia se llena en 5 s en loop, solo mientras se ve */
+  @keyframes cs-progress {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+  :global(.lp-motion) .cs.is-playing .cs-bar.is-live span {
+    animation: cs-progress 5s linear infinite;
+  }
+</style>

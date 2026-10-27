@@ -1,0 +1,123 @@
+---
+// 7 · Mesas y VIP (SPEC_landing_clubs §4.7, 01:30): cada mesa es un tipo de entrada con precio, cupo y descripción
+// (EditEventForm.vue), pago online con Webpay y agotada al venderse todas. Quien la compra recibe un QR por mesa
+// (buildAttendeeRows); emitir una entrada por invitado no existe: "Pronto". Hoy se resuelve con cortesías
+// (CourtesyTicketsForm.vue, cada una con su QR). No hay plano de mesas: se dice que no hay, sin "Pronto".
+// Copy sin marcas ni promoción de alcohol ("consumo incluido", §0.10).
+// Desktop: grid 6fr 5fr con la foto a la derecha (alterna con la puerta). Mobile: foto 3:4 arriba, texto y ticket debajo.
+import CapsulePhoto from "./CapsulePhoto.astro";
+import LedHeading from "./LedHeading.astro";
+import NightHour from "./NightHour.astro";
+import TableTicket from "./TableTicket.astro";
+import SoonBadge from "../../ui/SoonBadge.vue";
+import { CLUB_PHOTOS } from "./clubsLanding.js";
+---
+
+<section id="mesas" class="cl-section" aria-labelledby="cl-tables-title" data-cl-section="tables">
+  <span class="cl-halo ct-halo" aria-hidden="true"></span>
+  <div class="cl-wrap ct-grid" data-lp-reveal>
+    <div class="ct-media" data-lp-step>
+      <CapsulePhoto
+        photo={CLUB_PHOTOS.vip}
+        alt="Grupo de amigos riendo en una mesa VIP"
+        sizes="(min-width: 1024px) 40vw, 100vw"
+        position="50% 35%"
+        class="ct-photo"
+      />
+    </div>
+
+    <div class="ct-copy">
+      <NightHour time="01:30" label="Mesas" />
+      <LedHeading id="cl-tables-title" text="La mesa se paga" lit="antes de llegar." />
+      <p class="cl-lead ct-lead" data-lp-step>
+        Cada mesa es un tipo de entrada con su precio, su cupo y lo que incluye en la descripción: "Mesa VIP · hasta 6
+        personas · consumo incluido". Se paga online con Webpay; nada de pantallazos de transferencia ni de guardar la mesa
+        "hasta las 12". Cuando se venden todas, aparece agotada.
+      </p>
+      <div class="ct-body">
+        <ul class="cl-dots ct-lines">
+          <li data-lp-step>
+            <p>
+              <span class="cl-dots-title">Un QR por mesa.</span>
+              <span class="cl-dots-text">Quien la compra entra con su grupo; la puerta ve "Mesa VIP" al escanear.</span>
+              <span class="ct-soon">Una entrada para cada invitado de la mesa <SoonBadge dark /></span>
+            </p>
+          </li>
+          <li data-lp-step>
+            <p>
+              <span class="cl-dots-title">¿Mesa para un cumpleaños o una marca?</span>
+              <span class="cl-dots-text">Le mandas las entradas del grupo como cortesías: a cada persona le llega su QR.</span>
+            </p>
+          </li>
+          <li data-lp-step>
+            <p>
+              <span class="cl-dots-title">Cupos que se respetan.</span>
+              <span class="cl-dots-text">Si tienes 10 mesas, se venden 10. No hay plano para elegir mesa: la asignas tú en el local.</span>
+            </p>
+          </li>
+        </ul>
+        <TableTicket />
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .ct-halo {
+    --size: 700px;
+    right: -240px;
+    top: 10%;
+  }
+  .ct-grid {
+    display: grid;
+    gap: 40px;
+  }
+  .ct-media {
+    max-width: 520px;
+  }
+  .ct-media :global(.ct-photo) {
+    aspect-ratio: 3 / 4;
+    width: 100%;
+  }
+  .ct-lead {
+    max-width: 620px;
+    margin-top: 20px;
+  }
+  .ct-body {
+    display: grid;
+    gap: 32px;
+    margin-top: 32px;
+  }
+  .ct-lines p {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .ct-soon {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+    margin-top: 4px;
+    font-size: 13px;
+    color: var(--cl-text-3);
+  }
+  @media (min-width: 1024px) {
+    .ct-grid {
+      grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+      gap: 72px;
+      align-items: center;
+    }
+    .ct-media {
+      order: 2;
+      max-width: none;
+    }
+    .ct-media :global(.ct-photo) {
+      aspect-ratio: 4 / 5;
+    }
+    .ct-body {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 300px);
+      align-items: start;
+    }
+  }
+</style>

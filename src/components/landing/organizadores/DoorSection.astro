@@ -1,0 +1,279 @@
+---
+// 5 · La venta termina en la puerta (SPEC_landing_productores §5.5). Verificado igual que landing/DoorSection.vue:
+// validación offline con la lista descargada (ValidateQR.vue), rol Puerta (permissions.ts), link temporal de puerta
+// (create_checkin_link, hoy desde el conector de IA) y cortesías con su propio QR.
+// L14: el resultado del escaneo alterna cada 2,4 s entre "Válida" y "Ya ingresó" (crossfade), solo mientras el teléfono
+// está en pantalla y con html.lp-motion (sin "reducir movimiento"). Sin JS queda "Válida".
+const items = [
+  {
+    title: "Check-in desde el celular",
+    text: "Tu equipo escanea el QR desde el navegador del teléfono. Una entrada usada no vuelve a entrar.",
+    icon: '<rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><path d="M14 14h3v3M21 14v7h-7"></path>',
+  },
+  {
+    title: "Sigue funcionando sin señal",
+    text: "Si se cae la conexión, valida con la lista descargada y sincroniza al volver.",
+    icon: '<path d="M2 2l20 20M8.5 16.4a5 5 0 0 1 7 0M5 12.9a10 10 0 0 1 5.2-2.7M19 12.9a10 10 0 0 0-2.3-1.6M2 8.8a15 15 0 0 1 4.2-2.6M22 8.8A15 15 0 0 0 11 5.1M12 20h.01"></path>',
+  },
+  {
+    title: "Puerta sin contraseñas",
+    text: "Dale a tu equipo el rol Puerta, o un link temporal que no pide cuenta y vence solo (lo creas desde tu asistente de IA).",
+    icon: '<circle cx="8" cy="15" r="4"></circle><path d="M10.8 12.2L21 2M17 6l3 3M14 9l2 2"></path>',
+  },
+  {
+    title: "Cortesías e invitados",
+    text: "Las cortesías llegan con su propio QR y se validan igual que una entrada pagada.",
+    icon: '<rect x="3" y="8" width="18" height="4" rx="1"></rect><path d="M12 8v13M19 12v9H5v-9M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"></path>',
+  },
+];
+---
+
+<section class="lp-section" aria-labelledby="door-title" data-lp-section="door">
+  <div class="lp-wrap door">
+    <div class="door-phone-wrap" aria-hidden="true" data-lp-reveal data-lp-step>
+      <div class="lp-phone door-phone">
+        <div class="lp-phone-screen door-screen">
+          <p class="door-top"><span>Check-in · Puerta</span><span class="ev-tabular">98 / 140</span></p>
+          <div class="door-camera">
+            <div class="door-frame">
+              <span class="door-corner door-tl"></span><span class="door-corner door-tr"></span>
+              <span class="door-corner door-bl"></span><span class="door-corner door-br"></span>
+              <span class="door-qr"></span>
+            </div>
+          </div>
+          <div class="door-results" data-door-scan>
+            <div class="door-result door-ok">
+              <p class="door-result-title">✓ Válida</p>
+              <p>General · Sebastián P.</p>
+              <p>Entrada 1 de 2</p>
+            </div>
+            <div class="door-result door-used">
+              <p class="door-result-title">Ya ingresó</p>
+              <p>VIP · Camila R.</p>
+              <p>Validada a las 21:42</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="door-copy" data-lp-reveal>
+      <p class="lp-eyebrow" data-lp-step>El día del evento</p>
+      <h2 id="door-title" class="lp-h2 door-title" data-lp-step>La venta termina en la puerta.</h2>
+      <p class="lp-lead door-lead" data-lp-step>Que tu equipo reciba a la gente sin planillas ni listas de último minuto.</p>
+      <ul class="door-items" data-lp-step>
+        {items.map((item) => (
+          <li>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={item.icon} />
+            <h3 class="door-item-title">{item.title}</h3>
+            <p class="lp-body door-item-text">{item.text}</p>
+          </li>
+        ))}
+      </ul>
+      <p class="door-more" data-lp-step>
+        <a href="/guias/como-hacer-check-in-con-qr" class="lp-link" data-cta="learn_checkin" data-section="door">
+          Cómo funciona el control de acceso con QR <span aria-hidden="true">→</span>
+        </a>
+      </p>
+    </div>
+  </div>
+</section>
+
+<script>
+  // L14: alterna "Válida" / "Ya ingresó" cada 2,4 s mientras el teléfono se ve (en mobile está oculto: nunca entra)
+  const SCAN_EVERY_MS = 2400;
+  document.querySelectorAll<HTMLElement>("[data-door-scan]").forEach((el) => {
+    if (!document.documentElement.classList.contains("lp-motion")) return;
+    let timer = 0;
+    const io = new IntersectionObserver(([entry]) => {
+      window.clearInterval(timer);
+      timer = 0;
+      if (entry.isIntersecting) timer = window.setInterval(() => el.classList.toggle("is-used"), SCAN_EVERY_MS);
+    });
+    io.observe(el);
+  });
+</script>
+
+<style>
+  .door {
+    display: grid;
+    gap: 40px;
+  }
+  .door-phone-wrap {
+    display: none;
+  }
+  .door-title {
+    margin-top: 10px;
+  }
+  .door-lead {
+    margin-top: 12px;
+  }
+  .door-items {
+    display: grid;
+    gap: 18px;
+    margin-top: 22px;
+  }
+  .door-items svg {
+    display: none;
+  }
+  .door-item-title {
+    font-size: 16px;
+    font-weight: 600;
+  }
+  .door-item-text {
+    margin-top: 2px;
+    font-size: 15px;
+    line-height: 23px;
+  }
+  .door-more {
+    margin-top: 28px;
+  }
+
+  .door-phone {
+    width: 280px;
+    height: 560px;
+    border-radius: 42px;
+  }
+  .door-screen {
+    border-radius: 32px;
+    background: #111113;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+  }
+  .door-top {
+    display: flex;
+    justify-content: space-between;
+    padding: 18px 18px 0;
+    font-size: 13px;
+    color: var(--lp-on-dark-3);
+  }
+  .door-camera {
+    flex: 1;
+    margin: 16px;
+    border-radius: 20px;
+    background: #1c1c1f;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .door-frame {
+    position: relative;
+    width: 160px;
+    height: 160px;
+  }
+  .door-corner {
+    position: absolute;
+    width: 28px;
+    height: 28px;
+    border: 0 solid #fff;
+  }
+  .door-tl {
+    left: 0;
+    top: 0;
+    border-left-width: 3px;
+    border-top-width: 3px;
+    border-radius: 6px 0 0 0;
+  }
+  .door-tr {
+    right: 0;
+    top: 0;
+    border-right-width: 3px;
+    border-top-width: 3px;
+    border-radius: 0 6px 0 0;
+  }
+  .door-bl {
+    left: 0;
+    bottom: 0;
+    border-left-width: 3px;
+    border-bottom-width: 3px;
+    border-radius: 0 0 0 6px;
+  }
+  .door-br {
+    right: 0;
+    bottom: 0;
+    border-right-width: 3px;
+    border-bottom-width: 3px;
+    border-radius: 0 0 6px 0;
+  }
+  .door-qr {
+    position: absolute;
+    inset: 30px;
+    border-radius: 4px;
+    background: repeating-conic-gradient(#3a3a40 0 25%, #1c1c1f 0 50%) 0 0 / 20px 20px;
+    opacity: 0.8;
+  }
+  .door-results {
+    position: relative;
+    height: 112px;
+    margin: 0 16px 18px;
+  }
+  .door-result {
+    position: absolute;
+    inset: 0;
+    padding: 16px;
+    border-radius: 18px;
+    background: var(--brand-lime);
+    color: var(--brand-ink);
+    font-size: 13px;
+    transition: opacity 300ms ease;
+  }
+  .door-used {
+    opacity: 0;
+    background: #2a2a2e;
+    color: var(--lp-on-dark-2);
+  }
+  .door-used .door-result-title {
+    color: #fff;
+  }
+  .is-used .door-ok {
+    opacity: 0;
+  }
+  .is-used .door-used {
+    opacity: 1;
+  }
+  .door-result-title {
+    margin-bottom: 6px;
+    font-family: "Unbounded", system-ui, sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .door-result {
+      transition-duration: 1ms;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .door-items {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 28px 32px;
+      margin-top: 36px;
+    }
+    .door-items svg {
+      display: block;
+      margin-bottom: 10px;
+    }
+  }
+  @media (min-width: 1024px) {
+    .door {
+      grid-template-columns: 360px minmax(0, 1fr);
+      gap: 72px;
+      align-items: center;
+    }
+    .door-phone-wrap {
+      display: flex;
+      justify-content: center;
+    }
+    .door-title {
+      margin-top: 14px;
+    }
+    .door-lead {
+      margin-top: 18px;
+    }
+    .door-more {
+      margin-top: 32px;
+    }
+  }
+</style>

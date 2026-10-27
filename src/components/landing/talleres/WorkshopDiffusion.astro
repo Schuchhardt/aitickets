@@ -1,0 +1,298 @@
+---
+// 6 · Para llenar los últimos cupos (SPEC_landing_talleres §4.6, ancla #difusion): tres fichas con un mockup chico
+// cada una. Verificado en el código:
+//   Instagram automático → socialSeries.ts / socialSeriesCadence.ts (DEFAULT_KEYWORD por DM); el sticker de la historia
+//               dice "Quedan N entradas" (socialSeriesRender.ts), no "cupos" (Preguntas abiertas 6). Facebook, TikTok y
+//               reels en la serie → "Pronto"
+//   links por comunidad → TrackingLinkBuilder.vue y eventAnalytics.ts (ventas por canal)
+//   códigos de descuento → DiscountCodesManager.vue y discounts.mjs (porcentaje o monto, usos, fechas)
+//   anuncios → zernio-ads.mjs (cuenta publicitaria de Meta del productor): solo una línea, sin demo
+// TL14: la barra de la historia corre en loop de 5 s solo mientras se ve ([data-tl-play] → .is-playing).
+import SectionTab from "./SectionTab.astro";
+import Highlight from "./Highlight.astro";
+import SoonBadge from "../../ui/SoonBadge.vue";
+import { DISCOUNT_DEMO, LINK_SALES_DEMO, presetById } from "./talleresLanding.js";
+import { DEFAULT_KEYWORD } from "../../../lib/socialSeriesCadence";
+
+const preset = presetById("ceramica");
+const max = Math.max(...LINK_SALES_DEMO.map((r) => r.tickets));
+---
+
+<section id="difusion" class="tl-section tl-margin" aria-labelledby="tl-diff-title" data-tl-section="difusion">
+  <SectionTab text="Difusión" />
+  <div class="tl-wrap">
+    <div class="tl-ruled tl-diff-head" data-lp-reveal>
+      <p class="tl-eyebrow" data-lp-step>Difusión</p>
+      <h2 id="tl-diff-title" class="tl-h2 tl-diff-title" data-lp-step>¿Te quedan cupos? <Highlight>Que se enteren.</Highlight></h2>
+      <p class="tl-lead tl-diff-lead" data-lp-step>
+        Un taller de 10 cupos se llena con las personas correctas, no con miles de visitas. Estas tres cosas ayudan.
+      </p>
+    </div>
+
+    <ul class="tl-diff-grid" data-lp-reveal>
+      <li class="tl-card tl-card-plain tl-diff-card" data-lp-step>
+        <div class="tl-card-body tl-diff-body">
+          <p class="tl-eyebrow">Instagram</p>
+          <h3 class="tl-display tl-diff-h3">Tu Instagram, solo.</h3>
+          <p class="tl-diff-text">
+            Conectas tu cuenta y apruebas la serie con una vista previa. Con la imagen y los datos de tu taller armamos
+            historias que cuentan hacia la próxima fecha, todos los días la última semana, y le mandamos el link por DM a
+            quien responde {DEFAULT_KEYWORD}.
+          </p>
+          <div class="tl-story" data-tl-play role="img" aria-label={`Historia de ejemplo: ${preset.title}, este sábado a las ${preset.from}, quedan 3 entradas, responde ${DEFAULT_KEYWORD}`}>
+            <span class="tl-story-bar"><span class="tl-story-fill"></span></span>
+            <span class="tl-story-cover tl-grid">
+              <span class="tl-display tl-story-title">{preset.title}</span>
+            </span>
+            <span class="tl-story-when">Este sábado · {preset.from}</span>
+            <span class="tl-story-sticker">Quedan 3 entradas</span>
+            <span class="tl-story-key">Responde {DEFAULT_KEYWORD}</span>
+          </div>
+          <ul class="tl-diff-chips">
+            <li class="tl-chip tl-chip-on"><span aria-hidden="true">●</span> Instagram</li>
+            <li class="tl-chip">Facebook <SoonBadge dark={false} /></li>
+            <li class="tl-chip">TikTok <SoonBadge dark={false} /></li>
+            <li class="tl-chip">Reels <SoonBadge dark={false} /></li>
+          </ul>
+        </div>
+      </li>
+
+      <li class="tl-card tl-card-plain tl-diff-card" data-lp-step>
+        <div class="tl-card-body tl-diff-body">
+          <p class="tl-eyebrow">Links con seguimiento</p>
+          <h3 class="tl-display tl-diff-h3">Un link para cada comunidad.</h3>
+          <p class="tl-diff-text">
+            Uno para tu newsletter, otro para la tienda de materiales que te recomienda, otro para tus ex alumnos. En las
+            métricas ves cuántas inscripciones trajo cada uno.
+          </p>
+          <table class="tl-links">
+            <caption class="tl-example">Ventas por link · ejemplo</caption>
+            <tbody>
+              {
+                LINK_SALES_DEMO.map((row) => (
+                  <tr>
+                    <th scope="row">{row.name}</th>
+                    <td>
+                      <span class="tl-links-bar" style={`--w: ${row.tickets / max}`} data-lp-grow aria-hidden="true" />
+                    </td>
+                    <td class="tl-num">{row.tickets}</td>
+                  </tr>
+                ))
+              }
+            </tbody>
+          </table>
+        </div>
+      </li>
+
+      <li class="tl-card tl-card-plain tl-diff-card" data-lp-step>
+        <div class="tl-card-body tl-diff-body">
+          <p class="tl-eyebrow">Códigos de descuento</p>
+          <h3 class="tl-display tl-diff-h3">Un código para quienes ya vinieron.</h3>
+          <p class="tl-diff-text">
+            Crea un descuento para ex alumnos o socios desde tu panel: porcentaje o monto, cuántos usos y hasta cuándo.
+          </p>
+          <p class="tl-code">
+            <span class="tl-num tl-code-name">{DISCOUNT_DEMO.code}</span>
+            <span>{DISCOUNT_DEMO.value} · {DISCOUNT_DEMO.uses} usos · hasta {DISCOUNT_DEMO.until}</span>
+            <span class="tl-example">ejemplo</span>
+          </p>
+        </div>
+      </li>
+    </ul>
+
+    <p class="tl-diff-ads" data-lp-reveal>
+      <span data-lp-step>
+        ¿Necesitas un empujón? Lanza un anuncio en Instagram y Facebook desde tu panel para tu ciudad: tú defines cuánto y
+        por cuántos días, y Meta cobra el gasto directo en tu cuenta publicitaria.
+      </span>
+    </p>
+  </div>
+</section>
+
+<style>
+  .tl-diff-title {
+    margin-top: 14px;
+  }
+  .tl-diff-lead {
+    max-width: 640px;
+    margin-top: 18px;
+  }
+  .tl-diff-grid {
+    display: grid;
+    gap: 24px;
+    margin-top: 40px;
+    list-style: none;
+  }
+  .tl-diff-body {
+    padding-top: 56px;
+  }
+  .tl-diff-h3 {
+    margin-top: 6px;
+    font-size: 22px;
+    line-height: 28px;
+    font-weight: 700;
+  }
+  .tl-diff-text {
+    margin-top: 8px;
+    font-size: 16px;
+    line-height: 25px;
+    color: var(--tl-grafito-2);
+  }
+
+  /* Historia 150 × 300 */
+  .tl-story {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 150px;
+    height: 300px;
+    margin: 20px auto 0;
+    padding: 18px 12px 12px;
+    overflow: hidden;
+    border: 3px solid var(--tl-grafito);
+    border-radius: 22px;
+    background: var(--tl-papel);
+  }
+  .tl-story-bar {
+    position: absolute;
+    top: 8px;
+    left: 12px;
+    right: 12px;
+    height: 3px;
+    overflow: hidden;
+    border-radius: 2px;
+    background: rgba(31, 35, 41, 0.15);
+  }
+  .tl-story-fill {
+    display: block;
+    height: 100%;
+    background: var(--tl-grafito);
+    transform-origin: left center;
+  }
+  .tl-story-cover {
+    display: flex;
+    align-items: flex-end;
+    height: 120px;
+    padding: 8px;
+    border-radius: 8px;
+    background-color: var(--tl-ficha);
+  }
+  .tl-story-title {
+    font-size: 16px;
+    line-height: 18px;
+  }
+  .tl-story-when {
+    margin-top: 10px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .tl-story-sticker {
+    align-self: flex-start;
+    margin-top: 12px;
+    padding: 4px 8px;
+    border: 1.5px solid var(--tl-grafito);
+    border-radius: 6px;
+    background: var(--tl-destacador);
+    font-size: 12px;
+    font-weight: 700;
+    transform: rotate(-4deg);
+  }
+  .tl-story-key {
+    align-self: flex-start;
+    margin-top: auto;
+    padding: 4px 8px;
+    border: 1.5px solid var(--tl-grafito);
+    border-radius: 6px;
+    background: var(--brand-lime);
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .tl-diff-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 16px;
+  }
+  .tl-chip-on {
+    border-color: var(--brand-lime);
+    border-width: 2px;
+  }
+
+  /* Ventas por link */
+  .tl-links {
+    width: 100%;
+    margin-top: 20px;
+    border-collapse: collapse;
+  }
+  .tl-links caption {
+    text-align: left;
+    padding-bottom: 6px;
+  }
+  .tl-links th,
+  .tl-links td {
+    padding: 8px 0;
+    border-top: 1px solid var(--tl-line);
+    font-size: 14px;
+    font-weight: 500;
+    text-align: left;
+  }
+  .tl-links th {
+    width: 42%;
+  }
+  .tl-links td:last-child {
+    width: 2.5em;
+    text-align: right;
+    font-size: 16px;
+  }
+  .tl-links-bar {
+    display: block;
+    height: 8px;
+    border-radius: 4px;
+    background: var(--tl-tinta);
+    transform: scaleX(var(--w));
+    transform-origin: left center;
+  }
+
+  /* Código */
+  .tl-code {
+    display: grid;
+    gap: 4px;
+    margin-top: 20px;
+    padding: 14px 16px;
+    border: 2px dashed var(--tl-grafito);
+    border-radius: 8px;
+    font-size: 14px;
+  }
+  .tl-code-name {
+    font-size: 22px;
+    letter-spacing: 0.04em;
+  }
+  .tl-diff-ads {
+    max-width: 760px;
+    margin: 40px auto 0;
+    font-size: 16px;
+    line-height: 25px;
+    text-align: center;
+    color: var(--tl-grafito-2);
+  }
+  @media (min-width: 1024px) {
+    .tl-diff-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 28px;
+      margin-top: 56px;
+    }
+  }
+
+  /* TL14: barra de la historia en loop de 5 s, solo mientras se ve */
+  @keyframes tl-story-progress {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+  :global(.lp-motion) .tl-story.is-playing .tl-story-fill {
+    animation: tl-story-progress 5s linear infinite;
+  }
+</style>

@@ -1,14 +1,18 @@
-// Portada, hub de organizadores y páginas SEO (landings, guías, comparativa): se sirven sin BD.
+// Portada, landing de organizadores y páginas SEO (landings, guías, comparativa): se sirven sin BD.
 // En el proyecto "mobile" (390 px) también comprueba que ninguna página tenga scroll horizontal.
 import { expect, test } from "@playwright/test";
 
 const PAGES: { path: string; h1: RegExp; competitorPayout?: boolean }[] = [
   { path: "/", h1: /Tu próxima función/ },
-  { path: "/organizadores", h1: /funciones todas las semanas/ },
-  { path: "/ticketera-stand-up", h1: /stand-up/i },
-  { path: "/ticketera-teatro", h1: /funciones de tu obra/i },
-  { path: "/ticketera-musica-en-vivo", h1: /conciertos/i },
-  { path: "/ticketera-talleres", h1: /talleres/i },
+  { path: "/organizadores", h1: /merece vender más/ },
+  { path: "/ticketera-stand-up", h1: /Tú haz el show/ },
+  { path: "/ticketera-teatro", h1: /Que suba el telón/ },
+  { path: "/ticketera-musica-en-vivo", h1: /Tú pon la música/ },
+  { path: "/ticketera-discotecas", h1: /Abre la puerta/ },
+  { path: "/ticketera-fiestas", h1: /Preventa 1: agotada/ },
+  { path: "/ticketera-talleres", h1: /Abre inscripciones con un link/ },
+  { path: "/ticketera-seminarios", h1: /Tú armas el programa/ },
+  { path: "/academias", h1: /El día de la muestra/ },
   { path: "/vender-entradas-online", h1: /entradas/i },
   { path: "/entradas-con-qr", h1: /QR/ },
   { path: "/ventas-por-promotor", h1: /promotor/i },
@@ -53,7 +57,7 @@ test("el sitemap incluye las páginas SEO", async ({ request }) => {
   const res = await request.get("/sitemap.xml");
   expect(res.status()).toBe(200);
   const xml = await res.text();
-  for (const path of ["/ticketera-stand-up", "/ventas-por-promotor", "/ticketeras-en-chile", "/guias/como-hacer-check-in-con-qr"]) {
+  for (const path of ["/ticketera-stand-up", "/ticketera-musica-en-vivo", "/ticketera-discotecas", "/ticketera-fiestas", "/ticketera-teatro", "/ticketera-talleres", "/ticketera-seminarios", "/academias", "/ventas-por-promotor", "/ticketeras-en-chile", "/guias/como-hacer-check-in-con-qr"]) {
     expect(xml).toContain(`${path}</loc>`);
   }
 });
@@ -64,4 +68,14 @@ test("los términos dicen que en una cancelación se devuelve el cargo con su IV
   await expect(page.locator("body")).not.toContainText("no se devuelve");
   await page.goto("/precios");
   await expect(page.locator("body")).not.toContainText("IVA del cargo no se devuelve");
+});
+
+test("la portada muestra los ocho nichos y cada card lleva a su landing", async ({ page }) => {
+  await page.goto("/");
+  const cards = page.locator('[data-cta="niche"]');
+  await expect(cards).toHaveCount(8);
+  for (const href of ["/ticketera-stand-up", "/ticketera-teatro", "/ticketera-musica-en-vivo", "/ticketera-discotecas", "/ticketera-fiestas", "/ticketera-talleres", "/ticketera-seminarios", "/academias"]) {
+    await expect(page.locator(`[data-cta="niche"][href="${href}"]`)).toHaveCount(1);
+  }
+  await expect(page.locator("#precios")).toBeVisible();
 });

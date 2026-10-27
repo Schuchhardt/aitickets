@@ -1,0 +1,155 @@
+---
+// 2 · Tu lista de pendientes, tachada (SPEC_landing_talleres §4.2, ancla #pendientes): una hoja de cuaderno con seis
+// pendientes de quien dicta talleres, cada uno tachado con una línea azul y, al lado (debajo en mobile), lo que hace AI
+// Tickets. El plazo de la última fila sale de legal.mjs (PAYOUT_RELEASE_HOURS, vía talleresLanding.js) con el asterisco
+// de TERMS_NOTE.
+// TL8: cuando la hoja se revela (LandingMotion), los pendientes se tachan uno a uno (stagger 380 ms): la línea se dibuja
+// con clip-path, la casilla recibe el check y la respuesta aparece con fade y translateY 6 px. Sin JS o con "reducir
+// movimiento": todo ya tachado y visible.
+// Accesibilidad: lo visual va aria-hidden y cada fila tiene su frase completa para lectores ("Antes: … Ahora: …"); el
+// texto tachado va en <s>.
+import SectionTab from "./SectionTab.astro";
+import Highlight from "./Highlight.astro";
+import { PENDIENTES } from "./talleresLanding.js";
+import { TERMS_NOTE } from "../../../data/producerFaq";
+
+const lower = (text: string) => text.charAt(0).toLowerCase() + text.slice(1);
+---
+
+<section id="pendientes" class="tl-section tl-margin" aria-labelledby="tl-pend-title" data-tl-section="pendientes">
+  <SectionTab text="Pendientes" />
+  <div class="tl-wrap">
+    <div class="tl-ruled" data-lp-reveal>
+      <p class="tl-eyebrow" data-lp-step>Antes de cada taller</p>
+      <h2 id="tl-pend-title" class="tl-h2 tl-pend-title" data-lp-step>
+        Todo lo que hoy haces a mano, <Highlight>tachado.</Highlight>
+      </h2>
+    </div>
+    <div class="tl-ruled" data-lp-reveal>
+      <ol class="tl-card tl-pend-sheet" data-testid="workshop-pending">
+        {
+          PENDIENTES.map((row, i) => (
+            <li class="tl-pend-row" style={`--i: ${i}`}>
+              <span class="lp-sr-only">
+                Antes: {lower(row.before)}. Ahora: {row.after}
+              </span>
+              <span class="tl-pend-before" aria-hidden="true">
+                <span class="tl-tick tl-pend-tick">
+                  <svg viewBox="0 0 26 26">
+                    <path d="M5 14 L 11 20 L 23 4" />
+                  </svg>
+                </span>
+                <span class="tl-pend-text">
+                  <s>{row.before}</s>
+                  <span class="tl-pend-strike">{row.before}</span>
+                </span>
+              </span>
+              <span class="tl-pend-after" aria-hidden="true">
+                <span class="tl-pend-arrow">→</span>
+                <span>
+                  {row.after}
+                  {row.star && "*"}
+                </span>
+              </span>
+            </li>
+          ))
+        }
+      </ol>
+      <p class="tl-terms tl-pend-terms"><a href={TERMS_NOTE.href}>{TERMS_NOTE.text}</a></p>
+    </div>
+  </div>
+</section>
+
+<style>
+  .tl-pend-title {
+    margin-top: 14px;
+  }
+  /* Hoja con renglones (la ficha base): los renglones caen cada 28 px desde los 68 px. Todo el texto va con
+     line-height 28 y cada fila con 14 px arriba y abajo, así cada línea de texto queda entre dos renglones y la fila
+     siguiente empieza a la misma altura del patrón (sin bordes entre filas: separan los renglones). */
+  .tl-pend-sheet {
+    max-width: 860px;
+    margin-top: 40px;
+    padding: 54px 16px 14px;
+    list-style: none;
+  }
+  .tl-pend-row {
+    display: grid;
+    padding: 14px 0;
+  }
+  .tl-pend-before {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .tl-pend-text {
+    position: relative;
+    font-size: 18px;
+    line-height: 28px;
+    color: var(--tl-grafito);
+  }
+  .tl-pend-text s {
+    text-decoration: none;
+  }
+  /* La línea azul: una copia transparente del texto con line-through, que se revela con clip-path (TL8) */
+  .tl-pend-strike {
+    position: absolute;
+    inset: 0;
+    color: transparent;
+    text-decoration: line-through;
+    text-decoration-color: var(--tl-tinta);
+    text-decoration-thickness: 2.5px;
+    pointer-events: none;
+  }
+  .tl-pend-after {
+    display: flex;
+    gap: 8px;
+    padding-left: 32px;
+    font-size: 16px;
+    line-height: 28px;
+    color: var(--tl-grafito-2);
+  }
+  .tl-pend-arrow {
+    flex: 0 0 auto;
+    color: var(--tl-tinta);
+    font-weight: 600;
+  }
+  .tl-pend-terms {
+    max-width: 860px;
+  }
+  @media (min-width: 768px) {
+    .tl-pend-sheet {
+      padding-inline: 28px;
+    }
+    .tl-pend-row {
+      grid-template-columns: 1fr 1fr;
+      column-gap: 24px;
+      align-items: start;
+    }
+    .tl-pend-text {
+      font-size: 20px;
+      line-height: 28px;
+    }
+    .tl-pend-after {
+      padding-left: 0;
+    }
+  }
+
+  /* ---- TL8 ---- */
+  :global(.lp-motion) .tl-ruled:not(.is-in) .tl-pend-strike,
+  :global(.lp-motion) .tl-ruled:not(.is-in) .tl-pend-tick svg {
+    clip-path: inset(0 100% 0 0);
+  }
+  :global(.lp-motion) .tl-ruled:not(.is-in) .tl-pend-after {
+    opacity: 0;
+  }
+  :global(.lp-motion) .tl-ruled.is-in .tl-pend-strike {
+    animation: tl-draw 320ms var(--ease-out) calc(300ms + var(--i) * 380ms) both;
+  }
+  :global(.lp-motion) .tl-ruled.is-in .tl-pend-tick svg {
+    animation: tl-draw 220ms var(--ease-out) calc(450ms + var(--i) * 380ms) both;
+  }
+  :global(.lp-motion) .tl-ruled.is-in .tl-pend-after {
+    animation: tl-answer 300ms var(--ease-out) calc(500ms + var(--i) * 380ms) both;
+  }
+</style>

@@ -1,0 +1,44 @@
+---
+// Figura sobria (SPEC_landing_seminarios §1): <figure> con <picture> (AVIF/WebP con srcset), radio 4, filete de 1 px,
+// color natural sobrio (saturate .92, contrast 1.04) y la leyenda numerada "Fig. 0N — …" en meta. Sin giro ni overlay.
+// eager: la foto del hero (LCP: fetchpriority alto, sin lazy-load).
+interface Photo {
+  src: string;
+  width: number;
+  height: number;
+  sources: { type: string; srcset: string }[];
+}
+interface Props {
+  photo: Photo;
+  alt: string;
+  caption: string;
+  /** "4 / 5", "1024 / 688"… (reserva el alto: sin saltos) */
+  ratio: string;
+  position?: string;
+  sizes: string;
+  eager?: boolean;
+  class?: string;
+}
+const { photo, alt, caption, ratio, position = "50% 50%", sizes, eager = false, class: className } = Astro.props;
+---
+
+<figure class:list={["se-figure", className]}>
+  <span class="se-figure-frame" style={`aspect-ratio: ${ratio}`}>
+    <picture>
+      {photo.sources.map((s) => <source type={s.type} srcset={s.srcset} sizes={sizes} />)}
+      <img
+        class="se-figure-img"
+        src={photo.src}
+        alt={alt}
+        width={photo.width}
+        height={photo.height}
+        style={`object-position: ${position}`}
+        loading={eager ? "eager" : "lazy"}
+        fetchpriority={eager ? "high" : undefined}
+        decoding={eager ? "sync" : "async"}
+      />
+    </picture>
+    <slot />
+  </span>
+  <figcaption>{caption}</figcaption>
+</figure>

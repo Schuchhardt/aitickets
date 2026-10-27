@@ -43,7 +43,8 @@ export const storedOrders = (eventId) => {
   return Array.isArray(orders) ? orders : orders ? [orders] : [];
 };
 
-export function rememberOrder(event, { orderId, quantity, amount = 0, email = "", name = "" }) {
+// functionId: función de la entrada (si está amarrada a una), para "Te esperamos el sábado 8, 20:00."
+export function rememberOrder(event, { orderId, quantity, amount = 0, email = "", name = "", functionId = null }) {
   const key = `purchase_event_${event.id}`;
   const orders = storedOrders(event.id);
   if (!orders.some((o) => o.orderId === orderId)) {
@@ -58,6 +59,7 @@ export function rememberOrder(event, { orderId, quantity, amount = 0, email = ""
       tickets: [],
       email,
       name,
+      functionId,
     });
     safeSet(key, orders);
   }
@@ -74,6 +76,42 @@ export function trackFunnel(name, event, params = {}) {
     ...(utm?.campaign ? { utm_campaign: utm.campaign } : {}),
     ...params,
   });
+}
+
+/**
+ * Evento de embudo (§14) al volver de Webpay, según el estado que muestra payment-confirmation (no el de la orden):
+ *   order_paid    pagada, o ya cobrada y emitiéndose ('processing')
+ *   hold_expired  anulada porque la reserva de la orden venció antes del pago (expire-pending-orders la deja en
+ *                 "expired"); si Flow igual la rechazó o sigue pendiente, manda lo que se ve en pantalla
+ *   order_failed  rechazada o anulada
+ * Pendiente, en revisión, reembolsada o error: ninguno (null).
+ */
+export function checkoutReturnFunnel(state, order, { total = 0, qty = 0 } = {}) {
+  if (!order) return null;
+  if (state === "paid" || state === "processing") return { name: "order_paid", params: { order_id: order.id, total, qty } };
+  if (state === "cancelled" && order.status === "expired") return { name: "hold_expired", params: { order_id: order.id } };
+  if (state === "rejected" || state === "cancelled") return { name: "order_failed", params: { order_id: order.id, status: state } };
+  return null;
+}
+
+/**
+ * Manda el evento de checkoutReturnFunnel una vez por orden y resultado (recargar la página no lo repite).
+ * @returns {boolean} true si lo mandó
+ */
+export function trackCheckoutReturn(funnel, eventId, storage) {
+  if (!funnel?.name) return false;
+  const key = `ga_${funnel.name}_${funnel.params?.order_id}`;
+  let seen = false;
+  try {
+    const store = storage ?? sessionStorage;
+    seen = store.getItem(key) === "1";
+    store.setItem(key, "1");
+  } catch {
+    /* sin storage: se manda igual */
+  }
+  if (seen) return false;
+  trackFunnel(funnel.name, { id: eventId }, funnel.params);
+  return true;
 }
 
 async function postJson(url, body) {

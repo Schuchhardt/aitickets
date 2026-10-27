@@ -1,0 +1,60 @@
+---
+// Analítica de la portada (/), con prefijo home_ (mismo mecanismo que ProducerTracking de /organizadores):
+//   home_view                          carga de la página
+//   home_cta_click {position, label}   clic en un CTA de publicar ([data-cta="publish"]); position: hero, header,
+//                                      mobile_bar o final
+//   home_whatsapp_click {position}     clic en WhatsApp
+//   home_niche_click {niche, position} clic en la card de un nicho ([data-cta="niche"], data-niche)
+//   home_ai_connect_click              clic en "Conecta tu IA"
+//   home_faq_open {question}           abre una pregunta
+//   home_section_view {section}        cada [data-lp-section] entra en pantalla (una vez)
+// La calculadora manda lp_calc_change, igual que en /organizadores. CtaTracking sigue midiendo producer_cta_clicked.
+---
+
+<script>
+  import { trackEvent } from "../../../composables/useGoogleAnalytics.js";
+
+  const POSITIONS: Record<string, string> = { header_menu: "header", final_cta: "final" };
+  const position = (el: Element) => {
+    const section = el.getAttribute("data-section") || "";
+    return POSITIONS[section] || section;
+  };
+
+  trackEvent("home_view", { page: location.pathname });
+
+  document.addEventListener(
+    "click",
+    (e) => {
+      const target = e.target as Element | null;
+      const cta = target?.closest?.("[data-cta]");
+      const kind = cta?.getAttribute("data-cta");
+      if (cta && kind === "publish") {
+        trackEvent("home_cta_click", { position: position(cta), label: cta.textContent?.trim().slice(0, 60) || "" });
+      } else if (cta && kind === "whatsapp") {
+        trackEvent("home_whatsapp_click", { position: position(cta) });
+      } else if (cta && kind === "niche") {
+        trackEvent("home_niche_click", { niche: cta.getAttribute("data-niche") || "", position: position(cta) });
+      } else if (cta && kind === "connect_ai") {
+        trackEvent("home_ai_connect_click");
+      }
+
+      const question = target?.closest?.('[data-testid="landing-faq"] button[aria-expanded="false"]');
+      if (question) trackEvent("home_faq_open", { question: question.textContent?.trim().slice(0, 100) || "" });
+    },
+    { capture: true },
+  );
+
+  if ("IntersectionObserver" in window) {
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          trackEvent("home_section_view", { section: (entry.target as HTMLElement).dataset.lpSection });
+          io.unobserve(entry.target);
+        }
+      },
+      { rootMargin: "0px 0px -40% 0px", threshold: 0 },
+    );
+    document.querySelectorAll("[data-lp-section]").forEach((section) => io.observe(section));
+  }
+</script>

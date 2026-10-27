@@ -1,0 +1,95 @@
+---
+// 2 · ¿Te suena familiar? (SPEC_landing_academias §3.3): título y comparador Antes / Con AI Tickets. La isla
+// (BeforeAfterCompare) se hidrata en idle, antes de llegar a la sección, para que el cambio a "Antes" no se vea; si
+// igual ya está en pantalla al hidratarse, se queda en "Con AI Tickets".
+// Textos verificados contra el producto: pago con Webpay o tarjeta (Flow), entradas por correo con QR, métricas por
+// link (un link por curso), check-in offline (ValidateQR.vue). El plazo de pago sale de legal.mjs: lo de cada función
+// queda disponible PAYOUT_RELEASE_HOURS después de que termina y se retira a la cuenta (no "llega 48 h después").
+// En mobile (§3.10): 5 mensajes y 4 filas (las `desktopOnly` se esconden).
+import BeforeAfterCompare from "./BeforeAfterCompare.vue";
+import { formatCLP } from "../producerLanding.js";
+import { ACADEMY_CHAT, ACADEMY_COURSES, ACADEMY_DEMO, COMPARE_AUTO_SWITCH_MS, academyDemoRevenue } from "./academiasLanding.js";
+import { PAYOUT_RELEASE_HOURS } from "../../../../netlify/lib/legal.mjs";
+
+const pains = {
+  before: [
+    { t: "80 mensajes preguntando lo mismo", d: "Cuántas quedan, cuánto cuestan, si la abuela paga, a qué hora es." },
+    { t: "Transferencias que revisar una por una", d: "Y cruzarlas con quién dijo que pagó." },
+    { t: "Una planilla de quién pagó y cuántas", d: "Que solo entiende quien la armó.", desktopOnly: true },
+    { t: "Entradas impresas que repartir", d: "Retiro en secretaría y familias que no alcanzan a ir." },
+    { t: "Caja con efectivo el mismo día", d: "Vuelto, monedas y alguien cuidando la plata." },
+    { t: "Una lista en papel en la puerta", d: "Y una fila que no avanza mientras empieza la función.", desktopOnly: true },
+  ],
+  after: [
+    { t: "Un link en el grupo, y listo", d: "Fecha, horario, lugar y precio en una página. Las dudas se responden solas." },
+    { t: "Pago confirmado al instante", d: "Con Webpay o tarjeta. Nadie tiene que revisar transferencias." },
+    { t: "Todo en tu panel", d: "Cuántas entradas lleva cada curso y cada función, en tiempo real.", desktopOnly: true },
+    { t: "La entrada llega al celular", d: "Con QR, por correo. Sin imprimir ni repartir nada." },
+    {
+      t: "Cero efectivo",
+      d: `Lo recaudado de cada función queda disponible ${PAYOUT_RELEASE_HOURS} horas después y lo retiras a tu cuenta.`,
+    },
+    { t: "La puerta avanza sola", d: "Tu equipo escanea con el celular, aunque se caiga la señal.", desktopOnly: true },
+  ],
+};
+
+const dashboard = {
+  name: ACADEMY_DEMO.name,
+  when: ACADEMY_DEMO.when,
+  venue: ACADEMY_DEMO.venue,
+  sold: ACADEMY_DEMO.sold,
+  capacity: ACADEMY_DEMO.capacity,
+  courses: ACADEMY_COURSES,
+  revenueLabel: formatCLP(academyDemoRevenue()),
+  payoutNote: `Disponible ${PAYOUT_RELEASE_HOURS} h después de cada función`,
+};
+---
+
+<section class="cmp" aria-labelledby="ac-compare-title" data-ac-section="compare">
+  <div class="ac-wrap cmp-grid" data-lp-reveal>
+    <div class="cmp-head" data-lp-step>
+      <p class="ac-eyebrow">¿Te suena familiar?</p>
+      <h2 id="ac-compare-title" class="ac-h2 cmp-title">Del grupo de WhatsApp <span class="ac-serif">a un solo link.</span></h2>
+    </div>
+    <BeforeAfterCompare client:idle chat={ACADEMY_CHAT} dashboard={dashboard} pains={pains} autoSwitchMs={COMPARE_AUTO_SWITCH_MS} />
+  </div>
+</section>
+
+<style>
+  .cmp {
+    padding-block: 56px;
+    background: var(--ac-card);
+    border-block: 1px solid var(--ac-line);
+  }
+  .cmp-grid {
+    display: grid;
+    grid-template-areas: "head" "seg" "body";
+    gap: 20px;
+  }
+  .cmp-head {
+    grid-area: head;
+    max-width: 720px;
+  }
+  .cmp-title {
+    margin-top: 10px;
+  }
+  @media (min-width: 768px) {
+    .cmp-grid {
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-areas: "head seg" "body body";
+      align-items: end;
+      gap: 32px;
+    }
+  }
+  @media (min-width: 1024px) {
+    .cmp {
+      padding-block: 120px;
+    }
+    .cmp-grid {
+      row-gap: 56px;
+    }
+    .cmp-title {
+      margin-top: 16px;
+    }
+  }
+</style>

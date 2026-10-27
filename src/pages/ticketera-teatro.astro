@@ -1,0 +1,176 @@
+---
+// Landing especializada para teatro (docs/specs/rediseno/SPEC_landing_teatro_aitickets.md, fases 1 a 3): compañías de
+// teatro independiente, salas y productoras. Misma URL que la landing SEO anterior (src/data/landings.ts la marca
+// dedicated: [landing].astro ya no la genera, y la tarjeta, el sitemap, las relacionadas y "Según lo que produces" de
+// /organizadores siguen leyendo de ahí; el footer ya la enlaza en "Para quién"). Tema propio "programa de mano y luz de
+// sala" ([data-theme="teatro"], src/styles/landing-teatro.css) sin tocar los tokens globales ni repetir el lenguaje de
+// stand-up, academias o música: azul noche, un foco cálido, terciopelo, marfil, dorado de palco y Bodoni Moda redonda.
+// La página se ordena en actos: Obertura → Reparto → Acto I → Acto II → Entreacto → Acto III → Programa → Para salas
+// → La crítica → FAQ → Telón.
+// Reutiliza la fórmula de precios (priceQuote → fees.mjs), el FAQ, la barra CTA mobile, el movimiento (LandingMotion),
+// la barra de lectura de stand-up (en dorado) y el patrón de calculadora (usePriceCalculator). Montos y plazos: fees.mjs,
+// legal.mjs y producerFaq.ts; lo que no existe en el producto (repetir funciones, copiar entradas, reseñas durante la
+// temporada, ocupación por función, borderó, Facebook/TikTok/reels) va con "Pronto".
+// Pendiente antes de publicar (Preguntas abiertas 1): event-risk.mjs mide el aforo de un evento como la suma de los
+// cupos de todas sus entradas; una temporada larga puede quedar como "aforo grande" y retener una reserva. La página
+// dice solo PAYOUT_SCHEDULE_TEXT / PAYOUT_SHORT_TEXT con TERMS_NOTE.
+// Fase 4 (contenido real) queda fuera del código: fotos reales con autorización (§8), testimonio (THEATRE_TESTIMONIAL,
+// hoy null: la sección no se muestra), teaser real y revisión de los nombres de ejemplo.
+export const prerender = true;
+import AppFooter from "../components/AppFooter.vue";
+import LandingFaq from "../components/landing/LandingFaq.vue";
+import LandingMobileBar from "../components/landing/LandingMobileBar.vue";
+import CtaTracking from "../components/landing/CtaTracking.astro";
+import LandingMotion from "../components/landing/LandingMotion.astro";
+import TheatreHeader from "../components/landing/teatro/TheatreHeader.vue";
+import TheatreHero from "../components/landing/teatro/TheatreHero.astro";
+import Reparto from "../components/landing/teatro/Reparto.astro";
+import TheatreActOne from "../components/landing/teatro/TheatreActOne.astro";
+import TheatreSeason from "../components/landing/teatro/TheatreSeason.astro";
+import Intermission from "../components/landing/teatro/Intermission.astro";
+import ThreeCalls from "../components/landing/teatro/ThreeCalls.astro";
+import TheatreProgram from "../components/landing/teatro/TheatreProgram.astro";
+import TheatreVenues from "../components/landing/teatro/TheatreVenues.astro";
+import CriticQuote from "../components/landing/teatro/CriticQuote.astro";
+import TheatreClosing from "../components/landing/teatro/TheatreClosing.astro";
+import TheatreTracking from "../components/landing/teatro/TheatreTracking.astro";
+import ActEyebrow from "../components/landing/teatro/ActEyebrow.astro";
+import Layout from "../layouts/Layout.astro";
+import { publishUrl } from "../components/landing/links.js";
+import { THEATRE_PHOTOS } from "../components/landing/teatro/teatroLanding.js";
+import { getLanding } from "../data/landings";
+import { TEATRO_FAQ } from "../data/teatroFaq";
+import { IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL } from "../../netlify/lib/fees.mjs";
+import bodoniWoff2 from "@fontsource-variable/bodoni-moda/files/bodoni-moda-latin-wght-normal.woff2?url";
+import "../styles/global.css";
+import "../styles/landing.css";
+import "../styles/landing-teatro.css";
+
+const landing = getLanding("ticketera-teatro");
+if (!landing) throw new Error("Falta la landing ticketera-teatro en src/data/landings.ts");
+const demoHref = landing.demo?.url ?? "/eventos";
+const demoLabel = landing.demo?.label ?? "Ver eventos";
+
+const SITE_URL = (import.meta.env.SITE_URL || "https://aitickets.cl").replace(/\/$/, "");
+const url = `${SITE_URL}/${landing.slug}`;
+const jsonLd = [
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "AI Tickets", item: SITE_URL },
+      { "@type": "ListItem", position: 2, name: "Para organizadores", item: `${SITE_URL}/organizadores` },
+      { "@type": "ListItem", position: 3, name: landing.card.title, item: url },
+    ],
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "AI Tickets para teatro",
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Web",
+    url,
+    description: landing.description,
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "CLP",
+      description: `Sin mensualidad y 0% de comisión para compañías de teatro y salas. El comprador paga un cargo por servicio de ${SERVICE_FEE_PERCENT_LABEL} + IVA (${IVA_PERCENT_LABEL}) sobre ese cargo, o lo absorbe la compañía.`,
+    },
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: TEATRO_FAQ.map((f) => ({
+      "@type": "Question",
+      name: f.q,
+      acceptedAnswer: { "@type": "Answer", text: f.a },
+    })),
+  },
+];
+---
+
+<Layout title={landing.title} description={landing.description} canonical={`/${landing.slug}`} image={THEATRE_PHOTOS.hero.src}>
+  <link slot="head-extra" rel="preload" as="font" type="font/woff2" href={bodoniWoff2} crossorigin />
+  <LandingMotion />
+  <div class="te" data-theme="teatro">
+    <TheatreHeader client:idle publishHref={publishUrl("teatro_header")} />
+    <main>
+      <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+      <TheatreHero ctaLabel={landing.cta.label} demoHref={demoHref} demoLabel={demoLabel} />
+      <Reparto />
+      <TheatreActOne />
+      <TheatreSeason />
+      <Intermission />
+      <ThreeCalls />
+      <TheatreProgram />
+      <TheatreVenues />
+      <CriticQuote />
+
+      <section class="te-section faq" aria-labelledby="te-faq-title" data-te-section="faq">
+        <div class="te-wrap faq-inner" data-lp-reveal>
+          <div class="faq-head">
+            <ActEyebrow text="Preguntas" />
+            <h2 id="te-faq-title" class="te-h2 faq-title" data-lp-step>Preguntas frecuentes</h2>
+          </div>
+          <div class="faq-list" data-lp-step><LandingFaq client:visible items={TEATRO_FAQ} idPrefix="te-faq" /></div>
+        </div>
+      </section>
+
+      <TheatreClosing ctaLabel={landing.cta.label} />
+    </main>
+    <AppFooter client:idle tone="sala" />
+    <LandingMobileBar
+      client:idle
+      variant="pill"
+      title="Gratis para publicar"
+      subtitle="0% de comisión para la compañía"
+      ctaLabel="Publicar obra"
+      publishHref={publishUrl("teatro_mobile_bar")}
+    />
+  </div>
+  <CtaTracking />
+  <TheatreTracking />
+</Layout>
+
+<script>
+  // Loops decorativos (barra de la historia T13): corren solo mientras se ven ([data-te-play] → .is-playing). Con
+  // "reducir movimiento" no hay html.lp-motion y el CSS no los anima.
+  if ("IntersectionObserver" in window) {
+    const io = new IntersectionObserver((entries) => {
+      for (const entry of entries) entry.target.classList.toggle("is-playing", entry.isIntersecting);
+    });
+    document.querySelectorAll("[data-te-play]").forEach((el) => io.observe(el));
+  }
+</script>
+
+<style>
+  .faq-inner {
+    max-width: 880px;
+  }
+  .faq-head {
+    text-align: center;
+  }
+  .faq-title {
+    margin: 16px 0 24px;
+  }
+  /* §4.10: pregunta en Bodoni 500 de 22 px, signo "+" dorado (el giro de 45° ya lo hace LandingFaq) y separadores con
+     filete dorado al 20 % */
+  .faq-list :global(.lf-q) {
+    font-family: var(--te-display);
+    font-size: 22px;
+    line-height: 28px;
+    font-weight: 500;
+  }
+  .faq-list :global(.lf-icon) {
+    color: var(--te-oro);
+  }
+  .faq-list :global(.lf-item) {
+    border-color: rgba(212, 175, 106, 0.2);
+  }
+  @media (min-width: 1024px) {
+    .faq-title {
+      margin-bottom: 40px;
+    }
+  }
+</style>

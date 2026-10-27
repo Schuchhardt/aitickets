@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Noche de Vinilos — mobile</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&amp;family=Prompt:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#FFFFFF;-webkit-font-smoothing:antialiased}
+a{color:#0A0A0B}a:hover{color:#5B5B63}
+.btn-primary{transition:background 120ms cubic-bezier(.22,1,.36,1),transform 120ms cubic-bezier(.22,1,.36,1)}
+.btn-primary:active{transform:scale(.98);transition-duration:80ms}
+.field{transition:border-color 200ms,box-shadow 200ms}
+.field:focus{outline:none;border-color:#0A0A0B !important;box-shadow:0 0 0 4px rgba(154,230,0,.45)}
+.field-err{border-color:#D92D20 !important}
+@keyframes shakeA{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+@keyframes shakeB{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+.shake-a{animation:shakeA 280ms ease}
+.shake-b{animation:shakeB 280ms ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes posterIn{from{opacity:0;transform:scale(.98)}to{opacity:1;transform:none}}
+@keyframes msgIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+@keyframes barUp{from{transform:translateY(100%)}to{transform:none}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes popIn{0%{transform:scale(0)}100%{transform:scale(1)}}
+@keyframes draw{from{stroke-dashoffset:24}to{stroke-dashoffset:0}}
+@keyframes pulse{0%{transform:scale(1);opacity:.6}100%{transform:scale(2.4);opacity:0}}
+.enter-poster{animation:posterIn 480ms cubic-bezier(.22,1,.36,1) both}
+.e1{animation:fadeUp 320ms cubic-bezier(.22,1,.36,1) 80ms both}
+.e2{animation:fadeUp 320ms cubic-bezier(.22,1,.36,1) 120ms both}
+.e3{animation:fadeUp 320ms cubic-bezier(.22,1,.36,1) 160ms both}
+.swap-in{animation:fadeUp 340ms cubic-bezier(.22,1,.36,1) both}
+.msg-in{animation:msgIn 200ms cubic-bezier(.22,1,.36,1) both}
+.bar-up{animation:barUp 320ms cubic-bezier(.22,1,.36,1) both}
+.spinner{animation:spin 700ms linear infinite}
+.dot-pulse{animation:pulse 1.2s ease-out 3}
+.check-circle{animation:popIn 320ms cubic-bezier(.34,1.56,.64,1) both}
+.check-path{stroke-dasharray:24;stroke-dashoffset:24;animation:draw 240ms cubic-bezier(.22,1,.36,1) 200ms forwards}
+@media (prefers-reduced-motion: reduce){*{animation-duration:1ms !important;animation-delay:0ms !important;transition-duration:1ms !important}}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; font-family: 'Prompt', system-ui, sans-serif; color: #0A0A0B; background: #FFFFFF">
+  <div ref="{{setScroller}}" onScroll="{{onScroll}}" style="position: absolute; inset: 0; overflow-y: auto">
+    <header style="height: 56px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; background: #F8ECE4">
+      <a href="#" style="display: flex; align-items: center; gap: 2px; text-decoration: none; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 15px; letter-spacing: .14em; color: #0A0A0B" aria-label="AI Tickets, inicio"><span style="background: #0A0A0B; color: #FFFFFF; padding: 2px 5px; letter-spacing: .04em">AI</span><span>TICKETS</span></a>
+      <button type="button" aria-label="Preguntarle al asistente" style="width: 40px; height: 40px; border-radius: 12px; border: 1px solid rgba(0,0,0,.12); background: #FFFFFF; display: flex; align-items: center; justify-content: center">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0A0A0B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"></path></svg>
+      </button>
+    </header>
+
+    <div style="background: linear-gradient(#F8ECE4 0 300px, #FFFFFF 300px); padding: 8px 16px 0">
+      <figure class="enter-poster" style="margin: 0; aspect-ratio: 1 / 1; border-radius: 20px; overflow: hidden; background: #E8572A; position: relative; box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.08)" role="img" aria-label="Póster de Noche de Vinilos">
+        <div style="position: absolute; width: 120%; aspect-ratio: 1 / 1; right: -60%; top: 22%; border-radius: 50%; background: repeating-radial-gradient(circle at center, #141414 0 3px, #1F1F1F 3px 6px)"></div>
+        <div style="position: absolute; width: 30%; aspect-ratio: 1 / 1; right: 5%; top: 67%; border-radius: 50%; background: #F4E6D4"></div>
+        <div style="position: absolute; left: 22px; top: 22px; font-family: 'Sora', sans-serif; color: #F4E6D4">
+          <div style="font-size: 11px; font-weight: 600; letter-spacing: .18em">CLUB SURCO PRESENTA</div>
+          <div style="font-size: 44px; line-height: .92; font-weight: 800; letter-spacing: -.03em; margin-top: 12px">NOCHE<br>DE<br>VINILOS</div>
+        </div>
+        <div style="position: absolute; left: 22px; bottom: 22px; font-family: 'Sora', sans-serif; color: #141414; font-size: 12px; font-weight: 700; letter-spacing: .06em">JUE 22 OCT · 20:00</div>
+      </figure>
+    </div>
+
+    <div style="padding: 20px 16px 0; display: flex; flex-direction: column; gap: 14px">
+      <div class="e1" style="display: flex; gap: 8px; align-items: center">
+        <span style="background: #9AE600; font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 999px">Gratis</span>
+        <span style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: #8A3A06">
+          <span style="position: relative; width: 6px; height: 6px"><span class="dot-pulse" style="position: absolute; inset: 0; border-radius: 50%; background: #B54708"></span><span style="position: absolute; inset: 0; border-radius: 50%; background: #B54708"></span></span>Quedan 12 cupos</span>
+      </div>
+      <h1 class="e2" style="font-family: 'Sora', sans-serif; font-size: 30px; line-height: 34px; font-weight: 700; letter-spacing: -.02em; margin: 0">Noche de Vinilos</h1>
+      <div class="e3" style="display: flex; flex-direction: column; gap: 10px; font-size: 15px">
+        <div style="display: flex; align-items: center; gap: 8px; color: #5B5B63; font-size: 14px">
+          <span style="width: 22px; height: 22px; border-radius: 50%; background: #0A0A0B; color: #9AE600; font-family: 'Sora', sans-serif; font-size: 10px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center" aria-hidden="true">CS</span>Organiza <strong style="color: #0A0A0B; font-weight: 500">Club Surco</strong></div>
+        <div style="display: flex; gap: 12px; align-items: center">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0A0A0B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M16 3v4M8 3v4M3 10h18"></path></svg>
+          <div><div style="font-weight: 600">Jueves 22 de octubre</div><div style="font-size: 14px; color: #5B5B63">20:00 – 23:30</div></div>
+        </div>
+        <div style="display: flex; gap: 12px; align-items: center">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0A0A0B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"></path><circle cx="12" cy="9.5" r="2.5"></circle></svg>
+          <div><div style="font-weight: 600">Galpón Italia</div><div style="font-size: 14px; color: #5B5B63">Av. Italia 1150, Providencia</div></div>
+        </div>
+      </div>
+
+      <section aria-label="Confirmar asistencia" style="margin-top: 6px; background: #FFFFFF; border: 1px solid rgba(0,0,0,.08); border-radius: 16px; padding: 16px; box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.06)">
+        <sc-if value="{{isForm}}" hint-placeholder-val="{{ true }}">
+          <form onSubmit="{{submit}}" novalidate="" style="display: flex; flex-direction: column; gap: 12px">
+            <div style="display: flex; flex-direction: column; gap: 6px">
+              <label for="m-name" style="font-size: 14px; font-weight: 500">Nombre y apellido</label>
+              <input id="m-name" ref="{{setNameInput}}" class="{{nameCls}}" type="text" autocomplete="name" value="{{name}}" onChange="{{onName}}" readOnly="{{busy}}" aria-invalid="{{nameInvalid}}" placeholder="Sebastián Pérez" style="height: 48px; border: 1px solid rgba(0,0,0,.16); border-radius: 12px; padding: 0 14px; font-family: inherit; font-size: 16px; background: #FFFFFF; opacity: {{fieldOpacity}}">
+              <sc-if value="{{errName}}" hint-placeholder-val="{{ false }}"><div class="msg-in" style="font-size: 13px; color: #B42318">{{errName}}</div></sc-if>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px">
+              <label for="m-email" style="font-size: 14px; font-weight: 500">Email</label>
+              <input id="m-email" class="{{emailCls}}" type="email" inputmode="email" autocomplete="email" value="{{email}}" onChange="{{onEmail}}" readOnly="{{busy}}" aria-invalid="{{emailInvalid}}" placeholder="tu@email.com" style="height: 48px; border: 1px solid rgba(0,0,0,.16); border-radius: 12px; padding: 0 14px; font-family: inherit; font-size: 16px; background: #FFFFFF; opacity: {{fieldOpacity}}">
+              <sc-if value="{{errEmail}}" hint-placeholder-val="{{ false }}"><div class="msg-in" style="font-size: 13px; color: #B42318">{{errEmail}}</div></sc-if>
+              <sc-if value="{{suggestion}}" hint-placeholder-val="{{ false }}">
+                <div class="msg-in" style="font-size: 13px; color: #5B5B63">¿Quisiste decir <button type="button" onClick="{{applySuggestion}}" style="background: none; border: 0; padding: 0; font: inherit; color: #0A0A0B; font-weight: 600; text-decoration: underline">{{suggestion}}</button>?</div>
+              </sc-if>
+            </div>
+            <button type="submit" class="btn-primary" disabled="{{busy}}" style="height: 48px; border: 0; border-radius: 12px; background: #0A0A0B; color: #FFFFFF; font-family: inherit; font-size: 16px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 10px">
+              <sc-if value="{{busy}}" hint-placeholder-val="{{ false }}"><span class="spinner" style="width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(255,255,255,.3); border-top-color: #FFFFFF" aria-hidden="true"></span></sc-if>
+              <span>{{ctaLabel}}</span>
+            </button>
+            <p style="margin: 0; font-size: 12px; line-height: 18px; color: #6E6E76">Al confirmar aceptas los <a href="#" style="color: #5B5B63">Términos</a> y la <a href="#" style="color: #5B5B63">Política de privacidad</a>.</p>
+          </form>
+        </sc-if>
+        <sc-if value="{{isSuccess}}" hint-placeholder-val="{{ false }}">
+          <div class="swap-in" role="status" style="display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 6px 0">
+            <div class="check-circle" style="width: 52px; height: 52px; border-radius: 50%; background: #9AE600; display: flex; align-items: center; justify-content: center">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0A0A0B" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="check-path" d="M5 12.5l4.5 4.5L19 7.5"></path></svg>
+            </div>
+            <h2 style="font-family: 'Sora', sans-serif; font-size: 19px; font-weight: 700; margin: 4px 0 0">¡Listo, {{firstName}}! Estás dentro.</h2>
+            <p style="margin: 0; font-size: 14px; line-height: 21px; color: #5B5B63">Te enviamos tu entrada con QR a<br><strong style="color: #0A0A0B; font-weight: 600">{{email}}</strong></p>
+            <div style="display: flex; gap: 8px; width: 100%; margin-top: 8px">
+              <button type="button" style="flex: 1; height: 44px; border-radius: 12px; border: 1px solid rgba(0,0,0,.16); background: #FFFFFF; font-family: inherit; font-size: 14px; font-weight: 500">Añadir al calendario</button>
+              <button type="button" style="flex: 1; height: 44px; border-radius: 12px; border: 1px solid rgba(0,0,0,.16); background: #FFFFFF; font-family: inherit; font-size: 14px; font-weight: 500">Invitar a alguien</button>
+            </div>
+            <a href="#" style="margin-top: 4px; font-size: 14px; font-weight: 500; text-decoration: none">Ver mi entrada →</a>
+          </div>
+        </sc-if>
+      </section>
+
+      <section style="margin-top: 26px">
+        <h2 style="font-family: 'Sora', sans-serif; font-size: 18px; font-weight: 700; margin: 0 0 10px">Sobre el evento</h2>
+        <p style="margin: 0 0 10px; font-size: 16px; line-height: 26px; color: #2A2A2F">Una noche para escuchar discos completos, de principio a fin, en un buen equipo de sonido y sin celulares en la mano.</p>
+        <p style="margin: 0; font-size: 16px; line-height: 26px; color: #2A2A2F">Esta edición suenan tres discos elegidos por la comunidad de Club Surco. Entre cada lado hay una pausa corta para conversar y servirse algo.</p>
+      </section>
+      <section style="margin-top: 26px">
+        <h2 style="font-family: 'Sora', sans-serif; font-size: 18px; font-weight: 700; margin: 0 0 10px">Ubicación</h2>
+        <div style="position: relative; aspect-ratio: 16 / 9; border-radius: 16px; overflow: hidden; background: #EEF0EC" role="img" aria-label="Mapa de Galpón Italia">
+          <div style="position: absolute; left: -10%; right: -10%; top: 40%; height: 12px; background: #FFFFFF; transform: rotate(-8deg)"></div>
+          <div style="position: absolute; top: -10%; bottom: -10%; left: 34%; width: 9px; background: #FFFFFF; transform: rotate(12deg)"></div>
+          <div style="position: absolute; left: 50%; top: 52%; transform: translate(-50%, -100%)"><svg width="28" height="36" viewBox="0 0 32 40" aria-hidden="true"><path d="M16 39s13-12.6 13-23A13 13 0 0 0 3 16c0 10.4 13 23 13 23z" fill="#0A0A0B"></path><circle cx="16" cy="16" r="5" fill="#9AE600"></circle></svg></div>
+        </div>
+        <a href="#" style="display: inline-block; margin-top: 10px; font-size: 14px; font-weight: 500; text-decoration: none">Cómo llegar ↗</a>
+      </section>
+      <div style="height: 120px"></div>
+    </div>
+  </div>
+
+  <sc-if value="{{showBar}}" hint-placeholder-val="{{ false }}">
+    <div class="bar-up" style="position: absolute; left: 0; right: 0; bottom: 0; height: 88px; box-sizing: border-box; padding: 12px 16px 22px; background: rgba(255,255,255,.92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-top: 1px solid rgba(0,0,0,.08); display: flex; align-items: center; justify-content: space-between; gap: 12px">
+      <div>
+        <div style="font-family: 'Sora', sans-serif; font-size: 18px; font-weight: 700">Gratis</div>
+        <div style="font-size: 12px; color: #8A3A06">Quedan 12 cupos</div>
+      </div>
+      <button type="button" onClick="{{goToCard}}" class="btn-primary" style="min-width: 180px; height: 48px; border: 0; border-radius: 12px; background: #0A0A0B; color: #FFFFFF; font-family: inherit; font-size: 15px; font-weight: 600">Confirmar asistencia</button>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+var DOMAINS = ['gmail.com','hotmail.com','outlook.com','yahoo.com','icloud.com','live.cl','hotmail.cl','yahoo.es','me.com','uc.cl','uchile.cl'];
+function lev(a, b) {
+  var m = a.length, n = b.length, d = [], i, j;
+  for (i = 0; i <= m; i++) { d[i] = [i]; }
+  for (j = 0; j <= n; j++) { d[0][j] = j; }
+  for (i = 1; i <= m; i++) { for (j = 1; j <= n; j++) { d[i][j] = Math.min(d[i-1][j] + 1, d[i][j-1] + 1, d[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1)); } }
+  return d[m][n];
+}
+function suggest(email) {
+  var at = email.lastIndexOf('@');
+  if (at < 1) return '';
+  var dom = email.slice(at + 1).toLowerCase();
+  if (dom.length < 4 || DOMAINS.indexOf(dom) >= 0) return '';
+  var best = '', bestD = 3;
+  DOMAINS.forEach(function (x) { var dd = lev(dom, x); if (dd < bestD) { bestD = dd; best = x; } });
+  return best ? email.slice(0, at + 1) + best : '';
+}
+function validEmail(e) { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e); }
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { name: '', email: '', status: 'idle', errName: '', errEmail: '', shake: 0, scrolled: false };
+    this.scroller = null;
+    this.nameInput = null;
+  }
+  renderVals() {
+    var s = this.state, self = this;
+    var busy = s.status === 'submitting';
+    var shakeCls = s.shake % 2 ? ' shake-a' : ' shake-b';
+    var first = (s.name.trim().split(/\s+/)[0]) || '';
+    return {
+      name: s.name, email: s.email, busy: busy,
+      isForm: s.status !== 'success', isSuccess: s.status === 'success',
+      errName: s.errName, errEmail: s.errEmail,
+      nameInvalid: s.errName ? 'true' : 'false', emailInvalid: s.errEmail ? 'true' : 'false',
+      nameCls: 'field' + (s.errName ? ' field-err' + (s.shake ? shakeCls : '') : ''),
+      emailCls: 'field' + (s.errEmail ? ' field-err' + (s.shake ? shakeCls : '') : ''),
+      fieldOpacity: busy ? 0.6 : 1,
+      suggestion: s.errEmail ? '' : suggest(s.email.trim()),
+      ctaLabel: busy ? 'Confirmando…' : 'Confirmar asistencia',
+      firstName: first.charAt(0).toUpperCase() + first.slice(1),
+      showBar: s.scrolled && s.status !== 'success',
+      setScroller: function (el) { self.scroller = el; },
+      setNameInput: function (el) { self.nameInput = el; },
+      onScroll: function (e) { var past = e.currentTarget.scrollTop > 820; if (past !== self.state.scrolled) self.setState({ scrolled: past }); },
+      goToCard: function () {
+        if (self.scroller) self.scroller.scrollTo({ top: 520, behavior: 'smooth' });
+        setTimeout(function () { if (self.nameInput) self.nameInput.focus({ preventScroll: true }); }, 450);
+      },
+      onName: function (e) { self.setState({ name: e.target.value, errName: '' }); },
+      onEmail: function (e) { self.setState({ email: e.target.value, errEmail: '' }); },
+      applySuggestion: function () { self.setState({ email: suggest(self.state.email.trim()) }); },
+      submit: function (e) {
+        if (e && e.preventDefault) e.preventDefault();
+        if (self.state.status === 'submitting') return;
+        var en = self.state.name.trim().length >= 2 ? '' : 'Escribe tu nombre.';
+        var ee = validEmail(self.state.email.trim()) ? '' : 'Revisa tu email, parece incompleto.';
+        if (en || ee) { self.setState({ errName: en, errEmail: ee, shake: self.state.shake + 1 }); return; }
+        self.setState({ status: 'submitting' });
+        setTimeout(function () { self.setState({ status: 'success' }); }, 1100);
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

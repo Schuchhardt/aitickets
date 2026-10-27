@@ -31,6 +31,8 @@
   --danger-text: #b42318;
   --warning: #b54708;
   --warning-text: #8a3a06;
+  /* Texto en tono positivo (rótulo "Asistencia confirmada"): el lima no cumple AA como texto sobre blanco */
+  --success-text: #067647;
 
   /* Tinte del evento (HSL sin función; lo fija la página según el póster) */
   --event-tint: 240 10% 96%;

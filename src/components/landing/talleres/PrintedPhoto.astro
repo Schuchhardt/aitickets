@@ -1,0 +1,41 @@
+---
+// Foto impresa de la landing de talleres (SPEC_landing_talleres §1 y §7): <picture> con AVIF/WebP a varios anchos, ancho
+// y alto reservados (CLS) y lazy-load salvo la del hero (priority: eager, fetchpriority="high", LCP). El borde blanco,
+// el giro (tilt, en grados) y el clip dibujado son CSS y SVG inline (.tl-photo en landing-talleres.css): color natural,
+// sin overlays ni filtros. caption: pie en Caveat (decorativo, aria-hidden: la foto ya tiene su alt).
+interface Props {
+  photo: { src: string; width: number; height: number; sources: { type: string; srcset: string }[] };
+  alt: string;
+  /** Ancho que ocupa la foto en pantalla (atributo sizes) */
+  sizes: string;
+  tilt?: number;
+  caption?: string;
+  class?: string;
+  priority?: boolean;
+  /** Recorte (aspect-ratio CSS, p. ej. "4 / 5"); por defecto el de la foto */
+  ratio?: string;
+}
+
+const { photo, alt, sizes, tilt = 0, caption, class: className, priority = false, ratio } = Astro.props;
+const style = [`--tilt: ${tilt}deg`, ratio ? `--ratio: ${ratio}` : ""].filter(Boolean).join("; ");
+---
+
+<figure class:list={["tl-photo", className]} style={style}>
+  <svg class="tl-clip" viewBox="0 0 22 48" aria-hidden="true">
+    <path d="M7 40 V8 a4 4 0 0 1 8 0 V36 a6 6 0 0 1 -12 0 V12" />
+  </svg>
+  <picture>
+    {photo.sources.map((source) => <source type={source.type} srcset={source.srcset} sizes={sizes} />)}
+    <img
+      class="tl-photo-img"
+      src={photo.src}
+      alt={alt}
+      width={photo.width}
+      height={photo.height}
+      loading={priority ? "eager" : "lazy"}
+      fetchpriority={priority ? "high" : undefined}
+      decoding={priority ? undefined : "async"}
+    />
+  </picture>
+  {caption && <figcaption class="tl-photo-caption tl-hand" aria-hidden="true">{caption}</figcaption>}
+</figure>

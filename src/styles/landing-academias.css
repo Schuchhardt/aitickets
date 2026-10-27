@@ -1,0 +1,372 @@
+/* ------------------------------------------------------------------------------------------------
+ * Tema de la landing de academias (/academias, docs/specs/rediseno/SPEC_landing_academias_aitickets.md §1).
+ * Claro y cálido, con scope en [data-theme="academias"]: no toca los tokens globales. Dentro del scope se redefinen los
+ * tokens de superficie y texto para que los componentes compartidos (FAQ, badge "Pronto") tomen el papel y la tinta.
+ * El naranjo --ac-chaos solo representa el desorden del "Antes"; el lima, el botón del cierre, las barras y los checks.
+ * Prefijo ac-. Se carga junto a landing.css (usa .lp-sr-only y el movimiento de LandingMotion).
+ * ---------------------------------------------------------------------------------------------- */
+/* Fraunces solo en cursiva 400, servida desde el sitio como las demás fuentes (igual que en stand-up) */
+@import "@fontsource/fraunces/400-italic.css";
+
+[data-theme="academias"] {
+  --ac-paper: #fbf7f0;
+  --ac-card: #ffffff;
+  --ac-sand: #f1eadf;
+  --ac-ink: #1b1712;
+  --ac-ink-hover: #3a322a;
+  --ac-text-2: #3e372f;
+  --ac-text-3: #5e554b; /* eyebrows */
+  --ac-text-4: #6f665c; /* meta y legales (AA sobre paper) */
+  --ac-serif: #7a5c3e;
+  --ac-chaos: #c2410c;
+  --ac-chaos-bg: #fde8df;
+  --ac-chat-bg: #efe6d8;
+  /* Mensaje propio del chat: verde claro sacado del lima de marca, no el verde de WhatsApp (§0.5) */
+  --ac-chat-mine: color-mix(in srgb, var(--brand-lime) 26%, #fff);
+  --ac-line: rgba(27, 23, 18, 0.08);
+  --ac-line-strong: rgba(27, 23, 18, 0.16);
+  /* Texto sobre tinta */
+  --ac-on-ink-1: #fbf7f0;
+  --ac-on-ink-2: #cfc5ba;
+  --ac-on-ink-3: #b5aba0;
+  --ac-shadow-photo: 0 30px 70px rgba(70, 50, 30, 0.18);
+
+  /* Componentes compartidos dentro del tema */
+  --surface-0: var(--ac-paper);
+  --surface-1: var(--ac-card);
+  --surface-2: var(--ac-sand);
+  --border: var(--ac-line);
+  --border-strong: rgba(27, 23, 18, 0.12);
+  --text-1: var(--ac-ink);
+  --text-2: var(--ac-text-3);
+  --text-3: var(--ac-text-4);
+
+  font-family: "Prompt", system-ui, sans-serif;
+  color: var(--ac-ink);
+  background: var(--ac-paper);
+  -webkit-font-smoothing: antialiased;
+}
+
+.ac-wrap {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-inline: 16px;
+}
+@media (min-width: 768px) {
+  .ac-wrap {
+    padding-inline: 40px;
+  }
+}
+.ac [id] {
+  scroll-margin-top: 84px;
+}
+
+/* ---------- Tipografía ----------
+ * Display: Unbounded (la del sitio). La spec escala sobre Sora (H1 64/66 y 38/41, H2 52/56 y 32/36); Unbounded es ~20%
+ * más ancha, así que se baja la escala en la misma proporción (como en /organizadores y /ticketera-stand-up). La
+ * segunda parte de cada titular va en Fraunces cursiva 400 color --ac-serif. */
+.ac-h1,
+.ac-h2,
+.ac-h3 {
+  font-family: "Unbounded", system-ui, sans-serif;
+  font-weight: 700;
+  color: inherit;
+  text-wrap: balance;
+  overflow-wrap: break-word;
+}
+.ac-h1 {
+  font-size: 31px;
+  line-height: 36px;
+  letter-spacing: -0.04em;
+}
+.ac-h2 {
+  font-size: 27px;
+  line-height: 32px;
+  letter-spacing: -0.035em;
+}
+.ac-h3 {
+  font-size: 20px;
+  line-height: 25px;
+  letter-spacing: -0.02em;
+}
+.ac-serif {
+  font-family: "Fraunces", Georgia, serif;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  color: var(--ac-serif);
+}
+.ac-eyebrow {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ac-text-3);
+}
+.ac-lead {
+  font-size: 16px;
+  line-height: 25px;
+  color: var(--ac-text-2);
+}
+.ac-body {
+  font-size: 15px;
+  line-height: 23px;
+  color: var(--ac-text-3);
+}
+.ac-example {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ac-text-4);
+}
+@media (min-width: 1024px) {
+  .ac-h1 {
+    font-size: 52px;
+    line-height: 58px;
+  }
+  .ac-h2 {
+    font-size: 42px;
+    line-height: 48px;
+  }
+  .ac-h3 {
+    font-size: 22px;
+    line-height: 27px;
+  }
+  .ac-eyebrow {
+    font-size: 13px;
+    line-height: 18px;
+  }
+  .ac-lead {
+    font-size: 19px;
+    line-height: 30px;
+  }
+}
+
+/* ---------- Botones y enlaces ---------- */
+.ac-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 0 24px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform var(--dur-1) var(--ease-out), box-shadow var(--dur-2) var(--ease-out),
+    background-color var(--dur-1) var(--ease-out), border-color var(--dur-1) var(--ease-out);
+  -webkit-tap-highlight-color: transparent;
+}
+.ac-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--ac-paper), 0 0 0 5px var(--ac-ink);
+}
+.ac-btn-ink {
+  border: 0;
+  background: var(--ac-ink);
+  color: var(--ac-on-ink-1);
+}
+.ac-btn-ink:hover {
+  background: var(--ac-ink-hover);
+  transform: translateY(-1px);
+}
+.ac-btn-ink:active {
+  transform: scale(0.98);
+}
+.ac-btn-line {
+  border: 1px solid rgba(27, 23, 18, 0.2);
+  background: transparent;
+  color: var(--ac-ink);
+  font-weight: 500;
+}
+.ac-btn-line:hover {
+  border-color: rgba(27, 23, 18, 0.4);
+  background: rgba(27, 23, 18, 0.03);
+}
+/* En el cierre (foto oscura) el primario pasa a lima */
+.ac-btn-lime {
+  border: 0;
+  background: var(--brand-lime);
+  color: var(--ac-ink);
+}
+.ac-btn-lime:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(154, 230, 0, 0.3);
+}
+.ac-btn-lime:focus-visible,
+.ac-btn-line-light:focus-visible {
+  box-shadow: 0 0 0 3px var(--ac-ink), 0 0 0 6px var(--brand-lime);
+}
+.ac-btn-line-light {
+  border: 1px solid rgba(251, 247, 240, 0.35);
+  background: transparent;
+  color: var(--ac-on-ink-1);
+  font-weight: 500;
+}
+.ac-btn-line-light:hover {
+  border-color: rgba(251, 247, 240, 0.6);
+  background: rgba(251, 247, 240, 0.06);
+}
+@media (min-width: 1024px) {
+  .ac-btn {
+    min-height: 54px;
+    padding: 0 26px;
+  }
+}
+.ac-inline-link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: rgba(27, 23, 18, 0.3);
+  border-radius: 4px;
+}
+.ac-inline-link:hover {
+  text-decoration-color: currentColor;
+}
+.ac-inline-link:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+/* ---------- Fotos y cards ---------- */
+.ac-photo {
+  position: relative;
+  overflow: hidden;
+  border-radius: 24px;
+  background: var(--ac-sand);
+  box-shadow: var(--ac-shadow-photo);
+}
+@media (min-width: 768px) {
+  .ac-photo {
+    border-radius: 32px;
+  }
+}
+.ac-photo picture {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.ac-photo-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* AC10: las fotos crecen un poco al pasar el mouse */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .ac-photo .ac-photo-img {
+    transition: transform 900ms var(--ease-out);
+  }
+  .ac-photo:hover .ac-photo-img {
+    transform: scale(1.03);
+  }
+}
+.ac-card {
+  background: var(--ac-card);
+  border-radius: 20px;
+  box-shadow: 0 16px 40px rgba(70, 50, 30, 0.16);
+}
+.ac-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--brand-lime);
+  color: var(--ac-ink);
+}
+.ac-bar-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--ac-sand);
+  overflow: hidden;
+}
+.ac-bar {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--brand-lime);
+  transform: scaleX(var(--lp-scale, 1));
+  transform-origin: left;
+}
+
+/* ---------- Movimiento (SPEC_landing_academias §4) ----------
+ * Igual que /organizadores y stand-up: todo cuelga de html.lp-motion (LandingMotion.astro: JS, IntersectionObserver y
+ * sin "reducir movimiento"); sin la clase, cada elemento queda en su estado final. Solo transform y opacity. */
+@keyframes ac-rise {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+@keyframes ac-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes ac-photo-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+@keyframes ac-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+}
+@keyframes ac-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+@keyframes ac-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+}
+
+/* AC1: eyebrow, H1, bajada y CTAs del hero (rise + fade con stagger) */
+.lp-motion .ac-rise-1 {
+  animation: ac-rise 700ms var(--ease-out) 80ms both;
+}
+.lp-motion .ac-rise-2 {
+  animation: ac-rise 700ms var(--ease-out) 200ms both;
+}
+.lp-motion .ac-fade-1 {
+  animation: ac-fade 700ms ease 350ms both;
+}
+.lp-motion .ac-fade-2 {
+  animation: ac-fade 700ms ease 500ms both;
+}
+/* AC2: foto del hero */
+.lp-motion .ac-photo-in {
+  animation: ac-photo-in 900ms var(--ease-out) 150ms both;
+}
+/* AC3: cards flotantes (pop con --ease-spring y luego flotan ±5 px, dos ciclos) */
+.lp-motion .ac-pop-1 {
+  animation: ac-card-in 600ms var(--ease-spring) 800ms both, ac-float 6s ease-in-out 1500ms 2;
+}
+.lp-motion .ac-pop-2 {
+  animation: ac-card-in 600ms var(--ease-spring) 1050ms both, ac-float 6s ease-in-out 1800ms 2;
+}
+
+/* AC4 y AC9: secciones que entran una vez (fade + translateY 20px, 600 ms) */
+.lp-motion .ac .is-in [data-lp-step],
+.lp-motion .ac .is-in[data-lp-step] {
+  animation: ac-up 600ms var(--ease-out) var(--lp-d, 0ms) both;
+}
+
+/* Fondo del documento (rebote del scroll en iOS y macOS) del mismo color que la página */
+html:has(body [data-theme="academias"]) {
+  background: #fbf7f0;
+}

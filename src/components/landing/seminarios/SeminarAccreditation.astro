@@ -1,0 +1,168 @@
+---
+// 7 · Mesa de acreditación (SPEC_landing_seminarios §4.7, la única sección turquesa, HALL · ACREDITACIÓN ↓, ancla
+// #acreditacion): la firma 2 (isla AccreditationDesk) en una grilla 1fr 300px 1fr, con la credencial colgando sobre la
+// columna 3 desde el borde de la sección (por eso la sección recorta en vertical) y, a la derecha, la foto del hall o
+// los siete ítems; después el chip de credenciales impresas, la nota de pago y los links. Verificado en el código:
+//   varias mesas → rol Puerta (permissions.ts) o link de escáner sin cuenta que vence solo (tools/access.ts, hoy desde el
+//                  asistente de IA)
+//   sin señal → ValidateQR.vue descarga la lista, valida offline y sincroniza (y rechaza lo que ese celular ya escaneó)
+//   otro día → getFunctionCheck (checkin.mjs) con la opción de validarla igual
+//   sin QR → búsqueda por nombre o correo, validación manual y reenvío (/api/orders/resend)
+//   una entrada se valida una sola vez (confirm-ticket): el pase completo se acredita el primer día ("Pronto" el ingreso
+//   diario); detalle por tipo desde el asistente de IA (get_checkin_stats); aforo en vivo en el panel: "Pronto"
+//   acreditar cuenta para el pago → ledger.ts (CHECKIN_RELEASE_THRESHOLD o acreditar que se realizó) y términos §8
+// La foto de referencia muestra una pistola lectora (AI Tickets escanea con la cámara del celular): es "solo staging"
+// (§8) y no hay staging, así que no se muestra (SHOW_DESK_PHOTO) y la columna 3 lleva los ítems (§4.7). Con una foto
+// con celular, los ítems vuelven a dos columnas bajo la mesa.
+// Mobile: credencial arriba, escáner a 260×520, mesas en una fila de 3 cifras, foto omitida e ítems en una columna.
+import { ClipboardCheck } from "lucide-vue-next";
+import AccreditationDesk from "./AccreditationDesk.vue";
+import Figure from "./Figure.astro";
+import SeminarHeading from "./SeminarHeading.astro";
+import WayfindingSign from "./WayfindingSign.astro";
+import SoonBadge from "../../ui/SoonBadge.vue";
+import { PHOTO_ALT, SEMINAR_PHOTOS, SHOW_DESK_PHOTO } from "./seminariosLanding.js";
+import { TERMS_NOTE } from "../../../data/producerFaq";
+
+interface Props {
+  /** Rótulo de la función del Día 2 (formatFunctionLabel) */
+  fnLabel: string;
+}
+const { fnLabel } = Astro.props;
+const items = [
+  {
+    title: "Varias mesas a la vez.",
+    text: "Cada persona de tu equipo entra con el rol Puerta, o con un link de escáner que vence solo (lo creas desde tu asistente de IA). No necesitan tu cuenta.",
+  },
+  { title: "Sin wifi, igual.", text: "Cada celular acredita y rechaza lo que ya escaneó; al volver la conexión, se cruza con las demás mesas." },
+  { title: "¿Llegó el día equivocado?", text: "Si la entrada es de otro día, el escáner avisa y tu equipo decide si la deja pasar." },
+  { title: "¿Sin QR?", text: "Se busca por nombre o correo, se acredita a mano o se le reenvía la entrada." },
+  { title: "La mesa ve qué entrada es.", text: "General, estudiante, convenio o cortesía, con el nombre de su titular." },
+  { title: "El pase completo, una vez.", text: "Se acredita el primer día que la persona llega.", soon: "Ingreso cada día con el mismo pase" },
+  {
+    title: "¿Cuántos llegaron de cada tipo?",
+    text: "El contador del escáner te dice cuántos entraron; el detalle por tipo de entrada te lo da tu asistente de IA.",
+    soon: "Aforo en vivo en el panel",
+  },
+];
+---
+
+<section id="acreditacion" class="se-section se-bg-hall se-on-dark sea" aria-labelledby="se-accreditation-title" data-se-section="acreditacion" data-se-screen="Acreditación">
+  <div class="se-wrap" data-lp-reveal>
+    <WayfindingSign room="Hall" label="Acreditación" icon={ClipboardCheck} arrow="↓" tone="hall" />
+    <SeminarHeading id="se-accreditation-title" text="08:30, el hall lleno." emphasis="La fila avanza con el celular." />
+    <p class="se-lead sea-lead" data-lp-step>
+      Tu equipo acredita desde su teléfono, en varias mesas a la vez. Antes de abrir, cada celular descarga la lista: si el
+      wifi del hotel se cae, sigue acreditando y se sincroniza cuando vuelve.
+    </p>
+
+    <div class:list={["sea-desk", SHOW_DESK_PHOTO && "has-photo"]} data-lp-step>
+      <AccreditationDesk client:visible fnLabel={fnLabel} />
+      {
+        SHOW_DESK_PHOTO && (
+          <div class="sea-photo">
+            <Figure photo={SEMINAR_PHOTOS.acreditacion} alt={PHOTO_ALT.acreditacion} caption="Fig. 04 — Acreditación en el hall." ratio="4 / 5" sizes="260px" />
+          </div>
+        )
+      }
+      <ol class="se-items is-two sea-items">
+        {
+          items.map((item, i) => (
+            <li class="se-item" data-lp-step>
+              <span class="se-num">{i + 1}</span>
+              <div>
+                <p class="se-item-title">{item.title}</p>
+                <p class="se-item-text">{item.text}</p>
+                {item.soon && (
+                  <p class="se-item-extra">
+                    <span class="se-soon-chip">
+                      {item.soon} <SoonBadge dark />
+                    </span>
+                  </p>
+                )}
+              </div>
+            </li>
+          ))
+        }
+      </ol>
+    </div>
+
+    <div class="sea-print" data-lp-step>
+      <p class="se-soon-chip">Imprimir credenciales con nombre <SoonBadge dark /></p>
+      <p class="se-meta sea-print-note">Mientras, exportas tus inscritos a CSV para preparar las credenciales con tu plantilla.</p>
+    </div>
+    <p class="se-note sea-note" data-lp-step>
+      *Acreditar también cuenta para tu pago: los check-ins acreditan que el evento se realizó, una de las condiciones para
+      liberar lo vendido. <a href={TERMS_NOTE.href} class="se-link">{TERMS_NOTE.text}</a>
+    </p>
+    <p class="se-meta sea-links" data-lp-step>
+      <a href="/guias/como-hacer-check-in-con-qr" class="se-link">Guía: check-in con QR →</a>
+      <a href="/entradas-con-qr" class="se-link">Entradas con QR →</a>
+    </p>
+  </div>
+</section>
+
+<style>
+  /* El cordón de la credencial sube hasta el borde de la sección y se corta ahí */
+  .sea {
+    overflow: clip;
+  }
+  .sea-lead {
+    max-width: 680px;
+    margin-top: 18px;
+  }
+  .sea-desk {
+    position: relative;
+    display: grid;
+    gap: 32px;
+    margin-top: 40px;
+  }
+  .sea-photo {
+    display: none;
+  }
+  .sea-items {
+    margin-top: 16px;
+  }
+  .sea-print {
+    margin-top: 28px;
+  }
+  .sea-print-note {
+    margin-top: 8px;
+  }
+  .sea-note {
+    max-width: 720px;
+    margin-top: 20px;
+  }
+  .sea-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 28px;
+    margin-top: 24px;
+  }
+  .sea-links .se-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    color: #ffffff;
+  }
+  @media (min-width: 1024px) {
+    .sea-desk {
+      grid-template-columns: minmax(0, 1fr) 300px minmax(0, 1fr);
+      gap: 40px;
+      align-items: start;
+    }
+    .sea-photo {
+      display: block;
+      justify-self: end;
+      width: 260px;
+    }
+    .sea-desk.has-photo .sea-items {
+      grid-column: 1 / -1;
+    }
+    /* Sin foto, los ítems van en la columna 3, en una sola columna */
+    .sea-desk:not(.has-photo) .sea-items {
+      grid-template-columns: minmax(0, 1fr);
+      margin-top: 0;
+    }
+  }
+</style>

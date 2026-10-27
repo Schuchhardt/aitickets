@@ -1,0 +1,135 @@
+---
+// Landing para academias de música, danza y teatro (docs/specs/rediseno/SPEC_landing_academias_aitickets.md, fases 1 y
+// 2). Ruta /academias, registrada en src/data/landings.ts como dedicated: [landing].astro no la genera y la tarjeta, el
+// sitemap, las relacionadas y "Según lo que produces" de /organizadores siguen leyendo de ahí; el footer la enlaza en
+// "Para quién". Tema propio claro y cálido ([data-theme="academias"], src/styles/landing-academias.css) sin tocar los
+// tokens globales.
+// Reutiliza de /organizadores y stand-up la fórmula de precios (priceQuote → fees.mjs), el FAQ, la barra CTA mobile
+// (en píldora blanca) y el movimiento (LandingMotion). Montos y plazos: fees.mjs, legal.mjs y producerFaq.ts. Lo que no
+// existe en el producto (separar la lista de asistentes por función) va con "Pronto".
+// Fase 3 (contenido real) queda fuera del código: fotos de muestras reales con autorización de la academia y de las
+// familias, testimonio (ACADEMY_TESTIMONIAL, hoy null: la cita no se muestra) y una muestra real enlazada en el hero.
+export const prerender = true;
+import AppFooter from "../components/AppFooter.vue";
+import LandingFaq from "../components/landing/LandingFaq.vue";
+import LandingMobileBar from "../components/landing/LandingMobileBar.vue";
+import CtaTracking from "../components/landing/CtaTracking.astro";
+import LandingMotion from "../components/landing/LandingMotion.astro";
+import AcademyHeader from "../components/landing/academias/AcademyHeader.vue";
+import AcademyHero from "../components/landing/academias/AcademyHero.astro";
+import AcademyCompare from "../components/landing/academias/AcademyCompare.astro";
+import StepsCards from "../components/landing/academias/StepsCards.astro";
+import DoorSection from "../components/landing/academias/DoorSection.astro";
+import FreeVsPaid from "../components/landing/academias/FreeVsPaid.astro";
+import ForWhoChips from "../components/landing/academias/ForWhoChips.astro";
+import AcademyClosing from "../components/landing/academias/AcademyClosing.astro";
+import AcademyTracking from "../components/landing/academias/AcademyTracking.astro";
+import Layout from "../layouts/Layout.astro";
+import { publishUrl } from "../components/landing/links.js";
+import { ACADEMY_PHOTOS } from "../components/landing/academias/academiasLanding.js";
+import { getLanding } from "../data/landings";
+import { IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL } from "../../netlify/lib/fees.mjs";
+import "../styles/global.css";
+import "../styles/landing.css";
+import "../styles/landing-academias.css";
+
+const landing = getLanding("academias");
+if (!landing) throw new Error("Falta la landing academias en src/data/landings.ts");
+const demoHref = landing.demo?.url ?? "/eventos";
+const demoLabel = landing.demo?.label ?? "Ver eventos";
+
+const SITE_URL = (import.meta.env.SITE_URL || "https://aitickets.cl").replace(/\/$/, "");
+const url = `${SITE_URL}/${landing.slug}`;
+const jsonLd = [
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "AI Tickets", item: SITE_URL },
+      { "@type": "ListItem", position: 2, name: "Para organizadores", item: `${SITE_URL}/organizadores` },
+      { "@type": "ListItem", position: 3, name: landing.card.title, item: url },
+    ],
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "AI Tickets para academias",
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Web",
+    url,
+    description: landing.description,
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "CLP",
+      description: `Gratis para muestras gratuitas. Si se cobra entrada, 0% de comisión para la academia: la familia paga un cargo por servicio de ${SERVICE_FEE_PERCENT_LABEL} + IVA (${IVA_PERCENT_LABEL}) sobre ese cargo, o lo absorbe la academia.`,
+    },
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: landing.faq.map((f) => ({
+      "@type": "Question",
+      name: f.q,
+      acceptedAnswer: { "@type": "Answer", text: f.a },
+    })),
+  },
+];
+---
+
+<Layout title={landing.title} description={landing.description} canonical={`/${landing.slug}`} image={ACADEMY_PHOTOS.recital.src}>
+  <LandingMotion />
+  <div class="ac" data-theme="academias">
+    <AcademyHeader client:idle publishHref={publishUrl("academias_header")} />
+    <main>
+      <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+      <AcademyHero demoHref={demoHref} demoLabel={demoLabel} />
+      <AcademyCompare />
+      <StepsCards />
+      <DoorSection />
+      <FreeVsPaid />
+      <ForWhoChips />
+
+      <section class="ac-wrap faq" aria-labelledby="ac-faq-title" data-ac-section="faq">
+        <div class="faq-inner" data-lp-reveal>
+          <h2 id="ac-faq-title" class="ac-h2 faq-title" data-lp-step>Preguntas frecuentes</h2>
+          <div data-lp-step><LandingFaq client:visible items={landing.faq} idPrefix="ac-faq" /></div>
+        </div>
+      </section>
+
+      <AcademyClosing />
+    </main>
+    <AppFooter client:idle tone="paper" />
+    <LandingMobileBar
+      client:idle
+      variant="pill-light"
+      title="Gratis para muestras gratis"
+      subtitle="0% de comisión si cobras"
+      ctaLabel="Crear muestra"
+      publishHref={publishUrl("academias_mobile_bar")}
+    />
+  </div>
+  <CtaTracking />
+  <AcademyTracking />
+</Layout>
+
+<style>
+  .faq {
+    padding-bottom: 72px;
+  }
+  .faq-inner {
+    max-width: 860px;
+    margin: 0 auto;
+  }
+  .faq-title {
+    margin-bottom: 12px;
+  }
+  @media (min-width: 1024px) {
+    .faq {
+      padding-bottom: 128px;
+    }
+    .faq-title {
+      margin-bottom: 20px;
+    }
+  }
+</style>

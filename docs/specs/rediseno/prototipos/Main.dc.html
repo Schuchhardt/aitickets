@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Noche de Vinilos — evento gratuito</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&amp;family=Prompt:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#FFFFFF;-webkit-font-smoothing:antialiased}
+a{color:#0A0A0B}a:hover{color:#5B5B63}
+.btn-primary{transition:background 120ms cubic-bezier(.22,1,.36,1),transform 120ms cubic-bezier(.22,1,.36,1)}
+.btn-primary:hover{background:#26262A !important;transform:translateY(-1px)}
+.btn-primary:active{transform:scale(.98);transition-duration:80ms}
+.btn-ghost{transition:background 120ms,border-color 120ms}
+.btn-ghost:hover{background:#F6F6F7 !important;border-color:rgba(0,0,0,.24) !important}
+.link-quiet{transition:color 120ms}
+.link-quiet:hover{color:#0A0A0B !important}
+.field{transition:border-color 200ms,box-shadow 200ms}
+.field:focus{outline:none;border-color:#0A0A0B !important;box-shadow:0 0 0 4px rgba(154,230,0,.45)}
+.field-err{border-color:#D92D20 !important}
+@keyframes shakeA{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+@keyframes shakeB{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+.shake-a{animation:shakeA 280ms ease}
+.shake-b{animation:shakeB 280ms ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes posterIn{from{opacity:0;transform:scale(.98)}to{opacity:1;transform:none}}
+@keyframes tintIn{from{opacity:0}to{opacity:1}}
+@keyframes cardIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes msgIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+@keyframes pulse{0%{transform:scale(1);opacity:.6}100%{transform:scale(2.4);opacity:0}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes popIn{0%{transform:scale(0)}100%{transform:scale(1)}}
+@keyframes draw{from{stroke-dashoffset:24}to{stroke-dashoffset:0}}
+.enter-poster{animation:posterIn 480ms cubic-bezier(.22,1,.36,1) both}
+.enter-tint{animation:tintIn 600ms ease both}
+.e1{animation:fadeUp 320ms cubic-bezier(.22,1,.36,1) 80ms both}
+.e2{animation:fadeUp 320ms cubic-bezier(.22,1,.36,1) 120ms both}
+.e3{animation:fadeUp 320ms cubic-bezier(.22,1,.36,1) 160ms both}
+.e4{animation:fadeUp 320ms cubic-bezier(.22,1,.36,1) 200ms both}
+.e5{animation:fadeUp 320ms cubic-bezier(.22,1,.36,1) 240ms both}
+.enter-card{animation:cardIn 320ms cubic-bezier(.22,1,.36,1) 280ms both}
+.swap-in{animation:fadeUp 340ms cubic-bezier(.22,1,.36,1) both}
+.msg-in{animation:msgIn 200ms cubic-bezier(.22,1,.36,1) both}
+.dot-pulse{animation:pulse 1.2s ease-out 3}
+.spinner{animation:spin 700ms linear infinite}
+.check-circle{animation:popIn 320ms cubic-bezier(.34,1.56,.64,1) both}
+.check-path{stroke-dasharray:24;stroke-dashoffset:24;animation:draw 240ms cubic-bezier(.22,1,.36,1) 200ms forwards}
+.faq-body{transition:grid-template-rows 200ms cubic-bezier(.65,0,.35,1)}
+.chev{transition:transform 200ms cubic-bezier(.65,0,.35,1)}
+@media (prefers-reduced-motion: reduce){*{animation-duration:1ms !important;animation-delay:0ms !important;transition-duration:1ms !important}}
+</style>
+</helmet>
+<div style="font-family: 'Prompt', system-ui, sans-serif; color: #0A0A0B; background: #FFFFFF; min-height: 100vh">
+
+  <header style="border-bottom: 1px solid rgba(0,0,0,.08); background: #FFFFFF">
+    <div style="max-width: 1080px; margin: 0 auto; padding: 0 24px; height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 16px">
+      <a href="#" style="display: flex; align-items: center; gap: 2px; text-decoration: none; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 17px; letter-spacing: .14em; color: #0A0A0B" aria-label="AI Tickets, inicio">
+        <span style="background: #0A0A0B; color: #FFFFFF; padding: 2px 5px; letter-spacing: .04em">AI</span><span>TICKETS</span>
+      </a>
+      <nav style="display: flex; align-items: center; gap: 24px; font-size: 14px; font-weight: 500">
+        <a href="#" class="link-quiet" style="color: #5B5B63; text-decoration: none">Eventos</a>
+        <a href="#" class="link-quiet" style="color: #5B5B63; text-decoration: none">Para organizadores</a>
+        <a href="#" class="btn-primary" style="background: #0A0A0B; color: #FFFFFF; text-decoration: none; padding: 8px 14px; border-radius: 999px">Ingresar</a>
+      </nav>
+    </div>
+  </header>
+
+  <div class="enter-tint" style="background: #F8ECE4; position: absolute; left: 0; right: 0; top: 65px; height: 560px; z-index: 0" aria-hidden="true"></div>
+
+  <main style="position: relative; z-index: 1; max-width: 1080px; margin: 0 auto; padding: 48px 24px 64px; display: flex; flex-wrap: wrap; gap: 48px; align-items: flex-start">
+
+    <div style="flex: 1 1 380px; max-width: 440px; min-width: 0; display: flex; flex-direction: column; gap: 56px">
+      <figure class="enter-poster" style="margin: 0; aspect-ratio: 4 / 5; border-radius: 24px; overflow: hidden; background: #E8572A; position: relative; box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.08)" role="img" aria-label="Póster de Noche de Vinilos">
+        <div style="position: absolute; width: 132%; aspect-ratio: 1 / 1; right: -58%; top: 18%; border-radius: 50%; background: repeating-radial-gradient(circle at center, #141414 0 3px, #1F1F1F 3px 6px)"></div>
+        <div style="position: absolute; width: 34%; aspect-ratio: 1 / 1; right: 8%; top: 51%; border-radius: 50%; background: #F4E6D4; display: flex; align-items: center; justify-content: center">
+          <div style="width: 14%; aspect-ratio: 1 / 1; border-radius: 50%; background: #141414"></div>
+        </div>
+        <div style="position: absolute; left: 28px; top: 28px; right: 28px; font-family: 'Sora', sans-serif; color: #F4E6D4">
+          <div style="font-size: 13px; font-weight: 600; letter-spacing: .18em">CLUB SURCO PRESENTA</div>
+          <div style="font-size: 56px; line-height: .92; font-weight: 800; letter-spacing: -.03em; margin-top: 16px">NOCHE<br>DE<br>VINILOS</div>
+        </div>
+        <div style="position: absolute; left: 28px; bottom: 28px; font-family: 'Sora', sans-serif; color: #141414; font-size: 14px; font-weight: 700; letter-spacing: .06em">JUE 22 OCT · 20:00</div>
+      </figure>
+
+      <section aria-labelledby="about-h">
+        <h2 id="about-h" style="font-family: 'Sora', sans-serif; font-size: 20px; font-weight: 700; margin: 0 0 12px">Sobre el evento</h2>
+        <div style="font-size: 16px; line-height: 26px; color: #2A2A2F">
+          <p style="margin: 0 0 12px">Una noche para escuchar discos completos, de principio a fin, en un buen equipo de sonido y sin celulares en la mano.</p>
+          <p style="margin: 0 0 12px">Esta edición suenan tres discos elegidos por la comunidad de Club Surco. Entre cada lado hay una pausa corta para conversar, servirse algo y comentar lo que se escuchó.</p>
+          <p style="margin: 0">Cupos limitados por la capacidad del galpón. Si confirmas y no puedes ir, avísanos para liberar tu lugar.</p>
+        </div>
+      </section>
+
+      <section aria-labelledby="loc-h">
+        <h2 id="loc-h" style="font-family: 'Sora', sans-serif; font-size: 20px; font-weight: 700; margin: 0 0 12px">Ubicación</h2>
+        <div style="position: relative; aspect-ratio: 16 / 9; border-radius: 16px; overflow: hidden; background: #EEF0EC; border: 1px solid rgba(0,0,0,.08)" role="img" aria-label="Mapa de Galpón Italia">
+          <div style="position: absolute; left: -10%; right: -10%; top: 38%; height: 14px; background: #FFFFFF; transform: rotate(-8deg)"></div>
+          <div style="position: absolute; left: -10%; right: -10%; top: 72%; height: 8px; background: #FFFFFF; transform: rotate(4deg)"></div>
+          <div style="position: absolute; top: -10%; bottom: -10%; left: 30%; width: 10px; background: #FFFFFF; transform: rotate(12deg)"></div>
+          <div style="position: absolute; top: -10%; bottom: -10%; left: 68%; width: 8px; background: #FFFFFF; transform: rotate(-6deg)"></div>
+          <div style="position: absolute; left: 48%; top: 30%; width: 22%; height: 22%; background: #DCE6D2; border-radius: 6px"></div>
+          <div style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -100%)">
+            <svg width="32" height="40" viewBox="0 0 32 40" aria-hidden="true"><path d="M16 39s13-12.6 13-23A13 13 0 0 0 3 16c0 10.4 13 23 13 23z" fill="#0A0A0B"></path><circle cx="16" cy="16" r="5" fill="#9AE600"></circle></svg>
+          </div>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap">
+          <div style="font-size: 14px; line-height: 20px; color: #5B5B63">Av. Italia 1150, Providencia</div>
+          <a href="#" class="btn-ghost" style="font-size: 14px; font-weight: 500; text-decoration: none; color: #0A0A0B; border: 1px solid rgba(0,0,0,.16); border-radius: 999px; padding: 8px 14px; display: inline-flex; align-items: center; gap: 6px">Cómo llegar
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7"></path><path d="M8 7h9v9"></path></svg>
+          </a>
+        </div>
+      </section>
+
+      <section aria-labelledby="faq-h">
+        <h2 id="faq-h" style="font-family: 'Sora', sans-serif; font-size: 20px; font-weight: 700; margin: 0 0 4px">Preguntas frecuentes</h2>
+        <sc-for list="{{faqs}}" as="f" hint-placeholder-count="3">
+          <div style="border-bottom: 1px solid rgba(0,0,0,.08)">
+            <button type="button" onClick="{{f.toggle}}" aria-expanded="{{f.expanded}}" style="width: 100%; background: none; border: 0; padding: 16px 0; display: flex; justify-content: space-between; align-items: center; gap: 12px; font-family: inherit; font-size: 16px; font-weight: 500; color: #0A0A0B; text-align: left; cursor: pointer">
+              <span>{{f.q}}</span>
+              <svg class="chev" style="transform: {{f.rot}}; flex: 0 0 auto" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5B5B63" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+            </button>
+            <div class="faq-body" style="display: grid; grid-template-rows: {{f.rows}}">
+              <div style="overflow: hidden">
+                <p style="margin: 0 0 16px; font-size: 15px; line-height: 24px; color: #5B5B63">{{f.a}}</p>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+        <a href="#" class="link-quiet" style="display: inline-flex; align-items: center; gap: 6px; margin-top: 20px; font-size: 14px; color: #5B5B63; text-decoration: none">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"></path></svg>
+          ¿No encuentras lo que buscas? Pregúntale al asistente →
+        </a>
+      </section>
+    </div>
+
+    <div style="flex: 999 1 420px; min-width: 0; position: sticky; top: 24px; display: flex; flex-direction: column; gap: 20px">
+      <div class="e1" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap">
+        <span style="background: #9AE600; color: #0A0A0B; font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 999px">Gratis</span>
+        <span style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: #8A3A06; background: #FFFFFF; border: 1px solid rgba(0,0,0,.08); padding: 4px 10px; border-radius: 999px">
+          <span style="position: relative; width: 6px; height: 6px">
+            <span class="dot-pulse" style="position: absolute; inset: 0; border-radius: 50%; background: #B54708"></span>
+            <span style="position: absolute; inset: 0; border-radius: 50%; background: #B54708"></span>
+          </span>
+          Quedan 12 cupos
+        </span>
+      </div>
+
+      <h1 class="e2" style="font-family: 'Sora', sans-serif; font-size: 44px; line-height: 48px; font-weight: 700; letter-spacing: -.02em; margin: 0">Noche de Vinilos</h1>
+
+      <div class="e3" style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: #5B5B63">
+        <span style="width: 24px; height: 24px; border-radius: 50%; background: #0A0A0B; color: #9AE600; font-family: 'Sora', sans-serif; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center" aria-hidden="true">CS</span>
+        <span>Organiza <a href="#" style="color: #0A0A0B; font-weight: 500; text-decoration: none">Club Surco</a></span>
+      </div>
+
+      <div class="e4" style="display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; gap: 14px; align-items: center">
+          <div style="width: 48px; height: 48px; border-radius: 12px; border: 1px solid rgba(0,0,0,.12); background: #FFFFFF; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; flex: 0 0 auto" aria-hidden="true">
+            <div style="font-size: 10px; font-weight: 600; letter-spacing: .08em; color: #5B5B63; line-height: 12px">OCT</div>
+            <div style="font-family: 'Sora', sans-serif; font-size: 20px; font-weight: 700; line-height: 22px">22</div>
+          </div>
+          <div>
+            <div style="font-size: 16px; font-weight: 600; line-height: 22px">Jueves 22 de octubre</div>
+            <div style="font-size: 14px; color: #5B5B63; line-height: 20px">20:00 – 23:30</div>
+          </div>
+        </div>
+        <a href="#loc-h" style="display: flex; gap: 14px; align-items: center; text-decoration: none; color: #0A0A0B">
+          <div style="width: 48px; height: 48px; border-radius: 12px; border: 1px solid rgba(0,0,0,.12); background: #FFFFFF; display: flex; align-items: center; justify-content: center; flex: 0 0 auto" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0A0A0B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"></path><circle cx="12" cy="9.5" r="2.5"></circle></svg>
+          </div>
+          <div>
+            <div style="font-size: 16px; font-weight: 600; line-height: 22px">Galpón Italia</div>
+            <div style="font-size: 14px; color: #5B5B63; line-height: 20px">Av. Italia 1150, Providencia</div>
+          </div>
+        </a>
+      </div>
+
+      <section class="enter-card" aria-label="Confirmar asistencia" style="background: #FFFFFF; border: 1px solid rgba(0,0,0,.08); border-radius: 16px; padding: 20px; box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.06); max-width: 420px">
+
+        <sc-if value="{{isForm}}" hint-placeholder-val="{{ true }}">
+          <form onSubmit="{{submit}}" novalidate="" style="display: flex; flex-direction: column; gap: 14px">
+            <div style="font-size: 14px; color: #5B5B63">Gratis · Quedan 12 cupos</div>
+
+            <div style="display: flex; flex-direction: column; gap: 6px">
+              <label for="rsvp-name" style="font-size: 14px; font-weight: 500">Nombre y apellido</label>
+              <input id="rsvp-name" class="{{nameCls}}" type="text" autocomplete="name" value="{{name}}" onChange="{{onName}}" onBlur="{{blurName}}" readOnly="{{busy}}" aria-invalid="{{nameInvalid}}" aria-describedby="rsvp-name-err" placeholder="Sebastián Pérez" style="height: 48px; border: 1px solid rgba(0,0,0,.16); border-radius: 12px; padding: 0 14px; font-family: inherit; font-size: 16px; color: #0A0A0B; background: #FFFFFF; opacity: {{fieldOpacity}}">
+              <sc-if value="{{errName}}" hint-placeholder-val="{{ false }}">
+                <div id="rsvp-name-err" class="msg-in" style="font-size: 13px; color: #B42318">{{errName}}</div>
+              </sc-if>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 6px">
+              <label for="rsvp-email" style="font-size: 14px; font-weight: 500">Email</label>
+              <input id="rsvp-email" class="{{emailCls}}" type="email" inputmode="email" autocomplete="email" value="{{email}}" onChange="{{onEmail}}" onBlur="{{blurEmail}}" readOnly="{{busy}}" aria-invalid="{{emailInvalid}}" aria-describedby="rsvp-email-err" placeholder="tu@email.com" style="height: 48px; border: 1px solid rgba(0,0,0,.16); border-radius: 12px; padding: 0 14px; font-family: inherit; font-size: 16px; color: #0A0A0B; background: #FFFFFF; opacity: {{fieldOpacity}}">
+              <sc-if value="{{errEmail}}" hint-placeholder-val="{{ false }}">
+                <div id="rsvp-email-err" class="msg-in" style="font-size: 13px; color: #B42318">{{errEmail}}</div>
+              </sc-if>
+              <sc-if value="{{suggestion}}" hint-placeholder-val="{{ false }}">
+                <div class="msg-in" style="font-size: 13px; color: #5B5B63">¿Quisiste decir <button type="button" onClick="{{applySuggestion}}" style="background: none; border: 0; padding: 0; font: inherit; color: #0A0A0B; font-weight: 600; text-decoration: underline; cursor: pointer">{{suggestion}}</button>?</div>
+              </sc-if>
+            </div>
+
+            <sc-if value="{{showGuestsLink}}" hint-placeholder-val="{{ true }}">
+              <button type="button" onClick="{{openGuests}}" class="link-quiet" style="align-self: flex-start; background: none; border: 0; padding: 0; font-family: inherit; font-size: 14px; color: #5B5B63; cursor: pointer">+ Llevo acompañantes</button>
+            </sc-if>
+            <sc-if value="{{guests}}" hint-placeholder-val="{{ false }}">
+              <div class="msg-in" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; background: #F6F6F7; border-radius: 12px; padding: 10px 12px">
+                <div style="font-size: 14px">Entradas <span style="color: #5B5B63">· máx. 4</span></div>
+                <div style="display: flex; align-items: center; gap: 4px">
+                  <button type="button" onClick="{{dec}}" disabled="{{decDisabled}}" aria-label="Quitar un acompañante" style="width: 36px; height: 36px; border-radius: 10px; border: 1px solid rgba(0,0,0,.16); background: #FFFFFF; font-size: 18px; cursor: pointer; opacity: {{decOpacity}}">−</button>
+                  <span aria-live="polite" style="width: 28px; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums">{{qty}}</span>
+                  <button type="button" onClick="{{inc}}" disabled="{{incDisabled}}" aria-label="Agregar un acompañante" style="width: 36px; height: 36px; border-radius: 10px; border: 1px solid rgba(0,0,0,.16); background: #FFFFFF; font-size: 18px; cursor: pointer; opacity: {{incOpacity}}">+</button>
+                </div>
+              </div>
+            </sc-if>
+
+            <button type="submit" class="btn-primary" disabled="{{busy}}" style="height: 48px; border: 0; border-radius: 12px; background: #0A0A0B; color: #FFFFFF; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px">
+              <sc-if value="{{busy}}" hint-placeholder-val="{{ false }}">
+                <span class="spinner" style="width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(255,255,255,.3); border-top-color: #FFFFFF" aria-hidden="true"></span>
+              </sc-if>
+              <span>{{ctaLabel}}</span>
+            </button>
+
+            <p style="margin: 0; font-size: 12px; line-height: 18px; color: #6E6E76">Al confirmar aceptas los <a href="#" style="color: #5B5B63">Términos</a> y la <a href="#" style="color: #5B5B63">Política de privacidad</a>.</p>
+          </form>
+        </sc-if>
+
+        <sc-if value="{{isSuccess}}" hint-placeholder-val="{{ false }}">
+          <div class="swap-in" role="status" aria-live="polite" style="display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; padding: 8px 0 4px">
+            <div class="check-circle" style="width: 56px; height: 56px; border-radius: 50%; background: #9AE600; display: flex; align-items: center; justify-content: center">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#0A0A0B" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="check-path" d="M5 12.5l4.5 4.5L19 7.5"></path></svg>
+            </div>
+            <h2 style="font-family: 'Sora', sans-serif; font-size: 20px; font-weight: 700; margin: 6px 0 0">¡Listo, {{firstName}}! Estás dentro.</h2>
+            <p style="margin: 0; font-size: 15px; line-height: 22px; color: #5B5B63">Te enviamos {{ticketWord}} con QR a<br><strong style="color: #0A0A0B; font-weight: 600">{{email}}</strong></p>
+            <div style="display: flex; flex-direction: column; gap: 8px; width: 100%; margin-top: 10px">
+              <button type="button" class="btn-ghost" style="height: 44px; border-radius: 12px; border: 1px solid rgba(0,0,0,.16); background: #FFFFFF; font-family: inherit; font-size: 15px; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M16 3v4M8 3v4M3 10h18"></path></svg>
+                Añadir al calendario
+              </button>
+              <button type="button" class="btn-ghost" style="height: 44px; border-radius: 12px; border: 1px solid rgba(0,0,0,.16); background: #FFFFFF; font-family: inherit; font-size: 15px; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"></path><path d="M16 6l-4-4-4 4"></path><path d="M12 2v13"></path></svg>
+                Invitar a alguien
+              </button>
+            </div>
+            <a href="#" style="margin-top: 6px; font-size: 14px; font-weight: 500; text-decoration: none">Ver mi entrada →</a>
+          </div>
+        </sc-if>
+      </section>
+
+      <div style="display: flex; gap: 20px; font-size: 14px; padding-left: 4px">
+        <a href="#" class="link-quiet" style="color: #5B5B63; text-decoration: none; display: inline-flex; align-items: center; gap: 6px">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"></path><path d="M16 6l-4-4-4 4"></path><path d="M12 2v13"></path></svg>Compartir</a>
+        <a href="#" class="link-quiet" style="color: #5B5B63; text-decoration: none; display: inline-flex; align-items: center; gap: 6px">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M16 3v4M8 3v4M3 10h18"></path></svg>Añadir al calendario</a>
+      </div>
+    </div>
+  </main>
+
+  <footer style="border-top: 1px solid rgba(0,0,0,.08)">
+    <div style="max-width: 1080px; margin: 0 auto; padding: 24px; display: flex; justify-content: center; font-size: 14px; color: #5B5B63">
+      <span>¿Organizas eventos? <a href="#" style="color: #0A0A0B; font-weight: 500; text-decoration: none">Vende con AI Tickets →</a></span>
+    </div>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1500}}'>
+var DOMAINS = ['gmail.com','hotmail.com','outlook.com','yahoo.com','icloud.com','live.cl','hotmail.cl','yahoo.es','me.com','uc.cl','uchile.cl'];
+function lev(a, b) {
+  var m = a.length, n = b.length, d = [], i, j;
+  for (i = 0; i <= m; i++) { d[i] = [i]; }
+  for (j = 0; j <= n; j++) { d[0][j] = j; }
+  for (i = 1; i <= m; i++) {
+    for (j = 1; j <= n; j++) {
+      d[i][j] = Math.min(d[i-1][j] + 1, d[i][j-1] + 1, d[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1));
+    }
+  }
+  return d[m][n];
+}
+function suggest(email) {
+  var at = email.lastIndexOf('@');
+  if (at < 1) return '';
+  var dom = email.slice(at + 1).toLowerCase();
+  if (dom.length < 4 || DOMAINS.indexOf(dom) >= 0) return '';
+  var best = '', bestD = 3;
+  DOMAINS.forEach(function (x) { var dd = lev(dom, x); if (dd < bestD) { bestD = dd; best = x; } });
+  return best ? email.slice(0, at + 1) + best : '';
+}
+function validEmail(e) { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e); }
+var FAQS = [
+  { q: '¿Tengo que llevar algo?', a: 'Nada. Hay sillas, cojines y algo para tomar. Si quieres, trae un disco para la ronda abierta del final.' },
+  { q: '¿Puedo ir con acompañantes?', a: 'Sí, hasta 3 por persona. Agrégalos al confirmar con “+ Llevo acompañantes” para que cada uno reciba su QR.' },
+  { q: '¿Hay estacionamiento?', a: 'No hay estacionamiento propio. Recomendamos llegar en metro (estación Santa Isabel, 10 minutos caminando).' }
+];
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { name: '', email: '', status: 'idle', errName: '', errEmail: '', shake: 0, guests: false, qty: 1, faq: -1 };
+  }
+  checkName(v) { return v.trim().length >= 2 ? '' : 'Escribe tu nombre.'; }
+  checkEmail(v) { return validEmail(v.trim()) ? '' : 'Revisa tu email, parece incompleto.'; }
+  renderVals() {
+    var s = this.state, self = this;
+    var busy = s.status === 'submitting';
+    var shakeCls = s.shake % 2 ? ' shake-a' : ' shake-b';
+    var nameCls = 'field' + (s.errName ? ' field-err' + (s.shake ? shakeCls : '') : '');
+    var emailCls = 'field' + (s.errEmail ? ' field-err' + (s.shake ? shakeCls : '') : '');
+    var sug = s.errEmail ? '' : suggest(s.email.trim());
+    var first = (s.name.trim().split(/\s+/)[0]) || '';
+    return {
+      name: s.name, email: s.email, busy: busy,
+      isForm: s.status !== 'success', isSuccess: s.status === 'success',
+      errName: s.errName, errEmail: s.errEmail,
+      nameInvalid: s.errName ? 'true' : 'false', emailInvalid: s.errEmail ? 'true' : 'false',
+      nameCls: nameCls, emailCls: emailCls,
+      fieldOpacity: busy ? 0.6 : 1,
+      suggestion: sug,
+      guests: s.guests, showGuestsLink: !s.guests, qty: s.qty,
+      decDisabled: s.qty <= 1, incDisabled: s.qty >= 4,
+      decOpacity: s.qty <= 1 ? 0.4 : 1, incOpacity: s.qty >= 4 ? 0.4 : 1,
+      ctaLabel: busy ? 'Confirmando…' : (s.qty > 1 ? 'Confirmar ' + s.qty + ' asistencias' : 'Confirmar asistencia'),
+      firstName: first.charAt(0).toUpperCase() + first.slice(1),
+      ticketWord: s.qty > 1 ? 'tus ' + s.qty + ' entradas' : 'tu entrada',
+      faqs: FAQS.map(function (f, i) {
+        var open = s.faq === i;
+        return { q: f.q, a: f.a, expanded: open ? 'true' : 'false', rows: open ? '1fr' : '0fr', rot: open ? 'rotate(180deg)' : 'rotate(0deg)',
+          toggle: function () { self.setState({ faq: open ? -1 : i }); } };
+      }),
+      onName: function (e) { self.setState({ name: e.target.value, errName: '' }); },
+      onEmail: function (e) { self.setState({ email: e.target.value, errEmail: '' }); },
+      blurName: function () { if (s.name) self.setState({ errName: self.checkName(self.state.name) }); },
+      blurEmail: function () { if (s.email) self.setState({ errEmail: self.checkEmail(self.state.email) }); },
+      applySuggestion: function () { self.setState({ email: suggest(self.state.email.trim()) }); },
+      openGuests: function () { self.setState({ guests: true, qty: 2 }); },
+      inc: function () { self.setState({ qty: Math.min(4, self.state.qty + 1) }); },
+      dec: function () { var q = self.state.qty - 1; self.setState(q <= 1 ? { qty: 1, guests: false } : { qty: q }); },
+      submit: function (e) {
+        if (e && e.preventDefault) e.preventDefault();
+        if (self.state.status === 'submitting') return;
+        var en = self.checkName(self.state.name), ee = self.checkEmail(self.state.email);
+        if (en || ee) { self.setState({ errName: en, errEmail: ee, shake: self.state.shake + 1 }); return; }
+        self.setState({ status: 'submitting' });
+        setTimeout(function () { self.setState({ status: 'success' }); }, 1100);
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

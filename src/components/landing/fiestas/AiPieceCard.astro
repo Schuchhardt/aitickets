@@ -1,0 +1,140 @@
+---
+// Piezas con IA (SPEC_landing_fiestas §4.5, card 1): en Promocionar (CreateSocialPost.vue, /api/promote/generate) se
+// escribe el post con un tono y se genera una imagen a partir de los datos del evento, con hasta MAX_REFERENCE_IMAGES
+// imágenes de referencia (src/lib/marketing.ts, por props). Mockup sin resultado inventado: cuatro miniaturas de
+// referencia (recortes de las fotos de fiesta) → flecha → un cuadro con la textura de pulsera y "Generar imagen".
+import { PARTY_PHOTOS } from "./fiestasLanding.js";
+
+interface Props {
+  maxReferences: number;
+}
+const { maxReferences } = Astro.props;
+const refs = [
+  { photo: PARTY_PHOTOS.hero, position: "20% 40%" },
+  { photo: PARTY_PHOTOS.universitaria, position: "50% 30%" },
+  { photo: PARTY_PHOTOS.hero, position: "80% 30%" },
+  { photo: PARTY_PHOTOS.universitaria, position: "50% 80%" },
+].slice(0, maxReferences);
+---
+
+<div class="fi-card fai" data-testid="party-ai-card">
+  <h3 class="fi-h3">¿Sin diseñador esta vez?</h3>
+  <p class="fai-text">
+    En Promocionar escribes el post con el tono que quieras y generas una imagen a partir de los datos de tu fiesta. Si
+    subes hasta {maxReferences} imágenes de referencia, como el flyer de la edición anterior, la nueva sigue su estilo y
+    sus colores.
+  </p>
+  <div class="fai-mock" aria-hidden="true">
+    <ul class="fai-refs">
+      {
+        refs.map((r) => (
+          <li class="fai-ref">
+            <picture>
+              {r.photo.sources.map((source) => <source type={source.type} srcset={source.srcset} sizes="80px" />)}
+              <img class="fi-photo-img" src={r.photo.src} alt="" width={r.photo.width} height={r.photo.height} style={`object-position: ${r.position}`} loading="lazy" decoding="async" />
+            </picture>
+            <span class="fai-ref-tag">referencia</span>
+          </li>
+        ))
+      }
+    </ul>
+    <span class="fai-arrow">→</span>
+    <div class="fai-out">
+      <span class="fai-tex"></span>
+      <span class="fai-btn">Generar imagen</span>
+      <span class="fi-example fai-ex">ejemplo</span>
+    </div>
+  </div>
+</div>
+
+<style>
+  .fai {
+    padding: 20px;
+    transform: rotate(-1deg);
+  }
+  .fai-text {
+    margin-top: 10px;
+    font-size: 15px;
+    line-height: 23px;
+    color: var(--fi-text-2);
+  }
+  .fai-mock {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 0.8fr);
+    align-items: center;
+    gap: 10px;
+    margin-top: 18px;
+  }
+  .fai-refs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .fai-ref {
+    position: relative;
+    aspect-ratio: 1;
+    overflow: hidden;
+    border: 2px solid var(--fi-tinta);
+    border-radius: 8px;
+  }
+  .fai-ref picture {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  .fai-ref-tag {
+    position: absolute;
+    left: 3px;
+    bottom: 3px;
+    padding: 0 4px;
+    border-radius: 4px;
+    background: var(--fi-crema);
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .fai-arrow {
+    font-size: 22px;
+    font-weight: 700;
+  }
+  .fai-out {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    aspect-ratio: 4 / 5;
+    border: 2px dashed var(--fi-tinta);
+    border-radius: 10px;
+    background: var(--fi-amarillo);
+    overflow: hidden;
+  }
+  .fai-tex {
+    position: absolute;
+    inset: 0;
+    background-image: var(--fi-tyvek);
+    opacity: 0.12;
+  }
+  .fai-btn {
+    position: relative;
+    padding: 6px 10px;
+    border: 2px solid var(--fi-tinta);
+    border-radius: 999px;
+    background: var(--fi-crema);
+    box-shadow: 0 3px 0 var(--fi-tinta);
+    font-size: 11px;
+    font-weight: 700;
+    text-align: center;
+  }
+  .fai-ex {
+    position: relative;
+    color: var(--fi-tinta);
+  }
+  @media (min-width: 1024px) {
+    .fai {
+      padding: 24px;
+    }
+  }
+</style>

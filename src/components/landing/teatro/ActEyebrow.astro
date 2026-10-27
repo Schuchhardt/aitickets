@@ -1,0 +1,20 @@
+---
+// Eyebrow de cada acto (SPEC_landing_teatro §1): "—— ◆ ACTO I ◆ ——", Prompt 600 en mayúsculas espaciadas entre dos
+// filetes dorados de 40 px con un rombo de 5 px al medio. Filetes y rombos son CSS y aria-hidden: el lector lee solo
+// el texto. T6: los filetes crecen desde el rombo hacia afuera al revelar el bloque (landing-teatro.css).
+interface Props {
+  text: string;
+  class?: string;
+  /** data-lp-step del bloque que lo contiene (reveal de LandingMotion) */
+  step?: boolean;
+}
+const { text, class: className, step = true } = Astro.props;
+---
+
+<p class:list={["te-eyebrow", className]} data-lp-step={step ? "" : undefined}>
+  <span class="te-rule te-rule-l" aria-hidden="true"></span>
+  <span class="te-diamond" aria-hidden="true"></span>
+  <span class="te-eyebrow-text">{text}</span>
+  <span class="te-diamond" aria-hidden="true"></span>
+  <span class="te-rule te-rule-r" aria-hidden="true"></span>
+</p>

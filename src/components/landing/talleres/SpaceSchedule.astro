@@ -1,0 +1,232 @@
+---
+// 9 · Para espacios que programan talleres (SPEC_landing_talleres §4.9, ancla #espacios): la web de ejemplo de un
+// espacio con cuatro talleres (fichas con pestaña de color y portada tipográfica, con el rótulo que daría cardLabel a
+// cada uno, vía spaceCards de talleresLanding.js) y cuatro ítems verificados en el código:
+//   web gratis con plantillas y dominio → sites.ts, /web-gratis (aitickets.cl/o/<slug>)
+//   un evento por taller con su precio, cupo y lista; CSV → /api/events/orders-csv
+//   acceso de Solo lectura limitado a un taller → ROLE_LABELS (permissions.ts) + assign_event_staff (hoy solo desde el
+//               asistente de IA)
+// Mobile: ítems arriba y el mockup debajo con las fichas en carrusel horizontal.
+import SectionTab from "./SectionTab.astro";
+import Highlight from "./Highlight.astro";
+import Tick from "./Tick.astro";
+import { SPACE_DEMO, spaceCards } from "./talleresLanding.js";
+
+const cards = spaceCards();
+const tabColors = ["var(--tl-destacador)", "var(--brand-lime)", "#b9d3f5", "#f3c3c6"];
+const items = [
+  {
+    title: "Tu web gratis, con todos tus talleres.",
+    text: "Una página en aitickets.cl/o/tu-espacio con tu programación inscribiendo, con plantillas y, si quieres, tu dominio.",
+  },
+  { title: "Cada taller, con sus fechas y sus cupos.", text: "Cada tallerista que programas es un evento con su precio, su cupo y su lista." },
+  {
+    title: "Cada tallerista ve lo suyo.",
+    text: "Le das acceso de Solo lectura limitado a su taller para que siga sus inscripciones. Hoy se asigna desde tu asistente de IA.",
+  },
+  {
+    title: "Para rendirle a cada tallerista.",
+    text: "Descargas los inscritos de cada taller en CSV, con nombre, correo, entradas y montos.",
+  },
+];
+---
+
+<section id="espacios" class="tl-section tl-on-papel-2" aria-labelledby="tl-spaces-title" data-tl-section="espacios">
+  <SectionTab text="Espacios" />
+  <div class="tl-wrap">
+    <div class="tl-spaces-head" data-lp-reveal>
+      <p class="tl-eyebrow" data-lp-step>Para espacios</p>
+      <h2 id="tl-spaces-title" class="tl-h2 tl-spaces-title" data-lp-step>
+        ¿Tienes un espacio con varios talleres? <Highlight>Toda tu programación, en tu web.</Highlight>
+      </h2>
+    </div>
+    <div class="tl-spaces-grid">
+      <div class="tl-spaces-copy" data-lp-reveal>
+        <ul class="tl-checklist">
+          {
+            items.map((item) => (
+              <li data-lp-step>
+                <Tick />
+                <div>
+                  <strong>{item.title}</strong>
+                  <p>{item.text}</p>
+                </div>
+              </li>
+            ))
+          }
+        </ul>
+        <a href="/web-gratis" class="tl-btn tl-spaces-cta" data-cta="web" data-section="espacios" data-lp-step>
+          Arma la web de tu espacio <span aria-hidden="true">→</span>
+        </a>
+      </div>
+
+      <div class="tl-browser" data-lp-reveal data-testid="workshop-space">
+        <div class="tl-browser-bar" data-lp-step>
+          <span class="tl-browser-dots" aria-hidden="true"><span></span><span></span><span></span></span>
+          <span class="tl-browser-url">{SPACE_DEMO.url}</span>
+          <span class="tl-example">ejemplo</span>
+        </div>
+        <ul class="tl-browser-grid">
+          {
+            cards.map((card, i) => (
+              <li class="tl-space-card" style={`--tab: ${tabColors[i]}`} data-lp-step>
+                <span class="tl-space-tab" aria-hidden="true" />
+                <p class="tl-display tl-space-title">{card.title}</p>
+                <p class="tl-space-when">{card.when}</p>
+                <p class="tl-space-foot">
+                  {card.label ? (
+                    <span class:list={["tl-space-label", `is-${card.label.tone}`]}>{card.label.text}</span>
+                  ) : (
+                    <span class="tl-num tl-space-price">{card.finalPrice}</span>
+                  )}
+                </p>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .tl-spaces-head {
+    max-width: 900px;
+  }
+  .tl-spaces-title {
+    margin-top: 14px;
+  }
+  .tl-spaces-grid {
+    display: grid;
+    gap: 40px;
+    margin-top: 40px;
+  }
+  .tl-spaces-cta {
+    margin-top: 32px;
+  }
+  .tl-browser {
+    min-width: 0;
+    overflow: hidden;
+    border: 2px solid var(--tl-grafito);
+    border-radius: 12px;
+    background: var(--tl-papel);
+    box-shadow: 6px 6px 0 var(--tl-grafito);
+  }
+  .tl-browser-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-bottom: 2px solid var(--tl-grafito);
+    background: var(--tl-ficha);
+  }
+  .tl-browser-dots {
+    display: inline-flex;
+    gap: 5px;
+  }
+  .tl-browser-dots span {
+    width: 9px;
+    height: 9px;
+    border: 1.5px solid var(--tl-grafito);
+    border-radius: 50%;
+  }
+  .tl-browser-url {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: var(--tl-papel-2);
+    font-size: 13px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .tl-browser-grid {
+    display: flex;
+    gap: 12px;
+    padding: 24px 16px 16px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  .tl-browser-grid::-webkit-scrollbar {
+    display: none;
+  }
+  .tl-space-card {
+    position: relative;
+    flex: 0 0 72%;
+    display: flex;
+    flex-direction: column;
+    min-height: 168px;
+    padding: 18px 14px 14px;
+    border: 1px solid var(--tl-line-strong);
+    border-radius: 6px;
+    background: var(--tl-ficha);
+    box-shadow: var(--tl-sombra-papel);
+    scroll-snap-align: start;
+  }
+  .tl-space-tab {
+    position: absolute;
+    top: -10px;
+    left: 14px;
+    width: 44px;
+    height: 12px;
+    border: 1px solid var(--tl-line-strong);
+    border-bottom: 0;
+    border-radius: 4px 4px 0 0;
+    background: var(--tab);
+  }
+  .tl-space-title {
+    font-size: 18px;
+    line-height: 22px;
+    font-weight: 700;
+  }
+  .tl-space-when {
+    margin-top: 4px;
+    font-size: 13px;
+    color: var(--tl-grafito-3);
+  }
+  .tl-space-foot {
+    margin-top: auto;
+    padding-top: 12px;
+  }
+  .tl-space-label {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .tl-space-label.is-warning {
+    background: var(--tl-destacador);
+  }
+  .tl-space-label.is-neutral {
+    background: var(--tl-papel-2);
+  }
+  .tl-space-price {
+    font-size: 18px;
+  }
+  @media (min-width: 768px) {
+    .tl-browser-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 20px 16px;
+      overflow: visible;
+    }
+  }
+  @media (min-width: 1024px) {
+    .tl-spaces-grid {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 64px;
+      margin-top: 56px;
+      align-items: start;
+    }
+    /* Desktop: el mockup a la izquierda y los ítems a la derecha */
+    .tl-browser {
+      grid-row: 1;
+      grid-column: 1;
+    }
+  }
+</style>

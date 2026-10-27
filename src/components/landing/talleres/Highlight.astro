@@ -1,0 +1,15 @@
+---
+// Destacador de la landing de talleres (SPEC_landing_talleres §1): <mark> con el amarillo detrás de las palabras en
+// grafito (.tl-mark en landing-talleres.css, con borde irregular). Es el único énfasis de la página: nunca cursiva ni
+// color. Cada palabra lleva su propio trazo (así, si el titular corta en dos líneas, cada línea queda pintada entera) y
+// los trazos se tocan sobre el espacio. Con LandingMotion se pintan de izquierda a derecha, palabra a palabra, cuando su
+// bloque se revela (TL3). El contenido es texto plano.
+interface Props {
+  class?: string;
+}
+const { class: className } = Astro.props;
+const text = (await Astro.slots.render("default")).trim();
+const words = text.split(/\s+/);
+---
+
+<mark class:list={["tl-mark", className]}>{words.map((word, i) => <Fragment>{i > 0 && " "}<span class="tl-mark-w" style={`--w: ${i}`} set:html={word} /></Fragment>)}</mark>

@@ -1,0 +1,126 @@
+---
+// 4b · Marketing en piloto automático (SPEC_landing_productores §5.4b, ancla #marketing). Confirmado en el código
+// (§13): historias y posts automáticos en Instagram (src/lib/socialSeries.ts) y anuncios en Meta vía Zernio
+// (netlify/lib/zernio-ads.mjs). Facebook y TikTok automáticos y los reels no existen: van con "Pronto".
+// Las horas del calendario y la frecuencia salen de la cadencia real (DEFAULT_CADENCE): una historia cada pocos días
+// que se vuelve diaria la última semana, a la hora pico de visitas del evento (la hora por defecto solo si aún no hay
+// datos).
+// Al entrar (L7 y §5.4b): título y bajada en cascada; en el calendario, las publicaciones aparecen día por día.
+import MarketingWeek from "../MarketingWeek.vue";
+import AdsDemo from "../AdsDemo.vue";
+import SoonBadge from "../../ui/SoonBadge.vue";
+import { DEMO_EVENT_NAME } from "../producerLanding.js";
+import { DEFAULT_CADENCE } from "../../../lib/socialSeriesCadence";
+
+const dailyTime = DEFAULT_CADENCE.default_time;
+const eventDayTime = DEFAULT_CADENCE.event_day_time;
+const storyCadence = `Cada ${DEFAULT_CADENCE.sparse_every_days} días; diaria la última semana`;
+---
+
+<section id="marketing" class="lp-section mk" aria-labelledby="marketing-title" data-lp-section="marketing">
+  <div class="lp-wrap">
+    <div class="mk-head" data-lp-reveal>
+      <div class="mk-head-title">
+        <p class="lp-eyebrow" data-lp-step>Marketing en piloto automático</p>
+        <h2 id="marketing-title" class="lp-h2 mk-title" data-lp-step>Tu evento se promociona solo, todos los días.</h2>
+      </div>
+      <p class="lp-lead mk-lead" data-lp-step>
+        Conecta tu Instagram. Con el póster y los datos de tu evento armamos historias y posts con cuenta regresiva, y se
+        publican solos hasta el día de la función.
+      </p>
+    </div>
+
+    <div class="mk-grid" data-lp-reveal>
+      <div class="mk-week" data-lp-step>
+        <MarketingWeek client:visible eventName={DEMO_EVENT_NAME} dailyTime={dailyTime} eventDayTime={eventDayTime} />
+      </div>
+
+      <ul class="mk-list" aria-label="Publicaciones automáticas de ejemplo" data-lp-step>
+        <li>
+          <span>Historia con cuenta regresiva<span class="mk-sub">{storyCadence}</span></span>
+          <span class="mk-on">Activa</span>
+        </li>
+        <li><span>Post diario la última semana</span><span class="mk-on">Activa</span></li>
+        <li><span>Reel antes de la función</span><SoonBadge dark={false} /></li>
+        <li class="mk-list-note"><span>Facebook y TikTok</span><SoonBadge dark={false} /></li>
+      </ul>
+
+      <div data-lp-step><AdsDemo client:visible /></div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .mk {
+    padding-bottom: 0;
+  }
+  .mk-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px 32px;
+  }
+  .mk-head-title {
+    max-width: 580px;
+  }
+  .mk-title {
+    margin-top: 10px;
+  }
+  .mk-lead {
+    max-width: 420px;
+  }
+  .mk-grid {
+    display: grid;
+    gap: 12px;
+    margin-top: 20px;
+    align-items: start;
+  }
+  .mk-week {
+    display: none;
+  }
+  .mk-list {
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    overflow: hidden;
+  }
+  .mk-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    font-size: 14px;
+  }
+  .mk-list li + li {
+    border-top: 1px solid var(--border);
+  }
+  .mk-sub {
+    display: block;
+    font-size: 12px;
+    color: var(--text-2);
+  }
+  .mk-on {
+    font-weight: 600;
+    color: var(--lp-lime-deep);
+  }
+  .mk-list-note {
+    color: var(--text-2);
+  }
+  @media (min-width: 1024px) {
+    .mk-title {
+      margin-top: 14px;
+    }
+    .mk-grid {
+      grid-template-columns: minmax(0, 1fr) 360px;
+      gap: 24px;
+      margin-top: 44px;
+    }
+    .mk-week {
+      display: block;
+    }
+    .mk-list {
+      display: none;
+    }
+  }
+</style>

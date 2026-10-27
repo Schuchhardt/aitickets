@@ -6,10 +6,13 @@
 //   códigos de descuento → netlify/lib/discounts.mjs · links con ref/UTM → TrackingLinkBuilder.vue
 //   métricas por canal → dashboard/events/[id]/analytics.astro · check-in offline → ValidateQR.vue
 //   link de puerta sin cuenta → tools/access.ts (hoy solo desde el conector de IA)
+//   máximo por compra → event_tickets.max_quantity (DEFAULT_MAX_PER_PURCHASE; hoy se cambia desde tools/tickets.ts)
+//   búsqueda por nombre y reenvío de entradas en la puerta → ValidateQR.vue (/api/orders/resend)
 // Si cambia el producto, actualizar aquí y en src/data/producerFaq.ts.
-import { SERVICE_FEE_PERCENT_LABEL, computeFeeSplit } from "../../netlify/lib/fees.mjs";
+import { IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL, computeFeeSplit } from "../../netlify/lib/fees.mjs";
 import { PAYOUT_RELEASE_HOURS, PAYOUT_BUSINESS_DAYS } from "../../netlify/lib/legal.mjs";
-import type { FaqItem } from "./producerFaq";
+import { DEFAULT_MAX_PER_PURCHASE } from "../components/Reservation/pricing.js";
+import { ABSORB_FEE_ACTIVATION, MAX_EVENT_FUNCTIONS, PRODUCER_FAQ, type FaqItem } from "./producerFaq";
 
 export type LandingSection = {
     heading: string;
@@ -35,20 +38,31 @@ export type Landing = {
     demo?: { url: string; label: string };
     cta: { label: string; campaign: string };
     related: string[];
+    /**
+     * La landing tiene página propia con diseño especializado en src/pages/<slug>.astro (por ejemplo
+     * /ticketera-stand-up, docs/specs/rediseno/SPEC_landing_standup_aitickets.md): [landing].astro no la genera, pero
+     * la tarjeta, el sitemap, las relacionadas y las guías siguen leyendo estos datos.
+     */
+    dedicated?: boolean;
 };
 
 const clp = (n: number) => `$${Math.round(n).toLocaleString("es-CL")}`;
 const fee = `${SERVICE_FEE_PERCENT_LABEL} + IVA`;
 const ex = computeFeeSplit(10000);
 const payout = `Lo de cada función queda disponible ${PAYOUT_RELEASE_HOURS} h después de que termina; pides el retiro y llega en hasta ${PAYOUT_BUSINESS_DAYS} días hábiles.`;
+const producerFaq = (q: string): FaqItem => {
+    const item = PRODUCER_FAQ.find((f) => f.q === q);
+    if (!item) throw new Error(`Falta la pregunta "${q}" en PRODUCER_FAQ`);
+    return item;
+};
 
 export const LANDINGS: Landing[] = [
     {
         slug: "ticketera-stand-up",
         kind: "vertical",
         card: { title: "Stand-up y comedia", text: "Funciones semanales, line-up que promociona y un link por comediante." },
-        title: "Ticketera para stand-up y comedia en Chile | AI Tickets",
-        description: "Vende entradas para tus shows de stand-up: funciones semanales, un link de venta por comediante para saber quién vende, check-in con QR y 0% de comisión para el productor.",
+        title: "Vende entradas para stand-up en Chile · 0% de comisión | AI Tickets",
+        description: "Ticketera para stand-up: vende entradas para tus shows de comedia y open mics, con un link por comediante para saber quién vende, difusión automática en Instagram, check-in con QR y 0% de comisión para ti.",
         eyebrow: "Para productores de comedia",
         h1: "La ticketera para el stand-up que se presenta todas las semanas",
         intro:
@@ -92,37 +106,27 @@ export const LANDINGS: Landing[] = [
         demo: { url: "/eventos/evento-demo-aitickets", label: "Ver un evento de stand-up de ejemplo" },
         cta: { label: "Publicar mi próximo show", campaign: "vertical_standup" },
         related: ["ventas-por-promotor", "entradas-con-qr", "guias/como-medir-ventas-por-promotor"],
+        dedicated: true,
     },
     {
         slug: "ticketera-teatro",
         kind: "vertical",
         card: { title: "Teatro independiente", text: "Una obra, muchas funciones: cartelera, prensa e invitados en un solo evento." },
-        title: "Venta de entradas para teatro independiente | AI Tickets",
-        description: "Publica tu obra con todas sus funciones, vende entradas por función con Webpay y tarjetas, maneja cortesías de prensa y valida con QR. Sin mensualidad.",
-        eyebrow: "Para compañías y productoras de teatro",
-        h1: "Vende las funciones de tu obra sin rehacer el evento cada semana",
+        title: "Ticketera para teatro en Chile: vende tu temporada · 0% de comisión | AI Tickets",
+        description:
+            "Vende las entradas de tu obra: todas las funciones en una página, aforo por función, cortesías de prensa con QR y cobro por función. 0% de comisión.",
+        eyebrow: "Para compañías de teatro y salas",
+        h1: "Que suba el telón. La boletería de tu obra ya está lista.",
         intro:
-            "Una obra en cartelera son muchas funciones con el mismo elenco, la misma sala y el mismo público objetivo. En AI Tickets publicas la obra una vez y agregas sus funciones; cada entrada queda asociada a su fecha y la sala sabe exactamente quién llega.",
-        highlights: ["Todas las funciones en una sola página", "Cortesías de prensa e invitados con QR", "Cobras función por función"],
-        sections: [
-            {
-                heading: "Una página para toda la temporada",
-                body:
-                    "Agrega hasta 60 funciones a la obra. El público elige la fecha en la misma página y recibe su entrada para esa función. Si cambia un horario, avisamos por email a quienes ya compraron para esa fecha.",
-            },
-            {
-                heading: "Prensa, elenco e invitados",
-                items: [
-                    { title: "Cortesías en un minuto", text: "Envía cortesías por email desde el panel, con la cantidad de entradas que necesites. No cuentan como venta." },
-                    { title: "Equipo con su rol", text: "Producción, boletería y difusión con permisos distintos: Puerta, Marketing, Finanzas o Solo lectura." },
-                    { title: "Preguntas del público", text: "La página de la obra tiene un asistente que responde dudas de duración, edad recomendada o accesos con la información que cargaste." },
-                ],
-            },
-            {
-                heading: "Cobras cada función, no al cierre de la temporada",
-                body: `${payout} Así puedes pagar sala, técnica y elenco mientras la obra sigue en cartelera.`,
-            },
-        ],
+            `Una obra en cartelera son muchas funciones con el mismo elenco, la misma sala y el mismo público. En AI Tickets publicas la obra una vez con todas sus funciones, cada una con su aforo; mandas las cortesías de prensa con su QR y lo de cada función queda disponible ${PAYOUT_RELEASE_HOURS} h después de que termina.`,
+        highlights: ["Todas las funciones en una sola página", "Cortesías de prensa con QR", "Aforo por función"],
+        // Plata: la spec (§9) pide "cobro función por función" y el highlight "Cobras función por función*"; con
+        // dedicated nada pinta los highlights (ni el asterisco de TERMS_NOTE), y el cobro por función depende de la
+        // reserva por riesgo (Preguntas abiertas 1), así que aquí va solo lo de legal.mjs, sin promesa con asterisco.
+        // La página es propia (src/pages/ticketera-teatro.astro, SPEC_landing_teatro): las secciones viven en
+        // src/components/landing/teatro y las preguntas en src/data/teatroFaq.ts (que toma de aquí estas dos). La de
+        // "¿Cuánto paga el público?" queda cubierta por las de costo y cargo absorbido de PRODUCER_FAQ.
+        sections: [],
         faq: [
             {
                 q: "¿Puedo tener entradas generales y precios distintos por función?",
@@ -130,93 +134,245 @@ export const LANDINGS: Landing[] = [
             },
             {
                 q: "¿Funciona si la obra es en una sala que no tiene ticketera propia?",
-                a: "Sí. AI Tickets te da la página de venta, el cobro y el control de acceso con QR desde el celular; no necesitas equipos especiales.",
-            },
-            {
-                q: "¿Cuánto paga el público?",
-                a: `El valor de la entrada más un cargo por servicio de ${fee}. En una entrada de ${clp(10000)}, el comprador paga ${clp(ex.total)} y tú recibes ${clp(ex.producerNet)}. También puedes absorber el cargo.`,
+                a: "Sí. AI Tickets te da la boletería online de tu obra, el cobro y el control de acceso con QR desde el celular, en Santiago, Valparaíso, Concepción o cualquier ciudad de Chile; no necesitas equipos especiales.",
             },
         ],
         demo: { url: "/eventos/evento-demo-teatro", label: "Ver una obra de ejemplo" },
         cta: { label: "Publicar mi obra", campaign: "vertical_teatro" },
-        related: ["entradas-con-qr", "vender-entradas-online", "guias/como-hacer-una-preventa"],
+        related: ["entradas-con-qr", "academias", "guias/como-hacer-una-preventa"],
+        dedicated: true,
     },
     {
         slug: "ticketera-musica-en-vivo",
         kind: "vertical",
         card: { title: "Música en vivo", text: "Preventas, tipos de entrada con cupo y difusión medida por canal." },
-        title: "Plataforma para vender entradas de conciertos | AI Tickets",
-        description: "Vende entradas para tus tocatas y conciertos: preventa, tipos de entrada con cupo, códigos de descuento, links por canal y check-in con QR. 0% de comisión para el productor.",
-        eyebrow: "Para bandas, salas y productores de música",
-        h1: "Entradas para tus conciertos, con preventa y difusión medida",
+        title: "Ticketera para conciertos y tocatas en Chile · 0% de comisión | AI Tickets",
+        description:
+            "Vende entradas para tus conciertos, tocatas y giras: preventa por tandas con cupo, un link por banda del cartel, check-in con QR aunque no haya señal y cobro por fecha. 0% de comisión para bandas, productoras y salas.",
+        eyebrow: "Para bandas, solistas, productoras y salas",
+        h1: "Tú pon la música. La boletería corre por nuestra cuenta.",
         intro:
-            "En música la venta se juega en las primeras horas y en la última semana. AI Tickets te ayuda a armar la preventa, ver qué canal de difusión vende y llegar a la puerta con todo ordenado.",
-        highlights: ["Preventa con cupo limitado", "Links para cada banda, medio o campaña", "Check-in con QR aunque no haya señal"],
-        sections: [
-            {
-                heading: "Preventa que se agota de verdad",
-                items: [
-                    { title: "Tipos de entrada con cupo", text: "Crea una entrada \"Preventa\" con menos unidades y menor precio; cuando se agota, queda la general." },
-                    { title: "Códigos con fecha límite", text: "Descuentos por porcentaje o monto, con usos máximos, límite por comprador y fecha de término." },
-                    { title: "Varias fechas", text: "¿Gira o doble fecha? Hasta 60 funciones por evento, cada una con sus entradas." },
-                ],
-            },
-            {
-                heading: "Mide la difusión",
-                body:
-                    "Arma un link con seguimiento para cada banda del cartel, medio o campaña pagada. En las métricas del evento ves visitas, conversión y ventas por canal, y también desde qué ciudades te visitan y a qué hora se vende más.",
-            },
-            {
-                heading: "Posts con IA para cada anuncio",
-                body: "Genera textos e imágenes para Instagram y Facebook a partir de tu evento y publícalos desde el panel cuando conectes tus cuentas.",
-            },
-        ],
+            "En música la venta se juega en las primeras horas de la preventa y en la última semana. AI Tickets te ayuda a armar las tandas, ver qué banda o canal vende y llegar a la puerta con todo ordenado.",
+        highlights: ["Preventa por tandas con cupo", "Un link para cada banda, medio o campaña", "Check-in con QR aunque no haya señal"],
+        // La página es propia (src/pages/ticketera-musica-en-vivo.astro, SPEC_landing_musica): las secciones viven en
+        // src/components/landing/musica y las preguntas en src/data/musicaFaq.ts (que toma de aquí la de zonas). Las de
+        // cobro por fecha y costo que tenía la landing genérica quedan cubiertas por las de PRODUCER_FAQ.
+        sections: [],
         faq: [
             {
                 q: "¿Puedo vender entradas de distintas zonas o precios?",
                 a: "Sí, con tipos de entrada distintos, cada uno con su precio y su cupo. AI Tickets no tiene mapa de asientos numerados.",
             },
-            { q: "¿Cómo cobro si hago varias fechas?", a: payout, terms: true },
-            {
-                q: "¿Hay costo por usar la plataforma?",
-                a: `No hay mensualidad ni costo por publicar. El comprador paga un cargo por servicio de ${fee} por entrada pagada.`,
-            },
         ],
         demo: { url: "/eventos/evento-demo-concierto", label: "Ver un concierto de ejemplo" },
         cta: { label: "Publicar mi próximo concierto", campaign: "vertical_musica" },
-        related: ["ventas-por-promotor", "guias/como-hacer-una-preventa", "vender-entradas-online"],
+        related: ["ventas-por-promotor", "academias", "guias/como-hacer-una-preventa"],
+        dedicated: true,
+    },
+    {
+        // Ruta "discotecas" y no "clubs": en Chile se busca más "ticketera para discotecas" / "lista free discoteca"
+        // (SPEC_landing_clubs, Preguntas abiertas 1). /ticketera-clubs y /ticketera-clubes redirigen aquí con 301
+        // (astro.config.mjs); el sitemap lista solo esta URL.
+        slug: "ticketera-discotecas",
+        kind: "vertical",
+        card: { title: "Clubs y discotecas", text: "Lista free por RRPP, cover y mesas pagadas antes de llegar, y la puerta con QR." },
+        title: "Ticketera para discotecas y clubs en Chile: lista free, cover y mesas · 0% de comisión | AI Tickets",
+        description:
+            "Vende entradas para tu discoteca o club: lista free con QR para cada RRPP, cover y mesas VIP con pago online, check-in en la puerta aunque no haya señal y cobro por noche. 0% de comisión para el club.",
+        eyebrow: "Para clubs, discotecas y productoras de noche",
+        h1: "Abre la puerta. Nosotros llevamos la lista.",
+        intro: `Lista free con QR para cada RRPP, cover y mesas pagados antes de llegar y check-in en la puerta aunque no haya señal. Lo de cada noche queda disponible ${PAYOUT_RELEASE_HOURS} h después de que termina. 0% de comisión para el club.`,
+        highlights: ["Lista free con QR para cada RRPP", "Cover y mesas pagados antes de llegar", "Check-in en la puerta aunque no haya señal"],
+        // La página es propia (src/pages/ticketera-discotecas.astro, SPEC_landing_clubs): las secciones viven en
+        // src/components/landing/clubs y las preguntas en src/data/clubsFaq.ts, que toma de aquí estas seis (las propias
+        // de clubs; las de dinero, plazos, redes y anuncios vienen de PRODUCER_FAQ y ORGANIZADORES_FAQ). Verificado:
+        //   lista con hora de cierre → ventana de venta por entrada (isTicketOnSale), hoy desde tools/tickets.ts
+        //   mesas → un QR por unidad (buildAttendeeRows); cortesías → CourtesyTicketsForm.vue
+        //   transferir una entrada → transfer_ticket (tools/postsale.ts); lista de invitados → tools/guests.ts
+        //   sin preguntas en el checkout (edad, RUT) ni venta en la puerta (POS)
+        sections: [],
+        faq: [
+            {
+                q: "¿Cómo armo la lista free?",
+                a: "Creas un tipo de entrada de $0 llamado, por ejemplo, \"Lista free\", con su cupo. Cada persona se inscribe con su nombre y correo y le llega su QR. Si quieres que la inscripción se cierre a una hora, hoy se programa desde tu asistente de IA conectado o escribiéndonos por WhatsApp. En la puerta, tu equipo ve que es una entrada de lista al escanearla.",
+            },
+            {
+                q: "¿Cómo vendo mesas?",
+                a: "Cada mesa es un tipo de entrada con su precio, su cupo y la descripción de lo que incluye. Quien la compra recibe un QR para la mesa. Si quieres que cada invitado tenga su propia entrada, envíaselas como cortesías. No hay plano para elegir mesa.",
+            },
+            {
+                q: "¿Puedo pedir que sean mayores de 18?",
+                a: "Hoy AI Tickets no verifica la edad al comprar. Indícalo en la descripción del evento y en el nombre de la entrada (\"+18\"): el asistente de la página lo responde a quien pregunte, y tu equipo revisa el carnet en la puerta.",
+            },
+            {
+                q: "¿Qué pasa si alguien comparte el pantallazo de su QR?",
+                a: "Cada QR entra una sola vez. Si el pantallazo ya se usó, el escáner lo marca como validado y no pasa. Si una persona no puede ir, tu equipo le transfiere la entrada a otra persona desde tu asistente de IA: el QR anterior deja de servir.",
+            },
+            {
+                q: "¿Puedo tener lista de invitados y cortesías?",
+                a: "Sí. Las cortesías se envían desde el panel por correo, cada una con su QR, y no cuentan como venta. La lista de invitados del club, con acompañantes, la manejas desde tu asistente de IA: les manda el link por correo o te deja los WhatsApp listos para enviar.",
+            },
+            {
+                q: "¿Se puede pagar el cover en la puerta?",
+                a: "AI Tickets vende online: tu público compra desde el celular en la página de la noche, mientras haya cupo y la venta esté abierta. No hay cobro en efectivo ni con máquina en la puerta.",
+            },
+        ],
+        // No hay un evento de ejemplo de club en demoEvent.mjs (Preguntas abiertas 3): mientras tanto, el concierto
+        demo: { url: "/eventos/evento-demo-concierto", label: "Ver un evento de ejemplo" },
+        cta: { label: "Publicar mi próxima noche", campaign: "vertical_clubs" },
+        related: ["ventas-por-promotor", "entradas-con-qr", "ticketera-musica-en-vivo", "ticketera-fiestas"],
+        dedicated: true,
+    },
+    {
+        slug: "ticketera-fiestas",
+        kind: "vertical",
+        card: { title: "Fiestas", text: "Preventa por etapas, un código para cada promotor y la puerta con QR aunque no haya señal." },
+        title: "Ticketera para fiestas en Chile: preventa por etapas y códigos para promotores · 0% de comisión | AI Tickets",
+        description:
+            "Vende entradas para tu fiesta: preventa por etapas con fecha de apertura, un código y un link para cada promotor, tu flyer en Instagram toda la semana y check-in con QR aunque no haya señal. 0% de comisión para la productora.",
+        eyebrow: "Para productoras de fiestas y centros de estudiantes",
+        h1: "Preventa 1: agotada. ¿Abrimos la 2?",
+        intro: `Vende tu fiesta por etapas, con un código para cada promotor, tu flyer en Instagram toda la semana y la puerta con QR aunque el galpón no tenga señal. Lo de tu fiesta queda disponible ${PAYOUT_RELEASE_HOURS} h después de que termina. 0% de comisión para la productora.`,
+        highlights: ["Preventa por etapas con fecha de apertura", "Un código y un link para cada promotor", "Check-in con QR aunque no haya señal"],
+        // La página es propia (src/pages/ticketera-fiestas.astro, SPEC_landing_fiestas): las secciones viven en
+        // src/components/landing/fiestas y las preguntas en src/data/fiestasFaq.ts, que toma de aquí estas siete (las
+        // propias de fiestas; las de dinero, plazos, redes y anuncios vienen de PRODUCER_FAQ y ORGANIZADORES_FAQ).
+        // Verificado:
+        //   etapas → un tipo de entrada con ventana de venta (isTicketOnSale), hoy programada desde tools/tickets.ts;
+        //            la siguiente no abre sola cuando se agota la anterior (Pronto en la página)
+        //   "Ver QR" por entrada → src/pages/ticket/[id].astro; máximo por compra → DEFAULT_MAX_PER_PURCHASE
+        //   dirección exacta → mensaje programado (send_attendee_message / schedule_reminder en tools/messaging.ts);
+        //                      un lugar sin dirección exacta suma riesgo (event-risk.mjs) y puede dejar una reserva
+        //   transferir una entrada → transfer_ticket (tools/postsale.ts)
+        //   sin preguntas en el checkout (edad, RUT, ser alumno) ni venta en la puerta (POS)
+        sections: [],
+        faq: [
+            {
+                q: "¿Cómo armo una preventa por etapas?",
+                a: "Cada etapa es un tipo de entrada con su precio, su cupo y su fecha y hora de apertura y cierre. Hoy las fechas se programan desde tu asistente de IA conectado o escribiéndonos por WhatsApp. Mientras una etapa está a la venta, tu público ve las siguientes con su fecha de apertura. Si una etapa se agota antes de tiempo, adelantas la siguiente por el mismo camino: todavía no abre sola.",
+            },
+            {
+                q: "¿Puedo tener entrada alumno y entrada general?",
+                a: "Sí: son dos tipos de entrada, cada uno con su precio y su cupo. AI Tickets no verifica al comprar que la persona sea alumna: en la puerta tu equipo ve el tipo de entrada al escanearla y pide la credencial.",
+            },
+            {
+                q: "¿Puedo pedir que sean mayores de 18?",
+                a: "Hoy AI Tickets no verifica la edad al comprar. Indícalo en la descripción de la fiesta y en el nombre de la entrada (\"+18\"): el asistente de la página lo responde a quien pregunte, y tu equipo revisa el carnet en la puerta.",
+            },
+            {
+                q: "¿Puedo avisar la dirección a última hora?",
+                a: "Sí. Publica la comuna o un punto de referencia y, el mismo día, programa un correo a todos los que compraron con la dirección exacta desde tu asistente de IA. Ten en cuenta que un evento sin dirección exacta puede quedar con una parte de lo vendido en reserva (ver términos).",
+                terms: true,
+            },
+            {
+                q: "¿Qué pasa si alguien comparte el pantallazo de su QR?",
+                a: "Cada QR entra una sola vez: si el pantallazo ya se usó, el escáner lo marca como validado y no pasa. Si la señal se cae, cada celular sigue validando y rechaza lo que él ya escaneó, y todo se cruza al volver la conexión. Si una persona no puede ir, tu equipo le transfiere la entrada a otra persona desde tu asistente de IA y el QR anterior deja de servir.",
+            },
+            {
+                q: "¿Cómo le paso su entrada a cada amigo?",
+                a: `Quien compra recibe un correo con cada entrada y su link "Ver QR": le manda a cada amigo la suya. Si no lo cambias, son hasta ${DEFAULT_MAX_PER_PURCHASE} entradas por compra.`,
+            },
+            {
+                q: "¿Se puede vender en la puerta?",
+                a: "AI Tickets vende online: tu público compra desde el celular en la página de la fiesta, mientras haya cupo y la venta esté abierta. No hay cobro en efectivo ni con máquina en la puerta.",
+            },
+        ],
+        // No hay un evento de ejemplo de fiesta en demoEvent.mjs (Preguntas abiertas 10): mientras tanto, el concierto
+        demo: { url: "/eventos/evento-demo-concierto", label: "Ver un evento de ejemplo" },
+        cta: { label: "Publicar mi fiesta", campaign: "vertical_fiestas" },
+        related: ["ventas-por-promotor", "ticketera-discotecas", "entradas-con-qr"],
+        dedicated: true,
+    },
+    {
+        slug: "ticketera-seminarios",
+        kind: "vertical",
+        card: { title: "Seminarios y congresos", text: "Varios días en un evento, precios para empresas y estudiantes, y acreditación con QR." },
+        title: "Ticketera para seminarios y congresos en Chile: inscripciones y acreditación con QR · 0% de comisión | AI Tickets",
+        description:
+            "Inscripciones gratis o pagadas con Webpay para seminarios, charlas y congresos: varios días en un evento con pase completo o por día, precio estudiante y de convenio, cortesías para expositores y acreditación con QR desde el celular. 0% de comisión.",
+        eyebrow: "Para organizadores de seminarios, congresos y charlas",
+        h1: "Tú armas el programa. La acreditación es un QR.",
+        intro: `Inscripciones gratis o pagadas con Webpay, un congreso de varios días en un solo evento, precios para estudiantes y convenios, y la acreditación con el celular aunque se caiga el wifi del hotel. Lo de cada día queda disponible ${PAYOUT_RELEASE_HOURS} h después de que termina; el pase completo, ${PAYOUT_RELEASE_HOURS} h después del último día. 0% de comisión para ti.`,
+        highlights: ["Varios días en un evento, con pase completo o por día", "Precio estudiante y códigos de convenio", "Acreditación con QR aunque se caiga el wifi"],
+        // La página es propia (src/pages/ticketera-seminarios.astro, SPEC_landing_seminarios): las secciones viven en
+        // src/components/landing/seminarios y las preguntas en src/data/seminariosFaq.ts, que toma de aquí estas diez (las
+        // propias de seminarios; las de dinero, plazos, cortesías, compras de empresa y eventos grandes se arman allá con
+        // sus constantes, y las de redes y reseñas vienen de PRODUCER_FAQ y ORGANIZADORES_FAQ).
+        // Verificado:
+        //   varios días → hasta MAX_EVENT_FUNCTIONS funciones (schedule.ts); cada entrada para una función o para todas
+        //                 (event_date_id NULL); el pase completo se valida una vez (confirm-ticket): ingreso diario "Pronto"
+        //   programa → descripción con títulos y listas (sanitize.ts) y el asistente de la página (EventAssistant.vue);
+        //              agenda con expositores y salas "Pronto"
+        //   documentos → terms.astro §3 (boleta del cargo; el precio de la entrada lo documenta el productor), pendiente de
+        //                validar con abogado y contador; RUT y razón social al comprar "Pronto"
+        //   convenios → códigos de descuento por evento o de la organización (discounts.mjs); sin entradas ocultas
+        //   certificados de asistencia → "Pronto"; hoy, la lista de quienes ingresaron (list_attendees)
+        //   sin transmisión online ni pago con orden de compra o transferencia
+        sections: [],
+        faq: [
+            { q: "¿Cuánto cuesta una charla gratuita?", a: "Nada. Las inscripciones gratis no pagan cargo por servicio y no hay mensualidad." },
+            {
+                q: "¿Cómo publico un congreso de varios días?",
+                a: `Un solo evento con un día por función (hasta ${MAX_EVENT_FUNCTIONS}), y entradas que sirven para un día o para todos (pase completo). Tu público ve las fechas en la página y elige. El pase completo se acredita una vez, el primer día que la persona llega.`,
+            },
+            {
+                q: "¿Dónde va el programa con los expositores?",
+                a: "En la descripción del evento, con un título por día y una lista por bloque. El asistente de tu página lo usa para responder preguntas como \"¿a qué hora es el panel?\". Una sección propia de agenda, con expositores y salas, todavía no existe.",
+            },
+            {
+                q: "¿Pueden pedirme factura?",
+                a: "El cargo por servicio lo documenta AI Tickets con boleta electrónica. El valor de la entrada lo documentas tú, como organizador: si una empresa necesita factura, se la emites con los datos de su compra. Desde tu panel exportas las órdenes a CSV con comprador, correo, entradas, montos y medio de pago.",
+                terms: true,
+            },
+            {
+                q: "¿Puedo tener precio de socio o de convenio?",
+                a: "Sí, con un código de descuento por institución: porcentaje o monto, usos máximos, límite por persona y fecha de término. Puede servir para un evento o para todos los tuyos, y se aplica al total de la compra.",
+            },
+            {
+                q: "¿Cómo funciona la entrada estudiante?",
+                a: "Es un tipo de entrada con su precio y su cupo. AI Tickets no verifica al comprar que la persona sea estudiante: en la acreditación tu equipo ve el tipo de entrada al escanearla y pide la credencial.",
+            },
+            {
+                q: "¿Qué pasa si se cae el wifi del lugar?",
+                a: "Antes de abrir, el escáner descarga la lista de entradas. Si se cae la conexión, cada celular sigue acreditando y rechaza lo que él ya escaneó; al volver, se sincroniza con los demás. Si alguien no trae su QR, se busca por nombre o correo y se acredita a mano o se le reenvía la entrada.",
+            },
+            {
+                q: "¿Entregan certificado de asistencia?",
+                a: "Todavía no: está en camino. Hoy tu asistente de IA te da la lista de quienes ingresaron, con su hora, para que emitas los certificados.",
+            },
+            {
+                q: "¿Puedo hacer un evento solo para mi empresa o mis socios?",
+                a: "Sí. Un evento privado no aparece en la cartelera de AI Tickets ni en buscadores: solo entra quien tiene el link. Antes de publicarlo, puedes compartir una vista previa privada con tu comité o tus auspiciadores.",
+            },
+            {
+                q: "¿Sirve para una charla online o híbrida?",
+                a: "AI Tickets inscribe y acredita eventos presenciales; no transmite. Si tu charla tiene transmisión, mandas el link a tus inscritos por correo desde tu asistente de IA.",
+            },
+        ],
+        // No hay un seminario de ejemplo en demoEvent.mjs (Preguntas abiertas 12): mientras tanto, la inscripción gratuita
+        demo: { url: "/eventos/evento-demo-gratis", label: "Ver una inscripción de ejemplo" },
+        cta: { label: "Publicar mi seminario", campaign: "vertical_seminarios" },
+        related: ["entradas-con-qr", "ticketera-talleres", "vender-entradas-online"],
+        dedicated: true,
     },
     {
         slug: "ticketera-talleres",
         kind: "vertical",
-        card: { title: "Talleres y charlas", text: "Cupos por fecha, inscripciones gratis o pagadas y recordatorios automáticos." },
-        title: "Venta de entradas e inscripciones para talleres | AI Tickets",
-        description: "Publica tus talleres, cursos cortos y charlas con cupos por fecha. Inscripciones gratis sin costo o pagadas con Webpay, recordatorio automático y asistencia con QR.",
-        eyebrow: "Para talleres, cursos cortos y charlas",
-        h1: "Inscripciones para tus talleres, con cupos y recordatorios automáticos",
+        // Sin "charlas": quedan para /ticketera-seminarios (SPEC_landing_talleres, Preguntas abiertas 8)
+        card: { title: "Talleres y cursos", text: "Cupos por fecha, inscripciones gratis o pagadas y recordatorio el día antes." },
+        title: "Inscripciones para talleres en Chile: cupos, Webpay y QR · 0% de comisión | AI Tickets",
+        description:
+            "Abre inscripciones para tus talleres y cursos cortos: cupos por fecha, gratis o con pago por Webpay, entrada con QR, recordatorio el día antes y lista de asistentes en el celular. 0% de comisión.",
+        eyebrow: "Para talleristas y espacios que dictan talleres",
+        h1: "Abre inscripciones con un link. El día del taller, solo enseña.",
         intro:
-            "Un taller tiene cupos chicos, fechas que se repiten y asistentes que hay que recordar. AI Tickets te da una página de inscripción, cobra si corresponde y le avisa a cada persona antes de la sesión.",
-        highlights: ["Gratis para eventos gratuitos", "Cupos por fecha", "Recordatorio por email antes de cada sesión"],
-        sections: [
-            {
-                heading: "Cupos claros en cada fecha",
-                body:
-                    "Agrega cada sesión como una función y define cuántos cupos tiene cada tipo de entrada. Cuando se llena, la página deja de vender esa entrada.",
-            },
-            {
-                heading: "Gratis o pagado",
-                items: [
-                    { title: "Eventos gratuitos", text: "Inscripción con nombre y email, entrada con QR y sin cargo por servicio." },
-                    { title: "Pagado con Webpay", text: `El participante paga con Webpay o tarjeta; el cargo por servicio es ${fee} y puedes absorberlo para mostrar un precio final.` },
-                    { title: "Códigos para tu comunidad", text: "Descuentos para ex alumnos, socios o grupos, con cupo y fecha límite." },
-                ],
-            },
-            {
-                heading: "Que nadie se olvide",
-                body:
-                    "Cada inscrito recibe su entrada por email al instante y un recordatorio antes de la sesión. Si cambias fecha u horario, les avisamos automáticamente.",
-            },
-        ],
+            "Cupos por fecha que se cierran solos, inscripción gratis o pagada con Webpay, la entrada con QR al correo de cada persona y un recordatorio el día antes. Sin DM preguntando si queda cupo, sin pantallazos de transferencias, sin planillas. 0% de comisión para ti.",
+        // "Recordatorio por correo el día antes" y no "antes de cada sesión": a quien tiene una entrada para todas las
+        // funciones (un curso) el recordatorio automático le llega solo antes de la primera fecha (send-event-reminders).
+        highlights: ["Gratis si tu taller es gratis", "Cupos por fecha", "Recordatorio por correo el día antes"],
+        // La página es propia (src/pages/ticketera-talleres.astro, SPEC_landing_talleres): las secciones viven en
+        // src/components/landing/talleres y las preguntas en src/data/talleresFaq.ts (que toma de aquí estas tres).
+        sections: [],
         faq: [
             {
                 q: "¿Puedo pedir datos adicionales al inscribirse?",
@@ -228,9 +384,66 @@ export const LANDINGS: Landing[] = [
             },
             { q: "¿Cuánto cuesta un taller gratuito?", a: "Nada. Las entradas gratis no pagan cargo por servicio y no hay mensualidad." },
         ],
+        // No hay un taller de ejemplo en demoEvent.mjs (Preguntas abiertas 9): mientras tanto, la inscripción gratuita
         demo: { url: "/eventos/evento-demo-gratis", label: "Ver una inscripción gratuita de ejemplo" },
-        cta: { label: "Publicar mi taller", campaign: "vertical_talleres" },
-        related: ["vender-entradas-online", "entradas-con-qr", "guias/como-vender-entradas-online"],
+        cta: { label: "Abrir inscripciones", campaign: "vertical_talleres" },
+        related: ["academias", "entradas-con-qr", "guias/como-vender-entradas-online", "ticketera-seminarios"],
+        dedicated: true,
+    },
+    {
+        slug: "academias",
+        kind: "vertical",
+        card: { title: "Academias", text: "Muestras y recitales de fin de año, gratis o con entrada, con el QR en el celular de cada familia." },
+        title: "Entradas para muestras y recitales de academias · Gratis o con venta | AI Tickets",
+        description:
+            "Venta y reserva de entradas para la muestra de fin de año de tu academia de música, danza o teatro: un link para los apoderados, entrada con QR al celular y control de acceso desde el celular. Gratis si la muestra es gratis.",
+        eyebrow: "Para academias de música, danza y teatro",
+        h1: "El día de la muestra, preocúpate solo del escenario",
+        intro:
+            "Las familias compran o reservan con un link, reciben su entrada en el celular y entran con QR. Sin planillas, sin transferencias que revisar, sin entradas impresas y sin caja en la puerta.",
+        highlights: [
+            "Gratis si tu muestra es gratis",
+            "Un link por curso para saber cuántas entradas compró cada uno",
+            `0% de comisión para la academia; la familia paga ${fee}`,
+        ],
+        // La página es propia (src/pages/academias.astro): las secciones viven en src/components/landing/academias
+        sections: [],
+        faq: [
+            {
+                q: "¿Cuánto cuesta?",
+                a: `Si tu muestra es gratis, nada. Si cobras entrada, la academia no paga comisión: la familia paga un cargo por servicio de ${SERVICE_FEE_PERCENT_LABEL} más IVA (${IVA_PERCENT_LABEL}) sobre ese cargo, o lo absorbe la academia para mostrar un precio redondo. ${ABSORB_FEE_ACTIVATION}`,
+            },
+            {
+                q: "¿Las familias tienen que descargar una app?",
+                a: "No. Compran o reservan desde el navegador del celular y reciben su entrada con QR por correo.",
+            },
+            {
+                q: "¿Puedo tener dos funciones, en la mañana y en la tarde?",
+                a: "Sí. Cada función tiene su propio cupo y cada familia elige la suya al comprar.",
+            },
+            {
+                q: "¿Puedo limitar cuántas entradas compra cada familia?",
+                a: `Sí. Cada tipo de entrada tiene un máximo por compra (${DEFAULT_MAX_PER_PURCHASE} si no lo cambias), para que alcance para todos. Hoy se ajusta desde tu asistente de IA conectado o escribiéndonos por WhatsApp.`,
+            },
+            {
+                q: "¿Cómo sé cuántas entradas compró cada curso?",
+                a: "Creas un link con seguimiento por curso y lo compartes en el grupo de cada uno. En las métricas del evento ves las órdenes, entradas e ingresos que trajo cada link.",
+            },
+            {
+                q: "¿Y si una familia pierde su entrada?",
+                a: "Se la reenvías a su correo desde el panel. En la puerta también se puede buscar por nombre.",
+            },
+            { q: "¿Cuándo recibo lo recaudado?", a: producerFaq("¿Cuándo recibo el dinero de mis ventas?").a, terms: true },
+            {
+                q: "¿Me ayudan con la primera muestra?",
+                a: "Sí. Escríbenos por WhatsApp o agenda una videollamada de 15 minutos y la dejamos lista contigo.",
+            },
+        ],
+        // Hasta que haya una muestra real enlazada (SPEC_landing_academias Fase 3): la inscripción gratuita de ejemplo
+        demo: { url: "/eventos/evento-demo-gratis", label: "Ver un evento de ejemplo" },
+        cta: { label: "Crear mi muestra gratis", campaign: "vertical_academias" },
+        related: ["ticketera-teatro", "ticketera-talleres", "entradas-con-qr"],
+        dedicated: true,
     },
     {
         slug: "vender-entradas-online",

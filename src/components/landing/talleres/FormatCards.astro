@@ -1,0 +1,102 @@
+---
+// Fichero de formatos (SPEC_landing_talleres §4.3, debajo del armador): tres fichas (un día, un curso, un taller que se
+// repite) con cómo se arma cada uno en AI Tickets y una nota al margen. El tope de fechas es MAX_EVENT_FUNCTIONS
+// (producerFaq.ts). TL11: entran como un abanico (desde rotate(0) y ±40 px a su giro final, stagger 90 ms). Mobile:
+// carrusel con scroll-snap.
+import MarginNote from "./MarginNote.astro";
+import { FORMAT_CARDS } from "./talleresLanding.js";
+import { MAX_EVENT_FUNCTIONS } from "../../../data/producerFaq";
+
+const tilts = [-1, 0, 1];
+const fan = ["40px", "0px", "-40px"];
+const cards = FORMAT_CARDS.map((c, i) => ({
+  ...c,
+  text: c.text.replace("{maxFunctions}", String(MAX_EVENT_FUNCTIONS)),
+  tilt: tilts[i],
+  fan: fan[i],
+}));
+---
+
+<div class="tl-formats" data-lp-reveal>
+  <h3 class="tl-h3 tl-formats-title" data-lp-step>Un día, un curso o todas las semanas.</h3>
+  <ul class="tl-formats-list" data-testid="workshop-formats">
+    {
+      cards.map((card, i) => (
+        <li class="tl-card tl-card-plain tl-format" style={`--tilt: ${card.tilt}deg; --tl-fan-x: ${card.fan}; --i: ${i}`}>
+          <div class="tl-card-body tl-format-body">
+            <h4 class="tl-display tl-format-title">{card.title}</h4>
+            <p class="tl-format-label">Cómo se arma</p>
+            <p class="tl-format-text">{card.text}</p>
+            <MarginNote text={card.note} arrow="none" class="tl-format-note" />
+          </div>
+        </li>
+      ))
+    }
+  </ul>
+</div>
+
+<style>
+  .tl-formats {
+    margin-top: 72px;
+  }
+  .tl-formats-list {
+    display: flex;
+    gap: 16px;
+    margin: 24px -16px 0;
+    padding: 8px 16px 16px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    list-style: none;
+  }
+  .tl-formats-list::-webkit-scrollbar {
+    display: none;
+  }
+  .tl-format {
+    flex: 0 0 82%;
+    scroll-snap-align: center;
+  }
+  .tl-format-body {
+    padding-top: 56px;
+  }
+  .tl-format-title {
+    font-size: 22px;
+    line-height: 26px;
+    font-weight: 700;
+  }
+  .tl-format-label {
+    margin-top: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--tl-grafito-3);
+  }
+  .tl-format-text {
+    margin-top: 4px;
+    font-size: 16px;
+    line-height: 28px;
+  }
+  .tl-format-note {
+    margin-top: 12px;
+  }
+  @media (min-width: 768px) {
+    .tl-formats-list {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 24px;
+      margin-inline: 0;
+      padding-inline: 0;
+      overflow: visible;
+    }
+  }
+  /* TL11: abanico */
+  @media (min-width: 768px) {
+    :global(.lp-motion) .tl-formats:not(.is-in) .tl-format {
+      opacity: 0;
+    }
+    :global(.lp-motion) .tl-formats.is-in .tl-format {
+      animation: tl-fan 600ms var(--ease-out) calc(150ms + var(--i) * 90ms) both;
+    }
+  }
+</style>

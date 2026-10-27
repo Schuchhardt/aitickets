@@ -1,0 +1,98 @@
+---
+// 3 · La curva de un concierto (SPEC_landing_musica §4.3, ancla #como-se-vende): encabezado y la isla de la curva con
+// los seis momentos. Los números de los momentos salen del código: la última semana y el umbral de escasez de
+// DEFAULT_CADENCE (socialSeriesCadence.ts), el plazo de pago de legal.mjs. Lo que no existe (aviso automático a la
+// lista de "Avísame" y abrir sola la siguiente tanda) va con "Pronto". La hora de apertura de una tanda hoy se programa
+// desde el asistente de IA (tools/tickets.ts), por eso el chip dice "Venta abre el …" sin prometer el formulario.
+import MusicSalesCurve from "./MusicSalesCurve.vue";
+import { DEFAULT_CADENCE } from "../../../lib/socialSeriesCadence";
+import { PAYOUT_BUSINESS_DAYS, PAYOUT_RELEASE_HOURS } from "../../../../netlify/lib/legal.mjs";
+import { TERMS_NOTE } from "../../../data/producerFaq";
+
+const moments = [
+  {
+    tag: "D-45 · Anuncio",
+    title: "Publicas la fecha en una tarde.",
+    text:
+      "Creas los tipos de entrada con su precio y su cupo: Preventa 1, Preventa 2, General, VIP. Si la venta abre más adelante, la página muestra cuándo parte y junta los correos de quienes quieren enterarse.",
+    chips: [
+      { label: "Tipos de entrada con cupo" },
+      { label: "Venta abre el …" },
+      { label: "Lista de \"Avísame\"" },
+      { label: "Aviso automático al abrir", soon: true },
+    ],
+  },
+  {
+    tag: "D-44 · Preventa",
+    title: "La primera ola se agota en horas.",
+    text:
+      "Cuando se acaba la Preventa 1, aparece agotada y tu público ve la siguiente tanda con su precio. Los códigos de descuento tienen cupo, límite por persona y fecha de término.",
+    chips: [{ label: "Tandas con cupo" }, { label: "Códigos con fecha límite" }, { label: "Siguiente tanda automática", soon: true }],
+  },
+  {
+    tag: "D-30 · La meseta",
+    title: "Cuando la venta se aplana, sabes por qué.",
+    text:
+      "En las métricas del evento ves visitas, conversión, ventas por canal, desde qué ciudades te visitan y a qué hora se compra. Cada domingo te llega un reporte con la semana y qué hacer en la próxima.",
+    chips: [{ label: "Ventas por canal" }, { label: "Ciudades y horas" }, { label: "Reporte semanal" }],
+  },
+  {
+    tag: `D-${DEFAULT_CADENCE.daily_from_days} · Última semana`,
+    title: "La segunda ola.",
+    text: `Las historias en tu Instagram pasan a ser diarias y se suma un post diario en el feed. Cuando queda menos del ${DEFAULT_CADENCE.scarcity_threshold_pct}% de las entradas, cada pieza dice cuántas quedan. Buen momento para un código de última semana.`,
+    chips: [{ label: "Historias diarias" }, { label: "Quedan N entradas" }, { label: "Código de última semana" }],
+  },
+  {
+    tag: "Show · 20:30",
+    title: "La puerta avanza sola.",
+    text:
+      "Tu equipo escanea los QR con su celular, aunque la sala no tenga señal. Las cortesías de prensa y de las bandas entran con su propio QR.",
+    chips: [{ label: "QR sin señal" }, { label: "Cortesías" }, { label: "Rol Puerta" }],
+  },
+  {
+    tag: `+${PAYOUT_RELEASE_HOURS} h · El bis`,
+    title: "La plata de la fecha, y la próxima.",
+    text: `Lo de esta fecha queda disponible ${PAYOUT_RELEASE_HOURS} h después del show; pides el retiro y llega en hasta ${PAYOUT_BUSINESS_DAYS} días hábiles. Tu público recibe un correo para calificar y subir fotos, y con un clic lo invitas a tu próxima fecha.`,
+    chips: [{ label: "Cobro por fecha*" }, { label: "Reseñas con fotos" }, { label: "Invitar al próximo show" }],
+  },
+];
+---
+
+<section id="como-se-vende" class="mu-section cs" aria-labelledby="mu-curve-title" data-mu-section="curve">
+  <div class="mu-wrap">
+    <div class="cs-head" data-lp-reveal>
+      <p class="mu-mono mu-eyebrow" data-lp-step><span aria-hidden="true">02 —</span> Cómo se vende un concierto</p>
+      <h2 id="mu-curve-title" class="mu-h2 cs-title" data-lp-step>La venta se juega <span class="mu-red">en dos momentos.</span></h2>
+      <p class="mu-lead cs-lead" data-lp-step>
+        Las primeras horas de la preventa y la última semana. Entre medio, la venta se aplana. Así te acompaña AI Tickets en
+        cada parte.
+      </p>
+    </div>
+    <MusicSalesCurve client:visible moments={moments} />
+    <p class="cs-terms"><a href={TERMS_NOTE.href} class="mu-link">{TERMS_NOTE.text}</a></p>
+  </div>
+</section>
+
+<style>
+  .cs-head {
+    max-width: 900px;
+    margin-bottom: 40px;
+  }
+  .cs-title {
+    margin-top: 22px;
+  }
+  .cs-lead {
+    max-width: 620px;
+    margin-top: 20px;
+  }
+  .cs-terms {
+    margin-top: 24px;
+    font-size: 12px;
+    color: var(--mu-text-3);
+  }
+  @media (min-width: 1024px) {
+    .cs-head {
+      margin-bottom: 72px;
+    }
+  }
+</style>

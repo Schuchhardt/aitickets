@@ -1,0 +1,592 @@
+/* ------------------------------------------------------------------------------------------------
+ * Tema de la landing de música en vivo (/ticketera-musica-en-vivo, docs/specs/rediseno/SPEC_landing_musica_aitickets.md
+ * §1): "afiche de gira". Negro escenario frío, papel de afiche, un solo rojo de sala, Anton condensada en mayúsculas y
+ * metadatos en monoespaciada del sistema. Todo cuadrado (0 px en fotos y bloques, 4-6 px en cards y botones) y con
+ * grano. Scope en [data-theme="musica"]: no toca los tokens globales; los tokens puente (surface/text/border) hacen que
+ * los componentes compartidos (FAQ, badge "Pronto", barra mobile) se vean en oscuro, como en stand-up y academias.
+ * El rojo va en gráfica, titulares grandes y sellos (texto rojo solo ≥ 18 px; sobre papel, --mu-red-ink); el lima solo
+ * en acciones y confirmaciones ("Válida", "Tú recibes"), nunca pegado al rojo en piezas chicas. Prefijo mu-. Se carga
+ * junto a landing.css (usa .lp-sr-only y el movimiento de LandingMotion).
+ * ---------------------------------------------------------------------------------------------- */
+/* Anton 400 solo latin (cubre las tildes del español), servida desde el sitio como las demás fuentes: sin hoja de
+ * Google Fonts que bloquee el render del hero. La página la precarga (Layout, slot head-extra). */
+@import "@fontsource/anton/latin-400.css";
+
+/* Respaldo con métricas aproximadas a Anton para que el swap no mueva el hero (CLS, §7). Ajustar si se cambia la
+ * fuente de acento (Preguntas abiertas 10). */
+@font-face {
+  font-family: "Anton Fallback";
+  src: local("Impact"), local("Arial Narrow Bold");
+  size-adjust: 94%;
+  ascent-override: 118%;
+  descent-override: 33%;
+  line-gap-override: 0%;
+}
+
+[data-theme="musica"] {
+  --mu-stage: #0a0a0d; /* fondo principal (negro escenario, frío) */
+  --mu-stage-2: #141418; /* secciones alternas, cards */
+  --mu-stage-3: #1f1f26; /* inputs, chips, filas */
+  --mu-line: rgba(242, 240, 235, 0.12);
+  --mu-line-strong: rgba(242, 240, 235, 0.2);
+  --mu-text-1: #f2f0eb;
+  --mu-text-2: #c8c5be;
+  --mu-text-3: #a19e97; /* meta, eyebrows (≈ 7:1 sobre stage) */
+  --mu-red: #ff3b30; /* rojo de sala (≈ 5,5:1 sobre stage) */
+  --mu-red-deep: #5a0e0a; /* sombra del duotono */
+  --mu-red-ink: #a3120b; /* rojo para texto sobre papel (AA) */
+  --mu-paper: #eee9df; /* papel de afiche */
+  --mu-paper-2: #e2dccf; /* cinta adhesiva, controles sobre papel */
+  --mu-ink: #111013; /* texto sobre papel y sobre rojo */
+  --mu-ink-2: #46434a; /* texto secundario sobre papel (≥ 7:1) */
+  --mu-ink-3: #5f5b63; /* meta sobre papel (≥ 5:1) */
+  /* Grano: ruido fractal en gris, inline (< 1 KB), una sola capa por sección */
+  --mu-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  /* Máscara de los sellos de goma: opaca con huecos de tinta que no agarró */
+  --mu-stamp-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='s'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.7' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -3.2 0 0 0 2.5'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23s)'/%3E%3C/svg%3E");
+  --mu-display: "Anton", "Anton Fallback", Impact, "Arial Narrow", sans-serif;
+  --mu-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Componentes compartidos dentro del tema (LandingFaq, LandingMobileBar, SoonBadge) */
+  --surface-0: var(--mu-stage);
+  --surface-1: var(--mu-stage-2);
+  --surface-2: var(--mu-stage-3);
+  --border: var(--mu-line);
+  --border-strong: var(--mu-line-strong);
+  --text-1: var(--mu-text-1);
+  --text-2: var(--mu-text-2);
+  --text-3: var(--mu-text-3);
+
+  font-family: "Prompt", system-ui, sans-serif;
+  color: var(--mu-text-1);
+  background: var(--mu-stage);
+  -webkit-font-smoothing: antialiased;
+}
+
+.mu-wrap {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding-inline: 20px;
+}
+@media (min-width: 768px) {
+  .mu-wrap {
+    padding-inline: 40px;
+  }
+}
+.mu [id] {
+  scroll-margin-top: 88px;
+}
+/* Ritmo de cortes duros (§2): 72 px de padding vertical en mobile, 140 en desktop */
+.mu-section {
+  position: relative;
+  padding-block: 72px;
+}
+@media (min-width: 1024px) {
+  .mu-section {
+    padding-block: 140px;
+  }
+}
+.mu-on-stage-2 {
+  background: var(--mu-stage-2);
+}
+/* Bloques de papel de afiche: texto tinta y tokens puente en claro para lo compartido */
+.mu-on-paper {
+  --text-1: var(--mu-ink);
+  --text-2: var(--mu-ink-2);
+  --text-3: var(--mu-ink-3);
+  --surface-2: var(--mu-paper-2);
+  background: var(--mu-paper);
+  color: var(--mu-ink);
+}
+
+/* ---------- Grano (una capa por sección, §1) ---------- */
+.mu-grain {
+  position: relative;
+  isolation: isolate;
+}
+.mu-grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background-image: var(--mu-grain);
+  opacity: 0.07;
+  pointer-events: none;
+}
+
+/* ---------- Tipografía ----------
+ * Anton en mayúsculas con tracking 0, nunca bajo 24 px. El texto va escrito normal en el HTML (lo leen así los lectores
+ * de pantalla y los tests) y se pasa a mayúsculas con CSS. Énfasis: rojo o letra calada, nunca cursiva. */
+.mu-h1,
+.mu-h2,
+.mu-h3,
+.mu-display {
+  font-family: var(--mu-display);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  overflow-wrap: break-word;
+}
+.mu-h1 {
+  font-size: 64px;
+  line-height: 58px;
+}
+.mu-h1-sub {
+  display: block;
+  font-size: 38px;
+  line-height: 38px;
+}
+.mu-h2 {
+  font-size: 52px;
+  line-height: 50px;
+  text-wrap: balance;
+}
+.mu-h3 {
+  font-size: 28px;
+  line-height: 30px;
+}
+@media (min-width: 1024px) {
+  .mu-h1 {
+    font-size: clamp(96px, 10.4vw, 152px);
+    line-height: 0.9;
+  }
+  .mu-h1-sub {
+    font-size: clamp(52px, 5.8vw, 84px);
+    line-height: 1;
+  }
+  .mu-h2 {
+    font-size: clamp(64px, 7.2vw, 104px);
+    line-height: 0.93;
+  }
+  .mu-h3 {
+    font-size: 44px;
+    line-height: 44px;
+  }
+}
+.mu-red {
+  color: var(--mu-red);
+}
+.mu-on-paper .mu-red {
+  color: var(--mu-red-ink);
+}
+/* Letra calada (solo ≥ 56 px; en mobile el H2 mide 52 px, así que ahí va lleno). El trazo no puede ser currentColor
+ * (el color es transparente): va en --mu-outline, tinta sobre papel y sobre rojo. */
+.mu-outline {
+  --mu-outline: var(--mu-text-1);
+}
+.mu-on-red .mu-outline,
+.mu-on-paper .mu-outline {
+  --mu-outline: var(--mu-ink);
+}
+@media (min-width: 1024px) {
+  @supports (-webkit-text-stroke: 1px) {
+    .mu-outline {
+      color: transparent;
+      -webkit-text-stroke: 1.5px var(--mu-outline);
+    }
+    .mu-on-red .mu-outline,
+    .mu-on-paper .mu-outline {
+      -webkit-text-stroke-width: 2px;
+    }
+  }
+}
+/* Metadatos como un setlist: mono del sistema, mayúsculas, cifras tabulares */
+.mu-mono {
+  font-family: var(--mu-mono);
+  font-size: 13px;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+@media (min-width: 1024px) {
+  .mu-mono {
+    font-size: 14px;
+    line-height: 20px;
+  }
+}
+.mu-eyebrow {
+  color: var(--mu-text-3);
+}
+.mu-on-paper .mu-eyebrow {
+  color: var(--mu-ink-3);
+}
+/* Numeración de setlist antes de cada H2: "01 —" */
+.mu-num {
+  display: block;
+  margin-bottom: 20px;
+  color: var(--mu-text-3);
+}
+.mu-on-paper .mu-num {
+  color: var(--mu-ink-3);
+}
+.mu-lead {
+  font-size: 16px;
+  line-height: 25px;
+  color: var(--mu-text-2);
+}
+.mu-on-paper .mu-lead {
+  color: var(--mu-ink-2);
+}
+@media (min-width: 1024px) {
+  .mu-lead {
+    font-size: 18px;
+    line-height: 29px;
+  }
+}
+.mu-example {
+  font-family: var(--mu-mono);
+  font-size: 11px;
+  line-height: 16px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mu-text-3);
+}
+.mu-on-paper .mu-example {
+  color: var(--mu-ink-3);
+}
+
+/* ---------- Botones y enlaces (radio 6, no pill) ---------- */
+.mu-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 0 22px;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.1;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform var(--dur-1) var(--ease-out), background-color var(--dur-1) var(--ease-out),
+    border-color var(--dur-1) var(--ease-out), box-shadow var(--dur-2) var(--ease-out);
+  -webkit-tap-highlight-color: transparent;
+}
+.mu-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--mu-stage), 0 0 0 6px var(--brand-lime);
+}
+.mu-btn-lime {
+  border: 0;
+  background: var(--brand-lime);
+  color: var(--mu-ink);
+}
+.mu-btn-lime:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 0 rgba(0, 0, 0, 0.35);
+}
+.mu-btn-line {
+  border: 1.5px solid rgba(242, 240, 235, 0.4);
+  background: rgba(10, 10, 13, 0.25);
+  color: var(--mu-text-1);
+  font-weight: 500;
+}
+.mu-btn-line:hover {
+  border-color: var(--mu-text-1);
+  background: rgba(242, 240, 235, 0.08);
+}
+.mu-btn-ink {
+  border: 0;
+  background: var(--mu-ink);
+  color: var(--mu-paper);
+}
+.mu-btn-ink:hover {
+  transform: translateY(-1px);
+}
+.mu-btn-ink:focus-visible {
+  box-shadow: 0 0 0 3px var(--mu-paper), 0 0 0 5px var(--mu-ink);
+}
+.mu-btn:active {
+  transform: scale(0.98);
+}
+@media (min-width: 1024px) {
+  .mu-btn {
+    min-height: 56px;
+    padding: 0 26px;
+    font-size: 17px;
+  }
+}
+.mu-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--mu-text-1);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-color: rgba(242, 240, 235, 0.35);
+  border-radius: 2px;
+}
+.mu-link:hover {
+  text-decoration-color: currentColor;
+}
+.mu-on-paper .mu-link,
+.mu-on-red .mu-link {
+  color: var(--mu-ink);
+  text-decoration-color: rgba(17, 16, 19, 0.35);
+}
+.mu-link:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+
+/* ---------- Fotos en duotono y fotocopia (§1, sin JS ni archivos teñidos) ----------
+ * Duotono: la foto en grises con más contraste; encima, rojo en multiply (los claros pasan a rojo) y rojo profundo en
+ * lighten (los negros suben a rojo oscuro). Fotocopia: solo grises con más contraste. La animación de la foto va en el
+ * <img> y no en el contenedor, para que las capas de mezcla no queden dentro de un transform (Safari iOS, §7). */
+.mu-duo {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--mu-stage);
+}
+.mu-duo picture,
+.mu-duo .mu-photo-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.mu-photo-img {
+  object-fit: cover;
+}
+.mu-duo .mu-photo-img {
+  filter: grayscale(1) contrast(1.15);
+}
+.mu-duo::before,
+.mu-duo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.mu-duo::before {
+  background: var(--mu-red);
+  mix-blend-mode: multiply;
+}
+.mu-duo::after {
+  background: var(--mu-red-deep);
+  mix-blend-mode: lighten;
+}
+@supports not (mix-blend-mode: multiply) {
+  .mu-duo .mu-photo-img {
+    filter: grayscale(1) sepia(1) hue-rotate(-40deg) saturate(4);
+  }
+  .mu-duo::before,
+  .mu-duo::after {
+    display: none;
+  }
+}
+.mu-copy {
+  position: relative;
+  overflow: hidden;
+  background: var(--mu-paper-2);
+}
+.mu-copy .mu-photo-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: grayscale(1) contrast(1.25);
+  mix-blend-mode: multiply;
+}
+
+/* ---------- Talón de entrada (muescas de perforación con mask, §1) ----------
+ * --stub: ancho del talón a la derecha. La línea punteada de la perforación la pone .mu-ticket-stub. En la variante
+ * vertical (.mu-ticket-v) el talón va abajo y las muescas a los costados. */
+.mu-ticket {
+  --stub: 96px;
+  --notch: 10px;
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--stub);
+  border-radius: 4px;
+  background: var(--mu-paper);
+  color: var(--mu-ink);
+  -webkit-mask: radial-gradient(circle var(--notch) at calc(100% - var(--stub)) 0, #0000 98%, #000) top / 100% 51% no-repeat,
+    radial-gradient(circle var(--notch) at calc(100% - var(--stub)) 100%, #0000 98%, #000) bottom / 100% 51% no-repeat;
+  mask: radial-gradient(circle var(--notch) at calc(100% - var(--stub)) 0, #0000 98%, #000) top / 100% 51% no-repeat,
+    radial-gradient(circle var(--notch) at calc(100% - var(--stub)) 100%, #0000 98%, #000) bottom / 100% 51% no-repeat;
+}
+.mu-ticket-stub {
+  border-left: 2px dashed rgba(17, 16, 19, 0.35);
+}
+.mu-ticket-v {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto var(--stub);
+  -webkit-mask: radial-gradient(circle var(--notch) at 0 calc(100% - var(--stub)), #0000 98%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle var(--notch) at 100% calc(100% - var(--stub)), #0000 98%, #000) right / 51% 100% no-repeat;
+  mask: radial-gradient(circle var(--notch) at 0 calc(100% - var(--stub)), #0000 98%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle var(--notch) at 100% calc(100% - var(--stub)), #0000 98%, #000) right / 51% 100% no-repeat;
+}
+.mu-ticket-v .mu-ticket-stub {
+  border-left: 0;
+  border-top: 2px dashed rgba(17, 16, 19, 0.35);
+}
+
+/* ---------- Sello de goma (AGOTADA / AGOTADO) ---------- */
+.mu-stamp {
+  display: inline-block;
+  padding: 2px 10px 0;
+  border: 4px double currentColor;
+  border-radius: 4px;
+  font-family: var(--mu-display);
+  font-size: 26px;
+  line-height: 1.15;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--mu-red);
+  transform: rotate(var(--mu-stamp-rot, -10deg));
+  -webkit-mask-image: var(--mu-stamp-mask);
+  mask-image: var(--mu-stamp-mask);
+  -webkit-mask-size: 120px 120px;
+  mask-size: 120px 120px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.mu-stamp-ink {
+  color: var(--mu-ink);
+}
+.mu-on-paper .mu-stamp:not(.mu-stamp-ink) {
+  color: var(--mu-red-ink);
+}
+
+/* ---------- Chips y cuadrados de lista ---------- */
+.mu-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 3px 9px;
+  border: 1px solid var(--mu-line-strong);
+  border-radius: 4px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--mu-text-2);
+}
+.mu-square {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  margin-top: 8px;
+  background: currentColor;
+}
+
+/* ---------- Rangos (calculadora y anuncios) ---------- */
+.mu-range {
+  width: 100%;
+  height: 28px;
+  margin: 0;
+  accent-color: var(--mu-ink);
+  cursor: pointer;
+}
+.mu-range:focus-visible {
+  outline: 2px solid var(--mu-ink);
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+
+/* ---------- Movimiento (§6) ----------
+ * Igual que las otras landings: todo cuelga de html.lp-motion (LandingMotion.astro: JS, IntersectionObserver y sin
+ * "reducir movimiento"); sin la clase cada elemento queda en su estado final (sellos puestos, barras llenas, sin loops).
+ * Solo transform, opacity y clip-path. */
+@keyframes mu-photo-in {
+  from {
+    transform: scale(1.06);
+  }
+}
+@keyframes mu-fade {
+  from {
+    opacity: 0.6;
+  }
+}
+/* El recorte final deja aire arriba y abajo: Anton dibuja las tildes de las mayúsculas (TÚ, MÚSICA) sobre la caja
+ * de la línea, y con inset(0) quedarían cortadas */
+@keyframes mu-print {
+  from {
+    clip-path: inset(-0.3em -0.1em 100% -0.1em);
+  }
+  to {
+    clip-path: inset(-0.3em -0.1em -0.3em -0.1em);
+  }
+}
+@keyframes mu-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+@keyframes mu-up-24 {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+@keyframes mu-ticket-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px) rotate(-8deg);
+  }
+}
+@keyframes mu-stamp-pop {
+  0% {
+    opacity: 0;
+    transform: rotate(var(--mu-stamp-rot, -10deg)) scale(1.6);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(var(--mu-stamp-rot, -10deg)) scale(1);
+  }
+}
+@keyframes mu-grow-x {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes mu-poster-in {
+  from {
+    opacity: 0;
+    transform: rotate(-3deg);
+  }
+}
+@keyframes mu-eq {
+  0%,
+  100% {
+    transform: scaleY(var(--eq-lo, 0.3));
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+@keyframes mu-pop-y {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+/* M8 y reveal genérico: fade + translateY 24 px */
+.lp-motion .mu .is-in [data-lp-step],
+.lp-motion .mu .is-in[data-lp-step] {
+  animation: mu-up-24 700ms var(--ease-out) var(--lp-d, 0ms) both;
+}
+/* Sello con pop (M4, M9, M11): cuando su bloque se revela */
+.lp-motion [data-lp-reveal]:not(.is-in) .mu-stamp-reveal {
+  opacity: 0;
+}
+.lp-motion .is-in .mu-stamp-reveal {
+  animation: mu-stamp-pop 220ms var(--ease-spring) var(--mu-stamp-delay, 300ms) both;
+}
+
+/* Fondo del documento (rebote del scroll en iOS y macOS) del mismo color que la página */
+html:has(body [data-theme="musica"]) {
+  background: #0a0a0d;
+}
+
+/* Bloque rojo a sangre (§4.4): texto tinta y tokens puente para "Pronto" sobre rojo */
+.mu-on-red {
+  --text-1: var(--mu-ink);
+  --text-2: var(--mu-ink);
+  --surface-2: rgba(17, 16, 19, 0.14);
+  color: var(--mu-ink);
+}

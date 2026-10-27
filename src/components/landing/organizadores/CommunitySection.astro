@@ -1,0 +1,528 @@
+---
+// 5b · Antes, durante y después (SPEC_landing_productores §5.5b, ancla #comunidad). Todo existe en producción: video de
+// portada (src/lib/eventVideo.ts), muro de asistentes (netlify/lib/attendee-community.mjs) y reseñas e invitaciones
+// (docs/runbooks/resenas-e-invitaciones.md). Los límites del copy salen de esas fuentes. Desktop: tres filas
+// alternadas; mobile: versión compacta (video 4:5, chips del muro y card de reseñas).
+// Movimiento (L7, L17-L21): cada fila entra al llegar a ella; las barras de la distribución de notas crecen con 80 ms
+// entre cada una. El muro, el correo y el video traen su propio movimiento (WallDemo, ReviewEmailDemo, LandingCoverVideo).
+import LandingCoverVideo from "../LandingCoverVideo.vue";
+import WallDemo from "../WallDemo.vue";
+import ReviewEmailDemo from "../ReviewEmailDemo.vue";
+import InviteDemo from "../InviteDemo.vue";
+import StarRating from "../../event/StarRating.vue";
+import { DEMO_EVENT_NAME, LANDING_MEDIA } from "../producerLanding.js";
+import { EVENT_VIDEO_MAX_BYTES } from "../../../lib/eventVideo";
+import { FEED_EMOJIS, FEED_MESSAGE_MAX } from "../../../../netlify/lib/attendee-community.mjs";
+import {
+  MAX_PHOTOS_PER_PERSON,
+  REVIEW_REQUEST_DELAY_HOURS,
+  REVIEW_REQUEST_WINDOW_HOURS,
+  REWARD_CODE_PREFIX,
+  REWARD_LIMITS,
+} from "../../../../netlify/lib/reviews.mjs";
+
+const videoMaxMb = Math.round(EVENT_VIDEO_MAX_BYTES / (1024 * 1024));
+const emojis = [...FEED_EMOJIS];
+const coverLabel = "Video de portada de ejemplo: comediante en escena";
+
+const coverChecks = [
+  `MP4, MOV o WebM de hasta ${videoMaxMb} MB, horizontal o vertical.`,
+  "Mientras carga se ve un cuadro del video; al compartir y en los correos se usa la imagen del evento.",
+  "Súbelo desde el panel o pídeselo a tu IA con el link del video.",
+  "También puedes sumar un video arriba de las fotos de la galería.",
+];
+const reviewChecks = [
+  "Comentario público y un mensaje privado solo para ti.",
+  `Hasta ${MAX_PHOTOS_PER_PERSON} fotos por asistente, visibles al tiro o con tu revisión.`,
+  "Premio opcional por calificar: un código de descuento para tus próximos eventos, sin importar la nota.",
+  "Con un clic invitas a quienes fueron a tu próximo evento, sin repetir a quienes ya compraron ni a quienes se dieron de baja.",
+];
+// Reseñas de ejemplo (rotuladas como tales)
+const distribution = [
+  { stars: 5, share: 0.82 },
+  { stars: 4, share: 0.13 },
+  { stars: 3, share: 0.03 },
+  { stars: 2, share: 0.01 },
+  { stars: 1, share: 0.01 },
+];
+// Miniaturas cuadradas de ~100 px: la variante más chica de cada foto (AVIF y, de respaldo, WebP), no el JPG original
+const photo = (name: string, width: number, w: number, h: number) => ({
+  avif: `/landing/${name}-${width}.avif`,
+  src: `/landing/${name}-${width}.webp`,
+  w: width,
+  h: Math.round((h / w) * width),
+});
+const photos = [
+  photo("aitk-publico", 640, 1344, 768),
+  photo("aitk-comediante", 480, 896, 1152),
+  photo("aitk-hero-standup", 640, 1344, 768),
+  photo("aitk-openmic", 480, 896, 1152),
+  photo("aitk-backstage", 480, 896, 1152),
+];
+const comments = [
+  { name: "María P.", rating: 5, text: "Lloré de la risa. La sala chica le da otra onda." },
+  { name: "Tomás R.", rating: 4, text: "Buenísimo el line-up. Volvería con amigos." },
+];
+---
+
+<section id="comunidad" class="lp-section comm" aria-labelledby="community-title" data-lp-section="community">
+  <div class="lp-wrap">
+    <div class="comm-head" data-lp-reveal>
+      <p class="lp-eyebrow" data-lp-step>Antes, durante y después</p>
+      <h2 id="community-title" class="lp-h2 comm-title" data-lp-step>Tu evento se ve vivo antes y se recuerda después.</h2>
+      <p class="lp-lead comm-lead" data-lp-step>
+        Video de portada para que den ganas de ir, un muro donde tu público se encuentra y reseñas que te traen al próximo
+        evento a los que ya fueron.
+      </p>
+    </div>
+
+    <!-- Desktop: tres filas alternadas -->
+    <div class="comm-desktop">
+      <div class="comm-row comm-row-1" data-lp-reveal>
+        <div class="browser" data-lp-step>
+          <p class="browser-bar" aria-hidden="true"><span></span><span></span><span></span><em>aitickets.cl/eventos/stand-up-de-viernes</em></p>
+          <div class="browser-cover">
+            <LandingCoverVideo
+              client:visible
+              src={LANDING_MEDIA.coverVideo}
+              webmSrc={LANDING_MEDIA.coverVideoWebm}
+              poster={LANDING_MEDIA.coverPoster}
+              posterWidth={LANDING_MEDIA.coverPosterWidth}
+              posterHeight={LANDING_MEDIA.coverPosterHeight}
+              posterSources={LANDING_MEDIA.coverPosterSources}
+              posterSizes="540px"
+              label={coverLabel}
+              sound
+              pausable={false}
+              priority={false}
+              soundPosition="top"
+              soundEvent="lp_cover_sound"
+            />
+            <div class="cover-shade" aria-hidden="true"></div>
+            <div class="cover-caption">
+              <p class="cover-date">VIE 23 OCT · 21:00 · PROVIDENCIA</p>
+              <p class="cover-name">{DEMO_EVENT_NAME}</p>
+            </div>
+          </div>
+        </div>
+        <div data-lp-step>
+          <p class="comm-stage">Antes</p>
+          <h3 class="lp-h3 lp-h3-lg comm-h3">Una portada en video vende más que un póster.</h3>
+          <p class="lp-body comm-text">
+            Sube un clip de tu show y reemplaza la imagen arriba de la página del evento. Se reproduce solo y sin sonido, y
+            quien quiera lo activa con un toque.
+          </p>
+          <ul class="comm-checks">{coverChecks.map((c) => <li class="lp-check">{c}</li>)}</ul>
+        </div>
+      </div>
+
+      <div class="comm-row comm-row-2" data-lp-reveal>
+        <div data-lp-step>
+          <p class="comm-stage">Durante</p>
+          <h3 class="lp-h3 lp-h3-lg comm-h3">Un muro para que tu público se encuentre.</h3>
+          <p class="lp-body comm-text">
+            Quienes tienen entrada reaccionan con un emoji y dejan un mensaje corto que ven los demás asistentes. Se arma la
+            previa, la gente se coordina y llega con ganas. Tú lo moderas desde el panel.
+          </p>
+          <p class="lp-body comm-text-2">
+            Y si alguien necesita hablar contigo, te escribe desde su entrada: el mensaje te llega al correo y queda guardado
+            en el panel del evento.
+          </p>
+        </div>
+        <div data-lp-step><WallDemo client:visible emojis={emojis} maxLength={FEED_MESSAGE_MAX} compact={false} /></div>
+      </div>
+
+      <div class="comm-row comm-row-3" data-lp-reveal>
+        <div class="reviews-grid" data-lp-step>
+          <ReviewEmailDemo
+            client:visible
+            eventName={DEMO_EVENT_NAME}
+            rewardPercent={REWARD_LIMITS.defaultValue}
+            rewardCodePrefix={REWARD_CODE_PREFIX}
+          />
+          <div class="summary">
+            <p class="summary-kicker">Página del evento terminado · ejemplo</p>
+            <p class="summary-avg"><span class="lp-display">4,8</span><StarRating readonly showLabel={false} modelValue={4.8} size={16} label="Promedio" /></p>
+            <p class="summary-count">86 reseñas</p>
+            <ul class="summary-dist" aria-label="Distribución de notas">
+              {distribution.map((d, i) => (
+                <li>
+                  <span>{d.stars}</span>
+                  <span class="lp-bar-track summary-track" role="img" aria-label={`${Math.round(d.share * 100)}% con ${d.stars} ${d.stars === 1 ? "estrella" : "estrellas"}`}>
+                    <span class="lp-bar summary-bar" data-lp-grow style={`--lp-scale: ${d.share}; --lp-d: ${200 + i * 80}ms`}></span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div class="photos lp-card">
+            <p class="photos-title">Fotos de los asistentes</p>
+            <ul class="photos-grid">
+              {photos.map((p) => (
+                <li><picture><source type="image/avif" srcset={p.avif} /><img src={p.src} width={p.w} height={p.h} alt="Foto de ejemplo subida por un asistente" loading="lazy" decoding="async" /></picture></li>
+              ))}
+            </ul>
+            <ul class="photos-comments">
+              {comments.map((c) => (
+                <li>
+                  <p><strong>{c.name}</strong> <StarRating readonly showLabel={false} modelValue={c.rating} size={13} label={`Nota de ${c.name}`} /></p>
+                  <p class="photos-comment">{c.text}</p>
+                </li>
+              ))}
+            </ul>
+            <p class="lp-example">Datos de ejemplo</p>
+          </div>
+        </div>
+        <div data-lp-step>
+          <p class="comm-stage">Después</p>
+          <h3 class="lp-h3 lp-h3-lg comm-h3">Reseñas que te traen al próximo evento.</h3>
+          <p class="lp-body comm-text">
+            Entre {REVIEW_REQUEST_DELAY_HOURS} y {REVIEW_REQUEST_WINDOW_HOURS} horas después de cada función, cada asistente
+            recibe un correo “¿Cómo estuvo?” y califica en segundos, sin crear cuenta. La página del evento terminado muestra
+            el promedio, los comentarios y las fotos que suben tus asistentes.
+          </p>
+          <ul class="comm-checks">{reviewChecks.map((c) => <li class="lp-check">{c}</li>)}</ul>
+          <div class="comm-invite"><InviteDemo client:visible /></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile: versión compacta, mismo orden -->
+    <div class="comm-mobile">
+      <div class="m-cover" data-lp-reveal data-lp-step>
+        <LandingCoverVideo
+          client:visible
+          src={LANDING_MEDIA.coverVideo}
+          webmSrc={LANDING_MEDIA.coverVideoWebm}
+          poster={LANDING_MEDIA.coverPoster}
+          posterWidth={LANDING_MEDIA.coverPosterWidth}
+          posterHeight={LANDING_MEDIA.coverPosterHeight}
+          posterSources={LANDING_MEDIA.coverPosterSources}
+          posterSizes="220vw"
+          label={coverLabel}
+          sound
+          pausable={false}
+          priority={false}
+          soundPosition="top"
+          soundEvent="lp_cover_sound"
+        />
+        <div class="cover-shade" aria-hidden="true"></div>
+        <div class="cover-caption">
+          <p class="cover-date">PORTADA CON VIDEO</p>
+          <p class="cover-name">{DEMO_EVENT_NAME}</p>
+        </div>
+      </div>
+      <p class="lp-body m-text" data-lp-reveal data-lp-step>
+        Sube un clip de hasta {videoMaxMb} MB y reemplaza la imagen de portada. Se reproduce solo y sin sonido, y quien
+        quiera lo activa con un toque.
+      </p>
+
+      <div class="m-block" data-lp-reveal data-lp-step><WallDemo client:visible emojis={emojis} maxLength={FEED_MESSAGE_MAX} compact /></div>
+      <p class="lp-body m-text" data-lp-reveal data-lp-step>
+        Quienes tienen entrada reaccionan y dejan un mensaje para los demás. Tú lo moderas, y si alguien necesita hablar
+        contigo, te escribe desde su entrada.
+      </p>
+
+      <div class="m-block summary" data-lp-reveal data-lp-step>
+        <p class="summary-kicker">Página del evento terminado · ejemplo</p>
+        <p class="summary-avg"><span class="lp-display">4,8</span><StarRating readonly showLabel={false} modelValue={4.8} size={16} label="Promedio" /><span class="summary-count">86 reseñas</span></p>
+        <ul class="m-photos">
+          {photos.slice(0, 4).map((p) => (
+            <li><picture><source type="image/avif" srcset={p.avif} /><img src={p.src} width={p.w} height={p.h} alt="Foto de ejemplo subida por un asistente" loading="lazy" decoding="async" /></picture></li>
+          ))}
+        </ul>
+        <p class="m-comment"><strong>{comments[0].name}</strong> <StarRating readonly showLabel={false} modelValue={comments[0].rating} size={13} label={`Nota de ${comments[0].name}`} /></p>
+        <p class="m-comment-text">{comments[0].text}</p>
+      </div>
+      <p class="lp-body m-text" data-lp-reveal data-lp-step>
+        Después de cada función llega un correo “¿Cómo estuvo?”. Reúnes notas, comentarios y fotos, y con un clic invitas a
+        quienes fueron a tu próximo evento.
+      </p>
+    </div>
+  </div>
+</section>
+
+<style>
+  .comm {
+    padding-top: 0;
+  }
+  .comm-head {
+    max-width: 760px;
+  }
+  .comm-title {
+    margin-top: 10px;
+  }
+  .comm-lead {
+    margin-top: 12px;
+  }
+  .comm-desktop {
+    display: none;
+  }
+  .comm-stage {
+    font-family: "Unbounded", system-ui, sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--text-3);
+  }
+  .comm-h3 {
+    margin-top: 8px;
+  }
+  .comm-text {
+    margin-top: 14px;
+  }
+  .comm-text-2 {
+    margin-top: 12px;
+  }
+  .comm-checks {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 20px;
+  }
+  .comm-invite {
+    margin-top: 22px;
+  }
+
+  /* Video de portada */
+  .browser {
+    border-radius: 20px;
+    overflow: hidden;
+    background: var(--brand-ink);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 24px 60px rgba(0, 0, 0, 0.14);
+  }
+  .browser-bar {
+    height: 34px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 14px;
+    background: #1a1a1d;
+  }
+  .browser-bar span {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #3a3a40;
+  }
+  .browser-bar em {
+    margin-left: 12px;
+    font-style: normal;
+    font-size: 11px;
+    color: var(--lp-on-dark-3);
+  }
+  .browser-cover,
+  .m-cover {
+    position: relative;
+    aspect-ratio: 16 / 9;
+  }
+  .cover-shade {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0) 45%, rgba(0, 0, 0, 0.75) 100%);
+    pointer-events: none;
+  }
+  .cover-caption {
+    position: absolute;
+    left: 20px;
+    right: 20px;
+    bottom: 16px;
+    color: #fff;
+    pointer-events: none;
+  }
+  .cover-date {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    opacity: 0.85;
+  }
+  .cover-name {
+    font-family: "Unbounded", system-ui, sans-serif;
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  /* Reseñas */
+  .reviews-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 16px;
+  }
+  .summary {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 20px;
+    border-radius: 20px;
+    background: var(--brand-ink);
+    color: #fff;
+  }
+  .summary-kicker {
+    font-size: 12px;
+    color: var(--lp-on-dark-3);
+  }
+  .summary-avg {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .summary-avg .lp-display {
+    font-size: 36px;
+    line-height: 44px;
+  }
+  .summary-count {
+    font-size: 12px;
+    color: var(--lp-on-dark-3);
+  }
+  .summary-dist {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .summary-dist li {
+    display: grid;
+    grid-template-columns: 12px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--lp-on-dark-3);
+  }
+  .summary-track {
+    display: block;
+    height: 5px;
+  }
+  .summary-bar {
+    display: block;
+  }
+  /* Estrellas en lima como en el prototipo (sobre fondo oscuro, y lima oscuro sobre blanco). StarRating es el mismo de la
+     página del evento, que sigue en ámbar: solo se pisa aquí. */
+  .summary :global(.fill svg) {
+    fill: var(--brand-lime);
+  }
+  .photos-comments :global(.fill svg) {
+    fill: var(--lp-lime-ink);
+  }
+  .photos {
+    grid-column: 1 / -1;
+    padding: 18px;
+    box-shadow: none;
+  }
+  .photos-title {
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .photos-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .photos-grid img,
+  .m-photos img {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    border-radius: 10px;
+  }
+  .photos-comments {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 14px 0 8px;
+    font-size: 14px;
+    line-height: 20px;
+  }
+  .photos-comments strong,
+  .m-comment strong {
+    font-weight: 600;
+  }
+  .photos-comment {
+    color: var(--text-2);
+  }
+
+  /* Mobile */
+  .comm-mobile {
+    margin-top: 20px;
+  }
+  .m-cover {
+    aspect-ratio: 4 / 5;
+    border-radius: 18px;
+    overflow: hidden;
+    background: var(--brand-ink);
+  }
+  .m-cover .cover-name {
+    font-size: 22px;
+  }
+  .m-cover .cover-date {
+    font-size: 11px;
+  }
+  .m-text {
+    margin-top: 12px;
+    font-size: 15px;
+    line-height: 23px;
+  }
+  .m-block {
+    margin-top: 28px;
+  }
+  .m-photos {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    margin-top: 4px;
+  }
+  .m-photos img {
+    border-radius: 8px;
+  }
+  .m-comment {
+    margin-top: 4px;
+    font-size: 14px;
+  }
+  .m-comment-text {
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--lp-on-dark-2);
+  }
+
+  @media (min-width: 1024px) {
+    .comm-title {
+      margin-top: 14px;
+    }
+    .comm-lead {
+      margin-top: 18px;
+    }
+    .comm-desktop {
+      display: block;
+    }
+    .comm-mobile {
+      display: none;
+    }
+    .comm-row {
+      display: grid;
+      gap: 56px;
+      align-items: center;
+      margin-top: 112px;
+    }
+    .comm-row-1 {
+      grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+      margin-top: 64px;
+    }
+    .comm-row-2 {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+    }
+    .comm-row-3 {
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+      align-items: start;
+    }
+    .cover-caption {
+      left: 22px;
+      right: 22px;
+      bottom: 18px;
+    }
+    .cover-name {
+      font-size: 28px;
+    }
+  }
+</style>

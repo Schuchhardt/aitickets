@@ -1,0 +1,79 @@
+---
+// 2 · Franja de formatos (SPEC_landing_standup §4.2 y S5). Decorativa (aria-hidden): los formatos se repiten dos veces
+// para que el desplazamiento de 38 s vuelva al inicio sin salto. Se pausa con el mouse encima y queda quieta con
+// "reducir movimiento".
+// Tamaño: 20/30 px en vez de 22/34 por la misma razón que los titulares (landing-standup.css, "Tipografía"): la spec
+// mide sobre Sora y Unbounded es más ancha.
+import { STANDUP_FORMATS } from "./standupLanding.js";
+
+const items = [...STANDUP_FORMATS, ...STANDUP_FORMATS];
+---
+
+<div class="fm" aria-hidden="true">
+  <div class="fm-track">
+    {items.map((format) => (
+      <span class="fm-item">{format}<span class="fm-dot"></span></span>
+    ))}
+  </div>
+</div>
+
+<style>
+  .fm {
+    overflow: hidden;
+    padding: 16px 0;
+    border-block: 1px solid rgba(244, 237, 228, 0.1);
+  }
+  .fm-track {
+    display: flex;
+    width: max-content;
+    font-family: "Unbounded", system-ui, sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--sb-marquee);
+  }
+  /* Separación como padding (no gap en la pista): así la mitad exacta del ancho es una vuelta completa */
+  .fm-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 32px;
+    padding-right: 32px;
+  }
+  .fm-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--brand-lime);
+  }
+  @keyframes fm-scroll {
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .fm-track {
+      animation: fm-scroll 38s linear infinite;
+    }
+    .fm:hover .fm-track {
+      animation-play-state: paused;
+    }
+  }
+  @media (min-width: 1024px) {
+    .fm {
+      padding: 22px 0;
+    }
+    .fm-item {
+      gap: 48px;
+      padding-right: 48px;
+    }
+    .fm-track {
+      font-size: 30px;
+    }
+    .fm-dot {
+      width: 10px;
+      height: 10px;
+    }
+  }
+</style>

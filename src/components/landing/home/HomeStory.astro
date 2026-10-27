@@ -1,0 +1,394 @@
+---
+// "Una función, de principio a fin": la semana de una función contada en cinco capítulos, cada uno con la foto de un
+// nicho distinto (el recorrido es el mismo para un stand-up que para un seminario) y una card de lo que pasa en AI
+// Tickets en ese momento. Todo lo que se promete está en el producto: tope de funciones (MAX_EVENT_FUNCTIONS),
+// links por promotor, historias automáticas en Instagram, QR + recordatorio, rol Puerta con validación offline y pago
+// por función (legal.mjs). Al entrar cada capítulo, la línea de tiempo crece, las barras se llenan y los números cuentan.
+import HomePhoto from "./HomePhoto.astro";
+import { HOME_STORY_PHOTOS } from "./homeLanding.js";
+import { formatCLP } from "../producerLanding.js";
+import { MAX_EVENT_FUNCTIONS, TERMS_NOTE } from "../../../data/producerFaq";
+import { PAYOUT_BUSINESS_DAYS, PAYOUT_RELEASE_HOURS } from "../../../../netlify/lib/legal.mjs";
+
+const chapters = [
+  {
+    key: "publicas",
+    when: "Lunes",
+    title: "Publicas tus fechas",
+    text: `Creas el evento con sus funciones (hasta ${MAX_EVENT_FUNCTIONS} por evento), los tipos de entrada y el lugar. ¿Se repite la próxima semana? Lo duplicas y solo agregas las fechas nuevas.`,
+    tag: "Stand-up",
+    alt: "Productor preparando su próxima función",
+  },
+  {
+    key: "difusion",
+    when: "Martes",
+    title: "Tu equipo lo comparte",
+    text: "Cada promotor, comediante o banda comparte su propio link y ves cuántas entradas trae cada uno. Si conectas tu Instagram, las historias con cuenta regresiva se publican solas.",
+    tag: "Fiestas",
+    alt: "Promotor compartiendo el link de una fiesta desde su celular",
+  },
+  {
+    key: "venta",
+    when: "Jueves",
+    title: "Se vende desde el celular",
+    text: "La gente compra en un par de pasos, recibe su entrada con QR al instante y un recordatorio por email antes de la función.",
+    tag: "Música en vivo",
+    alt: "Público disfrutando un concierto",
+  },
+  {
+    key: "puerta",
+    when: "Viernes, 20:30",
+    title: "Abres la puerta",
+    text: "Tu equipo escanea los QR desde el celular con el rol Puerta. Si se cae la conexión, valida con la lista descargada y sincroniza al volver.",
+    tag: "Clubs",
+    alt: "Puerta de un club con la fila entrando",
+  },
+  {
+    key: "cobro",
+    when: "Después del show",
+    title: "Cobras lo de esa función",
+    text: `Queda disponible ${PAYOUT_RELEASE_HOURS} horas después de que termina. Lo retiras desde el panel y llega en hasta ${PAYOUT_BUSINESS_DAYS} días hábiles.*`,
+    tag: "Seminarios",
+    alt: "Organizadora revisando los resultados de su seminario",
+  },
+] as const;
+
+const links = [
+  { name: "Link de Camila", count: 31, scale: 1 },
+  { name: "Link de Diego", count: 18, scale: 0.58 },
+  { name: "Instagram", count: 12, scale: 0.39 },
+];
+---
+
+<section class="lp-section lp-dark hs" aria-labelledby="historia-title" data-lp-section="story">
+  <div class="lp-wrap">
+    <div class="hs-head" data-lp-reveal>
+      <p class="lp-eyebrow" data-lp-step>Cómo funciona</p>
+      <h2 id="historia-title" class="lp-h2 hs-title" data-lp-step>Una función, de principio a fin.</h2>
+      <p class="lp-lead hs-lead" data-lp-step>
+        Da lo mismo si es un open mic, una obra o un seminario: la semana se ve igual. Esto es lo que pasa en AI Tickets
+        desde que publicas hasta que cobras.
+      </p>
+    </div>
+
+    <ol class="hs-list" role="list">
+      {chapters.map((chapter, i) => (
+        <li class:list={["hs-chapter", i % 2 === 1 && "hs-flip"]} data-lp-reveal>
+          <span class="hs-rail" aria-hidden="true"><span class="hs-line"></span></span>
+          <div class="hs-media" data-lp-step>
+            <HomePhoto
+              photo={HOME_STORY_PHOTOS[chapter.key]}
+              alt={chapter.alt}
+              sizes="(min-width: 1024px) 400px, 86vw"
+              class="hs-photo"
+            />
+            <span class="hs-tag">{chapter.tag}</span>
+
+            {chapter.key === "publicas" && (
+              <div class="hs-ui" aria-hidden="true">
+                <p class="hs-ui-kicker"><span class="hs-ok">✓</span> Evento publicado</p>
+                <p class="hs-ui-row ev-tabular"><span>Vie 23 oct</span><span>21:00</span></p>
+                <p class="hs-ui-row ev-tabular"><span>Sáb 24 oct</span><span>21:00</span></p>
+                <p class="hs-ui-more">+ 4 funciones más</p>
+              </div>
+            )}
+            {chapter.key === "difusion" && (
+              <div class="hs-ui hs-ui-wide" aria-hidden="true">
+                <p class="hs-ui-kicker">Ventas por link · esta semana</p>
+                {links.map((link, j) => (
+                  <div class="hs-link">
+                    <p class="hs-ui-row ev-tabular">
+                      <span>{link.name}</span>
+                      <strong data-lp-count={link.count} style={`--lp-d: ${300 + j * 120}ms`}>{link.count}</strong>
+                    </p>
+                    <div class="lp-bar-track hs-track">
+                      <div class="lp-bar" data-lp-grow style={`--lp-scale: ${link.scale}; --lp-d: ${300 + j * 120}ms`}></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {chapter.key === "venta" && (
+              <div class="hs-ui hs-ui-wide" aria-hidden="true">
+                <p class="hs-ui-kicker">Viernes · 21:00</p>
+                <p class="hs-ui-big ev-tabular"><strong data-lp-count="142" style="--lp-d: 300ms">142</strong> de 200 vendidas</p>
+                <div class="lp-bar-track hs-track">
+                  <div class="lp-bar" data-lp-grow style="--lp-scale: 0.71; --lp-d: 300ms"></div>
+                </div>
+              </div>
+            )}
+            {chapter.key === "puerta" && (
+              <div class="hs-ui" aria-hidden="true">
+                <p class="hs-ui-row ev-tabular hs-ui-kicker"><span>Check-in · Puerta</span><span><span data-lp-count="98" style="--lp-d: 300ms">98</span> / 140</span></p>
+                <p class="hs-valid"><span class="hs-ok">✓</span> Válida · General</p>
+              </div>
+            )}
+            {chapter.key === "cobro" && (
+              <div class="hs-ui" aria-hidden="true">
+                <p class="hs-ui-kicker">Pago disponible · función del jueves</p>
+                <p class="hs-ui-big ev-tabular">{formatCLP(1296000)}</p>
+              </div>
+            )}
+          </div>
+          <div class="hs-copy">
+            <p class="hs-when" data-lp-step><span class="hs-num">0{i + 1}</span> {chapter.when}</p>
+            <h3 class="lp-h3 lp-h3-lg hs-chapter-title" data-lp-step>{chapter.title}</h3>
+            <p class="lp-lead hs-text" data-lp-step>{chapter.text}</p>
+          </div>
+        </li>
+      ))}
+    </ol>
+
+    <div class="hs-end" data-lp-reveal>
+      <p class="hs-end-title" data-lp-step>Y el lunes, a duplicar para la próxima.</p>
+      <p class="lp-small hs-end-note" data-lp-step>
+        Fotos y cifras de ejemplo. <a href={TERMS_NOTE.href} class="lp-inline-link">{TERMS_NOTE.text}</a>
+      </p>
+    </div>
+  </div>
+</section>
+
+<style>
+  .hs-head {
+    max-width: 720px;
+  }
+  .hs-title {
+    margin-top: 10px;
+  }
+  .hs-lead {
+    margin-top: 12px;
+  }
+  .hs-list {
+    margin-top: 40px;
+    list-style: none;
+    padding: 0;
+    display: grid;
+    gap: 56px;
+  }
+  .hs-chapter {
+    position: relative;
+    display: grid;
+    gap: 22px;
+    padding-left: 28px;
+  }
+  /* Línea de tiempo: un tramo por capítulo que crece al entrar */
+  .hs-rail {
+    position: absolute;
+    left: 6px;
+    top: 6px;
+    bottom: -56px;
+    width: 2px;
+  }
+  .hs-chapter:last-child .hs-rail {
+    bottom: 0;
+  }
+  .hs-rail::before {
+    content: "";
+    position: absolute;
+    top: -2px;
+    left: -5px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--brand-lime);
+    box-shadow: 0 0 0 4px rgba(190, 242, 100, 0.18);
+  }
+  .hs-line {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, var(--brand-lime), var(--lp-dark-track));
+    transform-origin: top;
+  }
+  .hs-media {
+    position: relative;
+    max-width: 420px;
+  }
+  .hs-media :global(.hs-photo) {
+    aspect-ratio: 4 / 5;
+    border-radius: 22px;
+  }
+  .hs-tag {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(10, 10, 11, 0.72);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+  }
+  /* Card de producto encima de la foto */
+  .hs-ui {
+    position: absolute;
+    right: -12px;
+    bottom: 18px;
+    min-width: 200px;
+    max-width: 78%;
+    padding: 12px 14px;
+    border-radius: 16px;
+    background: var(--surface-0);
+    color: var(--text-1);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+    font-size: 13px;
+    line-height: 19px;
+  }
+  .hs-ui-wide {
+    width: 240px;
+  }
+  .hs-ui-kicker {
+    color: var(--text-3);
+    font-size: 12px;
+    margin-bottom: 6px;
+  }
+  .hs-ui-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .hs-ui-more {
+    margin-top: 4px;
+    color: var(--lp-lime-ink);
+    font-weight: 600;
+  }
+  .hs-ui-big {
+    font-weight: 700;
+    font-size: 17px;
+    line-height: 24px;
+  }
+  .hs-link + .hs-link {
+    margin-top: 8px;
+  }
+  .hs-track {
+    margin-top: 4px;
+    height: 6px;
+    background: var(--surface-2);
+  }
+  .hs-ok {
+    display: inline-grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    margin-right: 4px;
+    border-radius: 50%;
+    background: var(--brand-lime);
+    color: var(--brand-ink);
+    font-size: 11px;
+    font-weight: 800;
+  }
+  .hs-valid {
+    margin-top: 2px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: var(--lp-lime-tint);
+    color: var(--lp-lime-deep);
+    font-weight: 700;
+  }
+  .hs-when {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--lp-on-dark-3);
+  }
+  .hs-num {
+    color: var(--brand-lime);
+    margin-right: 6px;
+  }
+  .hs-chapter-title {
+    margin-top: 8px;
+  }
+  .hs-text {
+    margin-top: 10px;
+  }
+  .hs-end {
+    margin-top: 56px;
+    padding-left: 28px;
+  }
+  .hs-end-title {
+    font-family: "Unbounded", system-ui, sans-serif;
+    font-weight: 700;
+    font-size: 22px;
+    line-height: 28px;
+    color: var(--brand-lime);
+  }
+  .hs-end-note {
+    margin-top: 10px;
+    color: var(--lp-on-dark-3);
+  }
+
+  @media (min-width: 1024px) {
+    .hs-title {
+      margin-top: 14px;
+    }
+    .hs-lead {
+      margin-top: 18px;
+    }
+    .hs-list {
+      margin-top: 72px;
+      gap: 96px;
+    }
+    .hs-chapter {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      align-items: center;
+      gap: 72px;
+      padding-left: 0;
+    }
+    /* La línea pasa por el centro, entre la foto y el texto */
+    .hs-rail {
+      left: 50%;
+      bottom: -96px;
+    }
+    .hs-media {
+      justify-self: end;
+      width: 100%;
+    }
+    .hs-flip .hs-media {
+      order: 2;
+      justify-self: start;
+    }
+    .hs-flip .hs-ui {
+      right: auto;
+      left: -28px;
+    }
+    .hs-ui {
+      right: -36px;
+    }
+    .hs-end {
+      margin-top: 96px;
+      padding-left: 0;
+      text-align: center;
+    }
+    .hs-end-title {
+      font-size: 30px;
+      line-height: 36px;
+    }
+  }
+
+  /* Movimiento (html.lp-motion): el tramo de la línea crece y la card de producto aparece después de la foto */
+  :global(.lp-motion) [data-lp-reveal]:not(:global(.is-in)) .hs-line {
+    transform: scaleY(0);
+  }
+  :global(.lp-motion) :global(.is-in) .hs-line {
+    animation: hs-grow-y 1100ms var(--ease-out, ease-out) both;
+  }
+  :global(.lp-motion) [data-lp-reveal]:not(:global(.is-in)) .hs-ui {
+    opacity: 0;
+  }
+  :global(.lp-motion) :global(.is-in) .hs-ui {
+    animation: hs-pop 520ms var(--ease-out, ease-out) 260ms both;
+  }
+  @keyframes hs-grow-y {
+    from {
+      transform: scaleY(0);
+    }
+  }
+  @keyframes hs-pop {
+    from {
+      opacity: 0;
+      transform: translateY(14px) scale(0.95);
+    }
+  }
+</style>

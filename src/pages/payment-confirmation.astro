@@ -10,6 +10,7 @@ import { sendTicketsEmail } from "./api/_lib/server-utils";
 import { LEGAL } from "../lib/legal";
 import { verifyFlowReturnToken } from "../../netlify/lib/payments/flow.mjs";
 import { orderFeeBreakdown } from "../../netlify/lib/fees.mjs";
+import { checkoutReturnFunnel } from "../components/event/checkoutApi.js";
 
 export const prerender = false;
 
@@ -234,6 +235,10 @@ const firstName = String(order?.buyer_first_name || '').trim().split(/\s+/)[0] |
 const ticketCount = tickets.length || Number(order?.ticket_qty) || 0;
 const isSuccess = state === 'paid' || state === 'processing';
 const isFailed = state === 'rejected' || state === 'cancelled';
+// Embudo del checkout (SPEC_evento §14) al volver de Webpay: order_paid, hold_expired u order_failed según el estado que
+// se muestra (checkoutReturnFunnel). Lo manda el script de abajo con trackFunnel (event_id + ref/UTM guardados por la
+// página del evento).
+const funnel = eventData ? checkoutReturnFunnel(state, order, { total: totalPaid, qty: ticketCount }) : null;
 const title = state === 'paid'
   ? `¡Listo${firstName ? `, ${firstName}` : ''}! Tienes ${ticketCount} ${ticketCount === 1 ? 'entrada' : 'entradas'} para ${eventData?.name || 'el evento'}.`
   : state === 'processing'
@@ -300,6 +305,18 @@ const body = state === 'paid'
       let seen = false;
       try { seen = sessionStorage.getItem(key) === "1"; sessionStorage.setItem(key, "1"); } catch { /* sin storage */ }
       if (!seen) setTimeout(() => fireConfetti({ origin: check }), 350);
+    }
+  </script>
+
+  {funnel && <div hidden data-funnel={JSON.stringify(funnel)} data-funnel-event={String(eventData.id)}></div>}
+  <script>
+    // Embudo §14: una vez por orden y resultado (recargar la página no lo repite)
+    import { trackCheckoutReturn } from "../components/event/checkoutApi.js";
+    const el = document.querySelector<HTMLElement>("[data-funnel]");
+    if (el) {
+      try {
+        trackCheckoutReturn(JSON.parse(el.dataset.funnel || "{}"), Number(el.dataset.funnelEvent));
+      } catch { /* JSON inválido: sin analítica */ }
     }
   </script>
 

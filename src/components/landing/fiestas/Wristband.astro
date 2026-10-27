@@ -1,0 +1,46 @@
+---
+// Pulsera de Tyvek (SPEC_landing_fiestas §1): banda con extremos redondeados, fibras al 6%, el texto repetido a lo largo
+// (aria-hidden: el texto real de la sección va en `label` como texto oculto para lectores) y la pestaña cuadrada con su
+// N° de serie, como la numeración de una pulsera real. cut = agotada (dos mitades separadas por un corte en zigzag, F7).
+// divider = separador de sección: cruza el borde superior a sangre, girada −2°, la mitad sobre la sección anterior; su
+// bloque se revela con LandingMotion (F5: la banda entra desde la izquierda y la pestaña se cierra).
+interface Props {
+  color: "amarillo" | "naranja" | "cobalto" | "crema" | "tinta";
+  label: string;
+  serial?: number;
+  cut?: boolean;
+  tilt?: number;
+  divider?: boolean;
+  /** Repeticiones del texto a lo largo de la banda */
+  repeat?: number;
+  class?: string;
+}
+const { color, label, serial = 1, cut = false, tilt = -2, divider = false, repeat = 8, class: className } = Astro.props;
+const text = Array.from({ length: repeat }, () => `${label} · AI TICKETS ·`).join(" ");
+const serialLabel = `N° ${String(serial).padStart(4, "0")}`;
+---
+
+{
+  divider ? (
+    <div class="fi-divider" data-lp-reveal>
+      <p class="lp-sr-only">{label}</p>
+      <div class={`fi-band fi-band--${color} ${cut ? "is-cut" : ""} ${className ?? ""}`} style={`--tilt: ${tilt}deg`} aria-hidden="true">
+        <div class="fi-divider-inner" style="width: 100%">
+          <span class="fi-band-tab fi-band-tab-first">{serialLabel}</span>
+          <span class="fi-band-strip">
+            <span class="fi-band-half fi-band-a"><span class="fi-band-text">{text}</span></span>
+            <span class="fi-band-half fi-band-b"><span class="fi-band-text">{text}</span></span>
+          </span>
+        </div>
+      </div>
+    </div>
+  ) : (
+    <div class={`fi-band fi-band--${color} ${cut ? "is-cut" : ""} ${className ?? ""}`} style={`--tilt: ${tilt}deg`} aria-hidden="true">
+      <span class="fi-band-strip">
+        <span class="fi-band-half fi-band-a"><span class="fi-band-text">{text}</span></span>
+        <span class="fi-band-half fi-band-b"><span class="fi-band-text">{text}</span></span>
+      </span>
+      <span class="fi-band-tab">{serialLabel}</span>
+    </div>
+  )
+}

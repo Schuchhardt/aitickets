@@ -1,0 +1,199 @@
+---
+// Landing especializada para fiestas y productoras de eventos (docs/specs/rediseno/SPEC_landing_fiestas_aitickets.md,
+// fases 1 a 3): fiestas universitarias, temáticas, en galpón o casona, Año Nuevo y fiestas que salen de gira, con
+// preventa por etapas, promotores, mucha difusión en Instagram y la puerta sin señal. Ruta nueva /ticketera-fiestas,
+// registrada en src/data/landings.ts como dedicated: [landing].astro no la genera, y la tarjeta, el sitemap, las
+// relacionadas y "Según lo que produces" de /organizadores leen de ahí; el footer la enlaza en "Para quién".
+// Tema propio "pulsera, sticker y desechable" ([data-theme="fiestas"], src/styles/landing-fiestas.css) sin tocar los
+// tokens globales ni repetir el lenguaje de las otras landings: a todo color (naranja, cobalto y crema; la noche solo en
+// la puerta), Bagel Fat One con la frase enfatizada dentro de un sticker, pulseras de Tyvek que abren cada sección y
+// fotos de cámara desechable. La página se ordena como la vida de una fiesta, de la idea al día después.
+// Reutiliza la fórmula de precios (priceQuote → fees.mjs), los descuentos (computeDiscountedTotals de discounts.mjs), el
+// FAQ, la barra CTA mobile, el movimiento (LandingMotion), la lógica de los anuncios (useAdsDemo) y del muro
+// (useWallDemo), la serie de redes (seriesMarks de música, DEFAULT_CADENCE) y los rótulos del checkout (formatSaleStart).
+// Montos y plazos: fees.mjs, legal.mjs y producerFaq.ts. Los textos de las historias salen de pieceText
+// (socialSeriesRender.ts, módulo de servidor) llamado aquí al construir y pasados por props. Lo que no existe en el
+// producto (abrir la siguiente etapa sola, aviso automático a la lista, dirección secreta cargada por la productora,
+// acceso del promotor, vista de aforo en el panel, Facebook/TikTok/reels, segmentar por gustos) va con "Pronto".
+// La fecha de la fiesta de ejemplo es el sábado que cae al menos 28 días después del build (la página es prerender: no
+// hay desfase de hidratación).
+// Fase 4 (contenido real) queda fuera del código: fotos reales con autorización (§8), testimonio (PARTY_TESTIMONIAL, hoy
+// null: la sección no se muestra), evento de ejemplo de fiesta y revisión de los nombres de ejemplo.
+export const prerender = true;
+import AppFooter from "../components/AppFooter.vue";
+import LandingFaq from "../components/landing/LandingFaq.vue";
+import LandingMobileBar from "../components/landing/LandingMobileBar.vue";
+import CtaTracking from "../components/landing/CtaTracking.astro";
+import LandingMotion from "../components/landing/LandingMotion.astro";
+import PartyHeader from "../components/landing/fiestas/PartyHeader.vue";
+import PartyHero from "../components/landing/fiestas/PartyHero.astro";
+import PartyForWho from "../components/landing/fiestas/PartyForWho.astro";
+import PartyPresale from "../components/landing/fiestas/PartyPresale.astro";
+import PartyPromoters from "../components/landing/fiestas/PartyPromoters.astro";
+import PartyDiffusion from "../components/landing/fiestas/PartyDiffusion.astro";
+import PartyPage from "../components/landing/fiestas/PartyPage.astro";
+import PartyNight from "../components/landing/fiestas/PartyNight.astro";
+import PartyPrice from "../components/landing/fiestas/PartyPrice.astro";
+import DayAfter from "../components/landing/fiestas/DayAfter.astro";
+import PartyQuote from "../components/landing/fiestas/PartyQuote.astro";
+import PartyClosing from "../components/landing/fiestas/PartyClosing.astro";
+import PartyTracking from "../components/landing/fiestas/PartyTracking.astro";
+import Wristband from "../components/landing/fiestas/Wristband.astro";
+import Layout from "../layouts/Layout.astro";
+import { publishUrl } from "../components/landing/links.js";
+import { PARTY_NAME, PARTY_PHOTOS, PARTY_START, PARTY_VENUE, STORY_FRAMES, partySchedule } from "../components/landing/fiestas/fiestasLanding.js";
+import { getLanding } from "../data/landings";
+import { FIESTAS_FAQ } from "../data/fiestasFaq";
+import { DEFAULT_CADENCE, DEFAULT_KEYWORD } from "../lib/socialSeriesCadence";
+import { longDateLabel, pieceText } from "../lib/socialSeriesRender";
+import { IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL } from "../../netlify/lib/fees.mjs";
+import bagelWoff2 from "@fontsource/bagel-fat-one/files/bagel-fat-one-latin-400-normal.woff2?url";
+import "../styles/global.css";
+import "../styles/landing.css";
+import "../styles/landing-fiestas.css";
+
+const landing = getLanding("ticketera-fiestas");
+if (!landing) throw new Error("Falta la landing ticketera-fiestas en src/data/landings.ts");
+const demoHref = landing.demo?.url ?? "/eventos";
+const demoLabel = landing.demo?.label ?? "Ver eventos";
+
+// La fiesta de ejemplo y sus etapas (fiestasLanding.js) y los textos reales de cada historia (pieceText)
+const schedule = partySchedule();
+const piece = (frame: (typeof STORY_FRAMES)[number], styleIndex: number) =>
+  pieceText({
+    kind: "story",
+    variant: frame.variant as "countdown" | "sold_out",
+    daysToEvent: frame.days,
+    eventName: PARTY_NAME,
+    dateLabel: longDateLabel(schedule.date),
+    startTime: PARTY_START,
+    venue: PARTY_VENUE,
+    keyword: DEFAULT_KEYWORD,
+    remaining: frame.remaining,
+    styleIndex,
+  });
+const storyFrames = STORY_FRAMES.map((frame, i) => {
+  const text = piece(frame, i);
+  // La pieza "Agotado" muestra solo su primera línea ("Entradas agotadas."): la segunda habla de "la sala"
+  const message = frame.variant === "sold_out" ? text.message.slice(0, 1) : text.message;
+  return { id: frame.id, label: frame.label, kicker: text.kicker, bigLines: text.bigLines, message, scarcity: text.scarcity, time: DEFAULT_CADENCE.default_time };
+});
+const soldOutText = piece(STORY_FRAMES[STORY_FRAMES.length - 1], 0);
+const soldOut = { big: soldOutText.bigLines.join(" "), message: soldOutText.message[0] };
+
+const SITE_URL = (import.meta.env.SITE_URL || "https://aitickets.cl").replace(/\/$/, "");
+const url = `${SITE_URL}/${landing.slug}`;
+const jsonLd = [
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "AI Tickets", item: SITE_URL },
+      { "@type": "ListItem", position: 2, name: "Para organizadores", item: `${SITE_URL}/organizadores` },
+      { "@type": "ListItem", position: 3, name: landing.card.title, item: url },
+    ],
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "AI Tickets para fiestas",
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Web",
+    url,
+    description: landing.description,
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "CLP",
+      description: `Sin mensualidad y 0% de comisión para la productora. El comprador paga un cargo por servicio de ${SERVICE_FEE_PERCENT_LABEL} + IVA (${IVA_PERCENT_LABEL}) sobre ese cargo, o lo absorbe la productora. Las entradas gratis no pagan cargo.`,
+    },
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: FIESTAS_FAQ.map((f) => ({
+      "@type": "Question",
+      name: f.q,
+      acceptedAnswer: { "@type": "Answer", text: f.a },
+    })),
+  },
+];
+---
+
+<Layout title={landing.title} description={landing.description} canonical={`/${landing.slug}`} image={PARTY_PHOTOS.hero.src}>
+  <link slot="head-extra" rel="preload" as="font" type="font/woff2" href={bagelWoff2} crossorigin />
+  <LandingMotion />
+  <div class="fi" data-theme="fiestas">
+    <PartyHeader client:idle publishHref={publishUrl("fiestas_header")} />
+    <main>
+      <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+      <PartyHero ctaLabel={landing.cta.label} demoHref={demoHref} demoLabel={demoLabel} schedule={schedule} />
+      <PartyForWho />
+      <PartyPresale schedule={schedule} soldOut={soldOut} />
+      <PartyPromoters stamp={schedule.stamp} />
+      <PartyDiffusion frames={storyFrames} />
+      <PartyPage />
+      <PartyNight stamp={schedule.stamp} payoutLabel={schedule.payout.label} />
+      <PartyPrice />
+      <DayAfter stamp={schedule.stamp} />
+      <PartyQuote stamp={schedule.stamp} />
+
+      <section class="fi-section fi-bg-crema faq" aria-labelledby="fi-faq-title" data-fi-section="faq" data-fi-band-color="cobalto" data-fi-band-label="Preguntas">
+        <Wristband color="cobalto" label="Preguntas" serial={9} divider />
+        <div class="fi-wrap faq-inner" data-lp-reveal>
+          <h2 id="fi-faq-title" class="fi-h2 faq-title" data-lp-step>Preguntas frecuentes</h2>
+          <div class="faq-list" data-lp-step><LandingFaq client:visible items={FIESTAS_FAQ} idPrefix="fi-faq" /></div>
+        </div>
+      </section>
+
+      <PartyClosing ctaLabel={landing.cta.label} />
+    </main>
+    <AppFooter client:idle tone="dark" />
+    <LandingMobileBar
+      client:idle
+      variant="pill"
+      title="Gratis para publicar"
+      subtitle="0% de comisión para la productora"
+      ctaLabel="Publicar mi fiesta"
+      publishHref={publishUrl("fiestas_mobile_bar")}
+    />
+  </div>
+  <CtaTracking />
+  <PartyTracking />
+</Layout>
+
+<style>
+  .faq-inner {
+    max-width: 960px;
+  }
+  .faq-title {
+    margin-bottom: 20px;
+  }
+  /* §4.11: pregunta en Prompt 700; el "+" es un sticker circle naranja de 32 px que gira 45° al abrir */
+  .faq-list :global(.lf-q) {
+    font-weight: 700;
+  }
+  .faq-list :global(.lf-icon) {
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    padding: 5px;
+    overflow: visible;
+    border: 2px solid var(--fi-tinta);
+    border-radius: 50%;
+    background: var(--fi-naranja);
+    color: var(--fi-tinta);
+    box-shadow: 2px 2px 0 var(--fi-tinta);
+    transition: transform 200ms var(--ease-out);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .faq-list :global(.lf-icon) {
+      transition: none;
+    }
+  }
+  @media (min-width: 1024px) {
+    .faq-title {
+      margin-bottom: 32px;
+    }
+  }
+</style>

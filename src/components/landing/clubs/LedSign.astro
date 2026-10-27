@@ -1,0 +1,49 @@
+---
+// Letrero LED de la landing de clubs (SPEC_landing_clubs §1, C4): caja negra con grilla de LEDs y texto Doto fluor que
+// cambia de mensaje por pasos cada `interval` ms (los puntos se apagan y prenden por columnas en 160 ms), nunca como
+// marquesina. El texto real va en un <p> con aria-live="off": el cambio es decorativo. Sin JS o con "reducir
+// movimiento" queda fijo en su primer mensaje; fuera de pantalla no rota.
+interface Props {
+  messages: readonly string[];
+  interval?: number;
+  /** Reserva alto para dos líneas (el mensaje más largo no cabe en una a 28 px en una card angosta) */
+  twoLines?: boolean;
+  class?: string;
+}
+const { messages, interval = 3000, twoLines = false, class: className } = Astro.props;
+---
+
+<div
+  class:list={["cl-sign", twoLines && "cl-sign-2l", className]}
+  data-led-sign={messages.length > 1 ? JSON.stringify(messages) : undefined}
+  data-interval={interval}
+>
+  <p class="cl-sign-text" aria-live="off">{messages[0]}</p>
+</div>
+
+<script>
+  // Rota los mensajes solo con html.lp-motion (JS, IntersectionObserver y sin "reducir movimiento") y en pantalla
+  const signs = document.querySelectorAll<HTMLElement>("[data-led-sign]");
+  if (signs.length && document.documentElement.classList.contains("lp-motion")) {
+    for (const sign of signs) {
+      const messages: string[] = JSON.parse(sign.dataset.ledSign || "[]");
+      const text = sign.querySelector<HTMLElement>(".cl-sign-text");
+      if (!text || messages.length < 2) continue;
+      let index = 0;
+      let timer = 0;
+      const next = () => {
+        index = (index + 1) % messages.length;
+        text.classList.remove("is-switching");
+        void text.offsetWidth; // reinicia la animación por columnas
+        text.textContent = messages[index];
+        text.classList.add("is-switching");
+      };
+      new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          window.clearInterval(timer);
+          if (entry.isIntersecting) timer = window.setInterval(next, Number(sign.dataset.interval) || 3000);
+        }
+      }).observe(sign);
+    }
+  }
+</script>

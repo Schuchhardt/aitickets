@@ -1,0 +1,61 @@
+---
+// Analítica de la landing de seminarios (SPEC_landing_seminarios §10), con prefijo se_ como fi_ en fiestas:
+//   se_view                     carga de la página
+//   se_cta_click {position}     clic en un CTA de publicar ([data-cta="publish"], position = data-section: hero,
+//                               closing, header, mobile_bar)
+//   se_demo_click {position}    clic en el evento de ejemplo ([data-cta="demo"])
+//   se_whatsapp_click {position}
+//   se_faq_open {question}      abre una pregunta (el botón todavía dice aria-expanded="false" en la fase de captura)
+//   se_section_view {section}   cada [data-se-section] entra en pantalla (una vez)
+// Los propios los mandan las islas: se_slide (HeroScreen, solo los manuales), se_program_format / se_program_mode /
+// se_matrix_change / se_program_toggle (ProgramBuilder), se_team_assign (TeamOrder), se_channel_sort / se_channel_open /
+// se_link_copy (ChannelTable), se_ads_demo (SeminarAdsDemo), se_wall_react (SeminarWall), se_scan_demo
+// (AccreditationDesk) y se_calc_change (QuoteCalculator). CtaTracking sigue midiendo producer_cta_clicked.
+// También arranca el movimiento de la página (seminariosLanding.client.js): el balanceo de las credenciales (C4), la
+// entrada de los rótulos de sala (C5) y la sala que se oscurece en el cierre (C17).
+---
+
+<script>
+  import { trackEvent } from "../../../composables/useGoogleAnalytics.js";
+  import { observeDim, observeSigns, observeSwing } from "./seminariosLanding.client.js";
+
+  const CTA_EVENTS: Record<string, string> = {
+    publish: "se_cta_click",
+    demo: "se_demo_click",
+    whatsapp: "se_whatsapp_click",
+  };
+
+  trackEvent("se_view", { page: location.pathname });
+  observeSigns();
+  observeSwing();
+  observeDim();
+
+  document.addEventListener(
+    "click",
+    (e) => {
+      const target = e.target as Element | null;
+      const cta = target?.closest?.("[data-cta]");
+      const name = cta && CTA_EVENTS[cta.getAttribute("data-cta") || ""];
+      if (cta && name) trackEvent(name, { position: cta.getAttribute("data-section") || "" });
+
+      const question = target?.closest?.('[data-testid="landing-faq"] button[aria-expanded="false"]');
+      if (question) trackEvent("se_faq_open", { question: question.textContent?.trim().slice(0, 100) || "" });
+    },
+    { capture: true },
+  );
+
+  if ("IntersectionObserver" in window) {
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          trackEvent("se_section_view", { section: (entry.target as HTMLElement).dataset.seSection });
+          io.unobserve(entry.target);
+        }
+      },
+      // Con margen y no con umbral de área: una sección más alta que la pantalla nunca llegaría al 25%
+      { rootMargin: "0px 0px -40% 0px", threshold: 0 },
+    );
+    document.querySelectorAll("[data-se-section]").forEach((section) => io.observe(section));
+  }
+</script>

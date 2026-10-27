@@ -1,0 +1,129 @@
+---
+// 4 · La lista de los RRPP (SPEC_landing_clubs §4.4, JUE 20:00): la lista free es un tipo de entrada de $0 con cupo
+// (EditEventForm.vue; las gratis no pagan cargo, fees.mjs), cada RRPP con su link con seguimiento (TrackingLinkBuilder.vue)
+// y sus números por canal (eventAnalytics.ts), códigos de descuento (discounts.mjs), exportación de órdenes a CSV con su
+// canal, cierre de la inscripción a una hora (ventana de venta por entrada, isTicketOnSale; hoy desde el asistente de IA,
+// tools/tickets.ts), lista de invitados (tools/guests.ts, solo desde el asistente: AI Tickets no envía WhatsApp, deja
+// los links listos) y cortesías con su QR (CourtesyTicketsForm.vue).
+// "Pronto": acceso propio de cada RRPP a sus números y cuántos de cada lista entraron (check-ins por canal). La comisión
+// automática por RRPP no existe y no se muestra (Preguntas abiertas 5).
+// Mobile: los ítems arriba y el ranking como cards debajo.
+import LedHeading from "./LedHeading.astro";
+import NightHour from "./NightHour.astro";
+import RrppBoard from "./RrppBoard.vue";
+import SoonBadge from "../../ui/SoonBadge.vue";
+import { DIRECT_CHANNEL } from "../../../lib/eventAnalytics";
+
+const items = [
+  { title: "Un link por RRPP, en un minuto.", text: "Le pones su nombre y se lo mandas. No necesita cuenta." },
+  {
+    title: "La lista se cierra sola.",
+    text: "La inscripción a la lista free se corta a la hora que elijas, o cuando se llena el cupo. Hoy la hora se programa desde tu asistente de IA conectado o escribiéndonos por WhatsApp.",
+  },
+  {
+    title: "Un código para cada RRPP.",
+    text: "Descuento por porcentaje o monto, con usos máximos y fecha de término, para el cover de su gente.",
+  },
+  {
+    title: "Liquidas sin discusiones.",
+    text: "Exportas las órdenes a CSV con el link de cada una y calculas la comisión de cada RRPP.",
+  },
+  {
+    title: "Invitados del club, aparte.",
+    text: "Tu lista de invitados con sus acompañantes, y les mandas el link por correo o te dejamos los WhatsApp listos para enviar (desde tu asistente de IA). Si son cortesías, les llega su propio QR.",
+  },
+];
+---
+
+<section id="lista" class="cl-section cl-on-noche-2" aria-labelledby="cl-list-title" data-cl-section="list">
+  <span class="cl-halo cll-halo" aria-hidden="true"></span>
+  <div class="cl-wrap" data-lp-reveal>
+    <NightHour time="JUE 20:00" label="Los RRPP mueven la lista" />
+    <LedHeading id="cl-list-title" text="La lista ya no vive" lit="en un grupo de WhatsApp." />
+    <p class="cl-lead cll-lead" data-lp-step>
+      La lista free es un tipo de entrada de $0 con su cupo: cada persona se inscribe con su nombre y su correo, y le
+      llega su QR. Cada RRPP comparte su propio link y en las métricas de tu noche ves cuántas visitas trajo, cuántos se
+      inscribieron y cuánto vendió en cover y mesas. Sin capturas de pantalla, sin planillas, sin nombres repetidos a la 1
+      de la mañana.
+    </p>
+
+    <div class="cll-grid">
+      <ol class="cl-items cll-items">
+        {
+          items.map((item, i) => (
+            <li class="cl-item" data-lp-step>
+              <span class="cl-item-num" aria-hidden="true">{i + 1}</span>
+              <div>
+                <h3 class="cl-item-title">{item.title}</h3>
+                <p class="cl-item-text">{item.text}</p>
+              </div>
+            </li>
+          ))
+        }
+      </ol>
+
+      <div class="cll-board" data-lp-step>
+        <RrppBoard client:visible directLabel={DIRECT_CHANNEL} />
+        <ul class="cll-soon" data-testid="club-rrpp-soon">
+          <li>Cada RRPP ve sus números en su celular <SoonBadge dark /></li>
+          <li>Cuántos de cada lista entraron <SoonBadge dark /></li>
+        </ul>
+        <p class="cll-links">
+          <a href="/guias/como-medir-ventas-por-promotor" class="cl-link">Guía: cómo medir ventas por promotor →</a>
+          <a href="/ventas-por-promotor" class="cl-link">Ventas por promotor →</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .cll-halo {
+    --size: 720px;
+    right: -260px;
+    bottom: -260px;
+  }
+  .cll-lead {
+    max-width: 720px;
+    margin-top: 20px;
+  }
+  .cll-grid {
+    display: grid;
+    gap: 36px;
+    margin-top: 36px;
+  }
+  .cll-board {
+    min-width: 0;
+  }
+  .cll-soon {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+    margin-top: 14px;
+    font-size: 14px;
+    line-height: 22px;
+    color: var(--cl-text-2);
+  }
+  .cll-soon li {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .cll-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 20px;
+    margin-top: 14px;
+    font-size: 14px;
+  }
+  .cll-links .cl-link {
+    min-height: 44px;
+  }
+  @media (min-width: 1024px) {
+    .cll-grid {
+      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+      gap: 56px;
+      margin-top: 56px;
+    }
+  }
+</style>

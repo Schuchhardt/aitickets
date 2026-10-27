@@ -1,0 +1,265 @@
+---
+// 3 · Acto I · Antes del estreno (SPEC_landing_teatro §4.3, ancla #obra), en tres escenas:
+// 1. La temporada en una tarde: varias funciones (hasta MAX_EVENT_FUNCTIONS, schedule.ts), aforo y precio por función
+//    con tipos de entrada amarrados a una función (EditEventForm.vue paso 3) y el selector "Así lo ve tu público"
+//    (FunctionPicker, precios con priceQuote). Lo que no existe (repetir funciones en un paso, copiar las entradas a
+//    cada función) va con "Pronto". No hay butacas numeradas: se dice, sin "Pronto" (§0.6).
+// 2. Prensa e invitados (#prensa): cortesías (CourtesyTicketsForm.vue: no cuentan como venta y pueden superar el
+//    cupo), lista de invitados (hoy solo desde el asistente de IA, tools/guests.ts) y vista previa privada con link que
+//    vence (eventPreview.ts). Foto del ensayo en arco de proscenio con el pase de prensa colgado.
+// 3. El elenco también vende: links con seguimiento y ventas por canal (TrackingLinkBuilder.vue, eventAnalytics.ts).
+import ActEyebrow from "./ActEyebrow.astro";
+import FunctionPicker from "./FunctionPicker.vue";
+import PressPass from "./PressPass.astro";
+import LinkSales from "./LinkSales.astro";
+import ProsceniumPhoto from "./ProsceniumPhoto.astro";
+import SoonBadge from "../../ui/SoonBadge.vue";
+import { THEATRE_PHOTOS } from "./teatroLanding.js";
+import { MAX_EVENT_FUNCTIONS } from "../../../data/producerFaq";
+
+const chips = [
+  { label: "Aforo por función" },
+  { label: "Precio de estreno" },
+  { label: "Entradas de estudiante y adulto mayor" },
+  { label: "Jueves popular" },
+  { label: "Si cambias un horario, avisamos a quienes compraron" },
+  { label: "Repetir funciones de jueves a domingo", soon: true },
+  { label: "Copiar las entradas a cada función", soon: true },
+];
+
+const pressItems = [
+  {
+    title: "Cortesías en un minuto.",
+    text: "Nombre, correo y cuántas entradas: la crítica y su acompañante. Si eliges la entrada de una función, la cortesía es para esa noche. No cuentan como venta y salen aunque la función esté llena: eso lo decides tú.",
+  },
+  {
+    title: "Lista de invitados con acompañantes.",
+    text: "Arma la lista del estreno y mándales el link por correo o por WhatsApp. Hoy se hace desde tu asistente de IA conectado.",
+  },
+  {
+    title: "La página, antes que nadie.",
+    text: "Comparte una vista previa privada con la sala o con la prensa antes de abrir la venta, con un link que vence solo.",
+  },
+];
+---
+
+<section id="obra" class="te-section te-on-sala-2 a1" aria-labelledby="te-act1-title" data-te-section="obra">
+  <div class="te-wrap">
+    <div class="te-act-head a1-head" data-lp-reveal>
+      <span class="te-foco" aria-hidden="true"></span>
+      <ActEyebrow text="Acto I" />
+      <h2 id="te-act1-title" class="te-h2 a1-title" data-lp-step>
+        Una obra. <span class="te-gold a1-line">Todas sus funciones.</span>
+      </h2>
+      <p class="te-lead a1-lead" data-lp-step>
+        Publicas la temporada una sola vez. Tu público elige su función en la misma página y recibe su entrada para esa
+        fecha.
+      </p>
+    </div>
+
+    <!-- Escena 1 · La temporada en una tarde -->
+    <div class="a1-scene a1-scene-1">
+      <div class="a1-copy" data-lp-reveal>
+        <p class="te-meta te-gold" data-lp-step>Escena 1</p>
+        <h3 class="te-h3 a1-h3" data-lp-step>Cada función con su aforo, cada entrada con su precio.</h3>
+        <p class="a1-text" data-lp-step>
+          Agrega hasta {MAX_EVENT_FUNCTIONS} funciones, cada una con su fecha, su hora y, si sales de gira, su sala. Para
+          que cada función tenga su propio aforo, creas sus entradas amarradas a esa función; una entrada "para todas las
+          funciones" comparte el cupo entre todas. Así el estreno puede tener su precio y los jueves, uno popular.
+        </p>
+        <ul class="a1-chips" data-lp-step>
+          {
+            chips.map((c) => (
+              <li class="te-chip">
+                {c.label}
+                {c.soon && <SoonBadge dark />}
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+      <div class="a1-mock" data-lp-reveal>
+        <div data-lp-step><FunctionPicker client:visible /></div>
+        <p class="a1-mock-note" data-lp-step>
+          No hay butacas numeradas: si separas platea y galería, cada una es un tipo de entrada con su cupo.
+        </p>
+      </div>
+    </div>
+
+    <!-- Escena 2 · Prensa e invitados -->
+    <div id="prensa" class="a1-scene a1-scene-2">
+      <div class="a1-media" data-lp-reveal>
+        <div class="a1-photo-wrap" data-lp-step>
+          <ProsceniumPhoto
+            photo={THEATRE_PHOTOS.ensayo}
+            alt="Elenco ensayando con libretos mientras la directora da indicaciones desde la platea"
+            sizes="(min-width: 1024px) 520px, 100vw"
+            arch
+            class="a1-photo"
+          />
+          <PressPass class="a1-pass" />
+        </div>
+      </div>
+      <div class="a1-copy" data-lp-reveal>
+        <p class="te-meta te-gold" data-lp-step>Escena 2</p>
+        <h3 class="te-h3 a1-h3" data-lp-step>
+          La prensa entra con su QR. <span class="te-gold a1-line">Y tú sabes quién vino.</span>
+        </h3>
+        <ul class="a1-items">
+          {
+            pressItems.map((item) => (
+              <li class="a1-item" data-lp-step>
+                <span class="te-bullet" aria-hidden="true" />
+                <p>
+                  <strong class="a1-item-title">{item.title}</strong> {item.text}
+                </p>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+    </div>
+
+    <!-- Escena 3 · El elenco también vende -->
+    <div class="a1-scene-3" data-lp-reveal>
+      <p class="te-meta te-gold" data-lp-step>Escena 3</p>
+      <h3 class="te-h3 a1-h3" data-lp-step>Un link para cada integrante del elenco.</h3>
+      <p class="a1-text a1-text-center" data-lp-step>
+        Y otro para la sala, para el medio que te entrevistó o para tu campaña. En las métricas de la obra ves cuántas
+        entradas trajo cada uno, comparado con la venta directa. La venta se asocia al link cuando la persona compra en la
+        misma visita.
+      </p>
+      <div class="a1-links" data-lp-step><LinkSales /></div>
+      <p class="a1-guide" data-lp-step>
+        <a href="/ventas-por-promotor" class="te-link">Ventas por promotor</a>
+        <a href="/guias/como-medir-ventas-por-promotor" class="te-link">Guía: cómo medir ventas por promotor <span aria-hidden="true">→</span></a>
+      </p>
+    </div>
+  </div>
+</section>
+
+<style>
+  .a1-head {
+    max-width: 820px;
+    margin: 0 auto;
+    text-align: center;
+  }
+  .a1-title {
+    margin-top: 20px;
+  }
+  .a1-line {
+    display: block;
+  }
+  .a1-lead {
+    max-width: 620px;
+    margin: 20px auto 0;
+  }
+  .a1-scene {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 40px;
+    margin-top: 72px;
+  }
+  .a1-h3 {
+    margin-top: 10px;
+  }
+  .a1-text {
+    margin-top: 16px;
+    font-size: 16px;
+    line-height: 25px;
+    color: var(--te-text-2);
+  }
+  .a1-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 24px;
+  }
+  .a1-mock-note {
+    margin-top: 14px;
+    font-size: 13px;
+    line-height: 19px;
+    color: var(--te-text-3);
+  }
+  .a1-photo-wrap {
+    position: relative;
+  }
+  .a1-media :global(.a1-photo) {
+    aspect-ratio: 4 / 5;
+  }
+  /* Mobile: el pase va abajo de la foto, sin rotación */
+  .a1-media :global(.a1-pass) {
+    margin: -64px auto 0;
+    z-index: 3;
+  }
+  .a1-items {
+    display: grid;
+    gap: 18px;
+    margin-top: 24px;
+  }
+  .a1-item {
+    display: flex;
+    gap: 14px;
+    font-size: 16px;
+    line-height: 25px;
+    color: var(--te-text-2);
+  }
+  .a1-item-title {
+    display: block;
+    font-weight: 600;
+    color: var(--te-text-1);
+  }
+  .a1-scene-3 {
+    max-width: 720px;
+    margin: 88px auto 0;
+    padding-top: 56px;
+    border-top: 1px solid rgba(212, 175, 106, 0.3);
+    text-align: center;
+  }
+  .a1-text-center {
+    max-width: 640px;
+    margin-inline: auto;
+  }
+  .a1-links {
+    margin-top: 28px;
+  }
+  .a1-guide {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px 24px;
+    margin-top: 20px;
+    font-size: 15px;
+  }
+  @media (min-width: 1024px) {
+    .a1-scene {
+      margin-top: 112px;
+      align-items: center;
+      gap: 72px;
+    }
+    .a1-scene-1 {
+      grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    }
+    .a1-scene-2 {
+      grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+    }
+    .a1-text,
+    .a1-item {
+      font-size: 18px;
+      line-height: 29px;
+    }
+    .a1-photo-wrap {
+      max-width: 520px;
+    }
+    /* Desktop: el pase cuelga abajo a la derecha, encima de la foto */
+    .a1-media :global(.a1-pass) {
+      position: absolute;
+      right: -40px;
+      bottom: -36px;
+      margin: 0;
+    }
+    .a1-scene-3 {
+      margin-top: 136px;
+    }
+  }
+</style>

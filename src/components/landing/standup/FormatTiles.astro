@@ -1,0 +1,168 @@
+---
+// 6 · Del open mic a la gira (SPEC_landing_standup §4.6 y S15): tres formatos, cada uno enlazado a un evento de ejemplo
+// o a una guía. Open mic: evento gratuito con inscripción (y lista de espera, api/events/waitlist); Line-up: la guía de
+// links por promotor; Show solista: el evento de ejemplo con varias funciones en gira. En mobile, fila con scroll
+// horizontal (snap); desde 768 px, tres columnas. Hover: la foto escala 1.06 y el texto sube 6 px.
+import StandupPhoto from "./StandupPhoto.astro";
+import { STANDUP_PHOTOS } from "./standupLanding.js";
+
+const tiles = [
+  {
+    format: "open_mic",
+    name: "Open mic",
+    line: "Entradas baratas o gratis, cupos y lista de espera",
+    href: "/eventos/evento-demo-gratis",
+    photo: STANDUP_PHOTOS.openmic,
+    alt: "Open mic de comedia en un bar lleno",
+    position: "50% 50%",
+  },
+  {
+    format: "line_up",
+    name: "Line-up",
+    line: "Un link por comediante y ves quién vende",
+    href: "/guias/como-medir-ventas-por-promotor",
+    photo: STANDUP_PHOTOS.hero,
+    alt: "Comediante en el escenario de un bar",
+    position: "40% 50%",
+  },
+  {
+    format: "solo_show",
+    name: "Show solista",
+    line: "Temporadas de muchas funciones en sala",
+    href: "/eventos/evento-demo-gira",
+    photo: STANDUP_PHOTOS.comediante,
+    alt: "Comediante en primer plano bajo un foco",
+    position: "50% 35%",
+  },
+];
+---
+
+<section class="su-wrap ft" aria-labelledby="formats-title" data-su-section="formats">
+  <div class="ft-head" data-lp-reveal>
+    <h2 id="formats-title" class="su-h2 ft-title" data-lp-step>Del open mic <span class="su-serif">a la gira.</span></h2>
+    <p class="su-lead ft-lead" data-lp-step>Funciona igual para el open mic de los martes que para un solista con temporada en sala.</p>
+  </div>
+  <ul class="ft-grid" data-lp-reveal>
+    {tiles.map((tile) => (
+      <li data-lp-step>
+        <a href={tile.href} class="ft-tile su-photo" data-su-tile={tile.format}>
+          <StandupPhoto photo={tile.photo} alt={tile.alt} sizes="(min-width: 768px) 400px, 78vw" position={tile.position} class="ft-img" />
+          <span class="ft-shade" aria-hidden="true"></span>
+          <span class="ft-label">
+            <span class="ft-name">{tile.name}</span>
+            <span class="ft-line">{tile.line}</span>
+          </span>
+        </a>
+      </li>
+    ))}
+  </ul>
+</section>
+
+<style>
+  .ft {
+    padding-top: 96px;
+    padding-bottom: 72px;
+  }
+  .ft-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 14px 32px;
+  }
+  .ft-title {
+    max-width: 760px;
+  }
+  .ft-lead {
+    max-width: 340px;
+  }
+  .ft-grid {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 78%;
+    gap: 12px;
+    margin: 32px -16px 0;
+    padding: 0 16px 4px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: 16px;
+    scrollbar-width: none;
+  }
+  .ft-grid::-webkit-scrollbar {
+    display: none;
+  }
+  .ft-grid li {
+    scroll-snap-align: start;
+  }
+  .ft-tile {
+    display: block;
+    aspect-ratio: 3 / 4;
+    color: var(--sb-text-1);
+    text-decoration: none;
+  }
+  .ft-tile:focus-visible {
+    outline: 2px solid var(--brand-lime);
+    outline-offset: 3px;
+  }
+  .ft-tile :global(.ft-img) {
+    position: absolute;
+    inset: 0;
+  }
+  .ft-shade {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(14, 11, 9, 0) 45%, rgba(14, 11, 9, 0.88) 100%);
+  }
+  .ft-label {
+    position: absolute;
+    left: 20px;
+    right: 20px;
+    bottom: 20px;
+  }
+  .ft-name {
+    display: block;
+    font-family: "Unbounded", system-ui, sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+  }
+  .ft-line {
+    display: block;
+    margin-top: 4px;
+    font-size: 14px;
+    line-height: 20px;
+    color: #d9d0c5;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .ft-tile :global(.ft-img) {
+      transition: transform 900ms var(--ease-out);
+    }
+    .ft-label {
+      transition: transform 400ms var(--ease-out);
+    }
+    .ft-tile:hover :global(.ft-img) {
+      transform: scale(1.06);
+    }
+    .ft-tile:hover .ft-label {
+      transform: translateY(-6px);
+    }
+  }
+  @media (min-width: 768px) {
+    .ft-grid {
+      grid-auto-flow: row;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      margin: 56px 0 0;
+      padding: 0;
+      overflow: visible;
+    }
+  }
+  @media (min-width: 1024px) {
+    .ft {
+      padding-top: 160px;
+      padding-bottom: 120px;
+    }
+    .ft-name {
+      font-size: 22px;
+    }
+  }
+</style>

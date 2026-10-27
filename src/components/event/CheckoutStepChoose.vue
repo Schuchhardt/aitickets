@@ -1,8 +1,8 @@
 <script setup>
 // Paso 1 del checkout pagado (§6.3): lugar → función → entradas. Cada nivel se omite si tiene una sola opción.
-import { computed, nextTick } from "vue";
+import { ref, computed, nextTick } from "vue";
 import QuantityStepper from "./QuantityStepper.vue";
-import { formatCLP, miniCalendar, hhmm, ticketMax, ticketRowsFor, dateParts, formatSaleStart } from "./eventView.js";
+import { formatCLP, miniCalendar, hhmm, ticketMax, ticketRowsFor, groupByMonth, formatSaleStart } from "./eventView.js";
 import { isFeeAbsorbed } from "../Reservation/pricing.js";
 
 const props = defineProps({
@@ -16,8 +16,6 @@ const props = defineProps({
 });
 const emit = defineEmits(["update:place", "update:functionId", "update:selection", "track"]);
 
-const MONTHS = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-
 const showPlaces = computed(() => props.model.places.length > 1);
 const placeFunctions = computed(() =>
   props.model.functions.filter((f) => !showPlaces.value || !props.place || f.place === props.place),
@@ -28,15 +26,7 @@ const selectedPlace = computed(() => props.model.places.find((p) => p.key === pr
 // Más de 8 funciones en el mismo lugar: agrupadas por mes
 const functionGroups = computed(() => {
   const list = placeFunctions.value;
-  if (list.length <= 8) return [{ key: "all", label: "", items: list }];
-  const groups = new Map();
-  for (const f of list) {
-    const p = dateParts(f.date);
-    const key = p ? `${p.y}-${p.m}` : "x";
-    if (!groups.has(key)) groups.set(key, { key, label: p ? MONTHS[p.m - 1] : "", items: [] });
-    groups.get(key).items.push(f);
-  }
-  return [...groups.values()];
+  return list.length <= 8 ? [{ key: "all", label: "", items: list }] : groupByMonth(list);
 });
 
 const rows = computed(() => {
@@ -44,6 +34,17 @@ const rows = computed(() => {
   return ticketRowsFor(props.event, props.model.needsFunction ? props.functionId : null);
 });
 const absorbed = computed(() => isFeeAbsorbed(props.event));
+
+// Se llegó con la función elegida (?funcion=, chip de la card o "Elegir" de la lista, §4.9b): el foco va a la primera
+// fila de entradas a la venta (al "+" de su stepper) en vez de al lugar o la fecha
+const rowsEl = ref(null);
+defineExpose({
+  focusTickets() {
+    const target = rowsEl.value?.$el?.querySelector('[data-ticket-row="available"] .stepper-plus');
+    target?.focus({ preventScroll: true });
+    return Boolean(target);
+  },
+});
 
 function selectPlace(key) {
   if (key === props.place) return;
@@ -143,11 +144,12 @@ async function onRadioKey(e, items, current, select, keyOf) {
     <!-- c) Entradas -->
     <div v-if="rows.length" class="block">
       <h3 class="block-title">Entradas</h3>
-      <TransitionGroup tag="ul" name="row" class="rows" appear :key="functionId || 'all'">
+      <TransitionGroup ref="rowsEl" tag="ul" name="row" class="rows" appear :key="functionId || 'all'">
         <li
           v-for="(t, i) in rows"
           :key="t.id"
           class="row"
+          :data-ticket-row="t.status"
           :class="{ 'is-off': t.status !== 'available' }"
           :style="{ '--i': i }"
         >

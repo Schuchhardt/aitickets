@@ -1,0 +1,157 @@
+---
+// 1 · Hero (SPEC_landing_seminarios §4.1, papel): grilla de 12 columnas con el texto en 1–6 y la sala en 7–12 (la spec
+// dice 1–5: en Archivo Expanded "programa." no cabe en 5 columnas sin cortarse). H1 con el énfasis en Condensed,
+// bajada armada con el plazo de pago (dayReleaseText: PAYOUT_RELEASE_HOURS de legal.mjs con la regla de ledger.ts, que
+// libera el pase completo con el último día; la spec dice solo "lo de cada jornada") y la nota de términos (TERMS_NOTE),
+// CTAs y microcopy. A la derecha, la sala (isla HeroScreen: la foto con la pantalla que proyecta láminas)
+// y la credencial colgante de una asistente, pegada al borde inferior izquierdo de la foto, con el cordón que sale por
+// arriba. Mobile: la foto 4:3 sin overlay, las láminas en carrusel y la credencial a 200 px, sin balanceo, alineada a la
+// derecha bajo los CTA y la nota de términos (la spec la pone "a la derecha de los CTA", pero también pide los CTA a
+// ancho completo: en 390 px no caben 200 px al lado).
+// Movimiento al cargar (solo con html.lp-motion): C1 el H1 sube y el énfasis se ensancha, C2 la foto se revela y la
+// pantalla se enciende, C4 la credencial se balancea al entrar.
+import Credential from "./Credential.vue";
+import HeroScreen from "./HeroScreen.vue";
+import SeminarHeading from "./SeminarHeading.astro";
+import { DESK_CASES, PHOTO_ALT, SEMINAR_NAME, SEMINAR_PHOTOS, dayReleaseText } from "./seminariosLanding.js";
+import { publishUrl } from "../links.js";
+import { TERMS_NOTE } from "../../../data/producerFaq";
+
+interface Props {
+  ctaLabel: string;
+  demoHref: string;
+  demoLabel: string;
+}
+const { ctaLabel, demoHref, demoLabel } = Astro.props;
+const carolina = DESK_CASES[0];
+const day1 = `${SEMINAR_NAME} · Día 1`;
+---
+
+<section class="se-bg-papel seh-hero" aria-labelledby="se-hero-title" data-se-section="hero" data-se-screen="Apertura">
+  <div class="se-wrap seh-grid">
+    <div class="seh-copy">
+      <p class="se-meta seh-eyebrow">Para seminarios, congresos, charlas y jornadas</p>
+      <SeminarHeading tag="h1" id="se-hero-title" text="Tú armas el programa." emphasis="La acreditación es un QR." class="seh-title se-hero-title" />
+      <p class="se-lead seh-lead">
+        Inscripciones gratis o pagadas con Webpay, un congreso de varios días en un solo evento, precios para estudiantes y
+        convenios, y la acreditación con el celular aunque se caiga el wifi del hotel. {dayReleaseText}*. 0% de comisión
+        para ti.
+      </p>
+      <div class="seh-ctas" data-hero-cta>
+        <a href={publishUrl("seminarios_hero")} class="se-btn se-btn-solid" data-cta="publish" data-section="hero">
+          {ctaLabel} <span class="se-btn-arrow" aria-hidden="true">→</span>
+        </a>
+        <a href={demoHref} class="se-btn se-btn-line" data-cta="demo" data-section="hero">{demoLabel}</a>
+      </div>
+      <p class="se-meta seh-micro">Sin mensualidad · Sin permanencia · Las inscripciones gratis no pagan nada</p>
+      <p class="se-note seh-terms"><a href={TERMS_NOTE.href} class="se-link">{TERMS_NOTE.text}</a></p>
+      <div class="seh-cred-mobile" aria-hidden="true">
+        <Credential name={carolina.name} org={carolina.org} type="asistente" day={day1} small swing={false} responsive={false} example cord={56} />
+      </div>
+    </div>
+
+    <div class="seh-visual">
+      <HeroScreen client:visible photo={SEMINAR_PHOTOS.hero} alt={PHOTO_ALT.hero} caption="Fig. 01 — Expositor y audiencia en una sala de conferencias." />
+      <div class="seh-cred" aria-hidden="true">
+        <Credential name={carolina.name} org={carolina.org} type="asistente" day={day1} small={false} swing responsive={false} example cord={300} />
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .seh-hero {
+    position: relative;
+    padding: 104px 0 64px;
+    overflow-x: clip;
+  }
+  .seh-grid {
+    display: grid;
+    gap: 40px;
+  }
+  .seh-copy {
+    min-width: 0;
+  }
+  .seh-hero :global(.seh-title) {
+    margin-top: 16px;
+  }
+  .seh-lead {
+    max-width: 560px;
+    margin-top: 22px;
+  }
+  .seh-ctas {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 28px;
+  }
+  .seh-ctas .se-btn-line {
+    justify-content: center;
+  }
+  .seh-micro {
+    margin-top: 16px;
+  }
+  .seh-terms {
+    margin-top: 8px;
+  }
+  .seh-cred-mobile {
+    display: flex;
+    justify-content: flex-end;
+    padding: 56px 8px 0 0;
+  }
+  .seh-visual {
+    position: relative;
+    min-width: 0;
+  }
+  .seh-cred {
+    display: none;
+  }
+  @media (min-width: 640px) {
+    .seh-ctas {
+      flex-direction: row;
+      flex-wrap: wrap;
+    }
+  }
+  @media (min-width: 1024px) {
+    .seh-hero {
+      min-height: min(100svh, 880px);
+      padding: 136px 0 72px;
+    }
+    .seh-grid {
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      column-gap: 24px;
+      align-items: center;
+    }
+    .seh-copy {
+      grid-column: 1 / span 6;
+    }
+    .seh-visual {
+      grid-column: 7 / span 6;
+      padding-bottom: 40px;
+    }
+    .seh-cred-mobile {
+      display: none;
+    }
+    /* La leyenda de la foto deja lugar a la credencial */
+    .seh-visual :global(.seh-caption) {
+      padding-left: 300px;
+    }
+    /* La credencial cuelga en el borde inferior izquierdo de la foto; el cordón sale por arriba */
+    .seh-cred {
+      position: absolute;
+      left: 20px;
+      bottom: -120px;
+      display: block;
+      z-index: 2;
+    }
+  }
+  @media (min-width: 1024px) and (max-width: 1239px) {
+    .seh-cred {
+      transform: scale(0.82);
+      transform-origin: left bottom;
+    }
+    .seh-visual :global(.seh-caption) {
+      padding-left: 250px;
+    }
+  }
+</style>

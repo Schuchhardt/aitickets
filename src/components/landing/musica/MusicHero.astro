@@ -1,0 +1,226 @@
+---
+// 1 · Hero afiche (SPEC_landing_musica §4.1): foto de la sala en duotono con grano, H1 en Anton (segunda línea en
+// rojo), bajada armada con las constantes de pago (legal.mjs), CTAs, microcopy del cargo (fees.mjs), talón de ejemplo
+// y ecualizador en el borde inferior. La foto es el LCP: AVIF/WebP con srcset y fetchpriority alto, sin lazy-load.
+// Alto min(100svh, 920px) en desktop y 760 px en mobile (mínimos: con zoom de texto crece).
+// Microcopy: "Cargo por servicio 8% + IVA: lo paga el público" en vez de pegar SERVICE_FEE_NOTE ("+ cargo por
+// servicio…") delante de "lo paga el público", que no se lee bien; el porcentaje sale igual de fees.mjs.
+// Movimiento al cargar (solo con html.lp-motion): M1 foto (scale 1.06 → 1 y el duotono de 0,6 a 1), M2 líneas del H1
+// con efecto de impresión (clip-path, stagger 140 ms), M3 bajada y CTAs, M4 talón y sello (GigTicket), M5 ecualizador.
+import DuotonePhoto from "./DuotonePhoto.astro";
+import GigTicket from "./GigTicket.astro";
+import EqBars from "./EqBars.astro";
+import { MUSIC_PHOTOS } from "./musicaLanding.js";
+import { publishUrl } from "../links.js";
+import { PAYOUT_RELEASE_HOURS } from "../../../../netlify/lib/legal.mjs";
+import { SERVICE_FEE_PERCENT_LABEL } from "../../../../netlify/lib/fees.mjs";
+
+interface Props {
+  ctaLabel: string;
+  demoHref: string;
+  demoLabel: string;
+}
+const { ctaLabel, demoHref, demoLabel } = Astro.props;
+---
+
+<section class="mh mu-grain" aria-labelledby="mu-hero-title" data-mu-section="hero">
+  <div class="mh-media">
+    <DuotonePhoto
+      photo={MUSIC_PHOTOS.hero}
+      alt="Banda tocando con luces rojas frente a una sala llena"
+      sizes="100vw"
+      position="50% 45%"
+      class="mh-photo"
+      priority
+    />
+    <div class="mh-shade" aria-hidden="true"></div>
+  </div>
+
+  <div class="mu-wrap mh-inner">
+    <p class="mu-mono mh-eyebrow mh-fade-1">Para bandas, solistas, productoras y salas</p>
+    <h1 id="mu-hero-title" class="mu-h1 mh-title">
+      <span class="mh-line mh-print-1">Tú pon la música.</span>
+      <span class="mu-h1-sub mu-red mh-line mh-print-2">La boletería corre por nuestra cuenta.</span>
+    </h1>
+
+    <div class="mh-bottom">
+      <div class="mh-copy">
+        <p class="mu-lead mh-lead mh-fade-1">
+          Preventa por tandas con su cupo, un link para cada banda del cartel, tu fecha en Instagram hasta el día del
+          show y check-in con QR aunque la sala no tenga señal. Lo de cada fecha queda disponible {PAYOUT_RELEASE_HOURS} h
+          después del show. 0% de comisión para ti.
+        </p>
+        <div class="mh-ctas mh-fade-2" data-hero-cta>
+          <a href={publishUrl("musica_hero")} class="mu-btn mu-btn-lime" data-cta="publish" data-section="hero">
+            {ctaLabel} <span aria-hidden="true">→</span>
+          </a>
+          <a href={demoHref} class="mu-btn mu-btn-line" data-cta="demo" data-section="hero">{demoLabel}</a>
+        </div>
+        <p class="mu-mono mh-micro mh-fade-2">
+          Sin mensualidad · Sin permanencia · Cargo por servicio {SERVICE_FEE_PERCENT_LABEL} + IVA: lo paga el público
+        </p>
+      </div>
+      <GigTicket class="mh-ticket" />
+    </div>
+  </div>
+
+  <EqBars class="mh-eq" />
+</section>
+
+<style>
+  .mh {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-height: 760px;
+    overflow: hidden;
+    background: var(--mu-stage);
+  }
+  .mh-media {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+  }
+  .mh-media :global(.mh-photo) {
+    width: 100%;
+    height: 100%;
+  }
+  /* En mobile la foto ocupa la parte de arriba y el texto va sobre el negro */
+  .mh-shade {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background: linear-gradient(
+      180deg,
+      rgba(10, 10, 13, 0.55) 0%,
+      rgba(10, 10, 13, 0.1) 20%,
+      rgba(10, 10, 13, 0.7) 42%,
+      rgba(10, 10, 13, 0.94) 66%,
+      var(--mu-stage) 100%
+    );
+  }
+  .mh-inner {
+    position: relative;
+    z-index: 2;
+    flex: 1;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding-top: 160px;
+    padding-bottom: 96px;
+  }
+  .mh-eyebrow {
+    color: var(--mu-text-2);
+  }
+  /* Aire arriba del H1: Anton dibuja las tildes de TÚ y MÚSICA sobre la caja de la línea */
+  .mh-title {
+    margin-top: 24px;
+    color: var(--mu-text-1);
+  }
+  .mh-line {
+    display: block;
+  }
+  .mh-title .mu-h1-sub {
+    margin-top: 8px;
+  }
+  .mh-bottom {
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+    margin-top: 24px;
+  }
+  .mh-lead {
+    max-width: 560px;
+    color: var(--mu-text-1);
+  }
+  .mh-ctas {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 28px;
+  }
+  .mh-micro {
+    margin-top: 16px;
+    font-size: 12px;
+    line-height: 18px;
+    color: var(--mu-text-2);
+  }
+  .mh :global(.mh-eq) {
+    position: absolute;
+    z-index: 2;
+    left: 20px;
+    right: 20px;
+    bottom: 0;
+  }
+  @media (min-width: 640px) {
+    .mh-ctas {
+      flex-direction: row;
+      flex-wrap: wrap;
+    }
+  }
+  @media (min-width: 768px) {
+    .mh :global(.mh-eq) {
+      left: 40px;
+      right: 40px;
+    }
+  }
+  @media (min-width: 1024px) {
+    .mh {
+      min-height: min(100svh, 920px);
+    }
+    /* §4.1: gradiente de legibilidad de --mu-stage al 85 % abajo a la izquierda, a transparente */
+    .mh-shade {
+      background:
+        linear-gradient(180deg, rgba(10, 10, 13, 0.55) 0%, rgba(10, 10, 13, 0) 22%),
+        linear-gradient(20deg, rgba(10, 10, 13, 0.85) 0%, rgba(10, 10, 13, 0.6) 40%, rgba(10, 10, 13, 0) 75%);
+    }
+    .mh-inner {
+      padding-top: 128px;
+      padding-bottom: 112px;
+    }
+    .mh-title {
+      max-width: 1100px;
+      margin-top: 40px;
+    }
+    .mh-title .mu-h1-sub {
+      max-width: 900px;
+      margin-top: 12px;
+    }
+    .mh-bottom {
+      flex-direction: row;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 48px;
+      margin-top: 36px;
+    }
+    .mh-bottom :global(.mh-ticket) {
+      flex: 0 0 340px;
+      margin-bottom: 8px;
+    }
+  }
+
+  /* M1: la foto pasa de scale 1.06 a 1 y el duotono entra de 0,6 a 1 (1,8 s, una vez) */
+  :global(.lp-motion) .mh-media :global(.mu-photo-img) {
+    animation: mu-photo-in 1800ms var(--ease-out) both;
+  }
+  :global(.lp-motion) .mh-media :global(.mu-duo::before),
+  :global(.lp-motion) .mh-media :global(.mu-duo::after) {
+    animation: mu-fade 1800ms ease both;
+  }
+  /* M2: cada línea del H1 se "imprime" de arriba abajo, con 140 ms entre líneas */
+  :global(.lp-motion) .mh-print-1 {
+    animation: mu-print 700ms var(--ease-out) 160ms both;
+  }
+  :global(.lp-motion) .mh-print-2 {
+    animation: mu-print 700ms var(--ease-out) 300ms both;
+  }
+  /* M3: bajada y CTAs */
+  :global(.lp-motion) .mh-fade-1 {
+    animation: mu-up 700ms var(--ease-out) 600ms both;
+  }
+  :global(.lp-motion) .mh-fade-2 {
+    animation: mu-up 700ms var(--ease-out) 750ms both;
+  }
+</style>

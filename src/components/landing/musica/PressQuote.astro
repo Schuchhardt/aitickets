@@ -1,0 +1,78 @@
+---
+// 9 · Testimonio con formato de cita de prensa (SPEC_landing_musica §4.10): solo con una cita real, con nombre,
+// banda/productora/sala, ciudad y foto autorizados (MUSIC_TESTIMONIAL en src/data/producerSocialProof.ts). Sin datos no
+// se renderiza nada, ni el contenedor: nunca se inventa.
+import { MUSIC_TESTIMONIAL } from "../../../data/producerSocialProof";
+
+const t = MUSIC_TESTIMONIAL;
+---
+
+{t && (
+  <section class="mu-section pq" aria-label="Lo que dice una banda, productora o sala" data-mu-section="testimonial" data-mu-testimonial>
+    <figure class="mu-wrap pq-inner" data-lp-reveal>
+      <p class="pq-mark" aria-hidden="true">“</p>
+      <blockquote class="pq-quote" data-lp-step>{t.quote}</blockquote>
+      <figcaption class="pq-author" data-lp-step>
+        <span class="mu-duo pq-photo">
+          <picture>
+            {t.photo.sources.map((source) => <source type={source.type} srcset={source.srcset} sizes="72px" />)}
+            <img src={t.photo.src} alt="" width={t.photo.width} height={t.photo.height} loading="lazy" decoding="async" class="mu-photo-img" />
+          </picture>
+        </span>
+        <span>
+          <span class="pq-name">{t.name}</span>
+          <span class="mu-mono pq-company">{t.company}</span>
+        </span>
+      </figcaption>
+    </figure>
+  </section>
+)}
+
+<style>
+  .pq-inner {
+    max-width: 1080px;
+  }
+  .pq-mark {
+    font-family: var(--mu-display);
+    font-size: 120px;
+    line-height: 80px;
+    color: var(--mu-red);
+  }
+  .pq-quote {
+    margin-top: 8px;
+    font-size: 24px;
+    line-height: 34px;
+    font-weight: 400;
+    color: var(--mu-text-1);
+  }
+  .pq-author {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 28px;
+  }
+  .pq-photo {
+    flex: 0 0 72px;
+    width: 72px;
+    height: 72px;
+  }
+  .pq-name {
+    display: block;
+    font-weight: 600;
+  }
+  .pq-company {
+    display: block;
+    margin-top: 2px;
+    color: var(--mu-text-3);
+  }
+  @media (min-width: 1024px) {
+    .pq-mark {
+      font-size: 160px;
+      line-height: 110px;
+    }
+    .pq-quote {
+      font-size: 32px;
+      line-height: 44px;
+    }
+  }
+</style>

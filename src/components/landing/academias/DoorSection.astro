@@ -1,0 +1,168 @@
+---
+// 4 · El día de la muestra (SPEC_landing_academias §3.5): foto 4:5 de la puerta con la card lima "Válida" y cuatro
+// ítems. Verificado como en organizadores/DoorSection.astro: rol Puerta (permissions.ts) o link temporal de puerta sin
+// cuenta (create_checkin_link, hoy desde el conector de IA: así lo dice el ítem), validación offline con la lista
+// descargada y búsqueda por nombre o correo con validación manual (ValidateQR.vue), cortesías con su propio QR.
+import StandupPhoto from "../standup/StandupPhoto.astro";
+import { ACADEMY_DEMO, ACADEMY_PHOTOS } from "./academiasLanding.js";
+
+const items = [
+  {
+    title: "Profes o voluntarios escanean con su celular",
+    text: "Les das el rol Puerta, o un link temporal que no pide cuenta ni contraseña y vence solo (lo creas desde tu asistente de IA).",
+  },
+  {
+    title: "Funciona aunque el gimnasio no tenga señal",
+    text: "Se valida con la lista descargada y se sincroniza cuando vuelve la conexión.",
+  },
+  {
+    title: "¿El abuelo no tiene la entrada en el celular?",
+    text: "Se busca por nombre en la lista y entra igual.",
+  },
+  {
+    title: "Profes e invitados, con cortesía",
+    text: "Les mandas una entrada sin costo con su propio QR.",
+  },
+];
+---
+
+<section class="ac-wrap door" aria-labelledby="ac-door-title" data-ac-section="door">
+  <div class="door-media" data-lp-reveal>
+    <div class="ac-photo door-photo" data-lp-step>
+      <StandupPhoto
+        photo={ACADEMY_PHOTOS.puerta}
+        alt="Una familia muestra su entrada con QR en el celular y una profesora la escanea en la puerta"
+        sizes="(min-width: 1024px) 540px, 100vw"
+        class="ac-photo-img"
+      />
+      <div class="door-valid">
+        <p class="door-valid-title">✓ Válida</p>
+        <p class="door-valid-meta">{ACADEMY_DEMO.family} · {ACADEMY_DEMO.familyTickets} de {ACADEMY_DEMO.familyTickets}<span class="door-valid-fn"> · Función 17:00</span></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="door-copy" data-lp-reveal>
+    <p class="ac-eyebrow" data-lp-step>El día de la muestra</p>
+    <h2 id="ac-door-title" class="ac-h2 door-title" data-lp-step>Nadie en la puerta <span class="ac-serif">con una lista de papel.</span></h2>
+    <ul class="door-items" data-lp-step>
+      {items.map((item) => (
+        <li class="door-item">
+          <span class="door-dot" aria-hidden="true"></span>
+          <div>
+            <h3 class="door-item-title">{item.title}</h3>
+            <p class="ac-body door-item-text">{item.text}</p>
+          </div>
+        </li>
+      ))}
+    </ul>
+    <p class="door-more" data-lp-step>
+      <a href="/guias/como-hacer-check-in-con-qr" class="ac-inline-link" data-cta="learn_checkin" data-section="door">Cómo funciona el control de acceso con QR</a>
+    </p>
+  </div>
+</section>
+
+<style>
+  .door {
+    display: grid;
+    gap: 24px;
+    padding-top: 0;
+    padding-bottom: 56px;
+  }
+  .door-photo {
+    aspect-ratio: 4 / 4.6;
+  }
+  .door-valid {
+    position: absolute;
+    left: 12px;
+    bottom: 12px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    background: var(--brand-lime);
+    color: var(--ac-ink);
+  }
+  .door-valid-title {
+    font-family: "Unbounded", system-ui, sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .door-valid-meta {
+    margin-top: 2px;
+    font-size: 12px;
+  }
+  .door-valid-fn {
+    display: none;
+  }
+  .door-title {
+    margin-top: 10px;
+  }
+  .door-items {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    margin-top: 22px;
+  }
+  .door-item {
+    display: flex;
+    gap: 14px;
+  }
+  .door-dot {
+    width: 10px;
+    height: 10px;
+    flex: 0 0 auto;
+    margin-top: 7px;
+    border-radius: 50%;
+    background: var(--brand-lime);
+  }
+  .door-item-title {
+    font-size: 16px;
+    font-weight: 600;
+  }
+  .door-item-text {
+    margin-top: 2px;
+  }
+  .door-more {
+    margin-top: 24px;
+    font-size: 15px;
+    font-weight: 500;
+  }
+  @media (min-width: 768px) {
+    .door-photo {
+      aspect-ratio: 4 / 5;
+    }
+    .door-valid {
+      left: 20px;
+      bottom: 20px;
+      width: 220px;
+      padding: 14px 16px;
+      border-radius: 16px;
+    }
+    .door-valid-title {
+      font-size: 18px;
+    }
+    .door-valid-meta {
+      font-size: 13px;
+    }
+    .door-valid-fn {
+      display: inline;
+    }
+  }
+  @media (min-width: 1024px) {
+    .door {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      align-items: center;
+      gap: 72px;
+      padding-bottom: 128px;
+    }
+    .door-title {
+      margin-top: 16px;
+    }
+    .door-items {
+      gap: 22px;
+      margin-top: 32px;
+    }
+    .door-item-title {
+      font-size: 17px;
+    }
+  }
+</style>

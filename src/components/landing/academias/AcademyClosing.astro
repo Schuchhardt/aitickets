@@ -1,0 +1,144 @@
+---
+// 8 · Cierre (SPEC_landing_academias §3.9): foto del grupo de teatro saludando con overlay tinta 72% (decorativa), CTA
+// lima y WhatsApp. data-final-cta: la barra flotante de mobile se esconde al llegar aquí. Lleva los links a la demo de
+// 15 minutos ("Te ayudamos con la primera") y a /organizadores.
+import StandupPhoto from "../standup/StandupPhoto.astro";
+import { ACADEMY_PHOTOS } from "./academiasLanding.js";
+import { DEMO_CALL_URL, publishUrl, whatsappUrl } from "../links.js";
+---
+
+<section class="cl" aria-labelledby="ac-closing-title" data-final-cta data-ac-section="closing">
+  <div class="cl-media" aria-hidden="true">
+    <StandupPhoto photo={ACADEMY_PHOTOS.teatro} alt="" sizes="100vw" position="50% 40%" class="ac-photo-img" />
+  </div>
+  <div class="cl-shade" aria-hidden="true"></div>
+  <div class="ac-wrap cl-inner" data-lp-reveal>
+    <h2 id="ac-closing-title" class="ac-h2 cl-title" data-lp-step>¿Cuándo es <span class="ac-serif cl-serif">la próxima muestra?</span></h2>
+    <p class="cl-lead" data-lp-step>Créala hoy y comparte el link en el grupo de apoderados. Te ayudamos con la primera.</p>
+    <div class="cl-ctas" data-lp-step>
+      <a href={publishUrl("academias_final")} class="ac-btn ac-btn-lime" data-cta="publish" data-section="final_cta">
+        Crear mi muestra gratis <span aria-hidden="true">→</span>
+      </a>
+      <a
+        href={whatsappUrl("Hola, quiero vender o reservar entradas para la muestra de mi academia con AI Tickets")}
+        class="ac-btn ac-btn-line-light"
+        target="_blank"
+        rel="noopener noreferrer"
+        data-cta="whatsapp"
+        data-section="final_cta"
+      >
+        Hablar por WhatsApp
+      </a>
+    </div>
+    <p class="cl-help" data-lp-step>
+      ¿Prefieres verlo antes?
+      <a href={DEMO_CALL_URL} class="cl-link" target="_blank" rel="noopener noreferrer" data-cta="demo_call" data-section="final_cta">Agenda una videollamada de 15 min</a>
+      ·
+      <a href="/organizadores" class="cl-link" data-cta="organizadores" data-section="final_cta">Todo lo que hace AI Tickets</a>
+    </p>
+  </div>
+</section>
+
+<style>
+  .cl {
+    position: relative;
+    isolation: isolate;
+    min-height: 520px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    text-align: center;
+    color: var(--ac-on-ink-1);
+  }
+  .cl-media {
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+  }
+  .cl-media :global(picture),
+  .cl-media :global(.ac-photo-img) {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .cl-shade {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: rgba(27, 23, 18, 0.74);
+  }
+  .cl-inner {
+    max-width: 860px;
+    padding-block: 80px;
+  }
+  .cl-title {
+    font-size: 32px;
+    line-height: 36px;
+    letter-spacing: -0.04em;
+  }
+  .cl-serif {
+    display: block;
+    color: #f1e3cf;
+  }
+  .cl-lead {
+    margin-top: 16px;
+    font-size: 16px;
+    line-height: 25px;
+    color: #e6ddd2;
+  }
+  .cl-ctas {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 24px;
+  }
+  .cl-help {
+    margin-top: 22px;
+    font-size: 14px;
+    line-height: 22px;
+    color: var(--ac-on-ink-2);
+  }
+  .cl-link {
+    color: var(--ac-on-ink-1);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-color: rgba(251, 247, 240, 0.4);
+    border-radius: 4px;
+  }
+  .cl-link:hover {
+    text-decoration-color: currentColor;
+  }
+  .cl-link:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+  @media (min-width: 640px) {
+    .cl-ctas {
+      flex-direction: row;
+      justify-content: center;
+      gap: 12px;
+    }
+  }
+  @media (min-width: 1024px) {
+    .cl {
+      min-height: 640px;
+    }
+    .cl-shade {
+      background: rgba(27, 23, 18, 0.72);
+    }
+    .cl-title {
+      font-size: 60px;
+      line-height: 64px;
+    }
+    .cl-lead {
+      margin-top: 22px;
+      font-size: 19px;
+      line-height: 30px;
+    }
+    .cl-ctas {
+      margin-top: 34px;
+    }
+  }
+</style>

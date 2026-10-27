@@ -1,0 +1,781 @@
+/* ------------------------------------------------------------------------------------------------
+ * Tema de la landing de clubs y discotecas (/ticketera-discotecas, docs/specs/rediseno/SPEC_landing_clubs_aitickets.md
+ * §1): "luz negra". La puerta y la cabina de un club a las 2 de la mañana: negro violáceo, letrero LED de puntos (Doto),
+ * timbre de tinta UV que aparece con la linterna, halos de luz y, en el precio, las luces de servicio blancas.
+ * Scope en [data-theme="clubs"]: no toca los tokens globales; los tokens puente (surface/text/border) hacen que los
+ * componentes compartidos (FAQ, badge "Pronto", barra mobile) se vean en oscuro, como en música.
+ * Rosa fluor = LED encendido y tinta UV (texto fluor solo ≥ 18 px; sobre servicio, --cl-fluor-ink). Violeta UV = solo
+ * luz (halos, bordes que brillan, resplandor), nunca texto chico. Lima solo en acciones y confirmaciones ("Válida",
+ * "Tú recibes"), nunca pegado al rosa en piezas chicas. Prefijo cl-. Se carga junto a landing.css (usa .lp-sr-only y
+ * el movimiento de LandingMotion).
+ * ---------------------------------------------------------------------------------------------- */
+/* Doto 800 solo latin (trae Á É Í Ó Ú Ñ ¿ ¡; la flecha → no está y va en Prompt), servida desde el sitio: sin hoja de
+ * Google Fonts que bloquee el render del hero. Pesa menos de 4 KB y Vite la inlinea aquí (assetsInlineLimit): llega con
+ * esta hoja y no necesita preload. */
+@import "@fontsource/doto/latin-800.css";
+
+/* Respaldo con métricas de Doto (monoespaciada de 600/1000 de ancho, ascenso 950 y descenso 250) para que el swap no
+ * mueva el hero (CLS, §7): Menlo y Consolas tienen casi el mismo ancho de letra. */
+@font-face {
+  font-family: "Doto Fallback";
+  src: local("Menlo"), local("Consolas"), local("DejaVu Sans Mono");
+  size-adjust: 100%;
+  ascent-override: 95%;
+  descent-override: 25%;
+  line-gap-override: 0%;
+}
+
+[data-theme="clubs"] {
+  --cl-noche: #07060b; /* fondo principal (negro violáceo) */
+  --cl-noche-2: #100e18; /* secciones alternas */
+  --cl-noche-3: #1a1726; /* cards, inputs, filas */
+  --cl-line: rgba(236, 232, 255, 0.12);
+  --cl-line-strong: rgba(236, 232, 255, 0.22);
+  --cl-line-glow: rgba(138, 92, 255, 0.45); /* borde de card que "brilla" */
+  --cl-text-1: #eeeaf8; /* blanco lavanda */
+  --cl-text-2: #c4bed6;
+  --cl-text-3: #9c96b0; /* meta, eyebrows (≈ 7:1 sobre noche) */
+  --cl-fluor: #ff4fb8; /* LED encendido / tinta UV (≈ 6,8:1 sobre noche) */
+  --cl-uv: #8a5cff; /* luz negra: halos, bordes, resplandor. Nunca texto < 24 px */
+  --cl-uv-soft: #b49bff; /* violeta para texto ≥ 14 px (≈ 9:1) */
+  --cl-servicio: #f2f1f6; /* "luces de servicio" (precio): blanco frío fluorescente */
+  --cl-servicio-2: #e4e2ec; /* controles y filas sobre servicio */
+  --cl-ink: #14121c; /* texto sobre servicio y sobre lima */
+  --cl-ink-2: #45405a; /* texto secundario sobre servicio (≥ 7:1) */
+  --cl-ink-3: #5e5873; /* meta sobre servicio (≥ 5:1) */
+  --cl-fluor-ink: #b0127a; /* rosa para texto sobre servicio (≈ 5,8:1) */
+  --cl-led-off: rgba(236, 232, 255, 0.06); /* LED apagado (grilla de puntos) */
+  --cl-glow: 0 0 10px rgba(255, 79, 184, 0.55), 0 0 28px rgba(138, 92, 255, 0.35);
+  --cl-led: "Doto", "Doto Fallback", ui-monospace, Menlo, monospace;
+
+  /* Componentes compartidos dentro del tema (LandingFaq, LandingMobileBar, SoonBadge), como en música */
+  --surface-0: var(--cl-noche);
+  --surface-1: var(--cl-noche-2);
+  --surface-2: var(--cl-noche-3);
+  --border: var(--cl-line);
+  --border-strong: var(--cl-line-strong);
+  --text-1: var(--cl-text-1);
+  --text-2: var(--cl-text-2);
+  --text-3: var(--cl-text-3);
+
+  font-family: "Prompt", system-ui, sans-serif;
+  color: var(--cl-text-1);
+  background: var(--cl-noche);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Fondo del documento (rebote del scroll en iOS y macOS) del mismo color que la página */
+html:has(body [data-theme="clubs"]) {
+  background: #07060b;
+}
+
+.cl-wrap {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding-inline: 20px;
+}
+@media (min-width: 768px) {
+  .cl-wrap {
+    padding-inline: 40px;
+  }
+}
+.cl [id] {
+  scroll-margin-top: 88px;
+}
+/* Hora a hora (§2): 72 px de padding vertical en mobile, 136 en desktop */
+/* overflow: clip (no hidden) para que el crossfader de la noche en vivo pueda ser sticky dentro de su sección */
+.cl-section {
+  position: relative;
+  padding-block: 72px;
+  overflow: hidden;
+  overflow: clip;
+}
+@media (min-width: 1024px) {
+  .cl-section {
+    padding-block: 136px;
+  }
+}
+.cl-on-noche-2 {
+  background: var(--cl-noche-2);
+}
+/* Bloque "luces de servicio" (§4.8): texto tinta y tokens puente en claro para lo compartido */
+.cl-on-servicio {
+  --text-1: var(--cl-ink);
+  --text-2: var(--cl-ink-2);
+  --text-3: var(--cl-ink-3);
+  --surface-2: var(--cl-servicio-2);
+  background: var(--cl-servicio);
+  color: var(--cl-ink);
+}
+
+/* ---------- Tipografía ----------
+ * Doto (matriz de puntos LED) solo en titulares, horas y cifras, nunca bajo 28 px ni en párrafos. El texto va escrito
+ * normal en el HTML (lo leen así los lectores de pantalla y los tests) y se pasa a mayúsculas con CSS. */
+.cl-led,
+.cl-h1,
+.cl-h2 {
+  font-family: var(--cl-led);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: break-word;
+}
+.cl-h1 {
+  position: relative;
+  font-size: 48px;
+  line-height: 50px;
+}
+.cl-h2 {
+  position: relative;
+  font-size: 36px;
+  line-height: 40px;
+  text-wrap: balance;
+}
+.cl-h3 {
+  font-size: 24px;
+  line-height: 28px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+@media (min-width: 1024px) {
+  .cl-h1 {
+    font-size: clamp(72px, 7.4vw, 104px);
+    line-height: 0.96;
+  }
+  /* 60 y no 68 px: Doto es monoespaciada y ancha (0,6 em por letra); a 68 px los H2 de las secciones a dos columnas
+   * quedaban en cinco líneas */
+  .cl-h2 {
+    font-size: clamp(48px, 4.2vw, 60px);
+    line-height: 1.08;
+  }
+  .cl-h3 {
+    font-size: 32px;
+    line-height: 36px;
+  }
+}
+.cl-line {
+  position: relative;
+  display: block;
+}
+/* Palabras encendidas: rosa fluor. El resplandor va en una copia sin texto accesible (content alternativo "") para que
+ * la animación C2 lo encienda al final con opacidad; solo en titulares ≥ 40 px. */
+.cl-lit {
+  color: var(--cl-fluor);
+}
+.cl-glow::after {
+  content: attr(data-glow) / "";
+  position: absolute;
+  inset: 0;
+  color: transparent;
+  text-shadow: var(--cl-glow);
+  pointer-events: none;
+}
+@media (forced-colors: active), (prefers-contrast: more) {
+  .cl-glow::after {
+    display: none;
+  }
+}
+.cl-meta {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  color: var(--cl-text-3);
+}
+.cl-on-servicio .cl-meta {
+  color: var(--cl-ink-3);
+}
+.cl-lead {
+  font-size: 16px;
+  line-height: 25px;
+  color: var(--cl-text-2);
+}
+.cl-on-servicio .cl-lead {
+  color: var(--cl-ink-2);
+}
+@media (min-width: 1024px) {
+  .cl-lead {
+    font-size: 18px;
+    line-height: 29px;
+  }
+}
+/* Rótulo "ejemplo" de las cards con datos */
+.cl-example {
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cl-text-3);
+}
+.cl-on-servicio .cl-example {
+  color: var(--cl-ink-3);
+}
+.cl-tabular {
+  font-variant-numeric: tabular-nums;
+}
+.cl-note {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--cl-text-3);
+}
+.cl-on-servicio .cl-note {
+  color: var(--cl-ink-3);
+}
+
+/* ---------- Grilla de LEDs apagados (detrás de H1, H2 y letreros), con máscara radial ---------- */
+.cl-led-grid {
+  position: absolute;
+  inset: -24px -32px;
+  z-index: -1;
+  background-image: radial-gradient(circle, var(--cl-led-off) 1.2px, transparent 1.6px);
+  background-size: 8px 8px;
+  -webkit-mask-image: radial-gradient(ellipse at 40% 50%, #000 30%, transparent 75%);
+  mask-image: radial-gradient(ellipse at 40% 50%, #000 30%, transparent 75%);
+  pointer-events: none;
+}
+
+/* ---------- Halos: gradientes radiales ya difuminados (sin filter: blur) ---------- */
+.cl-halo {
+  position: absolute;
+  z-index: 0;
+  width: var(--size, 720px);
+  height: var(--size, 720px);
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--halo, rgba(138, 92, 255, 0.22)) 0%, transparent 65%);
+  pointer-events: none;
+}
+.cl-halo-fluor {
+  --halo: rgba(255, 79, 184, 0.14);
+}
+.cl-section > .cl-wrap {
+  position: relative;
+  z-index: 1;
+}
+
+/* ---------- Letrero LED (LedSign y el de la noche en vivo) ----------
+ * Caja negra con grilla de LEDs y texto Doto fluor. Cambia de mensaje por pasos (C4, C11): los puntos se apagan y
+ * prenden por columnas. Si el mensaje no cabe en una línea a 28 px, pasa a dos (Doto nunca baja de 28 px). */
+.cl-sign {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 72px;
+  padding: 10px 16px;
+  border: 1px solid var(--cl-line);
+  border-radius: 10px;
+  background-color: #000;
+  background-image: radial-gradient(circle, var(--cl-led-off) 1.2px, transparent 1.6px);
+  background-size: 6px 6px;
+  overflow: hidden;
+}
+.cl-sign-text {
+  font-family: var(--cl-led);
+  font-weight: 800;
+  font-size: 28px;
+  line-height: 32px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  color: var(--cl-fluor);
+  overflow-wrap: anywhere;
+}
+.cl-sign-2l {
+  min-height: 84px;
+}
+@keyframes cl-columns {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+.lp-motion .cl-sign-text.is-switching {
+  animation: cl-columns 160ms steps(8) both;
+}
+
+/* ---------- Hora LED de sección (NightHour) y tira LED ---------- */
+.cl-hour {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 28px;
+}
+.cl-hour-pill {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 6px 16px 6px 14px;
+  border: 1px solid var(--cl-line);
+  border-radius: 999px;
+  background: var(--cl-noche-3);
+}
+.cl-hour-time {
+  font-family: var(--cl-led);
+  font-weight: 800;
+  font-size: 28px;
+  line-height: 32px;
+  color: var(--cl-fluor);
+  white-space: nowrap;
+}
+.cl-hour-arrow {
+  font-family: "Prompt", system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 20px;
+}
+.cl-hour-label {
+  max-width: 26ch;
+}
+.cl-strip {
+  flex: 1 1 auto;
+  min-width: 24px;
+  height: 4px;
+  background: radial-gradient(circle, var(--cl-fluor) 1px, transparent 1.5px) 0 50% / 6px 4px repeat-x;
+  transform-origin: left center;
+  opacity: 0.8;
+}
+.cl-on-servicio .cl-hour-pill {
+  background: #fff;
+  border-color: var(--cl-servicio-2);
+}
+.cl-on-servicio .cl-hour-time {
+  color: var(--cl-ink);
+}
+.cl-on-servicio .cl-strip {
+  background-image: radial-gradient(circle, var(--cl-fluor-ink) 1px, transparent 1.5px);
+}
+@media (max-width: 639px) {
+  .cl-hour {
+    flex-wrap: wrap;
+  }
+  .cl-hour-pill {
+    flex-wrap: wrap;
+    row-gap: 2px;
+    border-radius: 24px;
+  }
+  .cl-strip {
+    flex-basis: 100%;
+  }
+}
+
+/* ---------- Botones (radio 12, no pill) y enlaces ---------- */
+.cl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 0 22px;
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.1;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform var(--dur-1) var(--ease-out), background-color var(--dur-1) var(--ease-out),
+    border-color var(--dur-1) var(--ease-out), box-shadow var(--dur-2) var(--ease-out);
+  -webkit-tap-highlight-color: transparent;
+}
+.cl-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--cl-noche), 0 0 0 6px var(--brand-lime);
+}
+/* Lima con resplandor interior */
+.cl-btn-lime {
+  border: 0;
+  background: var(--brand-lime);
+  color: var(--cl-ink);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35), inset 0 -10px 18px rgba(255, 255, 255, 0.28);
+}
+.cl-btn-lime:hover {
+  transform: translateY(-2px);
+}
+.cl-btn-line {
+  border: 1.5px solid var(--cl-line-glow);
+  background: rgba(7, 6, 11, 0.35);
+  color: var(--cl-text-1);
+  font-weight: 500;
+}
+.cl-btn-line:hover {
+  border-color: var(--cl-uv-soft);
+  background: rgba(138, 92, 255, 0.12);
+}
+.cl-btn:active {
+  transform: scale(0.98);
+}
+@media (min-width: 1024px) {
+  .cl-btn {
+    min-height: 56px;
+    padding: 0 26px;
+    font-size: 17px;
+  }
+}
+.cl-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--cl-text-1);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-color: rgba(180, 155, 255, 0.5);
+  border-radius: 2px;
+}
+.cl-link:hover {
+  text-decoration-color: currentColor;
+}
+.cl-on-servicio .cl-link {
+  color: var(--cl-ink);
+  text-decoration-color: rgba(20, 18, 28, 0.35);
+}
+.cl-link:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+
+/* ---------- Cards (radio 16) con borde que brilla ---------- */
+.cl-card {
+  position: relative;
+  border: 1px solid var(--cl-line);
+  border-radius: 16px;
+  background: var(--cl-noche-3);
+}
+.cl-card-glow {
+  border-color: var(--cl-line-glow);
+  box-shadow: 0 0 0 1px rgba(138, 92, 255, 0.12), 0 0 32px rgba(138, 92, 255, 0.18);
+}
+
+/* ---------- Líneas con punto fluor ---------- */
+.cl-dots {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.cl-dots li {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr);
+  gap: 14px;
+}
+.cl-dots li::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  margin-top: 9px;
+  border-radius: 50%;
+  background: var(--cl-fluor);
+  box-shadow: 0 0 8px rgba(255, 79, 184, 0.6);
+}
+.cl-dots-title {
+  font-weight: 600;
+  color: var(--cl-text-1);
+}
+.cl-dots-text {
+  color: var(--cl-text-2);
+}
+
+/* ---------- Ítems numerados (número Doto fluor + título + texto) ---------- */
+.cl-items {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  counter-reset: cl-item;
+}
+.cl-item {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 14px;
+}
+.cl-item-num {
+  font-family: var(--cl-led);
+  font-weight: 800;
+  font-size: 28px;
+  line-height: 30px;
+  color: var(--cl-fluor);
+}
+.cl-item-title {
+  font-weight: 600;
+  font-size: 17px;
+  line-height: 24px;
+  color: var(--cl-text-1);
+}
+.cl-item-text {
+  margin-top: 4px;
+  font-size: 15px;
+  line-height: 23px;
+  color: var(--cl-text-2);
+}
+
+/* ---------- Fotos en cápsula y color de club (CapsulePhoto, hero) ---------- */
+.cl-photo-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: saturate(1.08) contrast(1.06);
+}
+.cl-capsule {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border: 1px solid var(--cl-line-glow);
+  border-radius: 999px;
+  background: var(--cl-noche-3);
+}
+.cl-capsule picture {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+/* Fuga de luz violeta → magenta en una esquina (screen al 45%) */
+.cl-leak::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: radial-gradient(circle at var(--leak-x, 85%) var(--leak-y, 12%), rgba(138, 92, 255, 0.9) 0%, rgba(255, 79, 184, 0.55) 26%, transparent 58%);
+  mix-blend-mode: screen;
+  opacity: 0.45;
+  pointer-events: none;
+}
+.cl-leak-magenta::after {
+  background: radial-gradient(circle at var(--leak-x, 18%) var(--leak-y, 92%), rgba(255, 79, 184, 0.9) 0%, rgba(138, 92, 255, 0.5) 28%, transparent 60%);
+}
+@supports not (mix-blend-mode: screen) {
+  .cl-leak::after {
+    opacity: 0.3;
+  }
+}
+@media (max-width: 767px) {
+  /* Mobile: las cápsulas pasan a 3:4 con radio 48 */
+  .cl-capsule {
+    border-radius: 48px;
+  }
+}
+
+/* ---------- Timbre UV (UvStamp) y linterna ----------
+ * Base al 6%; la capa encendida se ve solo donde pasa la luz (máscara radial que sigue al puntero, --x/--y) o tras el
+ * barrido automático (mask-position, mobile y teclado). Con "reducir movimiento" se ve completo. */
+.cl-uv {
+  position: relative;
+  display: inline-block;
+  width: var(--uv-size, 96px);
+  height: var(--uv-size, 96px);
+  color: var(--cl-fluor);
+  pointer-events: none;
+}
+.cl-uv svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.cl-uv-base {
+  opacity: 0.06;
+}
+.cl-uv-lit {
+  filter: drop-shadow(0 0 6px rgba(255, 79, 184, 0.6));
+  -webkit-mask-image: radial-gradient(circle 140px at var(--x, -200px) var(--y, -200px), #000 0%, #000 35%, transparent 100%);
+  mask-image: radial-gradient(circle 140px at var(--x, -200px) var(--y, -200px), #000 0%, #000 35%, transparent 100%);
+}
+/* Barrido: degradado tres veces más ancho que el timbre que se corre de derecha a izquierda (C5, 1,2 s) */
+.cl-uv.is-sweep .cl-uv-lit,
+.cl-uv.is-swept .cl-uv-lit {
+  -webkit-mask-image: linear-gradient(90deg, #000 45%, transparent 55%);
+  mask-image: linear-gradient(90deg, #000 45%, transparent 55%);
+  -webkit-mask-size: 300% 100%;
+  mask-size: 300% 100%;
+  -webkit-mask-position: 0% 0;
+  mask-position: 0% 0;
+}
+@keyframes cl-uv-sweep {
+  from {
+    -webkit-mask-position: 100% 0;
+    mask-position: 100% 0;
+  }
+  to {
+    -webkit-mask-position: 0% 0;
+    mask-position: 0% 0;
+  }
+}
+.cl-uv.is-sweep .cl-uv-lit {
+  animation: cl-uv-sweep 1200ms var(--ease-in-out) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cl-uv-lit {
+    -webkit-mask-image: none !important;
+    mask-image: none !important;
+    animation: none !important;
+  }
+}
+
+/* ---------- Rangos (calculadora y anuncios) ---------- */
+.cl-range {
+  width: 100%;
+  height: 28px;
+  margin: 0;
+  accent-color: var(--cl-fluor);
+  cursor: pointer;
+}
+.cl-on-servicio .cl-range {
+  accent-color: var(--cl-ink);
+}
+.cl-range:focus-visible {
+  outline: 2px solid var(--cl-uv-soft);
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+
+/* ---------- Movimiento (§6) ----------
+ * Igual que las otras landings: todo cuelga de html.lp-motion (LandingMotion.astro: JS, IntersectionObserver y sin
+ * "reducir movimiento"); sin la clase cada elemento queda en su estado final (letreros en su primer mensaje, timbres
+ * completos con "reducir movimiento", tubos encendidos, la noche quieta en 01:30). Solo transform, opacity, clip-path y
+ * mask-position. */
+@keyframes cl-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+@keyframes cl-up-20 {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.97);
+  }
+}
+@keyframes cl-up-24 {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+@keyframes cl-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes cl-photo-in {
+  from {
+    transform: scale(1.06);
+  }
+}
+/* C2: encendido LED por columnas de puntos, en 8 pasos. Deja aire arriba para las tildes de las mayúsculas. */
+@keyframes cl-led-on {
+  from {
+    clip-path: inset(-0.3em 100% -0.2em -0.05em);
+  }
+  to {
+    clip-path: inset(-0.3em -0.05em -0.2em -0.05em);
+  }
+}
+@keyframes cl-grow-x {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes cl-grow-y {
+  from {
+    transform: scaleY(0);
+  }
+}
+@keyframes cl-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+}
+@keyframes cl-drift {
+  from {
+    transform: translate(-40px, -20px);
+  }
+  to {
+    transform: translate(40px, 24px);
+  }
+}
+@keyframes cl-glow-once {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes cl-digit {
+  from {
+    opacity: 0.08;
+  }
+}
+
+/* Reveal genérico: fade + translateY 16 px */
+.lp-motion .cl .is-in [data-lp-step],
+.lp-motion .cl .is-in[data-lp-step] {
+  animation: cl-up 640ms var(--ease-out) var(--lp-d, 0ms) both;
+}
+
+/* C2 / C15: H2 y letreros grandes se encienden por columnas al revelarse su bloque; la línea encendida toma su
+ * resplandor al final */
+.lp-motion [data-lp-reveal]:not(.is-in) .cl-led-on {
+  clip-path: inset(-0.3em 100% -0.2em -0.05em);
+}
+.lp-motion .is-in .cl-led-on {
+  animation: cl-led-on 560ms steps(8) calc(var(--lp-d, 0ms) + var(--cl-line-d, 0ms)) both;
+}
+.lp-motion [data-lp-reveal]:not(.is-in) .cl-led-on.cl-glow::after {
+  opacity: 0;
+}
+.lp-motion .is-in .cl-led-on.cl-glow::after {
+  animation: cl-fade 400ms var(--ease-out) calc(var(--lp-d, 0ms) + var(--cl-line-d, 0ms) + 560ms) both;
+}
+
+/* C6: los dígitos de la hora "se encienden" (stagger 60 ms) y la tira crece al revelarse */
+.lp-motion [data-lp-reveal]:not(.is-in) .cl-hour-digit {
+  opacity: 0.08;
+}
+.lp-motion .is-in .cl-hour-digit {
+  animation: cl-digit 120ms steps(2) calc(var(--i, 0) * 60ms) both;
+}
+.lp-motion [data-lp-reveal]:not(.is-in) .cl-strip {
+  transform: scaleX(0);
+}
+.lp-motion .is-in .cl-strip {
+  animation: cl-grow-x 600ms var(--ease-out) 200ms both;
+}
+
+/* C7: deriva lenta de los halos (hero y cierre), pausada fuera de pantalla ([data-cl-play] → .is-playing) */
+.lp-motion [data-cl-play].is-playing .cl-halo-drift {
+  will-change: transform;
+  animation: cl-drift 24s var(--ease-in-out) infinite alternate;
+}
+.lp-motion [data-cl-play].is-playing .cl-halo-drift-2 {
+  animation-delay: -12s;
+}
+
+/* C2 al cargar (H1 del hero): cada línea se enciende por columnas, stagger 180 ms; la encendida toma su resplandor al
+ * final */
+.lp-motion .cl-led-load {
+  animation: cl-led-on 560ms steps(8) calc(120ms + var(--cl-line-d, 0ms)) both;
+}
+.lp-motion .cl-led-load.cl-glow::after {
+  animation: cl-fade 400ms var(--ease-out) calc(680ms + var(--cl-line-d, 0ms)) both;
+}
+/* El resplandor va solo en palabras encendidas ≥ 40 px: el H2 de mobile mide 36 */
+@media (max-width: 1023px) {
+  .cl-h2 .cl-glow::after {
+    display: none;
+  }
+}
+
+/* El punto de Doto (cinco LED en cruz) se lee como "+" en un monto: el separador de miles va en Prompt */
+.cl-sep {
+  font-family: "Prompt", system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: 0;
+}

@@ -1,0 +1,113 @@
+---
+// 5 · La noche en vivo (SPEC_landing_clubs §4.5, firma, VIE 23:30 → 05:00): la sección más oscura, sin halos salvo uno
+// fluor tenue detrás del letrero. El panel con el crossfader es la isla NightLive (client:visible; su SSR es el estado de
+// las 01:30). Sin JS, además, una tabla con los seis momentos de la noche (caption solo para lectores).
+import LedHeading from "./LedHeading.astro";
+import NightHour from "./NightHour.astro";
+import NightLive from "./NightLive.vue";
+import { LIVE_NIGHT, NIGHT_CAPACITY, NIGHT_TABLE } from "./clubsLanding.js";
+
+const num = (n: number) => n.toLocaleString("es-CL");
+---
+
+<section id="en-vivo" class="cl-section clv" aria-labelledby="cl-live-title" data-cl-section="live">
+  <span class="cl-halo cl-halo-fluor clv-halo" aria-hidden="true"></span>
+  <div class="cl-wrap" data-lp-reveal>
+    <NightHour time={`VIE ${LIVE_NIGHT.start}`} to={LIVE_NIGHT.end} label="La noche en vivo" />
+    <div class="clv-head">
+      <LedHeading id="cl-live-title" text="Mueve la noche." lit="Mira cómo se llena." />
+      <p class="cl-lead clv-lead" data-lp-step>
+        Así se ve una noche desde la puerta: quién entra, a qué hora y cuánto queda. Arrastra la hora.
+      </p>
+    </div>
+    <div class="clv-body" data-lp-step>
+      <NightLive client:visible />
+      <noscript>
+        <table class="clv-table">
+          <caption class="lp-sr-only">Una noche de ejemplo, de las 22:00 a las 05:00 (aforo {num(NIGHT_CAPACITY)})</caption>
+          <thead>
+            <tr>
+              <th scope="col">Hora</th>
+              <th scope="col">Letrero</th>
+              <th scope="col">Adentro</th>
+              {NIGHT_TABLE[0].byKind.map((r) => <th scope="col">{r.name}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {
+              NIGHT_TABLE.map((s) => (
+                <tr>
+                  <th scope="row">{s.time}</th>
+                  <td>{s.sign}</td>
+                  <td>
+                    {num(s.inside)} ({s.pct}%)
+                  </td>
+                  {s.byKind.map((r) => (
+                    <td>
+                      {num(r.inside)} / {num(r.issued)}
+                    </td>
+                  ))}
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </noscript>
+    </div>
+  </div>
+</section>
+
+<style>
+  .clv {
+    background: var(--cl-noche);
+  }
+  .clv-halo {
+    --size: 620px;
+    left: 8%;
+    top: 220px;
+  }
+  .clv-lead {
+    max-width: 560px;
+    margin-top: 20px;
+  }
+  .clv-body {
+    margin-top: 32px;
+  }
+  .clv-table {
+    width: 100%;
+    margin-top: 24px;
+    border-collapse: collapse;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+  .clv-table th,
+  .clv-table td {
+    padding: 8px 6px;
+    border-bottom: 1px solid var(--cl-line);
+    text-align: left;
+  }
+  .clv-table thead th {
+    color: var(--cl-text-3);
+    font-weight: 600;
+  }
+  @media (max-width: 767px) {
+    .clv-table {
+      display: block;
+      overflow-x: auto;
+    }
+  }
+  @media (min-width: 1024px) {
+    .clv-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+      gap: 48px;
+      align-items: end;
+    }
+    .clv-lead {
+      margin-top: 0;
+    }
+    .clv-body {
+      margin-top: 48px;
+    }
+  }
+</style>

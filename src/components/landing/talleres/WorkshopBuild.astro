@@ -1,0 +1,65 @@
+---
+// 3 · Arma tu taller (SPEC_landing_talleres §4.3, ancla #arma, firma de la página): encabezado, la isla del armador
+// (WorkshopBuilder) y el fichero de formatos. La isla hidrata antes de verse (rootMargin) para volver los inscritos a 0
+// fuera de pantalla. Sin JS se ve el estado inicial renderizado en el servidor (Cerámica, un día, con pago, 7 de 10) y
+// los controles se ocultan con un <noscript>: no se muestran controles que no responden.
+import SectionTab from "./SectionTab.astro";
+import Highlight from "./Highlight.astro";
+import FormatCards from "./FormatCards.astro";
+import WorkshopBuilder from "./WorkshopBuilder.vue";
+import { TERMS_NOTE } from "../../../data/producerFaq";
+---
+
+<section id="arma" class="tl-section tl-on-papel-2" aria-labelledby="tl-build-title" data-tl-section="arma">
+  <SectionTab text="Tu taller" />
+  <div class="tl-wrap">
+    <div class="tl-build-head" data-lp-reveal>
+      <p class="tl-eyebrow" data-lp-step>Pruébalo aquí</p>
+      <h2 id="tl-build-title" class="tl-h2 tl-build-title" data-lp-step>
+        Arma tu taller <Highlight>y mira cómo se inscriben.</Highlight>
+      </h2>
+      <p class="tl-lead tl-build-lead" data-lp-step>
+        Elige qué enseñas, cómo es el taller, cuántos cupos tiene y si cobras. A la derecha ves la página de inscripción
+        tal como la ve tu gente, con los mismos avisos que muestra AI Tickets.
+      </p>
+    </div>
+    <div class="tl-build-island">
+      <WorkshopBuilder client:visible={{ rootMargin: "600px" }} termsNote={TERMS_NOTE} />
+      <noscript>
+        <style is:inline>
+          .tl-build-island .wb-controls,
+          .tl-build-island .wb-move {
+            display: none;
+          }
+        </style>
+        <p class="tl-build-static">Ejemplo: un taller de cerámica de un día, con pago, 7 de 10 cupos tomados.</p>
+      </noscript>
+    </div>
+    <FormatCards />
+  </div>
+</section>
+
+<style>
+  .tl-build-head {
+    max-width: 820px;
+  }
+  .tl-build-title {
+    margin-top: 14px;
+  }
+  .tl-build-lead {
+    margin-top: 18px;
+  }
+  .tl-build-island {
+    margin-top: 40px;
+  }
+  .tl-build-static {
+    margin-top: 12px;
+    font-size: 14px;
+    color: var(--tl-grafito-3);
+  }
+  @media (min-width: 1024px) {
+    .tl-build-island {
+      margin-top: 56px;
+    }
+  }
+</style>

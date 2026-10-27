@@ -1,0 +1,203 @@
+---
+// Landing especializada para seminarios, congresos y charlas (docs/specs/rediseno/SPEC_landing_seminarios_aitickets.md,
+// fases 1 a 3): eventos de conocimiento con expositores, un programa por días y bloques, públicos con precios distintos,
+// empresas que compran para su equipo y la acreditación de las 08:30. Ruta nueva /ticketera-seminarios, registrada en
+// src/data/landings.ts como dedicated: [landing].astro no la genera, y la tarjeta, el sitemap, las relacionadas y "Según
+// lo que produces" de /organizadores leen de ahí; el footer la enlaza en "Para quién" y talleres la enlaza en su hero.
+// Tema propio "credencial, programa y pantalla" ([data-theme="seminarios"], src/styles/landing-seminarios.css) sin tocar
+// los tokens globales ni repetir el lenguaje de las otras landings: papel de programa neutro, un solo acento (el turquesa
+// del cordón), Archivo variable con el énfasis como cambio de ancho, rótulos de sala que abren cada sección, láminas
+// 16:9 y la credencial que cuelga. La página se recorre como un centro de eventos, de la sala al hall de acreditación.
+// Reutiliza la fórmula de precios (priceQuote → fees.mjs), los descuentos (computeDiscountedTotals de discounts.mjs), las
+// líneas de la calculadora de fiestas (useTicketLines), el FAQ, la barra CTA mobile, el movimiento (LandingMotion), la
+// lógica de los anuncios (useAdsDemo) y del muro (useWallDemo) y los rótulos de la página del evento (cardState,
+// cardLabel, cardFunctionChips, formatSaleStart). Montos y plazos: fees.mjs, legal.mjs, ledger.ts y producerFaq.ts. Los
+// textos de las historias salen de pieceText (socialSeriesRender.ts, módulo de servidor) llamado aquí al construir y
+// pasados por props. Lo que no existe en el producto (agenda con expositores, ingreso diario con el mismo pase, datos de
+// cada asistente y de facturación al comprar, credenciales impresas, certificados, LinkedIn desde el panel,
+// Facebook/TikTok/reels, segmentar por profesión, ver la lista de espera, aforo en vivo) va con "Pronto".
+// La jornada de ejemplo empieza el jueves que cae al menos 35 días después del build (la página es prerender: no hay
+// desfase de hidratación).
+// Fase 4 (contenido real) queda fuera del código: fotos reales con autorización (§8; la del hall muestra una pistola
+// lectora y es solo de staging), screenRect de la foto real, testimonio (SEMINAR_TESTIMONIAL, hoy null: la sección no se
+// muestra), evento de ejemplo de seminario y revisión de los nombres de ejemplo.
+export const prerender = true;
+import AppFooter from "../components/AppFooter.vue";
+import LandingFaq from "../components/landing/LandingFaq.vue";
+import LandingMobileBar from "../components/landing/LandingMobileBar.vue";
+import CtaTracking from "../components/landing/CtaTracking.astro";
+import LandingMotion from "../components/landing/LandingMotion.astro";
+import SeminarHeader from "../components/landing/seminarios/SeminarHeader.vue";
+import SeminarHero from "../components/landing/seminarios/SeminarHero.astro";
+import SeminarFormats from "../components/landing/seminarios/SeminarFormats.astro";
+import SeminarProgram from "../components/landing/seminarios/SeminarProgram.astro";
+import SeminarCompanies from "../components/landing/seminarios/SeminarCompanies.astro";
+import SeminarDiffusion from "../components/landing/seminarios/SeminarDiffusion.astro";
+import SeminarBefore from "../components/landing/seminarios/SeminarBefore.astro";
+import SeminarAccreditation from "../components/landing/seminarios/SeminarAccreditation.astro";
+import SeminarPrice from "../components/landing/seminarios/SeminarPrice.astro";
+import SeminarAfter from "../components/landing/seminarios/SeminarAfter.astro";
+import SeminarQuote from "../components/landing/seminarios/SeminarQuote.astro";
+import SeminarClosing from "../components/landing/seminarios/SeminarClosing.astro";
+import SeminarTracking from "../components/landing/seminarios/SeminarTracking.astro";
+import WayfindingSign from "../components/landing/seminarios/WayfindingSign.astro";
+import Layout from "../layouts/Layout.astro";
+import { HelpCircle } from "lucide-vue-next";
+import { publishUrl } from "../components/landing/links.js";
+import { SEMINAR_CAPACITY, SEMINAR_NAME, SEMINAR_PHOTOS, SEMINAR_VENUE, STORY_FRAMES, formatById, isScarce, seminarSchedule } from "../components/landing/seminarios/seminariosLanding.js";
+import { getLanding } from "../data/landings";
+import { SEMINARIOS_FAQ } from "../data/seminariosFaq";
+import { DEFAULT_CADENCE, DEFAULT_KEYWORD } from "../lib/socialSeriesCadence";
+import { longDateLabel, pieceText } from "../lib/socialSeriesRender";
+import { IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL } from "../../netlify/lib/fees.mjs";
+import archivoWoff2 from "@fontsource-variable/archivo/files/archivo-latin-wdth-normal.woff2?url";
+import "../styles/global.css";
+import "../styles/landing.css";
+import "../styles/landing-seminarios.css";
+
+const landing = getLanding("ticketera-seminarios");
+if (!landing) throw new Error("Falta la landing ticketera-seminarios en src/data/landings.ts");
+const demoHref = landing.demo?.url ?? "/eventos";
+const demoLabel = landing.demo?.label ?? "Ver eventos";
+
+// La jornada de ejemplo (seminariosLanding.js) y los textos reales de cada historia (pieceText). "Quedan N" solo si la
+// serie lo mostraría (bajo scarcity_threshold_pct del aforo, socialSeries.ts).
+const schedule = seminarSchedule();
+const day1 = formatById("congreso").days[0];
+const storyFrames = STORY_FRAMES.map((frame, styleIndex) => {
+  const text = pieceText({
+    kind: "story",
+    variant: "countdown",
+    daysToEvent: frame.days,
+    eventName: SEMINAR_NAME,
+    dateLabel: longDateLabel(schedule.d1),
+    startTime: day1.start,
+    venue: SEMINAR_VENUE,
+    keyword: DEFAULT_KEYWORD,
+    remaining: frame.remaining,
+    styleIndex,
+  });
+  const scarcity = isScarce(frame.remaining, DEFAULT_CADENCE.scarcity_threshold_pct, SEMINAR_CAPACITY) ? text.scarcity : null;
+  return { id: frame.id, kicker: text.kicker, bigLines: text.bigLines, message: text.message, scarcity, cta: text.cta };
+});
+
+const SITE_URL = (import.meta.env.SITE_URL || "https://aitickets.cl").replace(/\/$/, "");
+const url = `${SITE_URL}/${landing.slug}`;
+const jsonLd = [
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "AI Tickets", item: SITE_URL },
+      { "@type": "ListItem", position: 2, name: "Para organizadores", item: `${SITE_URL}/organizadores` },
+      { "@type": "ListItem", position: 3, name: landing.card.title, item: url },
+    ],
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "AI Tickets para seminarios y congresos",
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Web",
+    url,
+    description: landing.description,
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "CLP",
+      description: `Sin mensualidad y 0% de comisión para el organizador. Quien compra paga un cargo por servicio de ${SERVICE_FEE_PERCENT_LABEL} + IVA (${IVA_PERCENT_LABEL}) sobre ese cargo, o lo absorbe el organizador. Las inscripciones gratis no pagan cargo.`,
+    },
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: SEMINARIOS_FAQ.map((f) => ({
+      "@type": "Question",
+      name: f.q,
+      acceptedAnswer: { "@type": "Answer", text: f.a },
+    })),
+  },
+];
+---
+
+<Layout title={landing.title} description={landing.description} canonical={`/${landing.slug}`} image={SEMINAR_PHOTOS.hero.src}>
+  <link slot="head-extra" rel="preload" as="font" type="font/woff2" href={archivoWoff2} crossorigin />
+  <LandingMotion />
+  <div class="se" data-theme="seminarios">
+    <SeminarHeader client:idle publishHref={publishUrl("seminarios_header")} />
+    <main>
+      <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+      <SeminarHero ctaLabel={landing.cta.label} demoHref={demoHref} demoLabel={demoLabel} />
+      <SeminarFormats />
+      <SeminarProgram date={schedule.d1} />
+      <SeminarCompanies />
+      <SeminarDiffusion frames={storyFrames} />
+      <SeminarBefore date={schedule.d1} />
+      <SeminarAccreditation fnLabel={schedule.fnLabel2} />
+      <SeminarPrice schedule={schedule} />
+      <SeminarAfter />
+      <SeminarQuote />
+
+      <section class="se-section se-bg-papel faq" aria-labelledby="se-faq-title" data-se-section="faq" data-se-screen="Preguntas">
+        <div class="se-wrap faq-inner" data-lp-reveal>
+          <WayfindingSign room="Informaciones" label="Preguntas" icon={HelpCircle} arrow="↓" />
+          <h2 id="se-faq-title" class="se-h2 faq-title" data-lp-step>Preguntas frecuentes</h2>
+          <div class="faq-list" data-lp-step><LandingFaq client:visible items={SEMINARIOS_FAQ} idPrefix="se-faq" /></div>
+        </div>
+      </section>
+
+      <SeminarClosing ctaLabel={landing.cta.label} />
+    </main>
+    <AppFooter client:idle tone="dark" />
+    <LandingMobileBar
+      client:idle
+      variant="pill-light"
+      title="Gratis para publicar"
+      subtitle="0% de comisión para el organizador"
+      ctaLabel="Publicar mi seminario"
+      publishHref={publishUrl("seminarios_mobile_bar")}
+    />
+  </div>
+  <CtaTracking />
+  <SeminarTracking />
+</Layout>
+
+<style>
+  .faq-inner {
+    max-width: 960px;
+  }
+  .faq-title {
+    margin-bottom: 20px;
+  }
+  /* §4.11: pregunta en Archivo 700 (ancho normal); el "+" es un cuadrado de señalética grafito de 32 px con "+" blanco
+     que pasa a "−" (sin giro) */
+  .faq-list :global(.lf-q) {
+    font-family: var(--se-font);
+    font-weight: 700;
+    font-stretch: 100%;
+  }
+  .faq-list :global(.lf-icon) {
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    border-radius: 2px;
+    /* El trazo del ícono queda transparente: el "+" y el "−" se dibujan con el fondo, sin el giro de LandingFaq */
+    color: transparent;
+    background:
+      linear-gradient(#ffffff, #ffffff) center / 14px 2px no-repeat,
+      linear-gradient(#ffffff, #ffffff) center / 2px 14px no-repeat,
+      var(--se-grafito);
+    transition: none;
+  }
+  .faq-list :global(.lf-icon.is-open) {
+    transform: none;
+    background:
+      linear-gradient(#ffffff, #ffffff) center / 14px 2px no-repeat,
+      var(--se-grafito);
+  }
+  @media (min-width: 1024px) {
+    .faq-title {
+      margin-bottom: 32px;
+    }
+  }
+</style>

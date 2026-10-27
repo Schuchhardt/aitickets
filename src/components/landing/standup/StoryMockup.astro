@@ -1,0 +1,202 @@
+---
+// Historia de ejemplo de "Marketing en piloto automático" (SPEC_landing_standup §4.4). Mockup genérico: no copia la
+// interfaz de Instagram ni usa sus logos, y la productora es ficticia. Los textos son los de las historias reales
+// (src/lib/socialSeriesRender.ts → pieceText, etapa "hoy"): "Quedan N entradas" solo cuando de verdad quedan pocas, y el
+// link no va en un sticker (la API no lo permite) sino por DM a quien responde con la palabra clave (DEFAULT_KEYWORD de
+// src/lib/socialSeriesCadence.ts, la misma que usa socialSeries.ts). La historia del día de la función sale a las DEFAULT_CADENCE.event_day_time.
+// S10: la segunda barra se llena en 5 s, en loop, solo mientras la historia está en pantalla (.is-playing).
+// En mobile se dibuja a la mitad (150 × 300) con transform, para no rearmar el mockup.
+import StandupPhoto from "./StandupPhoto.astro";
+import { STANDUP_PHOTOS } from "./standupLanding.js";
+import { DEFAULT_CADENCE, DEFAULT_KEYWORD } from "../../../lib/socialSeriesCadence";
+
+const KEYWORD = DEFAULT_KEYWORD;
+---
+
+<figure class="sm-frame" aria-label="Historia de ejemplo: hoy 21:00, quedan 23 entradas" data-su-play>
+  <div class="sm-phone" aria-hidden="true">
+    <div class="sm-screen">
+      <StandupPhoto photo={STANDUP_PHOTOS.comediante} alt="" sizes="300px" position="50% 30%" class="sm-photo" />
+      <div class="sm-shade"></div>
+      <div class="sm-bars">
+        <span class="sm-bar is-done"></span>
+        <span class="sm-bar"><span class="sm-bar-fill"></span></span>
+        <span class="sm-bar"></span>
+      </div>
+      <p class="sm-account">
+        <span class="sm-avatar">RS</span>
+        <span class="sm-handle">risaseria</span>
+        <span class="sm-when">· programada {DEFAULT_CADENCE.event_day_time}</span>
+      </p>
+      <div class="sm-bottom">
+        <p class="sm-big">HOY<br />21:00</p>
+        <p class="sm-sticker">Quedan 23 entradas</p>
+        <p class="sm-dm">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-12.2 7.5L3 21l2-5.6A8.4 8.4 0 1 1 21 11.5z"></path></svg>
+          Responde {KEYWORD} y te mandamos el link
+        </p>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<script>
+  // S10: la barra de la historia corre solo mientras se ve (y nunca con "reducir movimiento", ver el CSS)
+  const frames = document.querySelectorAll<HTMLElement>("[data-su-play]");
+  if ("IntersectionObserver" in window) {
+    const io = new IntersectionObserver((entries) => {
+      for (const entry of entries) entry.target.classList.toggle("is-playing", entry.isIntersecting);
+    });
+    frames.forEach((frame) => io.observe(frame));
+  }
+</script>
+
+<style>
+  .sm-frame {
+    width: 150px;
+    height: 300px;
+    margin: 0;
+  }
+  .sm-phone {
+    width: 300px;
+    height: 600px;
+    padding: 9px;
+    border-radius: 40px;
+    background: #000;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+    transform: scale(0.5);
+    transform-origin: top left;
+  }
+  .sm-screen {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    border-radius: 32px;
+    color: #fff;
+  }
+  .sm-screen :global(.sm-photo) {
+    position: absolute;
+    inset: 0;
+  }
+  .sm-shade {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.45) 0%, rgba(0, 0, 0, 0) 22%, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, 0.75) 100%);
+  }
+  .sm-bars {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    display: flex;
+    gap: 4px;
+  }
+  .sm-bar {
+    flex: 1;
+    height: 3px;
+    overflow: hidden;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.35);
+  }
+  .sm-bar.is-done {
+    background: rgba(255, 255, 255, 0.95);
+  }
+  .sm-bar-fill {
+    display: block;
+    height: 100%;
+    background: #fff;
+    transform: scaleX(0.4);
+    transform-origin: left;
+  }
+  @keyframes sm-fill {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .sm-bar-fill {
+      animation: sm-fill 5s linear infinite paused;
+    }
+    .is-playing .sm-bar-fill {
+      animation-play-state: running;
+    }
+  }
+  .sm-account {
+    position: absolute;
+    top: 26px;
+    left: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+  }
+  .sm-avatar {
+    width: 26px;
+    height: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: #ffd666;
+    color: #24163f;
+    font-family: "Unbounded", system-ui, sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+  }
+  .sm-handle {
+    font-weight: 600;
+  }
+  .sm-when {
+    opacity: 0.75;
+  }
+  .sm-bottom {
+    position: absolute;
+    left: 16px;
+    right: 16px;
+    bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .sm-big {
+    font-family: "Unbounded", system-ui, sans-serif;
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 34px;
+    letter-spacing: -0.03em;
+  }
+  .sm-sticker {
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: #fff;
+    color: #0e0b09;
+    font-size: 13px;
+    font-weight: 600;
+    transform: rotate(-3deg);
+  }
+  .sm-dm {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: var(--brand-lime);
+    color: #0e0b09;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  @media (min-width: 900px) {
+    .sm-frame {
+      width: 300px;
+      height: 600px;
+    }
+    .sm-phone {
+      transform: none;
+    }
+  }
+</style>

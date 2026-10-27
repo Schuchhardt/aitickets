@@ -1,0 +1,259 @@
+---
+// 3 · Una semana con AI Tickets (SPEC_landing_standup §4.3): cuatro capítulos que alternan foto y texto, con una línea
+// fina al centro en desktop. Todo lo que se promete existe hoy (ver src/data/landings.ts): hasta 60 funciones por
+// evento, duplicar, links con seguimiento y métricas por canal, check-in offline y cortesías con QR.
+// Domingo: el plazo sale de legal.mjs (disponible PAYOUT_RELEASE_HOURS después de cada función y transferencia en hasta
+// PAYOUT_BUSINESS_DAYS días hábiles), no el "recibes la plata 48 h después del evento" del prototipo. Por eso el día va
+// sin hora ("DOMINGO", no "DOMINGO · 21:00" como en la spec): el plazo corre desde que termina la función del viernes,
+// así que a las 21:00 del domingo todavía no está disponible.
+// Lunes: el prototipo repite "Sáb 24" (dos funciones el sábado); aquí van con su hora para que no parezca un error.
+// Movimiento: S6 y S7 en WeekChapter; S8 barras de links (data-lp-grow, 120 ms entre barras); S9 el monto cuenta
+// hasta su valor en 1,4 s (data-lp-count de LandingMotion).
+import WeekChapter from "./WeekChapter.astro";
+import { DEMO_EVENT_NAME, formatCLP } from "../producerLanding.js";
+import { DEMO_PAYOUT, LINK_SALES, LINK_SALES_MAX, STANDUP_PHOTOS } from "./standupLanding.js";
+import { PAYOUT_BUSINESS_DAYS, PAYOUT_RELEASE_HOURS } from "../../../../netlify/lib/legal.mjs";
+
+const dates = ["Vie 23", "Sáb 24 · 20:00", "Sáb 24 · 22:30"];
+---
+
+<section class="su-wrap wk" aria-labelledby="week-title" data-su-section="week">
+  <div class="wk-intro" data-lp-reveal>
+    <p class="su-eyebrow" data-lp-step>Una semana con AI Tickets</p>
+    <h2 id="week-title" class="su-h2 wk-title" data-lp-step>
+      Del lunes en que publicas al domingo en que <span class="su-serif">cobras.</span>
+    </h2>
+  </div>
+
+  <div class="wk-chapters">
+    <span class="wk-line" aria-hidden="true"></span>
+
+    <WeekChapter
+      side="left"
+      day="LUNES"
+      title="Publicas todas tus fechas"
+      titleSerif="en una sola tarde."
+      text="Hasta 60 funciones en un evento, con entradas para una función o para todas. La próxima temporada la duplicas y solo cambias las fechas."
+      photo={STANDUP_PHOTOS.productor}
+      alt="Productor revisando su teléfono antes de un show"
+    >
+      <div slot="card" class="wk-card su-glass">
+        <p class="wk-card-kicker">Evento creado</p>
+        <p class="wk-card-main">{DEMO_EVENT_NAME} · 6 funciones</p>
+        <p class="wk-chips">
+          {dates.map((d) => <span class="su-chip">{d}</span>)}
+          <span class="su-chip">+3</span>
+        </p>
+      </div>
+    </WeekChapter>
+
+    <WeekChapter
+      side="right"
+      day="MIÉRCOLES"
+      title="Cada comediante con su link."
+      titleSerif="Y sabes quién vende."
+      text="Cada compra queda asociada al link con que llegó el comprador. Sin capturas de pantalla ni planillas: lo ves por canal, en pesos y entradas."
+      photo={STANDUP_PHOTOS.backstage}
+      alt="Comediantes del line-up riéndose backstage frente a un teléfono"
+      link={{ href: "/guias/como-medir-ventas-por-promotor", label: "Cómo medir lo que vende cada link", cta: "guide_promoters" }}
+    >
+      <div slot="card" class="wk-card su-glass wk-links">
+        <p class="wk-card-kicker">Ventas por link · ejemplo</p>
+        {LINK_SALES.map((link, i) => (
+          <div>
+            <p class="wk-link-row"><span>{link.name}</span><span class="ev-tabular">{link.tickets}</span></p>
+            <div class="su-bar-track wk-track">
+              <div class="su-bar" data-lp-grow style={`--lp-scale: ${(link.tickets / LINK_SALES_MAX).toFixed(3)}; --lp-d: ${300 + i * 120}ms`}></div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </WeekChapter>
+
+    <WeekChapter
+      side="left"
+      day="VIERNES · 20:45"
+      title="La fila avanza"
+      titleSerif="sin listas en papel."
+      text="Tu equipo escanea con su celular, aunque se caiga la señal. Una entrada usada no vuelve a entrar, y las cortesías se validan igual que las pagadas."
+      photo={STANDUP_PHOTOS.puerta}
+      alt="Persona del equipo escaneando el QR de una entrada en la puerta"
+      link={{ href: "/guias/como-hacer-check-in-con-qr", label: "Cómo funciona el check-in con QR", cta: "guide_checkin" }}
+    >
+      <div slot="card" class="wk-valid">
+        <p class="wk-valid-title">✓ Válida</p>
+        <p>General · Entrada 1 de 2</p>
+        <p>Puerta · 20:47</p>
+      </div>
+    </WeekChapter>
+
+    <WeekChapter
+      side="right"
+      day="DOMINGO"
+      title={`${PAYOUT_RELEASE_HOURS} horas después,`}
+      titleSerif="la plata es tuya."
+      text={`Lo de cada función queda disponible para retirar ${PAYOUT_RELEASE_HOURS} horas después de que termina. Pides el retiro desde el panel y te lo transferimos en hasta ${PAYOUT_BUSINESS_DAYS} días hábiles. Sin esperar a fin de mes ni perseguir a nadie.`}
+      photo={STANDUP_PHOTOS.publico}
+      alt="Público de un teatro pequeño riendo y aplaudiendo"
+      position="30% 50%"
+    >
+      <div slot="card" class="wk-paid">
+        <span class="wk-paid-check" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>
+        </span>
+        <div>
+          <p class="wk-paid-kicker">Disponible para retirar · función del viernes · ejemplo</p>
+          <p class="wk-paid-amount ev-tabular">$<span data-lp-count={DEMO_PAYOUT} data-lp-count-ms="1400">{formatCLP(DEMO_PAYOUT).replace("$", "")}</span></p>
+        </div>
+      </div>
+    </WeekChapter>
+  </div>
+</section>
+
+<style>
+  .wk {
+    padding-top: 96px;
+    padding-bottom: 56px;
+  }
+  .wk-intro {
+    max-width: 900px;
+  }
+  .wk-title {
+    margin-top: 14px;
+  }
+  .wk-chapters {
+    position: relative;
+    margin-top: 32px;
+  }
+  .wk-line {
+    display: none;
+  }
+  .wk-card {
+    position: absolute;
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    padding: 14px 16px;
+  }
+  .wk-card-kicker {
+    font-size: 12px;
+    color: var(--sb-text-3);
+  }
+  .wk-card-main {
+    margin-top: 2px;
+    font-weight: 600;
+  }
+  .wk-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .wk-links {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .wk-link-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 14px;
+  }
+  .wk-track {
+    margin-top: 6px;
+  }
+  .wk-valid {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 200px;
+    padding: 14px 16px;
+    border-radius: 18px;
+    background: var(--brand-lime);
+    color: var(--sb-ground);
+    font-size: 13px;
+  }
+  .wk-valid-title {
+    font-family: "Unbounded", system-ui, sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+  }
+  .wk-paid {
+    position: absolute;
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px;
+    border-radius: 18px;
+    background: rgba(244, 237, 228, 0.95);
+    color: var(--sb-ground);
+  }
+  .wk-paid-check {
+    flex: 0 0 auto;
+    width: 40px;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--brand-lime);
+  }
+  .wk-paid-kicker {
+    font-size: 12px;
+    color: var(--sb-ink-3);
+  }
+  .wk-paid-amount {
+    font-family: "Unbounded", system-ui, sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+  }
+  @media (min-width: 900px) {
+    .wk {
+      padding-top: 160px;
+      padding-bottom: 120px;
+    }
+    .wk-title {
+      margin-top: 18px;
+    }
+    .wk-chapters {
+      margin-top: 80px;
+    }
+    .wk-line {
+      display: block;
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      width: 1px;
+      background: rgba(244, 237, 228, 0.12);
+    }
+    .wk-card,
+    .wk-paid {
+      left: 24px;
+      right: 24px;
+      bottom: 24px;
+    }
+    .wk-card {
+      padding: 16px 18px;
+    }
+    .wk-valid {
+      top: 24px;
+      right: 24px;
+      width: 210px;
+      padding: 16px;
+    }
+    .wk-valid-title {
+      font-size: 22px;
+    }
+    .wk-paid {
+      padding: 18px;
+    }
+    .wk-paid-amount {
+      font-size: 22px;
+    }
+  }
+</style>

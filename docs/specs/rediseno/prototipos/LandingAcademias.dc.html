@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>AI Tickets para academias</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&amp;family=Prompt:wght@400;500;600&amp;family=Fraunces:ital,opsz,wght@1,9..144,400&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#FBF7F0;-webkit-font-smoothing:antialiased}
+a{color:#1B1712}a:hover{color:#5E554B}
+.btn-ink{transition:background 140ms,transform 140ms cubic-bezier(.22,1,.36,1)}
+.btn-ink:hover{background:#3A322A !important;transform:translateY(-1px)}
+.btn-ink:active{transform:scale(.98)}
+.btn-lime{transition:transform 140ms cubic-bezier(.22,1,.36,1),box-shadow 200ms}
+.btn-lime:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(154,230,0,.3)}
+.link-quiet{transition:color 140ms}.link-quiet:hover{color:#1B1712 !important}
+.hdr{transition:background 220ms,border-color 220ms}
+.rv{opacity:0;transform:translateY(20px);transition:opacity 600ms cubic-bezier(.22,1,.36,1),transform 600ms cubic-bezier(.22,1,.36,1)}
+.rv.in{opacity:1;transform:none}
+.seg{transition:transform 260ms cubic-bezier(.65,0,.35,1)}
+.pane{transition:opacity 420ms cubic-bezier(.22,1,.36,1),transform 420ms cubic-bezier(.22,1,.36,1)}
+.bar{transform-origin:left;transition:transform 900ms cubic-bezier(.22,1,.36,1)}
+.faq-body{transition:grid-template-rows 220ms cubic-bezier(.65,0,.35,1)}
+.chev{transition:transform 220ms cubic-bezier(.65,0,.35,1)}
+.photo img{transition:transform 900ms cubic-bezier(.22,1,.36,1)}
+.photo:hover img{transform:scale(1.03)}
+input[type=range]{accent-color:#1B1712;width:100%;height:28px;margin:0}
+@keyframes rise{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes cardIn{from{opacity:0;transform:translateY(16px) scale(.96)}to{opacity:1;transform:none}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+@keyframes bubble{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes item{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
+@keyframes photoIn{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
+.h1{animation:rise 700ms cubic-bezier(.22,1,.36,1) 80ms both}
+.h2{animation:rise 700ms cubic-bezier(.22,1,.36,1) 200ms both}
+.h3{animation:fade 700ms ease 450ms both}
+.h4{animation:fade 700ms ease 600ms both}
+.hero-photo{animation:photoIn 900ms cubic-bezier(.22,1,.36,1) 150ms both}
+.fc1{animation:cardIn 600ms cubic-bezier(.34,1.56,.64,1) 800ms both,float 6s ease-in-out 1500ms 2}
+.fc2{animation:cardIn 600ms cubic-bezier(.34,1.56,.64,1) 1050ms both,float 6s ease-in-out 1800ms 2}
+.bubble{animation:bubble 380ms cubic-bezier(.22,1,.36,1) both}
+.item{animation:item 380ms cubic-bezier(.22,1,.36,1) both}
+@media (prefers-reduced-motion: reduce){*{animation-duration:1ms !important;animation-delay:0ms !important;animation-iteration-count:1 !important;transition-duration:1ms !important}.rv{opacity:1;transform:none}}
+</style>
+</helmet>
+<div style="font-family: 'Prompt', system-ui, sans-serif; color: #1B1712; background: #FBF7F0">
+
+  <header class="hdr" style="position: sticky; top: 0; z-index: 20; background: {{hdrBg}}; border-bottom: 1px solid {{hdrBorder}}; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px)">
+    <div style="max-width: 1200px; margin: 0 auto; padding: 0 40px; height: 68px; display: flex; align-items: center; justify-content: space-between">
+      <a href="#" style="display: flex; align-items: center; gap: 2px; text-decoration: none; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 17px; letter-spacing: .14em; color: #1B1712" aria-label="AI Tickets, inicio"><span style="background: #1B1712; color: #FBF7F0; padding: 2px 5px; letter-spacing: .04em">AI</span><span>TICKETS</span></a>
+      <nav style="display: flex; align-items: center; gap: 28px; font-size: 14px; font-weight: 500">
+        <a href="#como" class="link-quiet" style="color: #5E554B; text-decoration: none">Cómo funciona</a>
+        <a href="#precio" class="link-quiet" style="color: #5E554B; text-decoration: none">Precio</a>
+        <a href="#" class="link-quiet" style="color: #5E554B; text-decoration: none">Ingresar</a>
+        <a href="#" class="btn-ink" style="height: 40px; padding: 0 18px; border-radius: 999px; background: #1B1712; color: #FBF7F0; text-decoration: none; display: inline-flex; align-items: center">Crear mi muestra</a>
+      </nav>
+    </div>
+  </header>
+
+  <section style="max-width: 1200px; margin: 0 auto; padding: 64px 40px 96px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 56px; align-items: center">
+    <div>
+      <div class="h1" style="font-size: 13px; font-weight: 600; letter-spacing: .12em; color: #5E554B">PARA ACADEMIAS DE MÚSICA, DANZA Y TEATRO</div>
+      <h1 class="h2" style="margin: 20px 0 0; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 64px; line-height: 66px; letter-spacing: -.04em">El día de la muestra, preocúpate <span style="font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 400; letter-spacing: -.02em; color: #7A5C3E">solo del escenario.</span></h1>
+      <p class="h3" style="margin: 24px 0 0; font-size: 19px; line-height: 30px; color: #3E372F; max-width: 520px">Las familias compran o reservan con un link, reciben su entrada en el celular y entran con QR. Sin planillas, sin transferencias que revisar, sin entradas impresas y sin caja en la puerta.</p>
+      <div class="h4" style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 32px">
+        <a href="#" class="btn-ink" style="height: 54px; padding: 0 26px; border-radius: 999px; background: #1B1712; color: #FBF7F0; text-decoration: none; font-size: 16px; font-weight: 600; display: inline-flex; align-items: center; gap: 10px">Crear mi muestra gratis <span aria-hidden="true">→</span></a>
+        <a href="#" style="height: 54px; padding: 0 22px; border-radius: 999px; border: 1px solid rgba(27,23,18,.2); color: #1B1712; text-decoration: none; font-size: 16px; font-weight: 500; display: inline-flex; align-items: center">Ver una muestra de ejemplo</a>
+      </div>
+      <p class="h4" style="margin: 18px 0 0; font-size: 13px; line-height: 20px; color: #6F665C">Si tu muestra es gratis, no pagas nada. Si cobras entrada, la familia paga un cargo de 8% + IVA, o lo absorbe la academia.</p>
+    </div>
+    <div style="position: relative">
+      <div class="hero-photo photo" style="border-radius: 32px; overflow: hidden; aspect-ratio: 5 / 4; box-shadow: 0 30px 70px rgba(70,50,30,.18)">
+        <img src="/_blob/781317cbcd2abd9dff2f563f5cbf65d8" alt="Muestra de fin de año de una academia de música, con familias en el público grabando con sus celulares" style="width: 100%; height: 100%; object-fit: cover">
+      </div>
+      <div class="fc1" style="position: absolute; left: -36px; bottom: 56px; width: 270px; background: #FFFFFF; border-radius: 20px; padding: 18px; box-shadow: 0 16px 40px rgba(70,50,30,.16)">
+        <div style="font-size: 12px; color: #6F665C">Muestra de fin de año · ejemplo</div>
+        <div style="font-family: 'Sora', sans-serif; font-weight: 700; font-size: 17px; margin-top: 2px">Sáb 13 dic · 11:00 y 17:00</div>
+        <div style="height: 8px; border-radius: 4px; background: #F1EADF; margin-top: 12px; overflow: hidden"><div style="width: 88%; height: 100%; background: #9AE600; border-radius: 4px"></div></div>
+        <div style="display: flex; justify-content: space-between; font-size: 13px; margin-top: 8px"><span style="color: #6F665C">Entradas</span><span style="font-weight: 600">212 de 240</span></div>
+      </div>
+      <div class="fc2" style="position: absolute; right: -24px; top: 32px; width: 250px; background: #1B1712; color: #FBF7F0; border-radius: 18px; padding: 14px 16px; display: flex; gap: 12px; align-items: center; box-shadow: 0 16px 40px rgba(27,23,18,.25)">
+        <div style="width: 34px; height: 34px; border-radius: 50%; background: #9AE600; display: flex; align-items: center; justify-content: center; flex: 0 0 auto"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1B1712" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></div>
+        <div style="font-size: 13px; line-height: 18px"><div style="font-weight: 600">Familia Rojas · 4 entradas</div><div style="color: #CFC5BA">Enviadas a su correo con QR</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section ref="{{refVs}}" style="background: #FFFFFF; border-top: 1px solid rgba(27,23,18,.08); border-bottom: 1px solid rgba(27,23,18,.08); padding: 120px 40px">
+    <div style="max-width: 1200px; margin: 0 auto">
+      <div class="{{rvVs}}" style="display: flex; justify-content: space-between; align-items: flex-end; gap: 32px; flex-wrap: wrap">
+        <div style="max-width: 720px">
+          <div style="font-size: 13px; font-weight: 600; letter-spacing: .12em; color: #5E554B">¿TE SUENA FAMILIAR?</div>
+          <h2 style="margin: 16px 0 0; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 52px; line-height: 56px; letter-spacing: -.035em">Del grupo de WhatsApp <span style="font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 400; color: #7A5C3E">a un solo link.</span></h2>
+        </div>
+        <div role="radiogroup" aria-label="Comparar" style="position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); background: #F1EADF; border-radius: 999px; padding: 5px; width: 360px">
+          <div class="seg" aria-hidden="true" style="position: absolute; top: 5px; bottom: 5px; left: 5px; width: calc(50% - 5px); border-radius: 999px; background: {{segBg}}; transform: {{segX}}"></div>
+          <button type="button" role="radio" aria-checked="{{beforeChecked}}" onClick="{{showBefore}}" style="position: relative; height: 46px; border: 0; background: none; font-family: inherit; font-size: 15px; font-weight: 600; color: {{beforeColor}}; cursor: pointer">Antes</button>
+          <button type="button" role="radio" aria-checked="{{afterChecked}}" onClick="{{showAfter}}" style="position: relative; height: 46px; border: 0; background: none; font-family: inherit; font-size: 15px; font-weight: 600; color: {{afterColor}}; cursor: pointer">Con AI Tickets</button>
+        </div>
+      </div>
+
+      <div class="{{rvVs}}" style="transition-delay: 150ms; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 56px; margin-top: 56px; align-items: start">
+        <div style="position: relative; min-height: 520px">
+          <div class="pane" style="position: absolute; inset: 0; opacity: {{beforeOpacity}}; transform: {{beforeT}}; pointer-events: {{beforeEvents}}">
+            <div style="background: #EFE6D8; border-radius: 28px; padding: 22px; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; overflow: hidden">
+              <div style="display: flex; align-items: center; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid rgba(27,23,18,.1)">
+                <div style="width: 40px; height: 40px; border-radius: 50%; background: #C9B79E; display: flex; align-items: center; justify-content: center; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 13px; color: #1B1712" aria-hidden="true">AP</div>
+                <div style="flex: 1"><div style="font-weight: 600; font-size: 15px">Apoderados Piano 2026</div><div style="font-size: 12px; color: #6F665C">47 participantes</div></div>
+                <span style="background: #C2410C; color: #FFFFFF; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 3px 9px">+38</span>
+              </div>
+              <sc-for list="{{chat}}" as="m" hint-placeholder-count="6">
+                <div class="bubble" style="animation-delay: {{m.delay}}; align-self: {{m.align}}; max-width: 78%; background: {{m.bg}}; border-radius: 16px; padding: 9px 12px; font-size: 14px; line-height: 20px; box-shadow: 0 1px 1px rgba(27,23,18,.06)">
+                  <div style="font-size: 12px; font-weight: 600; color: {{m.nameColor}}">{{m.name}}</div>{{m.text}}
+                </div>
+              </sc-for>
+              <div style="position: absolute; right: -10px; bottom: 40px; transform: rotate(4deg); background: #FFF6A8; border-radius: 6px; padding: 12px 14px; font-size: 13px; line-height: 19px; box-shadow: 0 10px 24px rgba(27,23,18,.15); width: 170px">
+                <div style="font-weight: 600">Planilla.xlsx</div>
+                <div>¿Pagó? ¿Cuántas? ¿Retiró?</div>
+                <div style="color: #6F665C">87 filas</div>
+              </div>
+            </div>
+          </div>
+          <div class="pane" style="position: absolute; inset: 0; opacity: {{afterOpacity}}; transform: {{afterT}}; pointer-events: {{afterEvents}}">
+            <div style="background: #1B1712; color: #FBF7F0; border-radius: 28px; padding: 28px; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px">
+                <div><div style="font-size: 12px; color: #B5ABA0">Tu panel · ejemplo</div><div style="font-family: 'Sora', sans-serif; font-weight: 700; font-size: 22px; margin-top: 4px">Muestra de fin de año</div><div style="font-size: 14px; color: #CFC5BA">Sáb 13 dic · 11:00 y 17:00 · Teatro del colegio</div></div>
+                <div style="text-align: right"><div style="font-family: 'Sora', sans-serif; font-weight: 800; font-size: 34px; font-variant-numeric: tabular-nums">212</div><div style="font-size: 12px; color: #B5ABA0">de 240 entradas</div></div>
+              </div>
+              <div>
+                <div style="font-size: 13px; color: #B5ABA0; margin-bottom: 10px">Por curso</div>
+                <sc-for list="{{courses}}" as="c" hint-placeholder-count="5">
+                  <div style="display: grid; grid-template-columns: 130px minmax(0, 1fr) 34px; gap: 12px; align-items: center; margin-top: 9px; font-size: 14px">
+                    <span>{{c.name}}</span>
+                    <span style="height: 8px; border-radius: 4px; background: rgba(251,247,240,.1); overflow: hidden"><span class="bar" style="display: block; height: 100%; border-radius: 4px; background: #9AE600; transform: {{c.scale}}; transition-delay: {{c.delay}}"></span></span>
+                    <span style="text-align: right; font-variant-numeric: tabular-nums">{{c.n}}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="margin-top: auto; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+                <div style="background: rgba(251,247,240,.06); border-radius: 16px; padding: 14px"><div style="font-size: 12px; color: #B5ABA0">Recaudado</div><div style="font-family: 'Sora', sans-serif; font-weight: 700; font-size: 20px; margin-top: 2px">$1.060.000</div><div style="font-size: 12px; color: #CFC5BA">Llega 48 h después del evento</div></div>
+                <div style="background: rgba(251,247,240,.06); border-radius: 16px; padding: 14px"><div style="font-size: 12px; color: #B5ABA0">Lista de asistentes</div><div style="font-weight: 600; font-size: 15px; margin-top: 4px">Descargar ↓</div><div style="font-size: 12px; color: #CFC5BA">Por nombre, curso y función</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 4px">
+          <sc-for list="{{pains}}" as="p" hint-placeholder-count="6">
+            <div class="item" style="animation-delay: {{p.delay}}; display: flex; gap: 14px; align-items: flex-start; padding: 16px 0; border-bottom: 1px solid rgba(27,23,18,.08)">
+              <span style="width: 28px; height: 28px; border-radius: 50%; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; background: {{p.iconBg}}; color: {{p.iconColor}}; font-size: 14px; font-weight: 700" aria-hidden="true">{{p.icon}}</span>
+              <div><div style="font-weight: 600; font-size: 17px">{{p.t}}</div><div style="font-size: 15px; line-height: 23px; color: #5E554B; margin-top: 2px">{{p.d}}</div></div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="como" ref="{{refHow}}" style="max-width: 1200px; margin: 0 auto; padding: 128px 40px 112px">
+    <div class="{{rvHow}}" style="max-width: 760px">
+      <div style="font-size: 13px; font-weight: 600; letter-spacing: .12em; color: #5E554B">CÓMO FUNCIONA</div>
+      <h2 style="margin: 16px 0 0; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 52px; line-height: 56px; letter-spacing: -.035em">Tres pasos, <span style="font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 400; color: #7A5C3E">y cero filas en secretaría.</span></h2>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; margin-top: 56px">
+      <sc-for list="{{steps}}" as="s" hint-placeholder-count="3">
+        <div class="{{s.cls}}" style="transition-delay: {{s.delay}}; background: #FFFFFF; border-radius: 28px; padding: 28px; border: 1px solid rgba(27,23,18,.06); display: flex; flex-direction: column; gap: 14px">
+          <div style="display: flex; align-items: center; justify-content: space-between">
+            <span style="width: 44px; height: 44px; border-radius: 50%; background: #F1EADF; display: flex; align-items: center; justify-content: center; font-family: 'Sora', sans-serif; font-weight: 800; font-size: 17px">{{s.n}}</span>
+            <span style="font-size: 12px; font-weight: 600; letter-spacing: .08em; color: #6F665C">{{s.when}}</span>
+          </div>
+          <h3 style="margin: 6px 0 0; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 24px; line-height: 28px; letter-spacing: -.02em">{{s.t}}</h3>
+          <p style="margin: 0; font-size: 16px; line-height: 25px; color: #3E372F">{{s.d}}</p>
+          <div style="margin-top: auto; background: #FBF7F0; border-radius: 16px; padding: 14px; font-size: 13px; line-height: 19px; color: #5E554B">{{s.tip}}</div>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <section ref="{{refDoor}}" style="max-width: 1200px; margin: 0 auto; padding: 0 40px 128px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 72px; align-items: center">
+    <div class="{{rvDoor}} photo" style="position: relative; border-radius: 32px; overflow: hidden; aspect-ratio: 4 / 5">
+      <img src="/_blob/461e603f4481ff97fa0cab0e4a27a458" alt="Una familia muestra su entrada con QR en el celular y una profesora la escanea en la puerta" style="width: 100%; height: 100%; object-fit: cover">
+      <div style="position: absolute; left: 20px; bottom: 20px; background: #9AE600; color: #1B1712; border-radius: 16px; padding: 14px 16px; width: 220px">
+        <div style="font-family: 'Sora', sans-serif; font-weight: 800; font-size: 20px">✓ Válida</div>
+        <div style="font-size: 13px; margin-top: 2px">Familia Rojas · 4 de 4 · Función 17:00</div>
+      </div>
+    </div>
+    <div class="{{rvDoor}}" style="transition-delay: 120ms">
+      <div style="font-size: 13px; font-weight: 600; letter-spacing: .12em; color: #5E554B">EL DÍA DE LA MUESTRA</div>
+      <h2 style="margin: 16px 0 0; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 52px; line-height: 56px; letter-spacing: -.035em">Nadie en la puerta <span style="font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 400; color: #7A5C3E">con una lista de papel.</span></h2>
+      <div style="display: flex; flex-direction: column; gap: 22px; margin-top: 32px">
+        <sc-for list="{{door}}" as="d" hint-placeholder-count="4">
+          <div style="display: flex; gap: 14px">
+            <span style="width: 10px; height: 10px; border-radius: 50%; background: #9AE600; margin-top: 8px; flex: 0 0 auto" aria-hidden="true"></span>
+            <div><div style="font-weight: 600; font-size: 17px">{{d.t}}</div><div style="font-size: 15px; line-height: 23px; color: #5E554B; margin-top: 2px">{{d.d}}</div></div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+
+  <section id="precio" ref="{{refPrice}}" style="background: #F1EADF; padding: 120px 40px">
+    <div style="max-width: 1200px; margin: 0 auto">
+      <div class="{{rvPrice}}" style="max-width: 760px">
+        <div style="font-size: 13px; font-weight: 600; letter-spacing: .12em; color: #5E554B">GRATIS O CON ENTRADA</div>
+        <h2 style="margin: 16px 0 0; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 52px; line-height: 56px; letter-spacing: -.035em">Funciona igual <span style="font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 400; color: #7A5C3E">si cobras o no.</span></h2>
+      </div>
+      <div class="{{rvPrice}}" style="transition-delay: 150ms; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 24px; margin-top: 48px">
+        <div style="background: #FFFFFF; border-radius: 28px; padding: 32px; display: flex; flex-direction: column; gap: 14px">
+          <span style="align-self: flex-start; background: #9AE600; font-size: 13px; font-weight: 600; border-radius: 999px; padding: 4px 12px">Muestra gratuita</span>
+          <h3 style="margin: 4px 0 0; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 28px; line-height: 32px; letter-spacing: -.02em">Las familias reservan su lugar.</h3>
+          <p style="margin: 0; font-size: 16px; line-height: 25px; color: #3E372F">Pones un cupo por función y nadie queda parado al fondo. Cada familia recibe su QR igual que si hubiera pagado.</p>
+          <div style="margin-top: auto; font-family: 'Sora', sans-serif; font-weight: 800; font-size: 40px">$0 <span style="font-family: 'Prompt', sans-serif; font-weight: 500; font-size: 15px; color: #6F665C">para todos</span></div>
+        </div>
+        <div style="background: #1B1712; color: #FBF7F0; border-radius: 28px; padding: 32px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px">
+          <div style="display: flex; flex-direction: column; gap: 14px">
+            <span style="align-self: flex-start; background: #FBF7F0; color: #1B1712; font-size: 13px; font-weight: 600; border-radius: 999px; padding: 4px 12px">Muestra con entrada</span>
+            <h3 style="margin: 4px 0 0; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 28px; line-height: 32px; letter-spacing: -.02em">Para la academia, el viaje de fin de año o la beca.</h3>
+            <p style="margin: 0; font-size: 15px; line-height: 23px; color: #CFC5BA">0% de comisión para la academia. La familia paga un cargo de 8% + IVA, o lo absorbes tú y muestras un precio redondo. Recibes todo 48 horas después del evento.</p>
+          </div>
+          <div style="background: rgba(251,247,240,.06); border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+            <div>
+              <div style="display: flex; justify-content: space-between; font-size: 14px"><label for="ac-price" style="font-weight: 600">Valor de la entrada</label><span style="font-weight: 600; font-variant-numeric: tabular-nums">{{priceLabel}}</span></div>
+              <input id="ac-price" type="range" min="1000" max="20000" step="500" value="{{price}}" onChange="{{onPrice}}" aria-valuetext="{{priceLabel}}" style="margin-top: 8px; accent-color: #9AE600">
+            </div>
+            <div role="radiogroup" aria-label="¿Quién paga el cargo?" style="position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); background: rgba(251,247,240,.08); border-radius: 999px; padding: 4px">
+              <div class="seg" aria-hidden="true" style="position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc(50% - 4px); border-radius: 999px; background: #FBF7F0; transform: {{paySegX}}"></div>
+              <button type="button" role="radio" aria-checked="{{famChecked}}" onClick="{{payFam}}" style="position: relative; height: 40px; border: 0; background: none; font-family: inherit; font-size: 13px; font-weight: 600; color: {{famColor}}; cursor: pointer">Paga la familia</button>
+              <button type="button" role="radio" aria-checked="{{acChecked}}" onClick="{{payAc}}" style="position: relative; height: 40px; border: 0; background: none; font-family: inherit; font-size: 13px; font-weight: 600; color: {{acColor}}; cursor: pointer">Lo absorbo yo</button>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px; font-size: 14px; font-variant-numeric: tabular-nums">
+              <div style="display: flex; justify-content: space-between"><span style="color: #CFC5BA">La familia paga</span><span style="font-weight: 600">{{famPays}}</span></div>
+              <div style="display: flex; justify-content: space-between"><span style="color: #CFC5BA">La academia recibe</span><span style="font-family: 'Sora', sans-serif; font-weight: 800; font-size: 22px; color: #9AE600">{{acRecv}}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section ref="{{refDir}}" style="max-width: 1200px; margin: 0 auto; padding: 128px 40px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 72px; align-items: center">
+    <div class="{{rvDir}} photo" style="border-radius: 32px; overflow: hidden; aspect-ratio: 4 / 5">
+      <img src="/_blob/a83bc3dc9a84de590356381d6ff9986f" alt="Directora de una academia de música revisando su celular en una sala con piano" style="width: 100%; height: 100%; object-fit: cover">
+    </div>
+    <div class="{{rvDir}}" style="transition-delay: 120ms">
+      <div style="font-size: 13px; font-weight: 600; letter-spacing: .12em; color: #5E554B">HECHO PARA</div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px">
+        <sc-for list="{{forWho}}" as="w" hint-placeholder-count="6"><span style="font-size: 15px; border: 1px solid rgba(27,23,18,.16); border-radius: 999px; padding: 8px 16px; background: #FFFFFF">{{w}}</span></sc-for>
+      </div>
+      <blockquote style="margin: 48px 0 0; font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 400; font-size: 34px; line-height: 44px; color: #1B1712">“[Aquí va una cita real de una directora o director de academia: cómo era la muestra antes y cómo es ahora.]”</blockquote>
+      <div style="margin-top: 20px; font-size: 15px"><strong>[Nombre Apellido]</strong> <span style="color: #6F665C">· [Academia · ciudad]</span></div>
+    </div>
+  </section>
+
+  <section style="max-width: 860px; margin: 0 auto; padding: 0 40px 128px">
+    <h2 style="margin: 0 0 20px; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 44px; letter-spacing: -.03em">Preguntas frecuentes</h2>
+    <sc-for list="{{faqs}}" as="f" hint-placeholder-count="8">
+      <div style="border-bottom: 1px solid rgba(27,23,18,.12)">
+        <button type="button" onClick="{{f.toggle}}" aria-expanded="{{f.expanded}}" style="width: 100%; background: none; border: 0; padding: 22px 0; display: flex; justify-content: space-between; align-items: center; gap: 16px; font-family: inherit; font-size: 18px; font-weight: 500; color: #1B1712; text-align: left; cursor: pointer">
+          <span>{{f.q}}</span>
+          <svg class="chev" style="transform: {{f.rot}}; flex: 0 0 auto" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6F665C" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+        </button>
+        <div class="faq-body" style="display: grid; grid-template-rows: {{f.rows}}"><div style="overflow: hidden"><p style="margin: 0 0 22px; font-size: 16px; line-height: 26px; color: #5E554B; max-width: 680px">{{f.a}}</p></div></div>
+      </div>
+    </sc-for>
+  </section>
+
+  <section style="position: relative; height: 640px; overflow: hidden; display: flex; align-items: center; justify-content: center; text-align: center">
+    <img src="/_blob/b2544c6bb054b6ef5cbbb7cf85151e82" alt="" aria-hidden="true" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 40%">
+    <div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(27,23,18,.72)"></div>
+    <div style="position: relative; padding: 0 40px; color: #FBF7F0; max-width: 860px">
+      <h2 style="margin: 0; font-family: 'Sora', sans-serif; font-weight: 800; font-size: 72px; line-height: 74px; letter-spacing: -.045em">¿Cuándo es <span style="font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 400; color: #F1E3CF">la próxima muestra?</span></h2>
+      <p style="font-size: 19px; line-height: 30px; color: #E6DDD2; margin: 22px 0 0">Créala hoy y comparte el link en el grupo de apoderados. Te ayudamos con la primera.</p>
+      <div style="display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin-top: 34px">
+        <a href="#" class="btn-lime" style="height: 56px; padding: 0 28px; border-radius: 999px; background: #9AE600; color: #1B1712; text-decoration: none; font-size: 17px; font-weight: 600; display: inline-flex; align-items: center; gap: 10px">Crear mi muestra gratis <span aria-hidden="true">→</span></a>
+        <a href="#" style="height: 56px; padding: 0 24px; border-radius: 999px; border: 1px solid rgba(251,247,240,.35); color: #FBF7F0; text-decoration: none; font-size: 16px; font-weight: 500; display: inline-flex; align-items: center">Hablar por WhatsApp</a>
+      </div>
+    </div>
+  </section>
+
+  <footer style="max-width: 1200px; margin: 0 auto; padding: 40px; display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; font-size: 14px; color: #6F665C">
+    <div style="display: flex; align-items: center; gap: 2px; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 15px; letter-spacing: .14em; color: #1B1712"><span style="background: #1B1712; color: #FBF7F0; padding: 2px 5px; letter-spacing: .04em">AI</span><span>TICKETS</span></div>
+    <div style="display: flex; gap: 22px; flex-wrap: wrap"><a href="#" class="link-quiet" style="color: #6F665C; text-decoration: none">Para organizadores</a><a href="#" class="link-quiet" style="color: #6F665C; text-decoration: none">Stand-up</a><a href="#" class="link-quiet" style="color: #6F665C; text-decoration: none">Guías</a><a href="#" class="link-quiet" style="color: #6F665C; text-decoration: none">Términos</a><a href="#" class="link-quiet" style="color: #6F665C; text-decoration: none">Privacidad</a></div>
+    <div>© 2026 Chanium LLC · AI Tickets</div>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":5900}}'>
+function clp(n) { return '$' + Math.round(n).toLocaleString('es-CL'); }
+var CHAT = [
+  { name: 'Carla (mamá de Sofi)', text: '¿Quedan entradas para el sábado? Somos 5', mine: false },
+  { name: 'Jorge', text: 'Transferí $15.000, ¿me confirman?', mine: false },
+  { name: 'Profe Marcela', text: 'Las entradas se retiran el jueves en secretaría', mine: true },
+  { name: 'Ana', text: '¿La abuela paga entrada?', mine: false },
+  { name: 'Paula', text: 'No alcancé a retirarlas, ¿las pueden dejar en la puerta?', mine: false },
+  { name: 'Jorge', text: '¿Les llegó mi transferencia???', mine: false }
+];
+var BEFORE = [
+  ['80 mensajes preguntando lo mismo', 'Cuántas quedan, cuánto cuestan, si la abuela paga, a qué hora es.'],
+  ['Transferencias que revisar una por una', 'Y cruzarlas con quién dijo que pagó.'],
+  ['Una planilla de quién pagó y cuántas', 'Que solo entiende quien la armó.'],
+  ['Entradas impresas que repartir', 'Retiro en secretaría y familias que no alcanzan a ir.'],
+  ['Caja con efectivo el mismo día', 'Vuelto, monedas y alguien cuidando la plata.'],
+  ['Una lista en papel en la puerta', 'Y una fila que no avanza mientras empieza la función.']
+];
+var AFTER = [
+  ['Un link en el grupo, y listo', 'Fecha, horario, lugar y precio en una página. Las dudas se responden solas.'],
+  ['Pago confirmado al instante', 'Con Webpay o tarjeta. Nadie tiene que revisar transferencias.'],
+  ['Todo en tu panel', 'Cuántas entradas lleva cada curso y cada función, en tiempo real.'],
+  ['La entrada llega al celular', 'Con QR, por correo. Sin imprimir ni repartir nada.'],
+  ['Cero efectivo', 'Lo recaudado llega a tu cuenta 48 horas después del evento.'],
+  ['La puerta avanza sola', 'Tu equipo escanea con el celular, aunque se caiga la señal.']
+];
+var COURSES = [['Teatro infantil', 64], ['Piano', 48], ['Canto', 40], ['Violín', 36], ['Guitarra', 24]];
+var STEPS = [
+  { n: '1', when: '10 MINUTOS', t: 'Creas la muestra', d: 'Fecha, uno o dos horarios, el lugar y cuántos caben. Gratis o con entrada.', tip: '¿Dos funciones, 11:00 y 17:00? Cada una con su propio cupo.' },
+  { n: '2', when: 'UN MENSAJE', t: 'Compartes un link', d: 'En el grupo de apoderados, por correo o en tu Instagram. Las familias compran o reservan desde el celular.', tip: 'Con un link por curso sabes cuántas entradas compró cada uno.' },
+  { n: '3', when: 'EL DÍA DE LA MUESTRA', t: 'Recibes a las familias', d: 'Tu equipo escanea los QR en la puerta. Si cobraste, 48 horas después tienes todo en tu cuenta.', tip: '¿Alguien perdió su entrada? Se la reenvías desde el panel en un toque.' }
+];
+var DOOR = [
+  { t: 'Profes o voluntarios escanean con su celular', d: 'Les das el rol Puerta o un link que vence solo. No necesitan cuenta ni contraseña.' },
+  { t: 'Funciona aunque el gimnasio no tenga señal', d: 'Se valida con la lista descargada y se sincroniza cuando vuelve la conexión.' },
+  { t: '¿El abuelo no tiene la entrada en el celular?', d: 'Se busca por nombre en la lista y entra igual.' },
+  { t: 'Profes e invitados, con cortesía', d: 'Les mandas una entrada sin costo con su propio QR.' }
+];
+var FAQS = [
+  { q: '¿Cuánto cuesta?', a: 'Si tu muestra es gratis, nada. Si cobras entrada, la academia no paga comisión: la familia paga un cargo por servicio de 8% más IVA sobre ese cargo, o lo absorbe la academia para mostrar un precio redondo.' },
+  { q: '¿Las familias tienen que descargar una app?', a: 'No. Compran o reservan desde el navegador del celular y reciben su entrada con QR por correo.' },
+  { q: '¿Puedo tener dos funciones, en la mañana y en la tarde?', a: 'Sí. Cada función tiene su propio cupo y cada familia elige la suya al comprar.' },
+  { q: '¿Puedo limitar cuántas entradas compra cada familia?', a: 'Sí, defines un máximo de entradas por compra para que alcance para todos.' },
+  { q: '¿Cómo sé cuántas entradas compró cada curso?', a: 'Creas un link por curso y en el panel ves las compras de cada uno, por función.' },
+  { q: '¿Y si una familia pierde su entrada?', a: 'Se la reenvías a su correo desde el panel. En la puerta también se puede buscar por nombre.' },
+  { q: '¿Cuándo recibo lo recaudado?', a: 'Recibes lo recaudado de cada función 48 horas después del evento.' },
+  { q: '¿Me ayudan con la primera muestra?', a: 'Sí. Escríbenos por WhatsApp o agenda una videollamada de 15 minutos y la dejamos lista contigo.' }
+];
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { y: 0, seen: {}, mode: 'before', auto: false, price: 5000, payer: 'fam', faq: -1 };
+    this._els = {}; this._obs = null; this._t = [];
+  }
+  componentDidMount() {
+    var self = this;
+    this._onScroll = function () { var y = window.scrollY || 0; if ((y > 8) !== (self.state.y > 8)) self.setState({ y: y }); };
+    window.addEventListener('scroll', this._onScroll, { passive: true });
+    if ('IntersectionObserver' in window) {
+      this._obs = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (!e.isIntersecting) return;
+          var k = e.target.getAttribute('data-k');
+          if (self.state.seen[k]) return;
+          var s = Object.assign({}, self.state.seen); s[k] = true; self.setState({ seen: s });
+          if (k === 'vs' && !self.state.auto) self._t.push(setTimeout(function () { if (!self.state.auto) self.setState({ mode: 'after', auto: true }); }, 2600));
+        });
+      }, { threshold: 0.25 });
+      Object.keys(this._els).forEach(function (k) { self._obs.observe(self._els[k]); });
+    } else {
+      this.setState({ seen: { vs: 1, how: 1, door: 1, price: 1, dir: 1 } });
+    }
+  }
+  componentWillUnmount() { window.removeEventListener('scroll', this._onScroll); if (this._obs) this._obs.disconnect(); this._t.forEach(clearTimeout); }
+  reg(k) { var self = this; return function (el) { if (!el) return; el.setAttribute('data-k', k); self._els[k] = el; if (self._obs) self._obs.observe(el); }; }
+  renderVals() {
+    var s = this.state, self = this, before = s.mode === 'before';
+    var rv = function (k) { return s.seen[k] ? 'rv in' : 'rv'; };
+    var fee = Math.round(s.price * 0.08), iva = Math.round(fee * 0.19);
+    var list = before ? BEFORE : AFTER;
+    return {
+      hdrBg: s.y > 8 ? 'rgba(251,247,240,.9)' : 'rgba(251,247,240,0)', hdrBorder: s.y > 8 ? 'rgba(27,23,18,.08)' : 'rgba(27,23,18,0)',
+      refVs: this.reg('vs'), refHow: this.reg('how'), refDoor: this.reg('door'), refPrice: this.reg('price'), refDir: this.reg('dir'),
+      rvVs: rv('vs'), rvHow: rv('how'), rvDoor: rv('door'), rvPrice: rv('price'), rvDir: rv('dir'),
+      segX: before ? 'translateX(0)' : 'translateX(100%)', segBg: before ? '#C2410C' : '#1B1712',
+      beforeChecked: before ? 'true' : 'false', afterChecked: before ? 'false' : 'true',
+      beforeColor: before ? '#FFFFFF' : '#5E554B', afterColor: before ? '#5E554B' : '#FBF7F0',
+      showBefore: function () { self.setState({ mode: 'before', auto: true }); },
+      showAfter: function () { self.setState({ mode: 'after', auto: true }); },
+      beforeOpacity: before ? 1 : 0, afterOpacity: before ? 0 : 1,
+      beforeT: before ? 'none' : 'translateY(-12px) scale(.98)', afterT: before ? 'translateY(12px) scale(.98)' : 'none',
+      beforeEvents: before ? 'auto' : 'none', afterEvents: before ? 'none' : 'auto',
+      chat: s.seen.vs ? CHAT.map(function (m, i) { return { name: m.name, text: m.text, align: m.mine ? 'flex-end' : 'flex-start', bg: m.mine ? '#DCF5C2' : '#FFFFFF', nameColor: m.mine ? '#3B6E00' : '#7A5C3E', delay: (200 + i * 260) + 'ms' }; }) : [],
+      courses: COURSES.map(function (c, i) { return { name: c[0], n: c[1], scale: (!before && s.seen.vs) ? 'scaleX(' + (c[1] / 64).toFixed(3) + ')' : 'scaleX(0)', delay: (200 + i * 90) + 'ms' }; }),
+      pains: s.seen.vs ? list.map(function (p, i) { return { t: p[0], d: p[1], icon: before ? '×' : '✓', iconBg: before ? '#FDE8DF' : '#9AE600', iconColor: before ? '#C2410C' : '#1B1712', delay: (i * 70) + 'ms', key: s.mode }; }) : [],
+      steps: STEPS.map(function (st, i) { return { n: st.n, when: st.when, t: st.t, d: st.d, tip: st.tip, cls: rv('how'), delay: (120 + i * 120) + 'ms' }; }),
+      door: DOOR,
+      price: s.price, priceLabel: clp(s.price),
+      onPrice: function (e) { self.setState({ price: parseInt(e.target.value, 10) }); },
+      paySegX: s.payer === 'fam' ? 'translateX(0)' : 'translateX(100%)',
+      famChecked: s.payer === 'fam' ? 'true' : 'false', acChecked: s.payer === 'ac' ? 'true' : 'false',
+      famColor: s.payer === 'fam' ? '#1B1712' : '#CFC5BA', acColor: s.payer === 'ac' ? '#1B1712' : '#CFC5BA',
+      payFam: function () { self.setState({ payer: 'fam' }); }, payAc: function () { self.setState({ payer: 'ac' }); },
+      famPays: clp(s.payer === 'fam' ? s.price + fee + iva : s.price), acRecv: clp(s.payer === 'fam' ? s.price : s.price - fee - iva),
+      forWho: ['Academias de música', 'Escuelas de danza', 'Talleres de teatro', 'Coros', 'Colegios artísticos', 'Conservatorios'],
+      faqs: FAQS.map(function (f, i) { var open = s.faq === i; return { q: f.q, a: f.a, expanded: open ? 'true' : 'false', rows: open ? '1fr' : '0fr', rot: open ? 'rotate(45deg)' : 'rotate(0deg)', toggle: function () { self.setState({ faq: open ? -1 : i }); } }; })
+    };
+  }
+}
+</script>
+</body>
+</html>

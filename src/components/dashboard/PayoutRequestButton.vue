@@ -8,7 +8,9 @@ import { Banknote } from 'lucide-vue-next'
 const props = defineProps({
   available: { type: Number, required: true },
   canRequest: { type: Boolean, default: false },
-  missing: { type: Array, default: () => [] } // etiquetas de lo que falta para retirar
+  // Etiquetas de lo que falta para retirar. required en vez de `default: () => []`: el chequeo de tipos
+  // de Astro corta defineProps en el primer ")" y el import desde finance/index.astro queda sin default export
+  missing: { type: Array, required: true }
 })
 
 const step = ref('idle') // idle | confirming | done

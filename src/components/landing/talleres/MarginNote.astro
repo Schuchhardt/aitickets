@@ -1,0 +1,71 @@
+---
+// Nota al margen en lápiz pasta azul (SPEC_landing_talleres §1): texto en Caveat + un trazo SVG (flecha a la izquierda,
+// a la derecha, hacia abajo o curva). Siempre aria-hidden: lo que dice está también en el texto normal de la sección.
+// TL4: el trazo se dibuja con clip-path y el texto aparece 300 ms después (.tl-draw / .tl-draw-text), cuando su bloque
+// se revela. delay: retraso extra del trazo (ms).
+interface Props {
+  text: string;
+  arrow?: "left" | "right" | "down" | "curve" | "none";
+  class?: string;
+  delay?: number;
+}
+const { text, arrow = "curve", class: className, delay } = Astro.props;
+const style = delay != null ? `--tl-draw-d: ${delay}ms` : undefined;
+---
+
+<span class:list={["tl-note", `tl-note-${arrow}`, className]} aria-hidden="true" style={style}>
+  <span class="tl-hand tl-draw-text">{text}</span>
+  {
+    arrow === "curve" && (
+      <svg class="tl-note-arrow tl-draw" viewBox="0 0 80 48" width="80" height="48">
+        <path class="tl-stroke" d="M74 4 C 60 30, 34 40, 8 38" />
+        <path class="tl-stroke" d="M18 30 L 7 38 L 19 45" />
+      </svg>
+    )
+  }
+  {
+    arrow === "left" && (
+      <svg class="tl-note-arrow tl-draw" viewBox="0 0 64 24" width="64" height="24">
+        <path class="tl-stroke" d="M60 12 C 44 6, 24 16, 6 12" />
+        <path class="tl-stroke" d="M14 5 L 5 12 L 14 19" />
+      </svg>
+    )
+  }
+  {
+    arrow === "right" && (
+      <svg class="tl-note-arrow tl-draw" viewBox="0 0 64 24" width="64" height="24">
+        <path class="tl-stroke" d="M4 12 C 20 18, 40 6, 58 12" />
+        <path class="tl-stroke" d="M50 5 L 59 12 L 50 19" />
+      </svg>
+    )
+  }
+  {
+    arrow === "down" && (
+      <svg class="tl-note-arrow tl-draw" viewBox="0 0 32 56" width="32" height="56">
+        <path class="tl-stroke" d="M18 4 C 8 20, 24 34, 15 50" />
+        <path class="tl-stroke" d="M8 42 L 15 51 L 23 43" />
+      </svg>
+    )
+  }
+</span>
+
+<style>
+  .tl-note {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    pointer-events: none;
+  }
+  .tl-note-curve,
+  .tl-note-down {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .tl-note-left {
+    flex-direction: row-reverse;
+  }
+  .tl-note-arrow {
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+</style>

@@ -1,0 +1,373 @@
+---
+// 6 · Acto III · La noche de la función (SPEC_landing_teatro §4.6, ancla #puerta): las tres llamadas en una línea de
+// tiempo vertical (desktop: alternando a los lados del eje; mobile: el eje a la izquierda). Todo verificado en el código:
+//   I   recordatorio el día antes a quienes tienen entrada para esa función (send-event-reminders)
+//   II  escáner con el celular, sin señal con sincronización, entrada usada no vuelve a entrar y aviso "Esta entrada es
+//       para otra función" con opción de validarla igual (ValidateQR.vue); la demo es DoorScanner
+//   III contador de validadas, búsqueda por nombre y reenvío (/api/orders/resend), cortesías con su QR
+// Rol Puerta (permissions.ts) o link de puerta que vence solo (hoy desde el asistente de IA, tools/access.ts) y
+// funciones gratis con inscripción y QR (RsvpForm.vue).
+// T14: cada campana se enciende (scale .6 → 1 y halo) al 50 % de visibilidad de su llamada y el número romano sube
+// 16 px. T16 "se apaga la sala": cuando la tercera llamada llega a la mitad de la pantalla, una capa --te-sala-off pasa
+// a .7 sobre el fondo y las llamadas I y II bajan a --te-text-3; al salir, vuelve. Solo con html.lp-motion (sin JS o
+// con "reducir movimiento": campanas encendidas y sin cambio de luz).
+import ActEyebrow from "./ActEyebrow.astro";
+import DoorScanner from "./DoorScanner.vue";
+import { LLAMADAS, PLAY_DEMO, SCANNER_DEMO, SEASON_FUNCTIONS } from "./teatroLanding.js";
+
+const fn = SEASON_FUNCTIONS[1];
+---
+
+<section id="puerta" class="te-section tc" aria-labelledby="te-calls-title" data-te-section="puerta" data-te-calls>
+  <div class="tc-off" aria-hidden="true"></div>
+  <div class="te-wrap tc-wrap">
+    <div class="te-act-head tc-head" data-lp-reveal>
+      <span class="te-foco" aria-hidden="true"></span>
+      <ActEyebrow text="Acto III" />
+      <h2 id="te-calls-title" class="te-h2 tc-title" data-lp-step>
+        Primera llamada, segunda llamada, <span class="te-gold tc-line">tercera llamada.</span>
+      </h2>
+      <p class="te-lead tc-lead" data-lp-step>Así llega tu público a la sala, sin listas de papel ni filas que no avanzan.</p>
+    </div>
+
+    <ol class="tc-calls">
+      {
+        LLAMADAS.map((call, i) => (
+          <li class:list={["tc-call", `tc-call-${i + 1}`]} data-te-call={i + 1}>
+            <span class="tc-bell" aria-hidden="true" />
+            <div class="tc-copy">
+              <p class="tc-numeral" aria-hidden="true">{call.numeral}</p>
+              <p class="te-meta tc-tag">
+                <span class="lp-sr-only">Llamada {call.numeral}: </span>
+                {call.tag}
+              </p>
+              <h3 class="te-h3 tc-h3">{call.title}</h3>
+              <p class="tc-text">{call.text}</p>
+            </div>
+            <div class="tc-mock">
+              {i === 0 && (
+                <div class="tc-mail" role="group" aria-label="Correo de recordatorio de ejemplo">
+                  <p class="tc-mail-from">AI Tickets · ejemplo</p>
+                  <p class="tc-mail-subject">
+                    Mañana: {PLAY_DEMO.title} · {fn.label} · {PLAY_DEMO.venue}
+                  </p>
+                  <span class="tc-mail-btn" aria-hidden="true">Ver mi entrada</span>
+                </div>
+              )}
+              {i === 1 && <DoorScanner client:visible />}
+              {i === 2 && (
+                <p class="tc-count">
+                  <span class="te-display tc-count-n">
+                    {SCANNER_DEMO.checkedIn} de {SCANNER_DEMO.capacity}
+                  </span>
+                  <span class="tc-count-label">validadas · {fn.label.split(" · ")[0]} · ejemplo</span>
+                </p>
+              )}
+            </div>
+          </li>
+        ))
+      }
+    </ol>
+
+    <ul class="tc-notes" data-lp-reveal>
+      <li class="tc-note" data-lp-step>
+        <span class="te-bullet" aria-hidden="true"></span>
+        <p>
+          <strong>El equipo de puerta no necesita tu cuenta.</strong> Le das el rol Puerta, o un link temporal que vence
+          solo (lo creas desde tu asistente de IA).
+        </p>
+      </li>
+      <li class="tc-note" data-lp-step>
+        <span class="te-bullet" aria-hidden="true"></span>
+        <p><strong>¿Ensayo abierto o función a beneficio gratis?</strong> Inscripción con QR para cada persona, sin cargo.</p>
+      </li>
+    </ul>
+    <p class="tc-guide">
+      <a href="/entradas-con-qr" class="te-link">Entradas con QR</a>
+      <a href="/guias/como-hacer-check-in-con-qr" class="te-link">Guía: check-in con QR <span aria-hidden="true">→</span></a>
+    </p>
+  </div>
+</section>
+
+<script>
+  // T14 y T16: campanas que se encienden y "se apaga la sala". Solo con html.lp-motion (JS y sin "reducir movimiento");
+  // sin la clase, el CSS deja las campanas encendidas y la sala sin cambio de luz.
+  const section = document.querySelector<HTMLElement>("[data-te-calls]");
+  if (section && document.documentElement.classList.contains("lp-motion") && "IntersectionObserver" in window) {
+    const calls = section.querySelectorAll<HTMLElement>("[data-te-call]");
+    // Cada campana se enciende cuando el borde superior de su llamada pasa la mitad de la pantalla. Con margen y no con
+    // umbral de área: en mobile la llamada II (con el escáner) mide más que una pantalla apaisada y nunca llegaría al 50 %.
+    const lit = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          entry.target.classList.add("is-lit");
+          lit.unobserve(entry.target);
+        }
+      },
+      { rootMargin: "0px 0px -50% 0px", threshold: 0 },
+    );
+    calls.forEach((call) => lit.observe(call));
+
+    // La tercera llamada "llega" cuando su borde superior pasa la mitad de la pantalla; la sala vuelve al salir
+    const third = calls[calls.length - 1];
+    let reached = false;
+    let inside = false;
+    const update = () => section.classList.toggle("is-dark", reached && inside);
+    new IntersectionObserver(
+      ([entry]) => {
+        reached = entry.boundingClientRect.top < window.innerHeight / 2;
+        update();
+      },
+      { rootMargin: "0px 0px -50% 0px", threshold: 0 },
+    ).observe(third);
+    new IntersectionObserver(
+      ([entry]) => {
+        inside = entry.isIntersecting;
+        update();
+      },
+      { threshold: 0 },
+    ).observe(section);
+  }
+</script>
+
+<style>
+  .tc {
+    isolation: isolate;
+  }
+  .tc-off {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background: var(--te-sala-off);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 900ms var(--ease-out);
+  }
+  .tc.is-dark .tc-off {
+    opacity: 0.7;
+  }
+  .tc-wrap {
+    position: relative;
+    z-index: 1;
+  }
+  .tc-head {
+    max-width: 860px;
+    margin: 0 auto;
+    text-align: center;
+  }
+  .tc-title {
+    margin-top: 20px;
+  }
+  .tc-line {
+    display: block;
+  }
+  .tc-lead {
+    max-width: 560px;
+    margin: 20px auto 0;
+  }
+
+  /* ---- Línea de tiempo: el eje a la izquierda en mobile ---- */
+  .tc-calls {
+    position: relative;
+    display: grid;
+    gap: 56px;
+    margin-top: 56px;
+    padding-left: 40px;
+  }
+  .tc-calls::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 9px;
+    width: 1px;
+    background: linear-gradient(180deg, rgba(212, 175, 106, 0) 0%, rgba(212, 175, 106, 0.5) 8%, rgba(212, 175, 106, 0.5) 92%, rgba(212, 175, 106, 0) 100%);
+  }
+  .tc-call {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+  .tc-bell {
+    position: absolute;
+    top: 30px;
+    left: -40px;
+    width: 20px;
+    height: 20px;
+    border: 1px solid var(--te-oro);
+    border-radius: 50%;
+    background: var(--te-oro);
+    box-shadow: 0 0 0 6px rgba(212, 175, 106, 0.12), 0 0 28px 8px var(--te-foco);
+    transition: transform 400ms var(--ease-spring), background-color 400ms var(--ease-out), box-shadow 400ms var(--ease-out);
+  }
+  .tc-numeral {
+    font-family: var(--te-display);
+    font-size: 56px;
+    line-height: 56px;
+    font-weight: 500;
+    color: var(--te-oro);
+  }
+  .tc-tag {
+    margin-top: 8px;
+    color: var(--te-text-3);
+  }
+  .tc-h3 {
+    margin-top: 8px;
+  }
+  .tc-text {
+    margin-top: 12px;
+    max-width: 480px;
+    font-size: 16px;
+    line-height: 25px;
+    color: var(--te-text-2);
+  }
+  .tc-h3,
+  .tc-text,
+  .tc-numeral {
+    transition: color 900ms var(--ease-out), opacity 600ms var(--ease-out), transform 600ms var(--ease-out);
+  }
+  /* "Se apaga la sala": solo queda iluminada la tercera llamada */
+  .tc.is-dark :is(.tc-call-1, .tc-call-2) :is(.tc-h3, .tc-text) {
+    color: var(--te-text-3);
+  }
+  .tc.is-dark :is(.tc-call-1, .tc-call-2) .tc-numeral {
+    color: rgba(212, 175, 106, 0.45);
+  }
+  .tc-mock {
+    min-width: 0;
+  }
+
+  .tc-mail {
+    max-width: 320px;
+    padding: 16px 18px;
+    border-radius: 10px;
+    background: var(--te-programa);
+    color: var(--te-ink);
+    box-shadow: 0 20px 44px rgba(7, 10, 18, 0.45);
+  }
+  .tc-mail-from {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--te-ink-3);
+  }
+  .tc-mail-subject {
+    margin-top: 6px;
+    font-size: 15px;
+    line-height: 22px;
+    font-weight: 600;
+  }
+  .tc-mail-btn {
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    margin-top: 12px;
+    padding: 0 14px;
+    border-radius: 8px;
+    background: var(--te-ink);
+    color: var(--te-programa);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .tc-count {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .tc-count-n {
+    font-size: 64px;
+    line-height: 64px;
+  }
+  .tc-count-label {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--te-text-3);
+  }
+
+  .tc-notes {
+    display: grid;
+    gap: 14px;
+    max-width: 720px;
+    margin: 64px auto 0;
+  }
+  .tc-note {
+    display: flex;
+    gap: 14px;
+    font-size: 16px;
+    line-height: 25px;
+    color: var(--te-text-2);
+  }
+  .tc-note strong {
+    color: var(--te-text-1);
+    font-weight: 600;
+  }
+  .tc-guide {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 24px;
+    max-width: 720px;
+    margin: 20px auto 0;
+    font-size: 15px;
+  }
+
+  @media (min-width: 1024px) {
+    .tc-calls {
+      gap: 96px;
+      margin-top: 88px;
+      padding-left: 0;
+    }
+    .tc-calls::before {
+      left: 50%;
+    }
+    /* Alternando a los lados del eje: el texto de un lado, el mockup del otro */
+    .tc-call {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 96px;
+      align-items: center;
+    }
+    .tc-bell {
+      top: 50%;
+      left: 50%;
+      margin: -10px 0 0 -10px;
+    }
+    .tc-call:nth-child(odd) .tc-copy {
+      text-align: right;
+    }
+    .tc-call:nth-child(odd) .tc-text {
+      margin-left: auto;
+    }
+    .tc-call:nth-child(even) .tc-copy {
+      order: 2;
+    }
+    .tc-call:nth-child(even) .tc-mock {
+      display: flex;
+      justify-content: flex-end;
+    }
+    .tc-text,
+    .tc-note {
+      font-size: 18px;
+      line-height: 29px;
+    }
+  }
+
+  /* T14: las campanas parten apagadas y se encienden al 50 % de su llamada */
+  :global(.lp-motion) .tc-call:not(:global(.is-lit)) .tc-bell {
+    background: var(--te-sala);
+    box-shadow: none;
+    transform: scale(0.6);
+  }
+  :global(.lp-motion) .tc-call:not(:global(.is-lit)) .tc-numeral {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tc-off {
+      display: none;
+    }
+  }
+</style>

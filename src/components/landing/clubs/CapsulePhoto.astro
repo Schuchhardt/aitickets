@@ -1,0 +1,33 @@
+---
+// Foto en cápsula de la landing de clubs (SPEC_landing_clubs §1): <picture> con AVIF/WebP a varios anchos, ancho y alto
+// reservados (CLS), radio de tubo de luz (999 px; en mobile 48 px), borde violeta que brilla y fuga de luz en una
+// esquina (leak: "uv" arriba a la derecha, "magenta" abajo a la izquierda). Color de club con CSS, sin archivos teñidos
+// (.cl-photo-img en landing-clubs.css). Lazy-load: ninguna cápsula es el LCP.
+interface Props {
+  photo: { src: string; width: number; height: number; sources: { type: string; srcset: string }[] };
+  alt: string;
+  /** Ancho que ocupa la foto en pantalla (atributo sizes) */
+  sizes: string;
+  leak?: "uv" | "magenta";
+  /** object-position */
+  position?: string;
+  class?: string;
+}
+const { photo, alt, sizes, leak = "uv", position, class: className } = Astro.props;
+---
+
+<div class:list={["cl-capsule cl-leak", leak === "magenta" && "cl-leak-magenta", className]}>
+  <picture>
+    {photo.sources.map((source) => <source type={source.type} srcset={source.srcset} sizes={sizes} />)}
+    <img
+      class="cl-photo-img"
+      src={photo.src}
+      alt={alt}
+      width={photo.width}
+      height={photo.height}
+      loading="lazy"
+      decoding="async"
+      style={position ? `object-position: ${position}` : undefined}
+    />
+  </picture>
+</div>

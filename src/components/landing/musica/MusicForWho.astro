@@ -1,0 +1,31 @@
+---
+// 2 · Hecho para (SPEC_landing_musica §4.2, fondo papel, ancla #para-quien): cartel tipográfico y selector "¿Quién
+// eres?" (AudiencePoster). La línea de cobro de las salas sale de legal.mjs (PAYOUT_SHORT_TEXT) y el tope de fechas de
+// producerFaq.ts (MAX_EVENT_FUNCTIONS). La isla hidrata 200 px antes de entrar en pantalla y el script inline marca
+// html.mu-js antes de pintar la sección: con JS el HTML del servidor ya trae el selector y una sola columna, igual que
+// después de hidratar (sin salto de layout, §7); sin JS se ven las tres columnas apiladas.
+import AudiencePoster from "./AudiencePoster.vue";
+import { PAYOUT_SHORT_TEXT } from "../../../../netlify/lib/legal.mjs";
+import { MAX_EVENT_FUNCTIONS } from "../../../data/producerFaq";
+---
+
+<section id="para-quien" class="mu-section mu-on-paper mu-grain fw" aria-labelledby="mu-forwho-title" data-mu-section="for_who">
+  <div class="mu-wrap" data-lp-reveal>
+    <h2 id="mu-forwho-title" class="mu-mono mu-eyebrow fw-kicker" data-lp-step><span aria-hidden="true">01 —</span> Hecho para</h2>
+    <script is:inline>document.documentElement.classList.add("mu-js");</script>
+    <AudiencePoster client:visible={{ rootMargin: "200px" }} payoutShort={PAYOUT_SHORT_TEXT} maxFunctions={MAX_EVENT_FUNCTIONS} />
+  </div>
+</section>
+
+<style>
+  .fw-kicker {
+    margin-bottom: 28px;
+    font-weight: 400;
+    text-align: center;
+  }
+  @media (min-width: 1024px) {
+    .fw-kicker {
+      margin-bottom: 40px;
+    }
+  }
+</style>

@@ -1,0 +1,198 @@
+---
+// Talón de entrada de ejemplo del hero (SPEC_landing_musica §4.1): papel de afiche con texto tinta, muescas y
+// perforación (.mu-ticket en landing-musica.css, la misma forma que usan las tandas y la calculadora). Tres tandas
+// (en mobile, dos): Preventa 1 con el sello AGOTADA, Preventa 2 con las que quedan y General atenuada con su fecha de
+// apertura, como en el checkout real. El talón lleva un patrón de cuadritos que NO es un QR válido (decorativo).
+// Precios sin cargo: debajo va SERVICE_FEE_NOTE de fees.mjs. Movimiento (M4): entra a los 900 ms y el sello cae a
+// los 1,5 s (solo con html.lp-motion; sin movimiento, el sello ya está puesto).
+import RubberStamp from "./RubberStamp.astro";
+import { GIG_DEMO, TIERS, tierState } from "./musicaLanding.js";
+import { formatCLP } from "../producerLanding.js";
+import { SERVICE_FEE_NOTE } from "../../../../netlify/lib/fees.mjs";
+
+interface Props {
+  class?: string;
+}
+const { class: className } = Astro.props;
+
+const tiers = TIERS.map((tier) => ({ ...tier, state: tierState(tier) }));
+// Patrón fijo de 9 × 9 cuadritos (no codifica nada)
+const cells = Array.from({ length: 81 }, (_, i) => Math.abs(Math.sin(i * 12.9898 + 4.1) * 43758.5453) % 1 > 0.48);
+---
+
+<div class:list={["gt", className]}>
+  <div class="mu-ticket gt-ticket" role="group" aria-label="Entrada de ejemplo">
+    <div class="gt-body">
+      <p class="mu-mono gt-head">Entrada · ejemplo</p>
+      <p class="mu-display gt-band">{GIG_DEMO.band}</p>
+      <p class="gt-title">{GIG_DEMO.title}</p>
+      <p class="mu-mono gt-meta">{GIG_DEMO.when} · {GIG_DEMO.venue}</p>
+      <ul class="gt-tiers">
+        {
+          tiers.map((tier) => (
+            <li class:list={["gt-tier", `is-${tier.state.kind}`]}>
+              <span class="gt-tier-name">{tier.name}</span>
+              <span class="gt-tier-price ev-tabular">{formatCLP(tier.price)}</span>
+              {tier.state.kind === "soldout" ? (
+                <span class="lp-sr-only">{tier.state.label}</span>
+              ) : (
+                <span class="mu-mono gt-tier-state">{tier.state.label}</span>
+              )}
+              {tier.state.kind === "soldout" && (
+                <span class="gt-stamp" aria-hidden="true">
+                  <RubberStamp label="Agotada" rotate={-9} />
+                </span>
+              )}
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+    <div class="mu-ticket-stub gt-stub" aria-hidden="true">
+      <span class="gt-code">
+        {cells.map((on) => <span class:list={{ "is-on": on }} />)}
+      </span>
+      <span class="mu-mono gt-number">{GIG_DEMO.number}</span>
+    </div>
+  </div>
+  <p class="mu-example gt-note">{SERVICE_FEE_NOTE}</p>
+</div>
+
+<style>
+  .gt {
+    width: 100%;
+    max-width: 380px;
+  }
+  .gt-ticket {
+    --stub: 84px;
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.45);
+  }
+  .gt-body {
+    padding: 18px 16px 16px 18px;
+  }
+  .gt-head {
+    font-size: 11px;
+    color: var(--mu-ink-3);
+  }
+  .gt-band {
+    margin-top: 6px;
+    font-size: 36px;
+    line-height: 36px;
+  }
+  .gt-title {
+    margin-top: 2px;
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--mu-ink-2);
+  }
+  .gt-meta {
+    margin-top: 8px;
+    font-size: 11px;
+    line-height: 16px;
+    color: var(--mu-ink-2);
+  }
+  .gt-tiers {
+    margin-top: 12px;
+    border-top: 1px solid rgba(17, 16, 19, 0.16);
+  }
+  .gt-tier {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(17, 16, 19, 0.16);
+    font-size: 14px;
+    line-height: 20px;
+  }
+  .gt-tier-name {
+    font-weight: 600;
+  }
+  .gt-tier-state {
+    grid-column: 1 / -1;
+    font-size: 11px;
+    line-height: 16px;
+    color: var(--mu-ink-2);
+  }
+  .gt-tier.is-soldout .gt-tier-name,
+  .gt-tier.is-soldout .gt-tier-price {
+    color: var(--mu-ink-3);
+    text-decoration: line-through;
+  }
+  .gt-tier.is-upcoming {
+    opacity: 0.55;
+  }
+  /* §4.1 mobile: solo dos tandas */
+  .gt-tier.is-upcoming {
+    display: none;
+  }
+  .gt-stamp {
+    position: absolute;
+    top: 50%;
+    left: 46%;
+    transform: translate(-50%, -50%);
+  }
+  .gt-stamp :global(.mu-stamp) {
+    color: var(--mu-red-ink);
+    font-size: 24px;
+  }
+  .gt-stub {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 14px 8px;
+  }
+  .gt-code {
+    display: grid;
+    grid-template-columns: repeat(9, 6px);
+    gap: 1px;
+  }
+  .gt-code span {
+    width: 6px;
+    height: 6px;
+  }
+  .gt-code span.is-on {
+    background: var(--mu-ink);
+  }
+  .gt-number {
+    font-size: 11px;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+  }
+  .gt-note {
+    margin-top: 10px;
+    color: var(--mu-text-3);
+  }
+  @media (min-width: 1024px) {
+    .gt {
+      max-width: 340px;
+    }
+    .gt-ticket {
+      --stub: 76px;
+      transform: rotate(-4deg);
+    }
+    .gt-band {
+      font-size: 44px;
+      line-height: 44px;
+    }
+    .gt-tier.is-upcoming {
+      display: grid;
+    }
+  }
+  /* M4: el talón entra a los 900 ms (translateY + rotate -8 → -4) y el sello cae a los 1,5 s */
+  @media (min-width: 1024px) {
+    :global(.lp-motion) .gt-ticket {
+      animation: mu-ticket-in 800ms var(--ease-out) 900ms both;
+    }
+  }
+  @media (max-width: 1023px) {
+    :global(.lp-motion) .gt-ticket {
+      animation: mu-up-24 800ms var(--ease-out) 900ms both;
+    }
+  }
+  :global(.lp-motion) .gt-stamp :global(.mu-stamp) {
+    animation: mu-stamp-pop 220ms var(--ease-spring) 1500ms both;
+  }
+</style>

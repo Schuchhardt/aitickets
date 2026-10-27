@@ -1,0 +1,273 @@
+---
+// 5 · Una gira, un solo evento (SPEC_landing_musica §4.6): setlist de fechas como tabla real (<table> con caption),
+// fecha y lugar en mono y la ciudad en Anton. Estados: quedan N, sello AGOTADO (pop al entrar, M11), tanda actual y
+// "Venta abre el …" atenuada. Toda la tabla lleva a la gira de ejemplo (/eventos/evento-demo-gira): en desktop cada
+// fila se invierte al pasar el mouse (rojo, de izquierda a derecha) y muestra "Ver la gira de ejemplo →"; como el
+// mouse no puede ser la única forma de verlo, debajo va el mismo link siempre visible (también para teclado y
+// lectores de pantalla). Las filas se pueden tocar (script chico; mide mu_tour_click).
+// El tope de fechas es MAX_EVENT_FUNCTIONS (producerFaq.ts, el MAX_FUNCTIONS de producer-api/tools/schedule.ts); el
+// aviso por correo al cambiar un horario y el cobro por fecha, de PRODUCER_FAQ y legal.mjs.
+import RubberStamp from "./RubberStamp.astro";
+import { TOUR_DATES } from "./musicaLanding.js";
+import { PAYOUT_SCHEDULE_TEXT } from "../../../../netlify/lib/legal.mjs";
+import { MAX_EVENT_FUNCTIONS, TERMS_NOTE } from "../../../data/producerFaq";
+
+const TOUR_URL = "/eventos/evento-demo-gira";
+---
+
+<section class="mu-section tr" aria-labelledby="mu-tour-title" data-mu-section="tour">
+  <div class="mu-wrap">
+    <div class="tr-head" data-lp-reveal>
+      <h2 id="mu-tour-title" class="mu-h2" data-lp-step>
+        <span class="mu-mono mu-num" aria-hidden="true">05 —</span>
+        Una gira, <span class="mu-outline">un solo evento.</span>
+      </h2>
+      <p class="mu-lead tr-lead" data-lp-step>
+        Hasta {MAX_EVENT_FUNCTIONS} fechas en un evento, cada una con su lugar y su ciudad. Entradas para una fecha específica o válidas para
+        cualquiera. Si cambias un horario, avisamos por correo a quienes ya compraron. Y cada fecha se cobra por separado:
+        no esperas a que termine la gira.
+      </p>
+    </div>
+
+    <div class="tr-table-wrap" data-lp-reveal>
+      <p class="mu-example tr-tag">Gira de ejemplo</p>
+      <table class="tr-table" role="table" data-mu-tour>
+        <caption class="lp-sr-only">Gira de ejemplo</caption>
+        <thead class="lp-sr-only" role="rowgroup">
+          <tr role="row">
+            <th scope="col" role="columnheader">Fecha</th>
+            <th scope="col" role="columnheader">Ciudad</th>
+            <th scope="col" role="columnheader">Lugar</th>
+            <th scope="col" role="columnheader">Estado</th>
+          </tr>
+        </thead>
+        <tbody role="rowgroup">
+          {
+            TOUR_DATES.map((date) => (
+              <tr class:list={["tr-row", `is-${date.status.kind}`]} role="row" data-href={TOUR_URL}>
+                <td class="mu-mono tr-when" role="cell">{date.when}</td>
+                <th scope="row" class="mu-display tr-city" role="rowheader">{date.city}</th>
+                <td class="mu-mono tr-venue" role="cell">{date.venue}</td>
+                <td class="tr-status" role="cell">
+                  {date.status.kind === "soldout" ? (
+                    <RubberStamp label={date.status.label} reveal rotate={-8} class="tr-stamp" />
+                  ) : (
+                    <span class="mu-mono">{date.status.label}</span>
+                  )}
+                  <span class="mu-mono tr-go" aria-hidden="true">Ver la gira de ejemplo →</span>
+                </td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+      <a href={TOUR_URL} class="mu-link mu-mono tr-link" data-cta="demo" data-section="tour" data-mu-tour-link>
+        Ver la gira de ejemplo <span aria-hidden="true">→</span>
+      </a>
+    </div>
+
+    <ul class="tr-notes" data-lp-reveal>
+      <li data-lp-step>
+        <span class="mu-square tr-square" aria-hidden="true"></span>
+        <p><strong>Duplica el evento.</strong> La próxima temporada copias descripción, imagen, lugares y entradas, y solo cambias las fechas.</p>
+      </li>
+      <li data-lp-step>
+        <span class="mu-square tr-square" aria-hidden="true"></span>
+        <p><strong>Cobro por fecha.</strong> {PAYOUT_SCHEDULE_TEXT}*</p>
+      </li>
+    </ul>
+    <p class="tr-terms"><a href={TERMS_NOTE.href} class="mu-link">{TERMS_NOTE.text}</a></p>
+  </div>
+</section>
+
+<script>
+  import { trackEvent } from "../../../composables/useGoogleAnalytics.js";
+
+  // Toda la fila lleva a la gira de ejemplo (el link visible de abajo es el accesible por teclado)
+  document.querySelectorAll<HTMLElement>("[data-mu-tour] tr[data-href]").forEach((row) => {
+    row.addEventListener("click", () => {
+      trackEvent("mu_tour_click", { position: "row" });
+      window.location.href = row.dataset.href || "/";
+    });
+  });
+  document.querySelector("[data-mu-tour-link]")?.addEventListener("click", () => trackEvent("mu_tour_click", { position: "link" }));
+</script>
+
+<style>
+  .tr-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+  .tr-lead {
+    max-width: 560px;
+  }
+  .tr-table-wrap {
+    margin-top: 40px;
+  }
+  .tr-tag {
+    margin-bottom: 10px;
+  }
+  /* Mobile: cada fila es un bloque (los role de la tabla mantienen la semántica al cambiar el display) */
+  .tr-table,
+  .tr-table tbody {
+    display: block;
+  }
+  .tr-table {
+    width: 100%;
+    border-collapse: collapse;
+    border-top: 1px solid var(--mu-line-strong);
+  }
+  .tr-row {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "city status" "when status" "venue status";
+    align-items: center;
+    column-gap: 16px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--mu-line);
+    cursor: pointer;
+  }
+  .tr-when {
+    grid-area: when;
+    color: var(--mu-text-2);
+    font-size: 12px;
+  }
+  .tr-city {
+    grid-area: city;
+    font-size: 28px;
+    line-height: 32px;
+    font-weight: 400;
+    text-align: left;
+  }
+  .tr-venue {
+    grid-area: venue;
+    color: var(--mu-text-3);
+    font-size: 12px;
+  }
+  .tr-status {
+    grid-area: status;
+    text-align: right;
+    color: var(--mu-text-1);
+  }
+  .tr-row.is-upcoming {
+    opacity: 0.55;
+  }
+  .tr-status :global(.tr-stamp) {
+    font-size: 22px;
+  }
+  .tr-go {
+    display: none;
+  }
+  .tr-link {
+    margin-top: 16px;
+  }
+  .tr-notes {
+    display: grid;
+    gap: 16px;
+    margin-top: 40px;
+  }
+  .tr-notes li {
+    display: flex;
+    gap: 14px;
+    font-size: 16px;
+    line-height: 25px;
+    color: var(--mu-text-2);
+  }
+  .tr-notes strong {
+    color: var(--mu-text-1);
+    font-weight: 600;
+  }
+  .tr-square {
+    color: var(--mu-red);
+  }
+  .tr-terms {
+    margin-top: 20px;
+    font-size: 12px;
+    color: var(--mu-text-3);
+  }
+  @media (min-width: 1024px) {
+    .tr-head {
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+      align-items: end;
+      gap: 64px;
+    }
+    .tr-table-wrap {
+      margin-top: 64px;
+    }
+    .tr-table {
+      display: table;
+    }
+    .tr-table tbody {
+      display: table-row-group;
+    }
+    .tr-row {
+      display: table-row;
+      padding: 0;
+    }
+    .tr-row > * {
+      position: relative;
+      z-index: 1;
+      padding: 20px 16px 18px 0;
+      vertical-align: middle;
+      transition: color 220ms var(--ease-out);
+    }
+    .tr-when {
+      width: 22%;
+      font-size: 14px;
+    }
+    .tr-city {
+      font-size: 40px;
+      line-height: 44px;
+    }
+    .tr-venue {
+      font-size: 14px;
+    }
+    .tr-status {
+      width: 26%;
+      padding-right: 16px;
+    }
+    /* M11: la fila se invierte de izquierda a derecha al pasar el mouse */
+    .tr-row::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      background: var(--mu-red);
+      clip-path: inset(0 100% 0 0);
+      transition: clip-path 220ms var(--ease-out);
+    }
+    .tr-row:hover::before {
+      clip-path: inset(0);
+    }
+    .tr-row:hover > *,
+    .tr-row:hover .tr-when,
+    .tr-row:hover .tr-venue {
+      color: var(--mu-ink);
+    }
+    .tr-row:hover .tr-status > :not(.tr-go) {
+      display: none;
+    }
+    .tr-row:hover .tr-go {
+      display: inline;
+    }
+    .tr-row:hover {
+      opacity: 1;
+    }
+    .tr-row:hover :global(.mu-stamp) {
+      color: var(--mu-ink);
+    }
+    .tr-notes {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 48px;
+      margin-top: 56px;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tr-row::before,
+    .tr-row > * {
+      transition-duration: 1ms;
+    }
+  }
+</style>

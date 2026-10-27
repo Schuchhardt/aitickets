@@ -1,0 +1,111 @@
+---
+// Movimiento de las landings rediseñadas (SPEC_landing_productores §8 y §9, L1-L21). Se pone una vez, al comienzo del
+// <body> (antes del header), para que la clase quede puesta antes de pintar.
+// - El script inline marca <html class="lp-motion"> solo si hay JS, IntersectionObserver y no hay "reducir
+//   movimiento". Sin esa clase, todo se ve en su estado final: sin JS el contenido está visible y legible.
+// - El script del módulo revela cada [data-lp-reveal] una sola vez, cuando su borde superior pasa el 80% del alto de la
+//   pantalla (el "umbral 20%" de L7, medido desde abajo: con un umbral de área una sección más alta que cinco
+//   pantallas nunca llegaría al 20%). Adentro:
+//     [data-lp-step]        entra con fade + translateY 16px (L7), 60 ms después del anterior; data-lp-step="120"
+//                           fija el retraso a mano (L8: 120 ms entre las columnas de "Cómo funciona").
+//     [data-lp-grow]        barra que crece de scaleX(0) a su valor (L12, L21); el retraso va en --lp-d.
+//     [data-lp-count="23"]  número que cuenta de 0 al valor (L12), con el retraso de --lp-d; data-lp-count-ms cambia
+//                           la duración (900 ms por defecto) y data-lp-count-decimals cuenta con decimales ("4,5").
+//   No anidar [data-lp-reveal]: los pasos se revelan con el más cercano que tenga .is-in.
+//   Si el foco del teclado entra a un bloque que todavía no se reveló (Tab deja el elemento enfocado en el borde de
+//   abajo, dentro del 20% que el observer ignora), se revela en ese momento: el foco nunca queda sobre algo invisible
+//   (§9, WCAG 2.4.7).
+// - Respaldo (§9): si el módulo no alcanza a marcar <html data-lp-ready> en LP_READY_MS (no cargó, cargó tarde o falló
+//   antes de observar), el script inline saca .lp-motion y todo queda en su estado final, sin animar.
+// Las clases y animaciones viven en src/styles/landing.css.
+---
+
+<script is:inline>
+  (function () {
+    try {
+      var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduced || !('IntersectionObserver' in window)) return;
+      var LP_READY_MS = 3000;
+      var html = document.documentElement;
+      html.classList.add('lp-motion');
+      setTimeout(function () {
+        if (!html.hasAttribute('data-lp-ready')) html.classList.remove('lp-motion');
+      }, LP_READY_MS);
+    } catch (e) {}
+  })();
+</script>
+
+<script>
+  const STEP_GAP = 60;
+  const COUNT_MS = 900;
+  const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
+
+  function countUp(el: HTMLElement) {
+    const to = Number(el.dataset.lpCount) || 0;
+    const duration = Number(el.dataset.lpCountMs) || COUNT_MS;
+    const decimals = Number(el.dataset.lpCountDecimals) || 0;
+    const format = (n: number) =>
+      decimals
+        ? n.toLocaleString("es-CL", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+        : Math.round(n).toLocaleString("es-CL");
+    const delay = parseFloat(getComputedStyle(el).getPropertyValue("--lp-d")) || 0;
+    el.textContent = format(0);
+    window.setTimeout(() => {
+      const start = performance.now();
+      const step = (now: number) => {
+        const t = Math.min(1, (now - start) / duration);
+        el.textContent = format(to * easeOut(t));
+        if (t < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    }, delay);
+  }
+
+  function reveal(root: Element) {
+    root.classList.add("is-in");
+    root.querySelectorAll<HTMLElement>("[data-lp-count]").forEach(countUp);
+  }
+
+  // Avisa al respaldo del script inline que las secciones ya se pueden revelar
+  const markReady = () => document.documentElement.setAttribute("data-lp-ready", "");
+
+  function init() {
+    const roots = document.querySelectorAll<HTMLElement>("[data-lp-reveal]");
+    if (!roots.length) return markReady();
+    if (!document.documentElement.classList.contains("lp-motion")) {
+      roots.forEach((root) => root.classList.add("is-in"));
+      return markReady();
+    }
+    roots.forEach((root) => {
+      const steps = [
+        ...(root.matches("[data-lp-step]") ? [root] : []),
+        ...root.querySelectorAll<HTMLElement>("[data-lp-step]"),
+      ];
+      steps.forEach((el, i) => {
+        const fixed = el.dataset.lpStep;
+        el.style.setProperty("--lp-d", `${fixed ? Number(fixed) || 0 : i * STEP_GAP}ms`);
+      });
+    });
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          // También cuenta si ya quedó arriba (por ejemplo, al entrar con un ancla como #precios)
+          if (!entry.isIntersecting && entry.boundingClientRect.top > 0) continue;
+          reveal(entry.target);
+          io.unobserve(entry.target);
+        }
+      },
+      { rootMargin: "0px 0px -20% 0px", threshold: 0 },
+    );
+    roots.forEach((root) => io.observe(root));
+    document.addEventListener("focusin", (event) => {
+      const root = (event.target as Element | null)?.closest?.("[data-lp-reveal]:not(.is-in)");
+      if (!root) return;
+      reveal(root);
+      io.unobserve(root);
+    });
+    markReady();
+  }
+
+  init();
+</script>

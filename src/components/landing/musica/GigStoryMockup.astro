@@ -1,0 +1,184 @@
+---
+// Historia de ejemplo de "Tu fecha en Instagram" (SPEC_landing_musica §4.8): teléfono de 280 × 560 (el único radio
+// grande de la página, porque es un teléfono) con la foto del público en duotono. Mockup genérico: sin interfaz ni
+// logos de Instagram, y la sala es ficticia. Los textos son los de las historias reales (socialSeriesRender.ts, etapa
+// "hoy"): "Quedan N entradas" solo cuando de verdad quedan pocas, y el link llega por DM a quien responde con la
+// palabra clave (DEFAULT_KEYWORD). La del día del show sale a las DEFAULT_CADENCE.event_day_time (la spec decía 19:30,
+// que es la hora por defecto de los otros días: manda la cadencia del código).
+// M13: la segunda barra se llena en 5 s, en loop, solo mientras se ve ([data-mu-play], ver la página) y nunca con
+// "reducir movimiento". En mobile se dibuja a 160 px de ancho con transform, para no rearmar el mockup.
+import DuotonePhoto from "./DuotonePhoto.astro";
+import { MUSIC_PHOTOS } from "./musicaLanding.js";
+import { DEFAULT_CADENCE, DEFAULT_KEYWORD } from "../../../lib/socialSeriesCadence";
+---
+
+<figure class="gs-frame" aria-label="Historia de ejemplo: hoy 21:00, quedan 38 entradas" data-mu-play>
+  <div class="gs-phone" aria-hidden="true">
+    <div class="gs-screen">
+      <DuotonePhoto photo={MUSIC_PHOTOS.publico} alt="" sizes="280px" position="50% 30%" class="gs-photo" />
+      <div class="gs-shade"></div>
+      <div class="gs-bars">
+        <span class="gs-bar is-done"></span>
+        <span class="gs-bar"><span class="gs-bar-fill"></span></span>
+        <span class="gs-bar"></span>
+      </div>
+      <p class="gs-account">
+        <span class="gs-avatar">SE</span>
+        <span class="gs-handle">sala.ejemplo</span>
+        <span class="gs-when">· programada {DEFAULT_CADENCE.event_day_time}</span>
+      </p>
+      <div class="gs-bottom">
+        <p class="gs-big">Hoy<br />21:00</p>
+        <p class="gs-sticker">Quedan 38 entradas</p>
+        <p class="gs-dm">Responde {DEFAULT_KEYWORD} y te llega el link</p>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<style>
+  .gs-frame {
+    flex: 0 0 auto;
+    width: 160px;
+    height: 320px;
+    margin: 0;
+  }
+  .gs-phone {
+    width: 280px;
+    height: 560px;
+    padding: 8px;
+    border-radius: 32px;
+    background: #000;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
+    transform: scale(0.5714);
+    transform-origin: top left;
+  }
+  .gs-screen {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    border-radius: 25px;
+    color: #fff;
+  }
+  .gs-screen :global(.gs-photo) {
+    position: absolute;
+    inset: 0;
+  }
+  .gs-shade {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.45) 0%, rgba(0, 0, 0, 0) 24%, rgba(0, 0, 0, 0) 45%, rgba(0, 0, 0, 0.75) 100%);
+  }
+  .gs-bars {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    display: flex;
+    gap: 4px;
+  }
+  .gs-bar {
+    flex: 1;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.35);
+    overflow: hidden;
+  }
+  .gs-bar.is-done {
+    background: #fff;
+  }
+  .gs-bar-fill {
+    display: block;
+    height: 100%;
+    background: #fff;
+    transform: scaleX(0.6);
+    transform-origin: left;
+  }
+  .gs-account {
+    position: absolute;
+    top: 26px;
+    left: 12px;
+    right: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+  }
+  .gs-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    background: var(--mu-paper);
+    color: var(--mu-ink);
+    font-family: var(--mu-mono);
+    font-size: 10px;
+    font-weight: 700;
+  }
+  .gs-handle {
+    font-weight: 600;
+  }
+  .gs-when {
+    color: rgba(255, 255, 255, 0.8);
+  }
+  .gs-bottom {
+    position: absolute;
+    left: 16px;
+    right: 16px;
+    bottom: 22px;
+  }
+  .gs-big {
+    font-family: var(--mu-display);
+    font-size: 72px;
+    line-height: 70px;
+    text-transform: uppercase;
+  }
+  .gs-sticker {
+    display: inline-block;
+    margin-top: 14px;
+    padding: 6px 10px;
+    background: var(--mu-paper);
+    color: var(--mu-ink);
+    font-family: var(--mu-mono);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    transform: rotate(-4deg);
+  }
+  .gs-dm {
+    margin-top: 12px;
+    padding: 8px 10px;
+    border-radius: 4px;
+    background: var(--brand-lime);
+    color: var(--mu-ink);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 17px;
+  }
+  @media (min-width: 1024px) {
+    .gs-frame {
+      width: 280px;
+      height: 560px;
+    }
+    .gs-phone {
+      transform: none;
+    }
+  }
+  @keyframes gs-fill {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+  :global(.lp-motion) .gs-bar-fill {
+    animation: gs-fill 5s linear infinite;
+    animation-play-state: paused;
+  }
+  :global(.lp-motion) .gs-frame:global(.is-playing) .gs-bar-fill {
+    animation-play-state: running;
+  }
+</style>

@@ -1,0 +1,157 @@
+---
+// 3 · Tu noche en historias (SPEC_landing_clubs §4.3, MIÉ a la hora por defecto de la serie): la bajada es la de
+// ORGANIZADORES_FAQ (serie con vista previa, historias con cuenta regresiva y posts, DM con la palabra clave) y, en un
+// evento con varias noches, la serie apunta a la próxima (anchorFor → nextFunctionStart en socialSeries.ts). La hora
+// LED, la de la historia y la palabra clave salen de DEFAULT_CADENCE y DEFAULT_KEYWORD (socialSeriesCadence.ts); los
+// límites de los anuncios de AD_LIMITS (zernio-ads.mjs). El asistente de la página responde con lo que cargó el club
+// (RecurringSection.vue lo promete en /organizadores).
+// Mobile: historia de 160 px a la izquierda y la serie a la derecha (su tira de 7 días con scroll horizontal); debajo,
+// los anuncios con un solo slider.
+import ClubAdsDemo from "./ClubAdsDemo.vue";
+import ClubSeriesWeek from "./ClubSeriesWeek.vue";
+import ClubStoryMockup from "./ClubStoryMockup.astro";
+import LedHeading from "./LedHeading.astro";
+import NightHour from "./NightHour.astro";
+import { weekSeries } from "./clubsLanding.js";
+import { DEFAULT_CADENCE, DEFAULT_KEYWORD } from "../../../lib/socialSeriesCadence";
+import { AD_LIMITS } from "../../../../netlify/lib/zernio-ads.mjs";
+
+const cadence = { ...DEFAULT_CADENCE };
+const week = weekSeries(cadence);
+const stories = week.filter((d) => d.story).length;
+const posts = week.filter((d) => d.post).length;
+---
+
+<section id="difusion" class="cl-section" aria-labelledby="cl-diffusion-title" data-cl-section="diffusion">
+  <span class="cl-halo cl-halo-fluor cd-halo" aria-hidden="true"></span>
+  <div class="cl-wrap" data-lp-reveal>
+    <NightHour time={`MIÉ ${DEFAULT_CADENCE.default_time}`} label="Tu noche en historias" />
+    <div class="cd-head">
+      <LedHeading id="cl-diffusion-title" text="Tu Instagram" lit="trabaja toda la semana." />
+      <p class="cl-lead cd-lead" data-lp-step>
+        Conectas tu Instagram una vez y apruebas la serie con una vista previa de cada pieza. Con el flyer y los datos de
+        tu noche armamos historias con cuenta regresiva y posts para el feed, y se publican solos. A quien responde la
+        historia con la palabra <strong>{DEFAULT_KEYWORD}</strong> le llega el link por DM. Si tu evento tiene varias
+        noches, la serie siempre apunta a la próxima.
+      </p>
+    </div>
+
+    <div class="cd-grid">
+      <div class="cd-story" data-lp-step>
+        <ClubStoryMockup time={DEFAULT_CADENCE.default_time} keyword={DEFAULT_KEYWORD} />
+      </div>
+      <!-- Solo mobile angosto: la leyenda de la serie al lado de la historia (la card la repite para lectores) -->
+      <div class="cd-aside" aria-hidden="true">
+        <p class="cl-meta">Esta semana</p>
+        <p class="cd-count-row"><span class="cl-led cd-count">{stories}</span> <span class="cl-meta">historias</span></p>
+        <p class="cd-count-row"><span class="cl-led cd-count cd-count-post">{posts}</span> <span class="cl-meta">posts</span></p>
+        <p class="cl-note">A la hora de más visitas de tu evento, o {DEFAULT_CADENCE.default_time}.</p>
+      </div>
+      <div class="cd-series" data-lp-step>
+        <ClubSeriesWeek client:visible cadence={cadence} />
+      </div>
+      <div class="cd-ads" data-lp-step>
+        <ClubAdsDemo
+          client:visible
+          minDays={AD_LIMITS.minDays}
+          maxDays={AD_LIMITS.maxDays}
+          minAge={AD_LIMITS.defaultAgeMin}
+          radiusKm={AD_LIMITS.cityRadiiKm[0]}
+        />
+      </div>
+    </div>
+
+    <p class="cl-note cd-note" data-lp-step>
+      La hora de la serie es la de más visitas de tu evento; si todavía no hay suficientes, {DEFAULT_CADENCE.default_time}.
+      Y la página de tu noche tiene un asistente que responde a tus compradores hasta qué hora es la lista, la edad mínima
+      o el código de vestimenta, con la información que cargaste.
+    </p>
+  </div>
+</section>
+
+<style>
+  .cd-halo {
+    --size: 680px;
+    left: -280px;
+    bottom: -220px;
+  }
+  .cd-lead {
+    max-width: 680px;
+    margin-top: 20px;
+  }
+  .cd-lead strong {
+    font-weight: 600;
+    color: var(--cl-text-1);
+  }
+  .cd-grid {
+    display: grid;
+    grid-template-columns: 160px minmax(0, 1fr);
+    grid-template-areas: "story series" "ads ads";
+    gap: 16px;
+    align-items: start;
+    margin-top: 36px;
+  }
+  .cd-story {
+    grid-area: story;
+  }
+  .cd-series {
+    grid-area: series;
+    min-width: 0;
+  }
+  .cd-ads {
+    grid-area: ads;
+    min-width: 0;
+  }
+  .cd-note {
+    max-width: 720px;
+    margin-top: 24px;
+    font-size: 14px;
+    line-height: 21px;
+  }
+  .cd-aside {
+    display: none;
+  }
+  @media (max-width: 479px) {
+    /* A 390 px la card de la serie no cabe al lado de la historia: a su lado va la leyenda y la card, debajo */
+    .cd-grid {
+      grid-template-areas: "story aside" "series series" "ads ads";
+      align-items: center;
+    }
+    .cd-aside {
+      grid-area: aside;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .cd-count-row {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+    .cd-count {
+      font-size: 40px;
+      line-height: 42px;
+      color: var(--cl-fluor);
+    }
+    .cd-count-post {
+      color: var(--cl-text-1);
+    }
+  }
+  @media (min-width: 1024px) {
+    .cd-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+      gap: 48px;
+      align-items: end;
+    }
+    .cd-lead {
+      margin-top: 0;
+    }
+    .cd-grid {
+      grid-template-columns: 280px minmax(0, 1fr);
+      grid-template-areas: "story series" "story ads";
+      gap: 24px 40px;
+      margin-top: 56px;
+    }
+  }
+</style>

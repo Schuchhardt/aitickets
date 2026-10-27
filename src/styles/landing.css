@@ -1,0 +1,370 @@
+/* ------------------------------------------------------------------------------------------------
+ * Landing de productores (/organizadores, docs/specs/rediseno/SPEC_landing_productores_aitickets.md §3).
+ * Usa los tokens del rediseño (global.css): solo blanco, --surface-1 y --brand-ink de fondo; el lima solo en el botón
+ * primario sobre negro, el estado "válida", las barras de ventas y el punto de "en vivo". Prefijo lp-.
+ * ---------------------------------------------------------------------------------------------- */
+.lp {
+  /* Tonos del lima que la spec fija para texto y estados (el lima puro no cumple AA como texto sobre blanco) */
+  --lp-lime-ink: #4c8a00;
+  --lp-lime-deep: #2f5a00;
+  --lp-lime-tint: #eef8dc;
+  --lp-lime-wash: #fbfef5;
+  /* Texto sobre --brand-ink */
+  --lp-on-dark-1: #ffffff;
+  --lp-on-dark-2: #c9c9cf;
+  --lp-on-dark-3: #a1a1aa;
+  --lp-dark-raised: #141416;
+  --lp-dark-track: #26262a;
+
+  font-family: "Prompt", system-ui, sans-serif;
+  color: var(--text-1);
+  background: var(--surface-0);
+  -webkit-font-smoothing: antialiased;
+}
+
+.lp-wrap {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding-inline: 16px;
+}
+@media (min-width: 768px) {
+  .lp-wrap {
+    padding-inline: 32px;
+  }
+}
+/* Ancho máximo + gutter cuando el fondo ocupa todo el ancho */
+.lp-section {
+  padding-block: 80px;
+}
+@media (min-width: 1024px) {
+  .lp-section {
+    padding-block: 128px;
+  }
+}
+.lp-surface {
+  background: var(--surface-1);
+}
+.lp-dark {
+  background: var(--brand-ink);
+  color: var(--lp-on-dark-1);
+}
+
+/* Anclas bajo el header sticky */
+.lp [id] {
+  scroll-margin-top: 80px;
+}
+
+/* ---------- Tipografía ---------- */
+/* Eyebrow: 13 px en todos los anchos (SPEC_landing_productores §3) */
+.lp-eyebrow {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.lp-dark .lp-eyebrow {
+  color: var(--lp-on-dark-3);
+}
+.lp-h1,
+.lp-h2,
+.lp-h3,
+.lp-display {
+  font-family: "Unbounded", system-ui, sans-serif;
+  font-weight: 700;
+  text-wrap: balance;
+  overflow-wrap: break-word;
+}
+.lp-h1 {
+  font-size: 40px;
+  line-height: 44px;
+  letter-spacing: -0.03em;
+}
+.lp-h2 {
+  font-size: 30px;
+  line-height: 34px;
+  letter-spacing: -0.02em;
+}
+.lp-h3 {
+  font-size: 22px;
+  line-height: 28px;
+  letter-spacing: -0.01em;
+}
+@media (min-width: 768px) {
+  .lp-h1 {
+    font-size: 48px;
+    line-height: 54px;
+  }
+  .lp-h2 {
+    font-size: 38px;
+    line-height: 44px;
+  }
+}
+@media (min-width: 1024px) {
+  /* La spec pide 64/68 con la display del prototipo (Sora); Unbounded, la display del sitio, es ~20% más ancha:
+     56/60 mantiene el H1 en 4-5 líneas dentro de la columna de 6/12 */
+  .lp-h1 {
+    font-size: 56px;
+    line-height: 60px;
+  }
+  .lp-h2 {
+    font-size: 44px;
+    line-height: 48px;
+  }
+  .lp-h3-lg {
+    font-size: 30px;
+    line-height: 34px;
+  }
+}
+.lp-lead {
+  font-size: 17px;
+  line-height: 27px;
+  color: var(--text-2);
+  max-width: 60ch;
+}
+.lp-dark .lp-lead {
+  color: var(--lp-on-dark-2);
+}
+.lp-body {
+  font-size: 16px;
+  line-height: 25px;
+  color: var(--text-2);
+}
+.lp-small {
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-3);
+}
+/* Rótulo de los mockups con cifras ficticias */
+.lp-example {
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--text-3);
+}
+.lp-dark .lp-example {
+  color: var(--lp-on-dark-3);
+}
+.lp-step-num {
+  font-family: "Unbounded", system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-3);
+}
+
+/* ---------- Botones y enlaces (sobre .ev-btn de global.css) ---------- */
+.lp-btn-lg {
+  min-height: 52px;
+  padding: 0 24px;
+}
+.lp-btn-lime {
+  background: var(--brand-lime);
+  color: var(--brand-ink);
+  border: 0;
+}
+.lp-btn-lime:hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+.lp-btn-lime:active {
+  transform: scale(0.98);
+}
+.lp-btn-lime:focus-visible,
+.lp-btn-ghost:focus-visible {
+  box-shadow: 0 0 0 3px var(--brand-ink), 0 0 0 6px var(--brand-lime);
+}
+.lp-btn-ghost {
+  background: transparent;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  font-weight: 500;
+}
+.lp-btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.lp-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-1);
+  text-decoration: none;
+  border-radius: 4px;
+}
+.lp-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.lp-link:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+.lp-dark .lp-link {
+  color: #e4e4e7;
+}
+.lp-dark .lp-link:hover {
+  color: #fff;
+}
+.lp-inline-link {
+  color: var(--text-1);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--border-strong);
+}
+.lp-inline-link:hover {
+  text-decoration-color: currentColor;
+}
+.lp-dark .lp-inline-link {
+  color: #e4e4e7;
+  text-decoration-color: rgba(255, 255, 255, 0.3);
+}
+
+/* ---------- Superficies ---------- */
+.lp-card {
+  background: var(--surface-0);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  box-shadow: var(--shadow-card);
+}
+.lp-tile {
+  background: var(--surface-1);
+  border-radius: var(--r-lg);
+}
+.lp-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface-0);
+  font-size: 13px;
+}
+.lp-check {
+  display: flex;
+  gap: 10px;
+  font-size: 15px;
+  line-height: 22px;
+  color: var(--text-2);
+}
+.lp-check::before {
+  content: "✓";
+  flex: 0 0 auto;
+  font-weight: 700;
+  color: var(--lp-lime-ink);
+}
+.lp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-pill);
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+/* Barras de ventas (lima sobre gris oscuro) */
+.lp-bar-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--lp-dark-track);
+  overflow: hidden;
+}
+.lp-bar {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--brand-lime);
+  /* El valor va en --lp-scale (no en un transform inline) para que la animación de entrada pueda partir de 0 */
+  transform: scaleX(var(--lp-scale, 1));
+  transform-origin: left;
+}
+
+/* Marcos de dispositivo sobrios (sin sombras de color) */
+.lp-phone {
+  border-radius: 44px;
+  background: var(--brand-ink);
+  padding: 10px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 24px 60px rgba(0, 0, 0, 0.14);
+}
+.lp-phone-screen {
+  width: 100%;
+  height: 100%;
+  border-radius: 34px;
+  overflow: hidden;
+  background: var(--surface-0);
+}
+
+.lp-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- Movimiento (SPEC_landing_productores §8; lo activa LandingMotion.astro) ----------
+ * Todo cuelga de html.lp-motion, que solo existe con JS y sin "reducir movimiento": sin la clase, cada elemento queda
+ * en su estado final. Solo se anima transform y opacity. */
+@keyframes lp-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+@keyframes lp-up-12 {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+@keyframes lp-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+@keyframes lp-msg {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes lp-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+/* Sin "to": la barra crece hasta su propio transform (scaleX del valor) */
+@keyframes lp-grow-x {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+/* L7: secciones que entran una sola vez */
+.lp-motion [data-lp-reveal]:not(.is-in) [data-lp-step],
+.lp-motion [data-lp-reveal][data-lp-step]:not(.is-in) {
+  opacity: 0;
+}
+.lp-motion .is-in [data-lp-step],
+.lp-motion .is-in[data-lp-step] {
+  animation: lp-up var(--dur-4) var(--ease-out) var(--lp-d, 0ms) both;
+}
+
+/* L12, L21: barras que crecen al entrar */
+.lp-motion [data-lp-reveal]:not(.is-in) [data-lp-grow] {
+  transform: scaleX(0);
+}
+.lp-motion .is-in [data-lp-grow] {
+  animation: lp-grow-x 900ms var(--ease-out) var(--lp-d, 0ms) both;
+}

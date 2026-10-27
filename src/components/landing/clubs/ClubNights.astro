@@ -1,0 +1,151 @@
+---
+// 2 · Armas el mes (SPEC_landing_clubs §4.2, MAR 16:00): noches que se repiten. Un evento con hasta MAX_EVENT_FUNCTIONS
+// noches (producerFaq.ts, el tope de schedule.ts), cada una con su horario aunque cruce la medianoche, su cobro por noche
+// (PAYOUT_RELEASE_HOURS de legal.mjs, con "*" de términos: una entrada válida para todas las noches se libera con la
+// última, ledger.ts) y duplicar evento (eventDuplicate.ts). El "evento recurrente automático" no existe y no se muestra.
+// Desktop: encabezado arriba; debajo la foto del encargado en cápsula (280 px) a la izquierda del mes del club y las tres
+// líneas. Mobile: la foto arriba en 3:4, el mes en filas compactas. Cierra con los links a /web-gratis y a la guía de
+// preventa (SEO §9) y la nota de términos del "*" de plazos (§0.5).
+import CapsulePhoto from "./CapsulePhoto.astro";
+import ClubMonth from "./ClubMonth.astro";
+import LedHeading from "./LedHeading.astro";
+import NightHour from "./NightHour.astro";
+import { CLUB_PHOTOS } from "./clubsLanding.js";
+import { PAYOUT_RELEASE_HOURS } from "../../../../netlify/lib/legal.mjs";
+import { MAX_EVENT_FUNCTIONS, TERMS_NOTE } from "../../../data/producerFaq";
+---
+
+<section id="noches" class="cl-section cl-on-noche-2" aria-labelledby="cl-nights-title" data-cl-section="nights">
+  <span class="cl-halo cn-halo" aria-hidden="true"></span>
+  <div class="cl-wrap" data-lp-reveal>
+    <NightHour time="MAR 16:00" label="Armas el mes" />
+    <div class="cn-head">
+      <LedHeading id="cl-nights-title" text="Cada semana abres." lit="Tú lo cargas una vez." />
+      <p class="cl-lead cn-lead" data-lp-step>
+        Jueves, viernes y sábado de todo el mes en una tarde. Cada noche con su hora de apertura y de cierre (aunque
+        termine a las 5 de la mañana), con sus entradas y su cupo, y se cobra por separado. ¿La próxima temporada? Duplicas
+        el evento y solo cambias las fechas.
+      </p>
+    </div>
+
+    <div class="cn-grid">
+      <div class="cn-photo" data-lp-step>
+        <CapsulePhoto
+          photo={CLUB_PHOTOS.manager}
+          alt="Encargado del club revisando las ventas en su celular en la barra antes de abrir"
+          sizes="(min-width: 900px) 280px, 100vw"
+          position="50% 30%"
+        />
+      </div>
+      <ClubMonth />
+    </div>
+
+    <ul class="cl-dots cn-lines">
+      <li data-lp-step>
+        <p>
+          <span class="cl-dots-title">Un evento con todas tus noches.</span>
+          <span class="cl-dots-text">Hasta {MAX_EVENT_FUNCTIONS} noches en un evento, cada una con su fecha y horario.</span>
+        </p>
+      </li>
+      <li data-lp-step>
+        <p>
+          <span class="cl-dots-title">Una entrada por noche, un cobro por noche.</span>
+          <span class="cl-dots-text">
+            Si la entrada es para una noche específica, lo de esa noche queda disponible {PAYOUT_RELEASE_HOURS} h después
+            de que termina*. Si vendes un pase válido para todas las noches, se cobra con la última.
+          </span>
+        </p>
+      </li>
+      <li data-lp-step>
+        <p>
+          <span class="cl-dots-title">Duplica la temporada.</span>
+          <span class="cl-dots-text">Copia descripción, imagen, lugar, tipos de entrada y preguntas frecuentes. Solo agregas las fechas nuevas.</span>
+        </p>
+      </li>
+    </ul>
+
+    <p class="cn-web" data-lp-step>
+      <a href="/web-gratis" class="cl-link cl-meta">Tu cartelera en tu propia web, gratis →</a>
+      <span class="cl-note">Plantilla nocturna y dominio propio si quieres.</span>
+    </p>
+    <p class="cn-web cn-guide" data-lp-step>
+      <a href="/guias/como-hacer-una-preventa" class="cl-link cl-meta">Guía: cómo hacer una preventa →</a>
+    </p>
+    <p class="cl-note cn-terms" data-lp-step><a href={TERMS_NOTE.href} class="cl-link">{TERMS_NOTE.text}</a></p>
+  </div>
+</section>
+
+<style>
+  .cn-halo {
+    --size: 760px;
+    right: -320px;
+    top: -200px;
+  }
+  .cn-lead {
+    max-width: 640px;
+    margin-top: 20px;
+  }
+  .cn-grid {
+    display: grid;
+    gap: 20px;
+    margin-top: 36px;
+  }
+  .cn-photo :global(.cl-capsule) {
+    aspect-ratio: 3 / 4;
+    max-height: 420px;
+    width: 100%;
+  }
+  .cn-lines {
+    margin-top: 36px;
+  }
+  .cn-lines p {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .cn-web {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px 12px;
+    margin-top: 28px;
+  }
+  .cn-web .cl-link {
+    color: var(--cl-text-1);
+    min-height: 44px;
+  }
+  .cn-guide {
+    margin-top: 4px;
+  }
+  .cn-terms {
+    margin-top: 16px;
+  }
+  @media (min-width: 900px) {
+    .cn-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+      gap: 48px;
+      align-items: end;
+    }
+    .cn-lead {
+      margin-top: 0;
+    }
+    .cn-grid {
+      grid-template-columns: 280px minmax(0, 1fr);
+      gap: 28px;
+      align-items: start;
+      margin-top: 48px;
+    }
+    .cn-photo :global(.cl-capsule) {
+      aspect-ratio: 3 / 5;
+      max-height: none;
+      border-radius: 999px;
+    }
+    .cn-lines {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 28px;
+      margin-top: 44px;
+    }
+  }
+</style>

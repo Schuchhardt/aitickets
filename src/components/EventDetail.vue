@@ -18,7 +18,7 @@ import { vReveal } from "./event/reveal.js";
 import IridescenceBg from "./event/IridescenceBg.vue";
 import { normalizePageSettings, pageBackgroundPreset } from "../lib/eventPageSettings";
 import PurchasedTicketsModal from "./PurchasedTicketsModal.vue";
-import { cardState, stockSummary, minFinalPrice, formatCLP, formatSaleStart, readCheckoutParams, upcomingFunctions, formatFunctionShort, readReviewHash, formatRating, reviewsCountLabel } from "./event/eventView.js";
+import { cardState, stockSummary, minFinalPrice, formatCLP, formatSaleStart, readCheckoutParams, upcomingFunctions, formatFunctionShort, readReviewHash, formatRating, reviewsCountLabel, cardFunctionChips, attendeeFeedUrl } from "./event/eventView.js";
 import { addToCalendar } from "./event/shareActions.js";
 import { cdnImage, cdnSrcset, EVENT_COVER_SIZES } from "../lib/imageCdn.js";
 import { storedOrders, trackFunnel } from "./event/checkoutApi.js";
@@ -182,13 +182,21 @@ const pastPlace = ref(false);
 const cardVisible = ref(true);
 let observers = [];
 const showBar = computed(() => {
-  if (isPaidOnSale.value) return pastPlace.value && !checkout.value;
-  if (state.value === "free") return !cardVisible.value && !["success", "waitlist_ok", "already"].includes(rsvpState.value);
+  // Con la card visible en mobile (varias funciones, §4.4b c) la barra espera a que la card salga de pantalla
+  if (isPaidOnSale.value) return pastPlace.value && !checkout.value && (cardHiddenOnMobile.value || !cardVisible.value);
+  if (state.value === "free") return !cardVisible.value && !["success", "confirmed", "waitlist_ok", "already"].includes(rsvpState.value);
   return false;
 });
+// Varias funciones (§4.9b): la barra dice cuántas hay en vez de la nota del cargo. Con un solo tipo de entrada
+// (paid_simple) se mantienen el precio exacto y "Comprar": el checkout va directo a Tus datos
+const functionsCount = computed(() => upcomingFunctions(props.event).length);
+const priceNote = computed(() => {
+  if (functionsCount.value > 1) return `${functionsCount.value} funciones`;
+  return props.event.fee_absorbed ? "precio final por entrada" : "por entrada, incluye cargo";
+});
 const bar = computed(() => {
-  if (state.value === "paid_simple") return { price: formatCLP(fromPrice.value), note: props.event.fee_absorbed ? "precio final por entrada" : "por entrada, incluye cargo", cta: "Comprar" };
-  if (state.value === "paid_multi") return { price: `Desde ${formatCLP(fromPrice.value)}`, note: props.event.fee_absorbed ? "precio final por entrada" : "por entrada, incluye cargo", cta: "Elegir entradas" };
+  if (state.value === "paid_simple") return { price: formatCLP(fromPrice.value), note: priceNote.value, cta: "Comprar" };
+  if (state.value === "paid_multi") return { price: `Desde ${formatCLP(fromPrice.value)}`, note: priceNote.value, cta: "Elegir entradas" };
   return { price: "Gratis", note: stock.value?.few ? `Quedan ${stock.value.remaining} cupos` : "", warning: Boolean(stock.value?.few), cta: "Confirmar asistencia" };
 });
 function onBarAction() {
@@ -203,12 +211,23 @@ const onShare = () => (showShareModal.value = true);
 const orders = ref([]);
 const showOrders = ref(false);
 const refreshOrders = () => (orders.value = storedOrders(props.event.id));
+// "Ver quiénes van →" de la fila mobile (en mobile la card de los pagados a la venta no se muestra)
+const feedUrl = computed(() => attendeeFeedUrl(orders.value));
 
 function scrollToId(id) {
   const el = document.getElementById(id);
   if (!el) return;
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+}
+// Desde la card ("+ N funciones", "Ver todas las funciones ↓"): además del scroll, el foco pasa al título de la
+// sección (#<id>-title) para que el teclado y el lector de pantalla sigan ahí (§11)
+function goToSection(id) {
+  scrollToId(id);
+  const title = document.getElementById(`${id}-title`);
+  if (!title) return;
+  if (!title.hasAttribute("tabindex")) title.setAttribute("tabindex", "-1");
+  title.focus({ preventScroll: true });
 }
 const openAssistant = () => eventBus.emit("assistant-open");
 
@@ -299,8 +318,11 @@ onBeforeUnmount(() => {
   eventBus.off("open-modal", onAssistantOpenCheckout);
 });
 
-// En mobile la card de los eventos pagados a la venta no se muestra: la barra inferior abre el checkout
-const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
+// En mobile la card de los eventos pagados a la venta no se muestra: la barra inferior abre el checkout. Excepción:
+// varias funciones con chips (§4.4b c), donde la card va inline después del lugar (como la de los gratis) para
+// elegir la función desde ahí; los eventos de una función quedan igual.
+const cardHasChips = computed(() => state.value === "paid_multi" && cardFunctionChips(props.event).chips.length > 0);
+const cardHiddenOnMobile = computed(() => isPaidOnSale.value && !cardHasChips.value);
 </script>
 
 <template>
@@ -364,7 +386,7 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
             :show-organizer="pageSettings.show_organizer"
             :thumb="layout === 'compact' ? coverSrc || '' : ''"
             :thumb-srcset="layout === 'compact' ? coverSrcset : undefined"
-            @show-functions="scrollToId('funciones')"
+            @show-functions="goToSection('funciones')"
             @show-location="scrollToId('ubicacion')"
             @open-image="showImage = true"
           />
@@ -390,22 +412,26 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
               :event="event"
               :state="state"
               :external-url="externalUrl"
-              :orders-count="orders.length"
+              :orders="orders"
               @checkout="openCheckout"
               @view-orders="showOrders = true"
               @rsvp-state="rsvpState = $event"
               @review="scrollToId('resenas')"
+              @show-functions="goToSection('funciones')"
             />
             <div v-if="state !== 'ended' && rsvpState !== 'success'" class="secondary">
               <button type="button" class="secondary-btn" @click="onShare">
                 <svg class="share-ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8" /></svg>
                 Compartir
               </button>
-              <span aria-hidden="true" class="secondary-sep">·</span>
-              <button type="button" class="secondary-btn" @click="addToCalendar(event)">
-                <svg class="cal-ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
-                Añadir al calendario
-              </button>
+              <!-- Asistencia confirmada: la card ya trae "Añadir al calendario" -->
+              <template v-if="rsvpState !== 'confirmed'">
+                <span aria-hidden="true" class="secondary-sep">·</span>
+                <button type="button" class="secondary-btn" @click="addToCalendar(event)">
+                  <svg class="cal-ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+                  Añadir al calendario
+                </button>
+              </template>
             </div>
           </div>
         </div>
@@ -418,6 +444,10 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
             <template v-if="orders.length">
               <span aria-hidden="true" class="secondary-sep">·</span>
               <button type="button" class="secondary-btn" @click="showOrders = true">Mis entradas ({{ orders.length }})</button>
+            </template>
+            <template v-if="feedUrl">
+              <span aria-hidden="true" class="secondary-sep">·</span>
+              <a :href="feedUrl" class="secondary-btn" data-testid="mobile-feed-link">Ver quiénes van →</a>
             </template>
           </div>
           <EventSections
@@ -719,6 +749,7 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value);
   border: 0;
   cursor: pointer;
   border-radius: 4px;
+  text-decoration: none; /* también hay links (<a>) en la fila */
 }
 .secondary-btn:hover {
   color: var(--text-1);

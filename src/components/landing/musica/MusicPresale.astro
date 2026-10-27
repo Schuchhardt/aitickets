@@ -1,0 +1,123 @@
+---
+// 4 · Preventa por tandas (SPEC_landing_musica §4.4, bloque rojo a sangre, ancla #preventa): texto tinta sobre rojo
+// (≈ 6:1), grano al 10 % y la demo de tandas (TierStack). Capacidades verificadas en el código: tipos de entrada con
+// precio y cupo (EditEventForm.vue), ventana de venta por entrada que hoy se programa desde el asistente de IA
+// (tools/tickets.ts), máximo por compra (DEFAULT_MAX_PER_PURCHASE), códigos con usos, límite por comprador y término
+// (discounts.mjs) y lista de "Avísame" (api/events/waitlist.ts). El aviso automático a esa lista no existe: "Pronto".
+// No hay mapa de asientos numerados y se dice (no va como "Pronto", §0.6). Al pie, la guía de preventa (links internos, §9).
+import TierStack from "./TierStack.vue";
+import SoonBadge from "../../ui/SoonBadge.vue";
+import { DEFAULT_MAX_PER_PURCHASE } from "../../Reservation/pricing.js";
+
+const capabilities = [
+  { title: "Tandas con cupo", text: "Preventa 1, 2 y General, o las que quieras, cada una con su precio." },
+  {
+    title: "Hora de apertura",
+    text: "La página muestra \"Venta abre el …\" y anota a quienes quieren enterarse. Hoy la hora se programa desde tu asistente de IA conectado o escribiéndonos por WhatsApp.",
+  },
+  {
+    title: "Máximo por compra",
+    text: `${DEFAULT_MAX_PER_PURCHASE} entradas por persona si no lo cambias, para que la preventa alcance para más gente.`,
+  },
+  { title: "Códigos con fecha límite", text: "Por porcentaje o monto, con usos máximos, límite por comprador y fecha de término." },
+  { title: "Lista de espera cuando se agota", text: "Tu público deja su correo en la página del evento.", soon: "Aviso automático" },
+];
+---
+
+<section id="preventa" class="mu-section mu-on-red mu-grain ps" aria-labelledby="mu-presale-title" data-mu-section="presale">
+  <div class="mu-wrap ps-grid">
+    <div class="ps-copy" data-lp-reveal>
+      <p class="mu-mono ps-num" data-lp-step aria-hidden="true">03 —</p>
+      <h2 id="mu-presale-title" class="mu-h2" data-lp-step>Preventa que se agota <span class="mu-outline">de verdad.</span></h2>
+      <p class="ps-lead" data-lp-step>
+        Cada tanda es un tipo de entrada con su precio y su cupo. Cuando se acaba, se ve agotada y queda la siguiente.
+        ¿Cancha, platea y VIP? También son tipos de entrada, cada uno con su cupo. No hay mapa de asientos numerados.
+      </p>
+      <ul class="ps-list">
+        {
+          capabilities.map((c) => (
+            <li class="ps-item" data-lp-step>
+              <span class="mu-square" aria-hidden="true" />
+              <p>
+                <strong>{c.title}</strong> — {c.text}
+                {c.soon && (
+                  <span class="ps-soon">
+                    {c.soon} <SoonBadge dark={false} />
+                  </span>
+                )}
+              </p>
+            </li>
+          ))
+        }
+      </ul>
+      <a href="/guias/como-hacer-una-preventa" class="mu-link mu-mono ps-guide" data-lp-step>Guía: cómo hacer una preventa <span aria-hidden="true">→</span></a>
+    </div>
+    <div class="ps-demo">
+      <TierStack client:visible={{ rootMargin: "200px" }} />
+    </div>
+  </div>
+</section>
+
+<style>
+  .ps {
+    background: var(--mu-red);
+    color: var(--mu-ink);
+  }
+  .ps::after {
+    opacity: 0.1;
+  }
+  .ps-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 40px;
+  }
+  .ps-num {
+    margin-bottom: 20px;
+    color: rgba(17, 16, 19, 0.6);
+  }
+  .ps-lead {
+    max-width: 560px;
+    margin-top: 20px;
+    font-size: 16px;
+    line-height: 25px;
+  }
+  .ps-list {
+    display: grid;
+    gap: 14px;
+    margin-top: 32px;
+  }
+  .ps-item {
+    display: flex;
+    gap: 12px;
+    font-size: 15px;
+    line-height: 24px;
+  }
+  .ps-item strong {
+    font-weight: 700;
+  }
+  .ps-guide {
+    margin-top: 28px;
+  }
+  .ps-soon {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 4px;
+    font-weight: 600;
+  }
+  @media (min-width: 1024px) {
+    .ps-grid {
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+      align-items: start;
+      gap: 80px;
+    }
+    .ps-lead {
+      font-size: 18px;
+      line-height: 29px;
+    }
+    .ps-item {
+      font-size: 16px;
+      line-height: 25px;
+    }
+  }
+</style>

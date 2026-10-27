@@ -1,0 +1,103 @@
+---
+// 6 · Todo lo demás, incluido (SPEC_landing_productores §5.6). Seis ítems sin cards, separados por bordes finos.
+// Verificado como en landing/RecurringSection.vue: MAX_FUNCTIONS = 60 (producer-api/tools/schedule.ts), duplicar
+// evento, roles de permissions.ts, recordatorio y aviso por cambios, asistente de la página y sitios con dominio propio.
+// Al final, una fila de texto (sin cards, §3) con las landings por tipo de evento que antes enlazaba el hub: sale de
+// LANDINGS, así crece sola cuando se suman nichos nuevos.
+import { CalendarDays, Copy, UserCog, BellRing, MessageCircleQuestion, Globe } from "lucide-vue-next";
+import { LANDINGS } from "../../../data/landings";
+
+const verticals = LANDINGS.filter((l) => l.kind === "vertical");
+
+const items = [
+  { icon: CalendarDays, title: "Hasta 60 funciones por evento", text: "Entradas para una función o válidas para todas." },
+  { icon: Copy, title: "Duplica la próxima semana", text: "Conserva descripción, imagen, lugar y entradas; solo cambias las fechas." },
+  { icon: UserCog, title: "Cada persona con su rol", text: "Puerta, Marketing, Finanzas o Solo lectura, por evento." },
+  { icon: BellRing, title: "Asistentes avisados", text: "QR al instante, recordatorio antes de la función y aviso si cambia algo." },
+  { icon: MessageCircleQuestion, title: "Menos mensajes por Instagram", text: "Un asistente en tu página responde horarios, lugar y edad mínima." },
+  { icon: Globe, title: "Tu web de eventos, gratis", text: "Todos tus eventos en una página, con tu propio dominio.", href: "/web-gratis" },
+];
+---
+
+<section class="lp-section lp-surface" aria-labelledby="extras-title" data-lp-section="extras">
+  <div class="lp-wrap" data-lp-reveal>
+    <h2 id="extras-title" class="lp-h2" data-lp-step>Todo lo demás, incluido.</h2>
+    <ul class="extras">
+      {items.map(({ icon: Icon, ...item }) => (
+        <li class="extra" data-lp-step>
+          <Icon class="extra-icon" size={24} aria-hidden="true" />
+          <h3 class="extra-title">
+            {item.href ? <a href={item.href} class="extra-link">{item.title}</a> : item.title}
+          </h3>
+          <p class="lp-body extra-text">{item.text}</p>
+        </li>
+      ))}
+    </ul>
+    <nav class="extras-niches" data-lp-step aria-label="AI Tickets según lo que produces">
+      <span class="extras-niches-label">Según lo que produces:</span>
+      {verticals.map((l) => (
+        <a href={`/${l.slug}`} class="lp-inline-link" data-cta="vertical" data-section="extras">{l.card.title}</a>
+      ))}
+    </nav>
+  </div>
+</section>
+
+<style>
+  .extras {
+    display: grid;
+    margin-top: 28px;
+    border-top: 1px solid var(--border-strong);
+  }
+  .extra {
+    padding: 22px 0;
+    border-bottom: 1px solid var(--border-strong);
+  }
+  .extra :global(.extra-icon) {
+    color: var(--text-1);
+  }
+  .extra-title {
+    margin-top: 10px;
+    font-size: 17px;
+    font-weight: 600;
+  }
+  .extra-link {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-color: var(--border-strong);
+  }
+  .extra-link:hover {
+    text-decoration-color: currentColor;
+  }
+  .extra-text {
+    margin-top: 6px;
+    font-size: 15px;
+    line-height: 23px;
+  }
+  .extras-niches {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+    margin-top: 28px;
+    font-size: 15px;
+    line-height: 23px;
+  }
+  .extras-niches-label {
+    color: var(--text-2);
+  }
+  @media (min-width: 768px) {
+    .extras {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: 28px;
+    }
+  }
+  @media (min-width: 1024px) {
+    .extras {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      margin-top: 44px;
+    }
+    .extra {
+      padding: 28px 28px 28px 0;
+    }
+  }
+</style>

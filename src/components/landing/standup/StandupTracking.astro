@@ -1,0 +1,58 @@
+---
+// Analítica de la landing de stand-up (SPEC_landing_standup §8): los eventos de la landing principal con prefijo su_.
+//   su_view                    carga de la página
+//   su_cta_click {position}    clic en un CTA de publicar ([data-cta="publish"], position = data-section)
+//   su_whatsapp_click / su_video_open / su_ai_connect_click {position}
+//   su_faq_open {question}     abre una pregunta (el botón todavía dice aria-expanded="false" en la fase de captura)
+//   su_tile_click {format}     clic en un formato de "Del open mic a la gira" ([data-su-tile])
+//   su_section_view {section}  cada [data-su-section] entra en pantalla (una vez)
+//   su_video_progress {pct}    25/50/75/100% del video del modal (lo manda VideoModal con progressEvent, como lp_)
+//   su_calc_change {price, payer, field}  uso de la calculadora de precio, 1 s después del último cambio y una vez por
+//                              sesión por campo (lo manda PriceSentence con useCalcChangeTracking, como lp_calc_change)
+// su_mk_toggle y su_ads_demo los mandan las islas de marketing. CtaTracking sigue midiendo producer_cta_clicked.
+---
+
+<script>
+  import { trackEvent } from "../../../composables/useGoogleAnalytics.js";
+
+  const CTA_EVENTS: Record<string, string> = {
+    publish: "su_cta_click",
+    whatsapp: "su_whatsapp_click",
+    video: "su_video_open",
+    connect_ai: "su_ai_connect_click",
+  };
+
+  trackEvent("su_view", { page: location.pathname });
+
+  document.addEventListener(
+    "click",
+    (e) => {
+      const target = e.target as Element | null;
+      const cta = target?.closest?.("[data-cta]");
+      const name = cta && CTA_EVENTS[cta.getAttribute("data-cta") || ""];
+      if (cta && name) trackEvent(name, { position: cta.getAttribute("data-section") || "" });
+
+      const tile = target?.closest?.("[data-su-tile]");
+      if (tile) trackEvent("su_tile_click", { format: tile.getAttribute("data-su-tile") });
+
+      const question = target?.closest?.('[data-testid="landing-faq"] button[aria-expanded="false"]');
+      if (question) trackEvent("su_faq_open", { question: question.textContent?.trim().slice(0, 100) || "" });
+    },
+    { capture: true },
+  );
+
+  if ("IntersectionObserver" in window) {
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          trackEvent("su_section_view", { section: (entry.target as HTMLElement).dataset.suSection });
+          io.unobserve(entry.target);
+        }
+      },
+      // Con margen y no con umbral de área: una sección más alta que la pantalla nunca llegaría al 30%
+      { rootMargin: "0px 0px -40% 0px", threshold: 0 },
+    );
+    document.querySelectorAll("[data-su-section]").forEach((section) => io.observe(section));
+  }
+</script>

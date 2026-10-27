@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>AI Tickets para productores — mobile</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&amp;family=Prompt:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;-webkit-font-smoothing:antialiased}
+a{color:#0A0A0B}a:hover{color:#5B5B63}
+.btn-primary:active{transform:scale(.98)}
+.seg{transition:transform 200ms cubic-bezier(.65,0,.35,1)}
+.faq-body{transition:grid-template-rows 200ms cubic-bezier(.65,0,.35,1)}
+.chev{transition:transform 200ms cubic-bezier(.65,0,.35,1)}
+.hdr{transition:background 200ms,border-color 200ms}
+input[type=range]{accent-color:#0A0A0B;width:100%;height:28px;margin:0}
+@keyframes up{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes barUp{from{transform:translateY(100%)}to{transform:none}}
+@keyframes kb{from{transform:scale(1.02)}to{transform:scale(1.12) translate(-2%,-1%)}}
+.kb{animation:kb 9s ease-in-out infinite alternate}
+@keyframes bump{0%{transform:scale(1)}40%{transform:scale(1.15)}100%{transform:scale(1)}}
+.bump{animation:bump 320ms cubic-bezier(.34,1.56,.64,1)}
+@media (prefers-reduced-motion: reduce){.kb,.bump{animation:none}}
+@keyframes popIn{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}
+@keyframes fillBar{from{transform:scaleX(0)}to{transform:scaleX(.71)}}
+.h1{animation:up 480ms cubic-bezier(.22,1,.36,1) both}
+.h2{animation:up 480ms cubic-bezier(.22,1,.36,1) 60ms both}
+.h3{animation:up 480ms cubic-bezier(.22,1,.36,1) 120ms both}
+.h4{animation:up 480ms cubic-bezier(.22,1,.36,1) 180ms both}
+.fc1{animation:popIn 400ms cubic-bezier(.34,1.56,.64,1) 500ms both}
+.fill71{transform-origin:left;animation:fillBar 900ms cubic-bezier(.22,1,.36,1) 700ms both}
+.bar-up{animation:barUp 320ms cubic-bezier(.22,1,.36,1) both}
+@media (prefers-reduced-motion: reduce){*{animation-duration:1ms !important;animation-delay:0ms !important;transition-duration:1ms !important}}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; font-family: 'Prompt', system-ui, sans-serif; color: #0A0A0B; background: #FFFFFF">
+  <div onScroll="{{onScroll}}" style="position: absolute; inset: 0; overflow-y: auto">
+
+    <header class="hdr" style="position: sticky; top: 0; z-index: 5; height: 56px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; background: {{hdrBg}}; border-bottom: 1px solid {{hdrBorder}}; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px)">
+      <a href="#" style="display: flex; align-items: center; gap: 2px; text-decoration: none; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 15px; letter-spacing: .14em; color: #0A0A0B" aria-label="AI Tickets, inicio"><span style="background: #0A0A0B; color: #FFFFFF; padding: 2px 5px; letter-spacing: .04em">AI</span><span>TICKETS</span></a>
+      <div style="display: flex; align-items: center; gap: 14px">
+        <a href="#" style="font-size: 14px; font-weight: 500; text-decoration: none">Ingresar</a>
+        <button type="button" aria-label="Abrir menú" style="width: 40px; height: 40px; border-radius: 10px; border: 1px solid rgba(0,0,0,.12); background: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0A0A0B" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg></button>
+      </div>
+    </header>
+
+    <section style="padding: 28px 16px 0">
+      <div class="h1" style="font-size: 11px; font-weight: 600; letter-spacing: .08em; color: #5B5B63; line-height: 17px">PARA PRODUCTORES · SIN MENSUALIDAD<br>0% DE COMISIÓN PARA TI</div>
+      <h1 class="h2" style="font-family: 'Sora', sans-serif; font-size: 40px; line-height: 44px; font-weight: 700; letter-spacing: -.03em; margin: 14px 0 0">Tu próxima función merece vender más.</h1>
+      <p class="h3" style="font-size: 17px; line-height: 26px; color: #3A3A40; margin: 16px 0 0">Publica tus fechas en minutos, mide qué promotor vende y recibe lo de cada función 48 horas después del evento.</p>
+      <div class="h4" style="margin-top: 24px; display: flex; flex-direction: column; gap: 14px">
+        <a href="#" class="btn-primary" style="height: 52px; border-radius: 12px; background: #0A0A0B; color: #FFFFFF; text-decoration: none; font-size: 16px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 10px">Publicar mi próxima función →</a>
+        <button type="button" style="height: 48px; border-radius: 12px; border: 1px solid rgba(0,0,0,.16); background: #FFFFFF; font-family: inherit; font-size: 15px; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 10px"><svg width="12" height="12" viewBox="0 0 24 24" fill="#0A0A0B" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"></path></svg>Ver cómo funciona · 1 min</button>
+        <p style="font-size: 13px; line-height: 19px; color: #6E6E76; margin: 0; text-align: center">Crear tu cuenta es gratis. El comprador paga un cargo de 8% + IVA, o lo absorbes tú.</p>
+      </div>
+
+      <div style="position: relative; height: 360px; margin-top: 28px; border-radius: 24px; background: #F6F6F7; overflow: hidden">
+        <div style="position: absolute; left: 50%; top: 32px; transform: translateX(-50%); width: 230px; height: 400px; border-radius: 36px; background: #0A0A0B; padding: 8px; box-sizing: border-box">
+          <div style="width: 100%; height: 100%; border-radius: 28px; overflow: hidden; background: #FFFFFF">
+            <div style="margin: 30px 10px 0; aspect-ratio: 1 / 1; border-radius: 14px; background: #24163F; position: relative; overflow: hidden">
+              <sc-if value="{{hasVideo}}" hint-placeholder-val="{{ true }}"><video ref="{{setVideo}}" src="{{videoSrc}}" poster="/_blob/899c0963b58a6351ce891c650af928f5" autoplay="" muted="" loop="" playsinline="" aria-hidden="true" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover"></video></sc-if>
+              <sc-if value="{{noVideo}}" hint-placeholder-val="{{ false }}"><img class="kb" src="/_blob/899c0963b58a6351ce891c650af928f5" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover"></sc-if>
+              <div aria-hidden="true" style="position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.45) 0%, rgba(0,0,0,0) 45%)"></div>
+              <div style="position: absolute; left: 12px; top: 12px; font-family: 'Sora', sans-serif; color: #FFFFFF; font-size: 22px; line-height: .95; font-weight: 800">STAND-UP<br>DE VIERNES</div>
+            </div>
+            <div style="padding: 10px; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 14px">Stand-up de Viernes</div>
+          </div>
+        </div>
+        <div class="fc1" style="position: absolute; left: 14px; bottom: 18px; right: 14px; background: #FFFFFF; border-radius: 14px; padding: 12px 14px; box-shadow: 0 12px 32px rgba(0,0,0,.12)">
+          <div style="display: flex; justify-content: space-between; font-size: 13px"><span style="font-weight: 600">142 de 200 vendidas</span><span style="color: #5B5B63">Datos de ejemplo</span></div>
+          <div style="height: 6px; border-radius: 3px; background: #EDEDEF; margin-top: 8px; overflow: hidden"><div class="fill71" style="height: 100%; background: #9AE600"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section style="padding: 28px 16px 0">
+      <div style="font-size: 13px; color: #5B5B63">Productores que ya venden con AI Tickets</div>
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px">
+        <div style="height: 36px; border-radius: 8px; border: 1px dashed rgba(0,0,0,.18); display: flex; align-items: center; justify-content: center; font-size: 11px; color: #8E8E96">[Logo]</div>
+        <div style="height: 36px; border-radius: 8px; border: 1px dashed rgba(0,0,0,.18); display: flex; align-items: center; justify-content: center; font-size: 11px; color: #8E8E96">[Logo]</div>
+        <div style="height: 36px; border-radius: 8px; border: 1px dashed rgba(0,0,0,.18); display: flex; align-items: center; justify-content: center; font-size: 11px; color: #8E8E96">[Logo]</div>
+      </div>
+    </section>
+
+    <section style="padding: 72px 16px 0">
+      <div style="font-size: 12px; font-weight: 600; letter-spacing: .08em; color: #5B5B63">CÓMO FUNCIONA</div>
+      <h2 style="font-family: 'Sora', sans-serif; font-size: 30px; line-height: 34px; font-weight: 700; letter-spacing: -.02em; margin: 10px 0 0">De la fecha a la puerta, en un solo lugar.</h2>
+      <div style="display: flex; flex-direction: column; gap: 22px; margin-top: 26px">
+        <div style="display: flex; gap: 14px"><div style="font-family: 'Sora', sans-serif; font-weight: 700; color: #8E8E96; width: 26px">01</div><div><div style="font-weight: 600; font-size: 17px">Publica</div><div style="font-size: 15px; line-height: 23px; color: #5B5B63; margin-top: 2px">Todas las fechas en un solo evento. Para la próxima temporada, lo duplicas.</div></div></div>
+        <div style="display: flex; gap: 14px"><div style="font-family: 'Sora', sans-serif; font-weight: 700; color: #8E8E96; width: 26px">02</div><div><div style="font-weight: 600; font-size: 17px">Comparte</div><div style="font-size: 15px; line-height: 23px; color: #5B5B63; margin-top: 2px">Un link para cada comediante, promotor o campaña, y posts listos con IA.</div></div></div>
+        <div style="display: flex; gap: 14px"><div style="font-family: 'Sora', sans-serif; font-weight: 700; color: #8E8E96; width: 26px">03</div><div><div style="font-weight: 600; font-size: 17px">Cobra</div><div style="font-size: 15px; line-height: 23px; color: #5B5B63; margin-top: 2px">Tu equipo valida con QR desde el celular y lo recaudado llega 48 h después del evento.</div></div></div>
+      </div>
+    </section>
+
+    <section style="margin-top: 72px; background: #F6F6F7; padding: 56px 16px">
+      <div style="font-size: 12px; font-weight: 600; letter-spacing: .08em; color: #5B5B63">PRECIO</div>
+      <h2 style="font-family: 'Sora', sans-serif; font-size: 30px; line-height: 34px; font-weight: 700; letter-spacing: -.02em; margin: 10px 0 0">Sin mensualidad. Se cobra solo cuando vendes.</h2>
+      <p style="font-size: 15px; line-height: 23px; color: #3A3A40; margin: 12px 0 0">Para ti, 0% de comisión. El comprador paga 8% + IVA sobre ese cargo, o lo absorbes tú. Las entradas gratis no pagan cargo.</p>
+      <div style="margin-top: 22px; background: #FFFFFF; border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 20px">
+        <div>
+          <div style="display: flex; justify-content: space-between; font-size: 14px"><label for="m-price" style="font-weight: 600">Precio de tu entrada</label><span style="font-weight: 600; font-variant-numeric: tabular-nums">{{priceLabel}}</span></div>
+          <input id="m-price" type="range" min="1000" max="100000" step="500" value="{{price}}" onChange="{{onPrice}}" aria-valuetext="{{priceLabel}}" style="margin-top: 8px">
+        </div>
+        <div>
+          <div style="display: flex; justify-content: space-between; font-size: 14px"><label for="m-qty" style="font-weight: 600">Entradas que esperas vender</label><span style="font-weight: 600; font-variant-numeric: tabular-nums">{{qty}}</span></div>
+          <input id="m-qty" type="range" min="10" max="1000" step="10" value="{{qty}}" onChange="{{onQty}}" style="margin-top: 8px">
+        </div>
+        <div role="radiogroup" aria-label="¿Quién paga el cargo?" style="position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); background: #F6F6F7; border-radius: 12px; padding: 4px">
+          <div class="seg" aria-hidden="true" style="position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc(50% - 4px); border-radius: 9px; background: #FFFFFF; box-shadow: 0 1px 2px rgba(0,0,0,.08); transform: {{segX}}"></div>
+          <button type="button" role="radio" aria-checked="{{buyerChecked}}" onClick="{{payBuyer}}" style="position: relative; height: 44px; border: 0; background: none; font-family: inherit; font-size: 14px; font-weight: 500; color: {{buyerColor}}">Paga el comprador</button>
+          <button type="button" role="radio" aria-checked="{{meChecked}}" onClick="{{payMe}}" style="position: relative; height: 44px; border: 0; background: none; font-family: inherit; font-size: 14px; font-weight: 500; color: {{meColor}}">Lo absorbo yo</button>
+        </div>
+        <div style="border-top: 1px solid rgba(0,0,0,.08); padding-top: 16px; display: flex; flex-direction: column; gap: 6px; font-size: 14px">
+          <div style="display: flex; justify-content: space-between"><span style="color: #5B5B63">El comprador paga</span><span style="font-weight: 600; font-variant-numeric: tabular-nums">{{buyerPays}}</span></div>
+          <div style="display: flex; justify-content: space-between"><span style="color: #5B5B63">Recibes por entrada</span><span style="font-weight: 600; font-variant-numeric: tabular-nums">{{perTicket}}</span></div>
+          <div style="color: #5B5B63; margin-top: 10px">Tú recibes en total</div>
+          <div aria-live="polite" style="font-family: 'Sora', sans-serif; font-size: 34px; line-height: 40px; font-weight: 700; font-variant-numeric: tabular-nums">{{total}}</div>
+        </div>
+      </div>
+    </section>
+
+    <section style="background: #0A0A0B; color: #FFFFFF; padding: 64px 16px">
+      <div style="font-size: 12px; font-weight: 600; letter-spacing: .08em; color: #A1A1AA">LINKS CON SEGUIMIENTO</div>
+      <h2 style="font-family: 'Sora', sans-serif; font-size: 30px; line-height: 34px; font-weight: 700; letter-spacing: -.02em; margin: 10px 0 0">¿Quién está vendiendo tus entradas?</h2>
+      <p style="font-size: 15px; line-height: 23px; color: #C9C9CF; margin: 12px 0 0">Un link para cada integrante del line-up, promotor o campaña. Ves órdenes, entradas e ingresos por canal, sin reportes a mano.</p>
+      <div style="margin-top: 22px; background: #141416; border: 1px solid rgba(255,255,255,.08); border-radius: 18px; padding: 18px; display: flex; flex-direction: column; gap: 16px">
+        <div><div style="display: flex; justify-content: space-between; font-size: 14px"><strong style="font-weight: 600">Link de campaña</strong><span>37</span></div><div style="height: 6px; border-radius: 3px; background: #26262A; margin-top: 8px"><div style="width: 92%; height: 100%; border-radius: 3px; background: #9AE600"></div></div></div>
+        <div><div style="display: flex; justify-content: space-between; font-size: 14px"><strong style="font-weight: 600">Link de Pedro</strong><span>23</span></div><div style="height: 6px; border-radius: 3px; background: #26262A; margin-top: 8px"><div style="width: 58%; height: 100%; border-radius: 3px; background: #9AE600"></div></div></div>
+        <div><div style="display: flex; justify-content: space-between; font-size: 14px"><strong style="font-weight: 600">Link de Ana</strong><span>11</span></div><div style="height: 6px; border-radius: 3px; background: #26262A; margin-top: 8px"><div style="width: 28%; height: 100%; border-radius: 3px; background: #9AE600"></div></div></div>
+        <div style="font-size: 11px; color: #8E8E96">Datos de ejemplo</div>
+      </div>
+    </section>
+
+    <section style="padding: 64px 16px 0">
+      <div style="font-size: 12px; font-weight: 600; letter-spacing: .08em; color: #5B5B63">MARKETING EN PILOTO AUTOMÁTICO</div>
+      <h2 style="font-family: 'Sora', sans-serif; font-size: 30px; line-height: 34px; font-weight: 700; letter-spacing: -.02em; margin: 10px 0 0">Tu evento se promociona solo, todos los días.</h2>
+      <p style="font-size: 15px; line-height: 23px; color: #3A3A40; margin: 12px 0 0">Conecta tus redes y programa historias, posts y reels que se publican solos hasta la función.</p>
+      <div style="margin-top: 18px; border: 1px solid rgba(0,0,0,.08); border-radius: 16px; overflow: hidden">
+        <div style="display: flex; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid rgba(0,0,0,.06); font-size: 14px"><span>Historia diaria · 19:00</span><span style="color: #2F5A00; font-weight: 600">Activa</span></div>
+        <div style="display: flex; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid rgba(0,0,0,.06); font-size: 14px"><span>Post lun · mié · vie · 12:00</span><span style="color: #2F5A00; font-weight: 600">Activa</span></div>
+        <div style="display: flex; justify-content: space-between; padding: 12px 14px; font-size: 14px"><span>Reel antes de la función</span><span style="color: #2F5A00; font-weight: 600">Activa</span></div>
+      </div>
+      <div style="margin-top: 12px; background: #0A0A0B; color: #FFFFFF; border-radius: 16px; padding: 16px">
+        <div style="font-weight: 600">¿Faltan entradas? Impulsa con anuncios.</div>
+        <div style="font-size: 13px; line-height: 19px; color: #C9C9CF; margin-top: 4px">Opcional. Tú defines el presupuesto diario y la pausas cuando quieras.</div>
+      </div>
+    </section>
+
+    <section style="padding: 64px 16px 0">
+      <div style="font-size: 12px; font-weight: 600; letter-spacing: .08em; color: #5B5B63">ANTES, DURANTE Y DESPUÉS</div>
+      <h2 style="font-family: 'Sora', sans-serif; font-size: 30px; line-height: 34px; font-weight: 700; letter-spacing: -.02em; margin: 10px 0 0">Tu evento se ve vivo antes y se recuerda después.</h2>
+      <div style="margin-top: 20px; position: relative; aspect-ratio: 4 / 5; border-radius: 18px; overflow: hidden; background: #0A0A0B">
+        <sc-if value="{{hasVideo}}" hint-placeholder-val="{{ true }}"><video ref="{{setVideo}}" src="{{videoSrc}}" poster="/_blob/899c0963b58a6351ce891c650af928f5" autoplay="" muted="" loop="" playsinline="" aria-label="Video de portada de ejemplo" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover"></video></sc-if>
+        <sc-if value="{{noVideo}}" hint-placeholder-val="{{ false }}"><img class="kb" src="/_blob/899c0963b58a6351ce891c650af928f5" alt="Portada de ejemplo: comediante en escena" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover"></sc-if>
+        <div aria-hidden="true" style="position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0) 50%, rgba(0,0,0,.75) 100%)"></div>
+        <button type="button" onClick="{{toggleSound}}" aria-label="{{soundLabel}}" style="position: absolute; right: 12px; top: 12px; width: 40px; height: 40px; border-radius: 50%; border: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="{{soundPath}}"></path></svg></button>
+        <div style="position: absolute; left: 16px; bottom: 14px; color: #FFFFFF"><div style="font-size: 11px; font-weight: 600; letter-spacing: .08em; opacity: .85">PORTADA CON VIDEO</div><div style="font-family: 'Sora', sans-serif; font-size: 22px; font-weight: 700">Stand-up de Viernes</div></div>
+      </div>
+      <p style="font-size: 15px; line-height: 23px; color: #3A3A40; margin: 12px 0 0">Sube un clip de hasta 50 MB y reemplaza la imagen de portada. Se reproduce solo y sin sonido; un cuadro queda como imagen para compartir.</p>
+
+      <div style="margin-top: 28px; border: 1px solid rgba(0,0,0,.08); border-radius: 18px; padding: 16px">
+        <div style="display: flex; justify-content: space-between; align-items: baseline"><div style="font-family: 'Sora', sans-serif; font-weight: 700; font-size: 17px">Quiénes van</div><div style="font-size: 11px; color: #8E8E96">Datos de ejemplo</div></div>
+        <div style="display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap">
+          <sc-for list="{{reacts}}" as="r" hint-placeholder-count="4"><button type="button" onClick="{{r.tap}}" aria-pressed="{{r.on}}" class="{{r.cls}}" style="display: inline-flex; align-items: center; gap: 5px; height: 32px; border-radius: 999px; border: 1px solid {{r.border}}; background: {{r.bg}}; padding: 0 10px; font-size: 14px"><span aria-hidden="true">{{r.e}}</span><span style="font-size: 12px; color: #5B5B63">{{r.n}}</span></button></sc-for>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 14px">
+          <div style="font-size: 14px; line-height: 20px"><strong style="font-weight: 600">Camila R.</strong> <span aria-hidden="true">🔥</span><br><span style="color: #3A3A40">Primera vez que vengo, ¡qué ganas!</span></div>
+          <div style="font-size: 14px; line-height: 20px"><strong style="font-weight: 600">Diego M.</strong> <span aria-hidden="true">🎉</span><br><span style="color: #3A3A40">Vamos 6 de la pega, nos vemos en primera fila.</span></div>
+        </div>
+      </div>
+      <p style="font-size: 15px; line-height: 23px; color: #3A3A40; margin: 12px 0 0">Quienes tienen entrada reaccionan y dejan un mensaje para los demás. Tú lo moderas, y si alguien necesita hablar contigo, te escribe desde su entrada.</p>
+
+      <div style="margin-top: 28px; background: #0A0A0B; color: #FFFFFF; border-radius: 18px; padding: 18px">
+        <div style="font-size: 12px; color: #A1A1AA">Página del evento terminado · ejemplo</div>
+        <div style="display: flex; align-items: baseline; gap: 8px; margin-top: 4px"><span style="font-family: 'Sora', sans-serif; font-weight: 800; font-size: 36px">4,8</span><span style="color: #9AE600; letter-spacing: 2px" aria-label="4,8 de 5 estrellas">★★★★★</span><span style="font-size: 12px; color: #A1A1AA">86 reseñas</span></div>
+        <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 12px">
+          <img src="/_blob/1db53f6239951ad7931447ffc54956b2" alt="Foto de ejemplo de un asistente" style="width: 100%; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 8px"><img src="/_blob/3b2662d7e351796facd5621c1bbf8fca" alt="Foto de ejemplo de un asistente" style="width: 100%; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 8px"><img src="/_blob/8fdd3c8283ce4017fe052a59449273d1" alt="Foto de ejemplo de un asistente" style="width: 100%; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 8px"><img src="/_blob/48bfd3f1bbd2157950c9471cdf8285e9" alt="Foto de ejemplo de un asistente" style="width: 100%; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 8px">
+        </div>
+        <div style="font-size: 14px; line-height: 20px; margin-top: 12px"><strong style="font-weight: 600">María P.</strong> <span style="color: #9AE600">★★★★★</span><br><span style="color: #C9C9CF">Lloré de la risa. La sala chica le da otra onda.</span></div>
+      </div>
+      <p style="font-size: 15px; line-height: 23px; color: #3A3A40; margin: 12px 0 0">Después de cada función llega un correo “¿Cómo estuvo?”. Reúnes notas, comentarios y fotos, y con un clic invitas a quienes fueron a tu próximo evento.</p>
+    </section>
+
+    <section style="padding: 64px 16px 0">
+      <div style="font-size: 12px; font-weight: 600; letter-spacing: .08em; color: #5B5B63">EL DÍA DEL EVENTO</div>
+      <h2 style="font-family: 'Sora', sans-serif; font-size: 30px; line-height: 34px; font-weight: 700; letter-spacing: -.02em; margin: 10px 0 0">La venta termina en la puerta.</h2>
+      <div style="display: flex; flex-direction: column; gap: 18px; margin-top: 22px">
+        <div><div style="font-weight: 600">Check-in desde el celular</div><div style="font-size: 15px; line-height: 23px; color: #5B5B63">Escanea el QR desde el navegador. Una entrada usada no vuelve a entrar.</div></div>
+        <div><div style="font-weight: 600">Sigue funcionando sin señal</div><div style="font-size: 15px; line-height: 23px; color: #5B5B63">Valida con la lista descargada y sincroniza al volver.</div></div>
+        <div><div style="font-weight: 600">Puerta sin contraseñas</div><div style="font-size: 15px; line-height: 23px; color: #5B5B63">Rol Puerta o un link temporal que vence solo.</div></div>
+        <div><div style="font-weight: 600">Cortesías e invitados</div><div style="font-size: 15px; line-height: 23px; color: #5B5B63">Con su propio QR, se validan igual que una pagada.</div></div>
+      </div>
+    </section>
+
+    <section style="padding: 64px 16px 0">
+      <h2 style="font-family: 'Sora', sans-serif; font-size: 30px; line-height: 34px; font-weight: 700; letter-spacing: -.02em; margin: 0 0 8px">Preguntas frecuentes</h2>
+      <sc-for list="{{faqs}}" as="f" hint-placeholder-count="5">
+        <div style="border-bottom: 1px solid rgba(0,0,0,.1)">
+          <button type="button" onClick="{{f.toggle}}" aria-expanded="{{f.expanded}}" style="width: 100%; background: none; border: 0; padding: 18px 0; display: flex; justify-content: space-between; align-items: center; gap: 12px; font-family: inherit; font-size: 16px; font-weight: 500; color: #0A0A0B; text-align: left">
+            <span>{{f.q}}</span>
+            <svg class="chev" style="transform: {{f.rot}}; flex: 0 0 auto" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5B5B63" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+          </button>
+          <div class="faq-body" style="display: grid; grid-template-rows: {{f.rows}}"><div style="overflow: hidden"><p style="margin: 0 0 18px; font-size: 15px; line-height: 23px; color: #5B5B63">{{f.a}}</p></div></div>
+        </div>
+      </sc-for>
+    </section>
+
+    <section ref="{{setFinal}}" style="margin-top: 64px; background: #0A0A0B; color: #FFFFFF; padding: 64px 16px 120px; text-align: center">
+      <h2 style="font-family: 'Sora', sans-serif; font-size: 36px; line-height: 40px; font-weight: 700; letter-spacing: -.03em; margin: 0">¿Cuándo es tu próxima función?</h2>
+      <p style="font-size: 16px; line-height: 24px; color: #C9C9CF; margin: 14px 0 0">Publícala hoy. Crear tu cuenta es gratis y no hay costos fijos.</p>
+      <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 26px">
+        <a href="#" style="height: 52px; border-radius: 12px; background: #9AE600; color: #0A0A0B; text-decoration: none; font-size: 16px; font-weight: 600; display: flex; align-items: center; justify-content: center">Publicar mi próxima función →</a>
+        <a href="#" style="height: 48px; border-radius: 12px; border: 1px solid rgba(255,255,255,.24); color: #FFFFFF; text-decoration: none; font-size: 15px; font-weight: 500; display: flex; align-items: center; justify-content: center">Hablar por WhatsApp</a>
+      </div>
+      <p style="font-size: 13px; color: #8E8E96; margin: 20px 0 0">Sin mensualidad · Sin permanencia · Sin costos fijos</p>
+    </section>
+  </div>
+
+  <sc-if value="{{showBar}}" hint-placeholder-val="{{ false }}">
+    <div class="bar-up" style="position: absolute; left: 0; right: 0; bottom: 0; height: 88px; box-sizing: border-box; padding: 12px 16px 22px; background: rgba(255,255,255,.92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-top: 1px solid rgba(0,0,0,.08); display: flex; align-items: center; justify-content: space-between; gap: 12px">
+      <div><div style="font-size: 15px; font-weight: 600">Gratis para publicar</div><div style="font-size: 12px; color: #5B5B63">0% de comisión para ti</div></div>
+      <a href="#" class="btn-primary" style="height: 48px; padding: 0 18px; border-radius: 12px; background: #0A0A0B; color: #FFFFFF; text-decoration: none; font-size: 15px; font-weight: 600; display: flex; align-items: center">Publicar función</a>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+function clp(n) { return '$' + Math.round(n).toLocaleString('es-CL'); }
+var VIDEO = '/_blob/00830326d00224e120775f7edb31c18e';
+var FAQS = [
+  { q: '¿Cuánto cuesta usar AI Tickets?', a: 'Publicar es gratis y no hay mensualidad. Por cada entrada pagada se cobra un cargo de 8% más IVA sobre ese cargo, que por defecto paga el comprador. Las entradas gratis no pagan cargo.' },
+  { q: '¿Cuándo recibo el dinero de mis ventas?', a: 'Recibes lo recaudado de cada función 48 horas después del evento.' },
+  { q: '¿Puedo publicar varias funciones?', a: 'Sí, hasta 60 por evento, con entradas para una función específica o válidas para todas.' },
+  { q: '¿Puedo poner un video como portada?', a: 'Sí, y te lo recomendamos: MP4, MOV o WebM de hasta 50 MB. Se reproduce solo, sin sonido, y cada persona puede activarlo.' },
+  { q: '¿Cómo funcionan las reseñas y el muro?', a: 'Después de cada función los asistentes califican, comentan y suben fotos. Antes, quienes tienen entrada reaccionan y dejan mensajes en el muro. Tú moderas todo desde el panel.' },
+  { q: '¿Necesito saber de inteligencia artificial?', a: 'No. Todo funciona desde el panel. La IA es una ayuda opcional.' },
+  { q: '¿Me ayudan a publicar mi primer evento?', a: 'Sí. Escríbenos por WhatsApp o agenda una demo de 15 minutos y lo publicamos contigo.' }
+];
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { scrolled: false, bar: false, price: 10000, qty: 100, payer: 'buyer', faq: -1, muted: true, mine: '', bumped: '' };
+    this._final = null;
+  }
+  renderVals() {
+    var s = this.state, self = this;
+    var fee = Math.round(s.price * 0.08), iva = Math.round(fee * 0.19);
+    var buyer = s.payer === 'buyer' ? s.price + fee + iva : s.price;
+    var per = s.payer === 'buyer' ? s.price : s.price - fee - iva;
+    return {
+      hdrBg: s.scrolled ? 'rgba(255,255,255,.92)' : '#FFFFFF', hdrBorder: s.scrolled ? 'rgba(0,0,0,.08)' : 'rgba(0,0,0,0)',
+      showBar: s.bar,
+      setFinal: function (el) { self._final = el; },
+      onScroll: function (e) {
+        var el = e.currentTarget, y = el.scrollTop, finalTop = self._final ? self._final.offsetTop : 99999;
+        var bar = y > 360 && y + 844 < finalTop + 120;
+        if (bar !== self.state.bar || (y > 8) !== self.state.scrolled) self.setState({ bar: bar, scrolled: y > 8 });
+      },
+      price: s.price, qty: s.qty, priceLabel: clp(s.price),
+      onPrice: function (e) { self.setState({ price: parseInt(e.target.value, 10) }); },
+      onQty: function (e) { self.setState({ qty: parseInt(e.target.value, 10) }); },
+      segX: s.payer === 'buyer' ? 'translateX(0)' : 'translateX(100%)',
+      buyerChecked: s.payer === 'buyer' ? 'true' : 'false', meChecked: s.payer === 'me' ? 'true' : 'false',
+      buyerColor: s.payer === 'buyer' ? '#0A0A0B' : '#5B5B63', meColor: s.payer === 'me' ? '#0A0A0B' : '#5B5B63',
+      payBuyer: function () { self.setState({ payer: 'buyer' }); },
+      payMe: function () { self.setState({ payer: 'me' }); },
+      buyerPays: clp(buyer), perTicket: clp(per), total: clp(per * s.qty),
+      hasVideo: !!VIDEO, noVideo: !VIDEO, videoSrc: VIDEO,
+      setVideo: function (el) { if (!el) return; el.muted = true; if (el.getAttribute('aria-label')) self._vid = el; var p = el.play(); if (p && p.catch) p.catch(function () {}); },
+      soundLabel: s.muted ? 'Activar sonido' : 'Silenciar', soundPath: s.muted ? 'M23 9l-6 6M17 9l6 6' : 'M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14',
+      toggleSound: function () { var m = !self.state.muted; if (self._vid) { self._vid.muted = m; if (!m) { var q = self._vid.play(); if (q && q.catch) q.catch(function () {}); } } self.setState({ muted: m }); },
+      reacts: [['🔥', 38], ['🎉', 25], ['🙌', 19], ['❤️', 12]].map(function (r) { var on = s.mine === r[0]; return { e: r[0], n: r[1] + (on ? 1 : 0), on: on ? 'true' : 'false', border: on ? '#0A0A0B' : 'rgba(0,0,0,.08)', bg: on ? '#F6F6F7' : '#FFFFFF', cls: s.bumped === r[0] ? 'bump' : '', tap: function () { var nx = self.state.mine === r[0] ? '' : r[0]; self.setState({ mine: nx, bumped: nx }); clearTimeout(self._b); self._b = setTimeout(function () { self.setState({ bumped: '' }); }, 400); } }; }),
+      faqs: FAQS.map(function (f, i) { var open = s.faq === i; return { q: f.q, a: f.a, expanded: open ? 'true' : 'false', rows: open ? '1fr' : '0fr', rot: open ? 'rotate(45deg)' : 'rotate(0deg)', toggle: function () { self.setState({ faq: open ? -1 : i }); } }; })
+    };
+  }
+}
+</script>
+</body>
+</html>
