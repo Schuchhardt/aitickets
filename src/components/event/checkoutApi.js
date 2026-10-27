@@ -78,6 +78,42 @@ export function trackFunnel(name, event, params = {}) {
   });
 }
 
+/**
+ * Evento de embudo (§14) al volver de Webpay, según el estado que muestra payment-confirmation (no el de la orden):
+ *   order_paid    pagada, o ya cobrada y emitiéndose ('processing')
+ *   hold_expired  anulada porque la reserva de la orden venció antes del pago (expire-pending-orders la deja en
+ *                 "expired"); si Flow igual la rechazó o sigue pendiente, manda lo que se ve en pantalla
+ *   order_failed  rechazada o anulada
+ * Pendiente, en revisión, reembolsada o error: ninguno (null).
+ */
+export function checkoutReturnFunnel(state, order, { total = 0, qty = 0 } = {}) {
+  if (!order) return null;
+  if (state === "paid" || state === "processing") return { name: "order_paid", params: { order_id: order.id, total, qty } };
+  if (state === "cancelled" && order.status === "expired") return { name: "hold_expired", params: { order_id: order.id } };
+  if (state === "rejected" || state === "cancelled") return { name: "order_failed", params: { order_id: order.id, status: state } };
+  return null;
+}
+
+/**
+ * Manda el evento de checkoutReturnFunnel una vez por orden y resultado (recargar la página no lo repite).
+ * @returns {boolean} true si lo mandó
+ */
+export function trackCheckoutReturn(funnel, eventId, storage) {
+  if (!funnel?.name) return false;
+  const key = `ga_${funnel.name}_${funnel.params?.order_id}`;
+  let seen = false;
+  try {
+    const store = storage ?? sessionStorage;
+    seen = store.getItem(key) === "1";
+    store.setItem(key, "1");
+  } catch {
+    /* sin storage: se manda igual */
+  }
+  if (seen) return false;
+  trackFunnel(funnel.name, { id: eventId }, funnel.params);
+  return true;
+}
+
 async function postJson(url, body) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);

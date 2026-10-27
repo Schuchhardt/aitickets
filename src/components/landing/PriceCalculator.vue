@@ -2,11 +2,13 @@
 // Calculadora de la landing de productores (SPEC_landing_productores §5.3). Los montos salen de fees.mjs (priceQuote →
 // computeFeeSplit), la misma regla del checkout: cargo 8% redondeado a pesos + IVA 19% del cargo, que paga el
 // comprador o absorbe el productor. Ej.: $10.000 → comprador $10.952 / recibes $10.000; absorbido → recibes $9.048.
+// Analítica (§11): lp_calc_change { price, qty, payer, field } 1 s después del último cambio, una vez por sesión por
+// campo (field: price, qty o payer), con useCalcChangeTracking (usePriceCalculator.js).
 import { computed, ref } from 'vue'
 import AnimatedNumber from '../event/AnimatedNumber.vue'
 import { IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL } from '../../../netlify/lib/fees.mjs'
 import { CALC_PRICE, CALC_QTY, formatCLP, parseAmount, priceQuote } from './producerLanding.js'
-import { useDelayedAnnouncement, usePayerToggle } from '../../composables/usePriceCalculator.js'
+import { useCalcChangeTracking, useDelayedAnnouncement, usePayerToggle } from '../../composables/usePriceCalculator.js'
 
 const price = ref(CALC_PRICE.default)
 const priceText = ref(CALC_PRICE.default.toLocaleString('es-CL'))
@@ -36,6 +38,8 @@ function onQtyText(e) {
 function onQtyRange(e) {
   qty.value = Number(e.target.value)
 }
+
+useCalcChangeTracking('lp_calc_change', { price, qty, payer }, () => ({ price: price.value, qty: qty.value, payer: payer.value }))
 
 // Total anunciado a lectores de pantalla con 400 ms de pausa (no a cada paso del slider)
 const announced = useDelayedAnnouncement(

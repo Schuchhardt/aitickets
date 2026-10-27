@@ -3,6 +3,8 @@
 // netlify/lib/attendee-community.mjs): los mismos emojis, mensajes de hasta FEED_MESSAGE_MAX caracteres y conteos
 // de mayor a menor. Es una demo local: no publica nada. compact = versión mobile (4 chips tocables y 2 mensajes).
 // La lógica vive en useWallDemo (compartida con PartyWall de /ticketera-fiestas); aquí van la piel y los mensajes.
+// Analítica (§11): lp_wall_demo { emoji, has_text } al publicar o tocar una reacción.
+import { trackEvent } from '../../composables/useGoogleAnalytics.js'
 import { useWallDemo } from '../../composables/useWallDemo.js'
 
 const props = defineProps({
@@ -23,6 +25,7 @@ const { pick, message, error, bumped, tapped, counts, posts, publish, tap, onEmo
   baseCounts: BASE_COUNTS,
   basePosts: BASE_POSTS,
   compact: () => props.compact,
+  onReact: (emoji, { hasText }) => trackEvent('lp_wall_demo', { emoji, has_text: hasText }),
 })
 </script>
 

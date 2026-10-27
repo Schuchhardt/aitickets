@@ -16,7 +16,10 @@ const t = THEATRE_TESTIMONIAL;
       </blockquote>
       <figcaption class="cq-author" data-lp-step>
         <span class="te-vignette cq-photo">
-          <img src={t.photo.src} alt="" width={t.photo.width} height={t.photo.height} loading="lazy" decoding="async" class="te-photo-img" />
+          <picture>
+            {t.photo.sources.map((source) => <source type={source.type} srcset={source.srcset} sizes="64px" />)}
+            <img src={t.photo.src} alt="" width={t.photo.width} height={t.photo.height} loading="lazy" decoding="async" class="te-photo-img" />
+          </picture>
         </span>
         <span class="cq-who">
           <span class="cq-name">{t.name}</span>
@@ -57,7 +60,9 @@ const t = THEATRE_TESTIMONIAL;
     height: 64px;
     border-radius: 50%;
   }
+  .cq-photo picture,
   .cq-photo img {
+    display: block;
     width: 100%;
     height: 100%;
   }

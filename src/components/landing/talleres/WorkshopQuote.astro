@@ -25,7 +25,10 @@ const hasHighlight = Boolean(quote?.highlight && quote.quote.includes(quote.high
             {after}»
           </blockquote>
           <figcaption class="tl-quote-by">
-            <img class="tl-quote-photo" src={quote.photo.src} width={quote.photo.width} height={quote.photo.height} alt="" loading="lazy" decoding="async" />
+            <picture>
+              {quote.photo.sources.map((source) => <source type={source.type} srcset={source.srcset} sizes="72px" />)}
+              <img class="tl-quote-photo" src={quote.photo.src} width={quote.photo.width} height={quote.photo.height} alt="" loading="lazy" decoding="async" />
+            </picture>
             <span>
               <span class="tl-quote-name">{quote.name}</span>
               <span class="tl-quote-company">{quote.company}</span>

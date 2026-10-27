@@ -5,11 +5,12 @@
 // Movimiento (§5.4b, con html.lp-motion de LandingMotion.astro): cuando la sección entra en pantalla, las publicaciones
 // aparecen día por día (70 ms por día, 40 ms entre publicaciones del mismo día); al prender un switch, sus publicaciones
 // entran igual. El contador interpola como el total de la calculadora y, como ahí, el lector de pantalla lee solo el valor
-// final desde una región aparte (sin los números intermedios).
+// final desde una región aparte (sin los números intermedios). Analítica (§11): lp_mk_toggle { type, on } por switch.
 import { computed, reactive } from 'vue'
 import SoonBadge from '../ui/SoonBadge.vue'
 import AnimatedNumber from '../event/AnimatedNumber.vue'
 import { marketingPostCount, marketingWeek } from './producerLanding.js'
+import { trackEvent } from '../../composables/useGoogleAnalytics.js'
 
 const props = defineProps({
   eventName: { type: String, required: true },
@@ -32,6 +33,11 @@ const networks = [
   { label: 'Facebook', connected: false },
   { label: 'TikTok', connected: false },
 ]
+
+function flip(key) {
+  on[key] = !on[key]
+  trackEvent('lp_mk_toggle', { type: key, on: on[key] })
+}
 
 // Retraso de la entrada de cada publicación: después del fade de la card, en cascada por día y por publicación
 const slotDelay = (dayIndex, slotIndex) => `${200 + dayIndex * 70 + slotIndex * 40}ms`
@@ -74,7 +80,7 @@ const slotText = (slot) => (slot.state === 'past' ? 'Publicado ✓' : slot.state
         class="mw-switch"
         :aria-checked="on[t.key] ? 'true' : 'false'"
         :data-testid="`marketing-toggle-${t.key}`"
-        @click="on[t.key] = !on[t.key]"
+        @click="flip(t.key)"
       >
         <span class="mw-track" :class="{ 'is-on': on[t.key] }" aria-hidden="true"><span class="mw-knob"></span></span>
         {{ t.label }}

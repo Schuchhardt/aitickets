@@ -8,11 +8,16 @@
 // §9 (LCP): si llegan posterSources, el póster va en un <picture> con AVIF/WebP a varios anchos; `posterSizes` dice qué
 // ancho ocupa la imagen ya recortada por object-fit: cover, para que el navegador no baje más de lo que se ve.
 // `pausable`: botón para pausar y reanudar el loop (WCAG 2.2.2), para videos de fondo que no tienen botón de sonido.
+// Formatos: si llega `webmSrc`, el <video> ofrece primero el WebM (más liviano) y después el MP4. El póster del <video>
+// es la versión del <picture> que ya bajó el navegador (AVIF/WebP), no el JPG de respaldo: no se descarga dos veces.
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Pause, Play, Volume2, VolumeX } from 'lucide-vue-next'
+import { trackEvent } from '../../composables/useGoogleAnalytics.js'
 
 const props = defineProps({
   src: { type: String, required: true },
+  /** Mismo clip en WebM (VP9), opcional: se ofrece antes que el MP4 */
+  webmSrc: { type: String, required: false },
   poster: { type: String, required: true },
   posterWidth: { type: Number, default: undefined },
   posterHeight: { type: Number, default: undefined },
@@ -31,12 +36,17 @@ const props = defineProps({
   soundPosition: { type: String, required: false },
   /** Muestra el botón de pausa del video (abajo a la derecha; la página lo puede reubicar con .lcv-pause) */
   pausable: { type: Boolean, required: false },
+  /** Evento de analítica al activar o silenciar el sonido ({ on }), p. ej. lp_cover_sound en /organizadores */
+  soundEvent: { type: String, required: false },
 })
 const emit = defineEmits(['sound'])
 
 const position = computed(() => (props.soundPosition === 'top' ? 'top' : 'bottom'))
 const root = ref(null)
+const posterImg = ref(null)
 const video = ref(null)
+// Póster del <video>: la imagen que eligió el <picture> (currentSrc), o el JPG si el navegador no la expone
+const videoPoster = ref(props.poster)
 const active = ref(false)
 const muted = ref(true)
 // Pausado a mano: el IntersectionObserver no lo vuelve a reproducir al entrar en pantalla
@@ -57,6 +67,7 @@ function play() {
 }
 
 function start() {
+  videoPoster.value = posterImg.value?.currentSrc || props.poster
   active.value = true
   requestAnimationFrame(() => {
     const v = video.value
@@ -113,6 +124,7 @@ function toggleSound() {
     if (!muted.value && v.paused) play()
   }
   emit('sound', !muted.value)
+  if (props.soundEvent) trackEvent(props.soundEvent, { on: !muted.value })
 }
 
 onMounted(() => {
@@ -146,6 +158,7 @@ onBeforeUnmount(() => {
         :sizes="props.posterSizes || '100vw'"
       />
       <img
+        ref="posterImg"
         class="lcv-media"
         :class="{ 'lcv-kb': kenBurns, 'is-visible': visible }"
         :src="props.poster"
@@ -161,8 +174,8 @@ onBeforeUnmount(() => {
       v-if="active"
       ref="video"
       class="lcv-media"
-      :src="props.src"
-      :poster="props.poster"
+      :src="props.webmSrc ? undefined : props.src"
+      :poster="videoPoster"
       muted
       loop
       playsinline
@@ -170,7 +183,13 @@ onBeforeUnmount(() => {
       disablepictureinpicture
       :aria-label="props.label || undefined"
       @error="onVideoError"
-    ></video>
+    >
+      <!-- Con <source>, el error de carga llega al último <source> y no al <video> -->
+      <template v-if="props.webmSrc">
+        <source :src="props.webmSrc" type="video/webm" />
+        <source :src="props.src" type="video/mp4" @error="onVideoError" />
+      </template>
+    </video>
 
     <button
       v-if="props.sound && active"

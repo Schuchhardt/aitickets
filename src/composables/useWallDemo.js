@@ -10,7 +10,7 @@ export const WALL_DEMO_LIMIT = 3
 /**
  * emojis: FEED_EMOJIS (en orden: desempata los conteos). baseCounts = { emoji: n }; basePosts = [{ id, name, emoji, when,
  * text, tint }]. compact: () => boolean (la versión mobile muestra 2 mensajes en vez de 4 y se reacciona con un toque).
- * onReact(emoji) se llama al publicar o tocar una reacción (analítica). mineTint: fondo del avatar de lo que publicas.
+ * onReact(emoji, { hasText }) se llama al publicar o tocar una reacción (analítica; hasText: si el mensaje traía texto). mineTint: fondo del avatar de lo que publicas.
  */
 export function useWallDemo({ emojis, baseCounts, basePosts, compact = () => false, onReact, mineTint = 'var(--surface-1)' }) {
   const pick = ref(emojis[0])
@@ -47,13 +47,13 @@ export function useWallDemo({ emojis, baseCounts, basePosts, compact = () => fal
     message.value = ''
     error.value = ''
     bump(pick.value)
-    onReact?.(pick.value)
+    onReact?.(pick.value, { hasText: Boolean(text) })
   }
   function tap(emoji) {
     tapped.value = tapped.value === emoji ? '' : emoji
     if (tapped.value) {
       bump(emoji)
-      onReact?.(emoji)
+      onReact?.(emoji, { hasText: false })
     }
   }
   /** Radiogroup de emojis: las flechas cambian la opción y mueven el foco */

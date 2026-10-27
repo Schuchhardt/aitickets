@@ -4,9 +4,10 @@
 // premio opcional es un código GRACIAS-XXXXXX. Usa las mismas estrellas que la página del evento (event/StarRating.vue).
 // L20: en esta demo la estrella en hover crece a 1.15 en 160 ms con la curva spring, las elegidas se rellenan de lima
 // (la página del evento sigue en ámbar: solo se pisa dentro de .rv) y el agradecimiento entra con el mismo fade de los
-// mensajes del chat (300 ms).
+// mensajes del chat (300 ms). Analítica (§11): lp_review_demo { stars } al enviar.
 import { ref } from 'vue'
 import StarRating from '../event/StarRating.vue'
+import { trackEvent } from '../../composables/useGoogleAnalytics.js'
 
 const props = defineProps({
   eventName: { type: String, required: true },
@@ -19,7 +20,9 @@ const rating = ref(0)
 const sent = ref(false)
 
 function send() {
-  if (rating.value) sent.value = true
+  if (!rating.value) return
+  sent.value = true
+  trackEvent('lp_review_demo', { stars: rating.value })
 }
 function reset() {
   rating.value = 0

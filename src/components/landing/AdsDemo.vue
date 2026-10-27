@@ -2,9 +2,10 @@
 // Card de anuncios de la landing (SPEC_landing_productores §5.4b). Los anuncios existen (Meta vía Zernio,
 // netlify/lib/zernio-ads.mjs): presupuesto diario, días y público de todo Chile o una ciudad, y Meta cobra el gasto
 // directo en la cuenta publicitaria de la productora. Aquí es solo una demostración: no se crea nada ni se estiman
-// alcances o resultados.
+// alcances o resultados. Analítica (§11): lp_ads_demo { budget, days } al apretar "Impulsar".
 import { computed, nextTick, ref } from 'vue'
 import { formatCLP } from './producerLanding.js'
+import { trackEvent } from '../../composables/useGoogleAnalytics.js'
 
 const budget = ref(10000)
 const days = ref(3)
@@ -16,6 +17,7 @@ const launchButton = ref(null)
 const pauseButton = ref(null)
 async function setLaunched(value) {
   launched.value = value
+  if (value) trackEvent('lp_ads_demo', { budget: budget.value, days: days.value })
   await nextTick()
   const next = value ? pauseButton.value : launchButton.value
   next?.focus()

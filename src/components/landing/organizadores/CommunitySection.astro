@@ -45,12 +45,19 @@ const distribution = [
   { stars: 2, share: 0.01 },
   { stars: 1, share: 0.01 },
 ];
+// Miniaturas cuadradas de ~100 px: la variante más chica de cada foto (AVIF y, de respaldo, WebP), no el JPG original
+const photo = (name: string, width: number, w: number, h: number) => ({
+  avif: `/landing/${name}-${width}.avif`,
+  src: `/landing/${name}-${width}.webp`,
+  w: width,
+  h: Math.round((h / w) * width),
+});
 const photos = [
-  { src: "/landing/aitk-publico.jpg", w: 1344, h: 768 },
-  { src: "/landing/aitk-comediante.jpg", w: 896, h: 1152 },
-  { src: "/landing/aitk-hero-standup.jpg", w: 1344, h: 768 },
-  { src: "/landing/aitk-openmic.jpg", w: 896, h: 1152 },
-  { src: "/landing/aitk-backstage.jpg", w: 896, h: 1152 },
+  photo("aitk-publico", 640, 1344, 768),
+  photo("aitk-comediante", 480, 896, 1152),
+  photo("aitk-hero-standup", 640, 1344, 768),
+  photo("aitk-openmic", 480, 896, 1152),
+  photo("aitk-backstage", 480, 896, 1152),
 ];
 const comments = [
   { name: "María P.", rating: 5, text: "Lloré de la risa. La sala chica le da otra onda." },
@@ -58,7 +65,7 @@ const comments = [
 ];
 ---
 
-<section id="comunidad" class="lp-section comm" aria-labelledby="community-title">
+<section id="comunidad" class="lp-section comm" aria-labelledby="community-title" data-lp-section="community">
   <div class="lp-wrap">
     <div class="comm-head" data-lp-reveal>
       <p class="lp-eyebrow" data-lp-step>Antes, durante y después</p>
@@ -78,6 +85,7 @@ const comments = [
             <LandingCoverVideo
               client:visible
               src={LANDING_MEDIA.coverVideo}
+              webmSrc={LANDING_MEDIA.coverVideoWebm}
               poster={LANDING_MEDIA.coverPoster}
               posterWidth={LANDING_MEDIA.coverPosterWidth}
               posterHeight={LANDING_MEDIA.coverPosterHeight}
@@ -88,6 +96,7 @@ const comments = [
               pausable={false}
               priority={false}
               soundPosition="top"
+              soundEvent="lp_cover_sound"
             />
             <div class="cover-shade" aria-hidden="true"></div>
             <div class="cover-caption">
@@ -150,7 +159,7 @@ const comments = [
             <p class="photos-title">Fotos de los asistentes</p>
             <ul class="photos-grid">
               {photos.map((p) => (
-                <li><img src={p.src} width={p.w} height={p.h} alt="Foto de ejemplo subida por un asistente" loading="lazy" decoding="async" /></li>
+                <li><picture><source type="image/avif" srcset={p.avif} /><img src={p.src} width={p.w} height={p.h} alt="Foto de ejemplo subida por un asistente" loading="lazy" decoding="async" /></picture></li>
               ))}
             </ul>
             <ul class="photos-comments">
@@ -184,6 +193,7 @@ const comments = [
         <LandingCoverVideo
           client:visible
           src={LANDING_MEDIA.coverVideo}
+          webmSrc={LANDING_MEDIA.coverVideoWebm}
           poster={LANDING_MEDIA.coverPoster}
           posterWidth={LANDING_MEDIA.coverPosterWidth}
           posterHeight={LANDING_MEDIA.coverPosterHeight}
@@ -194,6 +204,7 @@ const comments = [
           pausable={false}
           priority={false}
           soundPosition="top"
+          soundEvent="lp_cover_sound"
         />
         <div class="cover-shade" aria-hidden="true"></div>
         <div class="cover-caption">
@@ -217,7 +228,7 @@ const comments = [
         <p class="summary-avg"><span class="lp-display">4,8</span><StarRating readonly showLabel={false} modelValue={4.8} size={16} label="Promedio" /><span class="summary-count">86 reseñas</span></p>
         <ul class="m-photos">
           {photos.slice(0, 4).map((p) => (
-            <li><img src={p.src} width={p.w} height={p.h} alt="Foto de ejemplo subida por un asistente" loading="lazy" decoding="async" /></li>
+            <li><picture><source type="image/avif" srcset={p.avif} /><img src={p.src} width={p.w} height={p.h} alt="Foto de ejemplo subida por un asistente" loading="lazy" decoding="async" /></picture></li>
           ))}
         </ul>
         <p class="m-comment"><strong>{comments[0].name}</strong> <StarRating readonly showLabel={false} modelValue={comments[0].rating} size={13} label={`Nota de ${comments[0].name}`} /></p>

@@ -7,10 +7,12 @@
 // producerFaq.ts). Comparte con la calculadora principal la fórmula (priceQuote) y el comportamiento
 // (usePriceCalculator.js: radiogroup con flechas y resultado anunciado con 400 ms de pausa); cambian el rango del slider
 // (§4.7), los textos y el diseño, por eso no es el mismo componente.
+// Analítica (§8, el lp_calc_change de la principal con prefijo su_): su_calc_change { price, payer, field } 1 s después
+// del último cambio, una vez por sesión por campo (field: price o payer).
 import { computed, ref } from 'vue'
 import { SERVICE_FEE_LABEL, SERVICE_FEE_TAX_LABEL } from '../../../../netlify/lib/fees.mjs'
 import { formatCLP, priceQuote } from '../producerLanding.js'
-import { useDelayedAnnouncement, usePayerToggle } from '../../../composables/usePriceCalculator.js'
+import { useCalcChangeTracking, useDelayedAnnouncement, usePayerToggle } from '../../../composables/usePriceCalculator.js'
 
 const props = defineProps({
   lead: { type: String, required: true },
@@ -28,6 +30,8 @@ const price = ref(PRICE.default)
 const { payer, segButtons, onSegKey } = usePayerToggle(payers)
 const quote = computed(() => priceQuote(price.value, payer.value))
 const sign = computed(() => (payer.value === 'buyer' ? '+' : '−'))
+
+useCalcChangeTracking('su_calc_change', { price, payer }, () => ({ price: price.value, payer: payer.value }))
 
 // El H2 cambia con cada paso del slider: a los lectores de pantalla se les anuncia solo el valor final
 const announced = useDelayedAnnouncement(quote, (q) => `Tú recibes ${formatCLP(q.perTicket)}. Tu público paga ${formatCLP(q.buyerPays)}.`)

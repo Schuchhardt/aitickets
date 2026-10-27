@@ -5,15 +5,23 @@
 // cierra, el foco queda atrapado adentro y vuelve al botón al cerrar. El <video> recién se monta al abrir: antes no se
 // descarga nada. L15: al abrir y al cerrar, el fondo hace fade y el video escala .96 ↔ 1 (--dur-3); con "reducir
 // movimiento" cierra de inmediato.
+// Con `webmSrc` ofrece primero el WebM (VP9, más liviano) y el MP4 de respaldo, como LandingCoverVideo.
+// Analítica: con `progressEvent` (lp_video_progress en /organizadores, §11; su_video_progress en stand-up) manda { pct } al pasar por 25, 50, 75 y 100%
+// del video, una vez por hito en la página. La apertura la mide el tracking de cada landing (data-cta="video").
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { X } from 'lucide-vue-next'
+import { trackEvent } from '../../composables/useGoogleAnalytics.js'
 
 const props = defineProps({
   src: { type: String, required: true },
+  /** Versión WebM del mismo video (opcional) */
+  webmSrc: { type: String, required: false },
   poster: { type: String, required: false },
   title: { type: String, required: true },
   /** Subtítulos en español (.vtt), si existen */
   captions: { type: String, required: false },
+  /** Evento de analítica del avance del video ({ pct: 25 | 50 | 75 | 100 }) */
+  progressEvent: { type: String, required: false },
 })
 
 const dialog = ref(null)
@@ -63,6 +71,21 @@ function onClosed() {
   opener?.focus?.()
   opener = null
 }
+const PROGRESS_MARKS = [25, 50, 75, 100]
+const reached = new Set()
+function trackProgress(pct) {
+  if (!props.progressEvent || reached.has(pct)) return
+  reached.add(pct)
+  trackEvent(props.progressEvent, { pct })
+}
+function onTimeUpdate(e) {
+  const v = e.target
+  if (!v.duration || !Number.isFinite(v.duration)) return
+  const pct = (v.currentTime / v.duration) * 100
+  // El 100% lo marca `ended` (timeupdate rara vez llega justo al final)
+  for (const mark of PROGRESS_MARKS) if (mark < 100 && pct >= mark) trackProgress(mark)
+}
+
 function onBackdrop(e) {
   if (e.target === dialog.value) close()
 }
@@ -97,7 +120,21 @@ onBeforeUnmount(() => {
       <button type="button" class="vm-close" aria-label="Cerrar video" @click="close">
         <X :size="18" aria-hidden="true" />
       </button>
-      <video class="vm-video" :src="props.src" :poster="props.poster || undefined" controls autoplay playsinline preload="none">
+      <video
+        class="vm-video"
+        :src="props.webmSrc ? undefined : props.src"
+        :poster="props.poster || undefined"
+        controls
+        autoplay
+        playsinline
+        preload="none"
+        @timeupdate="onTimeUpdate"
+        @ended="trackProgress(100)"
+      >
+        <template v-if="props.webmSrc">
+          <source :src="props.webmSrc" type="video/webm" />
+          <source :src="props.src" type="video/mp4" />
+        </template>
         <track v-if="props.captions" kind="captions" srclang="es" label="Español" :src="props.captions" default />
       </video>
     </div>

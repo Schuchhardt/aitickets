@@ -10,13 +10,20 @@ export type ProducerStat = { value: string; label: string };
 export const PRODUCER_LOGOS: ProducerLogo[] = [];
 export const PRODUCER_STATS: ProducerStat[] = [];
 
+/**
+ * Foto de public/landing con sus variantes AVIF/WebP (node scripts/landing-media.mjs <foto>.jpg), como el photo() de
+ * cada landing: las citas la sirven en un <picture> y el JPG queda solo de respaldo. sources = [{ type: "image/avif",
+ * srcset: "/landing/x-480.avif 480w, /landing/x-896.avif 896w" }, { type: "image/webp", ... }].
+ */
+export type LandingPhoto = { src: string; width: number; height: number; sources: { type: string; srcset: string }[] };
+
 /** Cita de un productor con nombre, productora y foto, todo autorizado por escrito (foto en public/landing/...). */
 export type ProducerTestimonial = {
   quote: string;
   name: string;
   /** Productora y ciudad ("Risas Producciones · Santiago") */
   company: string;
-  photo: { src: string; width: number; height: number };
+  photo: LandingPhoto;
 };
 
 /** Testimonio de /ticketera-stand-up (SPEC_landing_standup §4.8). null: la sección no se renderiza. */

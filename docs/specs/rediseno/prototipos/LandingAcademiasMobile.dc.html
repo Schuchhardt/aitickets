@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>AI Tickets para academias — mobile</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&amp;family=Prompt:wght@400;500;600&amp;family=Fraunces:ital,opsz,wght@1,9..144,400&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;-webkit-font-smoothing:antialiased}
+a{color:#1B1712}
+.seg{transition:transform 260ms cubic-bezier(.65,0,.35,1)}
+.pane{transition:opacity 420ms cubic-bezier(.22,1,.36,1),transform 420ms cubic-bezier(.22,1,.36,1)}
+input[type=range]{accent-color:#9AE600;width:100%;height:28px;margin:0}
+@keyframes rise{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+@keyframes barUp{from{transform:translateY(100%)}to{transform:none}}
+@keyframes cardIn{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:none}}
+.h1{animation:rise 700ms cubic-bezier(.22,1,.36,1) 100ms both}
+.h2{animation:rise 700ms cubic-bezier(.22,1,.36,1) 250ms both}
+.fc{animation:cardIn 600ms cubic-bezier(.34,1.56,.64,1) 700ms both}
+.bar-up{animation:barUp 320ms cubic-bezier(.22,1,.36,1) both}
+@media (prefers-reduced-motion: reduce){*{animation-duration:1ms !important;animation-delay:0ms !important;transition-duration:1ms !important}}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; font-family: 'Prompt', system-ui, sans-serif; color: #1B1712; background: #FBF7F0">
+  <div onScroll="{{onScroll}}" style="position: absolute; inset: 0; overflow-y: auto">
+    <header style="height: 58px; padding: 0 18px; display: flex; align-items: center; justify-content: space-between">
+      <span style="display: flex; align-items: center; gap: 2px; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 15px; letter-spacing: .14em"><span style="background: #1B1712; color: #FBF7F0; padding: 2px 5px; letter-spacing: .04em">AI</span><span>TICKETS</span></span>
+      <button type="button" aria-label="Abrir menú" style="width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(27,23,18,.16); background: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1B1712" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 8h16M4 16h16"></path></svg></button>
+    </header>
+
+    <section style="padding: 12px 18px 0">
+      <div class="h1" style="font-size: 11px; font-weight: 600; letter-spacing: .12em; color: #5E554B">PARA ACADEMIAS DE MÚSICA, DANZA Y TEATRO</div>
+      <h1 class="h2" style="margin: 12px 0 0; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 38px; line-height: 41px; letter-spacing: -.04em">El día de la muestra, preocúpate <span style="font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 400; color: #7A5C3E">solo del escenario.</span></h1>
+      <p style="margin: 14px 0 0; font-size: 16px; line-height: 25px; color: #3E372F">Las familias compran o reservan con un link, reciben su entrada en el celular y entran con QR. Sin planillas, transferencias ni entradas impresas.</p>
+      <a href="#" style="margin-top: 20px; height: 54px; border-radius: 999px; background: #1B1712; color: #FBF7F0; text-decoration: none; font-size: 16px; font-weight: 600; display: flex; align-items: center; justify-content: center">Crear mi muestra gratis →</a>
+      <div style="position: relative; margin-top: 22px; border-radius: 26px; overflow: hidden; aspect-ratio: 4 / 3.4">
+        <img src="/_blob/781317cbcd2abd9dff2f563f5cbf65d8" alt="Muestra de fin de año de una academia de música con familias en el público" style="width: 100%; height: 100%; object-fit: cover">
+        <div class="fc" style="position: absolute; left: 12px; right: 12px; bottom: 12px; background: #FFFFFF; border-radius: 16px; padding: 12px 14px">
+          <div style="display: flex; justify-content: space-between; font-size: 13px"><span style="font-weight: 600">Muestra de fin de año</span><span>212 de 240</span></div>
+          <div style="height: 6px; border-radius: 3px; background: #F1EADF; margin-top: 8px"><div style="width: 88%; height: 100%; background: #9AE600; border-radius: 3px"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section style="margin-top: 56px; background: #FFFFFF; padding: 56px 18px">
+      <div style="font-size: 11px; font-weight: 600; letter-spacing: .12em; color: #5E554B">¿TE SUENA FAMILIAR?</div>
+      <h2 style="margin: 10px 0 0; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 32px; line-height: 36px; letter-spacing: -.03em">Del grupo de WhatsApp <span style="font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 400; color: #7A5C3E">a un solo link.</span></h2>
+      <div role="radiogroup" aria-label="Comparar" style="position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); background: #F1EADF; border-radius: 999px; padding: 4px; margin-top: 20px">
+        <div class="seg" aria-hidden="true" style="position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc(50% - 4px); border-radius: 999px; background: {{segBg}}; transform: {{segX}}"></div>
+        <button type="button" role="radio" aria-checked="{{beforeChecked}}" onClick="{{showBefore}}" style="position: relative; height: 44px; border: 0; background: none; font-family: inherit; font-size: 14px; font-weight: 600; color: {{beforeColor}}">Antes</button>
+        <button type="button" role="radio" aria-checked="{{afterChecked}}" onClick="{{showAfter}}" style="position: relative; height: 44px; border: 0; background: none; font-family: inherit; font-size: 14px; font-weight: 600; color: {{afterColor}}">Con AI Tickets</button>
+      </div>
+      <div style="position: relative; height: 330px; margin-top: 18px">
+        <div class="pane" style="position: absolute; inset: 0; opacity: {{beforeOpacity}}; transform: {{beforeT}}; background: #EFE6D8; border-radius: 22px; padding: 16px; display: flex; flex-direction: column; gap: 8px; overflow: hidden">
+          <div style="font-weight: 600; font-size: 14px">Apoderados Piano 2026 <span style="background: #C2410C; color: #FFFFFF; font-size: 11px; border-radius: 999px; padding: 2px 7px; margin-left: 6px">+38</span></div>
+          <div style="align-self: flex-start; background: #FFFFFF; border-radius: 14px; padding: 8px 10px; font-size: 13px; max-width: 85%">¿Quedan entradas para el sábado? Somos 5</div>
+          <div style="align-self: flex-start; background: #FFFFFF; border-radius: 14px; padding: 8px 10px; font-size: 13px; max-width: 85%">Transferí $15.000, ¿me confirman?</div>
+          <div style="align-self: flex-end; background: #DCF5C2; border-radius: 14px; padding: 8px 10px; font-size: 13px; max-width: 85%">Las entradas se retiran el jueves en secretaría</div>
+          <div style="align-self: flex-start; background: #FFFFFF; border-radius: 14px; padding: 8px 10px; font-size: 13px; max-width: 85%">No alcancé a retirarlas, ¿las dejan en la puerta?</div>
+          <div style="align-self: flex-start; background: #FFFFFF; border-radius: 14px; padding: 8px 10px; font-size: 13px; max-width: 85%">¿Les llegó mi transferencia???</div>
+        </div>
+        <div class="pane" style="position: absolute; inset: 0; opacity: {{afterOpacity}}; transform: {{afterT}}; background: #1B1712; color: #FBF7F0; border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+          <div style="display: flex; justify-content: space-between"><div><div style="font-size: 11px; color: #B5ABA0">Tu panel · ejemplo</div><div style="font-family: 'Sora', sans-serif; font-weight: 700; font-size: 17px">Muestra de fin de año</div></div><div style="font-family: 'Sora', sans-serif; font-weight: 800; font-size: 26px">212</div></div>
+          <sc-for list="{{courses}}" as="c" hint-placeholder-count="5">
+            <div style="display: grid; grid-template-columns: 100px minmax(0, 1fr) 26px; gap: 8px; align-items: center; font-size: 13px"><span>{{c.name}}</span><span style="height: 6px; border-radius: 3px; background: rgba(251,247,240,.1)"><span style="display: block; height: 100%; width: {{c.w}}; background: #9AE600; border-radius: 3px"></span></span><span style="text-align: right">{{c.n}}</span></div>
+          </sc-for>
+          <div style="margin-top: auto; background: rgba(251,247,240,.06); border-radius: 12px; padding: 10px 12px; font-size: 13px">$1.060.000 · llega 48 h después del evento</div>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; margin-top: 10px">
+        <sc-for list="{{pains}}" as="p" hint-placeholder-count="4">
+          <div style="display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(27,23,18,.08); font-size: 15px"><span style="width: 24px; height: 24px; border-radius: 50%; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; background: {{p.bg}}; color: {{p.fg}}; font-weight: 700; font-size: 13px" aria-hidden="true">{{p.icon}}</span>{{p.t}}</div>
+        </sc-for>
+      </div>
+    </section>
+
+    <section style="padding: 56px 18px 0">
+      <div style="font-size: 11px; font-weight: 600; letter-spacing: .12em; color: #5E554B">CÓMO FUNCIONA</div>
+      <h2 style="margin: 10px 0 0; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 32px; line-height: 36px; letter-spacing: -.03em">Tres pasos, <span style="font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 400; color: #7A5C3E">y cero filas en secretaría.</span></h2>
+      <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 20px">
+        <div style="background: #FFFFFF; border-radius: 20px; padding: 18px"><div style="font-family: 'Sora', sans-serif; font-weight: 700; font-size: 18px">1 · Creas la muestra</div><div style="font-size: 15px; line-height: 23px; color: #3E372F; margin-top: 4px">Fecha, uno o dos horarios, lugar y cupo. Gratis o con entrada.</div></div>
+        <div style="background: #FFFFFF; border-radius: 20px; padding: 18px"><div style="font-family: 'Sora', sans-serif; font-weight: 700; font-size: 18px">2 · Compartes un link</div><div style="font-size: 15px; line-height: 23px; color: #3E372F; margin-top: 4px">En el grupo de apoderados. Las familias compran desde el celular.</div></div>
+        <div style="background: #FFFFFF; border-radius: 20px; padding: 18px"><div style="font-family: 'Sora', sans-serif; font-weight: 700; font-size: 18px">3 · Recibes a las familias</div><div style="font-size: 15px; line-height: 23px; color: #3E372F; margin-top: 4px">Tu equipo escanea el QR. Si cobraste, recibes todo 48 h después.</div></div>
+      </div>
+    </section>
+
+    <section style="padding: 56px 18px 0">
+      <div style="position: relative; border-radius: 24px; overflow: hidden; aspect-ratio: 4 / 4.6">
+        <img src="/_blob/461e603f4481ff97fa0cab0e4a27a458" alt="Una familia muestra su entrada con QR y una profesora la escanea" style="width: 100%; height: 100%; object-fit: cover">
+        <div style="position: absolute; left: 12px; bottom: 12px; background: #9AE600; border-radius: 14px; padding: 10px 12px"><div style="font-family: 'Sora', sans-serif; font-weight: 800; font-size: 17px">✓ Válida</div><div style="font-size: 12px">Familia Rojas · 4 de 4</div></div>
+      </div>
+      <h2 style="margin: 22px 0 0; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 28px; line-height: 32px; letter-spacing: -.03em">Nadie en la puerta <span style="font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 400; color: #7A5C3E">con una lista de papel.</span></h2>
+      <p style="font-size: 15px; line-height: 23px; color: #3E372F; margin: 10px 0 0">Profes o voluntarios escanean con su celular, aunque no haya señal. Y si alguien no tiene su entrada, se busca por nombre.</p>
+    </section>
+
+    <section style="margin-top: 56px; background: #1B1712; color: #FBF7F0; padding: 48px 18px">
+      <div style="font-size: 11px; font-weight: 600; letter-spacing: .12em; color: #B5ABA0">GRATIS O CON ENTRADA</div>
+      <h2 style="margin: 10px 0 0; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 28px; line-height: 32px; letter-spacing: -.03em">Si es gratis, $0 para todos. Si cobras, 0% para la academia.</h2>
+      <div style="margin-top: 20px; background: rgba(251,247,240,.06); border-radius: 18px; padding: 16px">
+        <div style="display: flex; justify-content: space-between; font-size: 14px"><label for="acm-price" style="font-weight: 600">Valor de la entrada</label><span style="font-weight: 600">{{priceLabel}}</span></div>
+        <input id="acm-price" type="range" min="1000" max="20000" step="500" value="{{price}}" onChange="{{onPrice}}" style="margin-top: 6px">
+        <div style="display: flex; justify-content: space-between; font-size: 14px; margin-top: 10px"><span style="color: #CFC5BA">La familia paga</span><span style="font-weight: 600">{{famPays}}</span></div>
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 4px"><span style="color: #CFC5BA; font-size: 14px">La academia recibe</span><span style="font-family: 'Sora', sans-serif; font-weight: 800; font-size: 22px; color: #9AE600">{{acRecv}}</span></div>
+      </div>
+    </section>
+
+    <section ref="{{setFinal}}" style="position: relative; height: 520px; overflow: hidden; display: flex; align-items: center; text-align: center">
+      <img src="/_blob/b2544c6bb054b6ef5cbbb7cf85151e82" alt="" aria-hidden="true" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover">
+      <div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(27,23,18,.74)"></div>
+      <div style="position: relative; padding: 0 18px; color: #FBF7F0">
+        <h2 style="margin: 0; font-family: 'Sora', sans-serif; font-weight: 800; font-size: 38px; line-height: 40px; letter-spacing: -.04em">¿Cuándo es <span style="font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 400; color: #F1E3CF">la próxima muestra?</span></h2>
+        <a href="#" style="margin-top: 24px; height: 54px; border-radius: 999px; background: #9AE600; color: #1B1712; text-decoration: none; font-size: 16px; font-weight: 600; display: flex; align-items: center; justify-content: center">Crear mi muestra gratis →</a>
+        <a href="#" style="margin-top: 10px; height: 48px; border-radius: 999px; border: 1px solid rgba(251,247,240,.35); color: #FBF7F0; text-decoration: none; font-size: 15px; display: flex; align-items: center; justify-content: center">Hablar por WhatsApp</a>
+      </div>
+    </section>
+  </div>
+
+  <sc-if value="{{showBar}}" hint-placeholder-val="{{ false }}">
+    <div class="bar-up" style="position: absolute; left: 12px; right: 12px; bottom: 16px; height: 64px; box-sizing: border-box; padding: 8px 8px 8px 18px; background: rgba(255,255,255,.94); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(27,23,18,.1); border-radius: 999px; box-shadow: 0 10px 30px rgba(27,23,18,.12); display: flex; align-items: center; justify-content: space-between; gap: 10px">
+      <div style="font-size: 13px; line-height: 17px"><div style="font-weight: 600">Gratis para muestras gratis</div><div style="color: #6F665C">0% de comisión si cobras</div></div>
+      <a href="#" style="height: 48px; padding: 0 18px; border-radius: 999px; background: #1B1712; color: #FBF7F0; text-decoration: none; font-size: 14px; font-weight: 600; display: flex; align-items: center">Crear muestra</a>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+function clp(n) { return '$' + Math.round(n).toLocaleString('es-CL'); }
+var COURSES = [['Teatro infantil', 64], ['Piano', 48], ['Canto', 40], ['Violín', 36], ['Guitarra', 24]];
+var BEFORE = ['80 mensajes preguntando lo mismo', 'Transferencias que revisar una por una', 'Entradas impresas que repartir', 'Caja con efectivo y una lista en papel'];
+var AFTER = ['Un link en el grupo, y listo', 'Pago confirmado al instante', 'Entrada con QR directo al celular', 'Cero efectivo: recibes todo 48 h después'];
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { mode: 'before', bar: false, price: 5000 }; this._final = null; }
+  renderVals() {
+    var s = this.state, self = this, before = s.mode === 'before';
+    var fee = Math.round(s.price * 0.08), iva = Math.round(fee * 0.19);
+    return {
+      segX: before ? 'translateX(0)' : 'translateX(100%)', segBg: before ? '#C2410C' : '#1B1712',
+      beforeChecked: before ? 'true' : 'false', afterChecked: before ? 'false' : 'true',
+      beforeColor: before ? '#FFFFFF' : '#5E554B', afterColor: before ? '#5E554B' : '#FBF7F0',
+      showBefore: function () { self.setState({ mode: 'before' }); }, showAfter: function () { self.setState({ mode: 'after' }); },
+      beforeOpacity: before ? 1 : 0, afterOpacity: before ? 0 : 1,
+      beforeT: before ? 'none' : 'translateY(-10px) scale(.98)', afterT: before ? 'translateY(10px) scale(.98)' : 'none',
+      courses: COURSES.map(function (c) { return { name: c[0], n: c[1], w: Math.round(c[1] / 64 * 100) + '%' }; }),
+      pains: (before ? BEFORE : AFTER).map(function (t) { return { t: t, icon: before ? '×' : '✓', bg: before ? '#FDE8DF' : '#9AE600', fg: before ? '#C2410C' : '#1B1712' }; }),
+      price: s.price, priceLabel: clp(s.price), famPays: clp(s.price + fee + iva), acRecv: clp(s.price),
+      onPrice: function (e) { self.setState({ price: parseInt(e.target.value, 10) }); },
+      setFinal: function (el) { self._final = el; },
+      onScroll: function (e) { var y = e.currentTarget.scrollTop, ft = self._final ? self._final.offsetTop : 1e9; var bar = y > 520 && y + 844 < ft + 140; if (bar !== self.state.bar) self.setState({ bar: bar }); },
+      showBar: s.bar
+    };
+  }
+}
+</script>
+</body>
+</html>

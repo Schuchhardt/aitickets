@@ -19,7 +19,10 @@ const t = CLUB_TESTIMONIAL;
         </blockquote>
         <figcaption class="cq-by" data-lp-step>
           <span class="cl-capsule cq-photo">
-            <img class="cl-photo-img" src={t.photo.src} alt="" width={t.photo.width} height={t.photo.height} loading="lazy" decoding="async" />
+            <picture>
+              {t.photo.sources.map((source) => <source type={source.type} srcset={source.srcset} sizes="96px" />)}
+              <img class="cl-photo-img" src={t.photo.src} alt="" width={t.photo.width} height={t.photo.height} loading="lazy" decoding="async" />
+            </picture>
           </span>
           <span>
             <span class="cq-name">{t.name}</span>

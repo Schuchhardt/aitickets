@@ -1,0 +1,64 @@
+---
+// Analítica de la landing de productores (SPEC_landing_productores §11), con prefijo lp_ (las de nicho usan su_, ac_,
+// mu_…, mismo mecanismo):
+//   lp_view                          carga de la página
+//   lp_cta_click {position, label}   clic en un CTA de publicar ([data-cta="publish"]); position: hero, header,
+//                                    mobile_bar o final (data-section; header_menu cuenta como header y final_cta como final)
+//   lp_whatsapp_click {position}     clic en WhatsApp
+//   lp_video_open {position}         abre el modal de video ([data-cta="video"]: hero o how)
+//   lp_ai_connect_click              clic en "Conecta tu IA"
+//   lp_faq_open {question}           abre una pregunta (el botón todavía dice aria-expanded="false" en la fase de captura)
+//   lp_section_view {section}        cada [data-lp-section] entra en pantalla (una vez)
+// Los propios los mandan las islas: lp_video_progress (VideoModal), lp_calc_change (PriceCalculator), lp_mk_toggle
+// (MarketingWeek), lp_ads_demo (AdsDemo), lp_cover_sound (LandingCoverVideo), lp_wall_demo (WallDemo), lp_review_demo
+// (ReviewEmailDemo) y lp_invite_demo (InviteDemo). CtaTracking sigue midiendo producer_cta_clicked.
+---
+
+<script>
+  import { trackEvent } from "../../../composables/useGoogleAnalytics.js";
+
+  const POSITIONS: Record<string, string> = { header_menu: "header", final_cta: "final" };
+  const position = (el: Element) => {
+    const section = el.getAttribute("data-section") || "";
+    return POSITIONS[section] || section;
+  };
+
+  trackEvent("lp_view", { page: location.pathname });
+
+  document.addEventListener(
+    "click",
+    (e) => {
+      const target = e.target as Element | null;
+      const cta = target?.closest?.("[data-cta]");
+      const kind = cta?.getAttribute("data-cta");
+      if (cta && kind === "publish") {
+        trackEvent("lp_cta_click", { position: position(cta), label: cta.textContent?.trim().slice(0, 60) || "" });
+      } else if (cta && kind === "whatsapp") {
+        trackEvent("lp_whatsapp_click", { position: position(cta) });
+      } else if (cta && kind === "video") {
+        trackEvent("lp_video_open", { position: position(cta) });
+      } else if (cta && kind === "connect_ai") {
+        trackEvent("lp_ai_connect_click");
+      }
+
+      const question = target?.closest?.('[data-testid="landing-faq"] button[aria-expanded="false"]');
+      if (question) trackEvent("lp_faq_open", { question: question.textContent?.trim().slice(0, 100) || "" });
+    },
+    { capture: true },
+  );
+
+  if ("IntersectionObserver" in window) {
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          trackEvent("lp_section_view", { section: (entry.target as HTMLElement).dataset.lpSection });
+          io.unobserve(entry.target);
+        }
+      },
+      // Con margen y no con umbral de área: una sección más alta que la pantalla nunca llegaría al 25%
+      { rootMargin: "0px 0px -40% 0px", threshold: 0 },
+    );
+    document.querySelectorAll("[data-lp-section]").forEach((section) => io.observe(section));
+  }
+</script>

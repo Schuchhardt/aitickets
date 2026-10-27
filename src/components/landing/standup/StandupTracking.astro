@@ -6,6 +6,9 @@
 //   su_faq_open {question}     abre una pregunta (el botón todavía dice aria-expanded="false" en la fase de captura)
 //   su_tile_click {format}     clic en un formato de "Del open mic a la gira" ([data-su-tile])
 //   su_section_view {section}  cada [data-su-section] entra en pantalla (una vez)
+//   su_video_progress {pct}    25/50/75/100% del video del modal (lo manda VideoModal con progressEvent, como lp_)
+//   su_calc_change {price, payer, field}  uso de la calculadora de precio, 1 s después del último cambio y una vez por
+//                              sesión por campo (lo manda PriceSentence con useCalcChangeTracking, como lp_calc_change)
 // su_mk_toggle y su_ads_demo los mandan las islas de marketing. CtaTracking sigue midiendo producer_cta_clicked.
 ---
 

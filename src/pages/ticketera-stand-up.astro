@@ -27,6 +27,7 @@ import Testimonial from "../components/landing/standup/Testimonial.astro";
 import StandupAi from "../components/landing/standup/StandupAi.astro";
 import StandupClosing from "../components/landing/standup/StandupClosing.astro";
 import StandupTracking from "../components/landing/standup/StandupTracking.astro";
+import { STANDUP_PHOTOS } from "../components/landing/standup/standupLanding.js";
 import Layout from "../layouts/Layout.astro";
 import { publishUrl } from "../components/landing/links.js";
 import { LANDING_MEDIA } from "../components/landing/producerLanding.js";
@@ -87,7 +88,7 @@ const jsonLd = [
 ];
 ---
 
-<Layout title={landing.title} description={landing.description} canonical={`/${landing.slug}`}>
+<Layout title={landing.title} description={landing.description} canonical={`/${landing.slug}`} image={STANDUP_PHOTOS.hero.src}>
   <LandingMotion />
   <div class="su" data-theme="standup">
     <StandupHeader client:idle publishHref={publishUrl("standup_header")} />
@@ -140,9 +141,11 @@ const jsonLd = [
   <VideoModal
     client:load
     src={LANDING_MEDIA.demoVideo}
+    webmSrc={LANDING_MEDIA.demoVideoWebm}
     poster={LANDING_MEDIA.demoPoster}
     captions={LANDING_MEDIA.demoCaptions}
     title="Video: así vendes tu próxima función"
+    progressEvent="su_video_progress"
   />
   <CtaTracking />
   <StandupTracking />

@@ -14,7 +14,9 @@ export const DEMO_EVENT_NAME = 'Stand-up de Viernes'
  * subtítulos todavía; por eso el botón dice "21 s" y no "1 min").
  */
 export const LANDING_MEDIA = Object.freeze({
+  // MP4 (H.264, faststart) y WebM (VP9, ~30% del peso), generados con scripts/landing-media.mjs
   coverVideo: '/landing/cover-standup.mp4',
+  coverVideoWebm: '/landing/cover-standup.webm',
   coverPoster: '/landing/aitk-hero-standup.jpg',
   coverPosterWidth: 1344,
   coverPosterHeight: 768,
@@ -31,8 +33,10 @@ export const LANDING_MEDIA = Object.freeze({
         '/landing/aitk-hero-standup-640.webp 640w, /landing/aitk-hero-standup-1024.webp 1024w, /landing/aitk-hero-standup-1344.webp 1344w',
     },
   ],
+  // Demo del modal: MP4 (faststart) + WebM (VP9) y póster en WebP, generados con scripts/landing-media.mjs
   demoVideo: '/videos/aitickets-demo.mp4',
-  demoPoster: '/videos/aitickets-demo-poster.jpg',
+  demoVideoWebm: '/videos/aitickets-demo.webm',
+  demoPoster: '/videos/aitickets-demo-poster.webp',
   demoDurationLabel: '21 s',
   demoCaptions: '',
 })

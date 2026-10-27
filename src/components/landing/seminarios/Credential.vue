@@ -17,7 +17,7 @@ const props = defineProps({
   /** asistente | expositora | estudiante | cortesia | organizadora */
   type: { type: String, default: 'asistente' },
   day: { type: String, required: true },
-  /** { src, width, height } (testimonio): reemplaza al QR */
+  /** LandingPhoto { src, width, height, sources } del testimonio (producerSocialProof.ts): reemplaza al QR */
   photo: { type: Object, required: false },
   swing: { type: Boolean, default: false },
   small: { type: Boolean, default: false },
@@ -45,7 +45,10 @@ const kind = computed(() => CREDENTIAL_TYPES[props.type] ?? CREDENTIAL_TYPES.asi
         <p class="se-meta se-cred-day">{{ props.day }}</p>
         <div class="se-cred-foot">
           <span v-if="props.example" class="se-example">ejemplo</span>
-          <img v-if="props.photo" class="se-cred-photo" :src="props.photo.src" alt="" :width="props.photo.width" :height="props.photo.height" loading="lazy" decoding="async" />
+          <picture v-if="props.photo">
+            <source v-for="source in props.photo.sources" :key="source.type" :type="source.type" :srcset="source.srcset" sizes="80px" />
+            <img class="se-cred-photo" :src="props.photo.src" alt="" :width="props.photo.width" :height="props.photo.height" loading="lazy" decoding="async" />
+          </picture>
           <svg v-else class="se-cred-qr" viewBox="-1 -1 23 23" shape-rendering="crispEdges" aria-hidden="true">
             <path :d="DECOR_QR_PATH" fill="var(--se-grafito)" />
           </svg>

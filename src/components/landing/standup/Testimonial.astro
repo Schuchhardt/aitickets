@@ -12,7 +12,10 @@ const t = STANDUP_TESTIMONIAL;
       <p class="tm-mark" aria-hidden="true">“</p>
       <blockquote class="tm-quote su-serif" data-lp-step>{t.quote}</blockquote>
       <figcaption class="tm-author" data-lp-step>
-        <img src={t.photo.src} alt="" width={t.photo.width} height={t.photo.height} loading="lazy" decoding="async" />
+        <picture>
+          {t.photo.sources.map((source) => <source type={source.type} srcset={source.srcset} sizes="52px" />)}
+          <img src={t.photo.src} alt="" width={t.photo.width} height={t.photo.height} loading="lazy" decoding="async" />
+        </picture>
         <span>
           <span class="tm-name">{t.name}</span>
           <span class="tm-company">{t.company}</span>

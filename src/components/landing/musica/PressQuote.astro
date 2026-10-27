@@ -14,7 +14,10 @@ const t = MUSIC_TESTIMONIAL;
       <blockquote class="pq-quote" data-lp-step>{t.quote}</blockquote>
       <figcaption class="pq-author" data-lp-step>
         <span class="mu-duo pq-photo">
-          <img src={t.photo.src} alt="" width={t.photo.width} height={t.photo.height} loading="lazy" decoding="async" class="mu-photo-img" />
+          <picture>
+            {t.photo.sources.map((source) => <source type={source.type} srcset={source.srcset} sizes="72px" />)}
+            <img src={t.photo.src} alt="" width={t.photo.width} height={t.photo.height} loading="lazy" decoding="async" class="mu-photo-img" />
+          </picture>
         </span>
         <span>
           <span class="pq-name">{t.name}</span>

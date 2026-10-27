@@ -25,7 +25,10 @@ const t = PARTY_TESTIMONIAL;
         <figcaption class="fq-by" data-lp-step>
           <span class="fi-photo fq-photo" style="--tilt: 3deg">
             <span class="fi-photo-frame" style="--ratio: 4 / 5">
-              <img class="fi-photo-img" src={t.photo.src} alt="" width={t.photo.width} height={t.photo.height} loading="lazy" decoding="async" />
+              <picture>
+                {t.photo.sources.map((source) => <source type={source.type} srcset={source.srcset} sizes="120px" />)}
+                <img class="fi-photo-img" src={t.photo.src} alt="" width={t.photo.width} height={t.photo.height} loading="lazy" decoding="async" />
+              </picture>
               <span class="fi-photo-stamp" aria-hidden="true">{stamp}</span>
             </span>
           </span>

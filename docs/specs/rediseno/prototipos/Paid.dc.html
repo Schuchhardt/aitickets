@@ -1,0 +1,583 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Stand-up de Viernes — evento pagado</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&amp;family=Prompt:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#FFFFFF;-webkit-font-smoothing:antialiased}
+a{color:#0A0A0B}a:hover{color:#5B5B63}
+.btn-primary{transition:background 120ms cubic-bezier(.22,1,.36,1),transform 120ms cubic-bezier(.22,1,.36,1),opacity 200ms}
+.btn-primary:hover{background:#26262A !important;transform:translateY(-1px)}
+.btn-primary:active{transform:scale(.98);transition-duration:80ms}
+.btn-ghost{transition:background 120ms,border-color 120ms}
+.btn-ghost:hover{background:#F6F6F7 !important;border-color:rgba(0,0,0,.24) !important}
+.link-quiet{transition:color 120ms}
+.link-quiet:hover{color:#0A0A0B !important}
+.chip{transition:background 200ms cubic-bezier(.22,1,.36,1),color 200ms,border-color 200ms,transform 200ms cubic-bezier(.34,1.56,.64,1)}
+.chip:active{transform:scale(.96)}
+.tile{transition:background 200ms,border-color 200ms,transform 200ms cubic-bezier(.34,1.56,.64,1)}
+.tile:active{transform:scale(.96)}
+.field{transition:border-color 200ms,box-shadow 200ms}
+.field:focus{outline:none;border-color:#0A0A0B !important;box-shadow:0 0 0 4px rgba(154,230,0,.45)}
+.field-err{border-color:#D92D20 !important}
+@keyframes shakeA{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+@keyframes shakeB{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+.shake-a{animation:shakeA 280ms ease}
+.shake-b{animation:shakeB 280ms ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes rowIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes posterIn{from{opacity:0;transform:scale(.98)}to{opacity:1;transform:none}}
+@keyframes cardIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes msgIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+@keyframes overlayIn{from{opacity:0}to{opacity:1}}
+@keyframes overlayOut{from{opacity:1}to{opacity:0}}
+@keyframes sheetIn{from{transform:translateX(100%)}to{transform:none}}
+@keyframes sheetOut{from{transform:none}to{transform:translateX(100%)}}
+@keyframes stepFwd{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
+@keyframes stepBack{from{opacity:0;transform:translateX(-24px)}to{opacity:1;transform:none}}
+@keyframes numA{from{opacity:0;transform:translateY(60%)}to{opacity:1;transform:none}}
+@keyframes numB{from{opacity:0;transform:translateY(60%)}to{opacity:1;transform:none}}
+@keyframes fill{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes popIn{0%{transform:scale(0)}100%{transform:scale(1)}}
+@keyframes draw{from{stroke-dashoffset:24}to{stroke-dashoffset:0}}
+@keyframes pulse{0%{transform:scale(1);opacity:.6}100%{transform:scale(2.4);opacity:0}}
+.enter-poster{animation:posterIn 480ms cubic-bezier(.22,1,.36,1) both}
+.e1{animation:fadeUp 320ms cubic-bezier(.22,1,.36,1) 80ms both}
+.e2{animation:fadeUp 320ms cubic-bezier(.22,1,.36,1) 120ms both}
+.e3{animation:fadeUp 320ms cubic-bezier(.22,1,.36,1) 160ms both}
+.e4{animation:fadeUp 320ms cubic-bezier(.22,1,.36,1) 200ms both}
+.enter-card{animation:cardIn 320ms cubic-bezier(.22,1,.36,1) 280ms both}
+.reveal{animation:fadeUp 200ms cubic-bezier(.22,1,.36,1) both}
+.row-in{animation:rowIn 200ms cubic-bezier(.22,1,.36,1) both}
+.msg-in{animation:msgIn 200ms cubic-bezier(.22,1,.36,1) both}
+.overlay-in{animation:overlayIn 320ms cubic-bezier(.22,1,.36,1) both}
+.overlay-out{animation:overlayOut 240ms cubic-bezier(.65,0,.35,1) both}
+.sheet-in{animation:sheetIn 320ms cubic-bezier(.22,1,.36,1) both}
+.sheet-out{animation:sheetOut 240ms cubic-bezier(.65,0,.35,1) both}
+.step-fwd{animation:stepFwd 320ms cubic-bezier(.65,0,.35,1) both}
+.step-back{animation:stepBack 320ms cubic-bezier(.65,0,.35,1) both}
+.num-a{display:inline-block;animation:numA 200ms cubic-bezier(.22,1,.36,1) both}
+.num-b{display:inline-block;animation:numB 200ms cubic-bezier(.22,1,.36,1) both}
+.seg-fill{transform-origin:left;animation:fill 320ms cubic-bezier(.65,0,.35,1) both}
+.spinner{animation:spin 700ms linear infinite}
+.dot-pulse{animation:pulse 1.2s ease-out 3}
+.check-circle{animation:popIn 320ms cubic-bezier(.34,1.56,.64,1) both}
+.check-path{stroke-dasharray:24;stroke-dashoffset:24;animation:draw 240ms cubic-bezier(.22,1,.36,1) 200ms forwards}
+.tnum{font-variant-numeric:tabular-nums}
+@media (prefers-reduced-motion: reduce){*{animation-duration:1ms !important;animation-delay:0ms !important;transition-duration:1ms !important}}
+</style>
+</helmet>
+<div style="font-family: 'Prompt', system-ui, sans-serif; color: #0A0A0B; background: #FFFFFF; min-height: 100vh">
+
+  <header style="border-bottom: 1px solid rgba(0,0,0,.08); background: #FFFFFF">
+    <div style="max-width: 1080px; margin: 0 auto; padding: 0 24px; height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 16px">
+      <a href="#" style="display: flex; align-items: center; gap: 2px; text-decoration: none; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 17px; letter-spacing: .14em; color: #0A0A0B" aria-label="AI Tickets, inicio"><span style="background: #0A0A0B; color: #FFFFFF; padding: 2px 5px; letter-spacing: .04em">AI</span><span>TICKETS</span></a>
+      <nav style="display: flex; align-items: center; gap: 24px; font-size: 14px; font-weight: 500">
+        <a href="#" class="link-quiet" style="color: #5B5B63; text-decoration: none">Eventos</a>
+        <a href="#" class="link-quiet" style="color: #5B5B63; text-decoration: none">Para organizadores</a>
+        <a href="#" class="btn-primary" style="background: #0A0A0B; color: #FFFFFF; text-decoration: none; padding: 8px 14px; border-radius: 999px">Ingresar</a>
+      </nav>
+    </div>
+  </header>
+
+  <div style="background: #EEE9F7; position: absolute; left: 0; right: 0; top: 65px; height: 560px; z-index: 0" aria-hidden="true"></div>
+
+  <main style="position: relative; z-index: 1; max-width: 1080px; margin: 0 auto; padding: 48px 24px 64px; display: flex; flex-wrap: wrap; gap: 48px; align-items: flex-start">
+
+    <div style="flex: 1 1 380px; max-width: 440px; min-width: 0; display: flex; flex-direction: column; gap: 56px">
+      <figure class="enter-poster" style="margin: 0; aspect-ratio: 4 / 5; border-radius: 24px; overflow: hidden; background: #24163F; position: relative; box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.12)" role="img" aria-label="Póster de Stand-up de Viernes">
+        <div style="position: absolute; left: 50%; top: 28%; width: 90%; aspect-ratio: 1 / 1; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(circle, rgba(255,214,102,.55) 0%, rgba(255,214,102,0) 62%)"></div>
+        <div style="position: absolute; left: 50%; top: 40%; transform: translateX(-50%); width: 46px; height: 74px; border-radius: 23px; background: #0E0A18; border: 3px solid #FFD666"></div>
+        <div style="position: absolute; left: 50%; top: calc(40% + 76px); transform: translateX(-50%); width: 6px; height: 140px; background: #0E0A18"></div>
+        <div style="position: absolute; left: 28px; top: 28px; right: 28px; font-family: 'Sora', sans-serif; color: #FFFFFF">
+          <div style="font-size: 13px; font-weight: 600; letter-spacing: .18em; color: #FFD666">TEMPORADA 2026</div>
+          <div style="font-size: 50px; line-height: .95; font-weight: 800; letter-spacing: -.03em; margin-top: 14px">STAND-UP<br>DE VIERNES</div>
+        </div>
+        <div style="position: absolute; left: 28px; right: 28px; bottom: 28px; display: flex; justify-content: space-between; font-family: 'Sora', sans-serif; color: #FFFFFF; font-size: 13px; font-weight: 700; letter-spacing: .06em"><span>OCT – NOV</span><span>PROVIDENCIA · ÑUÑOA</span></div>
+      </figure>
+
+      <section aria-labelledby="fn-h">
+        <h2 id="fn-h" style="font-family: 'Sora', sans-serif; font-size: 20px; font-weight: 700; margin: 0 0 4px">Funciones</h2>
+        <sc-for list="{{fnGroups}}" as="g" hint-placeholder-count="2">
+          <div style="margin-top: 16px">
+            <div style="font-size: 13px; font-weight: 600; letter-spacing: .04em; color: #5B5B63; padding-bottom: 6px">{{g.title}}</div>
+            <sc-for list="{{g.items}}" as="f" hint-placeholder-count="3">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-top: 1px solid rgba(0,0,0,.08)">
+                <div style="font-size: 15px; font-weight: 500; opacity: {{f.opacity}}">{{f.short}}</div>
+                <div style="display: flex; align-items: center; gap: 14px">
+                  <span style="font-size: 13px; color: {{f.statusColor}}">{{f.statusText}}</span>
+                  <sc-if value="{{f.available}}" hint-placeholder-val="{{ true }}">
+                    <button type="button" onClick="{{f.choose}}" class="btn-ghost" style="height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid rgba(0,0,0,.16); background: #FFFFFF; font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer">Elegir</button>
+                  </sc-if>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-for>
+      </section>
+
+      <section aria-labelledby="about-h">
+        <h2 id="about-h" style="font-family: 'Sora', sans-serif; font-size: 20px; font-weight: 700; margin: 0 0 12px">Sobre el evento</h2>
+        <p style="margin: 0 0 12px; font-size: 16px; line-height: 26px; color: #2A2A2F">Tres comediantes, material nuevo cada semana y una sala chica donde se escucha todo. Noventa minutos de stand-up sin intermedio.</p>
+        <p style="margin: 0; font-size: 16px; line-height: 26px; color: #2A2A2F">La temporada pasa por Providencia en octubre y termina en Ñuñoa en noviembre. Mayores de 18 años.</p>
+      </section>
+    </div>
+
+    <div style="flex: 999 1 420px; min-width: 0; position: sticky; top: 24px; display: flex; flex-direction: column; gap: 20px">
+      <div class="e1" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap">
+        <span style="background: #0A0A0B; color: #FFFFFF; font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 999px">Desde $7.666</span>
+        <span style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: #8A3A06; background: #FFFFFF; border: 1px solid rgba(0,0,0,.08); padding: 4px 10px; border-radius: 999px">
+          <span style="position: relative; width: 6px; height: 6px"><span class="dot-pulse" style="position: absolute; inset: 0; border-radius: 50%; background: #B54708"></span><span style="position: absolute; inset: 0; border-radius: 50%; background: #B54708"></span></span>Últimas entradas el sáb 24</span>
+      </div>
+      <h1 class="e2" style="font-family: 'Sora', sans-serif; font-size: 44px; line-height: 48px; font-weight: 700; letter-spacing: -.02em; margin: 0">Stand-up de Viernes</h1>
+      <div class="e3" style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: #5B5B63">
+        <span style="width: 24px; height: 24px; border-radius: 50%; background: #FFD666; color: #24163F; font-family: 'Sora', sans-serif; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center" aria-hidden="true">RS</span>
+        <span>Organiza <a href="#" style="color: #0A0A0B; font-weight: 500; text-decoration: none">Risa Seria Producciones</a></span>
+      </div>
+      <div class="e4" style="display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; gap: 14px; align-items: center">
+          <div style="width: 48px; height: 48px; border-radius: 12px; border: 1px solid rgba(0,0,0,.12); background: #FFFFFF; display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 0 0 auto" aria-hidden="true">
+            <div style="font-size: 10px; font-weight: 600; letter-spacing: .08em; color: #5B5B63; line-height: 12px">OCT</div>
+            <div style="font-family: 'Sora', sans-serif; font-size: 20px; font-weight: 700; line-height: 22px">23</div>
+          </div>
+          <div>
+            <div style="font-size: 16px; font-weight: 600; line-height: 22px">Viernes 23 de octubre · 21:00</div>
+            <button type="button" onClick="{{openFresh}}" class="link-quiet" style="background: none; border: 0; padding: 0; font-family: inherit; font-size: 14px; color: #5B5B63; cursor: pointer">y 5 funciones más →</button>
+          </div>
+        </div>
+        <div style="display: flex; gap: 14px; align-items: center">
+          <div style="width: 48px; height: 48px; border-radius: 12px; border: 1px solid rgba(0,0,0,.12); background: #FFFFFF; display: flex; align-items: center; justify-content: center; flex: 0 0 auto" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0A0A0B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"></path><circle cx="12" cy="9.5" r="2.5"></circle></svg>
+          </div>
+          <div>
+            <div style="font-size: 16px; font-weight: 600; line-height: 22px">2 lugares</div>
+            <div style="font-size: 14px; color: #5B5B63; line-height: 20px">Providencia y Ñuñoa</div>
+          </div>
+        </div>
+      </div>
+
+      <section class="enter-card" aria-label="Comprar entradas" style="background: #FFFFFF; border: 1px solid rgba(0,0,0,.08); border-radius: 16px; padding: 20px; box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.06); max-width: 420px; display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px">
+          <div>
+            <div style="font-size: 13px; color: #5B5B63">Desde</div>
+            <div class="tnum" style="font-family: 'Sora', sans-serif; font-size: 28px; font-weight: 700; line-height: 32px">$7.666</div>
+          </div>
+          <div style="font-size: 13px; color: #5B5B63; text-align: right">por entrada<br>incluye cargo</div>
+        </div>
+        <div style="font-size: 14px; color: #2A2A2F; background: #F6F6F7; border-radius: 12px; padding: 10px 12px">6 funciones · 2 lugares · Próxima: vie 23 oct, 21:00</div>
+        <button type="button" onClick="{{openFresh}}" class="btn-primary" style="height: 48px; border: 0; border-radius: 12px; background: #0A0A0B; color: #FFFFFF; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer">Elegir entradas</button>
+        <div style="font-size: 12px; color: #6E6E76; text-align: center">Pago seguro con Webpay</div>
+      </section>
+
+      <div style="display: flex; gap: 20px; font-size: 14px; padding-left: 4px">
+        <a href="#" class="link-quiet" style="color: #5B5B63; text-decoration: none">↗ Compartir</a>
+        <a href="#" class="link-quiet" style="color: #5B5B63; text-decoration: none">+ Añadir al calendario</a>
+      </div>
+    </div>
+  </main>
+
+  <sc-if value="{{open}}" hint-placeholder-val="{{ false }}">
+    <div class="{{overlayCls}}" onClick="{{close}}" style="position: fixed; inset: 0; background: rgba(10,10,11,.4); z-index: 20"></div>
+    <aside class="{{sheetCls}}" role="dialog" aria-modal="true" aria-labelledby="sheet-title" style="position: fixed; top: 0; right: 0; bottom: 0; width: 480px; max-width: 100%; background: #FFFFFF; z-index: 21; display: flex; flex-direction: column; box-shadow: -8px 0 40px rgba(0,0,0,.12)">
+
+      <div style="flex: 0 0 auto; padding: 16px 20px; border-bottom: 1px solid rgba(0,0,0,.08); display: flex; align-items: center; gap: 12px">
+        <div style="width: 40px; height: 40px; border-radius: 10px; background: #24163F; display: flex; align-items: center; justify-content: center; flex: 0 0 auto" aria-hidden="true"><div style="width: 10px; height: 16px; border-radius: 5px; border: 2px solid #FFD666"></div></div>
+        <div style="flex: 1; min-width: 0">
+          <div id="sheet-title" style="font-family: 'Sora', sans-serif; font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Stand-up de Viernes</div>
+          <sc-if value="{{showSteps}}" hint-placeholder-val="{{ true }}">
+            <div style="display: flex; gap: 4px; margin-top: 6px" aria-label="{{stepAria}}">
+              <div style="width: 24px; height: 3px; border-radius: 2px; background: #0A0A0B"></div>
+              <div style="width: 24px; height: 3px; border-radius: 2px; background: #EDEDEF; overflow: hidden">
+                <sc-if value="{{isStep2}}" hint-placeholder-val="{{ false }}"><div class="seg-fill" style="width: 100%; height: 100%; background: #0A0A0B"></div></sc-if>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+        <button type="button" onClick="{{close}}" aria-label="Cerrar" style="width: 40px; height: 40px; border-radius: 10px; border: 0; background: #F6F6F7; display: flex; align-items: center; justify-content: center; cursor: pointer">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0A0A0B" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+        </button>
+      </div>
+
+      <sc-if value="{{showHold}}" hint-placeholder-val="{{ false }}">
+        <div class="msg-in tnum" style="flex: 0 0 auto; padding: 8px 20px; font-size: 13px; color: {{holdColor}}; background: #FAFAFA; border-bottom: 1px solid rgba(0,0,0,.06)">Guardamos tus entradas por {{holdText}}</div>
+      </sc-if>
+
+      <div style="flex: 1 1 auto; overflow-y: auto; padding: 20px">
+
+        <sc-if value="{{isStep1}}" hint-placeholder-val="{{ true }}">
+          <div class="{{stepCls}}" style="display: flex; flex-direction: column; gap: 24px">
+            <div>
+              <div style="font-size: 14px; font-weight: 600; margin-bottom: 10px">Lugar</div>
+              <div role="radiogroup" aria-label="Lugar" style="display: flex; gap: 8px; flex-wrap: wrap">
+                <sc-for list="{{places}}" as="p" hint-placeholder-count="2">
+                  <button type="button" role="radio" aria-checked="{{p.checked}}" onClick="{{p.pick}}" class="chip" style="height: 40px; padding: 0 18px; border-radius: 999px; border: 1px solid {{p.border}}; background: {{p.bg}}; color: {{p.color}}; font-family: inherit; font-size: 15px; font-weight: 500; cursor: pointer">{{p.name}}</button>
+                </sc-for>
+              </div>
+              <sc-if value="{{placeAddr}}" hint-placeholder-val="{{ false }}">
+                <div class="msg-in" style="font-size: 13px; color: #5B5B63; margin-top: 8px">{{placeAddr}}</div>
+              </sc-if>
+            </div>
+
+            <sc-if value="{{showFns}}" hint-placeholder-val="{{ false }}">
+              <div class="reveal">
+                <div style="font-size: 14px; font-weight: 600; margin-bottom: 10px">Fecha y hora</div>
+                <div role="radiogroup" aria-label="Fecha y hora" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px">
+                  <sc-for list="{{tiles}}" as="t" hint-placeholder-count="4">
+                    <button type="button" role="radio" aria-checked="{{t.checked}}" aria-disabled="{{t.ariaDisabled}}" disabled="{{t.disabled}}" onClick="{{t.pick}}" class="tile" style="height: 92px; border-radius: 12px; border: {{t.border}}; background: {{t.bg}}; font-family: inherit; color: #0A0A0B; cursor: pointer; opacity: {{t.opacity}}; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 0">
+                      <span style="font-size: 12px; font-weight: 600; letter-spacing: .06em; text-decoration: {{t.deco}}">{{t.dow}} {{t.day}}</span>
+                      <span style="font-size: 11px; font-weight: 600; letter-spacing: .08em; color: #5B5B63">{{t.mon}}</span>
+                      <span class="tnum" style="font-family: 'Sora', sans-serif; font-size: 15px; font-weight: 700; margin-top: 2px">{{t.time}}</span>
+                      <span style="font-size: 11px; font-weight: 500; color: {{t.statusColor}}; min-height: 14px">{{t.statusText}}</span>
+                    </button>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{showRows}}" hint-placeholder-val="{{ false }}">
+              <div class="reveal">
+                <div style="font-size: 14px; font-weight: 600; margin-bottom: 4px">Entradas</div>
+                <sc-for list="{{rows}}" as="r" hint-placeholder-count="2">
+                  <div class="row-in" style="animation-delay: {{r.delay}}; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 0; border-bottom: 1px solid rgba(0,0,0,.08)">
+                    <div style="min-width: 0">
+                      <div style="display: flex; align-items: baseline; gap: 10px">
+                        <span style="font-size: 15px; font-weight: 600">{{r.name}}</span>
+                        <span class="tnum" style="font-size: 15px; font-weight: 600">{{r.price}}</span>
+                      </div>
+                      <div style="font-size: 13px; color: #5B5B63; margin-top: 2px">{{r.desc}}</div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 4px; flex: 0 0 auto">
+                      <button type="button" onClick="{{r.dec}}" disabled="{{r.decDis}}" aria-label="{{r.decLabel}}" style="width: 36px; height: 36px; border-radius: 10px; border: 1px solid rgba(0,0,0,.16); background: #FFFFFF; font-size: 18px; cursor: pointer; opacity: {{r.decOpacity}}">−</button>
+                      <span aria-live="polite" class="tnum" style="width: 28px; text-align: center; font-weight: 600; overflow: hidden; height: 22px"><span class="{{r.numCls}}">{{r.qty}}</span></span>
+                      <button type="button" onClick="{{r.inc}}" disabled="{{r.incDis}}" aria-label="{{r.incLabel}}" style="width: 36px; height: 36px; border-radius: 10px; border: 1px solid rgba(0,0,0,.16); background: #FFFFFF; font-size: 18px; cursor: pointer; opacity: {{r.incOpacity}}">+</button>
+                    </div>
+                  </div>
+                </sc-for>
+                <div style="font-size: 12px; color: #6E6E76; margin-top: 10px">Precios con cargo por servicio e IVA del cargo incluidos. Máximo 10 por compra.</div>
+              </div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{isStep2}}" hint-placeholder-val="{{ false }}">
+          <div class="step-fwd" style="display: flex; flex-direction: column; gap: 22px">
+            <button type="button" onClick="{{back}}" class="link-quiet" style="align-self: flex-start; background: none; border: 0; padding: 0; font-family: inherit; font-size: 14px; color: #5B5B63; cursor: pointer">← Volver</button>
+
+            <div style="background: #F6F6F7; border-radius: 12px; padding: 14px">
+              <div style="font-size: 13px; color: #5B5B63">{{fnLabel}}</div>
+              <sc-for list="{{lines}}" as="l" hint-placeholder-count="1">
+                <div style="display: flex; justify-content: space-between; font-size: 15px; font-weight: 500; margin-top: 8px"><span>{{l.label}}</span><span class="tnum">{{l.amount}}</span></div>
+              </sc-for>
+              <sc-if value="{{codeApplied}}" hint-placeholder-val="{{ false }}">
+                <div class="msg-in" style="display: flex; justify-content: space-between; font-size: 14px; margin-top: 8px; color: #3B6E00"><span>Código AITALKS</span><span class="tnum">−$2.000</span></div>
+              </sc-if>
+              <button type="button" onClick="{{toggleDetails}}" aria-expanded="{{detailsAria}}" class="link-quiet" style="margin-top: 10px; background: none; border: 0; padding: 0; font-family: inherit; font-size: 13px; color: #5B5B63; cursor: pointer">{{detailsLabel}}</button>
+              <sc-if value="{{details}}" hint-placeholder-val="{{ false }}">
+                <div class="msg-in tnum" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(0,0,0,.08); display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #5B5B63">
+                  <div style="display: flex; justify-content: space-between"><span>Entradas</span><span>{{bSub}}</span></div>
+                  <div style="display: flex; justify-content: space-between"><span>Cargo por servicio (8%)</span><span>{{bFee}}</span></div>
+                  <div style="display: flex; justify-content: space-between"><span>IVA del cargo (19%)</span><span>{{bIva}}</span></div>
+                  <sc-if value="{{codeApplied}}" hint-placeholder-val="{{ false }}"><div style="display: flex; justify-content: space-between"><span>Descuento</span><span>−$2.000</span></div></sc-if>
+                  <div style="display: flex; justify-content: space-between; color: #0A0A0B; font-weight: 600"><span>Total</span><span>{{bTotal}}</span></div>
+                </div>
+              </sc-if>
+            </div>
+
+            <form onSubmit="{{pay}}" novalidate="" style="display: flex; flex-direction: column; gap: 14px">
+              <div style="font-family: 'Sora', sans-serif; font-size: 16px; font-weight: 700">Tus datos</div>
+              <div style="display: flex; flex-direction: column; gap: 6px">
+                <label for="p-name" style="font-size: 14px; font-weight: 500">Nombre y apellido</label>
+                <input id="p-name" class="{{nameCls}}" type="text" autocomplete="name" value="{{name}}" onChange="{{onName}}" readOnly="{{paying}}" aria-invalid="{{nameInvalid}}" placeholder="Sebastián Pérez" style="height: 48px; border: 1px solid rgba(0,0,0,.16); border-radius: 12px; padding: 0 14px; font-family: inherit; font-size: 16px; background: #FFFFFF">
+                <sc-if value="{{errName}}" hint-placeholder-val="{{ false }}"><div class="msg-in" style="font-size: 13px; color: #B42318">{{errName}}</div></sc-if>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 6px">
+                <label for="p-email" style="font-size: 14px; font-weight: 500">Email</label>
+                <input id="p-email" class="{{emailCls}}" type="email" inputmode="email" autocomplete="email" value="{{email}}" onChange="{{onEmail}}" readOnly="{{paying}}" aria-invalid="{{emailInvalid}}" placeholder="tu@email.com" style="height: 48px; border: 1px solid rgba(0,0,0,.16); border-radius: 12px; padding: 0 14px; font-family: inherit; font-size: 16px; background: #FFFFFF">
+                <sc-if value="{{errEmail}}" hint-placeholder-val="{{ false }}"><div class="msg-in" style="font-size: 13px; color: #B42318">{{errEmail}}</div></sc-if>
+                <sc-if value="{{suggestion}}" hint-placeholder-val="{{ false }}">
+                  <div class="msg-in" style="font-size: 13px; color: #5B5B63">¿Quisiste decir <button type="button" onClick="{{applySuggestion}}" style="background: none; border: 0; padding: 0; font: inherit; color: #0A0A0B; font-weight: 600; text-decoration: underline; cursor: pointer">{{suggestion}}</button>?</div>
+                </sc-if>
+                <div style="font-size: 13px; color: #6E6E76">Te enviaremos las entradas a este email.</div>
+              </div>
+
+              <sc-if value="{{showCodeLink}}" hint-placeholder-val="{{ true }}">
+                <button type="button" onClick="{{openCode}}" class="link-quiet" style="align-self: flex-start; background: none; border: 0; padding: 0; font-family: inherit; font-size: 14px; color: #5B5B63; text-decoration: underline; cursor: pointer">¿Tienes un código de descuento?</button>
+              </sc-if>
+              <sc-if value="{{codeOpen}}" hint-placeholder-val="{{ false }}">
+                <div class="msg-in" style="display: flex; flex-direction: column; gap: 6px">
+                  <div style="display: flex; gap: 8px">
+                    <input class="field" aria-label="Código de descuento" value="{{code}}" onChange="{{onCode}}" placeholder="Prueba AITALKS" style="flex: 1; min-width: 0; height: 44px; border: 1px solid rgba(0,0,0,.16); border-radius: 12px; padding: 0 14px; font-family: inherit; font-size: 15px; text-transform: uppercase">
+                    <button type="button" onClick="{{applyCode}}" class="btn-ghost" style="height: 44px; padding: 0 16px; border-radius: 12px; border: 1px solid rgba(0,0,0,.16); background: #FFFFFF; font-family: inherit; font-size: 15px; font-weight: 500; cursor: pointer">Aplicar</button>
+                  </div>
+                  <sc-if value="{{codeErr}}" hint-placeholder-val="{{ false }}"><div class="msg-in" style="font-size: 13px; color: #B42318">{{codeErr}}</div></sc-if>
+                </div>
+              </sc-if>
+              <sc-if value="{{codeApplied}}" hint-placeholder-val="{{ false }}">
+                <div class="msg-in" style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: #3B6E00">Código AITALKS aplicado · −$2.000 <button type="button" onClick="{{removeCode}}" style="background: none; border: 0; padding: 0; font: inherit; color: #5B5B63; text-decoration: underline; cursor: pointer">Quitar</button></div>
+              </sc-if>
+
+              <div class="{{acceptCls}}" style="display: flex; flex-direction: column; gap: 6px">
+                <label style="display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 20px; cursor: pointer">
+                  <input type="checkbox" checked="{{accept}}" onChange="{{toggleAccept}}" style="width: 18px; height: 18px; margin: 1px 0 0; accent-color: #0A0A0B; flex: 0 0 auto">
+                  <span>Entiendo que las entradas no tienen derecho a retracto. <button type="button" onClick="{{toggleTerms}}" style="background: none; border: 0; padding: 0; font: inherit; color: #5B5B63; text-decoration: underline; cursor: pointer">Ver condiciones</button></span>
+                </label>
+                <sc-if value="{{errAccept}}" hint-placeholder-val="{{ false }}"><div class="msg-in" style="font-size: 13px; color: #B42318; padding-left: 28px">{{errAccept}}</div></sc-if>
+                <sc-if value="{{terms}}" hint-placeholder-val="{{ false }}">
+                  <div class="msg-in" style="font-size: 12px; line-height: 18px; color: #5B5B63; background: #F6F6F7; border-radius: 10px; padding: 10px 12px; margin-left: 28px">Las entradas para eventos en fecha determinada no tienen derecho a retracto (Ley 19.496, art. 3 bis letra b). Si el evento se cancela o reprograma, se devuelven el valor de la entrada y el cargo por servicio, previa autorización del organizador, en hasta 20 días hábiles.</div>
+                </sc-if>
+              </div>
+            </form>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{paid}}" hint-placeholder-val="{{ false }}">
+          <div class="reveal" role="status" style="display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; padding-top: 24px">
+            <div class="check-circle" style="width: 64px; height: 64px; border-radius: 50%; background: #9AE600; display: flex; align-items: center; justify-content: center">
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#0A0A0B" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="check-path" d="M5 12.5l4.5 4.5L19 7.5"></path></svg>
+            </div>
+            <h2 style="font-family: 'Sora', sans-serif; font-size: 22px; line-height: 28px; font-weight: 700; margin: 8px 0 0">¡Listo, {{firstName}}! Tienes {{qtyWord}} para Stand-up de Viernes.</h2>
+            <p style="margin: 0; font-size: 15px; line-height: 22px; color: #5B5B63">Te las enviamos a <strong style="color: #0A0A0B; font-weight: 600">{{email}}</strong>. También puedes verlas aquí:</p>
+            <div style="width: 100%; margin-top: 10px; border: 1px solid rgba(0,0,0,.08); border-radius: 16px; padding: 16px; display: flex; gap: 16px; align-items: center; text-align: left">
+              <div style="width: 88px; height: 88px; border-radius: 8px; background: repeating-conic-gradient(#0A0A0B 0 25%, #FFFFFF 0 50%) 0 0 / 22px 22px; border: 6px solid #FFFFFF; outline: 1px solid rgba(0,0,0,.12); flex: 0 0 auto" role="img" aria-label="Código QR de ejemplo"></div>
+              <div>
+                <div style="font-size: 13px; color: #5B5B63">Entrada 1 de {{qtyNum}}</div>
+                <div style="font-size: 15px; font-weight: 600; margin-top: 2px">{{fnLabel}}</div>
+                <a href="#" style="display: inline-block; margin-top: 6px; font-size: 14px; font-weight: 500; text-decoration: none">Ver todas →</a>
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px; width: 100%; margin-top: 6px">
+              <button type="button" class="btn-ghost" style="flex: 1; height: 44px; border-radius: 12px; border: 1px solid rgba(0,0,0,.16); background: #FFFFFF; font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer">+ Añadir al calendario</button>
+              <button type="button" class="btn-ghost" style="flex: 1; height: 44px; border-radius: 12px; border: 1px solid rgba(0,0,0,.16); background: #FFFFFF; font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer">↗ Compartir el evento</button>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+
+      <sc-if value="{{showFooter}}" hint-placeholder-val="{{ true }}">
+        <div style="flex: 0 0 auto; padding: 14px 20px 18px; border-top: 1px solid rgba(0,0,0,.08); display: flex; flex-direction: column; gap: 8px">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px">
+            <div style="min-width: 0">
+              <sc-if value="{{hasQty}}" hint-placeholder-val="{{ false }}">
+                <div style="font-size: 12px; color: #5B5B63">Total · {{qtyWord}}</div>
+                <div class="tnum" style="font-family: 'Sora', sans-serif; font-size: 22px; font-weight: 700; line-height: 26px">{{shownTotal}}</div>
+              </sc-if>
+              <sc-if value="{{noQty}}" hint-placeholder-val="{{ true }}">
+                <div style="font-size: 14px; color: #5B5B63">Elige al menos una entrada</div>
+              </sc-if>
+            </div>
+            <button type="button" onClick="{{primary}}" disabled="{{primaryDisabled}}" class="btn-primary" style="height: 48px; padding: 0 20px; border: 0; border-radius: 12px; background: #0A0A0B; color: #FFFFFF; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer; opacity: {{primaryOpacity}}; display: flex; align-items: center; gap: 10px; white-space: nowrap">
+              <sc-if value="{{paying}}" hint-placeholder-val="{{ false }}"><span class="spinner" style="width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(255,255,255,.3); border-top-color: #FFFFFF" aria-hidden="true"></span></sc-if>
+              <span>{{primaryLabel}}</span>
+            </button>
+          </div>
+          <sc-if value="{{isStep2}}" hint-placeholder-val="{{ false }}">
+            <div style="font-size: 12px; color: #6E6E76; text-align: right">Pago seguro con Webpay · Tarjetas de crédito, débito y prepago</div>
+          </sc-if>
+        </div>
+      </sc-if>
+    </aside>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1240}}'>
+var PLACES = [
+  { id: 'prov', name: 'Providencia', venue: 'Sala Bodega', addr: 'Sala Bodega · Av. Providencia 1234, Providencia' },
+  { id: 'nunoa', name: 'Ñuñoa', venue: 'Casa Irarrázaval', addr: 'Casa Irarrázaval · Av. Irarrázaval 3400, Ñuñoa' }
+];
+var FUNCS = [
+  { id: 'f1', place: 'prov', dow: 'VIE', day: '23', mon: 'OCT', time: '21:00', status: 'ok', short: 'Vie 23 oct · 21:00' },
+  { id: 'f2', place: 'prov', dow: 'SÁB', day: '24', mon: 'OCT', time: '21:00', status: 'few', short: 'Sáb 24 oct · 21:00' },
+  { id: 'f3', place: 'prov', dow: 'SÁB', day: '24', mon: 'OCT', time: '23:00', status: 'ok', short: 'Sáb 24 oct · 23:00' },
+  { id: 'f4', place: 'prov', dow: 'VIE', day: '30', mon: 'OCT', time: '21:00', status: 'out', short: 'Vie 30 oct · 21:00' },
+  { id: 'f5', place: 'nunoa', dow: 'SÁB', day: '31', mon: 'OCT', time: '20:00', status: 'ok', short: 'Sáb 31 oct · 20:00' },
+  { id: 'f6', place: 'nunoa', dow: 'SÁB', day: '7', mon: 'NOV', time: '20:00', status: 'ok', short: 'Sáb 7 nov · 20:00' }
+];
+var TYPES = [
+  { id: 'gen', name: 'General', desc: 'Acceso general · sin asiento numerado', price: 10000 },
+  { id: 'vip', name: 'VIP', desc: 'Primera fila + 1 trago', price: 30000 },
+  { id: 'pre', name: 'Preventa', desc: 'Solo esta función · termina el domingo', price: 7000, onlyFn: 'f6' }
+];
+var DOMAINS = ['gmail.com','hotmail.com','outlook.com','yahoo.com','icloud.com','live.cl','hotmail.cl','yahoo.es','me.com','uc.cl','uchile.cl'];
+function lev(a, b) { var m = a.length, n = b.length, d = [], i, j; for (i = 0; i <= m; i++) d[i] = [i]; for (j = 0; j <= n; j++) d[0][j] = j; for (i = 1; i <= m; i++) for (j = 1; j <= n; j++) d[i][j] = Math.min(d[i-1][j] + 1, d[i][j-1] + 1, d[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1)); return d[m][n]; }
+function suggest(email) { var at = email.lastIndexOf('@'); if (at < 1) return ''; var dom = email.slice(at + 1).toLowerCase(); if (dom.length < 4 || DOMAINS.indexOf(dom) >= 0) return ''; var best = '', bd = 3; DOMAINS.forEach(function (x) { var dd = lev(dom, x); if (dd < bd) { bd = dd; best = x; } }); return best ? email.slice(0, at + 1) + best : ''; }
+function validEmail(e) { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e); }
+function fee(p) { return Math.round(p * 0.08); }
+function feeIva(p) { return Math.round(fee(p) * 0.19); }
+function fin(p) { return p + fee(p) + feeIva(p); }
+function clp(n) { return '$' + Math.round(n).toLocaleString('es-CL'); }
+function fnById(id) { for (var i = 0; i < FUNCS.length; i++) if (FUNCS[i].id === id) return FUNCS[i]; return null; }
+function placeById(id) { for (var i = 0; i < PLACES.length; i++) if (PLACES[i].id === id) return PLACES[i]; return null; }
+function typesFor(fnId) { return TYPES.filter(function (t) { return !t.onlyFn || t.onlyFn === fnId; }); }
+function totals(s) {
+  var r = { sub: 0, fees: 0, iva: 0, qty: 0, lines: [], disc: 0, total: 0 };
+  if (!s.fn) return r;
+  typesFor(s.fn).forEach(function (t) {
+    var q = s.qty[t.id] || 0;
+    if (q) { r.sub += t.price * q; r.fees += fee(t.price) * q; r.iva += feeIva(t.price) * q; r.qty += q; r.lines.push({ label: q + ' × ' + t.name, amount: clp(fin(t.price) * q) }); }
+  });
+  r.disc = s.codeApplied && r.qty ? 2000 : 0;
+  r.total = r.sub + r.fees + r.iva - r.disc;
+  return r;
+}
+function statusText(st) { return st === 'few' ? 'Últimas' : (st === 'out' ? 'Agotada' : ''); }
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { open: false, closing: false, step: 1, dir: 'fwd', place: null, fn: null, qty: { gen: 0, vip: 0, pre: 0 }, ticks: { gen: 0, vip: 0, pre: 0 },
+      name: '', email: '', codeOpen: false, code: '', codeApplied: false, codeErr: '', accept: false, terms: false,
+      errName: '', errEmail: '', errAccept: '', shake: 0, paying: false, paid: false, details: false, shown: 0, hold: 0 };
+    this._target = 0; this._raf = 0; this._hold = 0; this._t = [];
+  }
+  componentDidUpdate() {
+    var target = totals(this.state).total, self = this;
+    if (target === this._target) return;
+    var from = this.state.shown, start = 0;
+    this._target = target;
+    cancelAnimationFrame(this._raf);
+    var tick = function (now) {
+      if (!start) start = now;
+      var t = Math.min(1, (now - start) / 300), e = 1 - Math.pow(1 - t, 3);
+      self.setState({ shown: Math.round(from + (target - from) * e) });
+      if (t < 1) self._raf = requestAnimationFrame(tick);
+    };
+    this._raf = requestAnimationFrame(tick);
+  }
+  componentWillUnmount() { cancelAnimationFrame(this._raf); clearInterval(this._hold); this._t.forEach(clearTimeout); }
+  later(fn, ms) { this._t.push(setTimeout(fn, ms)); }
+  openSheet(place, fn) {
+    clearInterval(this._hold);
+    this.setState({ open: true, closing: false, step: 1, dir: 'fwd', place: place, fn: fn, paid: false, paying: false, hold: 0, errAccept: '', errName: '', errEmail: '' });
+  }
+  closeSheet() {
+    var self = this;
+    clearInterval(this._hold);
+    this.setState({ closing: true });
+    this.later(function () { self.setState({ open: false, closing: false }); }, 240);
+  }
+  startHold() {
+    var self = this;
+    clearInterval(this._hold);
+    this.setState({ hold: 598 });
+    this._hold = setInterval(function () {
+      var h = self.state.hold - 1;
+      if (h <= 0) { clearInterval(self._hold); self.setState({ hold: 0, step: 1, dir: 'back' }); return; }
+      self.setState({ hold: h });
+    }, 1000);
+  }
+  renderVals() {
+    var s = this.state, self = this, T = totals(s);
+    var fnObj = fnById(s.fn), pl = placeById(s.place);
+    var shakeCls = s.shake % 2 ? ' shake-a' : ' shake-b';
+    var first = (s.name.trim().split(/\s+/)[0]) || '';
+    var step1 = s.step === 1 && !s.paid, step2 = s.step === 2 && !s.paid;
+    var groups = PLACES.map(function (p) {
+      return { title: p.name.toUpperCase() + ' · ' + p.venue.toUpperCase(), items: FUNCS.filter(function (f) { return f.place === p.id; }).map(function (f) {
+        return { short: f.short, statusText: f.status === 'out' ? 'Agotada' : (f.status === 'few' ? 'Últimas' : 'Disponible'),
+          statusColor: f.status === 'out' ? '#6E6E76' : (f.status === 'few' ? '#B54708' : '#3B6E00'),
+          opacity: f.status === 'out' ? 0.5 : 1, available: f.status !== 'out',
+          choose: function () { self.openSheet(f.place, f.id); } };
+      }) };
+    });
+    return {
+      fnGroups: groups,
+      openFresh: function () { self.openSheet(null, null); },
+      open: s.open,
+      overlayCls: s.closing ? 'overlay-out' : 'overlay-in',
+      sheetCls: s.closing ? 'sheet-out' : 'sheet-in',
+      close: function () { self.closeSheet(); },
+      showSteps: !s.paid, isStep1: step1, isStep2: step2, paid: s.paid,
+      stepAria: 'Paso ' + s.step + ' de 2',
+      stepCls: s.dir === 'back' ? 'step-back' : 'step-fwd',
+      places: PLACES.map(function (p) {
+        var on = s.place === p.id;
+        return { name: p.name, checked: on ? 'true' : 'false', bg: on ? '#0A0A0B' : '#FFFFFF', color: on ? '#FFFFFF' : '#0A0A0B', border: on ? '#0A0A0B' : 'rgba(0,0,0,.16)',
+          pick: function () { if (self.state.place !== p.id) self.setState({ place: p.id, fn: null }); } };
+      }),
+      placeAddr: pl ? pl.addr : '',
+      showFns: !!s.place,
+      tiles: FUNCS.filter(function (f) { return f.place === s.place; }).map(function (f) {
+        var on = s.fn === f.id, out = f.status === 'out';
+        return { dow: f.dow, day: f.day, mon: f.mon, time: f.time, statusText: statusText(f.status),
+          statusColor: f.status === 'few' ? '#B54708' : '#5B5B63',
+          checked: on ? 'true' : 'false', disabled: out, ariaDisabled: out ? 'true' : 'false',
+          border: on ? '2px solid #0A0A0B' : '1px solid rgba(0,0,0,.16)', bg: on ? '#F6F6F7' : '#FFFFFF',
+          opacity: out ? 0.4 : 1, deco: out ? 'line-through' : 'none',
+          pick: function () { if (out) return; var q = Object.assign({}, self.state.qty); if (f.id !== 'f6') q.pre = 0; self.setState({ fn: f.id, qty: q }); } };
+      }),
+      showRows: !!s.fn,
+      rows: s.fn ? typesFor(s.fn).map(function (t, i) {
+        var q = s.qty[t.id] || 0;
+        var bump = function (d) { var qq = Object.assign({}, self.state.qty), tk = Object.assign({}, self.state.ticks); qq[t.id] = Math.max(0, Math.min(10, (qq[t.id] || 0) + d)); tk[t.id] = (tk[t.id] || 0) + 1; self.setState({ qty: qq, ticks: tk }); };
+        return { name: t.name, desc: t.desc, price: clp(fin(t.price)), qty: q, delay: (i * 30) + 'ms',
+          numCls: (s.ticks[t.id] || 0) % 2 ? 'num-a' : 'num-b',
+          decDis: q <= 0, incDis: q >= 10, decOpacity: q <= 0 ? 0.4 : 1, incOpacity: q >= 10 ? 0.4 : 1,
+          decLabel: 'Quitar una entrada ' + t.name, incLabel: 'Agregar una entrada ' + t.name,
+          dec: function () { bump(-1); }, inc: function () { bump(1); } };
+      }) : [],
+      fnLabel: fnObj ? fnObj.short + ' · ' + (pl ? pl.venue : '') : '',
+      lines: T.lines,
+      details: s.details, detailsAria: s.details ? 'true' : 'false', detailsLabel: s.details ? 'Ocultar detalle ⌃' : 'Ver detalle ⌄',
+      toggleDetails: function () { self.setState({ details: !self.state.details }); },
+      bSub: clp(T.sub), bFee: clp(T.fees), bIva: clp(T.iva), bTotal: clp(T.total),
+      name: s.name, email: s.email, paying: s.paying,
+      errName: s.errName, errEmail: s.errEmail, errAccept: s.errAccept,
+      nameInvalid: s.errName ? 'true' : 'false', emailInvalid: s.errEmail ? 'true' : 'false',
+      nameCls: 'field' + (s.errName ? ' field-err' + (s.shake ? shakeCls : '') : ''),
+      emailCls: 'field' + (s.errEmail ? ' field-err' + (s.shake ? shakeCls : '') : ''),
+      acceptCls: s.errAccept && s.shake ? shakeCls.trim() : '',
+      suggestion: s.errEmail ? '' : suggest(s.email.trim()),
+      onName: function (e) { self.setState({ name: e.target.value, errName: '' }); },
+      onEmail: function (e) { self.setState({ email: e.target.value, errEmail: '' }); },
+      applySuggestion: function () { self.setState({ email: suggest(self.state.email.trim()) }); },
+      showCodeLink: !s.codeOpen && !s.codeApplied, codeOpen: s.codeOpen && !s.codeApplied, codeApplied: s.codeApplied,
+      code: s.code, codeErr: s.codeErr,
+      openCode: function () { self.setState({ codeOpen: true }); },
+      onCode: function (e) { self.setState({ code: e.target.value, codeErr: '' }); },
+      applyCode: function () { if (self.state.code.trim().toUpperCase() === 'AITALKS') self.setState({ codeApplied: true, codeErr: '' }); else self.setState({ codeErr: 'Este código no existe o ya venció.' }); },
+      removeCode: function () { self.setState({ codeApplied: false, codeOpen: false, code: '' }); },
+      accept: s.accept, terms: s.terms,
+      toggleAccept: function () { self.setState({ accept: !self.state.accept, errAccept: '' }); },
+      toggleTerms: function (e) { if (e && e.preventDefault) e.preventDefault(); self.setState({ terms: !self.state.terms }); },
+      back: function () { clearInterval(self._hold); self.setState({ step: 1, dir: 'back', hold: 0 }); },
+      showHold: step2 && s.hold > 0,
+      holdText: Math.floor(s.hold / 60) + ':' + ('0' + (s.hold % 60)).slice(-2),
+      holdColor: s.hold <= 60 ? '#B54708' : '#5B5B63',
+      showFooter: !s.paid,
+      hasQty: T.qty > 0, noQty: T.qty === 0,
+      qtyNum: T.qty, qtyWord: T.qty === 1 ? '1 entrada' : T.qty + ' entradas',
+      shownTotal: clp(s.shown),
+      firstName: first.charAt(0).toUpperCase() + first.slice(1),
+      primaryLabel: step1 ? 'Continuar' : (s.paying ? 'Redirigiendo a Webpay…' : 'Pagar ' + clp(T.total) + ' con Webpay'),
+      primaryDisabled: (step1 && T.qty === 0) || s.paying,
+      primaryOpacity: step1 && T.qty === 0 ? 0.35 : 1,
+      pay: function (e) { if (e && e.preventDefault) e.preventDefault(); },
+      primary: function () {
+        var st = self.state;
+        if (st.step === 1) {
+          if (!totals(st).qty) return;
+          self.setState({ step: 2, dir: 'fwd' });
+          var f = fnById(st.fn);
+          if (f && f.status === 'few') self.startHold();
+          return;
+        }
+        var en = st.name.trim().length >= 2 ? '' : 'Escribe tu nombre.';
+        var ee = validEmail(st.email.trim()) ? '' : 'Revisa tu email, parece incompleto.';
+        var ea = st.accept ? '' : 'Marca esta casilla para continuar.';
+        if (en || ee || ea) { self.setState({ errName: en, errEmail: ee, errAccept: ea, shake: st.shake + 1 }); return; }
+        self.setState({ paying: true });
+        self.later(function () { clearInterval(self._hold); self.setState({ paying: false, paid: true, hold: 0 }); }, 1500);
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

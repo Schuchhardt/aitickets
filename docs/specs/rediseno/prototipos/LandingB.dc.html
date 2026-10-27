@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>AI Tickets para stand-up</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&amp;family=Prompt:wght@400;500;600&amp;family=Fraunces:ital,opsz,wght@0,9..144,500;1,9..144,400;1,9..144,500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0E0B09;-webkit-font-smoothing:antialiased}
+a{color:#F4EDE4}a:hover{color:#FFFFFF}
+.serif{font-family:'Fraunces',Georgia,serif;font-style:italic;font-weight:400;letter-spacing:-.01em}
+.btn-lime{transition:transform 140ms cubic-bezier(.22,1,.36,1),box-shadow 200ms}
+.btn-lime:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(154,230,0,.25)}
+.btn-lime:active{transform:scale(.98)}
+.btn-line{transition:background 140ms,border-color 140ms}
+.btn-line:hover{background:rgba(244,237,228,.08) !important;border-color:rgba(244,237,228,.4) !important}
+.hdr{transition:background 240ms,border-color 240ms}
+.rv{opacity:0;transform:translateY(24px);transition:opacity 700ms cubic-bezier(.22,1,.36,1),transform 700ms cubic-bezier(.22,1,.36,1)}
+.rv.in{opacity:1;transform:none}
+.ph{clip-path:inset(12% 12% 12% 12% round 28px);transition:clip-path 1000ms cubic-bezier(.22,1,.36,1)}
+.ph.in{clip-path:inset(0 0 0 0 round 28px)}
+.ph img{transform:scale(1.12);transition:transform 1400ms cubic-bezier(.22,1,.36,1)}
+.ph.in img{transform:scale(1)}
+.tile img{transition:transform 900ms cubic-bezier(.22,1,.36,1)}
+.tile:hover img{transform:scale(1.06)}
+.tile .lbl{transition:transform 400ms cubic-bezier(.22,1,.36,1)}
+.tile:hover .lbl{transform:translateY(-6px)}
+.seat{transition:background 260ms ease,transform 260ms cubic-bezier(.34,1.56,.64,1)}
+.seg{transition:transform 220ms cubic-bezier(.65,0,.35,1)}
+.faq-body{transition:grid-template-rows 220ms cubic-bezier(.65,0,.35,1)}
+.chev{transition:transform 220ms cubic-bezier(.65,0,.35,1)}
+input[type=range]{accent-color:#9AE600;width:100%;height:28px;margin:0}
+@keyframes kenburns{from{transform:scale(1.08)}to{transform:scale(1)}}
+@keyframes rise{from{opacity:0;transform:translateY(40px)}to{opacity:1;transform:none}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@keyframes cardIn{from{opacity:0;transform:translateY(20px) scale(.96)}to{opacity:1;transform:none}}
+@keyframes pop{0%{transform:scale(.6);opacity:0}100%{transform:scale(1);opacity:1}}
+@keyframes pulse{0%{transform:scale(1);opacity:.7}100%{transform:scale(2.6);opacity:0}}
+.kb{animation:kenburns 2400ms cubic-bezier(.22,1,.36,1) both}
+.w1{animation:rise 800ms cubic-bezier(.22,1,.36,1) 200ms both}
+.w2{animation:rise 800ms cubic-bezier(.22,1,.36,1) 360ms both}
+.w3{animation:fade 800ms ease 700ms both}
+.w4{animation:fade 800ms ease 850ms both}
+.hero-card{animation:cardIn 700ms cubic-bezier(.22,1,.36,1) 1100ms both}
+.marquee-track{animation:marquee 38s linear infinite}
+.marquee:hover .marquee-track{animation-play-state:paused}
+.pop{animation:pop 420ms cubic-bezier(.34,1.56,.64,1) both}
+@keyframes storyFill{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.story-bar{transform-origin:left;animation:storyFill 5s linear infinite}
+@keyframes slotIn{from{opacity:0;transform:translateY(6px) scale(.96)}to{opacity:1;transform:none}}
+.slot{animation:slotIn 360ms cubic-bezier(.34,1.56,.64,1) both}
+.live-dot{animation:pulse 1.4s ease-out infinite}
+@media (prefers-reduced-motion: reduce){*{animation-duration:1ms !important;animation-delay:0ms !important;animation-iteration-count:1 !important;transition-duration:1ms !important}.rv{opacity:1;transform:none}.ph{clip-path:none}.ph img{transform:none}.marquee-track{animation:none}}
+</style>
+</helmet>
+<div style="font-family: 'Prompt', system-ui, sans-serif; color: #F4EDE4; background: #0E0B09; overflow-x: clip">
+
+  <div aria-hidden="true" style="position: fixed; left: 0; top: 0; height: 2px; width: 100%; z-index: 30; background: #9AE600; transform-origin: left; transform: {{progress}}"></div>
+
+  <header class="hdr" style="position: fixed; left: 0; right: 0; top: 0; z-index: 20; background: {{hdrBg}}; border-bottom: 1px solid {{hdrBorder}}; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px)">
+    <div style="max-width: 1280px; margin: 0 auto; padding: 0 40px; height: 72px; display: flex; align-items: center; justify-content: space-between">
+      <a href="#" style="display: flex; align-items: center; gap: 2px; text-decoration: none; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 17px; letter-spacing: .14em; color: #F4EDE4" aria-label="AI Tickets, inicio"><span style="background: #F4EDE4; color: #0E0B09; padding: 2px 5px; letter-spacing: .04em">AI</span><span>TICKETS</span></a>
+      <nav style="display: flex; align-items: center; gap: 30px; font-size: 14px; font-weight: 500">
+        <a href="#" style="color: #D9D0C5; text-decoration: none">Eventos</a>
+        <a href="#redes" style="color: #D9D0C5; text-decoration: none">Marketing</a>
+        <a href="#precio" style="color: #D9D0C5; text-decoration: none">Precio</a>
+        <a href="#" style="color: #D9D0C5; text-decoration: none">Ingresar</a>
+        <a href="#" class="btn-lime" style="height: 40px; padding: 0 18px; border-radius: 999px; background: #9AE600; color: #0E0B09; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center">Publicar función</a>
+      </nav>
+    </div>
+  </header>
+
+  <section style="position: relative; height: 900px; overflow: hidden">
+    <img class="kb" src="/_blob/899c0963b58a6351ce891c650af928f5" alt="Comediante en el escenario de un bar, con el público riéndose" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%">
+    <div aria-hidden="true" style="position: absolute; inset: 0; background: linear-gradient(180deg, rgba(14,11,9,.55) 0%, rgba(14,11,9,0) 22%, rgba(14,11,9,.15) 50%, rgba(14,11,9,.92) 88%, #0E0B09 100%)"></div>
+    <div style="position: absolute; left: 0; right: 0; bottom: 72px">
+      <div style="max-width: 1280px; margin: 0 auto; padding: 0 40px; display: flex; align-items: flex-end; justify-content: space-between; gap: 48px; flex-wrap: wrap">
+        <div style="max-width: 760px">
+          <div class="w3" style="font-size: 13px; font-weight: 600; letter-spacing: .14em; color: #D9D0C5">PARA PRODUCTORES DE STAND-UP</div>
+          <h1 style="margin: 18px 0 0; font-family: 'Sora', sans-serif; font-weight: 800; font-size: 96px; line-height: 92px; letter-spacing: -.045em">
+            <span class="w1" style="display: block">Tú haz el show.</span>
+            <span class="w2 serif" style="display: block; font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 400; font-size: 88px; letter-spacing: -.02em; color: #E9DCCB; margin-top: 4px">Del resto nos encargamos.</span>
+          </h1>
+          <p class="w3" style="font-size: 19px; line-height: 30px; color: #D9D0C5; margin: 26px 0 0; max-width: 600px">Entradas para cada función, un link por comediante del line-up, tu show en redes todos los días y tu plata 48 horas después del evento. 0% de comisión para ti.</p>
+          <div class="w4" style="display: flex; gap: 14px; flex-wrap: wrap; margin-top: 34px">
+            <a href="#" class="btn-lime" style="height: 56px; padding: 0 28px; border-radius: 999px; background: #9AE600; color: #0E0B09; text-decoration: none; font-size: 17px; font-weight: 600; display: inline-flex; align-items: center; gap: 10px">Publicar mi próxima función <span aria-hidden="true">→</span></a>
+            <button type="button" class="btn-line" style="height: 56px; padding: 0 24px; border-radius: 999px; border: 1px solid rgba(244,237,228,.28); background: rgba(14,11,9,.2); color: #F4EDE4; font-family: inherit; font-size: 16px; font-weight: 500; display: inline-flex; align-items: center; gap: 10px; cursor: pointer"><svg width="12" height="12" viewBox="0 0 24 24" fill="#F4EDE4" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"></path></svg>Míralo en 1 minuto</button>
+          </div>
+        </div>
+        <div class="hero-card" style="width: 300px; background: rgba(23,18,15,.78); border: 1px solid rgba(244,237,228,.14); border-radius: 22px; padding: 20px; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px)">
+          <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #B5ABA0"><span style="position: relative; width: 7px; height: 7px"><span class="live-dot" style="position: absolute; inset: 0; border-radius: 50%; background: #9AE600"></span><span style="position: absolute; inset: 0; border-radius: 50%; background: #9AE600"></span></span>Vendiendo ahora · ejemplo</div>
+          <div style="font-family: 'Sora', sans-serif; font-weight: 700; font-size: 18px; margin-top: 10px">Stand-up de Viernes</div>
+          <div style="font-size: 13px; color: #B5ABA0">Vie 23 oct · 21:00 · Providencia</div>
+          <div style="display: grid; grid-template-columns: repeat(20, minmax(0, 1fr)); gap: 3px; margin-top: 14px" aria-hidden="true">
+            <sc-for list="{{miniSeats}}" as="m" hint-placeholder-count="100"><span style="aspect-ratio: 1 / 1; border-radius: 2px; background: {{m}}"></span></sc-for>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-top: 14px; font-size: 14px"><span style="color: #B5ABA0">Vendidas</span><span style="font-weight: 600; font-variant-numeric: tabular-nums">71 de 100</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="marquee" aria-hidden="true" style="border-top: 1px solid rgba(244,237,228,.1); border-bottom: 1px solid rgba(244,237,228,.1); overflow: hidden; padding: 22px 0">
+    <div class="marquee-track" style="display: flex; width: max-content; gap: 48px; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 34px; letter-spacing: -.02em; white-space: nowrap; color: #6F655B">
+      <sc-for list="{{marquee}}" as="g" hint-placeholder-count="16"><span style="display: inline-flex; align-items: center; gap: 48px">{{g}}<span style="width: 10px; height: 10px; border-radius: 50%; background: #9AE600"></span></span></sc-for>
+    </div>
+  </div>
+
+  <section style="max-width: 1280px; margin: 0 auto; padding: 160px 40px 80px">
+    <div ref="{{refIntro}}" class="{{rvIntro}}" style="max-width: 900px">
+      <div style="font-size: 13px; font-weight: 600; letter-spacing: .14em; color: #B5ABA0">UNA SEMANA CON AI TICKETS</div>
+      <h2 style="margin: 18px 0 0; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 64px; line-height: 66px; letter-spacing: -.035em">Del lunes en que publicas al domingo en que <span class="serif" style="font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 400; color: #E9DCCB">cobras.</span></h2>
+    </div>
+  </section>
+
+  <section style="max-width: 1280px; margin: 0 auto; padding: 0 40px 120px; position: relative">
+    <div aria-hidden="true" style="position: absolute; left: 50%; top: 0; bottom: 120px; width: 1px; background: rgba(244,237,228,.12)"></div>
+
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 96px; align-items: center; padding: 40px 0">
+      <div ref="{{refC1}}" class="{{phC1}}" style="position: relative; aspect-ratio: 4 / 5; border-radius: 28px; overflow: hidden">
+        <img src="/_blob/a75445c01b237816c05cbbc68325baf4" alt="Productor revisando su teléfono antes de un show" style="width: 100%; height: 100%; object-fit: cover">
+        <div style="position: absolute; left: 24px; bottom: 24px; right: 24px; background: rgba(14,11,9,.82); border: 1px solid rgba(244,237,228,.14); border-radius: 18px; padding: 16px; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px)">
+          <div style="font-size: 12px; color: #B5ABA0">Evento creado</div>
+          <div style="font-weight: 600; margin-top: 2px">Stand-up de Viernes · 6 funciones</div>
+          <div style="display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap"><span style="font-size: 12px; border: 1px solid rgba(244,237,228,.2); border-radius: 999px; padding: 3px 9px">Vie 23</span><span style="font-size: 12px; border: 1px solid rgba(244,237,228,.2); border-radius: 999px; padding: 3px 9px">Sáb 24</span><span style="font-size: 12px; border: 1px solid rgba(244,237,228,.2); border-radius: 999px; padding: 3px 9px">Sáb 24</span><span style="font-size: 12px; border: 1px solid rgba(244,237,228,.2); border-radius: 999px; padding: 3px 9px">+3</span></div>
+        </div>
+      </div>
+      <div class="{{rvC1}}">
+        <div style="font-family: 'Sora', sans-serif; font-weight: 800; font-size: 14px; letter-spacing: .18em; color: #9AE600">LUNES</div>
+        <h3 style="margin: 14px 0 0; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 44px; line-height: 48px; letter-spacing: -.03em">Publicas todas tus fechas <span class="serif" style="font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 400; color: #E9DCCB">en una sola tarde.</span></h3>
+        <p style="font-size: 18px; line-height: 29px; color: #CFC5BA; margin: 18px 0 0; max-width: 460px">Hasta 60 funciones en un evento, con entradas para una función o para todas. La próxima temporada la duplicas y solo cambias las fechas.</p>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 96px; align-items: center; padding: 40px 0">
+      <div class="{{rvC2}}" style="justify-self: end; text-align: right">
+        <div style="font-family: 'Sora', sans-serif; font-weight: 800; font-size: 14px; letter-spacing: .18em; color: #9AE600">MIÉRCOLES</div>
+        <h3 style="margin: 14px 0 0; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 44px; line-height: 48px; letter-spacing: -.03em">Cada comediante con su link. <span class="serif" style="font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 400; color: #E9DCCB">Y sabes quién vende.</span></h3>
+        <p style="font-size: 18px; line-height: 29px; color: #CFC5BA; margin: 18px 0 0 auto; max-width: 460px">Cada compra queda asociada al link con que llegó el comprador. Sin capturas de pantalla ni planillas: lo ves por canal, en pesos y entradas.</p>
+      </div>
+      <div ref="{{refC2}}" class="{{phC2}}" style="position: relative; aspect-ratio: 4 / 5; border-radius: 28px; overflow: hidden">
+        <img src="/_blob/48bfd3f1bbd2157950c9471cdf8285e9" alt="Comediantes del line-up riéndose backstage frente a un teléfono" style="width: 100%; height: 100%; object-fit: cover">
+        <div style="position: absolute; left: 24px; bottom: 24px; right: 24px; background: rgba(14,11,9,.84); border: 1px solid rgba(244,237,228,.14); border-radius: 18px; padding: 18px; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); display: flex; flex-direction: column; gap: 12px">
+          <div style="font-size: 12px; color: #B5ABA0">Ventas por link · ejemplo</div>
+          <sc-for list="{{links}}" as="l" hint-placeholder-count="3">
+            <div>
+              <div style="display: flex; justify-content: space-between; font-size: 14px"><span>{{l.name}}</span><span style="font-variant-numeric: tabular-nums">{{l.n}}</span></div>
+              <div style="height: 5px; border-radius: 3px; background: rgba(244,237,228,.12); margin-top: 6px; overflow: hidden"><div style="height: 100%; background: #9AE600; border-radius: 3px; transform-origin: left; transform: {{l.scale}}; transition: transform 1100ms cubic-bezier(.22,1,.36,1); transition-delay: {{l.delay}}"></div></div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 96px; align-items: center; padding: 40px 0">
+      <div ref="{{refC3}}" class="{{phC3}}" style="position: relative; aspect-ratio: 4 / 5; border-radius: 28px; overflow: hidden">
+        <img src="/_blob/ba87119f5659243eec3a86df40fc8ce4" alt="Persona del equipo escaneando el QR de una entrada en la puerta" style="width: 100%; height: 100%; object-fit: cover">
+        <div style="position: absolute; right: 24px; top: 24px; width: 210px; background: #9AE600; color: #0E0B09; border-radius: 18px; padding: 16px">
+          <div style="font-family: 'Sora', sans-serif; font-weight: 800; font-size: 22px">✓ Válida</div>
+          <div style="font-size: 13px; margin-top: 4px">General · Entrada 1 de 2</div>
+          <div style="font-size: 13px">Puerta · 20:47</div>
+        </div>
+      </div>
+      <div class="{{rvC3}}">
+        <div style="font-family: 'Sora', sans-serif; font-weight: 800; font-size: 14px; letter-spacing: .18em; color: #9AE600">VIERNES · 20:45</div>
+        <h3 style="margin: 14px 0 0; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 44px; line-height: 48px; letter-spacing: -.03em">La fila avanza <span class="serif" style="font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 400; color: #E9DCCB">sin listas en papel.</span></h3>
+        <p style="font-size: 18px; line-height: 29px; color: #CFC5BA; margin: 18px 0 0; max-width: 460px">Tu equipo escanea con su celular, aunque se caiga la señal. Una entrada usada no vuelve a entrar, y las cortesías se validan igual que las pagadas.</p>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 96px; align-items: center; padding: 40px 0">
+      <div class="{{rvC4}}" style="justify-self: end; text-align: right">
+        <div style="font-family: 'Sora', sans-serif; font-weight: 800; font-size: 14px; letter-spacing: .18em; color: #9AE600">DOMINGO · 21:00</div>
+        <h3 style="margin: 14px 0 0; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 44px; line-height: 48px; letter-spacing: -.03em">48 horas después, <span class="serif" style="font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 400; color: #E9DCCB">la plata es tuya.</span></h3>
+        <p style="font-size: 18px; line-height: 29px; color: #CFC5BA; margin: 18px 0 0 auto; max-width: 460px">Recibes lo recaudado de cada función 48 horas después del evento. Sin esperar a fin de mes ni perseguir a nadie.</p>
+      </div>
+      <div ref="{{refC4}}" class="{{phC4}}" style="position: relative; aspect-ratio: 4 / 5; border-radius: 28px; overflow: hidden">
+        <img src="/_blob/1db53f6239951ad7931447ffc54956b2" alt="Público de un teatro pequeño riendo y aplaudiendo" style="width: 100%; height: 100%; object-fit: cover; object-position: 30% 50%">
+        <div style="position: absolute; left: 24px; bottom: 24px; right: 24px; background: rgba(244,237,228,.95); color: #0E0B09; border-radius: 18px; padding: 18px; display: flex; align-items: center; gap: 14px">
+          <div style="width: 40px; height: 40px; border-radius: 50%; background: #9AE600; display: flex; align-items: center; justify-content: center; flex: 0 0 auto"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0E0B09" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></div>
+          <div><div style="font-size: 12px; color: #5B534B">Función del viernes · ejemplo</div><div style="font-family: 'Sora', sans-serif; font-weight: 700; font-size: 22px; font-variant-numeric: tabular-nums">{{payout}}</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="redes" ref="{{refMk}}" style="max-width: 1280px; margin: 0 auto; padding: 120px 40px 160px">
+    <div class="{{rvMk}}" style="display: flex; justify-content: space-between; align-items: flex-end; gap: 40px; flex-wrap: wrap">
+      <div style="max-width: 760px">
+        <div style="font-size: 13px; font-weight: 600; letter-spacing: .14em; color: #B5ABA0">MARKETING EN PILOTO AUTOMÁTICO</div>
+        <h2 style="margin: 18px 0 0; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 64px; line-height: 66px; letter-spacing: -.035em">Tu show, en redes <span class="serif" style="font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 400; color: #E9DCCB">todos los días.</span></h2>
+      </div>
+      <p style="font-size: 18px; line-height: 29px; color: #CFC5BA; margin: 0; max-width: 420px">Conecta tus redes una vez. Con el póster y los datos de tu evento armamos historias, posts y reels, y se publican solos hasta el día de la función.</p>
+    </div>
+
+    <div class="{{rvMk}}" style="transition-delay: 160ms; display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 48px; margin-top: 64px; align-items: start">
+
+      <div style="position: relative; width: 300px; height: 600px; border-radius: 40px; background: #000; padding: 9px; box-sizing: border-box; box-shadow: 0 30px 80px rgba(0,0,0,.5)">
+        <div style="position: relative; width: 100%; height: 100%; border-radius: 32px; overflow: hidden">
+          <img src="/_blob/3b2662d7e351796facd5621c1bbf8fca" alt="Historia de ejemplo con la foto de una comediante en el escenario" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%">
+          <div aria-hidden="true" style="position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.45) 0%, rgba(0,0,0,0) 22%, rgba(0,0,0,0) 55%, rgba(0,0,0,.75) 100%)"></div>
+          <div style="position: absolute; left: 12px; right: 12px; top: 12px; display: flex; gap: 4px" aria-hidden="true">
+            <div style="flex: 1; height: 3px; border-radius: 2px; background: rgba(255,255,255,.95)"></div>
+            <div style="flex: 1; height: 3px; border-radius: 2px; background: rgba(255,255,255,.35); overflow: hidden"><div class="story-bar" style="height: 100%; background: #FFFFFF"></div></div>
+            <div style="flex: 1; height: 3px; border-radius: 2px; background: rgba(255,255,255,.35)"></div>
+          </div>
+          <div style="position: absolute; left: 12px; top: 26px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: #FFFFFF">
+            <span style="width: 26px; height: 26px; border-radius: 50%; background: #FFD666; color: #24163F; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 10px; display: inline-flex; align-items: center; justify-content: center">RS</span>
+            <span style="font-weight: 600">risaseria</span><span style="opacity: .7">· programada 19:00</span>
+          </div>
+          <div style="position: absolute; left: 16px; right: 16px; bottom: 20px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start">
+            <div style="font-family: 'Sora', sans-serif; font-weight: 800; font-size: 34px; line-height: 34px; color: #FFFFFF; letter-spacing: -.03em">HOY<br>21:00</div>
+            <div style="background: #FFFFFF; color: #0E0B09; border-radius: 10px; padding: 8px 12px; font-size: 13px; font-weight: 600; transform: rotate(-3deg)">Quedan 23 entradas</div>
+            <div style="background: #9AE600; color: #0E0B09; border-radius: 999px; padding: 8px 14px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0E0B09" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"></path><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"></path></svg>aitickets.cl/standup-viernes</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 20px; min-width: 0">
+        <div style="background: #17120F; border: 1px solid rgba(244,237,228,.1); border-radius: 24px; padding: 24px">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap">
+            <div style="font-family: 'Sora', sans-serif; font-weight: 700; font-size: 18px">Esta semana · Stand-up de Viernes</div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap">
+              <sc-for list="{{nets}}" as="n" hint-placeholder-count="3">
+                <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 6px 12px; border-radius: 999px; border: 1px solid {{n.border}}; color: {{n.color}}"><span style="width: 7px; height: 7px; border-radius: 50%; background: {{n.dot}}"></span>{{n.label}}</span>
+              </sc-for>
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; margin-top: 20px">
+            <sc-for list="{{week}}" as="d" hint-placeholder-count="7">
+              <div style="border-radius: 14px; padding: 10px 8px; min-height: 176px; background: {{d.bg}}; border: 1px solid {{d.border}}; display: flex; flex-direction: column; gap: 6px">
+                <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; letter-spacing: .06em; color: {{d.headColor}}"><span>{{d.dow}}</span><span>{{d.num}}</span></div>
+                <sc-if value="{{d.isShow}}" hint-placeholder-val="{{ false }}"><div style="font-size: 10px; font-weight: 700; letter-spacing: .06em; color: #0E0B09; background: #E9DCCB; border-radius: 6px; padding: 3px 5px; text-align: center">FUNCIÓN 21:00</div></sc-if>
+                <sc-for list="{{d.slots}}" as="s" hint-placeholder-count="2">
+                  <div class="slot" style="animation-delay: {{s.delay}}; border-radius: 8px; padding: 6px 7px; background: {{s.bg}}; color: {{s.color}}; font-size: 11px; line-height: 14px">
+                    <div style="font-weight: 600">{{s.kind}}</div>
+                    <div style="opacity: .8">{{s.status}}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; align-items: center">
+            <sc-for list="{{toggles}}" as="t" hint-placeholder-count="3">
+              <button type="button" role="switch" aria-checked="{{t.on}}" onClick="{{t.flip}}" style="display: inline-flex; align-items: center; gap: 10px; height: 40px; padding: 0 14px 0 8px; border-radius: 999px; border: 1px solid rgba(244,237,228,.16); background: transparent; color: #F4EDE4; font-family: inherit; font-size: 14px; cursor: pointer">
+                <span style="width: 34px; height: 20px; border-radius: 999px; background: {{t.track}}; position: relative; transition: background 200ms"><span style="position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #FFFFFF; transform: {{t.knob}}; transition: transform 200ms cubic-bezier(.65,0,.35,1)"></span></span>{{t.label}}
+              </button>
+            </sc-for>
+            <span style="margin-left: auto; font-size: 14px; color: #B5ABA0; font-variant-numeric: tabular-nums">{{postCount}} publicaciones esta semana</span>
+          </div>
+          <div style="font-size: 13px; color: #8E8378; margin-top: 14px">Cada publicación lleva su propio link con seguimiento: ves cuántas entradas vendió cada historia. Puedes revisar y editar todo antes de que salga.</div>
+        </div>
+
+        <div style="background: #F4EDE4; color: #0E0B09; border-radius: 24px; padding: 24px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; align-items: center">
+          <div>
+            <div style="display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; letter-spacing: .08em; color: #8A3A06; background: #FFE9D6; border-radius: 999px; padding: 4px 10px">QUEDAN 23 ENTRADAS · FALTAN 3 DÍAS</div>
+            <h3 style="margin: 12px 0 0; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 28px; line-height: 32px; letter-spacing: -.02em">¿Necesitas un empujón? <span class="serif" style="font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 400; color: #5B534B">Impulsa con anuncios.</span></h3>
+            <p style="font-size: 15px; line-height: 23px; color: #3E3731; margin: 10px 0 0">Lanza una campaña en Instagram y Facebook desde tu panel, con el público de tu ciudad al que le gusta la comedia. Tú decides cuánto invertir y la pausas cuando quieras.</p>
+          </div>
+          <div style="background: #FFFFFF; border-radius: 18px; padding: 18px; display: flex; flex-direction: column; gap: 14px">
+            <sc-if value="{{adsIdle}}" hint-placeholder-val="{{ true }}">
+              <div style="display: flex; flex-direction: column; gap: 14px">
+                <div>
+                  <div style="display: flex; justify-content: space-between; font-size: 14px"><label for="ad-budget" style="font-weight: 600">Presupuesto diario</label><span style="font-weight: 600; font-variant-numeric: tabular-nums">{{budgetLabel}}</span></div>
+                  <input id="ad-budget" type="range" min="3000" max="50000" step="1000" value="{{budget}}" onChange="{{onBudget}}" style="margin-top: 6px; accent-color: #0E0B09">
+                </div>
+                <div>
+                  <div style="display: flex; justify-content: space-between; font-size: 14px"><label for="ad-days" style="font-weight: 600">Días</label><span style="font-weight: 600; font-variant-numeric: tabular-nums">{{days}}</span></div>
+                  <input id="ad-days" type="range" min="1" max="7" step="1" value="{{days}}" onChange="{{onDays}}" style="margin-top: 6px; accent-color: #0E0B09">
+                </div>
+                <div style="display: flex; flex-wrap: wrap; gap: 6px"><span style="font-size: 12px; background: #F4EDE4; border-radius: 999px; padding: 4px 10px">Santiago</span><span style="font-size: 12px; background: #F4EDE4; border-radius: 999px; padding: 4px 10px">20–45 años</span><span style="font-size: 12px; background: #F4EDE4; border-radius: 999px; padding: 4px 10px">Comedia y stand-up</span></div>
+                <button type="button" onClick="{{launch}}" class="btn-lime" style="height: 48px; border: 0; border-radius: 999px; background: #0E0B09; color: #F4EDE4; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer">Impulsar · {{adTotal}} en total</button>
+              </div>
+            </sc-if>
+            <sc-if value="{{adsOn}}" hint-placeholder-val="{{ false }}">
+              <div class="pop" style="display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 12px 0">
+                <div style="width: 44px; height: 44px; border-radius: 50%; background: #9AE600; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0E0B09" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></div>
+                <div style="font-weight: 600">Campaña activa · {{days}} días</div>
+                <div style="font-size: 14px; color: #5B534B">{{adTotal}} en total · la ves por canal en tus métricas</div>
+                <button type="button" onClick="{{resetAds}}" style="background: none; border: 0; font: inherit; font-size: 13px; color: #5B534B; text-decoration: underline; cursor: pointer">Pausar</button>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section ref="{{refSeats}}" style="background: #17120F; padding: 140px 40px; border-top: 1px solid rgba(244,237,228,.08); border-bottom: 1px solid rgba(244,237,228,.08)">
+    <div style="max-width: 1280px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 80px; align-items: center">
+      <div class="{{rvSeats}}" style="flex: 1 1 380px; min-width: 0">
+        <div style="font-size: 13px; font-weight: 600; letter-spacing: .14em; color: #B5ABA0">EN TIEMPO REAL</div>
+        <h2 style="margin: 18px 0 0; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 64px; line-height: 66px; letter-spacing: -.035em">Mira cómo <span class="serif" style="font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 400; color: #E9DCCB">se llena.</span></h2>
+        <p style="font-size: 18px; line-height: 29px; color: #CFC5BA; margin: 22px 0 0; max-width: 440px">Cada entrada vendida aparece al instante en tu panel, con el link que la trajo. Si una función se afloja, lo ves a tiempo para lanzar un código de última semana.</p>
+        <div style="display: flex; align-items: baseline; gap: 14px; margin-top: 40px">
+          <div style="font-family: 'Sora', sans-serif; font-weight: 800; font-size: 88px; line-height: 88px; letter-spacing: -.04em; font-variant-numeric: tabular-nums">{{seatCount}}</div>
+          <div style="font-size: 18px; color: #B5ABA0">de 200 entradas</div>
+        </div>
+        <sc-if value="{{soldOut}}" hint-placeholder-val="{{ false }}">
+          <div class="pop" style="display: inline-flex; align-items: center; gap: 8px; margin-top: 18px; background: #9AE600; color: #0E0B09; font-weight: 600; font-size: 15px; padding: 8px 16px; border-radius: 999px">Función agotada · 100% vendido</div>
+        </sc-if>
+      </div>
+      <div class="{{rvSeats}}" style="flex: 1 1 560px; min-width: 0; transition-delay: 160ms">
+        <div style="width: 70%; margin: 0 auto 28px; height: 26px; border-radius: 0 0 200px 200px / 0 0 26px 26px; background: rgba(244,237,228,.08); border: 1px solid rgba(244,237,228,.14); border-top: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; letter-spacing: .3em; color: #B5ABA0">ESCENARIO</div>
+        <div role="img" aria-label="{{seatAria}}" style="display: grid; grid-template-columns: repeat(21, minmax(0, 1fr)); gap: 6px">
+          <sc-for list="{{seats}}" as="s" hint-placeholder-count="210"><span class="seat" style="aspect-ratio: 1 / 1; border-radius: 6px 6px 3px 3px; background: {{s.bg}}; transform: {{s.t}}; visibility: {{s.vis}}"></span></sc-for>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section style="max-width: 1280px; margin: 0 auto; padding: 160px 40px 120px">
+    <div ref="{{refGal}}" class="{{rvGal}}" style="display: flex; justify-content: space-between; align-items: flex-end; gap: 32px; flex-wrap: wrap">
+      <h2 style="margin: 0; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 64px; line-height: 66px; letter-spacing: -.035em; max-width: 760px">Del open mic <span class="serif" style="font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 400; color: #E9DCCB">a la gira.</span></h2>
+      <p style="font-size: 17px; line-height: 27px; color: #CFC5BA; margin: 0; max-width: 340px">Funciona igual para el open mic de los martes que para un solista con temporada en sala.</p>
+    </div>
+    <div class="{{rvGal}}" style="transition-delay: 160ms; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 56px">
+      <sc-for list="{{tiles}}" as="t" hint-placeholder-count="3">
+        <a href="#" class="tile" style="position: relative; display: block; aspect-ratio: 3 / 4; border-radius: 22px; overflow: hidden; text-decoration: none; color: #F4EDE4">
+          <img src="{{t.src}}" alt="{{t.alt}}" style="width: 100%; height: 100%; object-fit: cover; object-position: {{t.pos}}">
+          <span aria-hidden="true" style="position: absolute; inset: 0; background: linear-gradient(180deg, rgba(14,11,9,0) 50%, rgba(14,11,9,.85) 100%)"></span>
+          <span class="lbl" style="position: absolute; left: 20px; right: 20px; bottom: 20px">
+            <span style="display: block; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 24px">{{t.name}}</span>
+            <span style="display: block; font-size: 14px; color: #D9D0C5; margin-top: 4px">{{t.line}}</span>
+          </span>
+        </a>
+      </sc-for>
+    </div>
+  </section>
+
+  <section id="precio" style="background: #F4EDE4; color: #0E0B09; padding: 140px 40px">
+    <div ref="{{refPrice}}" class="{{rvPrice}}" style="max-width: 1280px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 80px; align-items: center">
+      <div style="flex: 1 1 520px; min-width: 0">
+        <div style="font-size: 13px; font-weight: 600; letter-spacing: .14em; color: #6B6158">PRECIO</div>
+        <h2 style="margin: 18px 0 0; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 64px; line-height: 66px; letter-spacing: -.035em">Tú recibes <span style="font-variant-numeric: tabular-nums">{{recv}}</span>.<br><span class="serif" style="font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 400; color: #5B534B">Tu público paga <span style="font-variant-numeric: tabular-nums">{{pays}}</span>.</span></h2>
+        <p style="font-size: 18px; line-height: 29px; color: #3E3731; margin: 24px 0 0; max-width: 560px">Para ti, 0% de comisión. El comprador paga un cargo por servicio de 8% más IVA sobre ese cargo. Si prefieres un precio final redondo, lo absorbes tú. Las entradas gratis no pagan nada.</p>
+        <div style="display: flex; gap: 28px; flex-wrap: wrap; margin-top: 32px; font-size: 15px; font-weight: 500">
+          <span>Sin mensualidad</span><span>Sin permanencia</span><span>Pago 48 h después del evento</span>
+        </div>
+      </div>
+      <div style="flex: 1 1 420px; min-width: 0; background: #FFFFFF; border-radius: 28px; padding: 32px; box-shadow: 0 1px 2px rgba(14,11,9,.06), 0 24px 60px rgba(14,11,9,.10); display: flex; flex-direction: column; gap: 24px">
+        <div>
+          <div style="display: flex; justify-content: space-between; font-size: 15px"><label for="b-price" style="font-weight: 600">Precio de tu entrada</label><span style="font-weight: 600; font-variant-numeric: tabular-nums">{{priceLabel}}</span></div>
+          <input id="b-price" type="range" min="1000" max="60000" step="500" value="{{price}}" onChange="{{onPrice}}" aria-valuetext="{{priceLabel}}" style="margin-top: 10px; accent-color: #0E0B09">
+        </div>
+        <div role="radiogroup" aria-label="¿Quién paga el cargo?" style="position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); background: #F4EDE4; border-radius: 999px; padding: 4px">
+          <div class="seg" aria-hidden="true" style="position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc(50% - 4px); border-radius: 999px; background: #0E0B09; transform: {{segX}}"></div>
+          <button type="button" role="radio" aria-checked="{{buyerChecked}}" onClick="{{payBuyer}}" style="position: relative; height: 44px; border: 0; background: none; font-family: inherit; font-size: 15px; font-weight: 500; color: {{buyerColor}}; cursor: pointer">Paga el público</button>
+          <button type="button" role="radio" aria-checked="{{meChecked}}" onClick="{{payMe}}" style="position: relative; height: 44px; border: 0; background: none; font-family: inherit; font-size: 15px; font-weight: 500; color: {{meColor}}; cursor: pointer">Lo absorbo yo</button>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px; font-size: 15px; font-variant-numeric: tabular-nums; border-top: 1px solid rgba(14,11,9,.1); padding-top: 20px">
+          <div style="display: flex; justify-content: space-between"><span style="color: #6B6158">Entrada</span><span>{{bPrice}}</span></div>
+          <div style="display: flex; justify-content: space-between"><span style="color: #6B6158">Cargo por servicio (8%)</span><span>{{bFee}}</span></div>
+          <div style="display: flex; justify-content: space-between"><span style="color: #6B6158">IVA del cargo (19%)</span><span>{{bIva}}</span></div>
+          <div style="display: flex; justify-content: space-between; font-weight: 600; margin-top: 6px"><span>Tú recibes por entrada</span><span>{{recv}}</span></div>
+        </div>
+        <a href="#" style="color: #0E0B09; font-size: 15px; font-weight: 500">Ver precios en detalle →</a>
+      </div>
+    </div>
+  </section>
+
+  <section style="max-width: 1100px; margin: 0 auto; padding: 160px 40px 120px; text-align: center">
+    <div ref="{{refQuote}}" class="{{rvQuote}}">
+      <div aria-hidden="true" style="font-family: 'Fraunces', Georgia, serif; font-size: 120px; line-height: 60px; color: #9AE600">“</div>
+      <blockquote style="margin: 24px 0 0; font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 400; font-size: 46px; line-height: 58px; letter-spacing: -.01em; color: #F4EDE4">[Aquí va una cita real de un productor de stand-up: qué cambió en su semana desde que vende con AI Tickets.]</blockquote>
+      <div style="display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 36px">
+        <div style="width: 52px; height: 52px; border-radius: 50%; border: 1px dashed rgba(244,237,228,.35); display: flex; align-items: center; justify-content: center; font-size: 11px; color: #B5ABA0">[Foto]</div>
+        <div style="text-align: left"><div style="font-weight: 600">[Nombre Apellido]</div><div style="font-size: 14px; color: #B5ABA0">[Productora · ciudad]</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section style="max-width: 1280px; margin: 0 auto; padding: 0 40px 140px">
+    <div ref="{{refAi}}" class="{{rvAi}}" style="border: 1px solid rgba(244,237,228,.12); border-radius: 32px; padding: 56px; display: flex; flex-wrap: wrap; gap: 56px; align-items: center; background: #17120F">
+      <div style="flex: 1 1 420px; min-width: 0">
+        <div style="font-size: 13px; font-weight: 600; letter-spacing: .14em; color: #B5ABA0">OPCIONAL · CLAUDE Y CHATGPT</div>
+        <h2 style="margin: 16px 0 0; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 44px; line-height: 48px; letter-spacing: -.03em">¿Prefieres conversar? <span class="serif" style="font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 400; color: #E9DCCB">Tu ticketera también.</span></h2>
+        <p style="font-size: 17px; line-height: 27px; color: #CFC5BA; margin: 16px 0 0">Conecta AI Tickets a Claude o ChatGPT y pregunta cómo va tu evento, crea códigos de descuento o prepara posts. Todo lo importante te pide confirmación.</p>
+        <a href="#" style="display: inline-block; margin-top: 22px; font-weight: 600; text-decoration: none; color: #9AE600">Conecta tu IA →</a>
+      </div>
+      <div style="flex: 1 1 420px; min-width: 0; display: flex; flex-direction: column; gap: 12px">
+        <div style="align-self: flex-end; max-width: 80%; background: #F4EDE4; color: #0E0B09; border-radius: 20px 20px 6px 20px; padding: 14px 16px; font-size: 15px; line-height: 22px">¿Cómo va el Stand-up de Viernes?</div>
+        <div style="align-self: flex-start; max-width: 86%; background: #241D18; border: 1px solid rgba(244,237,228,.1); border-radius: 20px 20px 20px 6px; padding: 14px 16px; font-size: 15px; line-height: 22px">Vas en 142 de 200 entradas. El link de Pedro trae el 30% de las ventas. Faltan 9 días: ¿te armo un código de última semana?</div>
+        <div style="align-self: flex-end; max-width: 80%; background: #F4EDE4; color: #0E0B09; border-radius: 20px 20px 6px 20px; padding: 14px 16px; font-size: 15px; line-height: 22px">Dale, 15% hasta el jueves.</div>
+      </div>
+    </div>
+  </section>
+
+  <section style="max-width: 860px; margin: 0 auto; padding: 0 40px 140px">
+    <h2 style="margin: 0 0 24px; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 44px; letter-spacing: -.03em">Preguntas frecuentes</h2>
+    <sc-for list="{{faqs}}" as="f" hint-placeholder-count="6">
+      <div style="border-bottom: 1px solid rgba(244,237,228,.12)">
+        <button type="button" onClick="{{f.toggle}}" aria-expanded="{{f.expanded}}" style="width: 100%; background: none; border: 0; padding: 24px 0; display: flex; justify-content: space-between; align-items: center; gap: 16px; font-family: inherit; font-size: 18px; font-weight: 500; color: #F4EDE4; text-align: left; cursor: pointer">
+          <span>{{f.q}}</span>
+          <svg class="chev" style="transform: {{f.rot}}; flex: 0 0 auto" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#B5ABA0" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+        </button>
+        <div class="faq-body" style="display: grid; grid-template-rows: {{f.rows}}"><div style="overflow: hidden"><p style="margin: 0 0 24px; font-size: 16px; line-height: 26px; color: #CFC5BA; max-width: 680px">{{f.a}}</p></div></div>
+      </div>
+    </sc-for>
+  </section>
+
+  <section style="position: relative; height: 720px; overflow: hidden; display: flex; align-items: center; justify-content: center; text-align: center">
+    <img src="/_blob/8fdd3c8283ce4017fe052a59449273d1" alt="" aria-hidden="true" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 40%">
+    <div aria-hidden="true" style="position: absolute; inset: 0; background: radial-gradient(ellipse at center, rgba(14,11,9,.55) 0%, rgba(14,11,9,.88) 70%, #0E0B09 100%)"></div>
+    <div ref="{{refFinal}}" class="{{rvFinal}}" style="position: relative; padding: 0 40px; max-width: 900px">
+      <h2 style="margin: 0; font-family: 'Sora', sans-serif; font-weight: 800; font-size: 88px; line-height: 86px; letter-spacing: -.045em">¿Cuándo es tu <span class="serif" style="font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 400; color: #E9DCCB">próxima función?</span></h2>
+      <p style="font-size: 19px; line-height: 30px; color: #D9D0C5; margin: 24px 0 0">Publícala hoy. Crear tu cuenta es gratis y no hay costos fijos.</p>
+      <div style="display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; margin-top: 36px">
+        <a href="#" class="btn-lime" style="height: 58px; padding: 0 30px; border-radius: 999px; background: #9AE600; color: #0E0B09; text-decoration: none; font-size: 17px; font-weight: 600; display: inline-flex; align-items: center; gap: 10px">Publicar mi próxima función <span aria-hidden="true">→</span></a>
+        <a href="#" class="btn-line" style="height: 58px; padding: 0 26px; border-radius: 999px; border: 1px solid rgba(244,237,228,.3); color: #F4EDE4; text-decoration: none; font-size: 16px; font-weight: 500; display: inline-flex; align-items: center">Hablar por WhatsApp</a>
+      </div>
+      <p style="font-size: 14px; color: #B5ABA0; margin: 22px 0 0">¿Prefieres verlo antes? <a href="#" style="color: #F4EDE4">Agenda una demo de 15 min</a></p>
+    </div>
+  </section>
+
+  <footer style="border-top: 1px solid rgba(244,237,228,.1)">
+    <div style="max-width: 1280px; margin: 0 auto; padding: 48px 40px; display: flex; justify-content: space-between; gap: 32px; flex-wrap: wrap; font-size: 14px; color: #B5ABA0">
+      <div style="display: flex; align-items: center; gap: 2px; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 15px; letter-spacing: .14em; color: #F4EDE4"><span style="background: #F4EDE4; color: #0E0B09; padding: 2px 5px; letter-spacing: .04em">AI</span><span>TICKETS</span></div>
+      <div style="display: flex; gap: 24px; flex-wrap: wrap"><a href="#" style="color: #B5ABA0; text-decoration: none">Para organizadores</a><a href="#" style="color: #B5ABA0; text-decoration: none">Teatro</a><a href="#" style="color: #B5ABA0; text-decoration: none">Música en vivo</a><a href="#" style="color: #B5ABA0; text-decoration: none">Talleres</a><a href="#" style="color: #B5ABA0; text-decoration: none">Guías</a><a href="#" style="color: #B5ABA0; text-decoration: none">Términos</a><a href="#" style="color: #B5ABA0; text-decoration: none">Privacidad</a></div>
+      <div>© 2026 Chanium LLC · AI Tickets</div>
+    </div>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":9100}}'>
+function clp(n) { return '$' + Math.round(n).toLocaleString('es-CL'); }
+var GENRES = ['OPEN MIC', 'NOCHE DE COMEDIA', 'SHOW SOLISTA', 'LINE-UP', 'IMPRO', 'ROAST', 'TEMPORADA EN SALA', 'GIRA'];
+var FAQS = [
+  { q: '¿Cuánto cuesta usar AI Tickets?', a: 'Publicar es gratis y no hay mensualidad. Por cada entrada pagada se cobra un cargo por servicio de 8% más IVA sobre ese cargo, que por defecto paga el comprador. Las entradas gratis no pagan cargo.' },
+  { q: '¿Cuándo recibo el dinero de mis ventas?', a: 'Recibes lo recaudado de cada función 48 horas después del evento.' },
+  { q: '¿Puedo publicar varias funciones de una misma obra o show?', a: 'Sí. Un evento admite hasta 60 funciones, con entradas para una función específica o válidas para todas.' },
+  { q: '¿Puedo saber cuántas entradas vende cada promotor?', a: 'Sí. Creas un link para cada promotor, comediante o campaña, y ves órdenes, entradas e ingresos por link.' },
+  { q: '¿Necesito saber de inteligencia artificial?', a: 'No. Todo funciona desde el panel. La IA es una ayuda opcional.' },
+  { q: '¿Cómo funciona la publicación automática en redes?', a: 'Conectas Instagram, Facebook o TikTok una vez. Con el póster y los datos de tu evento armamos historias, posts y reels, eliges cuáles y a qué hora, y se publican solos hasta el día de la función. Puedes revisar y editar cada pieza antes de que salga.' },
+  { q: '¿Tengo que pagar anuncios?', a: 'No. La publicación en tus redes no tiene costo. Los anuncios son opcionales: si quieres impulsar una función, defines un presupuesto diario y los días, y la pausas cuando quieras.' },
+  { q: '¿Me ayudan a publicar mi primer evento?', a: 'Sí. Escríbenos por WhatsApp o agenda una demo de 15 minutos y lo publicamos contigo.' }
+];
+var TILES = [
+  { name: 'Open mic', line: 'Entradas baratas o gratis, cupos y lista de espera', src: '/_blob/8fdd3c8283ce4017fe052a59449273d1', alt: 'Open mic de comedia en un bar lleno', pos: '50% 50%' },
+  { name: 'Line-up', line: 'Un link por comediante y ves quién vende', src: '/_blob/899c0963b58a6351ce891c650af928f5', alt: 'Comediante en el escenario de un bar', pos: '40% 50%' },
+  { name: 'Show solista', line: 'Temporadas de muchas funciones en sala', src: '/_blob/3b2662d7e351796facd5621c1bbf8fca', alt: 'Comediante en primer plano bajo un foco', pos: '50% 35%' }
+];
+var DAYS = [['LUN','19'],['MAR','20'],['MIÉ','21'],['JUE','22'],['VIE','23'],['SÁB','24'],['DOM','25']];
+var TODAY = 2, SHOWS = [4, 5];
+var LINKS = [ { name: 'Link de campaña · Instagram', n: 37 }, { name: 'Link de Pedro · comediante', n: 23 }, { name: 'Link de Ana · promotora', n: 11 } ];
+var EMPTY_SEAT = 'rgba(244,237,228,.10)';
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { y: 0, prog: 0, seen: {}, sold: 0, price: 10000, payer: 'buyer', faq: -1, payout: 0, mk: { story: true, post: true, reel: true }, budget: 10000, days: 3, ads: false };
+    this._els = {}; this._obs = null; this._t = []; this._seatTimer = 0; this._raf = 0;
+    var order = [];
+    for (var i = 0; i < 210; i++) { if (i % 21 !== 10) order.push(i); }
+    for (var k = order.length - 1; k > 0; k--) { var j = Math.floor(((k * 9301 + 49297) % 233280) / 233280 * (k + 1)); var tmp = order[k]; order[k] = order[j]; order[j] = tmp; }
+    this._rank = {}; var self = this; order.forEach(function (idx, r) { self._rank[idx] = r; });
+  }
+  componentDidMount() {
+    var self = this;
+    this._onScroll = function () {
+      var y = window.scrollY || 0, h = document.documentElement.scrollHeight - window.innerHeight;
+      var p = h > 0 ? Math.min(1, y / h) : 0;
+      if (Math.abs(p - self.state.prog) > 0.004 || (y > 40) !== (self.state.y > 40)) self.setState({ y: y, prog: p });
+    };
+    window.addEventListener('scroll', this._onScroll, { passive: true });
+    if ('IntersectionObserver' in window) {
+      this._obs = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (!e.isIntersecting) return;
+          var key = e.target.getAttribute('data-k');
+          if (self.state.seen[key]) return;
+          var s = Object.assign({}, self.state.seen); s[key] = true; self.setState({ seen: s });
+          if (key === 'seats') self.fillSeats();
+          if (key === 'c4') self.countPayout();
+        });
+      }, { threshold: 0.25 });
+      Object.keys(this._els).forEach(function (k) { self._obs.observe(self._els[k]); });
+    } else {
+      this.setState({ seen: { mk: 1, intro: 1, c1: 1, c2: 1, c3: 1, c4: 1, seats: 1, gal: 1, price: 1, quote: 1, ai: 1, final: 1 }, sold: 200, payout: 1296000 });
+    }
+  }
+  componentWillUnmount() { window.removeEventListener('scroll', this._onScroll); if (this._obs) this._obs.disconnect(); clearInterval(this._seatTimer); cancelAnimationFrame(this._raf); this._t.forEach(clearTimeout); }
+  fillSeats() {
+    var self = this;
+    clearInterval(this._seatTimer);
+    this._seatTimer = setInterval(function () {
+      var n = Math.min(200, self.state.sold + 4);
+      self.setState({ sold: n });
+      if (n >= 200) clearInterval(self._seatTimer);
+    }, 40);
+  }
+  countPayout() {
+    var self = this, target = 1296000, start = 0;
+    var tick = function (now) { if (!start) start = now; var t = Math.min(1, (now - start) / 1400), e = 1 - Math.pow(1 - t, 3); self.setState({ payout: Math.round(target * e / 1000) * 1000 }); if (t < 1) self._raf = requestAnimationFrame(tick); };
+    this._raf = requestAnimationFrame(tick);
+  }
+  reg(key) { var self = this; return function (el) { if (!el) return; el.setAttribute('data-k', key); self._els[key] = el; if (self._obs) self._obs.observe(el); }; }
+  renderVals() {
+    var s = this.state, self = this;
+    var rv = function (k) { return s.seen[k] ? 'rv in' : 'rv'; };
+    var ph = function (k) { return s.seen[k] ? 'ph in' : 'ph'; };
+    var fee = Math.round(s.price * 0.08), iva = Math.round(fee * 0.19);
+    var recv = s.payer === 'buyer' ? s.price : s.price - fee - iva;
+    var pays = s.payer === 'buyer' ? s.price + fee + iva : s.price;
+    var mini = []; for (var m = 0; m < 100; m++) mini.push(((m * 37) % 100) < 71 ? '#9AE600' : 'rgba(244,237,228,.16)');
+    var seats = []; for (var i = 0; i < 210; i++) {
+      if (i % 21 === 10) { seats.push({ bg: 'transparent', t: 'none', vis: 'hidden' }); continue; }
+      var on = this._rank[i] < s.sold;
+      seats.push({ bg: on ? '#9AE600' : EMPTY_SEAT, t: on ? 'scale(1)' : 'scale(.86)', vis: 'visible' });
+    }
+    var marquee = GENRES.concat(GENRES);
+    return {
+      progress: 'scaleX(' + s.prog.toFixed(3) + ')',
+      nets: [ { label: 'Instagram · conectado', dot: '#9AE600', border: 'rgba(154,230,0,.4)', color: '#F4EDE4' }, { label: 'Facebook · conectado', dot: '#9AE600', border: 'rgba(154,230,0,.4)', color: '#F4EDE4' }, { label: '+ Conectar TikTok', dot: 'rgba(244,237,228,.3)', border: 'rgba(244,237,228,.2)', color: '#B5ABA0' } ],
+      week: DAYS.map(function (d, i) {
+        var slots = [], k = 0;
+        var st = function (kind, time) { var past = i < TODAY, today = i === TODAY; slots.push({ kind: kind, status: past ? 'Publicado ✓' : (today ? 'Hoy ' + time : time), bg: past ? 'rgba(154,230,0,.16)' : (today ? '#9AE600' : 'rgba(244,237,228,.07)'), color: past ? '#CFEA9C' : (today ? '#0E0B09' : '#D9D0C5'), delay: (s.seen.mk ? (i * 70 + k++ * 40) : 0) + 'ms' }); };
+        if (s.mk.post && (i === 0 || i === 2 || i === 4)) st('Post', '12:00');
+        if (s.mk.story) st('Historia', '19:00');
+        if (s.mk.reel && (i === 3 || i === 4)) st('Reel', '20:00');
+        return { dow: d[0], num: d[1], isShow: SHOWS.indexOf(i) >= 0, slots: s.seen.mk ? slots : [], bg: i === TODAY ? 'rgba(154,230,0,.06)' : 'rgba(244,237,228,.03)', border: i === TODAY ? 'rgba(154,230,0,.45)' : 'rgba(244,237,228,.08)', headColor: i === TODAY ? '#9AE600' : '#B5ABA0' };
+      }),
+      toggles: [['story', 'Historia diaria'], ['post', 'Post lun · mié · vie'], ['reel', 'Reel antes de la función']].map(function (t) { var on = s.mk[t[0]]; return { label: t[1], on: on ? 'true' : 'false', track: on ? '#9AE600' : 'rgba(244,237,228,.2)', knob: on ? 'translateX(14px)' : 'translateX(0)', flip: function () { var m = Object.assign({}, self.state.mk); m[t[0]] = !m[t[0]]; self.setState({ mk: m }); } }; }),
+      postCount: (s.mk.story ? 7 : 0) + (s.mk.post ? 3 : 0) + (s.mk.reel ? 2 : 0),
+      budget: s.budget, days: s.days, budgetLabel: clp(s.budget), adTotal: clp(s.budget * s.days),
+      onBudget: function (e) { self.setState({ budget: parseInt(e.target.value, 10) }); },
+      onDays: function (e) { self.setState({ days: parseInt(e.target.value, 10) }); },
+      adsIdle: !s.ads, adsOn: s.ads,
+      launch: function () { self.setState({ ads: true }); },
+      resetAds: function () { self.setState({ ads: false }); },
+      hdrBg: s.y > 40 ? 'rgba(14,11,9,.82)' : 'rgba(14,11,9,0)',
+      hdrBorder: s.y > 40 ? 'rgba(244,237,228,.08)' : 'rgba(244,237,228,0)',
+      miniSeats: mini, marquee: marquee,
+      refIntro: this.reg('intro'), refC1: this.reg('c1'), refC2: this.reg('c2'), refC3: this.reg('c3'), refC4: this.reg('c4'),
+      refSeats: this.reg('seats'), refMk: this.reg('mk'), rvMk: rv('mk'), refGal: this.reg('gal'), refPrice: this.reg('price'), refQuote: this.reg('quote'), refAi: this.reg('ai'), refFinal: this.reg('final'),
+      rvIntro: rv('intro'), rvC1: rv('c1'), rvC2: rv('c2'), rvC3: rv('c3'), rvC4: rv('c4'),
+      phC1: ph('c1'), phC2: ph('c2'), phC3: ph('c3'), phC4: ph('c4'),
+      rvSeats: rv('seats'), rvGal: rv('gal'), rvPrice: rv('price'), rvQuote: rv('quote'), rvAi: rv('ai'), rvFinal: rv('final'),
+      links: LINKS.map(function (l, i) { return { name: l.name, n: l.n, scale: s.seen.c2 ? 'scaleX(' + (l.n / 40).toFixed(3) + ')' : 'scaleX(0)', delay: (300 + i * 120) + 'ms' }; }),
+      payout: clp(s.payout),
+      seats: seats, seatCount: s.sold, soldOut: s.sold >= 200, seatAria: 'Mapa de la sala: ' + s.sold + ' de 200 asientos vendidos',
+      tiles: TILES,
+      price: s.price, priceLabel: clp(s.price), recv: clp(recv), pays: clp(pays),
+      bPrice: clp(s.price), bFee: (s.payer === 'buyer' ? '+' : '−') + clp(fee), bIva: (s.payer === 'buyer' ? '+' : '−') + clp(iva),
+      onPrice: function (e) { self.setState({ price: parseInt(e.target.value, 10) }); },
+      segX: s.payer === 'buyer' ? 'translateX(0)' : 'translateX(100%)',
+      buyerChecked: s.payer === 'buyer' ? 'true' : 'false', meChecked: s.payer === 'me' ? 'true' : 'false',
+      buyerColor: s.payer === 'buyer' ? '#F4EDE4' : '#3E3731', meColor: s.payer === 'me' ? '#F4EDE4' : '#3E3731',
+      payBuyer: function () { self.setState({ payer: 'buyer' }); },
+      payMe: function () { self.setState({ payer: 'me' }); },
+      faqs: FAQS.map(function (f, i) { var open = s.faq === i; return { q: f.q, a: f.a, expanded: open ? 'true' : 'false', rows: open ? '1fr' : '0fr', rot: open ? 'rotate(45deg)' : 'rotate(0deg)', toggle: function () { self.setState({ faq: open ? -1 : i }); } }; })
+    };
+  }
+}
+</script>
+</body>
+</html>

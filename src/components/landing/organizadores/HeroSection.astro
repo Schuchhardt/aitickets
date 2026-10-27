@@ -14,7 +14,7 @@ import { PRODUCER_LOGOS, PRODUCER_STATS } from "../../../data/producerSocialProo
 const hasProof = PRODUCER_LOGOS.length > 0 || PRODUCER_STATS.length > 0;
 ---
 
-<section class="hero lp-wrap" aria-labelledby="hero-title">
+<section class="hero lp-wrap" aria-labelledby="hero-title" data-lp-section="hero">
   <div class="hero-copy">
     <p class="lp-eyebrow">Para productores · Sin mensualidad · 0% de comisión para ti</p>
     <h1 id="hero-title" class="lp-h1 hero-title">Tu próxima función merece vender más.</h1>
@@ -53,6 +53,7 @@ const hasProof = PRODUCER_LOGOS.length > 0 || PRODUCER_STATS.length > 0;
             <LandingCoverVideo
               client:idle
               src={LANDING_MEDIA.coverVideo}
+              webmSrc={LANDING_MEDIA.coverVideoWebm}
               poster={LANDING_MEDIA.coverPoster}
               posterWidth={LANDING_MEDIA.coverPosterWidth}
               posterHeight={LANDING_MEDIA.coverPosterHeight}

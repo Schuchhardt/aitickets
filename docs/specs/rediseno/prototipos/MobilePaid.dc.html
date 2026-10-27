@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Stand-up de Viernes — mobile</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&amp;family=Prompt:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#FFFFFF;-webkit-font-smoothing:antialiased}
+a{color:#0A0A0B}a:hover{color:#5B5B63}
+.btn-primary{transition:background 120ms cubic-bezier(.22,1,.36,1),transform 120ms cubic-bezier(.22,1,.36,1),opacity 200ms}
+.btn-primary:active{transform:scale(.98);transition-duration:80ms}
+.chip{transition:background 200ms cubic-bezier(.22,1,.36,1),color 200ms,border-color 200ms,transform 200ms cubic-bezier(.34,1.56,.64,1)}
+.chip:active{transform:scale(.96)}
+.tile{transition:background 200ms,border-color 200ms,transform 200ms cubic-bezier(.34,1.56,.64,1)}
+.tile:active{transform:scale(.96)}
+.field{transition:border-color 200ms,box-shadow 200ms}
+.field:focus{outline:none;border-color:#0A0A0B !important;box-shadow:0 0 0 4px rgba(154,230,0,.45)}
+.field-err{border-color:#D92D20 !important}
+.snap{scroll-snap-type:x mandatory;scrollbar-width:none}
+.snap::-webkit-scrollbar{display:none}
+.snap > *{scroll-snap-align:start}
+@keyframes shakeA{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+@keyframes shakeB{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+.shake-a{animation:shakeA 280ms ease}
+.shake-b{animation:shakeB 280ms ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes rowIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes msgIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+@keyframes overlayIn{from{opacity:0}to{opacity:1}}
+@keyframes overlayOut{from{opacity:1}to{opacity:0}}
+@keyframes sheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+@keyframes sheetDown{from{transform:translateY(0)}to{transform:translateY(100%)}}
+@keyframes stepFwd{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
+@keyframes stepBack{from{opacity:0;transform:translateX(-24px)}to{opacity:1;transform:none}}
+@keyframes numA{from{opacity:0;transform:translateY(60%)}to{opacity:1;transform:none}}
+@keyframes numB{from{opacity:0;transform:translateY(60%)}to{opacity:1;transform:none}}
+@keyframes fill{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes barUp{from{transform:translateY(100%)}to{transform:none}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes popIn{0%{transform:scale(0)}100%{transform:scale(1)}}
+@keyframes draw{from{stroke-dashoffset:24}to{stroke-dashoffset:0}}
+.reveal{animation:fadeUp 200ms cubic-bezier(.22,1,.36,1) both}
+.row-in{animation:rowIn 200ms cubic-bezier(.22,1,.36,1) both}
+.msg-in{animation:msgIn 200ms cubic-bezier(.22,1,.36,1) both}
+.overlay-in{animation:overlayIn 320ms cubic-bezier(.22,1,.36,1) both}
+.overlay-out{animation:overlayOut 240ms cubic-bezier(.65,0,.35,1) both}
+.sheet-up{animation:sheetUp 320ms cubic-bezier(.22,1,.36,1) both}
+.sheet-down{animation:sheetDown 240ms cubic-bezier(.65,0,.35,1) both}
+.step-fwd{animation:stepFwd 320ms cubic-bezier(.65,0,.35,1) both}
+.step-back{animation:stepBack 320ms cubic-bezier(.65,0,.35,1) both}
+.num-a{display:inline-block;animation:numA 200ms cubic-bezier(.22,1,.36,1) both}
+.num-b{display:inline-block;animation:numB 200ms cubic-bezier(.22,1,.36,1) both}
+.seg-fill{transform-origin:left;animation:fill 320ms cubic-bezier(.65,0,.35,1) both}
+.bar-up{animation:barUp 320ms cubic-bezier(.22,1,.36,1) 300ms both}
+.spinner{animation:spin 700ms linear infinite}
+.check-circle{animation:popIn 320ms cubic-bezier(.34,1.56,.64,1) both}
+.check-path{stroke-dasharray:24;stroke-dashoffset:24;animation:draw 240ms cubic-bezier(.22,1,.36,1) 200ms forwards}
+.tnum{font-variant-numeric:tabular-nums}
+@media (prefers-reduced-motion: reduce){*{animation-duration:1ms !important;animation-delay:0ms !important;transition-duration:1ms !important}}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; font-family: 'Prompt', system-ui, sans-serif; color: #0A0A0B; background: #FFFFFF">
+  <div style="position: absolute; inset: 0; overflow-y: auto">
+    <header style="height: 56px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; background: #EEE9F7">
+      <a href="#" style="display: flex; align-items: center; gap: 2px; text-decoration: none; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 15px; letter-spacing: .14em; color: #0A0A0B" aria-label="AI Tickets, inicio"><span style="background: #0A0A0B; color: #FFFFFF; padding: 2px 5px; letter-spacing: .04em">AI</span><span>TICKETS</span></a>
+      <button type="button" aria-label="Preguntarle al asistente" style="width: 40px; height: 40px; border-radius: 12px; border: 1px solid rgba(0,0,0,.12); background: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0A0A0B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"></path></svg></button>
+    </header>
+    <div style="background: linear-gradient(#EEE9F7 0 300px, #FFFFFF 300px); padding: 8px 16px 0">
+      <figure style="margin: 0; aspect-ratio: 1 / 1; border-radius: 20px; overflow: hidden; background: #24163F; position: relative" role="img" aria-label="Póster de Stand-up de Viernes">
+        <div style="position: absolute; left: 50%; top: 30%; width: 90%; aspect-ratio: 1 / 1; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(circle, rgba(255,214,102,.55) 0%, rgba(255,214,102,0) 62%)"></div>
+        <div style="position: absolute; left: 62%; top: 46%; width: 40px; height: 64px; border-radius: 20px; background: #0E0A18; border: 3px solid #FFD666"></div>
+        <div style="position: absolute; left: 22px; top: 22px; font-family: 'Sora', sans-serif; color: #FFFFFF">
+          <div style="font-size: 11px; font-weight: 600; letter-spacing: .18em; color: #FFD666">TEMPORADA 2026</div>
+          <div style="font-size: 40px; line-height: .95; font-weight: 800; letter-spacing: -.03em; margin-top: 12px">STAND-UP<br>DE VIERNES</div>
+        </div>
+      </figure>
+    </div>
+    <div style="padding: 20px 16px 140px; display: flex; flex-direction: column; gap: 14px">
+      <div style="display: flex; gap: 8px"><span style="background: #0A0A0B; color: #FFFFFF; font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 999px">Desde $7.666</span></div>
+      <h1 style="font-family: 'Sora', sans-serif; font-size: 30px; line-height: 34px; font-weight: 700; letter-spacing: -.02em; margin: 0">Stand-up de Viernes</h1>
+      <div style="font-size: 14px; color: #5B5B63">Organiza <strong style="color: #0A0A0B; font-weight: 500">Risa Seria Producciones</strong></div>
+      <div style="display: flex; gap: 12px; align-items: center; font-size: 15px">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0A0A0B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M16 3v4M8 3v4M3 10h18"></path></svg>
+        <div><div style="font-weight: 600">Viernes 23 de octubre · 21:00</div><div style="font-size: 14px; color: #5B5B63">y 5 funciones más</div></div>
+      </div>
+      <div style="display: flex; gap: 12px; align-items: center; font-size: 15px">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0A0A0B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"></path><circle cx="12" cy="9.5" r="2.5"></circle></svg>
+        <div><div style="font-weight: 600">2 lugares</div><div style="font-size: 14px; color: #5B5B63">Providencia y Ñuñoa</div></div>
+      </div>
+      <section style="margin-top: 14px">
+        <h2 style="font-family: 'Sora', sans-serif; font-size: 18px; font-weight: 700; margin: 0 0 10px">Sobre el evento</h2>
+        <p style="margin: 0; font-size: 16px; line-height: 26px; color: #2A2A2F">Tres comediantes, material nuevo cada semana y una sala chica donde se escucha todo. Noventa minutos de stand-up sin intermedio.</p>
+      </section>
+    </div>
+  </div>
+
+  <div class="bar-up" style="position: absolute; left: 0; right: 0; bottom: 0; height: 88px; box-sizing: border-box; padding: 12px 16px 22px; background: rgba(255,255,255,.92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-top: 1px solid rgba(0,0,0,.08); display: flex; align-items: center; justify-content: space-between; gap: 12px">
+    <div>
+      <div class="tnum" style="font-family: 'Sora', sans-serif; font-size: 18px; font-weight: 700">Desde $7.666</div>
+      <div style="font-size: 12px; color: #5B5B63">por entrada, incluye cargo</div>
+    </div>
+    <button type="button" onClick="{{openFresh}}" class="btn-primary" style="min-width: 160px; height: 48px; border: 0; border-radius: 12px; background: #0A0A0B; color: #FFFFFF; font-family: inherit; font-size: 15px; font-weight: 600">Elegir entradas</button>
+  </div>
+
+  <sc-if value="{{open}}" hint-placeholder-val="{{ false }}">
+    <div class="{{overlayCls}}" onClick="{{close}}" style="position: absolute; inset: 0; background: rgba(10,10,11,.4); z-index: 20"></div>
+    <div class="{{sheetCls}}" role="dialog" aria-modal="true" aria-labelledby="ms-title" style="position: absolute; left: 0; right: 0; bottom: 0; height: 92%; background: #FFFFFF; border-radius: 24px 24px 0 0; z-index: 21; display: flex; flex-direction: column; box-shadow: 0 -8px 40px rgba(0,0,0,.12)">
+      <div style="transform: translateY({{dragPx}}); transition: {{dragTransition}}; display: flex; flex-direction: column; height: 100%; background: #FFFFFF; border-radius: 24px 24px 0 0">
+        <div onPointerDown="{{dragStart}}" onPointerMove="{{dragMove}}" onPointerUp="{{dragEnd}}" onPointerCancel="{{dragEnd}}" style="flex: 0 0 auto; padding: 10px 16px 12px; touch-action: none; cursor: grab; border-bottom: 1px solid rgba(0,0,0,.08)">
+          <div style="width: 36px; height: 4px; border-radius: 2px; background: #D4D4D8; margin: 0 auto 12px" aria-hidden="true"></div>
+          <div style="display: flex; align-items: center; gap: 12px">
+            <div style="flex: 1; min-width: 0">
+              <div id="ms-title" style="font-family: 'Sora', sans-serif; font-size: 15px; font-weight: 700">Stand-up de Viernes</div>
+              <sc-if value="{{showSteps}}" hint-placeholder-val="{{ true }}">
+                <div style="display: flex; gap: 4px; margin-top: 6px" aria-label="{{stepAria}}">
+                  <div style="width: 24px; height: 3px; border-radius: 2px; background: #0A0A0B"></div>
+                  <div style="width: 24px; height: 3px; border-radius: 2px; background: #EDEDEF; overflow: hidden"><sc-if value="{{isStep2}}" hint-placeholder-val="{{ false }}"><div class="seg-fill" style="width: 100%; height: 100%; background: #0A0A0B"></div></sc-if></div>
+                </div>
+              </sc-if>
+            </div>
+            <button type="button" onClick="{{close}}" aria-label="Cerrar" style="width: 40px; height: 40px; border-radius: 10px; border: 0; background: #F6F6F7; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0A0A0B" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+          </div>
+        </div>
+
+        <div style="flex: 1 1 auto; overflow-y: auto; padding: 18px 16px">
+          <sc-if value="{{isStep1}}" hint-placeholder-val="{{ true }}">
+            <div class="{{stepCls}}" style="display: flex; flex-direction: column; gap: 22px">
+              <div>
+                <div style="font-size: 14px; font-weight: 600; margin-bottom: 10px">Lugar</div>
+                <div role="radiogroup" aria-label="Lugar" style="display: flex; gap: 8px">
+                  <sc-for list="{{places}}" as="p" hint-placeholder-count="2">
+                    <button type="button" role="radio" aria-checked="{{p.checked}}" onClick="{{p.pick}}" class="chip" style="height: 44px; padding: 0 18px; border-radius: 999px; border: 1px solid {{p.border}}; background: {{p.bg}}; color: {{p.color}}; font-family: inherit; font-size: 15px; font-weight: 500">{{p.name}}</button>
+                  </sc-for>
+                </div>
+                <sc-if value="{{placeAddr}}" hint-placeholder-val="{{ false }}"><div class="msg-in" style="font-size: 13px; color: #5B5B63; margin-top: 8px">{{placeAddr}}</div></sc-if>
+              </div>
+              <sc-if value="{{showFns}}" hint-placeholder-val="{{ false }}">
+                <div class="reveal">
+                  <div style="font-size: 14px; font-weight: 600; margin-bottom: 10px">Fecha y hora</div>
+                  <div class="snap" role="radiogroup" aria-label="Fecha y hora" style="display: flex; gap: 8px; overflow-x: auto; margin: 0 -16px; padding: 0 16px 4px">
+                    <sc-for list="{{tiles}}" as="t" hint-placeholder-count="4">
+                      <button type="button" role="radio" aria-checked="{{t.checked}}" aria-disabled="{{t.ariaDisabled}}" disabled="{{t.disabled}}" onClick="{{t.pick}}" class="tile" style="flex: 0 0 88px; height: 92px; border-radius: 12px; border: {{t.border}}; background: {{t.bg}}; font-family: inherit; color: #0A0A0B; opacity: {{t.opacity}}; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 0">
+                        <span style="font-size: 12px; font-weight: 600; letter-spacing: .06em; text-decoration: {{t.deco}}">{{t.dow}} {{t.day}}</span>
+                        <span style="font-size: 11px; font-weight: 600; letter-spacing: .08em; color: #5B5B63">{{t.mon}}</span>
+                        <span class="tnum" style="font-family: 'Sora', sans-serif; font-size: 15px; font-weight: 700; margin-top: 2px">{{t.time}}</span>
+                        <span style="font-size: 11px; font-weight: 500; color: {{t.statusColor}}; min-height: 14px">{{t.statusText}}</span>
+                      </button>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-if>
+              <sc-if value="{{showRows}}" hint-placeholder-val="{{ false }}">
+                <div class="reveal">
+                  <div style="font-size: 14px; font-weight: 600; margin-bottom: 4px">Entradas</div>
+                  <sc-for list="{{rows}}" as="r" hint-placeholder-count="2">
+                    <div class="row-in" style="animation-delay: {{r.delay}}; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 0; border-bottom: 1px solid rgba(0,0,0,.08)">
+                      <div style="min-width: 0">
+                        <div style="font-size: 15px; font-weight: 600">{{r.name}} <span class="tnum" style="margin-left: 6px">{{r.price}}</span></div>
+                        <div style="font-size: 13px; color: #5B5B63; margin-top: 2px">{{r.desc}}</div>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 4px; flex: 0 0 auto">
+                        <button type="button" onClick="{{r.dec}}" disabled="{{r.decDis}}" aria-label="{{r.decLabel}}" style="width: 40px; height: 40px; border-radius: 10px; border: 1px solid rgba(0,0,0,.16); background: #FFFFFF; font-size: 18px; opacity: {{r.decOpacity}}">−</button>
+                        <span aria-live="polite" class="tnum" style="width: 26px; text-align: center; font-weight: 600; overflow: hidden; height: 22px"><span class="{{r.numCls}}">{{r.qty}}</span></span>
+                        <button type="button" onClick="{{r.inc}}" disabled="{{r.incDis}}" aria-label="{{r.incLabel}}" style="width: 40px; height: 40px; border-radius: 10px; border: 1px solid rgba(0,0,0,.16); background: #FFFFFF; font-size: 18px; opacity: {{r.incOpacity}}">+</button>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{isStep2}}" hint-placeholder-val="{{ false }}">
+            <div class="step-fwd" style="display: flex; flex-direction: column; gap: 18px">
+              <button type="button" onClick="{{back}}" style="align-self: flex-start; background: none; border: 0; padding: 0; font-family: inherit; font-size: 14px; color: #5B5B63">← Volver</button>
+              <button type="button" onClick="{{toggleDetails}}" aria-expanded="{{detailsAria}}" style="text-align: left; background: #F6F6F7; border: 0; border-radius: 12px; padding: 12px 14px; font-family: inherit; color: #0A0A0B">
+                <div style="display: flex; justify-content: space-between; font-size: 14px"><span style="color: #5B5B63">{{fnLabel}}</span><span>{{detailsChevron}}</span></div>
+                <sc-if value="{{details}}" hint-placeholder-val="{{ false }}">
+                  <div class="msg-in" style="margin-top: 8px">
+                    <sc-for list="{{lines}}" as="l" hint-placeholder-count="1"><div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: 500; margin-top: 4px"><span>{{l.label}}</span><span class="tnum">{{l.amount}}</span></div></sc-for>
+                    <div class="tnum" style="display: flex; justify-content: space-between; font-size: 12px; color: #5B5B63; margin-top: 6px"><span>Incluye cargo {{bFee}} + IVA {{bIva}}</span></div>
+                  </div>
+                </sc-if>
+              </button>
+              <div style="font-family: 'Sora', sans-serif; font-size: 16px; font-weight: 700">Tus datos</div>
+              <div style="display: flex; flex-direction: column; gap: 6px">
+                <label for="mp-name" style="font-size: 14px; font-weight: 500">Nombre y apellido</label>
+                <input id="mp-name" class="{{nameCls}}" type="text" autocomplete="name" value="{{name}}" onChange="{{onName}}" aria-invalid="{{nameInvalid}}" placeholder="Sebastián Pérez" style="height: 48px; border: 1px solid rgba(0,0,0,.16); border-radius: 12px; padding: 0 14px; font-family: inherit; font-size: 16px">
+                <sc-if value="{{errName}}" hint-placeholder-val="{{ false }}"><div class="msg-in" style="font-size: 13px; color: #B42318">{{errName}}</div></sc-if>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 6px">
+                <label for="mp-email" style="font-size: 14px; font-weight: 500">Email</label>
+                <input id="mp-email" class="{{emailCls}}" type="email" inputmode="email" autocomplete="email" value="{{email}}" onChange="{{onEmail}}" aria-invalid="{{emailInvalid}}" placeholder="tu@email.com" style="height: 48px; border: 1px solid rgba(0,0,0,.16); border-radius: 12px; padding: 0 14px; font-family: inherit; font-size: 16px">
+                <sc-if value="{{errEmail}}" hint-placeholder-val="{{ false }}"><div class="msg-in" style="font-size: 13px; color: #B42318">{{errEmail}}</div></sc-if>
+                <sc-if value="{{suggestion}}" hint-placeholder-val="{{ false }}"><div class="msg-in" style="font-size: 13px; color: #5B5B63">¿Quisiste decir <button type="button" onClick="{{applySuggestion}}" style="background: none; border: 0; padding: 0; font: inherit; color: #0A0A0B; font-weight: 600; text-decoration: underline">{{suggestion}}</button>?</div></sc-if>
+              </div>
+              <button type="button" style="align-self: flex-start; background: none; border: 0; padding: 0; font-family: inherit; font-size: 14px; color: #5B5B63; text-decoration: underline">¿Tienes un código de descuento?</button>
+              <div class="{{acceptCls}}">
+                <label style="display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 20px">
+                  <input type="checkbox" checked="{{accept}}" onChange="{{toggleAccept}}" style="width: 20px; height: 20px; margin: 0; accent-color: #0A0A0B; flex: 0 0 auto">
+                  <span>Entiendo que las entradas no tienen derecho a retracto. <a href="#" style="color: #5B5B63">Ver condiciones</a></span>
+                </label>
+                <sc-if value="{{errAccept}}" hint-placeholder-val="{{ false }}"><div class="msg-in" style="font-size: 13px; color: #B42318; padding-left: 30px; margin-top: 6px">{{errAccept}}</div></sc-if>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{paid}}" hint-placeholder-val="{{ false }}">
+            <div class="reveal" role="status" style="display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; padding-top: 32px">
+              <div class="check-circle" style="width: 64px; height: 64px; border-radius: 50%; background: #9AE600; display: flex; align-items: center; justify-content: center"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#0A0A0B" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="check-path" d="M5 12.5l4.5 4.5L19 7.5"></path></svg></div>
+              <h2 style="font-family: 'Sora', sans-serif; font-size: 20px; line-height: 26px; font-weight: 700; margin: 8px 0 0">¡Listo, {{firstName}}! Tienes {{qtyWord}} para Stand-up de Viernes.</h2>
+              <p style="margin: 0; font-size: 14px; line-height: 21px; color: #5B5B63">Te las enviamos a <strong style="color: #0A0A0B; font-weight: 600">{{email}}</strong>.</p>
+              <div style="margin-top: 8px; width: 160px; height: 160px; border-radius: 12px; background: repeating-conic-gradient(#0A0A0B 0 25%, #FFFFFF 0 50%) 0 0 / 26px 26px; border: 10px solid #FFFFFF; outline: 1px solid rgba(0,0,0,.12)" role="img" aria-label="Código QR de ejemplo"></div>
+              <div style="font-size: 14px; font-weight: 500">{{fnLabel}}</div>
+            </div>
+          </sc-if>
+        </div>
+
+        <sc-if value="{{showFooter}}" hint-placeholder-val="{{ true }}">
+          <div style="flex: 0 0 auto; padding: 12px 16px 26px; border-top: 1px solid rgba(0,0,0,.08); display: flex; flex-direction: column; gap: 10px">
+            <div style="display: flex; align-items: baseline; justify-content: space-between">
+              <sc-if value="{{hasQty}}" hint-placeholder-val="{{ false }}">
+                <span style="font-size: 13px; color: #5B5B63">Total · {{qtyWord}}</span>
+                <span class="tnum" style="font-family: 'Sora', sans-serif; font-size: 20px; font-weight: 700">{{shownTotal}}</span>
+              </sc-if>
+              <sc-if value="{{noQty}}" hint-placeholder-val="{{ true }}"><span style="font-size: 14px; color: #5B5B63">Elige al menos una entrada</span></sc-if>
+            </div>
+            <button type="button" onClick="{{primary}}" disabled="{{primaryDisabled}}" class="btn-primary" style="height: 52px; border: 0; border-radius: 12px; background: #0A0A0B; color: #FFFFFF; font-family: inherit; font-size: 16px; font-weight: 600; opacity: {{primaryOpacity}}; display: flex; align-items: center; justify-content: center; gap: 10px">
+              <sc-if value="{{paying}}" hint-placeholder-val="{{ false }}"><span class="spinner" style="width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(255,255,255,.3); border-top-color: #FFFFFF" aria-hidden="true"></span></sc-if>
+              <span>{{primaryLabel}}</span>
+            </button>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+var PLACES = [
+  { id: 'prov', name: 'Providencia', venue: 'Sala Bodega', addr: 'Sala Bodega · Av. Providencia 1234' },
+  { id: 'nunoa', name: 'Ñuñoa', venue: 'Casa Irarrázaval', addr: 'Casa Irarrázaval · Av. Irarrázaval 3400' }
+];
+var FUNCS = [
+  { id: 'f1', place: 'prov', dow: 'VIE', day: '23', mon: 'OCT', time: '21:00', status: 'ok', short: 'Vie 23 oct · 21:00' },
+  { id: 'f2', place: 'prov', dow: 'SÁB', day: '24', mon: 'OCT', time: '21:00', status: 'few', short: 'Sáb 24 oct · 21:00' },
+  { id: 'f3', place: 'prov', dow: 'SÁB', day: '24', mon: 'OCT', time: '23:00', status: 'ok', short: 'Sáb 24 oct · 23:00' },
+  { id: 'f4', place: 'prov', dow: 'VIE', day: '30', mon: 'OCT', time: '21:00', status: 'out', short: 'Vie 30 oct · 21:00' },
+  { id: 'f5', place: 'nunoa', dow: 'SÁB', day: '31', mon: 'OCT', time: '20:00', status: 'ok', short: 'Sáb 31 oct · 20:00' },
+  { id: 'f6', place: 'nunoa', dow: 'SÁB', day: '7', mon: 'NOV', time: '20:00', status: 'ok', short: 'Sáb 7 nov · 20:00' }
+];
+var TYPES = [
+  { id: 'gen', name: 'General', desc: 'Sin asiento numerado', price: 10000 },
+  { id: 'vip', name: 'VIP', desc: 'Primera fila + 1 trago', price: 30000 },
+  { id: 'pre', name: 'Preventa', desc: 'Solo esta función', price: 7000, onlyFn: 'f6' }
+];
+var DOMAINS = ['gmail.com','hotmail.com','outlook.com','yahoo.com','icloud.com','live.cl','hotmail.cl','yahoo.es','me.com','uc.cl','uchile.cl'];
+function lev(a, b) { var m = a.length, n = b.length, d = [], i, j; for (i = 0; i <= m; i++) d[i] = [i]; for (j = 0; j <= n; j++) d[0][j] = j; for (i = 1; i <= m; i++) for (j = 1; j <= n; j++) d[i][j] = Math.min(d[i-1][j] + 1, d[i][j-1] + 1, d[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1)); return d[m][n]; }
+function suggest(email) { var at = email.lastIndexOf('@'); if (at < 1) return ''; var dom = email.slice(at + 1).toLowerCase(); if (dom.length < 4 || DOMAINS.indexOf(dom) >= 0) return ''; var best = '', bd = 3; DOMAINS.forEach(function (x) { var dd = lev(dom, x); if (dd < bd) { bd = dd; best = x; } }); return best ? email.slice(0, at + 1) + best : ''; }
+function validEmail(e) { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e); }
+function fee(p) { return Math.round(p * 0.08); }
+function feeIva(p) { return Math.round(fee(p) * 0.19); }
+function fin(p) { return p + fee(p) + feeIva(p); }
+function clp(n) { return '$' + Math.round(n).toLocaleString('es-CL'); }
+function fnById(id) { for (var i = 0; i < FUNCS.length; i++) if (FUNCS[i].id === id) return FUNCS[i]; return null; }
+function placeById(id) { for (var i = 0; i < PLACES.length; i++) if (PLACES[i].id === id) return PLACES[i]; return null; }
+function typesFor(fnId) { return TYPES.filter(function (t) { return !t.onlyFn || t.onlyFn === fnId; }); }
+function totals(s) {
+  var r = { fees: 0, iva: 0, qty: 0, lines: [], total: 0 };
+  if (!s.fn) return r;
+  typesFor(s.fn).forEach(function (t) { var q = s.qty[t.id] || 0; if (q) { r.fees += fee(t.price) * q; r.iva += feeIva(t.price) * q; r.qty += q; r.total += fin(t.price) * q; r.lines.push({ label: q + ' × ' + t.name, amount: clp(fin(t.price) * q) }); } });
+  return r;
+}
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { open: false, closing: false, step: 1, dir: 'fwd', place: null, fn: null, qty: { gen: 0, vip: 0, pre: 0 }, ticks: { gen: 0, vip: 0, pre: 0 },
+      name: '', email: '', accept: false, errName: '', errEmail: '', errAccept: '', shake: 0, paying: false, paid: false, details: false, shown: 0, drag: 0, dragging: false };
+    this._target = 0; this._raf = 0; this._t = []; this._y0 = null; this._tStart = 0;
+  }
+  componentDidUpdate() {
+    var target = totals(this.state).total, self = this;
+    if (target === this._target) return;
+    var from = this.state.shown, start = 0;
+    this._target = target;
+    cancelAnimationFrame(this._raf);
+    var tick = function (now) { if (!start) start = now; var t = Math.min(1, (now - start) / 300), e = 1 - Math.pow(1 - t, 3); self.setState({ shown: Math.round(from + (target - from) * e) }); if (t < 1) self._raf = requestAnimationFrame(tick); };
+    this._raf = requestAnimationFrame(tick);
+  }
+  componentWillUnmount() { cancelAnimationFrame(this._raf); this._t.forEach(clearTimeout); }
+  later(fn, ms) { this._t.push(setTimeout(fn, ms)); }
+  closeSheet() { var self = this; this.setState({ closing: true }); this.later(function () { self.setState({ open: false, closing: false, drag: 0 }); }, 240); }
+  renderVals() {
+    var s = this.state, self = this, T = totals(s);
+    var fnObj = fnById(s.fn), pl = placeById(s.place);
+    var shakeCls = s.shake % 2 ? ' shake-a' : ' shake-b';
+    var first = (s.name.trim().split(/\s+/)[0]) || '';
+    var step1 = s.step === 1 && !s.paid, step2 = s.step === 2 && !s.paid;
+    return {
+      openFresh: function () { self.setState({ open: true, closing: false, step: 1, dir: 'fwd', paid: false, paying: false, drag: 0 }); },
+      open: s.open,
+      overlayCls: s.closing ? 'overlay-out' : 'overlay-in',
+      sheetCls: s.closing ? 'sheet-down' : 'sheet-up',
+      dragPx: s.drag + 'px', dragTransition: s.dragging ? 'none' : 'transform 240ms cubic-bezier(.22,1,.36,1)',
+      dragStart: function (e) { self._y0 = e.clientY; self._tStart = Date.now(); if (e.currentTarget.setPointerCapture) e.currentTarget.setPointerCapture(e.pointerId); self.setState({ dragging: true }); },
+      dragMove: function (e) { if (self._y0 === null) return; self.setState({ drag: Math.max(0, e.clientY - self._y0) }); },
+      dragEnd: function () {
+        if (self._y0 === null) return;
+        var d = self.state.drag, v = d / Math.max(1, Date.now() - self._tStart) * 1000;
+        self._y0 = null;
+        if (d > 120 || v > 500) { self.setState({ dragging: false }); self.closeSheet(); } else self.setState({ dragging: false, drag: 0 });
+      },
+      close: function () { self.closeSheet(); },
+      showSteps: !s.paid, isStep1: step1, isStep2: step2, paid: s.paid,
+      stepAria: 'Paso ' + s.step + ' de 2',
+      stepCls: s.dir === 'back' ? 'step-back' : 'step-fwd',
+      places: PLACES.map(function (p) { var on = s.place === p.id; return { name: p.name, checked: on ? 'true' : 'false', bg: on ? '#0A0A0B' : '#FFFFFF', color: on ? '#FFFFFF' : '#0A0A0B', border: on ? '#0A0A0B' : 'rgba(0,0,0,.16)', pick: function () { if (self.state.place !== p.id) self.setState({ place: p.id, fn: null }); } }; }),
+      placeAddr: pl ? pl.addr : '',
+      showFns: !!s.place,
+      tiles: FUNCS.filter(function (f) { return f.place === s.place; }).map(function (f) {
+        var on = s.fn === f.id, out = f.status === 'out';
+        return { dow: f.dow, day: f.day, mon: f.mon, time: f.time, statusText: f.status === 'few' ? 'Últimas' : (out ? 'Agotada' : ''), statusColor: f.status === 'few' ? '#B54708' : '#5B5B63',
+          checked: on ? 'true' : 'false', disabled: out, ariaDisabled: out ? 'true' : 'false', border: on ? '2px solid #0A0A0B' : '1px solid rgba(0,0,0,.16)', bg: on ? '#F6F6F7' : '#FFFFFF', opacity: out ? 0.4 : 1, deco: out ? 'line-through' : 'none',
+          pick: function () { if (out) return; var q = Object.assign({}, self.state.qty); if (f.id !== 'f6') q.pre = 0; self.setState({ fn: f.id, qty: q }); } };
+      }),
+      showRows: !!s.fn,
+      rows: s.fn ? typesFor(s.fn).map(function (t, i) {
+        var q = s.qty[t.id] || 0;
+        var bump = function (d) { var qq = Object.assign({}, self.state.qty), tk = Object.assign({}, self.state.ticks); qq[t.id] = Math.max(0, Math.min(10, (qq[t.id] || 0) + d)); tk[t.id] = (tk[t.id] || 0) + 1; self.setState({ qty: qq, ticks: tk }); };
+        return { name: t.name, desc: t.desc, price: clp(fin(t.price)), qty: q, delay: (i * 30) + 'ms', numCls: (s.ticks[t.id] || 0) % 2 ? 'num-a' : 'num-b',
+          decDis: q <= 0, incDis: q >= 10, decOpacity: q <= 0 ? 0.4 : 1, incOpacity: q >= 10 ? 0.4 : 1, decLabel: 'Quitar una entrada ' + t.name, incLabel: 'Agregar una entrada ' + t.name,
+          dec: function () { bump(-1); }, inc: function () { bump(1); } };
+      }) : [],
+      fnLabel: fnObj ? fnObj.short + ' · ' + (pl ? pl.venue : '') : '',
+      lines: T.lines, bFee: clp(T.fees), bIva: clp(T.iva),
+      details: s.details, detailsAria: s.details ? 'true' : 'false', detailsChevron: s.details ? 'Ocultar ⌃' : 'Ver resumen ⌄',
+      toggleDetails: function () { self.setState({ details: !self.state.details }); },
+      name: s.name, email: s.email, paying: s.paying,
+      errName: s.errName, errEmail: s.errEmail, errAccept: s.errAccept,
+      nameInvalid: s.errName ? 'true' : 'false', emailInvalid: s.errEmail ? 'true' : 'false',
+      nameCls: 'field' + (s.errName ? ' field-err' + (s.shake ? shakeCls : '') : ''),
+      emailCls: 'field' + (s.errEmail ? ' field-err' + (s.shake ? shakeCls : '') : ''),
+      acceptCls: s.errAccept && s.shake ? shakeCls.trim() : '',
+      suggestion: s.errEmail ? '' : suggest(s.email.trim()),
+      onName: function (e) { self.setState({ name: e.target.value, errName: '' }); },
+      onEmail: function (e) { self.setState({ email: e.target.value, errEmail: '' }); },
+      applySuggestion: function () { self.setState({ email: suggest(self.state.email.trim()) }); },
+      accept: s.accept,
+      toggleAccept: function () { self.setState({ accept: !self.state.accept, errAccept: '' }); },
+      back: function () { self.setState({ step: 1, dir: 'back' }); },
+      showFooter: !s.paid,
+      hasQty: T.qty > 0, noQty: T.qty === 0,
+      qtyWord: T.qty === 1 ? '1 entrada' : T.qty + ' entradas',
+      shownTotal: clp(s.shown),
+      firstName: first.charAt(0).toUpperCase() + first.slice(1),
+      primaryLabel: step1 ? 'Continuar' : (s.paying ? 'Redirigiendo a Webpay…' : 'Pagar ' + clp(T.total) + ' con Webpay'),
+      primaryDisabled: (step1 && T.qty === 0) || s.paying,
+      primaryOpacity: step1 && T.qty === 0 ? 0.35 : 1,
+      primary: function () {
+        var st = self.state;
+        if (st.step === 1) { if (totals(st).qty) self.setState({ step: 2, dir: 'fwd' }); return; }
+        var en = st.name.trim().length >= 2 ? '' : 'Escribe tu nombre.';
+        var ee = validEmail(st.email.trim()) ? '' : 'Revisa tu email, parece incompleto.';
+        var ea = st.accept ? '' : 'Marca esta casilla para continuar.';
+        if (en || ee || ea) { self.setState({ errName: en, errEmail: ee, errAccept: ea, shake: st.shake + 1 }); return; }
+        self.setState({ paying: true });
+        self.later(function () { self.setState({ paying: false, paid: true }); }, 1500);
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

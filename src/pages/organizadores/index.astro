@@ -17,6 +17,7 @@ import LandingMobileBar from "../../components/landing/LandingMobileBar.vue";
 import LandingFaq from "../../components/landing/LandingFaq.vue";
 import VideoModal from "../../components/landing/VideoModal.vue";
 import CtaTracking from "../../components/landing/CtaTracking.astro";
+import ProducerTracking from "../../components/landing/organizadores/ProducerTracking.astro";
 import LandingMotion from "../../components/landing/LandingMotion.astro";
 import HeroSection from "../../components/landing/organizadores/HeroSection.astro";
 import HowSection from "../../components/landing/organizadores/HowSection.astro";
@@ -94,7 +95,7 @@ const jsonLd = [
     <CommunitySection />
     <ExtrasSection />
     <AiSection />
-    <section class="lp-section faq" aria-labelledby="faq-title">
+    <section class="lp-section faq" aria-labelledby="faq-title" data-lp-section="faq">
       <div class="lp-wrap faq-wrap" data-lp-reveal>
         <h2 id="faq-title" class="lp-h2 faq-title" data-lp-step>Preguntas frecuentes</h2>
         <div data-lp-step><LandingFaq client:visible items={ORGANIZADORES_FAQ} idPrefix="org-faq" /></div>
@@ -106,12 +107,15 @@ const jsonLd = [
   <VideoModal
     client:load
     src={LANDING_MEDIA.demoVideo}
+    webmSrc={LANDING_MEDIA.demoVideoWebm}
     poster={LANDING_MEDIA.demoPoster}
     captions={LANDING_MEDIA.demoCaptions}
     title="Video: así vendes tu próxima función"
+    progressEvent="lp_video_progress"
   />
   <LandingMobileBar client:idle publishHref={publishUrl("organizadores_mobile_bar")} />
   <CtaTracking />
+  <ProducerTracking />
 </Layout>
 
 <style>
