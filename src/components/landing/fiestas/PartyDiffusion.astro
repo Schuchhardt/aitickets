@@ -1,0 +1,139 @@
+---
+// 5 · La última semana (SPEC_landing_fiestas §4.5, naranja, pulsera LA ÚLTIMA SEMANA): la serie automática de
+// Instagram con la bajada de ORGANIZADORES_FAQ (vista previa, historias con cuenta regresiva que se vuelven diarias la
+// última semana, post diario esa semana, DM con DEFAULT_KEYWORD, "Quedan N" bajo el umbral y la serie que se ajusta si
+// se agota). La tira de negativo lleva el texto real de cada pieza (pieceText, por props desde la página); la leyenda
+// cuenta historias y posts de las últimas dos semanas con seriesMarks y DEFAULT_CADENCE. Debajo, las piezas con IA
+// (MAX_REFERENCE_IMAGES) y los anuncios (AD_LIMITS). Facebook, TikTok y reels en la serie no existen: "Pronto".
+import AiPieceCard from "./AiPieceCard.astro";
+import FilmStrip, { type StoryFrame } from "./FilmStrip.astro";
+import PartyAdsDemo from "./PartyAdsDemo.vue";
+import StickerHeading from "./StickerHeading.astro";
+import Wristband from "./Wristband.astro";
+import SoonBadge from "../../ui/SoonBadge.vue";
+import { seriesCounts, seriesMarks } from "../musica/musicaLanding.js";
+import { DEFAULT_CADENCE, DEFAULT_KEYWORD } from "../../../lib/socialSeriesCadence";
+import { MAX_REFERENCE_IMAGES } from "../../../lib/marketing";
+import { AD_LIMITS } from "../../../../netlify/lib/zernio-ads.mjs";
+
+interface Props {
+  frames: StoryFrame[];
+}
+const { frames } = Astro.props;
+const counts = seriesCounts(seriesMarks(DEFAULT_CADENCE, 14));
+---
+
+<section
+  id="difusion"
+  class="fi-section fi-bg-naranja fd"
+  aria-labelledby="fi-diffusion-title"
+  data-fi-section="diffusion"
+  data-fi-band-color="cobalto"
+  data-fi-band-label="La última semana"
+>
+  <Wristband color="cobalto" label="La última semana" serial={4} divider />
+  <div class="fi-wrap" data-lp-reveal>
+    <div class="fd-head">
+      <StickerHeading id="fi-diffusion-title" text="Tu flyer, en historias" sticker="hasta el sábado." />
+      <p class="fi-lead fd-lead" data-lp-step>
+        Conectas tu Instagram una vez y apruebas la serie con una vista previa de cada pieza. Con tu flyer y los datos de la
+        fiesta armamos historias con cuenta regresiva, que se vuelven diarias la última semana, y un post diario en el feed
+        esa semana, y se publican solos. A quien responde la historia con la palabra <strong>{DEFAULT_KEYWORD}</strong> le
+        llega el link por DM. Cuando quedan pocas, la historia lo dice; si se agota, la serie se ajusta sola.
+      </p>
+    </div>
+
+    <div class="fd-strip">
+      <FilmStrip frames={frames} keyword={DEFAULT_KEYWORD} />
+    </div>
+    <p class="fd-legend" data-lp-step>
+      {counts.stories} historias y {counts.posts} posts en las últimas dos semanas · hora: la de más visitas de tu fiesta, o
+      {DEFAULT_CADENCE.default_time}
+    </p>
+    <ul class="fd-chips" aria-label="Redes" data-lp-step>
+      <li class="fd-chip is-on"><span aria-hidden="true">●</span> Instagram</li>
+      <li class="fd-chip">Facebook <SoonBadge dark={false} /></li>
+      <li class="fd-chip">TikTok <SoonBadge dark={false} /></li>
+      <li class="fd-chip">Reels <SoonBadge dark={false} /></li>
+    </ul>
+
+    <div class="fd-cards">
+      <div data-lp-step><AiPieceCard maxReferences={MAX_REFERENCE_IMAGES} /></div>
+      <div data-lp-step>
+        <PartyAdsDemo
+          client:visible
+          minDays={AD_LIMITS.minDays}
+          maxDays={AD_LIMITS.maxDays}
+          minAge={AD_LIMITS.defaultAgeMin}
+          radiusKm={AD_LIMITS.cityRadiiKm[0]}
+        />
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .fd-lead {
+    max-width: 680px;
+    margin-top: 18px;
+  }
+  .fd-lead strong {
+    font-weight: 700;
+  }
+  .fd-strip {
+    margin-top: 44px;
+  }
+  .fd-legend {
+    margin-top: 22px;
+    font-size: 15px;
+    line-height: 22px;
+    font-weight: 600;
+    color: var(--fi-tinta);
+  }
+  .fd-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+  }
+  .fd-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 32px;
+    padding: 3px 10px;
+    border: 2px dashed var(--fi-tinta);
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .fd-chip.is-on {
+    border-style: solid;
+    background: var(--fi-crema);
+  }
+  .fd-cards {
+    display: grid;
+    gap: 32px;
+    margin-top: 44px;
+  }
+  @media (min-width: 1024px) {
+    .fd-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+      gap: 48px;
+      align-items: end;
+    }
+    .fd-lead {
+      margin-top: 0;
+    }
+    .fd-strip {
+      margin-top: 64px;
+    }
+    .fd-cards {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 40px;
+      align-items: start;
+      margin-top: 64px;
+    }
+  }
+</style>

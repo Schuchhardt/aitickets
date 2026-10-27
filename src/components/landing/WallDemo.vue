@@ -2,7 +2,8 @@
 // Demo del muro "Quiénes van" (SPEC_landing_productores §5.5b). Igual que el producto (buyer/AttendeeFeed.vue y
 // netlify/lib/attendee-community.mjs): los mismos emojis, mensajes de hasta FEED_MESSAGE_MAX caracteres y conteos
 // de mayor a menor. Es una demo local: no publica nada. compact = versión mobile (4 chips tocables y 2 mensajes).
-import { computed, onBeforeUnmount, ref } from 'vue'
+// La lógica vive en useWallDemo (compartida con PartyWall de /ticketera-fiestas); aquí van la piel y los mensajes.
+import { useWallDemo } from '../../composables/useWallDemo.js'
 
 const props = defineProps({
   emojis: { type: Array, required: true },
@@ -16,55 +17,13 @@ const BASE_POSTS = [
   { id: 'b2', name: 'Diego M.', emoji: '🎉', when: 'hace 5 h', text: 'Vamos 6 de la pega, nos vemos en primera fila 😅', tint: '#f3eeff' },
   { id: 'b3', name: 'Fran S.', emoji: '🙌', when: 'ayer', text: 'La última vez fue buenísima. Repito.', tint: '#eef8dc' },
 ]
-const DEMO_LIMIT = 3
 
-const pick = ref(props.emojis[0])
-const message = ref('')
-const mine = ref([])
-const error = ref('')
-const bumped = ref('')
-// Versión compacta: un toque suma (o quita) tu reacción a ese emoji
-const tapped = ref('')
-let bumpTimer = null
-
-const counts = computed(() => {
-  const c = { ...BASE_COUNTS }
-  for (const p of mine.value) c[p.emoji] = (c[p.emoji] || 0) + 1
-  if (tapped.value) c[tapped.value] = (c[tapped.value] || 0) + 1
-  return Object.entries(c)
-    .sort((a, b) => b[1] - a[1] || props.emojis.indexOf(a[0]) - props.emojis.indexOf(b[0]))
-    .map(([emoji, n]) => ({ emoji, n }))
+const { pick, message, error, bumped, tapped, counts, posts, publish, tap, onEmojiKey } = useWallDemo({
+  emojis: props.emojis,
+  baseCounts: BASE_COUNTS,
+  basePosts: BASE_POSTS,
+  compact: () => props.compact,
 })
-const posts = computed(() => [...mine.value, ...BASE_POSTS].slice(0, props.compact ? 2 : 4))
-
-function bump(emoji) {
-  bumped.value = emoji
-  clearTimeout(bumpTimer)
-  bumpTimer = setTimeout(() => (bumped.value = ''), 400)
-}
-function publish() {
-  if (mine.value.length >= DEMO_LIMIT) {
-    error.value = 'Es una demo: con 3 mensajes basta 🙂'
-    return
-  }
-  const text = message.value.trim()
-  mine.value = [{ id: `m${Date.now()}`, name: 'Tú', emoji: pick.value, when: 'recién', text: text || `Reaccionó ${pick.value}`, tint: 'var(--surface-1)' }, ...mine.value]
-  message.value = ''
-  error.value = ''
-  bump(pick.value)
-}
-function tap(emoji) {
-  tapped.value = tapped.value === emoji ? '' : emoji
-  if (tapped.value) bump(emoji)
-}
-function onEmojiKey(e, i) {
-  if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return
-  e.preventDefault()
-  const next = (i + (e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 1) + props.emojis.length) % props.emojis.length
-  pick.value = props.emojis[next]
-  e.currentTarget.parentElement?.children[next]?.focus()
-}
-onBeforeUnmount(() => clearTimeout(bumpTimer))
 </script>
 
 <template>

@@ -1,0 +1,26 @@
+---
+// Confeti estático (SPEC_landing_fiestas §1): piezas en posiciones fijas (CONFETTI de fiestasLanding.js), aria-hidden.
+// float = flota lento (F16, 6–9 s alternado y desfasado por pieza), solo dentro de un [data-fi-play] en pantalla; dim =
+// muy tenue (la noche). Con "reducir movimiento" o sin JS queda quieto.
+import { CONFETTI } from "./fiestasLanding.js";
+
+interface Props {
+  set: keyof typeof CONFETTI;
+  float?: boolean;
+  dim?: boolean;
+  class?: string;
+}
+const { set, float = false, dim = false, class: className } = Astro.props;
+const pieces = CONFETTI[set];
+---
+
+<div class={`fi-confetti ${float ? "fi-confetti-float" : ""} ${dim ? "fi-confetti-dim" : ""} ${className ?? ""}`} aria-hidden="true">
+  {
+    pieces.map((p) => (
+      <span
+        class={`fi-confetti-piece fi-c-${p.color} ${p.shape === "dot" ? "is-dot" : ""}`}
+        style={`left: ${p.x}%; top: ${p.y}%; --r: ${p.r}deg; --dur: ${6 + (p.i % 4)}s; --delay: -${(p.i * 0.7).toFixed(1)}s`}
+      />
+    ))
+  }
+</div>

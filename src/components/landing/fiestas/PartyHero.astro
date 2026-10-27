@@ -1,0 +1,325 @@
+---
+// 1 · Hero (SPEC_landing_fiestas §4.1, naranja): H1 con sticker, bajada armada con el plazo de pago (legal.mjs) y la nota
+// de términos (TERMS_NOTE), CTAs, la foto desechable de la pista (LCP: AVIF/WebP con srcset y fetchpriority alto, sin
+// lazy-load) y encima la card "Tu fiesta" con los rótulos reales del checkout: "Agotada", el cargo con SERVICE_FEE_NOTE
+// (fees.mjs) y "Disponible desde el {formatSaleStart}" (CheckoutStepChoose.vue); arriba "Últimas entradas" (cardLabel).
+// Fecha de ejemplo: el sábado que cae al menos 28 días después del build (partySchedule, por props).
+// La foto de referencia tiene una bandera al fondo a la izquierda que el recorte 4:3 no alcanza a sacar: la real va sin
+// banderas ni marcas (§8); mientras tanto el encuadre la deja lo más al borde posible (object-position 85%).
+// Movimiento al cargar (solo con html.lp-motion): F1 flash de desechable, F2 H1 con el sticker que se pega, F3 bajada y
+// CTAs, F4 la card entra y la pulsera de la Preventa 1 se corta (F7); F16 el confeti flota.
+import Confetti from "./Confetti.astro";
+import DisposablePhoto from "./DisposablePhoto.astro";
+import Sticker from "./Sticker.astro";
+import StickerHeading from "./StickerHeading.astro";
+import Wristband from "./Wristband.astro";
+import { PARTY_END, PARTY_NAME, PARTY_PHOTOS, PARTY_START, PARTY_VENUE, PHOTO_ALT, defaultStages } from "./fiestasLanding.js";
+import { formatCLP } from "../producerLanding.js";
+import { publishUrl } from "../links.js";
+import { formatSaleStart } from "../../event/eventView.js";
+import { PAYOUT_RELEASE_HOURS } from "../../../../netlify/lib/legal.mjs";
+import { SERVICE_FEE_NOTE } from "../../../../netlify/lib/fees.mjs";
+import { TERMS_NOTE } from "../../../data/producerFaq";
+
+interface Props {
+  ctaLabel: string;
+  demoHref: string;
+  demoLabel: string;
+  schedule: { short: string; openings: string[]; stamp: string };
+}
+const { ctaLabel, demoHref, demoLabel, schedule } = Astro.props;
+const [p1, p2, p3, general] = defaultStages(4);
+---
+
+<section class="fi-bg-naranja fh" aria-labelledby="fi-hero-title" data-fi-section="hero" data-fi-band-color="naranja" data-fi-play>
+  <Confetti set="hero" float class="fh-confetti" />
+  <div class="fi-wrap fh-inner">
+    <div class="fh-copy">
+      <p class="fi-meta fh-eyebrow fh-in-0">Para productoras de fiestas, centros de estudiantes y fiestas temáticas</p>
+      <StickerHeading tag="h1" id="fi-hero-title" text="Preventa 1: agotada." sticker="¿Abrimos la 2?" class="fh-title" />
+      <p class="fi-lead fh-lead fh-in-1">
+        Vende tu fiesta por etapas, con un código para cada promotor, tu flyer en Instagram toda la semana y la puerta con
+        QR aunque el galpón no tenga señal. Lo de tu fiesta queda disponible {PAYOUT_RELEASE_HOURS} h después de que
+        termina*. 0% de comisión para la productora.
+      </p>
+      <div class="fh-ctas fh-in-2" data-hero-cta>
+        <a href={publishUrl("fiestas_hero")} class="fi-btn fi-btn-crema" data-cta="publish" data-section="hero">
+          {ctaLabel} <span class="fi-arrow" aria-hidden="true">→</span>
+        </a>
+        <a href={demoHref} class="fi-btn fi-btn-line" data-cta="demo" data-section="hero">{demoLabel}</a>
+      </div>
+      <p class="fi-meta fh-micro fh-in-2">Sin mensualidad · Sin permanencia · Las entradas gratis no pagan nada</p>
+    </div>
+
+    <div class="fh-visual">
+      <DisposablePhoto
+        photo={PARTY_PHOTOS.hero}
+        alt={PHOTO_ALT.hero}
+        tilt={2.5}
+        ratio="4 / 3"
+        position="85% 40%"
+        stamp={schedule.stamp}
+        sizes="(min-width: 1024px) 560px, 92vw"
+        eager
+        class="fh-photo"
+      />
+
+      <div class="fi-card fh-card" role="group" aria-label="Tu fiesta, ejemplo" data-testid="party-hero-card">
+        <Sticker shape="burst" tone="amarillo" tilt={10} class="fh-example"><span class="fh-example-text">ejemplo</span></Sticker>
+        <p class="fi-meta">{PARTY_NAME} · ejemplo</p>
+        <p class="fi-meta fh-when">{schedule.short} · {PARTY_START} → {PARTY_END} · {PARTY_VENUE}</p>
+        <p class="fh-label"><span class="fi-state">Últimas entradas</span></p>
+        <ul class="fh-rows">
+          <li class="fh-row">
+            <span class="fh-row-name">{p1.name}</span>
+            <span class="fh-row-price fi-tabular">{formatCLP(p1.price)}</span>
+            <span class="fh-row-state">
+              <Wristband color="amarillo" label={p1.name} cut class="fi-band-mini fh-cut" tilt={0} />
+              <span class="fh-soldout">Agotada</span>
+            </span>
+          </li>
+          <li class="fh-row fh-row-on">
+            <span class="fh-row-name">{p2.name}</span>
+            <span class="fh-row-price fi-tabular">{formatCLP(p2.price)}</span>
+            <span class="fh-stepper" aria-hidden="true"><span>−</span><span class="fi-tabular">2</span><span>+</span></span>
+            <span class="fh-row-fee">{SERVICE_FEE_NOTE}</span>
+          </li>
+          <li class="fh-row fi-dim">
+            <span class="fh-row-name">{p3.name}</span>
+            <span class="fh-row-price fi-tabular">{formatCLP(p3.price)}</span>
+            <span class="fh-row-sub">Disponible desde el {formatSaleStart(schedule.openings[2])}</span>
+          </li>
+          <li class="fh-row fi-dim">
+            <span class="fh-row-name">{general.name}</span>
+            <span class="fh-row-price fi-tabular">{formatCLP(general.price)}</span>
+            <span class="fh-row-sub">Disponible desde el {formatSaleStart(schedule.openings[3])}</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <p class="fi-wrap fi-note fh-terms">
+    <a href={TERMS_NOTE.href} class="fi-link">{TERMS_NOTE.text}</a>
+  </p>
+</section>
+
+<style>
+  .fh {
+    position: relative;
+    isolation: isolate;
+    padding: 108px 0 32px;
+    overflow-x: clip;
+  }
+  .fh :global(.fh-confetti) {
+    z-index: -1;
+  }
+  .fh-inner {
+    display: grid;
+    gap: 36px;
+  }
+  .fh-copy {
+    position: relative;
+    z-index: 2;
+  }
+  .fh-eyebrow {
+    max-width: 46ch;
+  }
+  .fh :global(.fh-title) {
+    margin-top: 18px;
+    color: var(--fi-tinta);
+  }
+  .fh-lead {
+    max-width: 600px;
+    margin-top: 22px;
+  }
+  .fh-ctas {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 28px;
+  }
+  .fh-micro {
+    margin-top: 16px;
+  }
+  .fh-visual {
+    position: relative;
+    padding-bottom: 210px;
+  }
+  .fh :global(.fh-photo) {
+    --tilt: 1.5deg !important;
+  }
+  .fh-card {
+    position: absolute;
+    left: 4px;
+    right: 16px;
+    bottom: 0;
+    max-width: 360px;
+    padding: 16px 16px 14px;
+    transform: rotate(-1.5deg);
+  }
+  .fh :global(.fh-example) {
+    position: absolute;
+    top: -40px;
+    right: -26px;
+    width: 78px;
+    height: 78px;
+    padding: 0;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  /* El sticker del H1 un punto más chico que la primera línea: "¿Abrimos la 2?" cabe en la columna sin cortar el "2?" */
+  .fh :global(.fh-title .fi-hl) {
+    font-size: 0.84em;
+  }
+  .fh-when {
+    margin-top: 2px;
+  }
+  .fh-label {
+    margin-top: 10px;
+  }
+  .fh-rows {
+    margin-top: 10px;
+    border-top: 2px solid var(--fi-tinta);
+  }
+  .fh-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 2px 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+  }
+  .fh-row-name {
+    font-weight: 600;
+  }
+  .fh-row-price {
+    font-weight: 700;
+    text-align: right;
+  }
+  .fh-row-state {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+  }
+  .fh-soldout {
+    font-weight: 700;
+  }
+  .fh-stepper {
+    grid-column: 2;
+    grid-row: 2;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 2px 10px;
+    border: 2px solid var(--fi-tinta);
+    border-radius: 999px;
+    font-weight: 700;
+  }
+  .fh-row-fee,
+  .fh-row-sub {
+    grid-column: 1;
+    grid-row: 2;
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--fi-text-3);
+  }
+  .fh-row-sub {
+    grid-column: 1 / -1;
+  }
+  .fh-terms {
+    position: relative;
+    z-index: 2;
+    margin-top: 24px;
+  }
+  @media (min-width: 640px) {
+    .fh-ctas {
+      flex-direction: row;
+      flex-wrap: wrap;
+    }
+  }
+  @media (min-width: 1024px) {
+    .fh {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-height: min(100svh, 920px);
+      padding: 120px 0 40px;
+    }
+    .fh-inner {
+      grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+      gap: 48px;
+      align-items: center;
+    }
+    .fh :global(.fh-photo) {
+      --tilt: 2.5deg !important;
+    }
+    .fh-visual {
+      padding-bottom: 150px;
+    }
+    .fh-card {
+      left: -48px;
+      right: auto;
+      width: 340px;
+      transform: rotate(-2deg);
+    }
+  }
+  @media (max-width: 1023px) {
+    /* Mobile: sin confeti sobre el texto (quedan solo las piezas del borde de abajo) */
+    .fh :global(.fh-confetti .fi-confetti-piece:not(:nth-child(2), :nth-child(4), :nth-child(6))) {
+      display: none;
+    }
+  }
+
+  /* ---- Movimiento al cargar (F1–F4) ---- */
+  :global(.lp-motion) .fh :global(.fh-photo) {
+    animation: fi-settle 700ms cubic-bezier(0.2, 0.8, 0.2, 1) 120ms both;
+  }
+  :global(.lp-motion) .fh :global(.fh-photo .fi-photo-flash) {
+    animation: fi-flash 180ms linear 120ms both;
+  }
+  :global(.lp-motion) .fh :global(.fh-photo .fi-photo-stamp) {
+    animation: fi-fade 200ms var(--ease-out) 320ms both;
+  }
+  :global(.lp-motion) .fh :global(.fh-title .fi-hl-text) {
+    display: inline-block;
+    animation: fi-up-24 500ms var(--ease-out) 100ms both;
+  }
+  :global(.lp-motion) .fh :global(.fh-title .fi-hl) {
+    animation: fi-stick 420ms cubic-bezier(0.34, 1.56, 0.64, 1) 350ms both;
+  }
+  :global(.lp-motion) .fh .fh-in-0 {
+    animation: fi-fade 400ms var(--ease-out) 60ms both;
+  }
+  :global(.lp-motion) .fh .fh-in-1 {
+    animation: fi-up 500ms var(--ease-out) 600ms both;
+  }
+  :global(.lp-motion) .fh .fh-in-2 {
+    animation: fi-up 500ms var(--ease-out) 750ms both;
+  }
+  @keyframes fh-card-in {
+    from {
+      opacity: 0;
+      transform: translateY(24px) rotate(-6deg);
+    }
+  }
+  :global(.lp-motion) .fh .fh-card {
+    animation: fh-card-in 520ms var(--ease-out) 900ms both;
+  }
+  /* F4 + F7: a 1,6 s la pulsera de la Preventa 1 se corta y aparece "Agotada" */
+  @keyframes fh-uncut {
+    from {
+      transform: none;
+    }
+  }
+  :global(.lp-motion) .fh :global(.fh-cut .fi-band-half) {
+    animation: fh-uncut 360ms cubic-bezier(0.2, 0.8, 0.2, 1) 1600ms both;
+  }
+  :global(.lp-motion) .fh .fh-soldout {
+    animation: fi-fade 200ms var(--ease-out) 1700ms both;
+  }
+</style>

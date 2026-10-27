@@ -1,0 +1,1105 @@
+/* ------------------------------------------------------------------------------------------------
+ * Tema de la landing de fiestas (/ticketera-fiestas, docs/specs/rediseno/SPEC_landing_fiestas_aitickets.md §1):
+ * "pulsera, sticker y desechable". Lo que queda de una fiesta en el bolsillo y en el celular: la pulsera de Tyvek de
+ * color con su pestaña numerada (una por etapa), los stickers troquelados con borde blanco, las fotos de cámara
+ * desechable con flash duro y la fecha estampada en naranjo, y el confeti. Es la única landing a todo color: bloques
+ * planos de naranja, azul cobalto y crema, y la noche oscura una sola vez, en la puerta.
+ * Scope en [data-theme="fiestas"]: no toca los tokens globales; los tokens puente (surface/text/border) hacen que los
+ * componentes compartidos (FAQ, badge "Pronto", barra mobile) tomen la paleta, como en música y clubs. En las secciones
+ * cobalto y noche (.fi-on-dark) se redefinen localmente.
+ * Reglas de color: nunca texto crema sobre naranja (2,9:1) ni amarillo sobre crema o naranja; sobre crema, el naranja de
+ * texto es --fi-naranja-ink. Lima (marca) solo en "✓ Válida" y "Tú recibes"; los CTA son botones sticker. Una pulsera
+ * nunca va sobre un fondo de su mismo color. Prefijo fi-. Se carga junto a landing.css (usa .lp-sr-only y el movimiento
+ * de LandingMotion).
+ * ---------------------------------------------------------------------------------------------- */
+/* Bagel Fat One 400 solo latin (trae Á É Í Ó Ú Ñ ¿ ¡; la flecha → no está y va en Prompt). Pesa 24 KB: la página la
+ * precarga (link rel=preload en ticketera-fiestas.astro). */
+@import "@fontsource/bagel-fat-one/latin-400.css";
+
+/* Respaldo con métricas aproximadas de Bagel Fat One (redonda y ancha, ascenso alto) sobre Arial Black, para que el swap
+ * no mueva el hero (CLS, §7). */
+@font-face {
+  font-family: "Bagel Fallback";
+  src: local("Arial Black"), local("Arial-Black");
+  size-adjust: 96%;
+  ascent-override: 92%;
+  descent-override: 24%;
+  line-gap-override: 0%;
+}
+
+[data-theme="fiestas"] {
+  --fi-naranja: #ff5b14; /* pulsera naranja: hero, difusión, cierre. Texto encima: solo tinta (6:1) */
+  --fi-naranja-ink: #b83a00; /* naranja para texto sobre crema (5,3:1) */
+  --fi-cobalto: #2b36ff; /* pulsera azul: la escalera, el día después. Texto encima: crema (6,3:1) o amarillo (5,3:1) */
+  --fi-cobalto-2: #1f28c9; /* cards y controles sobre cobalto (crema encima: 8,8:1) */
+  --fi-crema: #fff4e4; /* papel de sticker: fondo claro y relleno de stickers */
+  --fi-crema-2: #f5e6cf; /* secciones claras alternas, controles sobre crema */
+  --fi-tinta: #16110d; /* texto principal y contornos (17:1 sobre crema) */
+  --fi-text-2: #4a3f35; /* texto secundario sobre crema (9,4:1) */
+  --fi-text-3: #6b5e51; /* meta sobre crema (5,8:1) */
+  --fi-ink-on-naranja: #2a1f17; /* meta sobre naranja (5,2:1) */
+  --fi-amarillo: #ffe14d; /* confeti, Preventa 1, cifras sobre cobalto y noche. Nunca texto sobre crema */
+  --fi-noche: #120f14; /* la noche de la puerta (única sección oscura) */
+  --fi-noche-2: #1d1920; /* cards sobre noche */
+  --fi-text-night-2: #d9cfc3; /* 12:1 sobre noche */
+  --fi-text-night-3: #a99e92; /* meta sobre noche (7,2:1) */
+  --fi-stamp: #ff8a2a; /* fecha estampada de desechable (decorativa, aria-hidden) */
+  --fi-error: #c81e1e; /* banner de error del escáner (el rojo del producto) */
+  --fi-display: "Bagel Fat One", "Bagel Fallback", "Arial Black", system-ui, sans-serif;
+  /* Fibras de Tyvek: ruido precalculado como SVG en data: (< 2 KB), compartido por todas las pulseras */
+  --fi-tyvek: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='40'%3E%3Cfilter id='t'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9 .08' numOctaves='2' seed='7'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='120' height='40' filter='url(%23t)'/%3E%3C/svg%3E");
+
+  /* Componentes compartidos dentro del tema (LandingFaq, LandingMobileBar, SoonBadge), como en música y clubs */
+  --surface-0: var(--fi-crema);
+  --surface-1: var(--fi-crema-2);
+  --surface-2: #ffffff;
+  --border: rgba(22, 17, 13, 0.14);
+  --border-strong: rgba(22, 17, 13, 0.28);
+  --text-1: var(--fi-tinta);
+  --text-2: var(--fi-text-2);
+  --text-3: var(--fi-text-3);
+
+  font-family: "Prompt", system-ui, sans-serif;
+  color: var(--fi-tinta);
+  background: var(--fi-crema);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Fondo del documento (rebote del scroll en iOS y macOS): el naranja del hero arriba */
+html:has(body [data-theme="fiestas"]) {
+  background: #ff5b14;
+}
+
+.fi-wrap {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding-inline: 20px;
+}
+@media (min-width: 768px) {
+  .fi-wrap {
+    padding-inline: 40px;
+  }
+}
+.fi [id] {
+  scroll-margin-top: 88px;
+}
+/* La vida de una fiesta (§2): 72 px de padding vertical en mobile, 136 en desktop. overflow-x: clip deja que la pulsera
+ * separadora cruce el borde de arriba (la mitad sobre la sección anterior) sin scroll horizontal. */
+.fi-section {
+  position: relative;
+  padding-block: 72px;
+  overflow-x: clip;
+}
+@media (min-width: 1024px) {
+  .fi-section {
+    padding-block: 136px;
+  }
+}
+.fi-section > .fi-wrap {
+  position: relative;
+  z-index: 1;
+}
+.fi-bg-naranja {
+  background: var(--fi-naranja);
+}
+.fi-bg-crema {
+  background: var(--fi-crema);
+}
+.fi-bg-crema-2 {
+  background: var(--fi-crema-2);
+}
+.fi-bg-cobalto {
+  background: var(--fi-cobalto);
+}
+.fi-bg-noche {
+  background: var(--fi-noche);
+}
+/* Secciones cobalto y noche: texto crema y tokens puente en oscuro para lo compartido */
+.fi-on-dark {
+  --text-1: var(--fi-crema);
+  --text-2: #e9e3ff;
+  --text-3: #d6d3ff;
+  --surface-2: rgba(255, 255, 255, 0.12);
+  --border: rgba(255, 244, 228, 0.22);
+  color: var(--fi-crema);
+}
+.fi-bg-noche.fi-on-dark {
+  --text-2: var(--fi-text-night-2);
+  --text-3: var(--fi-text-night-3);
+}
+
+/* ---------- Tipografía ----------
+ * Bagel Fat One solo en titulares, cifras grandes y códigos de promotor, nunca bajo 24 px ni en párrafos. */
+.fi-display,
+.fi-h1,
+.fi-h2 {
+  font-family: var(--fi-display);
+  font-weight: 400;
+  letter-spacing: -0.005em;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: break-word;
+}
+.fi-h1 {
+  font-size: 52px;
+  line-height: 52px;
+}
+.fi-h2 {
+  font-size: 36px;
+  line-height: 40px;
+  text-wrap: balance;
+}
+.fi-h3 {
+  font-size: 22px;
+  line-height: 26px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+@media (min-width: 1024px) {
+  /* Hasta 104 px y no 112 como la spec: con 112 "¿Abrimos la 2?" no cabe en la columna 7fr del hero */
+  .fi-h1 {
+    font-size: clamp(72px, 6.8vw, 104px);
+    line-height: 0.95;
+  }
+  .fi-h2 {
+    font-size: clamp(48px, 4.6vw, 64px);
+    line-height: 1.03;
+  }
+  .fi-h3 {
+    font-size: 30px;
+    line-height: 34px;
+  }
+}
+/* Énfasis: la frase va dentro de un sticker troquelado (crema, contorno tinta de 3 px, sombra dura, girado −3°), que
+ * puede saltar de línea como bloque. Nunca cursiva, color solo ni subrayado. */
+.fi-hl {
+  display: inline-block;
+  margin: 0.06em 0.04em 0.12em;
+  padding: 0.02em 0.32em 0.1em;
+  border: 3px solid var(--fi-tinta);
+  border-radius: 999px;
+  background: var(--fi-crema);
+  color: var(--fi-tinta);
+  box-shadow: 0.07em 0.07em 0 var(--fi-tinta);
+  transform: rotate(-3deg);
+  transform-origin: 30% 60%;
+}
+.fi-hl-line {
+  display: block;
+}
+@media (max-width: 767px) {
+  .fi-hl {
+    transform: rotate(-2deg);
+  }
+}
+.fi-meta {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  color: var(--fi-text-3);
+}
+.fi-bg-naranja .fi-meta {
+  color: var(--fi-ink-on-naranja);
+}
+.fi-on-dark .fi-meta {
+  color: var(--text-3);
+}
+.fi-lead {
+  font-size: 16px;
+  line-height: 25px;
+  color: var(--fi-text-2);
+}
+.fi-bg-naranja .fi-lead {
+  color: var(--fi-tinta);
+}
+.fi-on-dark .fi-lead {
+  color: var(--text-2);
+}
+@media (min-width: 1024px) {
+  .fi-lead {
+    font-size: 18px;
+    line-height: 29px;
+  }
+}
+.fi-tabular {
+  font-variant-numeric: tabular-nums;
+}
+.fi-note {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--fi-text-3);
+}
+.fi-bg-naranja .fi-note {
+  color: var(--fi-ink-on-naranja);
+}
+.fi-on-dark .fi-note {
+  color: var(--text-3);
+}
+/* Rótulo "ejemplo" de las cards con datos */
+.fi-example {
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fi-text-3);
+}
+
+/* ---------- Pulsera (Wristband) ----------
+ * Banda con extremos redondeados, fibras de Tyvek al 6%, texto repetido (aria-hidden) y pestaña cuadrada con su N° de
+ * serie. Se dibuja en dos mitades con un corte en zigzag (clip-path): juntas se ven enteras; .is-cut las separa (F7). */
+.fi-band {
+  --band-h: 28px;
+  --band-bg: var(--fi-amarillo);
+  --band-fg: var(--fi-tinta);
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: var(--band-h);
+  transform: rotate(var(--tilt, -2deg));
+}
+@media (min-width: 768px) {
+  .fi-band {
+    --band-h: 32px;
+  }
+}
+.fi-band-strip {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+}
+.fi-band-half {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--band-bg);
+  color: var(--band-fg);
+  transition: transform 360ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.fi-band-half::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--fi-tyvek);
+  opacity: 0.06;
+  pointer-events: none;
+}
+.fi-band-a {
+  clip-path: polygon(0 0, var(--cut, 50%) 0, calc(var(--cut, 50%) - 6px) 25%, var(--cut, 50%) 50%, calc(var(--cut, 50%) - 6px) 75%, var(--cut, 50%) 100%, 0 100%);
+}
+.fi-band-b {
+  clip-path: polygon(var(--cut, 50%) 0, 100% 0, 100% 100%, var(--cut, 50%) 100%, calc(var(--cut, 50%) - 6px) 75%, var(--cut, 50%) 50%, calc(var(--cut, 50%) - 6px) 25%);
+}
+.fi-band.is-cut .fi-band-a {
+  transform: translate(-6px, 10px) rotate(-4deg);
+}
+.fi-band.is-cut .fi-band-b {
+  transform: translate(6px, 10px) rotate(4deg);
+}
+.fi-band-text {
+  flex: 0 0 auto;
+  padding-left: 14px;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.fi-band-tab {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin-left: -6px;
+  border-radius: 4px;
+  background: var(--band-bg);
+  color: var(--band-fg);
+  box-shadow: inset 0 0 0 2px rgba(22, 17, 13, 0.16);
+  font-size: 8px;
+  line-height: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  transform-origin: 0 50%;
+}
+.fi-band-tab-first {
+  order: -1;
+  margin-left: 0;
+  margin-right: -6px;
+  transform-origin: 100% 50%;
+}
+.fi-band--amarillo {
+  --band-bg: var(--fi-amarillo);
+}
+.fi-band--naranja {
+  --band-bg: var(--fi-naranja);
+}
+.fi-band--cobalto {
+  --band-bg: var(--fi-cobalto);
+  --band-fg: var(--fi-crema);
+}
+.fi-band--crema {
+  --band-bg: var(--fi-crema);
+}
+.fi-band--tinta {
+  --band-bg: var(--fi-tinta);
+  --band-fg: var(--fi-crema);
+}
+/* Como separador de sección: cruza el borde superior a sangre, girada −2°, la mitad sobre la sección anterior */
+.fi-divider {
+  position: absolute;
+  top: 0;
+  left: -24px;
+  right: -24px;
+  z-index: 3;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.fi-divider .fi-band-tab {
+  margin-left: 0;
+}
+.fi-divider-inner {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding-left: max(32px, calc((100vw - 1280px) / 2 + 52px));
+}
+.fi-divider-inner .fi-band-strip {
+  margin-left: -6px;
+}
+
+/* ---------- Sticker troquelado (Sticker.astro y las islas) ----------
+ * Contenido sobre un recorte con borde blanco de 6 px, contorno tinta de 2 px y sombra dura sin blur. El contorno y la
+ * sombra son drop-shadow sin desenfoque sobre la forma (sirven para cualquier recorte: estrella, corazón, ticket). */
+.fi-sticker {
+  --st-bg: var(--fi-crema);
+  --st-fg: var(--fi-tinta);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  isolation: isolate;
+  color: var(--st-fg);
+  transform: rotate(var(--tilt, 0deg));
+  filter: drop-shadow(2px 0 0 var(--fi-tinta)) drop-shadow(-2px 0 0 var(--fi-tinta)) drop-shadow(0 2px 0 var(--fi-tinta))
+    drop-shadow(0 -2px 0 var(--fi-tinta)) drop-shadow(4px 4px 0 var(--fi-tinta));
+}
+.fi-sticker-paper,
+.fi-sticker-ink {
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+}
+.fi-sticker-paper {
+  inset: 0;
+  background: #fff;
+}
+.fi-sticker-ink {
+  inset: 6px;
+  background: var(--st-bg);
+}
+.fi-sticker-body {
+  position: relative;
+  display: block;
+}
+.fi-sticker--pill .fi-sticker-paper,
+.fi-sticker--pill .fi-sticker-ink {
+  border-radius: 999px;
+}
+.fi-sticker--pill {
+  padding: 12px 22px;
+}
+.fi-sticker--circle .fi-sticker-paper,
+.fi-sticker--circle .fi-sticker-ink {
+  border-radius: 50%;
+}
+.fi-sticker--circle {
+  aspect-ratio: 1;
+  padding: 18px;
+}
+.fi-sticker--burst .fi-sticker-paper,
+.fi-sticker--burst .fi-sticker-ink {
+  clip-path: polygon(50% 0%, 59% 16%, 75% 6.7%, 75% 25%, 93.3% 25%, 84% 41%, 100% 50%, 84% 59%, 93.3% 75%, 75% 75%, 75% 93.3%, 59% 84%, 50% 100%, 41% 84%, 25% 93.3%, 25% 75%, 6.7% 75%, 16% 59%, 0% 50%, 16% 41%, 6.7% 25%, 25% 25%, 25% 6.7%, 41% 16%);
+}
+.fi-sticker--burst .fi-sticker-ink {
+  inset: 8px;
+}
+.fi-sticker--burst {
+  aspect-ratio: 1;
+  padding: 26%;
+}
+.fi-sticker--heart .fi-sticker-paper,
+.fi-sticker--heart .fi-sticker-ink {
+  clip-path: polygon(50% 100%, 12% 62%, 3% 46%, 1% 30%, 6% 15%, 17% 5%, 30% 2%, 42% 7%, 50% 17%, 58% 7%, 70% 2%, 83% 5%, 94% 15%, 99% 30%, 97% 46%, 88% 62%);
+}
+.fi-sticker--heart .fi-sticker-ink {
+  inset: 8px 8px 10px;
+}
+.fi-sticker--heart {
+  aspect-ratio: 1.1;
+  padding: 16% 18% 30%;
+}
+/* Ticket con muescas a los lados (máscara radial) */
+.fi-sticker--ticket .fi-sticker-paper,
+.fi-sticker--ticket .fi-sticker-ink {
+  border-radius: 10px;
+  -webkit-mask: radial-gradient(circle 9px at 0 50%, transparent 98%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle 9px at 100% 50%, transparent 98%, #000) right / 51% 100% no-repeat;
+  mask: radial-gradient(circle 9px at 0 50%, transparent 98%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle 9px at 100% 50%, transparent 98%, #000) right / 51% 100% no-repeat;
+}
+.fi-sticker--ticket .fi-sticker-ink {
+  -webkit-mask: radial-gradient(circle 4px at 0 50%, transparent 98%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle 4px at 100% 50%, transparent 98%, #000) right / 51% 100% no-repeat;
+  mask: radial-gradient(circle 4px at 0 50%, transparent 98%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle 4px at 100% 50%, transparent 98%, #000) right / 51% 100% no-repeat;
+}
+.fi-sticker--ticket {
+  padding: 16px 28px;
+}
+.fi-tone-crema {
+  --st-bg: var(--fi-crema);
+  --st-fg: var(--fi-tinta);
+}
+.fi-tone-amarillo {
+  --st-bg: var(--fi-amarillo);
+  --st-fg: var(--fi-tinta);
+}
+.fi-tone-naranja {
+  --st-bg: var(--fi-naranja);
+  --st-fg: var(--fi-tinta);
+}
+.fi-tone-cobalto {
+  --st-bg: var(--fi-cobalto);
+  --st-fg: var(--fi-crema);
+}
+.fi-tone-tinta {
+  --st-bg: var(--fi-tinta);
+  --st-fg: var(--fi-crema);
+}
+.fi-tone-lima {
+  --st-bg: var(--brand-lime);
+  --st-fg: var(--fi-tinta);
+}
+@media (forced-colors: active) {
+  .fi-sticker {
+    filter: none;
+    border: 2px solid CanvasText;
+  }
+}
+/* Sticker chico de texto ("ejemplo", "CATA10"): pastilla simple con contorno y sombra dura */
+.fi-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 3px 12px;
+  border: 2px solid var(--fi-tinta);
+  border-radius: 999px;
+  background: var(--fi-crema);
+  color: var(--fi-tinta);
+  box-shadow: 3px 3px 0 var(--fi-tinta);
+  font-size: 12px;
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transform: rotate(var(--tilt, -2deg));
+}
+.fi-tag-amarillo {
+  background: var(--fi-amarillo);
+}
+.fi-tag-naranja {
+  background: var(--fi-naranja);
+}
+.fi-tag-lima {
+  background: var(--brand-lime);
+}
+/* Chip de algo que no existe todavía ("Pronto"): contorno punteado, nunca dibujado como si funcionara */
+.fi-soon-chip {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 4px 6px 4px 12px;
+  border: 2px dashed currentColor;
+  border-radius: 999px;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+}
+
+/* ---------- Foto desechable (DisposablePhoto) ----------
+ * Marco blanco de 12 px (16 en desktop) y 40 abajo, como una copia; giro por prop; viñeta de flash al centro y fecha
+ * estampada en naranjo abajo a la derecha (aria-hidden). */
+.fi-photo {
+  position: relative;
+  display: block;
+  margin: 0;
+  padding: 12px 12px 40px;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 18px 40px rgba(22, 17, 13, 0.22);
+  transform: rotate(var(--tilt, 0deg));
+}
+@media (min-width: 1024px) {
+  .fi-photo {
+    padding: 16px 16px 40px;
+  }
+}
+.fi-photo-frame {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  aspect-ratio: var(--ratio, 4 / 5);
+  background: var(--fi-crema-2);
+}
+.fi-photo-frame picture {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.fi-photo-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: contrast(1.08) saturate(1.12);
+}
+.fi-photo-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 45%, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.05) 40%, rgba(0, 0, 0, 0.18) 100%);
+  mix-blend-mode: soft-light;
+  pointer-events: none;
+}
+.fi-photo-stamp {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  font-size: 15px;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--fi-stamp);
+  text-shadow: 0 0 6px rgba(255, 138, 42, 0.7);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.fi-photo-flash {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  opacity: 0;
+  pointer-events: none;
+}
+.fi-photo-caption {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 12px;
+  font-size: 10px;
+  line-height: 14px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fi-text-3);
+}
+
+/* ---------- Botones sticker ----------
+ * Pastilla de 52 px, contorno tinta 2 px y sombra dura 0 4px 0: al presionar baja 3 px y la sombra pasa a 0 1px 0. */
+.fi-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 0 24px;
+  border: 2px solid var(--fi-tinta);
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.1;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: 0 4px 0 var(--fi-tinta);
+  transition: transform 120ms var(--ease-out), box-shadow 120ms var(--ease-out), background-color var(--dur-1) var(--ease-out);
+  -webkit-tap-highlight-color: transparent;
+}
+.fi-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 0 var(--fi-tinta);
+}
+.fi-btn:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--fi-tinta);
+}
+.fi-btn:focus-visible {
+  outline: 3px solid var(--fi-cobalto);
+  outline-offset: 3px;
+}
+.fi-on-dark .fi-btn:focus-visible {
+  outline-color: var(--fi-amarillo);
+}
+.fi-btn-crema {
+  background: var(--fi-crema);
+  color: var(--fi-tinta);
+}
+.fi-btn-tinta {
+  background: var(--fi-tinta);
+  color: var(--fi-crema);
+}
+.fi-btn-tinta:hover,
+.fi-btn-tinta:active {
+  box-shadow: 0 4px 0 var(--fi-naranja-ink);
+}
+.fi-btn-line {
+  background: transparent;
+  color: var(--fi-tinta);
+  box-shadow: none;
+}
+.fi-btn-line:hover {
+  background: rgba(22, 17, 13, 0.06);
+  box-shadow: none;
+}
+.fi-btn-line:active {
+  box-shadow: none;
+}
+.fi-on-dark .fi-btn-line {
+  border-color: var(--fi-crema);
+  color: var(--fi-crema);
+}
+.fi-on-dark .fi-btn-line:hover {
+  background: rgba(255, 244, 228, 0.1);
+}
+.fi-btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+@media (min-width: 1024px) {
+  .fi-btn {
+    min-height: 56px;
+    padding: 0 28px;
+    font-size: 17px;
+  }
+}
+.fi-arrow {
+  font-family: "Prompt", system-ui, sans-serif;
+}
+.fi-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-thickness: 2px;
+  text-decoration-color: rgba(22, 17, 13, 0.35);
+  border-radius: 2px;
+}
+.fi-on-dark .fi-link {
+  text-decoration-color: rgba(255, 244, 228, 0.5);
+}
+.fi-link:hover {
+  text-decoration-color: currentColor;
+}
+.fi-link:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+.fi-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+  margin-top: 28px;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+/* ---------- Cards (radio 20) con contorno tinta y sombra dura ---------- */
+.fi-card {
+  position: relative;
+  border: 2px solid var(--fi-tinta);
+  border-radius: 20px;
+  background: var(--fi-crema);
+  color: var(--fi-tinta);
+  box-shadow: 5px 5px 0 var(--fi-tinta);
+}
+.fi-card .fi-meta {
+  color: var(--fi-text-3);
+}
+
+/* ---------- Ítems numerados (número en sticker circle + título Prompt 700 + texto) ---------- */
+.fi-items {
+  display: grid;
+  gap: 22px;
+}
+.fi-item {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+.fi-item-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 2px solid var(--fi-tinta);
+  border-radius: 50%;
+  background: var(--fi-cobalto);
+  color: var(--fi-crema);
+  box-shadow: 2px 2px 0 var(--fi-tinta);
+  font-family: var(--fi-display);
+  font-size: 18px;
+  line-height: 1;
+  transform: rotate(var(--tilt, -4deg));
+}
+.fi-item-num-amarillo {
+  background: var(--fi-amarillo);
+  color: var(--fi-tinta);
+}
+.fi-item-title {
+  font-weight: 700;
+  font-size: 17px;
+  line-height: 24px;
+}
+.fi-item-text {
+  margin-top: 4px;
+  font-size: 15px;
+  line-height: 23px;
+  color: var(--fi-text-2);
+}
+.fi-on-dark .fi-item-text {
+  color: var(--text-2);
+}
+
+/* ---------- Confeti estático (Confetti.astro) y ráfaga (fiestasLanding.client.js) ---------- */
+.fi-confetti {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.fi-confetti-piece {
+  position: absolute;
+  width: 6px;
+  height: 12px;
+  border-radius: 1px;
+  transform: rotate(var(--r, 0deg));
+}
+.fi-confetti-piece.is-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.fi-c-amarillo {
+  background: var(--fi-amarillo);
+}
+.fi-c-naranja {
+  background: var(--fi-naranja);
+}
+.fi-c-cobalto {
+  background: var(--fi-cobalto);
+}
+.fi-c-crema {
+  background: var(--fi-crema);
+}
+/* Sobre naranja, el confeti naranja se pinta tinta; sobre cobalto, el cobalto se pinta crema */
+.fi-bg-naranja .fi-c-naranja {
+  background: var(--fi-tinta);
+}
+.fi-confetti-dim .fi-confetti-piece {
+  opacity: 0.3;
+}
+.fi-confetti-dim .fi-c-cobalto,
+.fi-confetti-dim .fi-c-naranja {
+  background: var(--fi-amarillo);
+}
+.fi-burst-piece {
+  position: absolute;
+  z-index: 50;
+  width: 7px;
+  height: 13px;
+  border-radius: 1px;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+.fi-burst-piece.is-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+/* ---------- Rangos y campos ---------- */
+.fi-range {
+  width: 100%;
+  height: 28px;
+  margin: 0;
+  accent-color: var(--fi-tinta);
+  cursor: pointer;
+}
+.fi-range:focus-visible {
+  outline: 2px solid var(--fi-cobalto);
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+.fi-field {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 2px solid var(--fi-tinta);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--fi-tinta);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.fi-field:focus-visible {
+  outline: 3px solid var(--fi-cobalto);
+  outline-offset: 2px;
+}
+/* Segmented control con contorno tinta */
+.fi-seg {
+  display: inline-flex;
+  padding: 3px;
+  border: 2px solid var(--fi-tinta);
+  border-radius: 999px;
+  background: var(--fi-crema-2);
+}
+.fi-seg-btn {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fi-tinta);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.fi-seg-btn.is-on {
+  background: var(--fi-tinta);
+  color: var(--fi-crema);
+}
+.fi-seg-btn:focus-visible {
+  outline: 3px solid var(--fi-cobalto);
+  outline-offset: 2px;
+}
+
+/* ---------- Movimiento (§6) ----------
+ * Todo cuelga de html.lp-motion (LandingMotion.astro: JS, IntersectionObserver y sin "reducir movimiento"); sin la clase
+ * cada elemento queda en su estado final (pulseras cerradas, stickers pegados, confeti quieto). Solo transform, opacity
+ * y clip-path. */
+@keyframes fi-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+@keyframes fi-up-24 {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+@keyframes fi-fade {
+  from {
+    opacity: 0;
+  }
+}
+/* F2: el sticker se pega (rebote) */
+@keyframes fi-stick {
+  from {
+    opacity: 0;
+    transform: scale(1.25) rotate(-12deg);
+  }
+}
+/* F6: pop de stickers */
+@keyframes fi-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6) rotate(var(--tilt, 0deg));
+  }
+}
+/* F5: la pulsera entra desde la izquierda y la pestaña se cierra */
+@keyframes fi-band-in {
+  from {
+    transform: translateX(-6%);
+  }
+}
+@keyframes fi-tab-close {
+  from {
+    transform: rotate(-35deg);
+  }
+}
+/* F1: flash de desechable y la foto que se asienta */
+@keyframes fi-flash {
+  0% {
+    opacity: 0;
+  }
+  35% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes fi-settle {
+  from {
+    transform: rotate(6deg) scale(1.04);
+  }
+}
+/* F16: confeti que flota */
+@keyframes fi-float {
+  from {
+    transform: translateY(-6px) rotate(calc(var(--r, 0deg) - 8deg));
+  }
+  to {
+    transform: translateY(6px) rotate(calc(var(--r, 0deg) + 8deg));
+  }
+}
+@keyframes fi-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20%,
+  60% {
+    transform: translateX(-4px);
+  }
+  40%,
+  80% {
+    transform: translateX(4px);
+  }
+}
+@keyframes fi-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+}
+@keyframes fi-bump {
+  40% {
+    transform: scale(1.2);
+  }
+}
+
+/* Reveal genérico: fade + translateY 16 px */
+.lp-motion .fi .is-in [data-lp-step],
+.lp-motion .fi .is-in[data-lp-step] {
+  animation: fi-up 600ms var(--ease-out) var(--lp-d, 0ms) both;
+}
+/* F2 en H2: el sticker del titular se pega al revelarse */
+.lp-motion .fi [data-lp-reveal]:not(.is-in) .fi-h2 .fi-hl {
+  opacity: 0;
+}
+.lp-motion .fi .is-in .fi-h2 .fi-hl {
+  animation: fi-stick 420ms cubic-bezier(0.34, 1.56, 0.64, 1) calc(var(--lp-d, 0ms) + 250ms) both;
+}
+/* F5: pulseras de sección */
+.lp-motion .fi [data-lp-reveal]:not(.is-in) .fi-divider .fi-band {
+  opacity: 0;
+}
+.lp-motion .fi .is-in .fi-divider .fi-band-strip {
+  animation: fi-band-in 500ms var(--ease-out) both;
+}
+.lp-motion .fi .is-in .fi-divider .fi-band-tab {
+  animation: fi-tab-close 260ms var(--ease-out) 420ms both;
+}
+/* F6: stickers que hacen pop con stagger (--i) */
+.lp-motion .fi [data-lp-reveal]:not(.is-in) [data-fi-pop] {
+  opacity: 0;
+}
+.lp-motion .fi .is-in [data-fi-pop] {
+  animation: fi-pop 420ms cubic-bezier(0.34, 1.4, 0.64, 1) calc(var(--i, 0) * 60ms + 150ms) both;
+}
+/* F16: confeti que flota, pausado fuera de pantalla ([data-fi-play] → .is-playing) */
+.lp-motion [data-fi-play].is-playing .fi-confetti-float .fi-confetti-piece {
+  animation: fi-float var(--dur, 7s) var(--ease-in-out) var(--delay, 0s) infinite alternate;
+}
+/* F18: el CTA del cierre da un único "golpe" de sombra al entrar */
+@keyframes fi-thump {
+  50% {
+    transform: translateY(3px);
+    box-shadow: 0 1px 0 var(--fi-tinta);
+  }
+}
+.lp-motion .fi .is-in [data-fi-thump] {
+  animation: fi-thump 260ms var(--ease-out) 700ms both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fi-band-half,
+  .fi-btn {
+    transition: none;
+  }
+}
+
+/* Pulsera mini (filas del hero, de "Así lo ve tu público" y de las listas): solo la banda, sin texto ni pestaña */
+.fi-band-mini {
+  --band-h: 12px;
+  flex: 0 0 auto;
+  width: 52px;
+}
+.fi-band-mini .fi-band-text,
+.fi-band-mini .fi-band-tab {
+  display: none;
+}
+.fi-band-mini .fi-band-half {
+  box-shadow: inset 0 0 0 1.5px rgba(22, 17, 13, 0.5);
+}
+.fi-band-mini.is-cut .fi-band-a {
+  transform: translate(-3px, 3px) rotate(-6deg);
+}
+.fi-band-mini.is-cut .fi-band-b {
+  transform: translate(3px, 3px) rotate(6deg);
+}
+/* Fila atenuada (etapa que abre después), como en el checkout */
+.fi-dim {
+  opacity: 0.55;
+}
+/* Rótulo de estado de la card (cardLabel, tono warning) */
+.fi-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #ffe8c2;
+  color: #7a3c00;
+  font-size: 12px;
+  font-weight: 700;
+}
+.fi-state::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.fi-state-out {
+  background: var(--fi-tinta);
+  color: var(--fi-crema);
+}

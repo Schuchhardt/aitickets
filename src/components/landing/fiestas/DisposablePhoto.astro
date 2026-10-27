@@ -1,0 +1,50 @@
+---
+// Foto de cámara desechable (SPEC_landing_fiestas §1): <picture> con marco blanco de copia (12/16 px y 40 abajo), giro
+// por prop, contraste y saturación de flash, viñeta de flash al centro y la fecha estampada en naranjo abajo a la derecha
+// (aria-hidden). flash: F1 (destello blanco y la foto que se asienta) al cargar (hero) o al revelarse (montaje, hoja de
+// contactos); la clase la anima landing-fiestas.css y el componente que la usa. caption: texto al pie del marco.
+interface Photo {
+  src: string;
+  width: number;
+  height: number;
+  sources: { type: string; srcset: string }[];
+}
+interface Props {
+  photo: Photo;
+  alt: string;
+  tilt?: number;
+  ratio?: string;
+  position?: string;
+  stamp?: string;
+  sizes?: string;
+  eager?: boolean;
+  caption?: string;
+  class?: string;
+  style?: string;
+}
+const { photo, alt, tilt = 0, ratio = "4 / 5", position = "50% 50%", stamp, sizes = "(min-width: 1024px) 400px, 80vw", eager = false, caption, class: className, style = "" } = Astro.props;
+---
+
+<figure class={`fi-photo ${className ?? ""}`} style={`--tilt: ${tilt}deg; --ratio: ${ratio}; ${style}`}>
+  <span class="fi-photo-frame">
+    <picture>
+      {photo.sources.map((source) => <source type={source.type} srcset={source.srcset} sizes={sizes} />)}
+      <img
+        class="fi-photo-img"
+        src={photo.src}
+        alt={alt}
+        width={photo.width}
+        height={photo.height}
+        style={`object-position: ${position}`}
+        loading={eager ? "eager" : "lazy"}
+        decoding={eager ? undefined : "async"}
+        fetchpriority={eager ? "high" : undefined}
+      />
+    </picture>
+    <span class="fi-photo-vignette" aria-hidden="true"></span>
+    {stamp ? <span class="fi-photo-stamp" aria-hidden="true">{stamp}</span> : null}
+    <span class="fi-photo-flash" aria-hidden="true"></span>
+  </span>
+  {caption ? <figcaption class="fi-photo-caption">{caption}</figcaption> : null}
+  <slot />
+</figure>

@@ -1,0 +1,283 @@
+---
+// 6 · La fiesta empieza antes (SPEC_landing_fiestas §4.6, crema-2, pulsera QUIÉNES VAN): un teléfono con la página de una
+// fiesta de ejemplo (mockup decorativo, no copia la interfaz exacta: flyer vertical con el nombre, fondo con el tinte del
+// flyer, "Últimas entradas", "Comprar entradas" y el inicio de la galería), el muro "Quiénes van" (isla PartyWall, que
+// ven solo quienes tienen entrada) y seis ítems. Verificado: el flyer en su proporción y el tinte (eventCoverMeta.ts,
+// eventTint.js), video de portada hasta EVENT_VIDEO_MAX_BYTES (eventVideo.ts), galería con GALLERY_MAX_IMAGES fotos y un
+// video (eventGallery.ts), "Ver QR" por entrada (src/pages/ticket/[id].astro), DEFAULT_MAX_PER_PURCHASE y el asistente
+// de la página. La dirección que solo ven quienes compran no se puede cargar todavía (secret_location sin panel ni API):
+// "Pronto"; hoy, la comuna y un correo programado desde el asistente de IA (tools/messaging.ts).
+import PartyWall from "./PartyWall.vue";
+import StickerHeading from "./StickerHeading.astro";
+import Wristband from "./Wristband.astro";
+import SoonBadge from "../../ui/SoonBadge.vue";
+import { Camera, Film, Images, MessageCircle, QrCode, Smartphone } from "lucide-vue-next";
+import { PARTY_NAME, PARTY_PHOTOS } from "./fiestasLanding.js";
+import { DEFAULT_MAX_PER_PURCHASE } from "../../Reservation/pricing.js";
+import { EVENT_VIDEO_MAX_BYTES } from "../../../lib/eventVideo";
+import { GALLERY_MAX_IMAGES } from "../../../lib/eventGallery";
+import { FEED_EMOJIS, FEED_MESSAGE_MAX } from "../../../../netlify/lib/attendee-community.mjs";
+
+const photo = PARTY_PHOTOS.hero;
+const items = [
+  { icon: Smartphone, title: "Tu flyer, completo.", text: "Se ve en su proporción y la página toma su color." },
+  {
+    icon: Film,
+    title: "El aftermovie arriba.",
+    text: `Un video de portada (MP4, MOV o WebM de hasta ${Math.round(EVENT_VIDEO_MAX_BYTES / 1024 / 1024)} MB) que se reproduce solo, sin sonido.`,
+  },
+  { icon: Images, title: "Las fotos de la anterior.", text: `Una galería al final de la página, con hasta ${GALLERY_MAX_IMAGES} fotos y un video.` },
+  { icon: Camera, title: "\"Quiénes van\".", text: "Quien compra reacciona con un emoji y deja un mensaje que ven los demás asistentes. Tú lo moderas." },
+  {
+    icon: QrCode,
+    title: "Uno compra, cada uno con su QR.",
+    text: `Quien compra para el grupo le pasa a cada amigo su entrada con "Ver QR". Hasta ${DEFAULT_MAX_PER_PURCHASE} por compra si no lo cambias.`,
+  },
+  { icon: MessageCircle, title: "Un asistente que responde.", text: "El dress code, la edad mínima o hasta cuándo hay preventa, con la información que cargaste." },
+];
+---
+
+<section
+  id="pagina"
+  class="fi-section fi-bg-crema-2 fpg"
+  aria-labelledby="fi-page-title"
+  data-fi-section="page"
+  data-fi-band-color="naranja"
+  data-fi-band-label="Quiénes van"
+>
+  <Wristband color="naranja" label="Quiénes van" serial={5} divider />
+  <div class="fi-wrap" data-lp-reveal>
+    <StickerHeading id="fi-page-title" text="La fiesta" sticker="empieza antes." />
+    <p class="fi-lead fpg-lead" data-lp-step>La página de tu fiesta trabaja para que el que ya compró arrastre a su grupo.</p>
+
+    <div class="fpg-grid">
+      <div class="fpg-phone-wrap" data-lp-step>
+        <div class="fpg-phone" aria-hidden="true">
+          <div class="fpg-screen">
+            <div class="fpg-flyer">
+              <picture>
+                {photo.sources.map((source) => <source type={source.type} srcset={source.srcset} sizes="300px" />)}
+                <img class="fi-photo-img" src={photo.src} alt="" width={photo.width} height={photo.height} style="object-position: 62% 40%" loading="lazy" decoding="async" />
+              </picture>
+              <span class="fpg-flyer-name fi-display">{PARTY_NAME}</span>
+            </div>
+            <div class="fpg-body">
+              <span class="fi-state">Últimas entradas</span>
+              <span class="fpg-buy">Comprar entradas</span>
+              <span class="fpg-gallery">
+                {["20% 30%", "60% 70%", "85% 40%"].map((position) => (
+                  <span class="fpg-thumb">
+                    <picture>
+                      {photo.sources.map((source) => <source type={source.type} srcset={source.srcset} sizes="80px" />)}
+                      <img class="fi-photo-img" src={photo.src} alt="" width={photo.width} height={photo.height} style={`object-position: ${position}`} loading="lazy" decoding="async" />
+                    </picture>
+                  </span>
+                ))}
+              </span>
+            </div>
+          </div>
+        </div>
+        <span class="fi-tag fi-tag-amarillo fpg-example">ejemplo</span>
+      </div>
+
+      <div class="fpg-wall" data-lp-step>
+        <PartyWall client:visible emojis={[...FEED_EMOJIS]} maxLength={FEED_MESSAGE_MAX} />
+      </div>
+    </div>
+
+    <ul class="fpg-items">
+      {
+        items.map((item, i) => (
+          <li class="fpg-item" data-lp-step>
+            <span class="fpg-icon" style={`--tilt: ${i % 2 ? 4 : -4}deg`} aria-hidden="true">
+              <item.icon size={18} />
+            </span>
+            <div>
+              <p class="fi-item-title">{item.title}</p>
+              <p class="fi-item-text">{item.text}</p>
+            </div>
+          </li>
+        ))
+      }
+    </ul>
+
+    <div class="fpg-address" data-lp-step>
+      <p class="fpg-address-text">
+        <strong>¿Fiesta en lugar secreto?</strong> Publica la comuna y avísales la dirección exacta el mismo día con un correo
+        programado a todos los que compraron (desde tu asistente de IA).
+      </p>
+      <p class="fi-soon-chip">Dirección que solo ven quienes compran <SoonBadge dark={false} /></p>
+    </div>
+  </div>
+</section>
+
+<style>
+  .fpg-lead {
+    max-width: 600px;
+    margin-top: 18px;
+  }
+  .fpg-grid {
+    display: grid;
+    gap: 40px;
+    margin-top: 40px;
+  }
+  .fpg-phone-wrap {
+    position: relative;
+    justify-self: center;
+  }
+  .fpg-phone {
+    width: 240px;
+    height: 480px;
+    padding: 10px;
+    border: 3px solid var(--fi-tinta);
+    border-radius: 40px;
+    background: var(--fi-tinta);
+    box-shadow: 6px 6px 0 rgba(22, 17, 13, 0.25);
+    transform: rotate(-2deg);
+  }
+  .fpg-screen {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+    border-radius: 30px;
+    /* Tinte pastel del flyer (como eventTint.js) */
+    background: #f6dccd;
+  }
+  .fpg-flyer {
+    position: relative;
+    flex: 0 0 62%;
+    margin: 10px 10px 0;
+    overflow: hidden;
+    border-radius: 16px;
+  }
+  .fpg-flyer picture {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  .fpg-flyer-name {
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    font-size: 26px;
+    line-height: 26px;
+    color: var(--fi-amarillo);
+    text-shadow: 2px 2px 0 var(--fi-tinta);
+  }
+  .fpg-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+  }
+  .fpg-body .fi-state {
+    align-self: flex-start;
+  }
+  .fpg-buy {
+    display: block;
+    padding: 10px;
+    border-radius: 999px;
+    background: var(--fi-tinta);
+    color: var(--fi-crema);
+    font-size: 13px;
+    font-weight: 700;
+    text-align: center;
+  }
+  .fpg-gallery {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+  }
+  .fpg-thumb {
+    display: block;
+    aspect-ratio: 1;
+    overflow: hidden;
+    border-radius: 6px;
+  }
+  /* Miniaturas: la misma foto en AVIF/WebP (la variante chica), no el JPG original */
+  .fpg-thumb picture {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  .fpg-example {
+    position: absolute;
+    top: 24px;
+    right: -18px;
+    --tilt: 8deg;
+  }
+  .fpg-wall {
+    min-width: 0;
+  }
+  .fpg-items {
+    display: grid;
+    gap: 22px;
+    margin-top: 48px;
+  }
+  .fpg-item {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr);
+    gap: 14px;
+  }
+  .fpg-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border: 2px solid var(--fi-tinta);
+    border-radius: 50%;
+    background: var(--fi-amarillo);
+    box-shadow: 2px 2px 0 var(--fi-tinta);
+    transform: rotate(var(--tilt));
+  }
+  .fpg-address {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin-top: 40px;
+    padding: 20px;
+    border: 2px solid var(--fi-tinta);
+    border-radius: 20px;
+    background: var(--fi-crema);
+  }
+  .fpg-address-text {
+    max-width: 760px;
+    font-size: 15px;
+    line-height: 23px;
+  }
+  .fpg-address-text strong {
+    font-weight: 700;
+  }
+  @media (min-width: 768px) {
+    .fpg-items {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 26px 40px;
+    }
+  }
+  @media (min-width: 1024px) {
+    .fpg-grid {
+      grid-template-columns: 340px minmax(0, 1fr);
+      gap: 64px;
+      align-items: start;
+      margin-top: 56px;
+    }
+    .fpg-phone {
+      width: 300px;
+      height: 600px;
+    }
+    .fpg-flyer-name {
+      font-size: 32px;
+      line-height: 32px;
+    }
+    .fpg-address {
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      padding: 24px 28px;
+    }
+  }
+</style>

@@ -1,0 +1,158 @@
+---
+// 4 · Un código para cada promotor (SPEC_landing_fiestas §4.4, crema, pulsera LOS PROMOS): el texto, la plancha de
+// stickers (isla PromoSheet: códigos con los números del panel, o los canales con su link), la foto desechable del
+// promotor con su código pegado y cuatro ítems. Verificado: códigos de descuento por evento o de toda la organización
+// (discounts.mjs, /api/discount-codes) con usos, compras, descuento y ventas en el panel (DiscountCodesManager.vue);
+// links con seguimiento y métricas por canal (TrackingLinkBuilder.vue, eventAnalytics.ts; la frase de la misma visita es
+// la de PRODUCER_FAQ); CSV de órdenes con "Código de descuento" y "Canal" (ordersExport.ts); "Invitar a alguien" en la
+// página de la orden (src/pages/order/[id].astro, ref=invite). Que cada promotor vea sus números no existe: "Pronto".
+import PromoSheet from "./PromoSheet.vue";
+import DisposablePhoto from "./DisposablePhoto.astro";
+import StickerHeading from "./StickerHeading.astro";
+import Wristband from "./Wristband.astro";
+import SoonBadge from "../../ui/SoonBadge.vue";
+import { PARTY_NAME, PARTY_PHOTOS, PHOTO_ALT } from "./fiestasLanding.js";
+import { DIRECT_CHANNEL } from "../../../lib/eventAnalytics";
+
+interface Props {
+  stamp: string;
+}
+const { stamp } = Astro.props;
+const items = [
+  {
+    title: "Un código por promotor, en un minuto.",
+    text: "Porcentaje o monto, usos máximos, límite por persona y fecha de término. Puede servir para una fiesta o para todas las tuyas.",
+  },
+  {
+    title: "Y su link, por si no usan el código.",
+    text: "Cada link suma visitas, entradas e ingresos en las métricas de la fiesta. La venta se asocia al link cuando la persona compra en la misma visita en que llegó con él.",
+  },
+  { title: "Liquidas con un CSV.", text: "Exportas las órdenes con su código y su canal, y calculas lo de cada promotor." },
+  {
+    title: "Los que compran también invitan.",
+    text: `En la página de su compra tienen un botón "Invitar a alguien" que comparte "Voy a ${PARTY_NAME}, ¿vamos?". Esas ventas se ven como su propio canal.`,
+  },
+];
+---
+
+<section
+  id="promotores"
+  class="fi-section fi-bg-crema fpr"
+  aria-labelledby="fi-promos-title"
+  data-fi-section="promoters"
+  data-fi-band-color="naranja"
+  data-fi-band-label="Los promos"
+>
+  <Wristband color="naranja" label="Los promos" serial={3} divider />
+  <div class="fi-wrap" data-lp-reveal>
+    <div class="fpr-head">
+      <div>
+        <StickerHeading id="fi-promos-title" text="Cada promotor," sticker="con su código." />
+        <p class="fi-lead fpr-lead" data-lp-step>
+          En una fiesta venden veinte personas: el centro de estudiantes, los amigos del DJ, la cuenta de memes. A cada uno
+          le das su código de descuento y su link. En tu panel ves cuántas veces se usó cada código, cuánto vendió y cuánto
+          descontó; en las métricas de la fiesta, cuántas visitas y entradas trajo cada link. Sin pantallazos de
+          transferencias ni planillas compartidas.
+        </p>
+      </div>
+      <div class="fpr-photo" data-lp-step>
+        <DisposablePhoto photo={PARTY_PHOTOS.promotor} alt={PHOTO_ALT.promotor} tilt={-2.5} ratio="4 / 5" stamp={stamp} sizes="(min-width: 1024px) 360px, 70vw" />
+        <span class="fi-tag fi-tag-naranja fpr-code" aria-hidden="true">CATA10</span>
+      </div>
+    </div>
+
+    <div class="fpr-grid">
+      <div class="fpr-sheet" data-lp-step>
+        <PromoSheet client:visible directLabel={DIRECT_CHANNEL} />
+      </div>
+      <div>
+        <ol class="fi-items">
+          {
+            items.map((item, i) => (
+              <li class="fi-item" data-lp-step>
+                <span class="fi-item-num" style={`--tilt: ${i % 2 ? 4 : -4}deg`} aria-hidden="true">{i + 1}</span>
+                <div>
+                  <p class="fi-item-title">{item.title}</p>
+                  <p class="fi-item-text">{item.text}</p>
+                </div>
+              </li>
+            ))
+          }
+        </ol>
+        <p class="fi-soon-chip fpr-soon" data-lp-step>Cada promotor ve sus números en su celular <SoonBadge dark={false} /></p>
+      </div>
+    </div>
+
+    <p class="fi-links" data-lp-step>
+      <a href="/guias/como-medir-ventas-por-promotor" class="fi-link">Guía: cómo medir ventas por promotor <span class="fi-arrow" aria-hidden="true">→</span></a>
+      <a href="/ventas-por-promotor" class="fi-link">Ventas por promotor <span class="fi-arrow" aria-hidden="true">→</span></a>
+    </p>
+  </div>
+</section>
+
+<style>
+  .fpr-head {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 36px;
+  }
+  .fpr-lead {
+    max-width: 660px;
+    margin-top: 18px;
+  }
+  .fpr-photo {
+    position: relative;
+    width: min(300px, 78%);
+    margin: 0 auto;
+  }
+  .fpr-photo :global(.fi-photo) {
+    --tilt: 1deg !important;
+  }
+  .fpr-photo :global(.fi-photo-frame) {
+    aspect-ratio: 3 / 4;
+  }
+  .fpr-code {
+    position: absolute;
+    top: 18px;
+    right: -14px;
+    font-size: 15px;
+    --tilt: 6deg;
+  }
+  .fpr-grid {
+    display: grid;
+    gap: 40px;
+    margin-top: 44px;
+  }
+  .fpr-sheet {
+    min-width: 0;
+  }
+  .fpr-soon {
+    margin-top: 22px;
+  }
+  @media (min-width: 1024px) {
+    .fpr-head {
+      flex-direction: row;
+      align-items: center;
+      gap: 56px;
+    }
+    .fpr-head > div:first-child {
+      flex: 1 1 auto;
+    }
+    .fpr-photo {
+      flex: 0 0 320px;
+      margin: 0;
+    }
+    .fpr-photo :global(.fi-photo) {
+      --tilt: -2.5deg !important;
+    }
+    .fpr-photo :global(.fi-photo-frame) {
+      aspect-ratio: 4 / 5;
+    }
+    .fpr-grid {
+      grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+      gap: 56px;
+      margin-top: 64px;
+      align-items: start;
+    }
+  }
+</style>

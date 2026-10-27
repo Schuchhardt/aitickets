@@ -1,0 +1,98 @@
+---
+// 10 · Testimonio (SPEC_landing_fiestas §4.10 y §0.9): solo si PARTY_TESTIMONIAL (producerSocialProof.ts) es una cita
+// real con nombre, productora o centro de estudiantes, ciudad y foto autorizados por escrito. Si es null no se renderiza
+// nada, ni el contenedor. La cita va dentro de un sticker grande crema girado −1,5°, con comillas Bagel naranja de 96 px
+// y la foto como desechable de 120×150 con fecha estampada.
+import { PARTY_TESTIMONIAL } from "../../../data/producerSocialProof";
+
+interface Props {
+  stamp: string;
+}
+const { stamp } = Astro.props;
+const t = PARTY_TESTIMONIAL;
+---
+
+{
+  t && (
+    <section class="fi-section fi-bg-crema fq" aria-label="Lo que dicen las productoras" data-fi-section="testimonial" data-fi-testimonial>
+      <figure class="fi-wrap fq-inner" data-lp-reveal>
+        <div class="fq-sticker" data-lp-step>
+          <span class="fq-mark fi-display" aria-hidden="true">“</span>
+          <blockquote class="fq-quote">
+            <p>{t.quote}</p>
+          </blockquote>
+        </div>
+        <figcaption class="fq-by" data-lp-step>
+          <span class="fi-photo fq-photo" style="--tilt: 3deg">
+            <span class="fi-photo-frame" style="--ratio: 4 / 5">
+              <img class="fi-photo-img" src={t.photo.src} alt="" width={t.photo.width} height={t.photo.height} loading="lazy" decoding="async" />
+              <span class="fi-photo-stamp" aria-hidden="true">{stamp}</span>
+            </span>
+          </span>
+          <span>
+            <span class="fq-name">{t.name}</span>
+            <span class="fi-meta fq-company">{t.company}</span>
+          </span>
+        </figcaption>
+      </figure>
+    </section>
+  )
+}
+
+<style>
+  .fq-inner {
+    max-width: 960px;
+    margin: 0 auto;
+  }
+  .fq-sticker {
+    position: relative;
+    padding: 40px 24px 28px;
+    border: 3px solid var(--fi-tinta);
+    border-radius: 48px;
+    background: var(--fi-crema);
+    box-shadow: 6px 6px 0 var(--fi-tinta);
+    transform: rotate(-1.5deg);
+  }
+  .fq-mark {
+    position: absolute;
+    top: -40px;
+    left: 24px;
+    font-size: 96px;
+    line-height: 1;
+    color: var(--fi-naranja-ink);
+  }
+  .fq-quote {
+    margin: 0;
+    font-size: 20px;
+    line-height: 30px;
+  }
+  .fq-by {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    margin-top: 28px;
+  }
+  .fq-photo {
+    width: 120px;
+    flex: 0 0 auto;
+    padding: 6px 6px 18px;
+  }
+  .fq-name {
+    display: block;
+    font-weight: 700;
+  }
+  .fq-company {
+    display: block;
+    margin-top: 2px;
+  }
+  @media (min-width: 1024px) {
+    .fq-sticker {
+      padding: 56px 56px 40px;
+      border-radius: 64px;
+    }
+    .fq-quote {
+      font-size: 28px;
+      line-height: 40px;
+    }
+  }
+</style>

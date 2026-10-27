@@ -1,0 +1,58 @@
+---
+// Analítica de la landing de fiestas (SPEC_landing_fiestas §10), con prefijo fi_ como cl_ en clubs:
+//   fi_view                     carga de la página
+//   fi_cta_click {position}     clic en un CTA de publicar ([data-cta="publish"], position = data-section: hero,
+//                               closing, header, mobile_bar)
+//   fi_demo_click {position}    clic en el evento de ejemplo ([data-cta="demo"])
+//   fi_whatsapp_click {position}
+//   fi_faq_open {question}      abre una pregunta (el botón todavía dice aria-expanded="false" en la fase de captura)
+//   fi_section_view {section}   cada [data-fi-section] entra en pantalla (una vez)
+// Los propios los mandan las islas: fi_stairs_play / fi_stairs_count / fi_stairs_edit / fi_stairs_choice /
+// fi_stairs_end (PresaleStairs), fi_promo_flip / fi_promo_mode / fi_promo_sort / fi_link_copy (PromoSheet),
+// fi_wall_react (PartyWall), fi_scan_demo (DoorScanner), fi_ads_demo (PartyAdsDemo), fi_calc_change (StageCalculator)
+// y fi_band_name (BandNamer, sin el texto). CtaTracking sigue midiendo producer_cta_clicked.
+// También arranca el observador que pausa el confeti flotante fuera de pantalla ([data-fi-play], F16).
+---
+
+<script>
+  import { trackEvent } from "../../../composables/useGoogleAnalytics.js";
+  import { observePlay } from "./fiestasLanding.client.js";
+
+  const CTA_EVENTS: Record<string, string> = {
+    publish: "fi_cta_click",
+    demo: "fi_demo_click",
+    whatsapp: "fi_whatsapp_click",
+  };
+
+  trackEvent("fi_view", { page: location.pathname });
+  observePlay();
+
+  document.addEventListener(
+    "click",
+    (e) => {
+      const target = e.target as Element | null;
+      const cta = target?.closest?.("[data-cta]");
+      const name = cta && CTA_EVENTS[cta.getAttribute("data-cta") || ""];
+      if (cta && name) trackEvent(name, { position: cta.getAttribute("data-section") || "" });
+
+      const question = target?.closest?.('[data-testid="landing-faq"] button[aria-expanded="false"]');
+      if (question) trackEvent("fi_faq_open", { question: question.textContent?.trim().slice(0, 100) || "" });
+    },
+    { capture: true },
+  );
+
+  if ("IntersectionObserver" in window) {
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          trackEvent("fi_section_view", { section: (entry.target as HTMLElement).dataset.fiSection });
+          io.unobserve(entry.target);
+        }
+      },
+      // Con margen y no con umbral de área: una sección más alta que la pantalla nunca llegaría al 25%
+      { rootMargin: "0px 0px -40% 0px", threshold: 0 },
+    );
+    document.querySelectorAll("[data-fi-section]").forEach((section) => io.observe(section));
+  }
+</script>

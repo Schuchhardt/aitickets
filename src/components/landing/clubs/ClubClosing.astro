@@ -4,7 +4,8 @@
 // viernes a las 23:30 en hora de Chile (countdownToNight, EVENT_TIMEZONE): se actualiza cada minuto, sin segundos ni
 // transición, y es decorativa (aria-hidden). Sin JS: "Este viernes · 23:30". data-final-cta: la barra flotante de
 // mobile se esconde aquí. CTAs con los mismos destinos que stand-up (registro, WhatsApp y demo de 15 min) y los links
-// internos a /organizadores y a las landings de música y stand-up (SEO §9).
+// internos a /organizadores y a las landings de fiestas, música y stand-up (SEO §9; fiestas se suma con
+// SPEC_landing_fiestas: las landings de noche se enlazan entre sí).
 import LedHeading from "./LedHeading.astro";
 import { LIVE_NIGHT } from "./clubsLanding.js";
 import { DEMO_CALL_URL, publishUrl, whatsappUrl } from "../links.js";
@@ -45,7 +46,7 @@ const { ctaLabel } = Astro.props;
       <a href="/organizadores" class="cl-link" data-cta="organizadores" data-section="closing">Todo lo que hace AI Tickets</a>
     </p>
     <p class="ccl-help ccl-also" data-lp-step>
-      También para <a href="/ticketera-musica-en-vivo" class="cl-link">música en vivo</a> y <a href="/ticketera-stand-up" class="cl-link">stand-up</a>.
+      También para <a href="/ticketera-fiestas" class="cl-link">fiestas</a>, <a href="/ticketera-musica-en-vivo" class="cl-link">música en vivo</a> y <a href="/ticketera-stand-up" class="cl-link">stand-up</a>.
     </p>
   </div>
 </section>

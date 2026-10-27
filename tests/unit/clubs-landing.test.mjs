@@ -221,6 +221,6 @@ describe('preguntas frecuentes y landings.ts (§4.11, §9)', () => {
     const landing = getLanding('ticketera-discotecas')
     expect(landing).toMatchObject({ kind: 'vertical', dedicated: true, cta: { campaign: 'vertical_clubs' } })
     expect(landing.card.title).toBe('Clubs y discotecas')
-    expect(landing.related).toEqual(['ventas-por-promotor', 'entradas-con-qr', 'ticketera-musica-en-vivo'])
+    expect(landing.related).toEqual(['ventas-por-promotor', 'entradas-con-qr', 'ticketera-musica-en-vivo', 'ticketera-fiestas'])
   })
 })

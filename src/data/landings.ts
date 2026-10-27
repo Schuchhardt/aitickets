@@ -220,7 +220,67 @@ export const LANDINGS: Landing[] = [
         // No hay un evento de ejemplo de club en demoEvent.mjs (Preguntas abiertas 3): mientras tanto, el concierto
         demo: { url: "/eventos/evento-demo-concierto", label: "Ver un evento de ejemplo" },
         cta: { label: "Publicar mi próxima noche", campaign: "vertical_clubs" },
-        related: ["ventas-por-promotor", "entradas-con-qr", "ticketera-musica-en-vivo"],
+        related: ["ventas-por-promotor", "entradas-con-qr", "ticketera-musica-en-vivo", "ticketera-fiestas"],
+        dedicated: true,
+    },
+    {
+        slug: "ticketera-fiestas",
+        kind: "vertical",
+        card: { title: "Fiestas", text: "Preventa por etapas, un código para cada promotor y la puerta con QR aunque no haya señal." },
+        title: "Ticketera para fiestas en Chile: preventa por etapas y códigos para promotores · 0% de comisión | AI Tickets",
+        description:
+            "Vende entradas para tu fiesta: preventa por etapas con fecha de apertura, un código y un link para cada promotor, tu flyer en Instagram toda la semana y check-in con QR aunque no haya señal. 0% de comisión para la productora.",
+        eyebrow: "Para productoras de fiestas y centros de estudiantes",
+        h1: "Preventa 1: agotada. ¿Abrimos la 2?",
+        intro: `Vende tu fiesta por etapas, con un código para cada promotor, tu flyer en Instagram toda la semana y la puerta con QR aunque el galpón no tenga señal. Lo de tu fiesta queda disponible ${PAYOUT_RELEASE_HOURS} h después de que termina. 0% de comisión para la productora.`,
+        highlights: ["Preventa por etapas con fecha de apertura", "Un código y un link para cada promotor", "Check-in con QR aunque no haya señal"],
+        // La página es propia (src/pages/ticketera-fiestas.astro, SPEC_landing_fiestas): las secciones viven en
+        // src/components/landing/fiestas y las preguntas en src/data/fiestasFaq.ts, que toma de aquí estas siete (las
+        // propias de fiestas; las de dinero, plazos, redes y anuncios vienen de PRODUCER_FAQ y ORGANIZADORES_FAQ).
+        // Verificado:
+        //   etapas → un tipo de entrada con ventana de venta (isTicketOnSale), hoy programada desde tools/tickets.ts;
+        //            la siguiente no abre sola cuando se agota la anterior (Pronto en la página)
+        //   "Ver QR" por entrada → src/pages/ticket/[id].astro; máximo por compra → DEFAULT_MAX_PER_PURCHASE
+        //   dirección exacta → mensaje programado (send_attendee_message / schedule_reminder en tools/messaging.ts);
+        //                      un lugar sin dirección exacta suma riesgo (event-risk.mjs) y puede dejar una reserva
+        //   transferir una entrada → transfer_ticket (tools/postsale.ts)
+        //   sin preguntas en el checkout (edad, RUT, ser alumno) ni venta en la puerta (POS)
+        sections: [],
+        faq: [
+            {
+                q: "¿Cómo armo una preventa por etapas?",
+                a: "Cada etapa es un tipo de entrada con su precio, su cupo y su fecha y hora de apertura y cierre. Hoy las fechas se programan desde tu asistente de IA conectado o escribiéndonos por WhatsApp. Mientras una etapa está a la venta, tu público ve las siguientes con su fecha de apertura. Si una etapa se agota antes de tiempo, adelantas la siguiente por el mismo camino: todavía no abre sola.",
+            },
+            {
+                q: "¿Puedo tener entrada alumno y entrada general?",
+                a: "Sí: son dos tipos de entrada, cada uno con su precio y su cupo. AI Tickets no verifica al comprar que la persona sea alumna: en la puerta tu equipo ve el tipo de entrada al escanearla y pide la credencial.",
+            },
+            {
+                q: "¿Puedo pedir que sean mayores de 18?",
+                a: "Hoy AI Tickets no verifica la edad al comprar. Indícalo en la descripción de la fiesta y en el nombre de la entrada (\"+18\"): el asistente de la página lo responde a quien pregunte, y tu equipo revisa el carnet en la puerta.",
+            },
+            {
+                q: "¿Puedo avisar la dirección a última hora?",
+                a: "Sí. Publica la comuna o un punto de referencia y, el mismo día, programa un correo a todos los que compraron con la dirección exacta desde tu asistente de IA. Ten en cuenta que un evento sin dirección exacta puede quedar con una parte de lo vendido en reserva (ver términos).",
+                terms: true,
+            },
+            {
+                q: "¿Qué pasa si alguien comparte el pantallazo de su QR?",
+                a: "Cada QR entra una sola vez: si el pantallazo ya se usó, el escáner lo marca como validado y no pasa. Si la señal se cae, cada celular sigue validando y rechaza lo que él ya escaneó, y todo se cruza al volver la conexión. Si una persona no puede ir, tu equipo le transfiere la entrada a otra persona desde tu asistente de IA y el QR anterior deja de servir.",
+            },
+            {
+                q: "¿Cómo le paso su entrada a cada amigo?",
+                a: `Quien compra recibe un correo con cada entrada y su link "Ver QR": le manda a cada amigo la suya. Si no lo cambias, son hasta ${DEFAULT_MAX_PER_PURCHASE} entradas por compra.`,
+            },
+            {
+                q: "¿Se puede vender en la puerta?",
+                a: "AI Tickets vende online: tu público compra desde el celular en la página de la fiesta, mientras haya cupo y la venta esté abierta. No hay cobro en efectivo ni con máquina en la puerta.",
+            },
+        ],
+        // No hay un evento de ejemplo de fiesta en demoEvent.mjs (Preguntas abiertas 10): mientras tanto, el concierto
+        demo: { url: "/eventos/evento-demo-concierto", label: "Ver un evento de ejemplo" },
+        cta: { label: "Publicar mi fiesta", campaign: "vertical_fiestas" },
+        related: ["ventas-por-promotor", "ticketera-discotecas", "entradas-con-qr"],
         dedicated: true,
     },
     {

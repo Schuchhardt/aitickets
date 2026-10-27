@@ -1,0 +1,221 @@
+---
+// Tira de negativo (SPEC_landing_fiestas §4.5): banda tinta con perforaciones y cinco cuadros 9:16 con el flyer de
+// ejemplo de fondo (la foto del hero recortada vertical: el mismo archivo) y encima el texto real de cada pieza
+// (pieceText de socialSeriesRender.ts, llamado en el frontmatter de la página y pasado por props). Bajo cada cuadro, la
+// hora de la serie (DEFAULT_CADENCE.default_time). El sticker lima del primer cuadro dice cómo llega el link por DM.
+// F10: los cuadros entran con stagger 80 ms y el "Quedan N" hace pop. Mobile: scroll horizontal con scroll-snap.
+import { PARTY_PHOTOS } from "./fiestasLanding.js";
+
+export interface StoryFrame {
+  id: string;
+  label: string;
+  kicker: string | null;
+  bigLines: string[];
+  message: string[];
+  scarcity: string | null;
+  time: string;
+}
+interface Props {
+  frames: StoryFrame[];
+  keyword: string;
+}
+const { frames, keyword } = Astro.props;
+const photo = PARTY_PHOTOS.hero;
+---
+
+<div class="ffs" data-testid="party-film-strip">
+  <ol class="ffs-track" aria-label="Historias de ejemplo de la serie">
+    {
+      frames.map((f, i) => (
+        <li class="ffs-cell" style={`--i: ${i}`} data-fi-frame={f.id}>
+          <div class="ffs-frame">
+            <picture>
+              {photo.sources.map((source) => <source type={source.type} srcset={source.srcset} sizes="180px" />)}
+              <img class="fi-photo-img ffs-img" src={photo.src} alt="" width={photo.width} height={photo.height} style={`object-position: ${30 + i * 12}% 50%`} loading="lazy" decoding="async" />
+            </picture>
+            <div class="ffs-shade" aria-hidden="true" />
+            <div class="ffs-text">
+              <p class="ffs-day">{f.label}</p>
+              {f.kicker ? <p class="ffs-kicker">{f.kicker}</p> : null}
+              <p class="ffs-big">{f.bigLines.join(" ")}</p>
+              {f.message.map((line) => <p class="ffs-msg">{line}</p>)}
+              {f.scarcity ? <p class="ffs-scarce">{f.scarcity}</p> : null}
+            </div>
+            {i === 0 ? <p class="ffs-dm">Responde {keyword} y te llega el link</p> : null}
+          </div>
+          <p class="ffs-time">{f.time}</p>
+        </li>
+      ))
+    }
+  </ol>
+</div>
+
+<style>
+  .ffs {
+    position: relative;
+    margin-inline: -20px;
+    padding: 18px 0 14px;
+    background: var(--fi-tinta);
+    transform: rotate(-1deg);
+  }
+  /* Perforaciones arriba y abajo */
+  .ffs::before,
+  .ffs::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 8px;
+    background: linear-gradient(90deg, var(--fi-crema) 0 8px, transparent 8px 22px) 6px 0 / 22px 8px repeat-x;
+    border-radius: 2px;
+    opacity: 0.85;
+  }
+  .ffs::before {
+    top: 5px;
+  }
+  .ffs::after {
+    bottom: 5px;
+  }
+  .ffs-track {
+    display: flex;
+    gap: 12px;
+    padding: 6px 20px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  .ffs-track::-webkit-scrollbar {
+    display: none;
+  }
+  .ffs-cell {
+    flex: 0 0 150px;
+    scroll-snap-align: start;
+  }
+  .ffs-frame {
+    position: relative;
+    aspect-ratio: 9 / 16;
+    overflow: hidden;
+    border-radius: 6px;
+    background: var(--fi-noche-2);
+  }
+  .ffs-frame picture {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  .ffs-shade {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(18, 15, 20, 0.15) 0%, rgba(18, 15, 20, 0.3) 40%, rgba(18, 15, 20, 0.88) 100%);
+  }
+  .ffs-text {
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    color: var(--fi-crema);
+  }
+  .ffs-day {
+    align-self: flex-start;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: var(--fi-crema);
+    color: var(--fi-tinta);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .ffs-kicker {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .ffs-big {
+    font-family: var(--fi-display);
+    font-size: 26px;
+    line-height: 27px;
+    color: var(--fi-amarillo);
+  }
+  .ffs-msg {
+    font-size: 11px;
+    line-height: 14px;
+  }
+  .ffs-scarce {
+    align-self: flex-start;
+    margin-top: 4px;
+    padding: 3px 8px;
+    border: 2px solid var(--fi-tinta);
+    border-radius: 999px;
+    background: var(--fi-amarillo);
+    color: var(--fi-tinta);
+    font-size: 11px;
+    font-weight: 700;
+    transform: rotate(-3deg);
+  }
+  .ffs-dm {
+    position: absolute;
+    top: 10px;
+    left: 8px;
+    right: 8px;
+    padding: 4px 8px;
+    border: 2px solid var(--fi-tinta);
+    border-radius: 12px;
+    background: var(--brand-lime);
+    color: var(--fi-tinta);
+    font-size: 10px;
+    line-height: 13px;
+    font-weight: 700;
+    transform: rotate(-2deg);
+  }
+  .ffs-time {
+    margin-top: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--fi-crema);
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  @media (min-width: 768px) {
+    .ffs {
+      margin-inline: 0;
+      border-radius: 6px;
+    }
+  }
+  @media (min-width: 1024px) {
+    .ffs-track {
+      justify-content: center;
+      gap: 18px;
+      padding-inline: 24px;
+      overflow: visible;
+    }
+    .ffs-cell {
+      flex-basis: 180px;
+    }
+    .ffs-big {
+      font-size: 30px;
+      line-height: 31px;
+    }
+  }
+  /* F10 */
+  :global(.lp-motion [data-lp-reveal]:not(.is-in)) .ffs-cell {
+    opacity: 0;
+  }
+  :global(.lp-motion) :global(.is-in) .ffs-cell {
+    animation: ffs-in 500ms var(--ease-out) calc(var(--i) * 80ms + 120ms) both;
+  }
+  :global(.lp-motion) :global(.is-in) .ffs-scarce {
+    animation: fi-pop 360ms cubic-bezier(0.34, 1.56, 0.64, 1) calc(var(--i) * 80ms + 420ms) both;
+  }
+  @keyframes ffs-in {
+    from {
+      opacity: 0;
+      transform: translateX(24px);
+    }
+  }
+</style>

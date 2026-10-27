@@ -1,0 +1,207 @@
+---
+// 9 · El día después (SPEC_landing_fiestas §4.9, cobalto, pulsera EL DÍA DESPUÉS): la hoja de contactos (seis fotos de
+// desechable con fecha estampada, recortes de los mismos archivos) con dos reseñas de ejemplo (RATING_LABELS) y cuatro
+// cards. Verificado: correo de reseña con fotos entre REVIEW_REQUEST_DELAY_HOURS y REVIEW_REQUEST_WINDOW_HOURS h
+// después, hasta MAX_PHOTOS_PER_PERSON fotos y código de premio (reviews.mjs); invitar a la próxima a las audiencias de
+// INVITE_AUDIENCES; el muro pasa a "Así lo vivieron" (AttendeeFeed.vue); duplicar copia etapas y preguntas
+// (eventDuplicate.ts); reporte semanal los domingos (weekly-report-send.mjs).
+// F15: las fotos aparecen una a una con flash (stagger 120 ms). Mobile: hoja 3×2 y cards en carrusel (86%).
+import DisposablePhoto from "./DisposablePhoto.astro";
+import StickerHeading from "./StickerHeading.astro";
+import Wristband from "./Wristband.astro";
+import { CONTACT_SHEET, PARTY_PHOTOS } from "./fiestasLanding.js";
+import {
+  MAX_PHOTOS_PER_PERSON,
+  RATING_LABELS,
+  REVIEW_REQUEST_DELAY_HOURS,
+  REVIEW_REQUEST_WINDOW_HOURS,
+} from "../../../../netlify/lib/reviews.mjs";
+
+interface Props {
+  stamp: string;
+}
+const { stamp } = Astro.props;
+const cards = [
+  {
+    title: "Fotos y estrellas de tu público.",
+    text: `Entre ${REVIEW_REQUEST_DELAY_HOURS} y ${REVIEW_REQUEST_WINDOW_HOURS} h después de la fiesta les llega un correo para calificar y subir hasta ${MAX_PHOTOS_PER_PERSON} fotos. Si quieres, premias con un código para la próxima.`,
+  },
+  {
+    title: "Invita solo a los que vinieron.",
+    text: "Mandas el link de tu próxima fiesta a todos, solo a quienes entraron por la puerta o solo a quienes calificaron con 4 o 5 estrellas.",
+  },
+  { title: "\"Quiénes van\" pasa a \"Así lo vivieron\".", text: "El muro queda como recuerdo para tus asistentes." },
+  {
+    title: "La próxima, en un clic.",
+    text: "Duplicas la fiesta con sus etapas y sus preguntas frecuentes, subes las mejores fotos a la galería y el domingo te llega por correo cómo vendió la semana.",
+  },
+];
+---
+
+<section class="fi-section fi-bg-cobalto fi-on-dark fda" aria-labelledby="fi-after-title" data-fi-section="day_after" data-fi-band-color="amarillo" data-fi-band-label="El día después">
+  <Wristband color="amarillo" label="El día después" serial={8} divider />
+  <div class="fi-wrap" data-lp-reveal>
+    <StickerHeading id="fi-after-title" text="Las fotos de esta" sticker="venden la próxima." />
+
+    <div class="fda-grid">
+      <div class="fda-sheet" aria-label="Hoja de contactos de una fiesta, ejemplo" role="group">
+        <ul class="fda-photos">
+          {
+            CONTACT_SHEET.map((p, i) => (
+              <li style={`--i: ${i}`}>
+                <DisposablePhoto
+                  photo={PARTY_PHOTOS[p.photo as keyof typeof PARTY_PHOTOS]}
+                  alt=""
+                  tilt={p.tilt}
+                  ratio="1 / 1"
+                  position={p.position}
+                  stamp={stamp}
+                  sizes="(min-width: 1024px) 180px, 30vw"
+                  class="fda-photo"
+                />
+              </li>
+            ))
+          }
+        </ul>
+        <span class="fi-tag fda-review fda-review-1" style="--tilt: -4deg">★★★★★ {RATING_LABELS[5]}</span>
+        <span class="fi-tag fi-tag-amarillo fda-review fda-review-2" style="--tilt: 3deg">★★★★ {RATING_LABELS[4]}</span>
+        <span class="fi-tag fi-tag-lima fda-example" style="--tilt: 2deg">ejemplo</span>
+      </div>
+
+      <ol class="fda-cards">
+        {
+          cards.map((card, i) => (
+            <li class="fi-card fda-card" data-lp-step style={`--tilt: ${i % 2 ? 1 : -1}deg`}>
+              <span class="fda-num fi-display" aria-hidden="true">{i + 1}</span>
+              <p class="fda-title">{card.title}</p>
+              <p class="fda-text">{card.text}</p>
+            </li>
+          ))
+        }
+      </ol>
+    </div>
+  </div>
+</section>
+
+<style>
+  .fda :global(.fi-h2) {
+    color: var(--fi-crema);
+  }
+  .fda-grid {
+    display: grid;
+    gap: 44px;
+    margin-top: 44px;
+  }
+  .fda-sheet {
+    position: relative;
+    padding: 18px 4px 28px;
+  }
+  .fda-photos {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .fda :global(.fda-photo) {
+    padding: 6px 6px 18px;
+  }
+  .fda :global(.fda-photo .fi-photo-stamp) {
+    right: 4px;
+    bottom: 4px;
+    font-size: 9px;
+  }
+  .fda-review {
+    position: absolute;
+    text-transform: none;
+    letter-spacing: 0.02em;
+    font-size: 13px;
+  }
+  .fda-review-1 {
+    top: 0;
+    left: 6%;
+  }
+  .fda-review-2 {
+    bottom: 4px;
+    right: 6%;
+  }
+  .fda-example {
+    position: absolute;
+    top: 4px;
+    right: 2%;
+  }
+  .fda-cards {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 86%;
+    gap: 16px;
+    margin-inline: -20px;
+    padding: 6px 20px 14px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  .fda-cards::-webkit-scrollbar {
+    display: none;
+  }
+  .fda-card {
+    scroll-snap-align: start;
+    padding: 20px;
+    transform: rotate(var(--tilt));
+  }
+  .fda-num {
+    font-size: 40px;
+    line-height: 40px;
+    color: var(--fi-cobalto);
+  }
+  .fda-title {
+    margin-top: 8px;
+    font-weight: 700;
+    font-size: 17px;
+    line-height: 23px;
+  }
+  .fda-text {
+    margin-top: 6px;
+    font-size: 15px;
+    line-height: 23px;
+    color: var(--fi-text-2);
+  }
+  @media (max-width: 767px) {
+    .fda-card {
+      transform: none;
+    }
+  }
+  @media (min-width: 768px) {
+    .fda-cards {
+      grid-auto-flow: row;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-auto-columns: auto;
+      margin-inline: 0;
+      padding: 0;
+      overflow: visible;
+    }
+  }
+  @media (min-width: 1024px) {
+    .fda-grid {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+      gap: 56px;
+      align-items: center;
+      margin-top: 64px;
+    }
+    .fda-photos {
+      gap: 16px;
+    }
+    .fda :global(.fda-photo) {
+      padding: 8px 8px 24px;
+    }
+  }
+
+  /* F15: las fotos aparecen una a una con flash, solo la primera vez */
+  :global(.lp-motion [data-lp-reveal]:not(.is-in)) .fda-photos li {
+    opacity: 0;
+  }
+  :global(.lp-motion .is-in) .fda-photos li {
+    animation: fi-fade 240ms var(--ease-out) calc(var(--i) * 120ms + 100ms) both;
+  }
+  :global(.lp-motion .is-in) .fda-photos li :global(.fi-photo-flash) {
+    animation: fi-flash 180ms linear calc(var(--i) * 120ms + 100ms) both;
+  }
+</style>

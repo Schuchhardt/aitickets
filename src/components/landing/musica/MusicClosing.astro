@@ -2,7 +2,8 @@
 // 11 · Cierre (SPEC_landing_musica §4.12): foto del público con las manos arriba a pantalla completa, en duotono, con
 // overlay radial y el ecualizador abajo (como el hero). data-final-cta: la barra flotante de mobile se esconde aquí.
 // CTAs con los mismos destinos que stand-up (registro, WhatsApp y demo de 15 min) y los links internos a /organizadores
-// y a las landings de stand-up y teatro (SEO §9).
+// y a las landings de fiestas, stand-up y teatro (SEO §9; fiestas se suma con SPEC_landing_fiestas, que pide que se
+// enlacen entre sí).
 // La foto de referencia es vertical y llega solo a 896 px: en desktop se ve ampliada hasta que llegue la real (§8).
 import DuotonePhoto from "./DuotonePhoto.astro";
 import EqBars from "./EqBars.astro";
@@ -46,7 +47,7 @@ const { ctaLabel } = Astro.props;
       <a href="/organizadores" class="mu-link" data-cta="organizadores" data-section="closing">Todo lo que hace AI Tickets</a>
     </p>
     <p class="mc-help mc-also" data-lp-step>
-      También para <a href="/ticketera-stand-up" class="mu-link">stand-up</a> y <a href="/ticketera-teatro" class="mu-link">teatro</a>.
+      También para <a href="/ticketera-fiestas" class="mu-link">fiestas</a>, <a href="/ticketera-stand-up" class="mu-link">stand-up</a> y <a href="/ticketera-teatro" class="mu-link">teatro</a>.
     </p>
   </div>
   <EqBars class="mc-eq" />

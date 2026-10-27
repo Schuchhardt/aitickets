@@ -1,0 +1,22 @@
+---
+// Sticker troquelado (SPEC_landing_fiestas §1): el contenido sobre un recorte con borde blanco de 6 px, contorno tinta de
+// 2 px y sombra dura sin blur (estilos .fi-sticker en landing-fiestas.css; las islas Vue usan las mismas clases).
+// shape: pill | circle | burst (estrella de 12 puntas) | heart | ticket (con muescas). tilt: giro de −4° a 4°.
+// pop: entra con F6 (pop con stagger según index) al revelarse su bloque.
+interface Props {
+  shape?: "pill" | "circle" | "burst" | "heart" | "ticket";
+  tone?: "crema" | "amarillo" | "naranja" | "cobalto" | "tinta" | "lima";
+  tilt?: number;
+  pop?: boolean;
+  index?: number;
+  tag?: "span" | "div" | "li";
+  class?: string;
+}
+const { shape = "pill", tone = "crema", tilt = 0, pop = false, index = 0, tag: Tag = "span", class: className } = Astro.props;
+---
+
+<Tag class={`fi-sticker fi-sticker--${shape} fi-tone-${tone} ${className ?? ""}`} style={`--tilt: ${tilt}deg; --i: ${index}`} data-fi-pop={pop ? "" : undefined}>
+  <span class="fi-sticker-paper" aria-hidden="true"></span>
+  <span class="fi-sticker-ink" aria-hidden="true"></span>
+  <span class="fi-sticker-body"><slot /></span>
+</Tag>

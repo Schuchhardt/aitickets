@@ -1,0 +1,90 @@
+---
+// 8 · La caja (SPEC_landing_fiestas §4.8, crema, pulsera LA CAJA): precio y cobro. Plata y plazos solo de constantes: el
+// texto, como el priceLead de stand-up, con SERVICE_FEE_PERCENT_LABEL / IVA_PERCENT_LABEL (fees.mjs) y
+// ABSORB_FEE_ACTIVATION (producerFaq.ts); las garantías con PAYOUT_SHORT_TEXT y el cobro con PAYOUT_SCHEDULE_TEXT /
+// PAYOUT_RELEASE_HOURS (legal.mjs), con "*" y TERMS_NOTE. Cada fecha de una gira se cobra por separado: el ledger
+// libera cada orden según el término de su función (ledger.ts). La calculadora es la isla StageCalculator.
+import StageCalculator from "./StageCalculator.vue";
+import StickerHeading from "./StickerHeading.astro";
+import Wristband from "./Wristband.astro";
+import { PARTY_END } from "./fiestasLanding.js";
+import { IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL } from "../../../../netlify/lib/fees.mjs";
+import { PAYOUT_RELEASE_HOURS, PAYOUT_SCHEDULE_TEXT, PAYOUT_SHORT_TEXT } from "../../../../netlify/lib/legal.mjs";
+import { ABSORB_FEE_ACTIVATION, TERMS_NOTE } from "../../../data/producerFaq";
+---
+
+<section id="precio" class="fi-section fi-bg-crema fpc" aria-labelledby="fi-price-title" data-fi-section="price" data-fi-band-color="naranja" data-fi-band-label="La caja">
+  <Wristband color="naranja" label="La caja" serial={7} divider />
+  <div class="fi-wrap" data-lp-reveal>
+    <div class="fpc-grid">
+      <div class="fpc-copy">
+        <StickerHeading id="fi-price-title" text="Tú recibes el 100%" sticker="de cada etapa." />
+        <p class="fi-lead fpc-lead" data-lp-step>
+          Para la productora, 0% de comisión. El comprador paga un cargo por servicio de {SERVICE_FEE_PERCENT_LABEL} más IVA
+          ({IVA_PERCENT_LABEL}) sobre ese cargo. Si prefieres precios redondos, lo absorbes tú, por evento.
+          {ABSORB_FEE_ACTIVATION} Las entradas gratis no pagan nada.
+        </p>
+        <p class="fi-meta fpc-guarantees" data-lp-step>Sin mensualidad · Sin permanencia · {PAYOUT_SHORT_TEXT}*</p>
+        <div class="fpc-payout" data-lp-step>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"
+            ><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg
+          >
+          <p>
+            <span class="fpc-payout-title">Cobro de la fiesta.</span>
+            {PAYOUT_SCHEDULE_TEXT}* Si la fiesta termina a las {PARTY_END}, las {PAYOUT_RELEASE_HOURS} h cuentan desde las
+            {PARTY_END}. ¿Gira por varias ciudades? Cada fecha se cobra por separado.
+          </p>
+        </div>
+        <p class="fi-note fpc-terms" data-lp-step>
+          <a href={TERMS_NOTE.href} class="fi-link">{TERMS_NOTE.text}</a>
+        </p>
+      </div>
+      <div class="fpc-calc" data-lp-step>
+        <StageCalculator client:visible />
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .fpc-grid {
+    display: grid;
+    gap: 40px;
+  }
+  .fpc-lead {
+    max-width: 600px;
+    margin-top: 18px;
+  }
+  .fpc-guarantees {
+    margin-top: 18px;
+  }
+  .fpc-payout {
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr);
+    gap: 12px;
+    max-width: 600px;
+    margin-top: 24px;
+    padding: 16px;
+    border: 2px solid var(--fi-tinta);
+    border-radius: 16px;
+    background: var(--fi-crema-2);
+    font-size: 15px;
+    line-height: 23px;
+  }
+  .fpc-payout-title {
+    font-weight: 700;
+  }
+  .fpc-terms {
+    margin-top: 16px;
+  }
+  .fpc-calc {
+    min-width: 0;
+  }
+  @media (min-width: 1024px) {
+    .fpc-grid {
+      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+      gap: 56px;
+      align-items: start;
+    }
+  }
+</style>

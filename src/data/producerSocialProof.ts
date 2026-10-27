@@ -64,3 +64,10 @@ export const WORKSHOP_TESTIMONIAL: WorkshopTestimonial | null = null;
  * ciudad y foto autorizados por escrito. company = "Club o productora · ciudad". null: la sección no se renderiza.
  */
 export const CLUB_TESTIMONIAL: ProducerTestimonial | null = null;
+
+/**
+ * Cita de /ticketera-fiestas (SPEC_landing_fiestas §4.10 y §0.9): solo si es real, con nombre, productora o centro de
+ * estudiantes, ciudad y foto autorizados por escrito. company = "Productora o centro de estudiantes · ciudad". null: la
+ * sección no se renderiza.
+ */
+export const PARTY_TESTIMONIAL: ProducerTestimonial | null = null;
