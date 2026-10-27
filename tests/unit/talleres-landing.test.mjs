@@ -132,11 +132,11 @@ describe('el armador (§4.3) dice lo que dice la página real', () => {
     const weekly = builderNotes({ format: 'weekly', paid: false, enrolled: 7, seats: 10 })
     expect(weekly.find((n) => n.id === 'repeat')?.soon).toBe(true)
     const full = builderNotes({ format: 'day', paid: false, enrolled: 10, seats: 10 })
-    expect(full.find((n) => n.id === 'waitlist')?.soon).toBe(true)
+    expect(full.find((n) => n.id === 'waitlist')?.soon).toBeUndefined()
     // Todas las semanas: solo se llena la primera fecha y la nota no promete el aviso que el teléfono no muestra
     const weeklyFull = builderNotes({ format: 'weekly', paid: true, enrolled: 10, seats: 10 })
     expect(weeklyFull.find((n) => n.id === 'full')?.text).toContain('Agotada')
-    expect(weeklyFull.find((n) => n.id === 'waitlist')?.soon).toBe(true)
+    expect(weeklyFull.find((n) => n.id === 'waitlist')?.soon).toBeUndefined()
   })
 })
 

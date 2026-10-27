@@ -3,10 +3,9 @@
 // (≈ 6:1), grano al 10 % y la demo de tandas (TierStack). Capacidades verificadas en el código: tipos de entrada con
 // precio y cupo (EditEventForm.vue), ventana de venta por entrada que hoy se programa desde el asistente de IA
 // (tools/tickets.ts), máximo por compra (DEFAULT_MAX_PER_PURCHASE), códigos con usos, límite por comprador y término
-// (discounts.mjs) y lista de "Avísame" (api/events/waitlist.ts). El aviso automático a esa lista no existe: "Pronto".
+// (discounts.mjs) y lista de "Avísame" (api/events/waitlist.ts), con aviso automático al liberarse entradas (netlify/lib/waitlist.mjs).
 // No hay mapa de asientos numerados y se dice (no va como "Pronto", §0.6). Al pie, la guía de preventa (links internos, §9).
 import TierStack from "./TierStack.vue";
-import SoonBadge from "../../ui/SoonBadge.vue";
 import { DEFAULT_MAX_PER_PURCHASE } from "../../Reservation/pricing.js";
 
 const capabilities = [
@@ -20,7 +19,7 @@ const capabilities = [
     text: `${DEFAULT_MAX_PER_PURCHASE} entradas por persona si no lo cambias, para que la preventa alcance para más gente.`,
   },
   { title: "Códigos con fecha límite", text: "Por porcentaje o monto, con usos máximos, límite por comprador y fecha de término." },
-  { title: "Lista de espera cuando se agota", text: "Tu público deja su correo en la página del evento.", soon: "Aviso automático" },
+  { title: "Lista de espera cuando se agota", text: "Tu público deja su correo en la página del evento y le avisamos solos si se liberan entradas." },
 ];
 ---
 
@@ -40,11 +39,6 @@ const capabilities = [
               <span class="mu-square" aria-hidden="true" />
               <p>
                 <strong>{c.title}</strong> — {c.text}
-                {c.soon && (
-                  <span class="ps-soon">
-                    {c.soon} <SoonBadge dark={false} />
-                  </span>
-                )}
               </p>
             </li>
           ))
@@ -97,13 +91,6 @@ const capabilities = [
   }
   .ps-guide {
     margin-top: 28px;
-  }
-  .ps-soon {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    margin-left: 4px;
-    font-weight: 600;
   }
   @media (min-width: 1024px) {
     .ps-grid {

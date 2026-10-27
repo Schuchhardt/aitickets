@@ -4,12 +4,11 @@
 // etapa es un tipo de entrada con ventana de venta (isTicketOnSale en netlify/lib/tickets.mjs) que hoy se programa desde
 // el asistente de IA (tools/tickets.ts: sales_start/sales_end), dicho como ABSORB_FEE_ACTIVATION; la cuenta regresiva y
 // "Avisarme cuando abra" son de la card del evento (EventActionCard.vue) solo antes de la primera etapa (Preguntas
-// abiertas 2); el aviso automático a la lista no existe (api/events/waitlist.ts solo guarda el correo): "Pronto". Máximo
+// abiertas 2); a quienes dejan el correo se les avisa solo cuando abre (netlify/lib/waitlist.mjs). Máximo
 // por compra: DEFAULT_MAX_PER_PURCHASE (Reservation/pricing.js). Duplicar copia los tipos de entrada (eventDuplicate.ts).
 import PresaleStairs from "./PresaleStairs.vue";
 import StickerHeading from "./StickerHeading.astro";
 import Wristband from "./Wristband.astro";
-import SoonBadge from "../../ui/SoonBadge.vue";
 import { PARTY_START, openingLabel } from "./fiestasLanding.js";
 import { DEFAULT_MAX_PER_PURCHASE } from "../../Reservation/pricing.js";
 
@@ -21,7 +20,7 @@ const { schedule, soldOut } = Astro.props;
 const openingLabels = schedule.openings.map((_, i) => openingLabel(schedule, i));
 const items = [
   { color: "amarillo", title: "Cada etapa con su fecha y hora", text: "La programas una vez. Hoy se programa desde tu asistente de IA conectado o escribiéndonos por WhatsApp." },
-  { color: "naranja", title: "Antes de abrir, cuenta regresiva", text: "Las últimas 24 horas antes de la primera etapa, tu página muestra la cuenta regresiva y un botón para dejar el correo.", soon: "Aviso automático cuando abre" },
+  { color: "naranja", title: "Antes de abrir, cuenta regresiva", text: "Las últimas 24 horas antes de la primera etapa, tu página muestra la cuenta regresiva y un botón para dejar el correo. Cuando abre, les avisamos solos." },
   { color: "crema", title: `Hasta ${DEFAULT_MAX_PER_PURCHASE} por compra`, text: "Si no lo cambias, para que la preventa alcance para más gente." },
   { color: "tinta", title: "Las etapas se copian", text: "Duplicas la fiesta y vuelves a tener tus etapas, solo cambias las fechas." },
 ];
@@ -69,11 +68,6 @@ const items = [
             <div>
               <p class="fp-item-title">{item.title}</p>
               <p class="fp-item-text">{item.text}</p>
-              {item.soon ? (
-                <p class="fi-soon-chip fp-soon">
-                  {item.soon} <SoonBadge dark />
-                </p>
-              ) : null}
             </div>
           </li>
         ))
@@ -123,9 +117,6 @@ const items = [
     font-size: 15px;
     line-height: 23px;
     color: var(--text-2);
-  }
-  .fp-soon {
-    margin-top: 10px;
   }
   @media (min-width: 768px) {
     .fp-list {

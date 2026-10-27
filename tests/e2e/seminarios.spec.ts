@@ -122,8 +122,8 @@ test("lo que no existe va con Pronto y sin testimonio real no hay cita", async (
   await expect(page.locator("#empresas").getByTestId("soon-badge")).toHaveCount(2);
   // Facebook, TikTok y reels en la serie, LinkedIn desde el panel y segmentar por profesión
   await expect(page.locator("#difusion").getByTestId("soon-badge")).toHaveCount(5);
-  // Ver la lista de espera
-  await expect(page.locator("#pagina").getByTestId("soon-badge")).toHaveCount(1);
+  // La lista de espera ya existe: sin "Pronto"
+  await expect(page.locator("#pagina").getByTestId("soon-badge")).toHaveCount(0);
   // Ingreso diario, aforo en vivo y credenciales impresas
   await expect(page.locator("#acreditacion").getByTestId("soon-badge")).toHaveCount(3);
   // Certificados de asistencia

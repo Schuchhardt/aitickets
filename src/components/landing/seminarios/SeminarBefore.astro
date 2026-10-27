@@ -7,14 +7,13 @@
 // EventFAQManager.vue), recordatorio el día antes (send-event-reminders: al pase completo, solo antes de la primera
 // función), mensajes a los inscritos (send_attendee_message / schedule_reminder, desde el asistente de IA), "Añadir al
 // calendario" (shareActions.js), evento privado y vista previa privada (EditEventForm.vue, PreviewLinksManager.vue) y la
-// lista de espera que solo registra (api/events/waitlist.ts): verla y avisar es "Pronto".
+// lista de espera (api/events/waitlist.ts), que se ve en el panel y avisa sola al liberarse cupos (netlify/lib/waitlist.mjs).
 // Mobile: teléfono a 240×480, muro compacto debajo, foto omitida e ítems en una columna.
 import { Coffee } from "lucide-vue-next";
 import Figure from "./Figure.astro";
 import SeminarHeading from "./SeminarHeading.astro";
 import SeminarWall from "./SeminarWall.vue";
 import WayfindingSign from "./WayfindingSign.astro";
-import SoonBadge from "../../ui/SoonBadge.vue";
 import { PHOTO_ALT, SEMINAR_NAME, SEMINAR_ORG, SEMINAR_PHOTOS, SEMINAR_RUT, buyerCard, programModel } from "./seminariosLanding.js";
 import { FEED_EMOJIS, FEED_MESSAGE_MAX } from "../../../../netlify/lib/attendee-community.mjs";
 
@@ -42,7 +41,7 @@ const items = [
     title: "Privado si es interno.",
     text: "Un evento privado no aparece en la cartelera ni en buscadores: solo entra quien tiene el link. Antes de publicar, compartes una vista previa privada con tu comité o tus auspiciadores.",
   },
-  { title: "Cuando se llena.", text: "La página ofrece dejar el correo para avisar si se libera un cupo.", soon: "Ver la lista de espera y avisarles" },
+  { title: "Cuando se llena.", text: "La página ofrece dejar el correo. Ves la lista en tu panel y les avisamos solos si se libera un cupo." },
 ];
 ---
 
@@ -95,13 +94,6 @@ const items = [
             <div>
               <p class="se-item-title">{item.title}</p>
               <p class="se-item-text">{item.text}</p>
-              {item.soon && (
-                <p class="se-item-extra">
-                  <span class="se-soon-chip">
-                    {item.soon} <SoonBadge dark={false} />
-                  </span>
-                </p>
-              )}
             </div>
           </li>
         ))

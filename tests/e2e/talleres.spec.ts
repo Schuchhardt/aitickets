@@ -66,7 +66,7 @@ test("el armador lleno muestra el rótulo real y el Pronto de la lista de espera
   await builder.getByTestId("workshop-enrolled").fill("10");
   await expect(builder.getByTestId("workshop-label")).toHaveText("Gratis · Cupos llenos");
   await expect(builder.getByTestId("workshop-waitlist")).toContainText("Avisarme si se libera un cupo");
-  await expect(builder.locator('[data-note="waitlist"]').getByTestId("soon-badge")).toHaveCount(1);
+  await expect(builder.locator('[data-note="waitlist"]').getByTestId("soon-badge")).toHaveCount(0);
   await builder.getByTestId("workshop-paid").check();
   await expect(builder.getByTestId("workshop-label")).toHaveText("Agotado");
 });

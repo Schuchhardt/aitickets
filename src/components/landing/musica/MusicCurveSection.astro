@@ -1,8 +1,8 @@
 ---
 // 3 · La curva de un concierto (SPEC_landing_musica §4.3, ancla #como-se-vende): encabezado y la isla de la curva con
 // los seis momentos. Los números de los momentos salen del código: la última semana y el umbral de escasez de
-// DEFAULT_CADENCE (socialSeriesCadence.ts), el plazo de pago de legal.mjs. Lo que no existe (aviso automático a la
-// lista de "Avísame" y abrir sola la siguiente tanda) va con "Pronto". La hora de apertura de una tanda hoy se programa
+// DEFAULT_CADENCE (socialSeriesCadence.ts), el plazo de pago de legal.mjs. El aviso automático a la lista de "Avísame"
+// existe (netlify/lib/waitlist.mjs); abrir sola la siguiente tanda no, y va con "Pronto". La hora de apertura de una tanda hoy se programa
 // desde el asistente de IA (tools/tickets.ts), por eso el chip dice "Venta abre el …" sin prometer el formulario.
 import MusicSalesCurve from "./MusicSalesCurve.vue";
 import { DEFAULT_CADENCE } from "../../../lib/socialSeriesCadence";
@@ -19,7 +19,7 @@ const moments = [
       { label: "Tipos de entrada con cupo" },
       { label: "Venta abre el …" },
       { label: "Lista de \"Avísame\"" },
-      { label: "Aviso automático al abrir", soon: true },
+      { label: "Aviso automático al abrir" },
     ],
   },
   {

@@ -79,7 +79,8 @@ test("el selector de audiencia cambia las líneas y el cartel lleva un link por 
 test("lo que no existe va con Pronto y sin testimonio real no hay cita", async ({ page }) => {
   await open(page);
   await expect(page.locator("#como-se-vende").getByTestId("soon-badge").first()).toHaveText("Pronto");
-  await expect(page.locator("#preventa").getByTestId("soon-badge")).toHaveCount(1);
+  // El aviso a la lista de espera ya existe: la preventa no promete nada "Pronto"
+  await expect(page.locator("#preventa").getByTestId("soon-badge")).toHaveCount(0);
   // Facebook, TikTok y reels en la serie; gustos musicales en los anuncios
   await expect(page.getByTestId("music-series").getByTestId("soon-badge")).toHaveCount(3);
   await expect(page.getByTestId("music-ads-demo").getByTestId("soon-badge")).toHaveCount(1);
