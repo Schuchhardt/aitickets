@@ -5,15 +5,15 @@
 // - Clientes: registro dinámico (RFC 7591, /api/oauth/register) o Client ID Metadata Document (client_id es
 //   una URL https que publica { client_id, client_name, redirect_uris }).
 // - redirect_uri: coincidencia exacta; loopback http (localhost/127.0.0.1/[::1]) con cualquier puerto (RFC 8252).
-// - Access token = fila de aitickets_api_keys (1 h) ligada al grant; refresh token rotativo (90 días).
+// - Access token = fila de aitickets_api_keys (7 d) ligada al grant; refresh token rotativo (365 días).
 // - Todos los tokens/códigos se guardan como sha256.
 import { API_ROLES } from "./permissions";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { generateApiKey, hashApiKey, normalizeScopes, API_SCOPES, type ApiScope } from "./keys";
 import { fetchPublic, SafeFetchError } from "../safe-fetch";
 
-export const ACCESS_TOKEN_TTL_SECONDS = 3600;
-export const REFRESH_TOKEN_TTL_DAYS = 90;
+export const ACCESS_TOKEN_TTL_SECONDS = 604_800; // 7 days — MCP clients hold long-lived sessions
+export const REFRESH_TOKEN_TTL_DAYS = 365;
 export const CODE_TTL_SECONDS = 600;
 export const DEFAULT_OAUTH_SCOPES: ApiScope[] = ["read", "write"];
 

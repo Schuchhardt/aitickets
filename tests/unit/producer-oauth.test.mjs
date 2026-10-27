@@ -143,7 +143,7 @@ describe('tokens', () => {
     const client = await oauth.resolveClient(db, (await registerPublicClient()).client_id)
     const code = await obtainCode(client.client_id, ['read', 'publish'])
     const tokens = await oauth.exchangeAuthorizationCode(db, client, { code, redirectUri: REDIRECT, codeVerifier: VERIFIER })
-    expect(tokens).toMatchObject({ token_type: 'Bearer', expires_in: 3600, scope: 'read publish' })
+    expect(tokens).toMatchObject({ token_type: 'Bearer', expires_in: 604_800, scope: 'read publish' })
     const auth = await authenticateApiKey(db, tokens.access_token)
     expect(auth.ok).toBe(true)
     expect(auth.actor).toMatchObject({ userId: 1, orgId: 7, scopes: ['read', 'publish'] })
