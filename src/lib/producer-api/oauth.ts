@@ -68,6 +68,18 @@ export function protectedResourceMetadata(origin: string) {
 }
 
 export const resourceMetadataUrl = (origin: string) => `${origin}/.well-known/oauth-protected-resource/api/mcp`;
+export const adminResourceMetadataUrl = (origin: string) => `${origin}/.well-known/oauth-protected-resource/api/admin/mcp`;
+
+export function adminProtectedResourceMetadata(origin: string) {
+    return {
+        resource: `${origin}/api/admin/mcp`,
+        authorization_servers: [origin],
+        scopes_supported: [...API_SCOPES],
+        bearer_methods_supported: ["header"],
+        resource_name: "AI Tickets Admin",
+        resource_documentation: `${origin}/dashboard/ia`,
+    };
+}
 
 // ---------------------------------------------------------------------------
 // Clientes
