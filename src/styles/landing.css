@@ -276,6 +276,8 @@
   height: 100%;
   border-radius: inherit;
   background: var(--brand-lime);
+  /* El valor va en --lp-scale (no en un transform inline) para que la animación de entrada pueda partir de 0 */
+  transform: scaleX(var(--lp-scale, 1));
   transform-origin: left;
 }
 
@@ -304,4 +306,65 @@
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* ---------- Movimiento (SPEC_landing_productores §8; lo activa LandingMotion.astro) ----------
+ * Todo cuelga de html.lp-motion, que solo existe con JS y sin "reducir movimiento": sin la clase, cada elemento queda
+ * en su estado final. Solo se anima transform y opacity. */
+@keyframes lp-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+@keyframes lp-up-12 {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+@keyframes lp-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+@keyframes lp-msg {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes lp-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+/* Sin "to": la barra crece hasta su propio transform (scaleX del valor) */
+@keyframes lp-grow-x {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+/* L7: secciones que entran una sola vez */
+.lp-motion [data-lp-reveal]:not(.is-in) [data-lp-step],
+.lp-motion [data-lp-reveal][data-lp-step]:not(.is-in) {
+  opacity: 0;
+}
+.lp-motion .is-in [data-lp-step],
+.lp-motion .is-in[data-lp-step] {
+  animation: lp-up var(--dur-4) var(--ease-out) var(--lp-d, 0ms) both;
+}
+
+/* L12, L21: barras que crecen al entrar */
+.lp-motion [data-lp-reveal]:not(.is-in) [data-lp-grow] {
+  transform: scaleX(0);
+}
+.lp-motion .is-in [data-lp-grow] {
+  animation: lp-grow-x 900ms var(--ease-out) var(--lp-d, 0ms) both;
 }

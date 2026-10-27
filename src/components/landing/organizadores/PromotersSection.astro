@@ -1,6 +1,7 @@
 ---
 // 4 · Quién vende tus entradas (SPEC_landing_productores §5.4, fondo oscuro). Ejemplo de la tabla "Ventas por canal"
 // de las métricas del evento (dashboard/events/[id]/analytics), con datos ficticios rotulados como tales.
+// Al entrar el panel (L12), las barras crecen con 80 ms entre filas y las entradas cuentan de 0 al valor.
 import { formatCLP } from "../producerLanding.js";
 
 const TICKET_PRICE = 8000;
@@ -15,15 +16,15 @@ const max = Math.max(...channels.map((c) => c.tickets));
 
 <section class="lp-section lp-dark" aria-labelledby="promoters-title">
   <div class="lp-wrap promo">
-    <div class="promo-copy">
-      <p class="lp-eyebrow">Links con seguimiento</p>
-      <h2 id="promoters-title" class="lp-h2 promo-title">¿Quién está vendiendo tus entradas?</h2>
-      <p class="lp-lead promo-lead">
+    <div class="promo-copy" data-lp-reveal>
+      <p class="lp-eyebrow" data-lp-step>Links con seguimiento</p>
+      <h2 id="promoters-title" class="lp-h2 promo-title" data-lp-step>¿Quién está vendiendo tus entradas?</h2>
+      <p class="lp-lead promo-lead" data-lp-step>
         Crea un link para cada integrante del line-up, promotor o campaña. Cada compra queda asociada al link con que llegó
         el comprador, y en las métricas ves órdenes, entradas e ingresos por canal. Sin capturas de pantalla ni reportes a
         mano.
       </p>
-      <ul class="promo-points">
+      <ul class="promo-points" data-lp-step>
         <li>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"></path></svg>
           <span>Compara canales y decide dónde poner tu próxima publicación o tu presupuesto.</span>
@@ -33,7 +34,7 @@ const max = Math.max(...channels.map((c) => c.tickets));
           <span>Súmale códigos de descuento con fecha límite y cupos para preventas o la última semana.</span>
         </li>
       </ul>
-      <p class="promo-more">
+      <p class="promo-more" data-lp-step>
         <a href="/guias/como-medir-ventas-por-promotor" class="lp-link" data-cta="learn_promoters" data-section="promoters">
           Cómo medir las ventas de cada promotor <span aria-hidden="true">→</span>
         </a>
@@ -43,20 +44,20 @@ const max = Math.max(...channels.map((c) => c.tickets));
       </p>
     </div>
 
-    <figure class="promo-panel">
+    <figure class="promo-panel" data-lp-reveal data-lp-step="120">
       <figcaption class="promo-panel-head">
         <span>Ventas por canal · Stand-up del jueves</span>
         <span class="lp-example">Datos de ejemplo</span>
       </figcaption>
       <ul class="promo-rows">
-        {channels.map((c) => (
-          <li>
+        {channels.map((c, i) => (
+          <li style={`--lp-d: ${240 + i * 80}ms`}>
             <p class="promo-row-head">
               <span><strong>{c.name}</strong> <span class="promo-source">· {c.source}</span></span>
-              <span class="ev-tabular">{c.tickets} entradas</span>
+              <span class="ev-tabular"><span data-lp-count={c.tickets}>{c.tickets}</span> entradas</span>
             </p>
             <div class="lp-bar-track promo-track" aria-hidden="true">
-              <div class="lp-bar" style={`transform: scaleX(${(c.tickets / max).toFixed(3)})`}></div>
+              <div class="lp-bar" data-lp-grow style={`--lp-scale: ${(c.tickets / max).toFixed(3)}`}></div>
             </div>
             <p class="promo-money ev-tabular">{formatCLP(c.tickets * TICKET_PRICE)} en ventas</p>
           </li>

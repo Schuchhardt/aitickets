@@ -2,8 +2,13 @@
 // Demo del calendario de difusión automática (SPEC_landing_productores §5.4b). Muestra solo lo que existe hoy
 // (src/lib/socialSeries.ts): historias y posts de feed automáticos en Instagram. Lo que aún no existe (Facebook y
 // TikTok automáticos, reels) va con la etiqueta "Pronto" y su switch deshabilitado. Las horas vienen de DEFAULT_CADENCE.
+// Movimiento (§5.4b, con html.lp-motion de LandingMotion.astro): cuando la sección entra en pantalla, las publicaciones
+// aparecen día por día (70 ms por día, 40 ms entre publicaciones del mismo día); al prender un switch, sus publicaciones
+// entran igual. El contador interpola como el total de la calculadora y, como ahí, el lector de pantalla lee solo el valor
+// final desde una región aparte (sin los números intermedios).
 import { computed, reactive } from 'vue'
 import SoonBadge from '../ui/SoonBadge.vue'
+import AnimatedNumber from '../event/AnimatedNumber.vue'
 import { marketingPostCount, marketingWeek } from './producerLanding.js'
 
 const props = defineProps({
@@ -28,6 +33,9 @@ const networks = [
   { label: 'TikTok', connected: false },
 ]
 
+// Retraso de la entrada de cada publicación: después del fade de la card, en cascada por día y por publicación
+const slotDelay = (dayIndex, slotIndex) => `${200 + dayIndex * 70 + slotIndex * 40}ms`
+
 const slotText = (slot) => (slot.state === 'past' ? 'Publicado ✓' : slot.state === 'today' ? `Hoy ${slot.time}` : slot.time)
 </script>
 
@@ -45,11 +53,11 @@ const slotText = (slot) => (slot.state === 'past' ? 'Publicado ✓' : slot.state
     </div>
 
     <ol class="mw-grid" aria-label="Publicaciones programadas de la semana">
-      <li v-for="d in week" :key="d.num" class="mw-day" :class="{ 'is-today': d.isToday }">
+      <li v-for="(d, di) in week" :key="d.num" class="mw-day" :class="{ 'is-today': d.isToday }">
         <p class="mw-day-head"><span>{{ d.dow }}</span><span>{{ d.num }}</span></p>
         <p v-if="d.isShow" class="mw-show">FUNCIÓN</p>
         <TransitionGroup name="mw-slot" tag="ul" class="mw-slots">
-          <li v-for="s in d.slots" :key="s.kind" class="mw-slot" :class="`is-${s.state}`">
+          <li v-for="(s, si) in d.slots" :key="s.kind" class="mw-slot" :class="`is-${s.state}`" :style="{ '--mw-d': slotDelay(di, si) }">
             <span class="mw-slot-kind">{{ s.label }}</span>
             <span class="mw-slot-status">{{ slotText(s) }}</span>
           </li>
@@ -76,7 +84,8 @@ const slotText = (slot) => (slot.state === 'past' ? 'Publicado ✓' : slot.state
         Reel antes de la función
         <SoonBadge />
       </button>
-      <p class="mw-count" aria-live="polite"><span class="ev-tabular">{{ count }}</span> publicaciones esta semana</p>
+      <p class="mw-count" aria-hidden="true"><AnimatedNumber :value="count" format="plain" /> publicaciones esta semana</p>
+      <p class="lp-sr-only" aria-live="polite">{{ count }} publicaciones esta semana</p>
     </div>
     <p class="lp-small mw-note">
       Se publican a la hora en que más visitas tiene tu evento ({{ props.dailyTime }} mientras no hay datos). Apruebas la
@@ -185,15 +194,26 @@ const slotText = (slot) => (slot.state === 'past' ? 'Publicado ✓' : slot.state
 .mw-slot-status {
   opacity: 0.85;
 }
-.mw-slot-enter-active {
-  transition: opacity var(--dur-3) var(--ease-spring), transform var(--dur-3) var(--ease-spring);
+/* Entrada de las publicaciones: al revelar la sección y al prender un switch (los slots nuevos vuelven a animar).
+   html.lp-motion y [data-lp-reveal] están fuera del componente: el scope solo se agrega a .mw-slot. */
+@keyframes mw-slot-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+}
+.lp-motion [data-lp-reveal]:not(.is-in) .mw-slot {
+  opacity: 0;
+}
+.lp-motion .is-in .mw-slot {
+  animation: mw-slot-in 360ms var(--ease-spring) var(--mw-d, 0ms) both;
 }
 .mw-slot-leave-active {
   transition: opacity var(--dur-2) var(--ease-out);
 }
-.mw-slot-enter-from {
-  opacity: 0;
-  transform: translateY(6px) scale(0.96);
+/* Al salir, sin la animación de entrada: si no, Vue espera su duración (con retraso) antes de sacar el slot */
+.lp-motion .is-in .mw-slot.mw-slot-leave-active {
+  animation: none;
 }
 .mw-slot-leave-to {
   opacity: 0;
@@ -264,7 +284,6 @@ const slotText = (slot) => (slot.state === 'past' ? 'Publicado ✓' : slot.state
   margin-top: 6px;
 }
 @media (prefers-reduced-motion: reduce) {
-  .mw-slot-enter-active,
   .mw-slot-leave-active,
   .mw-track,
   .mw-knob {

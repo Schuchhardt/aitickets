@@ -7,20 +7,20 @@ import { ABSORB_FEE_ACTIVATION } from "../../../data/producerFaq";
 ---
 
 <section id="precios" class="lp-section lp-surface" aria-labelledby="precios-title">
-  <div class="lp-wrap">
+  <div class="lp-wrap" data-lp-reveal>
     <div class="price-head">
-      <p class="lp-eyebrow">Precio</p>
-      <h2 id="precios-title" class="lp-h2 price-title">Sin mensualidad. Se cobra solo cuando vendes.</h2>
-      <p class="lp-lead price-lead">
+      <p class="lp-eyebrow" data-lp-step>Precio</p>
+      <h2 id="precios-title" class="lp-h2 price-title" data-lp-step>Sin mensualidad. Se cobra solo cuando vendes.</h2>
+      <p class="lp-lead price-lead" data-lp-step>
         Para ti, 0% de comisión. El comprador paga un cargo por servicio de {SERVICE_FEE_PERCENT_LABEL} sobre el valor de la
         entrada, más IVA ({IVA_PERCENT_LABEL}) sobre ese cargo. Si prefieres mostrar un precio final, lo absorbes tú, por
         evento. {ABSORB_FEE_ACTIVATION} Las entradas gratis no pagan cargo.
       </p>
     </div>
-    <div class="price-calc">
+    <div class="price-calc" data-lp-step>
       <PriceCalculator client:visible />
     </div>
-    <a href="/precios" class="lp-link price-more" data-cta="pricing" data-section="pricing">Ver precios en detalle <span aria-hidden="true">→</span></a>
+    <p class="price-more" data-lp-step><a href="/precios" class="lp-link" data-cta="pricing" data-section="pricing">Ver precios en detalle <span aria-hidden="true">→</span></a></p>
   </div>
 </section>
 

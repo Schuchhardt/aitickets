@@ -1,13 +1,14 @@
 ---
 // 9 · Cierre (SPEC_landing_productores §5.9, fondo oscuro). data-final-cta: la barra CTA mobile se esconde cuando entra.
+// Entra como las demás secciones (L7).
 import { DEMO_CALL_URL, DEMO_EVENT_URL, publishUrl, whatsappUrl } from "../links.js";
 ---
 
 <section class="lp-section lp-dark closing" aria-labelledby="closing-title" data-final-cta>
-  <div class="lp-wrap">
-    <h2 id="closing-title" class="lp-h2 closing-title">¿Cuándo es tu próxima función?</h2>
-    <p class="closing-lead">Publícala hoy. Crear tu cuenta es gratis y no hay costos fijos.</p>
-    <div class="closing-ctas">
+  <div class="lp-wrap" data-lp-reveal>
+    <h2 id="closing-title" class="lp-h2 closing-title" data-lp-step>¿Cuándo es tu próxima función?</h2>
+    <p class="closing-lead" data-lp-step>Publícala hoy. Crear tu cuenta es gratis y no hay costos fijos.</p>
+    <div class="closing-ctas" data-lp-step>
       <a href={publishUrl("organizadores_final")} class="ev-btn lp-btn-lime lp-btn-lg closing-btn" data-cta="publish" data-section="final_cta">
         Publicar mi próxima función <span aria-hidden="true">→</span>
       </a>
@@ -15,13 +16,13 @@ import { DEMO_CALL_URL, DEMO_EVENT_URL, publishUrl, whatsappUrl } from "../links
         Hablar por WhatsApp
       </a>
     </div>
-    <p class="closing-help">
+    <p class="closing-help" data-lp-step>
       ¿Prefieres verlo antes?
       <a href={DEMO_CALL_URL} class="lp-inline-link" target="_blank" rel="noopener noreferrer" data-cta="demo_call" data-section="final_cta">Agenda una demo de 15 min</a>
       ·
       <a href={DEMO_EVENT_URL} class="lp-inline-link" data-cta="demo_event" data-section="final_cta">Mira un evento de ejemplo</a>
     </p>
-    <p class="closing-guarantees">Sin mensualidad · Sin permanencia · Sin costos fijos</p>
+    <p class="closing-guarantees" data-lp-step>Sin mensualidad · Sin permanencia · Sin costos fijos</p>
   </div>
 </section>
 

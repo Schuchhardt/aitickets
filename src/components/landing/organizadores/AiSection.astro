@@ -2,6 +2,9 @@
 // 7 · Tu ticketera, dentro de tu IA (SPEC_landing_productores §5.7): opcional, a la mitad de alto que antes y con el
 // chat en blanco/gris. Las herramientas nombradas existen en la API de productores (src/lib/producer-api/tools).
 // Enlaces de registro/login hacia /dashboard/ia, los mismos de AIConnectSection.vue.
+// L13: al entrar el chat, los mensajes aparecen en secuencia (como en el prototipo: 0,2 / 1,2 / 1,9 / 2,9 s) y antes de
+// cada respuesta se ve "escribiendo…" durante 500 ms. Una sola vez. Los mensajes siempre ocupan su lugar (solo cambia la
+// opacidad), así la card no salta; sin html.lp-motion se ven todos de una.
 const signupUrl = "/organizadores/registro?next=%2Fdashboard%2Fia&utm_source=aitickets&utm_medium=landing&utm_campaign=organizadores_ia";
 const clients = ["Claude", "ChatGPT", "Claude Code", "Cursor", "n8n / Zapier"];
 const steps = ["Crea tu cuenta", "Copia la URL del conector", "Pégala en Claude o ChatGPT"];
@@ -9,42 +12,55 @@ const steps = ["Crea tu cuenta", "Copia la URL del conector", "Pégala en Claude
 
 <section id="ia" class="lp-section" aria-labelledby="ai-title">
   <div class="lp-wrap ai">
-    <div class="ai-copy">
-      <p class="lp-eyebrow">Opcional · Claude y ChatGPT</p>
-      <h2 id="ai-title" class="lp-h2 ai-title">Tu ticketera, dentro de tu IA.</h2>
-      <p class="lp-lead ai-lead">
+    <div class="ai-copy" data-lp-reveal>
+      <p class="lp-eyebrow" data-lp-step>Opcional · Claude y ChatGPT</p>
+      <h2 id="ai-title" class="lp-h2 ai-title" data-lp-step>Tu ticketera, dentro de tu IA.</h2>
+      <p class="lp-lead ai-lead" data-lp-step>
         Conecta AI Tickets a Claude o ChatGPT y gestiona tus eventos conversando: cómo van las ventas, códigos de descuento,
         posts. Publicar, cobrar o enviar mensajes siempre te pide confirmación. No es obligatorio: todo funciona también
         desde el panel.
       </p>
-      <ol class="ai-steps">
+      <ol class="ai-steps" data-lp-step>
         {steps.map((step, i) => (
           <li><strong>{i + 1}</strong> {step}</li>
         ))}
       </ol>
-      <a href={signupUrl} class="lp-link ai-cta" data-cta="connect_ai" data-section="ai">Conecta tu IA <span aria-hidden="true">→</span></a>
-      <ul class="ai-chips" aria-label="Funciona con">
+      <p class="ai-cta" data-lp-step>
+        <a href={signupUrl} class="lp-link" data-cta="connect_ai" data-section="ai">Conecta tu IA <span aria-hidden="true">→</span></a>
+      </p>
+      <ul class="ai-chips" aria-label="Funciona con" data-lp-step>
         {clients.map((c) => <li class="lp-chip">{c}</li>)}
       </ul>
     </div>
 
-    <figure class="ai-chat lp-card" aria-label="Conversación de ejemplo con un asistente conectado a AI Tickets">
+    <figure
+      class="ai-chat lp-card"
+      aria-label="Conversación de ejemplo con un asistente conectado a AI Tickets"
+      data-lp-reveal
+      data-lp-step="120"
+    >
       <figcaption class="ai-chat-head"><span>Tu asistente · conectado a AI Tickets</span><span>Datos de ejemplo</span></figcaption>
-      <p class="msg msg-me">¿Cómo va la venta de “Stand-up de Viernes”?</p>
-      <div class="msg msg-ai">
-        <p>
-          Vas en <strong>142 de 200</strong> entradas (71%) y <strong>$1.136.000</strong> vendidos. El link de campaña de
-          Instagram es el que más vende. Faltan 9 días: te propongo un código de última semana.
-        </p>
-        <p class="msg-tools">get_event_performance ✓</p>
+      <p class="msg msg-me" style="--lp-msg: 200ms">¿Cómo va la venta de “Stand-up de Viernes”?</p>
+      <div class="msg-slot">
+        <span class="msg-typing" style="--lp-msg: 700ms" aria-hidden="true"><span></span><span></span><span></span></span>
+        <div class="msg msg-ai" style="--lp-msg: 1200ms">
+          <p>
+            Vas en <strong>142 de 200</strong> entradas (71%) y <strong>$1.136.000</strong> vendidos. El link de campaña de
+            Instagram es el que más vende. Faltan 9 días: te propongo un código de última semana.
+          </p>
+          <p class="msg-tools">get_event_performance ✓</p>
+        </div>
       </div>
-      <p class="msg msg-me">Dale. 15% hasta el jueves, y arma un post para Instagram.</p>
-      <div class="msg msg-ai">
-        <p>
-          Listo: creé <strong>ULTIMASEMANA15</strong> (15%, vence el jueves 23:59) y dejé el post en borrador con imagen y
-          link de seguimiento. ¿Lo publico?
-        </p>
-        <p class="msg-tools">create_discount_code ✓ · generate_image ✓ · create_social_post ✓</p>
+      <p class="msg msg-me" style="--lp-msg: 1900ms">Dale. 15% hasta el jueves, y arma un post para Instagram.</p>
+      <div class="msg-slot">
+        <span class="msg-typing" style="--lp-msg: 2400ms" aria-hidden="true"><span></span><span></span><span></span></span>
+        <div class="msg msg-ai" style="--lp-msg: 2900ms">
+          <p>
+            Listo: creé <strong>ULTIMASEMANA15</strong> (15%, vence el jueves 23:59) y dejé el post en borrador con imagen y
+            link de seguimiento. ¿Lo publico?
+          </p>
+          <p class="msg-tools">create_discount_code ✓ · generate_image ✓ · create_social_post ✓</p>
+        </div>
       </div>
     </figure>
   </div>
@@ -78,6 +94,8 @@ const steps = ["Crea tu cuenta", "Copia la URL del conector", "Pégala en Claude
   }
   .ai-cta {
     margin-top: 24px;
+  }
+  .ai-cta a {
     font-weight: 600;
   }
   .ai-chips {
@@ -115,10 +133,64 @@ const steps = ["Crea tu cuenta", "Copia la URL del conector", "Pégala en Claude
     background: var(--brand-ink);
     color: #fff;
   }
-  .msg-ai {
+  .msg-slot {
+    position: relative;
     align-self: flex-start;
+    max-width: 86%;
+  }
+  .msg-ai {
+    max-width: none;
     border-radius: 16px 16px 16px 4px;
     background: var(--surface-1);
+  }
+  /* "Escribiendo…": ocupa el lugar de la respuesta y solo se ve durante su animación (sin fill) */
+  .msg-typing {
+    position: absolute;
+    left: 0;
+    top: 0;
+    display: flex;
+    gap: 4px;
+    padding: 14px;
+    border-radius: 16px 16px 16px 4px;
+    background: var(--surface-1);
+    opacity: 0;
+    pointer-events: none;
+  }
+  .msg-typing span {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-3);
+    opacity: 0.25;
+  }
+  @keyframes ai-typing {
+    0%,
+    100% {
+      opacity: 1;
+    }
+  }
+  @keyframes ai-dot {
+    50% {
+      opacity: 1;
+    }
+  }
+  :global(.lp-motion [data-lp-reveal]:not(.is-in)) .msg {
+    opacity: 0;
+  }
+  :global(.lp-motion .is-in) .msg {
+    animation: lp-msg 300ms var(--ease-out) var(--lp-msg, 0ms) both;
+  }
+  :global(.lp-motion .is-in) .msg-typing {
+    animation: ai-typing 500ms linear var(--lp-msg, 0ms);
+  }
+  :global(.lp-motion .is-in) .msg-typing span {
+    animation: ai-dot 400ms ease-in-out var(--lp-msg, 0ms);
+  }
+  :global(.lp-motion .is-in) .msg-typing span:nth-child(2) {
+    animation-delay: calc(var(--lp-msg, 0ms) + 50ms);
+  }
+  :global(.lp-motion .is-in) .msg-typing span:nth-child(3) {
+    animation-delay: calc(var(--lp-msg, 0ms) + 100ms);
   }
   .msg-ai strong {
     font-weight: 600;

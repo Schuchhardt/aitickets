@@ -3,6 +3,10 @@
 // §5.5b y §9). Se comporta como la portada real (event/AutoplayVideo.vue: sin sonido, en loop y solo mientras está en
 // pantalla), pero cuidando el LCP: primero se ve el póster como imagen y el <video> recién se monta después de `load`
 // y en un momento ocioso, con preload="none". Con Save-Data, "reducir movimiento" o si el video falla, queda el póster.
+// L17: sin video (Save-Data o error), el póster hace un zoom lento (Ken Burns) que solo corre mientras se ve; con
+// "reducir movimiento", quieto.
+// §9 (LCP): si llegan posterSources, el póster va en un <picture> con AVIF/WebP a varios anchos; `posterSizes` dice qué
+// ancho ocupa la imagen ya recortada por object-fit: cover, para que el navegador no baje más de lo que se ve.
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Volume2, VolumeX } from 'lucide-vue-next'
 
@@ -11,6 +15,10 @@ const props = defineProps({
   poster: { type: String, required: true },
   posterWidth: { type: Number, default: undefined },
   posterHeight: { type: Number, default: undefined },
+  /** Versiones optimizadas del póster, cada una { type, srcset }; el JPG queda de respaldo */
+  posterSources: { type: Array, required: false },
+  /** Atributo sizes de esas versiones (por ejemplo '480px') */
+  posterSizes: { type: String, required: false },
   /** Texto alternativo del póster y aria-label del video. Vacío = decorativo (aria-hidden). */
   label: { type: String, required: false },
   /** Muestra el botón para activar el sonido; si no, un parlante tachado decorativo */
@@ -23,10 +31,15 @@ const props = defineProps({
 const emit = defineEmits(['sound'])
 
 const position = computed(() => (props.soundPosition === 'top' ? 'top' : 'bottom'))
+const root = ref(null)
 const video = ref(null)
 const active = ref(false)
 const muted = ref(true)
+// Ken Burns del póster cuando no hay video, pausado fuera de pantalla
+const kenBurns = ref(false)
+const visible = ref(false)
 let observer = null
+let posterObserver = null
 let idleHandle = null
 
 function play() {
@@ -56,6 +69,20 @@ function start() {
   })
 }
 
+function startKenBurns() {
+  if (kenBurns.value || !root.value) return
+  kenBurns.value = true
+  posterObserver = new IntersectionObserver(([entry]) => {
+    visible.value = entry.isIntersecting
+  })
+  posterObserver.observe(root.value)
+}
+function onVideoError() {
+  active.value = false
+  observer?.disconnect()
+  startKenBurns()
+}
+
 function scheduleStart() {
   const idle = window.requestIdleCallback || ((cb) => window.setTimeout(cb, 200))
   idleHandle = idle(start)
@@ -77,7 +104,11 @@ function toggleSound() {
 onMounted(() => {
   const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
   const saveData = navigator.connection?.saveData === true
-  if (reduced || saveData || !('IntersectionObserver' in window)) return
+  if (reduced || !('IntersectionObserver' in window)) return
+  if (saveData) {
+    startKenBurns()
+    return
+  }
   if (document.readyState === 'complete') scheduleStart()
   else window.addEventListener('load', onLoad, { once: true })
 })
@@ -86,21 +117,32 @@ onBeforeUnmount(() => {
   window.removeEventListener('load', onLoad)
   if (idleHandle != null) (window.cancelIdleCallback || window.clearTimeout)(idleHandle)
   observer?.disconnect()
+  posterObserver?.disconnect()
 })
 </script>
 
 <template>
-  <div class="lcv" :aria-hidden="props.label ? undefined : 'true'">
-    <img
-      class="lcv-media"
-      :src="props.poster"
-      :alt="props.label || ''"
-      :width="props.posterWidth"
-      :height="props.posterHeight"
-      :loading="props.priority ? 'eager' : 'lazy'"
-      :fetchpriority="props.priority ? 'high' : undefined"
-      decoding="async"
-    />
+  <div ref="root" class="lcv" :aria-hidden="props.label ? undefined : 'true'">
+    <picture>
+      <source
+        v-for="source in props.posterSources || []"
+        :key="source.type"
+        :type="source.type"
+        :srcset="source.srcset"
+        :sizes="props.posterSizes || '100vw'"
+      />
+      <img
+        class="lcv-media"
+        :class="{ 'lcv-kb': kenBurns, 'is-visible': visible }"
+        :src="props.poster"
+        :alt="props.label || ''"
+        :width="props.posterWidth"
+        :height="props.posterHeight"
+        :loading="props.priority ? 'eager' : 'lazy'"
+        :fetchpriority="props.priority ? 'high' : undefined"
+        decoding="async"
+      />
+    </picture>
     <video
       v-if="active"
       ref="video"
@@ -113,7 +155,7 @@ onBeforeUnmount(() => {
       preload="none"
       disablepictureinpicture
       :aria-label="props.label || undefined"
-      @error="active = false"
+      @error="onVideoError"
     ></video>
 
     <button
@@ -148,6 +190,26 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+/* L17: zoom lento alternado del póster (9 s), solo mientras está en pantalla */
+@keyframes lcv-kb {
+  from {
+    transform: scale(1.02);
+  }
+  to {
+    transform: scale(1.12) translate(-2%, -1%);
+  }
+}
+.lcv-kb {
+  animation: lcv-kb 9s ease-in-out infinite alternate paused;
+}
+.lcv-kb.is-visible {
+  animation-play-state: running;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lcv-kb {
+    animation: none;
+  }
 }
 .lcv-sound {
   position: absolute;

@@ -2,6 +2,8 @@
 // 1 · Hero + prueba social (SPEC_landing_productores §5.1). El teléfono muestra la página del evento con la portada en
 // video; el póster carga como imagen prioritaria y el video se monta después (LandingCoverVideo) para no ser el LCP.
 // La prueba social solo se muestra con datos reales (src/data/producerSocialProof.ts).
+// Movimiento al cargar (§8, solo con html.lp-motion): L1 textos en cascada, L2 el teléfono, L3 las cards flotantes (en
+// desktop flotan dos ciclos y se quedan quietas) y L4 la barra de vendidas.
 import LandingCoverVideo from "../LandingCoverVideo.vue";
 import { DEMO_EVENT_URL, publishUrl, whatsappUrl } from "../links.js";
 import { DEMO_EVENT_NAME, LANDING_MEDIA, formatCLP } from "../producerLanding.js";
@@ -54,6 +56,8 @@ const hasProof = PRODUCER_LOGOS.length > 0 || PRODUCER_STATS.length > 0;
               poster={LANDING_MEDIA.coverPoster}
               posterWidth={LANDING_MEDIA.coverPosterWidth}
               posterHeight={LANDING_MEDIA.coverPosterHeight}
+              posterSources={LANDING_MEDIA.coverPosterSources}
+              posterSizes="480px"
               priority
               sound={false}
             />
@@ -97,7 +101,7 @@ const hasProof = PRODUCER_LOGOS.length > 0 || PRODUCER_STATS.length > 0;
 
 {hasProof && (
   <section class="proof lp-wrap" aria-label="Productores que ya venden con AI Tickets">
-    <div class="proof-inner">
+    <div class="proof-inner" data-lp-reveal data-lp-step>
       {PRODUCER_LOGOS.length > 0 && (
         <div class="proof-logos">
           <p class="lp-small">Productores que ya venden con AI Tickets</p>
@@ -411,6 +415,51 @@ const hasProof = PRODUCER_LOGOS.length > 0 || PRODUCER_STATS.length > 0;
     line-height: 34px;
   }
 
+  /* ---------- Movimiento al cargar (L1-L4) ---------- */
+  @keyframes hero-phone-in {
+    from {
+      opacity: 0;
+      translate: 0 24px;
+    }
+  }
+  :global(.lp-motion) .hero-copy > * {
+    animation: lp-up-12 480ms var(--ease-out) both;
+  }
+  :global(.lp-motion) .hero-copy > :nth-child(2) {
+    animation-delay: 60ms;
+  }
+  :global(.lp-motion) .hero-copy > :nth-child(3) {
+    animation-delay: 120ms;
+  }
+  :global(.lp-motion) .hero-copy > :nth-child(4) {
+    animation-delay: 180ms;
+  }
+  :global(.lp-motion) .hero-copy > :nth-child(5) {
+    animation-delay: 240ms;
+  }
+  :global(.lp-motion) .hero-copy > :nth-child(6) {
+    animation-delay: 300ms;
+  }
+  /* translate (y no transform) porque el teléfono ya usa transform para centrarse y escalar */
+  :global(.lp-motion) .stage-phone {
+    animation: hero-phone-in 600ms var(--ease-out) 200ms both;
+  }
+  :global(.lp-motion) .float {
+    animation: lp-pop 400ms var(--ease-spring) 500ms both;
+  }
+  :global(.lp-motion) .float-link {
+    animation-delay: 650ms;
+  }
+  :global(.lp-motion) .float-paid {
+    animation-delay: 800ms;
+  }
+  :global(.lp-motion) .float-fill {
+    animation: lp-grow-x 900ms var(--ease-out) 700ms both;
+  }
+  :global(.lp-motion) .stage-note {
+    animation: ev-fade-in 400ms var(--ease-out) 900ms both;
+  }
+
   @media (min-width: 640px) {
     .hero-ctas {
       flex-direction: row;
@@ -493,6 +542,18 @@ const hasProof = PRODUCER_LOGOS.length > 0 || PRODUCER_STATS.length > 0;
     }
     .proof {
       padding-top: 24px;
+    }
+    /* L3: después de aparecer, flotan ±4 px dos ciclos (6 s cada uno) y quedan quietas */
+    :global(.lp-motion) .float {
+      animation:
+        lp-pop 400ms var(--ease-spring) 500ms both,
+        lp-float 6s ease-in-out 900ms 2;
+    }
+    :global(.lp-motion) .float-link {
+      animation-delay: 650ms, 1100ms;
+    }
+    :global(.lp-motion) .float-paid {
+      animation-delay: 800ms, 1300ms;
     }
   }
 </style>

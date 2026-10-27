@@ -2,6 +2,8 @@
 // 5 · La venta termina en la puerta (SPEC_landing_productores §5.5). Verificado igual que landing/DoorSection.vue:
 // validación offline con la lista descargada (ValidateQR.vue), rol Puerta (permissions.ts), link temporal de puerta
 // (create_checkin_link, hoy desde el conector de IA) y cortesías con su propio QR.
+// L14: el resultado del escaneo alterna cada 2,4 s entre "Válida" y "Ya ingresó" (crossfade), solo mientras el teléfono
+// está en pantalla y con html.lp-motion (sin "reducir movimiento"). Sin JS queda "Válida".
 const items = [
   {
     title: "Check-in desde el celular",
@@ -28,7 +30,7 @@ const items = [
 
 <section class="lp-section" aria-labelledby="door-title">
   <div class="lp-wrap door">
-    <div class="door-phone-wrap" aria-hidden="true">
+    <div class="door-phone-wrap" aria-hidden="true" data-lp-reveal data-lp-step>
       <div class="lp-phone door-phone">
         <div class="lp-phone-screen door-screen">
           <p class="door-top"><span>Check-in · Puerta</span><span class="ev-tabular">98 / 140</span></p>
@@ -39,20 +41,27 @@ const items = [
               <span class="door-qr"></span>
             </div>
           </div>
-          <div class="door-result">
-            <p class="door-result-title">✓ Válida</p>
-            <p>General · Sebastián P.</p>
-            <p>Entrada 1 de 2</p>
+          <div class="door-results" data-door-scan>
+            <div class="door-result door-ok">
+              <p class="door-result-title">✓ Válida</p>
+              <p>General · Sebastián P.</p>
+              <p>Entrada 1 de 2</p>
+            </div>
+            <div class="door-result door-used">
+              <p class="door-result-title">Ya ingresó</p>
+              <p>VIP · Camila R.</p>
+              <p>Validada a las 21:42</p>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="door-copy">
-      <p class="lp-eyebrow">El día del evento</p>
-      <h2 id="door-title" class="lp-h2 door-title">La venta termina en la puerta.</h2>
-      <p class="lp-lead door-lead">Que tu equipo reciba a la gente sin planillas ni listas de último minuto.</p>
-      <ul class="door-items">
+    <div class="door-copy" data-lp-reveal>
+      <p class="lp-eyebrow" data-lp-step>El día del evento</p>
+      <h2 id="door-title" class="lp-h2 door-title" data-lp-step>La venta termina en la puerta.</h2>
+      <p class="lp-lead door-lead" data-lp-step>Que tu equipo reciba a la gente sin planillas ni listas de último minuto.</p>
+      <ul class="door-items" data-lp-step>
         {items.map((item) => (
           <li>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={item.icon} />
@@ -61,12 +70,29 @@ const items = [
           </li>
         ))}
       </ul>
-      <a href="/guias/como-hacer-check-in-con-qr" class="lp-link door-more" data-cta="learn_checkin" data-section="door">
-        Cómo funciona el control de acceso con QR <span aria-hidden="true">→</span>
-      </a>
+      <p class="door-more" data-lp-step>
+        <a href="/guias/como-hacer-check-in-con-qr" class="lp-link" data-cta="learn_checkin" data-section="door">
+          Cómo funciona el control de acceso con QR <span aria-hidden="true">→</span>
+        </a>
+      </p>
     </div>
   </div>
 </section>
+
+<script>
+  // L14: alterna "Válida" / "Ya ingresó" cada 2,4 s mientras el teléfono se ve (en mobile está oculto: nunca entra)
+  const SCAN_EVERY_MS = 2400;
+  document.querySelectorAll<HTMLElement>("[data-door-scan]").forEach((el) => {
+    if (!document.documentElement.classList.contains("lp-motion")) return;
+    let timer = 0;
+    const io = new IntersectionObserver(([entry]) => {
+      window.clearInterval(timer);
+      timer = 0;
+      if (entry.isIntersecting) timer = window.setInterval(() => el.classList.toggle("is-used"), SCAN_EVERY_MS);
+    });
+    io.observe(el);
+  });
+</script>
 
 <style>
   .door {
@@ -177,20 +203,46 @@ const items = [
     background: repeating-conic-gradient(#3a3a40 0 25%, #1c1c1f 0 50%) 0 0 / 20px 20px;
     opacity: 0.8;
   }
-  .door-result {
+  .door-results {
+    position: relative;
     height: 112px;
     margin: 0 16px 18px;
+  }
+  .door-result {
+    position: absolute;
+    inset: 0;
     padding: 16px;
     border-radius: 18px;
     background: var(--brand-lime);
     color: var(--brand-ink);
     font-size: 13px;
+    transition: opacity 300ms ease;
+  }
+  .door-used {
+    opacity: 0;
+    background: #2a2a2e;
+    color: var(--lp-on-dark-2);
+  }
+  .door-used .door-result-title {
+    color: #fff;
+  }
+  .is-used .door-ok {
+    opacity: 0;
+  }
+  .is-used .door-used {
+    opacity: 1;
   }
   .door-result-title {
     margin-bottom: 6px;
     font-family: "Unbounded", system-ui, sans-serif;
     font-size: 20px;
     font-weight: 700;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .door-result {
+      transition-duration: 1ms;
+    }
   }
 
   @media (min-width: 768px) {

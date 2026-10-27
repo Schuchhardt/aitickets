@@ -1,5 +1,5 @@
 ---
-// Landing para productores (docs/specs/rediseno/SPEC_landing_productores_aitickets.md, fases A y B). Diez secciones con
+// Landing para productores (docs/specs/rediseno/SPEC_landing_productores_aitickets.md, fases A, B y C). Diez secciones con
 // solo dos fondos oscuros; el precio, la calculadora y los demás montos salen de fees.mjs/legal.mjs y las respuestas de
 // dinero de PRODUCER_FAQ. Lo que enlazaba el hub anterior sigue enlazado: las cuatro guías desde los links de las
 // secciones (Cómo funciona: vender online; Quién vende tus entradas: medir por promotor y preventa; La puerta: check-in
@@ -7,6 +7,9 @@
 // web gratis y la comparativa desde el footer.
 // La portada (/) sigue con su diseño y su H1 por ahora (pendiente anotado en el PR). Sin ProducerSessionBanner: con
 // sesión, el header ya cambia a "Ir a mi panel" y el aviso flotante tapaba la barra CTA mobile (§6).
+// Movimiento (§8): LandingMotion va primero en el <body> para marcar html.lp-motion antes de pintar; las secciones
+// marcan con data-lp-reveal / data-lp-step lo que entra al hacer scroll. ev-motion reduce a 1 ms cualquier transición
+// o animación con "reducir movimiento".
 export const prerender = true;
 import AppFooter from "../../components/AppFooter.vue";
 import LandingHeader from "../../components/landing/LandingHeader.vue";
@@ -14,6 +17,7 @@ import LandingMobileBar from "../../components/landing/LandingMobileBar.vue";
 import LandingFaq from "../../components/landing/LandingFaq.vue";
 import VideoModal from "../../components/landing/VideoModal.vue";
 import CtaTracking from "../../components/landing/CtaTracking.astro";
+import LandingMotion from "../../components/landing/LandingMotion.astro";
 import HeroSection from "../../components/landing/organizadores/HeroSection.astro";
 import HowSection from "../../components/landing/organizadores/HowSection.astro";
 import PricingSection from "../../components/landing/organizadores/PricingSection.astro";
@@ -77,8 +81,9 @@ const jsonLd = [
   description={`Ticketera para productores de eventos en Chile: publica tus funciones, vende entradas con 0% de comisión para ti, mide qué promotor vende y valida con QR. Sin mensualidad.`}
   canonical="/organizadores"
 >
+  <LandingMotion />
   <LandingHeader client:idle publishHref={publishUrl("organizadores_header")} />
-  <main class="lp">
+  <main class="lp ev-motion">
     <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
     <HeroSection />
     <HowSection />
@@ -90,9 +95,9 @@ const jsonLd = [
     <ExtrasSection />
     <AiSection />
     <section class="lp-section faq" aria-labelledby="faq-title">
-      <div class="lp-wrap faq-wrap">
-        <h2 id="faq-title" class="lp-h2 faq-title">Preguntas frecuentes</h2>
-        <LandingFaq client:visible items={ORGANIZADORES_FAQ} idPrefix="org-faq" />
+      <div class="lp-wrap faq-wrap" data-lp-reveal>
+        <h2 id="faq-title" class="lp-h2 faq-title" data-lp-step>Preguntas frecuentes</h2>
+        <div data-lp-step><LandingFaq client:visible items={ORGANIZADORES_FAQ} idPrefix="org-faq" /></div>
       </div>
     </section>
     <ClosingSection />

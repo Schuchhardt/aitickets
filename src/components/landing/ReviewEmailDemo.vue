@@ -2,6 +2,9 @@
 // Demo del correo "¿Cómo estuvo?" (SPEC_landing_productores §5.5b). Igual que el producto
 // (docs/runbooks/resenas-e-invitaciones.md): las estrellas solo preseleccionan y la reseña se manda con el botón; el
 // premio opcional es un código GRACIAS-XXXXXX. Usa las mismas estrellas que la página del evento (event/StarRating.vue).
+// L20: en esta demo la estrella en hover crece a 1.15 en 160 ms con la curva spring, las elegidas se rellenan de lima
+// (la página del evento sigue en ámbar: solo se pisa dentro de .rv) y el agradecimiento entra con el mismo fade de los
+// mensajes del chat (300 ms).
 import { ref } from 'vue'
 import StarRating from '../event/StarRating.vue'
 
@@ -81,7 +84,22 @@ function reset() {
   flex-direction: column;
   align-items: flex-start;
   gap: 8px;
-  animation: ev-fade-up var(--dur-3) var(--ease-out) both;
+  animation: ev-fade-up 300ms var(--ease-out) both;
+}
+.rv :deep(.pick) {
+  transition-duration: 160ms;
+  transition-timing-function: var(--ease-spring);
+}
+.rv :deep(.pick:hover) {
+  transform: scale(1.15);
+}
+/* Después del hover: al hacer clic el pointer sigue encima y si no se perdería el "press" de StarRating */
+.rv :deep(.pick:active) {
+  transform: scale(0.94);
+}
+.rv :deep(.pick.is-on svg) {
+  fill: var(--brand-lime);
+  stroke: var(--brand-ink);
 }
 .rv-thanks-title {
   font-size: 15px;
@@ -118,6 +136,9 @@ function reset() {
 @media (prefers-reduced-motion: reduce) {
   .rv-thanks {
     animation-duration: 1ms;
+  }
+  .rv :deep(.pick) {
+    transition-duration: 1ms;
   }
 }
 </style>

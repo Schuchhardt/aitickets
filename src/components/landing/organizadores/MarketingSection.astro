@@ -5,6 +5,7 @@
 // Las horas del calendario y la frecuencia salen de la cadencia real (DEFAULT_CADENCE): una historia cada pocos días
 // que se vuelve diaria la última semana, a la hora pico de visitas del evento (la hora por defecto solo si aún no hay
 // datos).
+// Al entrar (L7 y §5.4b): título y bajada en cascada; en el calendario, las publicaciones aparecen día por día.
 import MarketingWeek from "../MarketingWeek.vue";
 import AdsDemo from "../AdsDemo.vue";
 import SoonBadge from "../../ui/SoonBadge.vue";
@@ -18,23 +19,23 @@ const storyCadence = `Cada ${DEFAULT_CADENCE.sparse_every_days} días; diaria la
 
 <section id="marketing" class="lp-section mk" aria-labelledby="marketing-title">
   <div class="lp-wrap">
-    <div class="mk-head">
+    <div class="mk-head" data-lp-reveal>
       <div class="mk-head-title">
-        <p class="lp-eyebrow">Marketing en piloto automático</p>
-        <h2 id="marketing-title" class="lp-h2 mk-title">Tu evento se promociona solo, todos los días.</h2>
+        <p class="lp-eyebrow" data-lp-step>Marketing en piloto automático</p>
+        <h2 id="marketing-title" class="lp-h2 mk-title" data-lp-step>Tu evento se promociona solo, todos los días.</h2>
       </div>
-      <p class="lp-lead mk-lead">
+      <p class="lp-lead mk-lead" data-lp-step>
         Conecta tu Instagram. Con el póster y los datos de tu evento armamos historias y posts con cuenta regresiva, y se
         publican solos hasta el día de la función.
       </p>
     </div>
 
-    <div class="mk-grid">
-      <div class="mk-week">
+    <div class="mk-grid" data-lp-reveal>
+      <div class="mk-week" data-lp-step>
         <MarketingWeek client:visible eventName={DEMO_EVENT_NAME} dailyTime={dailyTime} eventDayTime={eventDayTime} />
       </div>
 
-      <ul class="mk-list" aria-label="Publicaciones automáticas de ejemplo">
+      <ul class="mk-list" aria-label="Publicaciones automáticas de ejemplo" data-lp-step>
         <li>
           <span>Historia con cuenta regresiva<span class="mk-sub">{storyCadence}</span></span>
           <span class="mk-on">Activa</span>
@@ -44,7 +45,7 @@ const storyCadence = `Cada ${DEFAULT_CADENCE.sparse_every_days} días; diaria la
         <li class="mk-list-note"><span>Facebook y TikTok</span><SoonBadge dark={false} /></li>
       </ul>
 
-      <AdsDemo client:visible />
+      <div data-lp-step><AdsDemo client:visible /></div>
     </div>
   </div>
 </section>

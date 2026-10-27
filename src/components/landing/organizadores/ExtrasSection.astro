@@ -20,11 +20,11 @@ const items = [
 ---
 
 <section class="lp-section lp-surface" aria-labelledby="extras-title">
-  <div class="lp-wrap">
-    <h2 id="extras-title" class="lp-h2">Todo lo demás, incluido.</h2>
+  <div class="lp-wrap" data-lp-reveal>
+    <h2 id="extras-title" class="lp-h2" data-lp-step>Todo lo demás, incluido.</h2>
     <ul class="extras">
       {items.map(({ icon: Icon, ...item }) => (
-        <li class="extra">
+        <li class="extra" data-lp-step>
           <Icon class="extra-icon" size={24} aria-hidden="true" />
           <h3 class="extra-title">
             {item.href ? <a href={item.href} class="extra-link">{item.title}</a> : item.title}
@@ -33,7 +33,7 @@ const items = [
         </li>
       ))}
     </ul>
-    <nav class="extras-niches" aria-label="AI Tickets según lo que produces">
+    <nav class="extras-niches" data-lp-step aria-label="AI Tickets según lo que produces">
       <span class="extras-niches-label">Según lo que produces:</span>
       {verticals.map((l) => (
         <a href={`/${l.slug}`} class="lp-inline-link" data-cta="vertical" data-section="extras">{l.card.title}</a>

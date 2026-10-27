@@ -1,6 +1,7 @@
 ---
 // 2 · Cómo funciona (SPEC_landing_productores §5.2): tres pasos con un mini-mockup cada uno. En mobile van apilados
 // (la spec prefiere apilados a un carrusel por accesibilidad) y sin los mockups, como en el prototipo.
+// Al entrar (L7, L8): eyebrow y título en cascada, y las tres columnas con 120 ms entre cada una.
 import { LANDING_MEDIA } from "../producerLanding.js";
 import { PAYOUT_RELEASE_HOURS } from "../../../../netlify/lib/legal.mjs";
 
@@ -14,13 +15,13 @@ const steps = [
 ];
 ---
 
-<section class="how lp-wrap" aria-labelledby="how-title">
-  <p class="lp-eyebrow">Cómo funciona</p>
-  <h2 id="how-title" class="lp-h2 how-title">De la fecha a la puerta, en un solo lugar.</h2>
+<section class="how lp-wrap" aria-labelledby="how-title" data-lp-reveal>
+  <p class="lp-eyebrow" data-lp-step>Cómo funciona</p>
+  <h2 id="how-title" class="lp-h2 how-title" data-lp-step>De la fecha a la puerta, en un solo lugar.</h2>
 
   <ol class="how-steps">
     {steps.map((step, i) => (
-      <li class="how-step">
+      <li class="how-step" data-lp-step={120 * (i + 1)}>
         <div class="how-mock lp-tile" aria-hidden="true">
           {i === 0 && (
             <>
@@ -61,7 +62,7 @@ const steps = [
     ))}
   </ol>
 
-  <p class="how-more">
+  <p class="how-more" data-lp-step="480">
     <a href={LANDING_MEDIA.demoVideo} class="lp-link" data-video-open data-cta="video" data-section="how">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"></path></svg>
       Ver el video completo

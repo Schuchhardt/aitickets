@@ -18,6 +18,19 @@ export const LANDING_MEDIA = Object.freeze({
   coverPoster: '/landing/aitk-hero-standup.jpg',
   coverPosterWidth: 1344,
   coverPosterHeight: 768,
+  // Póster en AVIF/WebP (§9, LCP), generado con sharp desde el JPG: regenerar si cambia la foto
+  coverPosterSources: [
+    {
+      type: 'image/avif',
+      srcset:
+        '/landing/aitk-hero-standup-640.avif 640w, /landing/aitk-hero-standup-1024.avif 1024w, /landing/aitk-hero-standup-1344.avif 1344w',
+    },
+    {
+      type: 'image/webp',
+      srcset:
+        '/landing/aitk-hero-standup-640.webp 640w, /landing/aitk-hero-standup-1024.webp 1024w, /landing/aitk-hero-standup-1344.webp 1344w',
+    },
+  ],
   demoVideo: '/videos/aitickets-demo.mp4',
   demoPoster: '/videos/aitickets-demo-poster.jpg',
   demoDurationLabel: '21 s',
