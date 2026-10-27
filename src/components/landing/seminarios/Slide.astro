@@ -1,0 +1,29 @@
+---
+// Lámina (SPEC_landing_seminarios §1): rectángulo blanco con filete de 1 px, padding 6% y pie de 28 px con filete
+// superior ("JORNADA EQUIPOS 2026 · EJEMPLO" a la izquierda y "03 / 12" a la derecha). Contenedor de mockups (resultados
+// de la encuesta, canales, la última lámina). ratio: "16 / 9" por defecto; "auto" deja que el contenido mande (mobile).
+import { SEMINAR_NAME } from "./seminariosLanding.js";
+
+interface Props {
+  /** "04 / 12". Sin número ni label, el pie no se muestra */
+  number?: string;
+  label?: string;
+  ratio?: string;
+  class?: string;
+  [key: string]: any;
+}
+const { number, label, ratio = "16 / 9", class: className, ...rest } = Astro.props;
+const foot = number || label ? (label ?? `${SEMINAR_NAME} · ejemplo`) : null;
+---
+
+<div class:list={["se-slide", className]} style={ratio !== "auto" ? `aspect-ratio: ${ratio}` : undefined} {...rest}>
+  <div class="se-slide-body"><slot /></div>
+  {
+    foot && (
+      <div class="se-slide-foot">
+        <span class="se-meta">{foot}</span>
+        {number && <span class="se-meta">{number}</span>}
+      </div>
+    )
+  }
+</div>

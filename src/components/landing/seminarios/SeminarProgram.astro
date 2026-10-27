@@ -1,0 +1,76 @@
+---
+// 3 · El programa (SPEC_landing_seminarios §4.3, blanco, SALA 2 · EL PROGRAMA →, ancla #programa): título, bajada y la
+// firma 1 (isla ProgramBuilder). En desktop, la foto de la organizadora al lado del título (columnas 9–12, 4:5, 260 px);
+// en mobile se omite. La fecha del Día 1 se calcula al construir (seminarDate: la página es prerender) y va por props.
+import { CalendarRange } from "lucide-vue-next";
+import Figure from "./Figure.astro";
+import ProgramBuilder from "./ProgramBuilder.vue";
+import SeminarHeading from "./SeminarHeading.astro";
+import WayfindingSign from "./WayfindingSign.astro";
+import { PHOTO_ALT, SEMINAR_PHOTOS } from "./seminariosLanding.js";
+
+interface Props {
+  date: string;
+}
+const { date } = Astro.props;
+---
+
+<section id="programa" class="se-section se-bg-blanco sep" aria-labelledby="se-program-title" data-se-section="programa" data-se-screen="El programa">
+  <div class="se-wrap">
+    <div class="sep-head" data-lp-reveal>
+      <div class="sep-copy">
+        <WayfindingSign room="Sala 2" label="El programa" icon={CalendarRange} />
+        <SeminarHeading id="se-program-title" text="Un congreso de dos días," emphasis="un solo evento." />
+        <p class="se-lead sep-lead" data-lp-step>
+          Elige el formato y decide qué entrada vale qué día. A la derecha ves cómo queda en tu panel y lo que ve tu público,
+          con los rótulos de la página real.
+        </p>
+      </div>
+      <div class="sep-photo" data-lp-step>
+        <Figure
+          photo={SEMINAR_PHOTOS.organizadora}
+          alt={PHOTO_ALT.organizadora}
+          caption="Fig. 02 — La organizadora repasa el programa antes de abrir."
+          ratio="4 / 5"
+          sizes="260px"
+        />
+      </div>
+    </div>
+    <div class="sep-builder">
+      <ProgramBuilder client:visible date={date} />
+    </div>
+  </div>
+</section>
+
+<style>
+  .sep-lead {
+    max-width: 620px;
+    margin-top: 18px;
+  }
+  .sep-photo {
+    display: none;
+  }
+  .sep-builder {
+    margin-top: 36px;
+  }
+  @media (min-width: 1024px) {
+    .sep-head {
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      column-gap: 24px;
+      align-items: end;
+    }
+    .sep-copy {
+      grid-column: 1 / span 8;
+    }
+    .sep-photo {
+      display: block;
+      grid-column: 9 / span 4;
+      justify-self: end;
+      width: 260px;
+    }
+    .sep-builder {
+      margin-top: 48px;
+    }
+  }
+</style>

@@ -71,3 +71,11 @@ export const CLUB_TESTIMONIAL: ProducerTestimonial | null = null;
  * sección no se renderiza.
  */
 export const PARTY_TESTIMONIAL: ProducerTestimonial | null = null;
+
+/**
+ * Cita de /ticketera-seminarios (SPEC_landing_seminarios §4.10 y §0.9): solo si es real, con nombre, cargo, institución u
+ * organización, ciudad y foto autorizados por escrito. company = "Institución u organización · ciudad"; role = cargo. null:
+ * la sección no se renderiza.
+ */
+export type SeminarTestimonial = ProducerTestimonial & { role: string };
+export const SEMINAR_TESTIMONIAL: SeminarTestimonial | null = null;

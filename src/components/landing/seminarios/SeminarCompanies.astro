@@ -1,0 +1,155 @@
+---
+// 4 · Empresas (SPEC_landing_seminarios §4.4, papel-2, SALA 3 · EMPRESAS →, ancla #empresas): a la izquierda, la compra
+// de una empresa (isla TeamOrder) y a la derecha seis ítems. Verificado en el código:
+//   tipos de entrada con precio y cupo; la puerta ve el tipo al escanear (ValidateQR.vue)
+//   convenios → códigos de descuento por evento o de toda la organización, % o monto, usos, límite por comprador y
+//               fechas (DiscountCodesManager.vue, discounts.mjs); el ejemplo sale de computeDiscountedTotals
+//   cortesías nominadas → CourtesyTicketsForm.vue, hasta MAX_COURTESY_PER_REQUEST (courtesy.ts, módulo de servidor:
+//               se importa aquí al construir) por envío; no cuentan como venta
+//   razón social, RUT y "Productor verificado" → EventTrust.vue
+//   documentos → terms.astro §3: AI Tickets emite boleta electrónica por el cargo; el precio de la entrada lo documenta
+//               el productor (pendiente de validar con abogado y contador: Preguntas abiertas 6). Cada compra trae un
+//               LEGAL.receiptLabel, que no es boleta ni factura. RUT y razón social al comprar: "Pronto"
+//   CSV de órdenes → ordersExport.ts
+import { BadgeCheck, Building, Building2, IdCard, Receipt, Sheet, TicketPercent } from "lucide-vue-next";
+import SeminarHeading from "./SeminarHeading.astro";
+import TeamOrder from "./TeamOrder.vue";
+import WayfindingSign from "./WayfindingSign.astro";
+import SoonBadge from "../../ui/SoonBadge.vue";
+import { AGREEMENT, agreementTotals } from "./seminariosLanding.js";
+import { formatCLP } from "../producerLanding.js";
+import { DEFAULT_MAX_PER_PURCHASE } from "../../Reservation/pricing.js";
+import { MAX_COURTESY_PER_REQUEST } from "../../../lib/courtesy";
+
+const agreement = agreementTotals();
+---
+
+<section id="empresas" class="se-section se-bg-papel-2 sec" aria-labelledby="se-companies-title" data-se-section="empresas" data-se-screen="Empresas">
+  <div class="se-wrap" data-lp-reveal>
+    <WayfindingSign room="Sala 3" label="Empresas" icon={Building2} />
+    <SeminarHeading id="se-companies-title" text="La empresa compra para su equipo." emphasis="Cada uno llega con su QR." />
+    <p class="se-lead sec-lead" data-lp-step>
+      Recursos humanos compra diez entradas en una sola compra y reenvía a cada persona la suya. Los socios del colegio
+      pagan con su código de convenio, los estudiantes con su entrada y tus expositores llegan con una cortesía a su nombre.
+    </p>
+
+    <div class="sec-grid">
+      <div class="sec-order" data-lp-step>
+        <TeamOrder client:visible maxPerPurchase={DEFAULT_MAX_PER_PURCHASE} />
+      </div>
+      <ul class="se-items sec-items">
+        <li class="se-item" data-lp-step>
+          <span class="se-picto"><IdCard size={20} aria-hidden="true" /></span>
+          <div>
+            <p class="se-item-title">Un precio para cada público.</p>
+            <p class="se-item-text">
+              General, estudiante, socio o pase completo, cada uno con su precio y su cupo. En la acreditación, tu equipo ve
+              qué entrada trae cada persona y pide la credencial de estudiante.
+            </p>
+          </div>
+        </li>
+        <li class="se-item" data-lp-step>
+          <span class="se-picto"><TicketPercent size={20} aria-hidden="true" /></span>
+          <div>
+            <p class="se-item-title">Convenios con código.</p>
+            <p class="se-item-text">
+              Un código para cada colegio profesional, universidad o empresa con convenio: porcentaje o monto, usos máximos,
+              límite por persona y fecha de término. Puede servir para este evento o para todos los tuyos.
+            </p>
+            <p class="se-item-text sec-example" data-testid="seminar-agreement">
+              <span class="se-meta">Ejemplo:</span> <code class="sec-code">{AGREEMENT.code}</code> en un pase de
+              <span class="se-tabular">{formatCLP(AGREEMENT.price)}</span> → el socio paga
+              <strong class="se-tabular">{formatCLP(agreement.total)}</strong> con el cargo incluido.
+            </p>
+          </div>
+        </li>
+        <li class="se-item" data-lp-step>
+          <span class="se-picto"><BadgeCheck size={20} aria-hidden="true" /></span>
+          <div>
+            <p class="se-item-title">Expositores, auspiciadores y prensa.</p>
+            <p class="se-item-text">
+              Cortesías a su nombre desde tu panel, hasta {MAX_COURTESY_PER_REQUEST} por envío. Les llega su QR, se acreditan
+              como cualquier entrada y no cuentan como venta.
+            </p>
+          </div>
+        </li>
+        <li class="se-item" data-lp-step>
+          <span class="se-picto"><Building size={20} aria-hidden="true" /></span>
+          <div>
+            <p class="se-item-title">Saben a quién le compran.</p>
+            <p class="se-item-text">
+              Tu página muestra tu razón social y tu RUT, y el sello <strong>Productor verificado</strong> cuando apruebas tu
+              identidad.
+            </p>
+          </div>
+        </li>
+        <li class="se-item" data-lp-step>
+          <span class="se-picto"><Receipt size={20} aria-hidden="true" /></span>
+          <div>
+            <p class="se-item-title">Cada compra, con su comprobante.</p>
+            <p class="se-item-text">
+              El cargo por servicio lo documenta AI Tickets con boleta electrónica. El valor de la entrada lo documentas tú,
+              como organizador: si una empresa te pide factura, se la emites con los datos de su compra.
+            </p>
+            <p class="se-item-extra"><span class="se-soon-chip">RUT y razón social de la empresa al comprar <SoonBadge dark={false} /></span></p>
+          </div>
+        </li>
+        <li class="se-item" data-lp-step>
+          <span class="se-picto"><Sheet size={20} aria-hidden="true" /></span>
+          <div>
+            <p class="se-item-title">Tu contabilidad, en un CSV.</p>
+            <p class="se-item-text">
+              Exportas las órdenes con comprador, correo, entradas, código de descuento, total pagado, neto para ti y medio de
+              pago.
+            </p>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<style>
+  .sec-lead {
+    max-width: 680px;
+    margin-top: 18px;
+  }
+  .sec-grid {
+    display: grid;
+    gap: 32px;
+    margin-top: 40px;
+  }
+  .sec-order,
+  .sec-items {
+    min-width: 0;
+  }
+  .sec-example {
+    margin-top: 8px;
+  }
+  .sec-code {
+    padding: 1px 6px;
+    border: 1px solid var(--se-grafito);
+    border-radius: 2px;
+    background: #ffffff;
+    font-family: var(--se-font);
+    font-size: 14px;
+    font-weight: 700;
+    font-stretch: 75%;
+    letter-spacing: 0.06em;
+  }
+  @media (min-width: 1024px) {
+    .sec-grid {
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      column-gap: 24px;
+      align-items: start;
+    }
+    .sec-order {
+      grid-column: 1 / span 5;
+      position: sticky;
+      top: 104px;
+    }
+    .sec-items {
+      grid-column: 7 / span 6;
+    }
+  }
+</style>

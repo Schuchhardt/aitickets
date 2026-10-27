@@ -1,0 +1,983 @@
+/* ------------------------------------------------------------------------------------------------
+ * Tema de la landing de seminarios (/ticketera-seminarios, docs/specs/rediseno/SPEC_landing_seminarios_aitickets.md §1):
+ * "credencial, programa y pantalla". Lo que se ve y se lleva en un congreso: el programa impreso con su columna de horas
+ * y sus filetes finos, la credencial de PVC con su ranura y el cordón turquesa, la pantalla 16:9 donde se proyecta cada
+ * lámina con su número abajo y la señalética del centro de eventos (SALA 2 →). Es la landing más sobria: papel neutro,
+ * grilla de 12 columnas, nada girado y un solo color con carácter, el turquesa del cordón. Lo único que se mueve como
+ * objeto físico es la credencial, que cuelga y se balancea.
+ * Scope en [data-theme="seminarios"]: no toca los tokens globales; los tokens puente (surface/text/border) hacen que los
+ * componentes compartidos (FAQ, badge "Pronto", barra mobile) tomen la paleta, como en música, clubs y fiestas. En el
+ * hall (turquesa) y el cierre (auditorio) se redefinen localmente (.se-on-dark).
+ * Reglas de color: el turquesa del cordón (--se-cordon) es solo gráfico (cordón, bandas, barras, pictogramas, filete de
+ * la fila elegida); como texto, siempre --se-cordon-ink. Lima (marca) solo en "✅ … validada" y "Tú recibes"; los CTA son
+ * grafito sobre papel y blancos sobre turquesa y auditorio. Sin segundo acento: lo que se distingue, se distingue por
+ * trama. Rojo solo para el error del escáner. Prefijo se-. Se carga junto a landing.css (usa .lp-sr-only y el
+ * movimiento de LandingMotion).
+ * ---------------------------------------------------------------------------------------------- */
+/* Archivo variable con los ejes de peso y de ancho (wdth 62–125). El woff2 latin (archivo-latin-wdth-normal) pesa 88 KiB
+ * y trae Á É Í Ó Ú Ñ ¿ ¡ (U+0000-00FF); las flechas → ↗ no están y caen al respaldo. La página lo precarga
+ * (link rel=preload en ticketera-seminarios.astro). */
+@import "@fontsource-variable/archivo/wdth.css";
+
+/* Respaldo con métricas aproximadas de Archivo sobre Arial, para que el swap no mueva el hero (CLS, §7). Con el respaldo
+ * el énfasis pierde el cambio de ancho pero conserva el color. */
+@font-face {
+  font-family: "Archivo Fallback";
+  src: local("Arial"), local("ArialMT");
+  size-adjust: 104%;
+  ascent-override: 88%;
+  descent-override: 21%;
+  line-gap-override: 0%;
+}
+
+[data-theme="seminarios"] {
+  --se-papel: #f5f5f0; /* papel del programa: fondo principal */
+  --se-papel-2: #e9eae3; /* secciones alternas */
+  --se-blanco: #ffffff; /* láminas, credencial, cards */
+  --se-grafito: #15191c; /* texto y filetes fuertes (16,2:1 sobre papel) */
+  --se-text-2: #3e464c; /* texto secundario (8,8:1 sobre papel) */
+  --se-text-3: #5b646b; /* meta (5,5:1 sobre papel; 5,0:1 sobre papel-2) */
+  --se-filete: rgba(21, 25, 28, 0.16); /* filetes de 1 px del programa */
+  --se-cordon: #00877f; /* turquesa del cordón: bandas, barras, pictogramas. Nunca texto bajo 24 px (4:1 sobre papel) */
+  --se-cordon-ink: #006b65; /* turquesa para texto sobre papel (5,8:1) y fondo del hall (blanco encima 6,4:1) */
+  --se-cordon-claro: #cfeae5; /* bloques del programa, fila elegida (grafito encima 13,9:1; cordon-ink 5,0:1) */
+  --se-auditorio: #0f1517; /* sala a oscuras: solo el cierre */
+  --se-auditorio-2: #1a2225; /* cards sobre auditorio */
+  --se-text-dark-2: #c9d1d0; /* 11,9:1 sobre auditorio */
+  --se-text-dark-3: #95a1a0; /* meta sobre auditorio (6,9:1) */
+  --se-proyector: #4fd1c5; /* turquesa sobre oscuro: cifras, puntero (9,9:1 sobre auditorio) */
+  --se-aviso: #fef3c7; /* aviso amarillo del escáner (el del producto) */
+  --se-aviso-ink: #713f12;
+  --se-error: #b91c1c; /* error del escáner (el rojo del producto) */
+  --se-font: "Archivo Variable", "Archivo", "Archivo Fallback", "Arial", system-ui, sans-serif;
+  --se-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* Componentes compartidos dentro del tema (LandingFaq, LandingMobileBar, SoonBadge), como en música, clubs y fiestas */
+  --surface-0: var(--se-papel);
+  --surface-1: var(--se-papel-2);
+  --surface-2: var(--se-blanco);
+  --border: var(--se-filete);
+  --border-strong: rgba(21, 25, 28, 0.32);
+  --text-1: var(--se-grafito);
+  --text-2: var(--se-text-2);
+  --text-3: var(--se-text-3);
+
+  font-family: "Prompt", system-ui, sans-serif;
+  color: var(--se-grafito);
+  background: var(--se-papel);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Fondo del documento (rebote del scroll en iOS y macOS): el papel del hero arriba */
+html:has(body [data-theme="seminarios"]) {
+  background: #f5f5f0;
+}
+
+/* Grilla de 12 columnas (§1): 1280 de ancho máximo, 20 px de margen en mobile y 40 en desktop */
+.se-wrap {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding-inline: 20px;
+}
+@media (min-width: 768px) {
+  .se-wrap {
+    padding-inline: 40px;
+  }
+}
+.se [id] {
+  scroll-margin-top: 88px;
+}
+/* El recorrido por el centro de eventos (§2): 72 px de padding vertical en mobile, 128 en desktop */
+.se-section {
+  position: relative;
+  padding-block: 72px;
+  overflow-x: clip;
+}
+@media (min-width: 1024px) {
+  .se-section {
+    padding-block: 128px;
+  }
+}
+.se-bg-papel {
+  background: var(--se-papel);
+}
+.se-bg-papel-2 {
+  background: var(--se-papel-2);
+}
+.se-bg-blanco {
+  background: var(--se-blanco);
+}
+.se-bg-hall {
+  background: var(--se-cordon-ink);
+}
+.se-bg-auditorio {
+  background: var(--se-auditorio);
+}
+/* Hall (turquesa) y cierre (auditorio): texto blanco y tokens puente en oscuro para lo compartido */
+.se-on-dark {
+  --text-1: #ffffff;
+  --text-2: rgba(255, 255, 255, 0.86);
+  --text-3: rgba(255, 255, 255, 0.78);
+  --surface-2: rgba(255, 255, 255, 0.14);
+  --border: rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+}
+.se-bg-auditorio.se-on-dark {
+  --text-2: var(--se-text-dark-2);
+  --text-3: var(--se-text-dark-3);
+  --border: rgba(255, 255, 255, 0.16);
+}
+
+/* ---------- Tipografía ----------
+ * Titulares en Archivo 800 Expanded (wdth 125); el énfasis es un cambio de ancho: la frase pasa a Condensed 700
+ * (wdth 62) en turquesa, en su propia línea. Nunca cursiva, sticker, destacador ni subrayado. */
+.se-display,
+.se-h1,
+.se-h2 {
+  font-family: var(--se-font);
+  font-weight: 800;
+  font-stretch: 125%;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: break-word;
+}
+.se-h1 {
+  font-size: 44px;
+  line-height: 46px;
+}
+.se-h2 {
+  font-size: 34px;
+  line-height: 38px;
+  text-wrap: balance;
+}
+.se-h3 {
+  font-family: var(--se-font);
+  font-size: 21px;
+  line-height: 26px;
+  font-weight: 700;
+  font-stretch: 100%;
+  letter-spacing: -0.01em;
+}
+.se-em {
+  display: block;
+  font-weight: 700;
+  font-stretch: 62%;
+  letter-spacing: -0.01em;
+  color: var(--se-cordon-ink);
+}
+.se-on-dark .se-em {
+  color: rgba(255, 255, 255, 0.8);
+}
+@media (min-width: 1024px) {
+  /* Hasta 88 px a 1760 de ancho (§1): con la columna de texto de 6 de 12, "programa." no se corta */
+  .se-h1 {
+    font-size: clamp(56px, 5vw, 88px);
+    line-height: 1;
+  }
+  .se-h2 {
+    font-size: clamp(44px, 4.4vw, 60px);
+    line-height: 1.04;
+  }
+  .se-h3 {
+    font-size: 26px;
+    line-height: 30px;
+  }
+}
+/* Meta / señalética: Archivo 600 SemiCondensed en mayúsculas, horas en tabular-nums */
+.se-meta {
+  font-family: var(--se-font);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  font-stretch: 75%;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  color: var(--se-text-3);
+}
+.se-on-dark .se-meta {
+  color: var(--text-3);
+}
+.se-tabular {
+  font-family: var(--se-font);
+  font-variant-numeric: tabular-nums;
+}
+.se-lead {
+  font-size: 16px;
+  line-height: 25px;
+  color: var(--se-text-2);
+}
+.se-on-dark .se-lead {
+  color: var(--text-2);
+}
+@media (min-width: 1024px) {
+  .se-lead {
+    font-size: 18px;
+    line-height: 29px;
+  }
+}
+.se-note {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--se-text-3);
+}
+.se-on-dark .se-note {
+  color: var(--text-3);
+}
+.se-link {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+  border-radius: 2px;
+}
+.se-link:hover {
+  text-decoration-thickness: 2px;
+}
+/* Sello "ejemplo" de toda card con datos (§0.10) */
+.se-example {
+  font-family: var(--se-font);
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 600;
+  font-stretch: 75%;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--se-text-3);
+}
+/* Chip de lo que todavía no existe (lleva SoonBadge adentro) */
+.se-soon-chip {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 4px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--text-2);
+}
+.se-on-dark .se-soon-chip {
+  border-color: rgba(255, 255, 255, 0.45);
+}
+/* "Pronto" sobre el turquesa del hall: el SoonBadge dark (blanco al 78% sobre blanco al 12%) es para fondos negros y
+   acá queda en ~3,7:1. Pastilla blanca con texto turquesa (6,4:1, AA), sin tocar el componente compartido */
+.se-bg-hall .soon.soon-dark {
+  background: #ffffff;
+  color: var(--se-cordon-ink);
+}
+
+/* ---------- Botones (§1): rectangulares de 52 px, radio 4, con la flecha en un cuadrado que avanza 4 px ---------- */
+.se-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 52px;
+  padding: 0 6px 0 20px;
+  border: 1.5px solid var(--se-grafito);
+  border-radius: 4px;
+  font-family: var(--se-font);
+  font-size: 16px;
+  font-weight: 700;
+  font-stretch: 100%;
+  line-height: 1.2;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 160ms var(--se-ease), color 160ms var(--se-ease);
+}
+.se-btn-solid {
+  background: var(--se-grafito);
+  color: #ffffff;
+}
+.se-btn-solid:hover {
+  background: #000000;
+}
+.se-btn-line {
+  padding-right: 20px;
+  background: transparent;
+  color: var(--se-grafito);
+}
+.se-btn-line:hover {
+  background: rgba(21, 25, 28, 0.06);
+}
+.se-btn-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.14);
+  font-family: "Prompt", system-ui, sans-serif;
+  font-weight: 500;
+  transition: transform 200ms var(--se-ease);
+}
+.se-btn:hover .se-btn-arrow,
+.se-btn:focus-visible .se-btn-arrow {
+  transform: translateX(4px);
+}
+.se-btn:focus-visible,
+.se-link:focus-visible,
+.se-focus:focus-visible {
+  outline: 3px solid var(--se-cordon-ink);
+  outline-offset: 3px;
+}
+/* Sobre turquesa y auditorio: primario blanco con texto grafito; contorno blanco; foco blanco */
+.se-on-dark .se-btn-solid {
+  border-color: #ffffff;
+  background: #ffffff;
+  color: var(--se-grafito);
+}
+.se-on-dark .se-btn-solid .se-btn-arrow {
+  background: rgba(21, 25, 28, 0.08);
+}
+.se-on-dark .se-btn-line {
+  border-color: #ffffff;
+  color: #ffffff;
+}
+.se-on-dark .se-btn-line:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+.se-on-dark .se-btn:focus-visible,
+.se-on-dark .se-link:focus-visible,
+.se-on-dark .se-focus:focus-visible {
+  outline-color: #ffffff;
+}
+/* La lámina del cierre es blanca dentro del auditorio: sus botones vuelven a los de papel */
+.se-on-dark .se-slide .se-btn-solid {
+  border-color: var(--se-grafito);
+  background: var(--se-grafito);
+  color: #ffffff;
+}
+.se-on-dark .se-slide .se-btn-solid .se-btn-arrow {
+  background: rgba(255, 255, 255, 0.14);
+}
+.se-on-dark .se-slide .se-btn-line {
+  border-color: var(--se-grafito);
+  color: var(--se-grafito);
+}
+.se-on-dark .se-slide .se-btn:focus-visible,
+.se-on-dark .se-slide .se-link:focus-visible {
+  outline-color: var(--se-cordon-ink);
+}
+
+/* ---------- Controles: segmented (radiogroup), campos y sliders ---------- */
+.se-seg {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 3px;
+  border: 1px solid var(--se-grafito);
+  border-radius: 4px;
+  background: var(--se-blanco);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.se-seg::-webkit-scrollbar {
+  display: none;
+}
+.se-seg-btn {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  font-family: var(--se-font);
+  font-size: 14px;
+  font-weight: 600;
+  font-stretch: 100%;
+  color: var(--se-text-2);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.se-seg-btn.is-on {
+  background: var(--se-grafito);
+  color: #ffffff;
+}
+.se-seg-btn:focus-visible {
+  outline: 3px solid var(--se-cordon-ink);
+  outline-offset: 2px;
+}
+.se-field {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--se-grafito);
+  border-radius: 4px;
+  background: var(--se-blanco);
+  font: inherit;
+  font-size: 16px;
+  color: var(--se-grafito);
+}
+.se-field:focus-visible {
+  outline: 3px solid var(--se-cordon-ink);
+  outline-offset: 2px;
+}
+.se-range {
+  width: 100%;
+  height: 44px;
+  accent-color: var(--se-cordon-ink);
+  cursor: pointer;
+}
+.se-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.se-toggle input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--se-cordon-ink);
+}
+
+/* ---------- Card blanca con filete (cards, mockups) ---------- */
+.se-card {
+  border: 1px solid var(--se-filete);
+  border-radius: 4px;
+  background: var(--se-blanco);
+}
+.se-card-strong {
+  border-color: var(--se-grafito);
+}
+
+/* ---------- Rótulo de sala (WayfindingSign, §1) ---------- */
+.se-sign {
+  display: flex;
+  align-items: stretch;
+  width: fit-content;
+  max-width: 100%;
+  height: 40px;
+  margin-bottom: 28px;
+  background: var(--se-grafito);
+  color: #ffffff;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.se-sign-icon,
+.se-sign-arrow {
+  flex: 0 0 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.se-sign-icon {
+  background: #ffffff;
+  color: var(--se-grafito);
+  border: 1px solid var(--se-grafito);
+}
+.se-sign-text {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 16px;
+  font-family: var(--se-font);
+  font-size: 12px;
+  font-weight: 600;
+  font-stretch: 75%;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.se-sign-arrow {
+  background: var(--se-cordon);
+  color: #ffffff;
+  font-family: "Prompt", system-ui, sans-serif;
+  font-size: 18px;
+}
+.se-sign-arrow span {
+  display: inline-block;
+}
+/* En el hall el rótulo invierte: cuadrado blanco y flecha en grafito sobre blanco */
+.se-sign.is-hall .se-sign-arrow {
+  background: #ffffff;
+  color: var(--se-grafito);
+}
+.se-sign.is-hall {
+  outline: 1px solid rgba(255, 255, 255, 0.4);
+}
+@media (min-width: 768px) {
+  .se-sign {
+    height: 48px;
+    margin-bottom: 36px;
+  }
+  .se-sign-icon,
+  .se-sign-arrow {
+    flex-basis: 48px;
+  }
+  .se-sign-text {
+    font-size: 13px;
+  }
+}
+
+/* ---------- Lámina 16:9 (Slide, §1) ---------- */
+.se-slide {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--se-filete);
+  background: var(--se-blanco);
+  color: var(--se-grafito);
+}
+.se-slide-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 6%;
+}
+.se-slide-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 28px;
+  padding: 0 12px;
+  border-top: 1px solid var(--se-filete);
+}
+.se-slide-foot .se-meta {
+  font-size: 11px;
+}
+
+/* ---------- Figura sobria (Figure, §1) ---------- */
+.se-figure {
+  margin: 0;
+}
+.se-figure-frame {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border: 1px solid var(--se-filete);
+  border-radius: 4px;
+  background: var(--se-papel-2);
+}
+.se-figure-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: saturate(0.92) contrast(1.04);
+}
+.se-figure figcaption {
+  margin-top: 10px;
+  font-family: var(--se-font);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+  font-stretch: 75%;
+  color: var(--se-text-3);
+}
+.se-on-dark .se-figure figcaption {
+  color: var(--text-3);
+}
+
+/* ---------- Pictograma de señalética (cuadrado grafito con ícono blanco) ---------- */
+.se-picto {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 2px;
+  background: var(--se-grafito);
+  color: #ffffff;
+}
+.se-num {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 2px;
+  background: #ffffff;
+  color: var(--se-cordon-ink);
+  font-family: var(--se-font);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Ítems con pictograma (empresas, antes del día, hall, después) ---------- */
+.se-items {
+  display: grid;
+  gap: 0;
+}
+.se-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 14px;
+  padding: 18px 0;
+  border-top: 1px solid var(--border);
+}
+.se-item-title {
+  font-family: var(--se-font);
+  font-weight: 700;
+  font-stretch: 100%;
+  font-size: 17px;
+  line-height: 23px;
+}
+.se-item-text {
+  margin-top: 4px;
+  font-size: 15px;
+  line-height: 23px;
+  color: var(--text-2);
+}
+.se-item-extra {
+  margin-top: 10px;
+}
+@media (min-width: 768px) {
+  .se-items.is-two {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 40px;
+  }
+}
+
+/* ---------- Programa (ProgramGrid): columna de horas + bloques con filetes ---------- */
+.se-program-day + .se-program-day {
+  margin-top: 0;
+}
+.se-program-head {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--se-grafito);
+}
+.se-program-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.se-program-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 12px;
+  align-items: baseline;
+  padding: 10px 10px 10px 0;
+  border-bottom: 1px solid var(--se-filete);
+  font-size: 14px;
+  line-height: 20px;
+}
+.se-program-time {
+  font-family: var(--se-font);
+  font-size: 13px;
+  font-weight: 600;
+  font-stretch: 75%;
+  font-variant-numeric: tabular-nums;
+  color: var(--se-text-3);
+}
+.se-program-row.is-pause {
+  color: var(--se-text-3);
+}
+.se-program-row.is-focus {
+  background: var(--se-cordon-claro);
+  box-shadow: inset 3px 0 0 var(--se-cordon);
+  padding-left: 10px;
+  margin-left: -10px;
+}
+@media (min-width: 768px) {
+  .se-program-row {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+}
+
+/* ---------- Credencial (Credential, §1) ---------- */
+.se-cred {
+  position: relative;
+  width: var(--cred-w, 260px);
+  transform-origin: 50% calc(-1 * var(--cord, 120px));
+  /* La sombra va en el contenedor: la máscara de la ranura recortaría la de la tarjeta */
+  filter: drop-shadow(0 12px 18px rgba(21, 25, 28, 0.16));
+}
+.se-cred-cord {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  width: 60px;
+  height: var(--cord, 120px);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.se-cred-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  aspect-ratio: 260 / 372;
+  overflow: hidden;
+  border: 1px solid var(--se-grafito);
+  border-radius: 12px;
+  background: #ffffff;
+  color: var(--se-grafito);
+  /* Ranura de 44×8 (radio 4) arriba al centro, recortada con una máscara (se ve el fondo de la sección) */
+  -webkit-mask: var(--se-slot) center / 100% 100% no-repeat;
+  mask: var(--se-slot) center / 100% 100% no-repeat;
+}
+.se-cred {
+  --se-slot: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 260 372' preserveAspectRatio='none'%3E%3Cpath fill-rule='evenodd' d='M0 0H260V372H0Z M112 10H148A4 4 0 0 1 148 18H112A4 4 0 0 1 112 10Z'/%3E%3C/svg%3E");
+}
+.se-cred-band {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  margin-top: 28px;
+  font-family: var(--se-font);
+  font-size: 12px;
+  font-weight: 700;
+  font-stretch: 75%;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+/* Tramas de la banda (nunca solo color): sólida turquesa, sólida grafito, rayas, contorno */
+.se-cred-band.is-solid {
+  background: var(--se-cordon-ink);
+  color: #ffffff;
+}
+.se-cred-band.is-ink {
+  background: var(--se-grafito);
+  color: #ffffff;
+}
+.se-cred-band.is-stripes {
+  background: repeating-linear-gradient(135deg, var(--se-cordon) 0 10px, #ffffff 10px 18px);
+  color: var(--se-grafito);
+}
+.se-cred-band.is-stripes span {
+  padding: 2px 8px;
+  background: #ffffff;
+}
+.se-cred-band.is-outline {
+  margin-inline: 10px;
+  border: 1.5px solid var(--se-grafito);
+  background: repeating-linear-gradient(135deg, rgba(21, 25, 28, 0.12) 0 1px, transparent 1px 6px);
+  color: var(--se-grafito);
+}
+.se-cred-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 18px 14px;
+}
+.se-cred-name {
+  font-family: var(--se-font);
+  font-size: 24px;
+  line-height: 26px;
+  font-weight: 800;
+  font-stretch: 125%;
+  letter-spacing: -0.02em;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.se-cred-org {
+  margin-top: 6px;
+  font-size: 14px;
+  line-height: 18px;
+  color: var(--se-text-2);
+}
+.se-cred-day {
+  margin-top: 10px;
+}
+/* La tarjeta es blanca también en el hall y el cierre: su meta no toma el color de .se-on-dark */
+.se-cred .se-meta {
+  color: var(--se-text-3);
+}
+.se-cred-foot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-top: auto;
+}
+.se-cred-qr {
+  width: 64px;
+  height: 64px;
+}
+.se-cred-photo {
+  width: 64px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 2px;
+}
+.se-cred.is-small {
+  --cred-w: 200px;
+}
+.se-cred.is-small .se-cred-band {
+  height: 32px;
+  margin-top: 24px;
+  font-size: 11px;
+}
+.se-cred.is-small .se-cred-body {
+  padding: 12px 14px 10px;
+}
+.se-cred.is-small .se-cred-name {
+  font-size: 19px;
+  line-height: 21px;
+}
+.se-cred.is-small .se-cred-org {
+  font-size: 13px;
+}
+.se-cred.is-small .se-cred-qr {
+  width: 48px;
+  height: 48px;
+}
+
+/* responsive: a 200×286 bajo 1024 px (mesa de acreditación en mobile) */
+@media (max-width: 1023px) {
+  .se-cred.is-responsive {
+    --cred-w: 200px;
+  }
+  .se-cred.is-responsive .se-cred-band {
+    height: 32px;
+    margin-top: 24px;
+    font-size: 11px;
+  }
+  .se-cred.is-responsive .se-cred-body {
+    padding: 12px 14px 10px;
+  }
+  .se-cred.is-responsive .se-cred-name {
+    font-size: 19px;
+    line-height: 21px;
+  }
+  .se-cred.is-responsive .se-cred-org {
+    font-size: 13px;
+  }
+  .se-cred.is-responsive .se-cred-qr {
+    width: 48px;
+    height: 48px;
+  }
+}
+/* C12: la credencial nueva "se imprime" de arriba abajo (solo con movimiento) */
+.lp-motion .se-cred.is-printing .se-cred-card {
+  animation: se-print 450ms var(--se-ease) both;
+}
+
+/* ---------- Movimiento (§6). Todo cuelga de html.lp-motion: sin JS o con "reducir movimiento", estado final ---------- */
+/* C4: péndulo amortiguado desde el clip, al entrar en viewport y al cambiar de caso */
+@keyframes se-swing {
+  0% {
+    transform: rotate(4deg);
+  }
+  25% {
+    transform: rotate(-3deg);
+  }
+  50% {
+    transform: rotate(2deg);
+  }
+  75% {
+    transform: rotate(-1deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+.lp-motion .se-cred.is-swinging {
+  animation: se-swing 1600ms cubic-bezier(0.3, 0.6, 0.4, 1) both;
+}
+/* C5: el rótulo de sala entra con clip-path y la flecha avanza 6 px y vuelve */
+@keyframes se-sign-in {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes se-nudge {
+  50% {
+    transform: translateX(6px);
+  }
+}
+.lp-motion .se-sign[data-se-sign]:not(.is-in) {
+  clip-path: inset(0 100% 0 0);
+}
+.lp-motion .se-sign.is-in {
+  animation: se-sign-in 420ms var(--se-ease) both;
+}
+.lp-motion .se-sign.is-in .se-sign-arrow span {
+  animation: se-nudge 240ms ease-out 420ms both;
+}
+/* C1: H1 del hero. La primera línea sube; la de énfasis entra "ensanchándose" (scaleX desde la izquierda) */
+@keyframes se-rise {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+@keyframes se-widen {
+  from {
+    opacity: 0;
+    transform: scaleX(0.86);
+  }
+}
+.lp-motion .se-hero-line {
+  display: block;
+  animation: se-rise 500ms var(--se-ease) both;
+}
+.lp-motion .se-hero-title .se-em {
+  transform-origin: left center;
+  animation: se-widen 520ms var(--se-ease) 200ms both;
+}
+/* C2 / C17: revelado de foto y lámina que "se enciende" */
+@keyframes se-reveal-x {
+  from {
+    clip-path: inset(0 0 0 100%);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes se-power {
+  0% {
+    opacity: 0;
+  }
+  55% {
+    opacity: 0.94;
+  }
+  70% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 0.94;
+  }
+}
+@keyframes se-power-full {
+  0% {
+    opacity: 0;
+  }
+  55% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes se-dim {
+  from {
+    opacity: 0.4;
+  }
+  to {
+    opacity: 0;
+  }
+}
+/* C12: la credencial nueva "se imprime" de arriba abajo */
+@keyframes se-print {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .se-btn,
+  .se-btn-arrow {
+    transition: none;
+  }
+}

@@ -1,0 +1,112 @@
+---
+// 2 · Para quién (SPEC_landing_seminarios §4.2, papel, SALA 1 · PARA QUIÉN →): seis formatos en una grilla 3×2 separada
+// por filetes, como el índice de un programa, cada uno con su pictograma de señalética, y los links a talleres y
+// academias (la frontera con las otras landings). El tope de funciones sale de MAX_EVENT_FUNCTIONS (producerFaq.ts).
+// Verificado: inscripción gratis con nombre y correo y cupo que se cierra (RsvpForm.vue); cada día una función
+// (EditEventForm.vue, schedule.ts); duplicar (eventDuplicate.ts); evento privado (EditEventForm.vue); códigos de
+// convenio (DiscountCodesManager.vue).
+import { Building2, CalendarRange, GraduationCap, ListOrdered, Mic, Presentation, Users } from "lucide-vue-next";
+import SeminarHeading from "./SeminarHeading.astro";
+import WayfindingSign from "./WayfindingSign.astro";
+import { MAX_EVENT_FUNCTIONS } from "../../../data/producerFaq";
+
+const formats = [
+  { icon: Mic, title: "Charlas abiertas", text: "Una fecha, inscripción gratis con nombre y correo, y un cupo que se cierra solo." },
+  { icon: Presentation, title: "Seminarios de un día", text: "Entrada general y estudiante, el café en la descripción y la acreditación a primera hora." },
+  { icon: CalendarRange, title: "Congresos de varios días", text: `Cada día es una función (hasta ${MAX_EVENT_FUNCTIONS}), con pase completo o entrada por día.` },
+  { icon: ListOrdered, title: "Ciclos de charlas", text: "Una charla al mes, cada una con su cupo y su inscripción. Duplicas la anterior y cambias la fecha." },
+  { icon: Building2, title: "Jornadas de empresa o gremio", text: "Un evento privado, solo con el link, para tus socios o tu equipo." },
+  {
+    icon: GraduationCap,
+    title: "Encuentros académicos",
+    text: "Colegios profesionales, universidades y fundaciones: socios con código de convenio y estudiantes con su propia entrada.",
+  },
+];
+---
+
+<section id="para-quien" class="se-section se-bg-papel sef" aria-labelledby="se-formats-title" data-se-section="para_quien" data-se-screen="Para quién">
+  <div class="se-wrap" data-lp-reveal>
+    <WayfindingSign room="Sala 1" label="Para quién" icon={Users} />
+    <SeminarHeading id="se-formats-title" text="Charla, seminario o congreso." emphasis="Un solo lugar para inscribir." />
+    <p class="se-lead sef-lead" data-lp-step>Desde una charla gratis un martes en la tarde hasta un congreso de dos días con quinientas personas.</p>
+
+    <ul class="sef-grid">
+      {
+        formats.map((f) => (
+          <li class="sef-item" data-lp-step>
+            <span class="se-picto">
+              <f.icon size={20} aria-hidden="true" />
+            </span>
+            <span>
+              <span class="se-h3 sef-title">{f.title}</span>
+              <span class="sef-text">{f.text}</span>
+            </span>
+          </li>
+        ))
+      }
+    </ul>
+
+    <p class="se-meta sef-links" data-lp-step>
+      <span>¿Clases prácticas con grupos chicos? <a href="/ticketera-talleres" class="se-link">Talleres →</a></span>
+      <span>¿La muestra de fin de año? <a href="/academias" class="se-link">Academias →</a></span>
+    </p>
+  </div>
+</section>
+
+<style>
+  .sef-lead {
+    max-width: 640px;
+    margin-top: 18px;
+  }
+  .sef-grid {
+    display: grid;
+    margin-top: 40px;
+    border-top: 1px solid var(--se-grafito);
+  }
+  .sef-item {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 16px;
+    padding: 22px 0;
+    border-bottom: 1px solid var(--se-filete);
+  }
+  .sef-title {
+    display: block;
+  }
+  .sef-text {
+    display: block;
+    margin-top: 6px;
+    font-size: 15px;
+    line-height: 23px;
+    color: var(--se-text-2);
+  }
+  .sef-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 32px;
+    margin-top: 28px;
+  }
+  .sef-links .se-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    color: var(--se-cordon-ink);
+  }
+  @media (min-width: 768px) {
+    .sef-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .sef-item {
+      padding: 26px 24px 26px 0;
+    }
+  }
+  @media (min-width: 1024px) {
+    .sef-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .sef-item:not(:nth-child(3n + 1)) {
+      padding-left: 24px;
+      border-left: 1px solid var(--se-filete);
+    }
+  }
+</style>

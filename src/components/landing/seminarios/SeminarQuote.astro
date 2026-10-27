@@ -1,0 +1,66 @@
+---
+// 10 · Testimonio (SPEC_landing_seminarios §4.10 y §0.9): solo si SEMINAR_TESTIMONIAL (producerSocialProof.ts) es una
+// cita real con nombre, cargo, institución u organización, ciudad y foto autorizados por escrito. Si es null no se
+// renderiza nada, ni el contenedor. La cita va en una lámina (16:9 en desktop, 4:5 en mobile) con comillas de Archivo 800
+// turquesa de 88 px y, a la derecha, una credencial con la foto autorizada en lugar del QR y la banda ORGANIZADORA.
+import Credential from "./Credential.vue";
+import Slide from "./Slide.astro";
+import { SEMINAR_TESTIMONIAL } from "../../../data/producerSocialProof";
+
+const t = SEMINAR_TESTIMONIAL;
+---
+
+{
+  t && (
+    <section class="se-section se-bg-papel seq" aria-label="Lo que dicen quienes organizan" data-se-section="testimonial" data-se-testimonial>
+      <figure class="se-wrap seq-inner" data-lp-reveal>
+        <Slide label={t.company} ratio="auto" class="seq-slide">
+          <span class="se-display seq-mark" aria-hidden="true">“</span>
+          <blockquote class="seq-quote">
+            <p>{t.quote}</p>
+          </blockquote>
+        </Slide>
+        <figcaption class="seq-by" data-lp-step>
+          <Credential name={t.name} org={t.role} type="organizadora" day={t.company} photo={t.photo} small swing={false} responsive={false} cord={60} example={false} />
+        </figcaption>
+      </figure>
+    </section>
+  )
+}
+
+<style>
+  .seq-inner {
+    display: grid;
+    gap: 32px;
+    align-items: center;
+  }
+  .seq-mark {
+    display: block;
+    font-size: 88px;
+    line-height: 0.8;
+    color: var(--se-cordon);
+  }
+  .seq-quote {
+    margin: 8px 0 0;
+    font-family: var(--se-font);
+    font-size: 21px;
+    line-height: 30px;
+    font-weight: 500;
+    font-stretch: 100%;
+  }
+  .seq-by {
+    display: flex;
+    justify-content: center;
+    padding-top: 60px;
+  }
+  @media (min-width: 1024px) {
+    .seq-inner {
+      grid-template-columns: minmax(0, 1fr) 260px;
+      gap: 48px;
+    }
+    .seq-quote {
+      font-size: 30px;
+      line-height: 42px;
+    }
+  }
+</style>

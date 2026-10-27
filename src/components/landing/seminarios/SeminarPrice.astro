@@ -1,0 +1,100 @@
+---
+// 8 · La cotización (SPEC_landing_seminarios §4.8, papel, SALA 5 · PRECIO →, ancla #precio): precio y cobro. Plata y
+// plazos solo de constantes: el texto, como el priceLead de stand-up, con SERVICE_FEE_PERCENT_LABEL / IVA_PERCENT_LABEL
+// (fees.mjs) y ABSORB_FEE_ACTIVATION (producerFaq.ts); la garantía de plazo con PAYOUT_RELEASE_HOURS (payoutGuaranteeText:
+// PAYOUT_SHORT_TEXT habla de "cada show") y el cobro por jornada con PAYOUT_SCHEDULE_TEXT y las fechas de ejemplo
+// calculadas (término de cada función + PAYOUT_RELEASE_HOURS, como functionEnd / lastFunctionEnd en ledger.ts), con "*" y
+// TERMS_NOTE. La cotización es la isla QuoteCalculator.
+import { Clock, Receipt } from "lucide-vue-next";
+import QuoteCalculator from "./QuoteCalculator.vue";
+import SeminarHeading from "./SeminarHeading.astro";
+import WayfindingSign from "./WayfindingSign.astro";
+import { congressReleaseText, payoutGuaranteeText } from "./seminariosLanding.js";
+import { IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL } from "../../../../netlify/lib/fees.mjs";
+import { PAYOUT_SCHEDULE_TEXT } from "../../../../netlify/lib/legal.mjs";
+import { ABSORB_FEE_ACTIVATION, TERMS_NOTE } from "../../../data/producerFaq";
+
+interface Props {
+  schedule: { today: string; release: { day1: { label: string }; last: { label: string } } };
+}
+const { schedule } = Astro.props;
+---
+
+<section id="precio" class="se-section se-bg-papel sepr" aria-labelledby="se-price-title" data-se-section="precio" data-se-screen="Precio">
+  <div class="se-wrap" data-lp-reveal>
+    <WayfindingSign room="Sala 5" label="Precio" icon={Receipt} />
+    <div class="sepr-grid">
+      <div class="sepr-copy">
+        <SeminarHeading id="se-price-title" text="Tú recibes el 100%" emphasis="de cada inscripción." />
+        <p class="se-lead sepr-lead" data-lp-step>
+          Para ti, 0% de comisión. Quien compra paga un cargo por servicio de {SERVICE_FEE_PERCENT_LABEL} más IVA
+          ({IVA_PERCENT_LABEL}) sobre ese cargo. Si prefieres precios redondos, lo absorbes tú, por evento.
+          {ABSORB_FEE_ACTIVATION} Las inscripciones gratis y las cortesías no pagan nada.
+        </p>
+        <p class="se-meta sepr-guarantees" data-lp-step>Sin mensualidad · Sin permanencia · {payoutGuaranteeText}*</p>
+        <div class="sepr-payout" data-lp-step data-testid="seminar-payout">
+          <span class="se-picto"><Clock size={20} aria-hidden="true" /></span>
+          <p>
+            <span class="sepr-payout-title">Cobro por jornada.</span>
+            {PAYOUT_SCHEDULE_TEXT}* {congressReleaseText} Ejemplo: Solo día 1 → {schedule.release.day1.label}; pase completo y Solo
+            día 2 → {schedule.release.last.label}.
+          </p>
+        </div>
+        <p class="se-note sepr-terms" data-lp-step>
+          <a href={TERMS_NOTE.href} class="se-link">{TERMS_NOTE.text}</a>
+        </p>
+      </div>
+      <div class="sepr-calc" data-lp-step>
+        <QuoteCalculator client:visible today={schedule.today} />
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .sepr-grid {
+    display: grid;
+    gap: 40px;
+  }
+  .sepr-lead {
+    max-width: 560px;
+    margin-top: 18px;
+  }
+  .sepr-guarantees {
+    margin-top: 18px;
+  }
+  .sepr-payout {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 14px;
+    max-width: 560px;
+    margin-top: 24px;
+    padding: 16px 0;
+    border-block: 1px solid var(--se-grafito);
+    font-size: 15px;
+    line-height: 23px;
+  }
+  .sepr-payout-title {
+    font-weight: 700;
+  }
+  .sepr-terms {
+    margin-top: 14px;
+  }
+  .sepr-copy,
+  .sepr-calc {
+    min-width: 0;
+  }
+  @media (min-width: 1024px) {
+    .sepr-grid {
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      column-gap: 24px;
+      align-items: start;
+    }
+    .sepr-copy {
+      grid-column: 1 / span 4;
+    }
+    .sepr-calc {
+      grid-column: 5 / span 8;
+    }
+  }
+</style>

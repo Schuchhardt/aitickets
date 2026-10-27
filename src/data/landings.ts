@@ -12,7 +12,7 @@
 import { IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL, computeFeeSplit } from "../../netlify/lib/fees.mjs";
 import { PAYOUT_RELEASE_HOURS, PAYOUT_BUSINESS_DAYS } from "../../netlify/lib/legal.mjs";
 import { DEFAULT_MAX_PER_PURCHASE } from "../components/Reservation/pricing.js";
-import { ABSORB_FEE_ACTIVATION, PRODUCER_FAQ, type FaqItem } from "./producerFaq";
+import { ABSORB_FEE_ACTIVATION, MAX_EVENT_FUNCTIONS, PRODUCER_FAQ, type FaqItem } from "./producerFaq";
 
 export type LandingSection = {
     heading: string;
@@ -284,9 +284,81 @@ export const LANDINGS: Landing[] = [
         dedicated: true,
     },
     {
+        slug: "ticketera-seminarios",
+        kind: "vertical",
+        card: { title: "Seminarios y congresos", text: "Varios días en un evento, precios para empresas y estudiantes, y acreditación con QR." },
+        title: "Ticketera para seminarios y congresos en Chile: inscripciones y acreditación con QR · 0% de comisión | AI Tickets",
+        description:
+            "Inscripciones gratis o pagadas con Webpay para seminarios, charlas y congresos: varios días en un evento con pase completo o por día, precio estudiante y de convenio, cortesías para expositores y acreditación con QR desde el celular. 0% de comisión.",
+        eyebrow: "Para organizadores de seminarios, congresos y charlas",
+        h1: "Tú armas el programa. La acreditación es un QR.",
+        intro: `Inscripciones gratis o pagadas con Webpay, un congreso de varios días en un solo evento, precios para estudiantes y convenios, y la acreditación con el celular aunque se caiga el wifi del hotel. Lo de cada día queda disponible ${PAYOUT_RELEASE_HOURS} h después de que termina; el pase completo, ${PAYOUT_RELEASE_HOURS} h después del último día. 0% de comisión para ti.`,
+        highlights: ["Varios días en un evento, con pase completo o por día", "Precio estudiante y códigos de convenio", "Acreditación con QR aunque se caiga el wifi"],
+        // La página es propia (src/pages/ticketera-seminarios.astro, SPEC_landing_seminarios): las secciones viven en
+        // src/components/landing/seminarios y las preguntas en src/data/seminariosFaq.ts, que toma de aquí estas diez (las
+        // propias de seminarios; las de dinero, plazos, cortesías, compras de empresa y eventos grandes se arman allá con
+        // sus constantes, y las de redes y reseñas vienen de PRODUCER_FAQ y ORGANIZADORES_FAQ).
+        // Verificado:
+        //   varios días → hasta MAX_EVENT_FUNCTIONS funciones (schedule.ts); cada entrada para una función o para todas
+        //                 (event_date_id NULL); el pase completo se valida una vez (confirm-ticket): ingreso diario "Pronto"
+        //   programa → descripción con títulos y listas (sanitize.ts) y el asistente de la página (EventAssistant.vue);
+        //              agenda con expositores y salas "Pronto"
+        //   documentos → terms.astro §3 (boleta del cargo; el precio de la entrada lo documenta el productor), pendiente de
+        //                validar con abogado y contador; RUT y razón social al comprar "Pronto"
+        //   convenios → códigos de descuento por evento o de la organización (discounts.mjs); sin entradas ocultas
+        //   certificados de asistencia → "Pronto"; hoy, la lista de quienes ingresaron (list_attendees)
+        //   sin transmisión online ni pago con orden de compra o transferencia
+        sections: [],
+        faq: [
+            { q: "¿Cuánto cuesta una charla gratuita?", a: "Nada. Las inscripciones gratis no pagan cargo por servicio y no hay mensualidad." },
+            {
+                q: "¿Cómo publico un congreso de varios días?",
+                a: `Un solo evento con un día por función (hasta ${MAX_EVENT_FUNCTIONS}), y entradas que sirven para un día o para todos (pase completo). Tu público ve las fechas en la página y elige. El pase completo se acredita una vez, el primer día que la persona llega.`,
+            },
+            {
+                q: "¿Dónde va el programa con los expositores?",
+                a: "En la descripción del evento, con un título por día y una lista por bloque. El asistente de tu página lo usa para responder preguntas como \"¿a qué hora es el panel?\". Una sección propia de agenda, con expositores y salas, todavía no existe.",
+            },
+            {
+                q: "¿Pueden pedirme factura?",
+                a: "El cargo por servicio lo documenta AI Tickets con boleta electrónica. El valor de la entrada lo documentas tú, como organizador: si una empresa necesita factura, se la emites con los datos de su compra. Desde tu panel exportas las órdenes a CSV con comprador, correo, entradas, montos y medio de pago.",
+                terms: true,
+            },
+            {
+                q: "¿Puedo tener precio de socio o de convenio?",
+                a: "Sí, con un código de descuento por institución: porcentaje o monto, usos máximos, límite por persona y fecha de término. Puede servir para un evento o para todos los tuyos, y se aplica al total de la compra.",
+            },
+            {
+                q: "¿Cómo funciona la entrada estudiante?",
+                a: "Es un tipo de entrada con su precio y su cupo. AI Tickets no verifica al comprar que la persona sea estudiante: en la acreditación tu equipo ve el tipo de entrada al escanearla y pide la credencial.",
+            },
+            {
+                q: "¿Qué pasa si se cae el wifi del lugar?",
+                a: "Antes de abrir, el escáner descarga la lista de entradas. Si se cae la conexión, cada celular sigue acreditando y rechaza lo que él ya escaneó; al volver, se sincroniza con los demás. Si alguien no trae su QR, se busca por nombre o correo y se acredita a mano o se le reenvía la entrada.",
+            },
+            {
+                q: "¿Entregan certificado de asistencia?",
+                a: "Todavía no: está en camino. Hoy tu asistente de IA te da la lista de quienes ingresaron, con su hora, para que emitas los certificados.",
+            },
+            {
+                q: "¿Puedo hacer un evento solo para mi empresa o mis socios?",
+                a: "Sí. Un evento privado no aparece en la cartelera de AI Tickets ni en buscadores: solo entra quien tiene el link. Antes de publicarlo, puedes compartir una vista previa privada con tu comité o tus auspiciadores.",
+            },
+            {
+                q: "¿Sirve para una charla online o híbrida?",
+                a: "AI Tickets inscribe y acredita eventos presenciales; no transmite. Si tu charla tiene transmisión, mandas el link a tus inscritos por correo desde tu asistente de IA.",
+            },
+        ],
+        // No hay un seminario de ejemplo en demoEvent.mjs (Preguntas abiertas 12): mientras tanto, la inscripción gratuita
+        demo: { url: "/eventos/evento-demo-gratis", label: "Ver una inscripción de ejemplo" },
+        cta: { label: "Publicar mi seminario", campaign: "vertical_seminarios" },
+        related: ["entradas-con-qr", "ticketera-talleres", "vender-entradas-online"],
+        dedicated: true,
+    },
+    {
         slug: "ticketera-talleres",
         kind: "vertical",
-        // Sin "charlas": quedan para la futura landing de seminarios (SPEC_landing_talleres, Preguntas abiertas 8)
+        // Sin "charlas": quedan para /ticketera-seminarios (SPEC_landing_talleres, Preguntas abiertas 8)
         card: { title: "Talleres y cursos", text: "Cupos por fecha, inscripciones gratis o pagadas y recordatorio el día antes." },
         title: "Inscripciones para talleres en Chile: cupos, Webpay y QR · 0% de comisión | AI Tickets",
         description:
@@ -315,7 +387,7 @@ export const LANDINGS: Landing[] = [
         // No hay un taller de ejemplo en demoEvent.mjs (Preguntas abiertas 9): mientras tanto, la inscripción gratuita
         demo: { url: "/eventos/evento-demo-gratis", label: "Ver una inscripción gratuita de ejemplo" },
         cta: { label: "Abrir inscripciones", campaign: "vertical_talleres" },
-        related: ["academias", "entradas-con-qr", "guias/como-vender-entradas-online"],
+        related: ["academias", "entradas-con-qr", "guias/como-vender-entradas-online", "ticketera-seminarios"],
         dedicated: true,
     },
     {

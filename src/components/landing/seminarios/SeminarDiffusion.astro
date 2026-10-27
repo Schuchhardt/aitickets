@@ -1,0 +1,274 @@
+---
+// 5 · Difusión (SPEC_landing_seminarios §4.5, papel, SALA 4 · DIFUSIÓN ↗, ancla #difusion): a la izquierda, la tabla de
+// canales dentro de una lámina (isla ChannelTable) con la nota de atribución de PRODUCER_FAQ; a la derecha, tres cards:
+// Instagram (la serie automática con los textos reales de pieceText, por props desde la página), LinkedIn y anuncios
+// (isla SeminarAdsDemo con AD_LIMITS). Verificado: TrackingLinkBuilder.vue y eventAnalytics.ts (ref, LinkedIn por
+// categorizeReferrer, DIRECT_CHANNEL), compartir en LinkedIn (ShareSheet.vue), serie de Instagram (socialSeries.ts,
+// DEFAULT_KEYWORD) y anuncios (zernio-ads.mjs). Facebook, TikTok y reels en la serie, publicar en LinkedIn desde el
+// panel y segmentar por profesión: "Pronto". Mobile: tabla de 3 columnas, cards apiladas e historias en scroll.
+import { Megaphone } from "lucide-vue-next";
+import ChannelTable from "./ChannelTable.vue";
+import SeminarAdsDemo from "./SeminarAdsDemo.vue";
+import SeminarHeading from "./SeminarHeading.astro";
+import Slide from "./Slide.astro";
+import WayfindingSign from "./WayfindingSign.astro";
+import SoonBadge from "../../ui/SoonBadge.vue";
+import { SEMINAR_PHOTOS } from "./seminariosLanding.js";
+import { DIRECT_CHANNEL } from "../../../lib/eventAnalytics";
+import { DEFAULT_KEYWORD } from "../../../lib/socialSeriesCadence";
+import { AD_LIMITS } from "../../../../netlify/lib/zernio-ads.mjs";
+
+export interface StoryFrame {
+  id: string;
+  kicker: string | null;
+  bigLines: string[];
+  message: string[];
+  scarcity: string | null;
+  cta: string | null;
+}
+interface Props {
+  frames: StoryFrame[];
+}
+const { frames } = Astro.props;
+const hero = SEMINAR_PHOTOS.hero;
+---
+
+<section id="difusion" class="se-section se-bg-papel sed" aria-labelledby="se-diffusion-title" data-se-section="difusion" data-se-screen="Difusión">
+  <div class="se-wrap" data-lp-reveal>
+    <WayfindingSign room="Sala 4" label="Difusión" icon={Megaphone} arrow="↗" />
+    <SeminarHeading id="se-diffusion-title" text="Tus expositores convocan." emphasis="Y sabes cuánto." />
+    <p class="se-lead sed-lead" data-lp-step>
+      Cada expositor, auspiciador o institución comparte su propio link. En las métricas del evento ves cuántas visitas e
+      inscripciones trajo cada uno, y cuántas llegaron desde LinkedIn.
+    </p>
+
+    <div class="sed-grid">
+      <div class="sed-table" data-lp-step>
+        <Slide number="04 / 12" ratio="auto" class="sed-slide">
+          <ChannelTable client:visible directLabel={DIRECT_CHANNEL} />
+        </Slide>
+        <p class="se-note sed-note">La venta se asocia al link cuando la persona compra en la misma visita en que llegó con él.</p>
+      </div>
+
+      <div class="sed-cards">
+        <article class="se-card sed-card" data-lp-step>
+          <h3 class="se-h3">Instagram, solo.</h3>
+          <p class="sed-text">
+            Conectas tu Instagram una vez y apruebas la serie. Con la imagen y los datos de tu evento armamos historias con
+            cuenta regresiva, diarias la última semana, y un post diario esa semana. A quien responde
+            <strong>{DEFAULT_KEYWORD}</strong> le llega el link por DM.
+          </p>
+          <ul class="sed-stories" aria-label="Historias de ejemplo">
+            {
+              frames.map((f) => (
+                <li class="sed-story">
+                  <picture>
+                    {hero.sources.map((src) => (
+                      <source type={src.type} srcset={src.srcset} sizes="120px" />
+                    ))}
+                    <img src={hero.src} alt="" width={hero.width} height={hero.height} loading="lazy" decoding="async" class="sed-story-img" />
+                  </picture>
+                  <span class="sed-story-ink">
+                    <span class="sed-story-kicker">{f.kicker}</span>
+                    <span class="sed-story-big">{f.bigLines.join(" ")}</span>
+                    {f.message.map((line) => (
+                      <span class="sed-story-line">{line}</span>
+                    ))}
+                    {f.scarcity && <span class="sed-story-scarce">{f.scarcity}</span>}
+                    {f.cta && <span class="sed-story-cta">{f.cta}</span>}
+                  </span>
+                </li>
+              ))
+            }
+          </ul>
+          <ul class="sed-chips" aria-label="Redes">
+            <li class="sed-chip is-on"><span aria-hidden="true">●</span> Instagram</li>
+            <li class="sed-chip">Facebook <SoonBadge dark={false} /></li>
+            <li class="sed-chip">TikTok <SoonBadge dark={false} /></li>
+            <li class="sed-chip">Reels <SoonBadge dark={false} /></li>
+          </ul>
+        </article>
+
+        <article class="se-card sed-card" data-lp-step>
+          <h3 class="se-h3">LinkedIn.</h3>
+          <p class="sed-text">
+            Las visitas que llegan desde LinkedIn aparecen como canal propio en tus métricas, y tu página trae el botón para
+            compartir en LinkedIn. Pide a tus expositores que publiquen su link.
+          </p>
+          <p class="se-soon-chip sed-soon">Publicar en LinkedIn desde tu panel <SoonBadge dark={false} /></p>
+        </article>
+
+        <div data-lp-step>
+          <SeminarAdsDemo
+            client:visible
+            minDays={AD_LIMITS.minDays}
+            maxDays={AD_LIMITS.maxDays}
+            minAge={AD_LIMITS.defaultAgeMin}
+            radiusKm={AD_LIMITS.cityRadiiKm[0]}
+          />
+        </div>
+      </div>
+    </div>
+
+    <p class="se-meta sed-links" data-lp-step>
+      <a href="/guias/como-medir-ventas-por-promotor" class="se-link">Guía: cómo medir ventas por promotor →</a>
+      <a href="/ventas-por-promotor" class="se-link">Ventas por promotor →</a>
+      <a href="/vender-entradas-online" class="se-link">Vender entradas online →</a>
+    </p>
+  </div>
+</section>
+
+<style>
+  .sed-lead {
+    max-width: 680px;
+    margin-top: 18px;
+  }
+  .sed-grid {
+    display: grid;
+    gap: 32px;
+    margin-top: 40px;
+  }
+  .sed-table,
+  .sed-cards {
+    min-width: 0;
+  }
+  .sed-table :global(.sed-slide) {
+    border-color: var(--se-grafito);
+  }
+  .sed-note {
+    margin-top: 10px;
+  }
+  .sed-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .sed-card {
+    padding: 20px;
+  }
+  .sed-text {
+    margin-top: 10px;
+    font-size: 15px;
+    line-height: 23px;
+    color: var(--se-text-2);
+  }
+  .sed-stories {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 4px;
+  }
+  .sed-stories::-webkit-scrollbar {
+    display: none;
+  }
+  .sed-story {
+    position: relative;
+    flex: 0 0 120px;
+    height: 213px;
+    overflow: hidden;
+    border-radius: 6px;
+    background: var(--se-grafito);
+  }
+  .sed-story-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 72% 40%;
+    filter: saturate(0.92) contrast(1.04) brightness(0.62);
+  }
+  .sed-story-ink {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    height: 100%;
+    padding: 8px 7px;
+    color: #ffffff;
+    font-size: 9px;
+    line-height: 12px;
+  }
+  .sed-story-kicker {
+    font-family: var(--se-font);
+    font-weight: 600;
+    font-stretch: 75%;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .sed-story-big {
+    margin-top: auto;
+    font-family: var(--se-font);
+    font-size: 17px;
+    line-height: 18px;
+    font-weight: 800;
+    font-stretch: 100%;
+  }
+  .sed-story-scarce {
+    align-self: flex-start;
+    margin-top: 4px;
+    padding: 1px 4px;
+    background: var(--se-cordon-ink);
+    font-weight: 600;
+  }
+  .sed-story-cta {
+    margin-top: 6px;
+    padding-top: 4px;
+    border-top: 1px solid rgba(255, 255, 255, 0.4);
+  }
+  .sed-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 14px;
+  }
+  .sed-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 30px;
+    padding: 3px 10px;
+    border: 1px solid var(--se-filete);
+    border-radius: 2px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--se-text-2);
+  }
+  .sed-chip.is-on {
+    border-color: var(--se-grafito);
+    color: var(--se-grafito);
+  }
+  .sed-chip.is-on span {
+    color: var(--se-cordon);
+  }
+  .sed-soon {
+    margin-top: 12px;
+  }
+  .sed-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 28px;
+    margin-top: 32px;
+  }
+  .sed-links .se-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    color: var(--se-cordon-ink);
+  }
+  @media (min-width: 1024px) {
+    .sed-grid {
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      column-gap: 24px;
+      align-items: start;
+    }
+    .sed-table {
+      grid-column: 1 / span 7;
+    }
+    .sed-cards {
+      grid-column: 8 / span 5;
+    }
+  }
+</style>

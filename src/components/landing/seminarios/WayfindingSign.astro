@@ -1,0 +1,25 @@
+---
+// Rótulo de sala (SPEC_landing_seminarios §1): barra grafito al ancho de su texto (no a sangre) con un cuadrado blanco y
+// su pictograma a la izquierda, "SALA 2 · EL PROGRAMA" en meta blanco y un cuadrado turquesa con la flecha a la derecha.
+// Abre cada sección, alineado a la columna 1. El texto real de la sección está en el H2: el rótulo es aria-hidden y deja
+// su texto como eyebrow para lectores de pantalla (<p class="lp-sr-only">). tone="hall": en la sección turquesa, la
+// flecha va en grafito sobre blanco. C5 (con html.lp-motion): entra con clip-path al 30% de visibilidad y la flecha
+// avanza 6 px y vuelve (observeSigns de seminariosLanding.client.js).
+interface Props {
+  room: string;
+  label: string;
+  /** Componente de lucide-vue-next */
+  icon: any;
+  arrow?: "→" | "↓" | "↗";
+  tone?: "default" | "hall";
+}
+const { room, label, icon: Icon, arrow = "→", tone = "default" } = Astro.props;
+const text = `${room} · ${label}`;
+---
+
+<p class="lp-sr-only">{text}</p>
+<div class:list={["se-sign", tone === "hall" && "is-hall"]} aria-hidden="true" data-se-sign>
+  <span class="se-sign-icon"><Icon size={20} stroke-width={2} /></span>
+  <span class="se-sign-text">{text}</span>
+  <span class="se-sign-arrow"><span>{arrow}</span></span>
+</div>

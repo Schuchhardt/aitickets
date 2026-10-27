@@ -1,0 +1,262 @@
+---
+// 6 · Antes del día (SPEC_landing_seminarios §4.6, papel-2, CAFÉ · ANTES DEL DÍA →, ancla #pagina): la página del evento
+// en un teléfono (mockup decorativo, no copia exacta) con el rótulo real "2 funciones" (cardLabel), la identificación del
+// organizador como la dice EventTrust.vue ("Organiza: {razón social} · RUT {rut}" y "✓ Productor verificado"), el
+// programa en la descripción y una pregunta al asistente (EventAssistant.vue); a la derecha "Quiénes van" (isla
+// SeminarWall), la foto del café y seis ítems. Verificado: asistente y FAQ con IA (EventAssistant.vue,
+// EventFAQManager.vue), recordatorio el día antes (send-event-reminders: al pase completo, solo antes de la primera
+// función), mensajes a los inscritos (send_attendee_message / schedule_reminder, desde el asistente de IA), "Añadir al
+// calendario" (shareActions.js), evento privado y vista previa privada (EditEventForm.vue, PreviewLinksManager.vue) y la
+// lista de espera que solo registra (api/events/waitlist.ts): verla y avisar es "Pronto".
+// Mobile: teléfono a 240×480, muro compacto debajo, foto omitida e ítems en una columna.
+import { Coffee } from "lucide-vue-next";
+import Figure from "./Figure.astro";
+import SeminarHeading from "./SeminarHeading.astro";
+import SeminarWall from "./SeminarWall.vue";
+import WayfindingSign from "./WayfindingSign.astro";
+import SoonBadge from "../../ui/SoonBadge.vue";
+import { PHOTO_ALT, SEMINAR_NAME, SEMINAR_ORG, SEMINAR_PHOTOS, SEMINAR_RUT, buyerCard, programModel } from "./seminariosLanding.js";
+import { FEED_EMOJIS, FEED_MESSAGE_MAX } from "../../../../netlify/lib/attendee-community.mjs";
+
+interface Props {
+  date: string;
+}
+const { date } = Astro.props;
+const label = buyerCard(programModel("congreso", "paid", {}, date), { date }).label;
+const hero = SEMINAR_PHOTOS.hero;
+const items = [
+  {
+    title: "Un asistente que responde.",
+    text: "El horario del panel, el estacionamiento o el dress code, con la información que cargaste. Las preguntas frecuentes las generas con IA desde tu panel.",
+  },
+  {
+    title: "Recordatorio el día antes.",
+    text: "Sale solo, con fecha, hora, lugar y el link a la entrada. Al pase completo le llega antes del primer día; para el segundo, programas uno desde tu asistente de IA.",
+  },
+  {
+    title: "Mensajes a tus inscritos.",
+    text: "El link de la transmisión, el cambio de sala o las presentaciones: a todos o solo a quienes no han llegado, ahora o programado, desde tu asistente de IA.",
+  },
+  { title: "Al calendario de cada uno.", text: "Tu página trae “Añadir al calendario” con la fecha elegida." },
+  {
+    title: "Privado si es interno.",
+    text: "Un evento privado no aparece en la cartelera ni en buscadores: solo entra quien tiene el link. Antes de publicar, compartes una vista previa privada con tu comité o tus auspiciadores.",
+  },
+  { title: "Cuando se llena.", text: "La página ofrece dejar el correo para avisar si se libera un cupo.", soon: "Ver la lista de espera y avisarles" },
+];
+---
+
+<section id="pagina" class="se-section se-bg-papel-2 seb" aria-labelledby="se-before-title" data-se-section="pagina" data-se-screen="Antes del día">
+  <div class="se-wrap" data-lp-reveal>
+    <WayfindingSign room="Café" label="Antes del día" icon={Coffee} />
+    <SeminarHeading id="se-before-title" text="Las dudas se responden solas." emphasis="Tú sigues con el programa." />
+
+    <div class="seb-grid">
+      <div class="seb-phone-col" data-lp-step>
+        <div class="seb-phone" role="img" aria-label={`La página de ${SEMINAR_NAME} en un celular: 2 funciones, el organizador verificado, el programa y el asistente que responde si hay estacionamiento (ejemplo)`}>
+          <div class="seb-screen" aria-hidden="true">
+            <picture>
+              {hero.sources.map((s) => <source type={s.type} srcset={s.srcset} sizes="300px" />)}
+              <img src={hero.src} alt="" width={hero.width} height={hero.height} loading="lazy" decoding="async" class="seb-img" />
+            </picture>
+            <div class="seb-page">
+              <p class="seb-title">{SEMINAR_NAME}</p>
+              {label && <p class="seb-label">{label}</p>}
+              <p class="seb-legal">Organiza: {SEMINAR_ORG} · RUT {SEMINAR_RUT}</p>
+              <p class="seb-verified"><span>✓</span> Productor verificado</p>
+              <div class="seb-desc">
+                <p class="seb-desc-h">Día 1</p>
+                <p>09:15 Keynote · Paula Ríos</p>
+                <p>11:00 Panel: equipos híbridos</p>
+              </div>
+              <div class="seb-chat">
+                <p class="seb-q">¿Hay estacionamiento?</p>
+                <p class="seb-a">Sí, el centro de eventos tiene estacionamiento pagado en el subterráneo.</p>
+                <p class="seb-tag">responde con lo que cargaste</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="seb-wall" data-lp-step>
+        <SeminarWall client:visible emojis={[...FEED_EMOJIS]} maxLength={FEED_MESSAGE_MAX} />
+      </div>
+
+      <div class="seb-photo" data-lp-step>
+        <Figure photo={SEMINAR_PHOTOS.networking} alt={PHOTO_ALT.networking} caption="Fig. 03 — Conversaciones en el café." ratio="4 / 5" sizes="280px" />
+      </div>
+    </div>
+
+    <ul class="se-items is-two seb-items">
+      {
+        items.map((item) => (
+          <li class="se-item seb-item" data-lp-step>
+            <div>
+              <p class="se-item-title">{item.title}</p>
+              <p class="se-item-text">{item.text}</p>
+              {item.soon && (
+                <p class="se-item-extra">
+                  <span class="se-soon-chip">
+                    {item.soon} <SoonBadge dark={false} />
+                  </span>
+                </p>
+              )}
+            </div>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</section>
+
+<style>
+  .seb-grid {
+    display: grid;
+    gap: 32px;
+    margin-top: 40px;
+  }
+  .seb-phone-col,
+  .seb-wall {
+    min-width: 0;
+  }
+  .seb-phone {
+    width: 240px;
+    height: 480px;
+    margin: 0 auto;
+    padding: 8px;
+    border-radius: 32px;
+    background: var(--se-grafito);
+    box-shadow: 0 18px 36px rgba(21, 25, 28, 0.18);
+  }
+  .seb-screen {
+    height: 100%;
+    overflow: hidden;
+    border-radius: 26px;
+    background: #ffffff;
+  }
+  .seb-img {
+    display: block;
+    width: 100%;
+    height: 96px;
+    object-fit: cover;
+    object-position: 40% 35%;
+    filter: saturate(0.92) contrast(1.04);
+  }
+  .seb-page {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 10px 12px;
+    font-size: 10px;
+    line-height: 14px;
+    color: var(--se-grafito);
+  }
+  .seb-title {
+    font-family: var(--se-font);
+    font-size: 15px;
+    line-height: 18px;
+    font-weight: 800;
+  }
+  .seb-label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--se-text-2);
+  }
+  .seb-legal {
+    color: var(--se-text-3);
+  }
+  .seb-verified {
+    font-weight: 600;
+  }
+  .seb-verified span {
+    color: var(--se-cordon-ink);
+  }
+  .seb-desc {
+    padding: 6px 0;
+    border-block: 1px solid var(--se-filete);
+    color: var(--se-text-2);
+  }
+  .seb-desc-h {
+    font-weight: 700;
+    color: var(--se-grafito);
+  }
+  .seb-chat {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 2px;
+  }
+  .seb-q {
+    align-self: flex-end;
+    max-width: 80%;
+    padding: 5px 8px;
+    border-radius: 10px 10px 2px 10px;
+    background: var(--se-grafito);
+    color: #ffffff;
+  }
+  .seb-a {
+    max-width: 88%;
+    padding: 5px 8px;
+    border-radius: 10px 10px 10px 2px;
+    background: var(--se-cordon-claro);
+  }
+  .seb-tag {
+    font-family: var(--se-font);
+    font-size: 9px;
+    font-weight: 600;
+    font-stretch: 75%;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--se-text-3);
+  }
+  .seb-photo {
+    display: none;
+  }
+  .seb-items {
+    margin-top: 40px;
+  }
+  @media (min-width: 768px) {
+    .seb-grid {
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: start;
+    }
+  }
+  @media (min-width: 1024px) {
+    .seb-grid {
+      grid-template-columns: 300px minmax(0, 1fr) 280px;
+      gap: 32px;
+    }
+    .seb-phone {
+      width: 300px;
+      height: 600px;
+      padding: 10px;
+      border-radius: 36px;
+    }
+    .seb-screen {
+      border-radius: 28px;
+    }
+    .seb-img {
+      height: 130px;
+    }
+    .seb-page {
+      gap: 7px;
+      padding: 14px 16px;
+      font-size: 12px;
+      line-height: 17px;
+    }
+    .seb-title {
+      font-size: 19px;
+      line-height: 22px;
+    }
+    .seb-label,
+    .seb-tag {
+      font-size: 10px;
+    }
+    .seb-photo {
+      display: block;
+    }
+  }
+</style>

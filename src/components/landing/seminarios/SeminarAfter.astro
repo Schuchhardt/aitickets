@@ -1,0 +1,231 @@
+---
+// 9 · Después (SPEC_landing_seminarios §4.9, papel-2, SALA 6 · DESPUÉS →): a la izquierda los resultados de la encuesta
+// dentro de una lámina (11 / 12): barras con RATING_LABELS (reviews.mjs), el promedio con formatRating (eventView.js), un
+// comentario público y un mensaje privado con la etiqueta real "Privado" (EventReviewsManager.vue). A la derecha, cinco
+// ítems. Verificado: encuesta entre REVIEW_REQUEST_DELAY_HOURS y REVIEW_REQUEST_WINDOW_HOURS h después de cada función,
+// con hasta MAX_PHOTOS_PER_PERSON fotos y mensaje privado (reviews.mjs, EventReviews.vue); mensajes a los inscritos desde
+// el asistente de IA (send_attendee_message); invitar a la próxima edición con INVITE_AUDIENCES (inviteAudience.ts) y
+// código de premio (REWARD_CODE_PREFIX); duplicar (eventDuplicate.ts), galería y reporte semanal del domingo
+// (send-weekly-reports). Certificados de asistencia: "Pronto".
+// C15: las barras crecen con stagger de 90 ms (data-lp-grow) y el promedio cuenta de 0 a 4,5 en 800 ms (data-lp-count
+// con data-lp-count-decimals de LandingMotion; sin movimiento queda el valor del HTML). El ítem 4 lleva a /web-gratis
+// (la cartelera de la institución, §0.6).
+import { Lock, ClipboardCheck } from "lucide-vue-next";
+import SeminarHeading from "./SeminarHeading.astro";
+import Slide from "./Slide.astro";
+import WayfindingSign from "./WayfindingSign.astro";
+import SoonBadge from "../../ui/SoonBadge.vue";
+import { SURVEY_DISTRIBUTION, surveyAverage } from "./seminariosLanding.js";
+import { formatRating } from "../../event/eventView.js";
+import { INVITE_AUDIENCE_TEXT } from "../../../data/inviteAudience";
+import { MAX_PHOTOS_PER_PERSON, RATING_LABELS, REVIEW_REQUEST_DELAY_HOURS, REVIEW_REQUEST_WINDOW_HOURS } from "../../../../netlify/lib/reviews.mjs";
+
+const bars = [5, 4, 3, 2, 1].map((stars) => ({ stars, label: RATING_LABELS[stars as 1 | 2 | 3 | 4 | 5], pct: SURVEY_DISTRIBUTION[stars as 1 | 2 | 3 | 4 | 5] }));
+const average = formatRating(surveyAverage());
+/** El mismo promedio redondeado que muestra formatRating, como número para el contador */
+const averageValue = Math.round(surveyAverage() * 10) / 10;
+const items = [
+  {
+    title: "Una encuesta por correo.",
+    text: `Entre ${REVIEW_REQUEST_DELAY_HOURS} y ${REVIEW_REQUEST_WINDOW_HOURS} h después de cada jornada les llega un correo para calificar con estrellas, comentar, subir hasta ${MAX_PHOTOS_PER_PERSON} fotos y dejarte un mensaje privado. Lo ves y lo exportas desde tu panel.`,
+  },
+  { title: "Las presentaciones, por correo.", text: "Mandas el link a todos los inscritos desde tu asistente de IA." },
+  {
+    title: "Invita a la próxima edición.",
+    text: `Con un correo desde el panel, a ${INVITE_AUDIENCE_TEXT}. Si quieres, con un código de premio para quien respondió la encuesta.`,
+  },
+  {
+    title: "La próxima, en un clic.",
+    text: "Duplicas el evento con sus tipos de entrada y sus preguntas frecuentes, subes las fotos a la galería y el domingo te llega por correo cómo vendió la semana.",
+    link: { href: "/web-gratis", text: "Y tu cartelera, en tu web gratis →" },
+  },
+  {
+    title: "Certificados de asistencia.",
+    text: "Con los check-ins de la acreditación. Mientras, tu asistente de IA te da la lista de quienes ingresaron.",
+    soon: true,
+  },
+];
+---
+
+<section class="se-section se-bg-papel-2 seaf" aria-labelledby="se-after-title" data-se-section="despues" data-se-screen="Después">
+  <div class="se-wrap" data-lp-reveal>
+    <WayfindingSign room="Sala 6" label="Después" icon={ClipboardCheck} />
+    <SeminarHeading id="se-after-title" text="La encuesta llega sola." emphasis="La próxima edición se llena con esta." />
+
+    <div class="seaf-grid">
+      <div class="seaf-results" data-lp-step>
+        <Slide number="11 / 12" ratio="auto" class="seaf-slide" data-testid="seminar-survey">
+          <div class="seaf-head">
+            <p class="se-meta">Resultados · ejemplo</p>
+            <p class="seaf-avg"><span class="se-display se-tabular" data-lp-count={averageValue} data-lp-count-decimals="1" data-lp-count-ms="800">{average}</span> <span class="seaf-star" aria-hidden="true">★</span><span class="lp-sr-only"> de 5 estrellas en promedio</span></p>
+          </div>
+          <ul class="seaf-bars">
+            {
+              bars.map((b, i) => (
+                <li class="seaf-bar-row">
+                  <span class="seaf-bar-label">{b.label}</span>
+                  <span class="seaf-bar" aria-hidden="true">
+                    <span data-lp-grow style={`width: ${b.pct}%; --lp-d: ${i * 90}ms`} />
+                  </span>
+                  <span class="se-tabular seaf-bar-pct">{b.pct}%</span>
+                </li>
+              ))
+            }
+          </ul>
+          <blockquote class="seaf-quote">"El panel de cierre fue lo mejor. Más tiempo para preguntas."</blockquote>
+          <div class="seaf-private">
+            <p class="seaf-private-tag"><Lock size={12} aria-hidden="true" /> Privado</p>
+            <p>"El audio del fondo de la sala se escuchaba bajo."</p>
+          </div>
+        </Slide>
+      </div>
+
+      <ol class="seaf-items">
+        {
+          items.map((item, i) => (
+            <li class="seaf-item" data-lp-step>
+              <span class="seaf-n se-tabular">{i + 1}</span>
+              <div>
+                <p class="se-item-title">
+                  {item.title} {item.soon && <SoonBadge dark={false} />}
+                </p>
+                <p class="se-item-text">{item.text}</p>
+                {item.link && (
+                  <p class="se-meta seaf-link">
+                    <a href={item.link.href} class="se-link">{item.link.text}</a>
+                  </p>
+                )}
+              </div>
+            </li>
+          ))
+        }
+      </ol>
+    </div>
+  </div>
+</section>
+
+<style>
+  .seaf-grid {
+    display: grid;
+    gap: 32px;
+    margin-top: 40px;
+  }
+  .seaf-results,
+  .seaf-items {
+    min-width: 0;
+  }
+  .seaf-results :global(.seaf-slide) {
+    border-color: var(--se-grafito);
+  }
+  .seaf-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .seaf-avg {
+    font-size: 48px;
+    line-height: 1;
+  }
+  .seaf-star {
+    font-size: 28px;
+    color: var(--se-cordon);
+  }
+  .seaf-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 16px;
+  }
+  .seaf-bar-row {
+    display: grid;
+    grid-template-columns: 84px minmax(0, 1fr) 40px;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+  }
+  .seaf-bar {
+    height: 10px;
+    background: var(--se-papel-2);
+  }
+  .seaf-bar span {
+    display: block;
+    height: 100%;
+    background: var(--se-cordon);
+    transform-origin: left center;
+  }
+  .seaf-bar-pct {
+    text-align: right;
+    font-weight: 600;
+  }
+  .seaf-quote {
+    margin: 18px 0 0;
+    padding-left: 12px;
+    border-left: 3px solid var(--se-grafito);
+    font-size: 15px;
+    line-height: 22px;
+  }
+  .seaf-private {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border: 1px dashed var(--border-strong);
+    font-size: 14px;
+    line-height: 21px;
+    color: var(--se-text-2);
+  }
+  .seaf-private-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 4px;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: var(--se-papel-2);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--se-grafito);
+  }
+  .seaf-items {
+    display: flex;
+    flex-direction: column;
+  }
+  .seaf-item {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr);
+    gap: 12px;
+    padding: 18px 0;
+    border-top: 1px solid var(--se-filete);
+  }
+  .seaf-link {
+    margin-top: 4px;
+  }
+  .seaf-link .se-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+  .seaf-n {
+    font-size: 28px;
+    line-height: 28px;
+    font-weight: 800;
+    font-stretch: 125%;
+    color: var(--se-cordon-ink);
+  }
+  @media (min-width: 1024px) {
+    .seaf-grid {
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      column-gap: 24px;
+      align-items: start;
+    }
+    .seaf-results {
+      grid-column: 1 / span 6;
+    }
+    .seaf-items {
+      grid-column: 8 / span 5;
+    }
+    .seaf-avg {
+      font-size: 72px;
+    }
+  }
+</style>

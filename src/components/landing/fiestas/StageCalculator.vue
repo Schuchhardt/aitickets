@@ -6,11 +6,13 @@
 // los totales si se vende todo. Misma fórmula que el checkout (priceQuote → computeFeeSplit de fees.mjs): $10.000 →
 // $10.952 / $10.000 (absorbido $9.048); con 150/200/200/150 a $8.000/$10.000/$12.000/$15.000 recibes $7.850.000 (tu
 // público paga $8.597.300) y, absorbido, $7.102.700. Comportamiento de las otras calculadoras (usePriceCalculator.js:
-// radiogroup con flechas y resultado anunciado con pausa). Analítica: fi_calc_change {payer, stages} (con pausa).
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { CALC_PRICE, CALC_QTY, formatCLP, parseAmount, priceQuote } from '../producerLanding.js'
+// radiogroup con flechas y resultado anunciado con pausa). Las filas, sus cuentas y "+ Etapa" / "×" son las de
+// useTicketLines (compartido con la cotización de seminarios). Analítica: fi_calc_change {payer, stages} (con pausa).
+import { computed, onBeforeUnmount, watch } from 'vue'
+import { formatCLP } from '../producerLanding.js'
 import { SERVICE_FEE_LABEL, SERVICE_FEE_TAX_LABEL } from '../../../../netlify/lib/fees.mjs'
 import { useDelayedAnnouncement, usePayerToggle } from '../../../composables/usePriceCalculator.js'
+import { useTicketLines } from '../../../composables/useTicketLines.js'
 import { trackEvent } from '../../../composables/useGoogleAnalytics.js'
 import { CALC_STAGES_MAX, CALC_STAGES_MIN, defaultStages } from './fiestasLanding.js'
 
@@ -19,58 +21,32 @@ const payers = [
   { value: 'producer', label: 'Lo absorbo yo' },
 ]
 const ALL = defaultStages(4)
-const toRow = (s) => ({ ...s, priceText: s.price.toLocaleString('es-CL'), qtyText: String(s.capacity) })
-const rows = ref(ALL.map(toRow))
-const picked = ref(0)
+const position = (name) => ALL.findIndex((s) => s.name === name)
 const { payer, segButtons, onSegKey } = usePayerToggle(payers)
 const absorbed = computed(() => payer.value === 'producer')
-
-const quotes = computed(() => rows.value.map((r) => ({ one: priceQuote(r.price, payer.value), all: priceQuote(r.price, payer.value, r.capacity) })))
-const totalPublic = computed(() => quotes.value.reduce((s, q, i) => s + q.one.buyerPays * rows.value[i].capacity, 0))
-const totalYou = computed(() => quotes.value.reduce((s, q) => s + q.all.total, 0))
-const pickedIndex = computed(() => Math.min(picked.value, rows.value.length - 1))
-const pickedRow = computed(() => rows.value[pickedIndex.value])
-const pickedQuote = computed(() => quotes.value[pickedIndex.value].one)
+const { rows, picked, quotes, totalPublic, totalYou, pickedIndex, pickedRow, pickedQuote, signature, onPrice, onQty, blurRow, onPickKey, addLine, removeLine } =
+  useTicketLines({
+    lines: ALL.map((s) => ({ ...s, qty: s.capacity })),
+    payer,
+    max: CALC_STAGES_MAX,
+    min: CALC_STAGES_MIN,
+    order: (a, b) => position(a.name) - position(b.name),
+  })
 
 const state = computed(() => [totalYou.value, totalPublic.value])
 const announced = useDelayedAnnouncement(state, ([you, pub]) => `Si se vende todo, tu público paga ${formatCLP(pub)}. Tú recibes ${formatCLP(you)}.`)
 
 let trackTimer = null
-watch([payer, () => rows.value.map((r) => `${r.price}x${r.capacity}`).join()], () => {
+watch([payer, signature], () => {
   clearTimeout(trackTimer)
   trackTimer = setTimeout(() => trackEvent('fi_calc_change', { payer: payer.value, stages: rows.value.length }), 800)
 })
 onBeforeUnmount(() => clearTimeout(trackTimer))
 
-function onPrice(row, e) {
-  row.price = parseAmount(e.target.value, CALC_PRICE.inputMax)
-}
-function onQty(row, e) {
-  row.capacity = Math.max(1, parseAmount(e.target.value, CALC_QTY.inputMax))
-}
-function blurRow(row) {
-  row.priceText = row.price.toLocaleString('es-CL')
-  row.qtyText = String(row.capacity)
-}
-/** Radiogroup "Desglose de una entrada de": las flechas cambian la opción y mueven el foco (como onSegKey) */
-function onPickKey(e) {
-  if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return
-  e.preventDefault()
-  const n = rows.value.length
-  const next = (pickedIndex.value + (e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 1) + n) % n
-  picked.value = next
-  e.currentTarget.children[next]?.focus()
-}
 function addStage() {
-  if (rows.value.length >= CALC_STAGES_MAX) return
   const used = new Set(rows.value.map((r) => r.name))
   const next = ALL.find((s) => !used.has(s.name)) ?? ALL[rows.value.length]
-  rows.value = [...rows.value, toRow(next)].sort((a, b) => ALL.findIndex((s) => s.name === a.name) - ALL.findIndex((s) => s.name === b.name))
-}
-function removeStage(i) {
-  if (rows.value.length <= CALC_STAGES_MIN) return
-  rows.value = rows.value.filter((_, j) => j !== i)
-  if (picked.value >= rows.value.length) picked.value = rows.value.length - 1
+  addLine({ ...next, qty: next.capacity })
 }
 </script>
 
@@ -100,7 +76,7 @@ function removeStage(i) {
             <span class="fi-band-strip"><span class="fi-band-half fi-band-a"></span><span class="fi-band-half fi-band-b"></span></span>
           </span>
           <span class="sc-name-text">{{ row.name }}</span>
-          <button v-if="rows.length > CALC_STAGES_MIN" type="button" class="sc-remove" :aria-label="`Quitar ${row.name}`" @click="removeStage(i)">
+          <button v-if="rows.length > CALC_STAGES_MIN" type="button" class="sc-remove" :aria-label="`Quitar ${row.name}`" @click="removeLine(i)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>
         </div>

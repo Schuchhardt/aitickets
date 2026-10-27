@@ -1,0 +1,18 @@
+---
+// Titular de la landing de seminarios (SPEC_landing_seminarios §1): un solo <h1>/<h2> en Archivo 800 Expanded con la
+// frase de énfasis en su propia línea, Condensed 700 en turquesa (--se-cordon-ink), mismo tamaño. El énfasis es un cambio
+// de ancho: nunca cursiva, sticker, destacador ni subrayado. Con la fuente de respaldo, el énfasis conserva el color.
+interface Props {
+  tag?: "h1" | "h2";
+  id?: string;
+  text: string;
+  emphasis: string;
+  class?: string;
+}
+const { tag: Tag = "h2", id, text, emphasis, class: className } = Astro.props;
+---
+
+<Tag id={id} class:list={[Tag === "h1" ? "se-h1" : "se-h2", className]}>
+  <span class="se-hero-line-wrap"><span class:list={[Tag === "h1" && "se-hero-line"]}>{text}</span></span>
+  <span class="se-em">{emphasis}</span>
+</Tag>
