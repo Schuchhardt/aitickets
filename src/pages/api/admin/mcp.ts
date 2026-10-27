@@ -1,12 +1,13 @@
-// Servidor MCP de administración de AI Tickets (Streamable HTTP, sin estado, respuestas JSON). Solo para el dueño de
-// la plataforma: header "Authorization: Bearer aitkadm_…" (ver docs/api/admin.md y src/lib/admin-api/auth.ts).
-// Deshabilitado (sin ADMIN_MCP_ENABLED / sin hash de la llave) o en otro host que SITE_URL: 404, como si no existiera.
-// Sin CORS: ningún navegador necesita llamarlo.
+// Servidor MCP de administración de AI Tickets (Streamable HTTP, sin estado, respuestas JSON).
+// Auth: llave estática "aitkadm_…" O token OAuth (aitk_) cuyo email esté en ADMIN_MCP_EMAILS.
+// Ver docs/api/admin.md y src/lib/admin-api/auth.ts.
+// Deshabilitado (sin ADMIN_MCP_ENABLED / sin credenciales) o en otro host que SITE_URL: 404.
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { authenticateAdminRequest, adminEndpointAvailable } from "../../../lib/admin-api/auth";
 import { handleAdminMcpPayload } from "../../../lib/admin-api/mcp";
 import { publicOrigin, readJsonBody, CORS_HEADERS } from "../../../lib/producer-api/http";
+import { adminResourceMetadataUrl } from "../../../lib/producer-api/oauth";
 
 export const prerender = false;
 
@@ -30,7 +31,13 @@ export const POST: APIRoute = async ({ request }) => {
     const auth = await authenticateAdminRequest(request, supabase);
     if (!auth.ok) {
         if (auth.status === 404) return notFound();
-        return json({ jsonrpc: "2.0", id: null, error: { code: -32001, message: auth.error } }, auth.status, auth.status === 429 ? { "Retry-After": "60" } : {});
+        const extra: Record<string, string> = {};
+        if (auth.status === 401) {
+            const origin = publicOrigin(new URL(request.url));
+            extra["WWW-Authenticate"] = `Bearer realm="aitickets-admin", resource_metadata="${adminResourceMetadataUrl(origin)}", error="invalid_token"`;
+        }
+        if (auth.status === 429) extra["Retry-After"] = "60";
+        return json({ jsonrpc: "2.0", id: null, error: { code: -32001, message: auth.error } }, auth.status, extra);
     }
 
     const body = await readJsonBody(request);

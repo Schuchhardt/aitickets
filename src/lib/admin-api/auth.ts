@@ -13,6 +13,7 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { notifySlack, serverEnv, siteUrl } from "../../pages/api/_lib/server-utils";
 import { rateLimit } from "../../../netlify/lib/rate-limit.mjs";
 import { clientIp } from "../producer-api/http";
+import { authenticateApiKey, extractApiKey } from "../producer-api/keys";
 
 export const ADMIN_KEY_PREFIX = "aitkadm_";
 const ADMIN_KEY_RE = /^aitkadm_[A-Za-z0-9_-]{43}$/;
@@ -47,6 +48,7 @@ export function adminConfig() {
         enabled: serverEnv("ADMIN_MCP_ENABLED") === "true",
         full: hashList("AITICKETS_ADMIN_KEY_SHA256"),
         readonly: hashList("AITICKETS_ADMIN_READONLY_KEY_SHA256"),
+        emails: (serverEnv("ADMIN_MCP_EMAILS") || "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean),
     };
 }
 
@@ -82,7 +84,7 @@ const matchesAny = (hash: string, list: string[]) => {
 /** ¿El endpoint está habilitado en este host? (si no, todo responde 404). */
 export function adminEndpointAvailable(request: Request): boolean {
     const cfg = adminConfig();
-    return cfg.enabled && cfg.full.length + cfg.readonly.length > 0 && isAdminHost(request);
+    return cfg.enabled && (cfg.full.length + cfg.readonly.length > 0 || cfg.emails.length > 0) && isAdminHost(request);
 }
 
 export async function authenticateAdminRequest(request: Request, supabase: any): Promise<AdminAuth> {
@@ -92,27 +94,42 @@ export async function authenticateAdminRequest(request: Request, supabase: any):
     const ipHash = sha256(ip);
 
     const raw = bearer(request);
+
+    // 1) Llave estática aitkadm_
     const hash = raw && ADMIN_KEY_RE.test(raw) ? sha256(raw) : null;
     const keyKind: AdminKeyKind | null = hash ? (matchesAny(hash, cfg.full) ? "full" : matchesAny(hash, cfg.readonly) ? "readonly" : null) : null;
 
-    if (!hash || !keyKind) {
-        const limit = await rateLimit("admin:authfail", ip, { windowSeconds: AUTH_FAILURE_WINDOW_SECONDS, max: AUTH_FAILURES_PER_WINDOW, supabase });
-        if (!limit.allowed) {
-            // Un aviso por IP y hora, no uno por intento
-            const alert = await rateLimit("admin:authfail-alert", ip, { windowSeconds: 3600, max: 1, supabase });
-            if (alert.allowed) {
-                await notifySlack(
-                    `🚨 *MCP de admin: intentos con llave inválida*\n• *IP:* ${ip}\n• Más de ${AUTH_FAILURES_PER_WINDOW} en ${AUTH_FAILURE_WINDOW_SECONDS / 60} min: bloqueada temporalmente. ` +
-                        "Si no fuiste tú, rota la llave (docs/api/admin.md).",
-                );
-            }
-            return { ok: false, status: 429, error: "Demasiados intentos. Espera unos minutos." };
-        }
-        return { ok: false, status: 401, error: "Llave de administración inválida." };
+    if (hash && keyKind) {
+        const fingerprint = hash.slice(0, 8);
+        const limit = await rateLimit("admin:key", fingerprint, { windowSeconds: 60, max: ADMIN_REQUESTS_PER_MINUTE, supabase });
+        if (!limit.allowed) return { ok: false, status: 429, error: `Demasiadas peticiones: máximo ${ADMIN_REQUESTS_PER_MINUTE} por minuto.` };
+        return { ok: true, keyKind, fingerprint, ipHash };
     }
 
-    const fingerprint = hash.slice(0, 8);
-    const limit = await rateLimit("admin:key", fingerprint, { windowSeconds: 60, max: ADMIN_REQUESTS_PER_MINUTE, supabase });
-    if (!limit.allowed) return { ok: false, status: 429, error: `Demasiadas peticiones: máximo ${ADMIN_REQUESTS_PER_MINUTE} por minuto.` };
-    return { ok: true, keyKind, fingerprint, ipHash };
+    // 2) Token OAuth (aitk_) — el email del usuario debe estar en ADMIN_MCP_EMAILS
+    if (cfg.emails.length > 0) {
+        const oauthKey = extractApiKey(request);
+        if (oauthKey && /^aitk_/.test(oauthKey)) {
+            const auth = await authenticateApiKey(supabase, oauthKey);
+            if (auth.ok && auth.actor.email && cfg.emails.includes(auth.actor.email.toLowerCase())) {
+                const fingerprint = sha256(oauthKey).slice(0, 8);
+                const limit = await rateLimit("admin:key", fingerprint, { windowSeconds: 60, max: ADMIN_REQUESTS_PER_MINUTE, supabase });
+                if (!limit.allowed) return { ok: false, status: 429, error: `Demasiadas peticiones: máximo ${ADMIN_REQUESTS_PER_MINUTE} por minuto.` };
+                return { ok: true, keyKind: "full", fingerprint, ipHash };
+            }
+        }
+    }
+
+    const limit = await rateLimit("admin:authfail", ip, { windowSeconds: AUTH_FAILURE_WINDOW_SECONDS, max: AUTH_FAILURES_PER_WINDOW, supabase });
+    if (!limit.allowed) {
+        const alert = await rateLimit("admin:authfail-alert", ip, { windowSeconds: 3600, max: 1, supabase });
+        if (alert.allowed) {
+            await notifySlack(
+                `🚨 *MCP de admin: intentos con llave inválida*\n• *IP:* ${ip}\n• Más de ${AUTH_FAILURES_PER_WINDOW} en ${AUTH_FAILURE_WINDOW_SECONDS / 60} min: bloqueada temporalmente. ` +
+                    "Si no fuiste tú, rota la llave (docs/api/admin.md).",
+            );
+        }
+        return { ok: false, status: 429, error: "Demasiados intentos. Espera unos minutos." };
+    }
+    return { ok: false, status: 401, error: "Llave de administración inválida." };
 }
