@@ -2,7 +2,7 @@
 // lo que el productor activa a mano y pestañas visibles.
 import { describe, expect, it } from 'vitest'
 
-const { eventProfile, eventPhase, normalizeOverrides, resolveModules, panelTabs, defaultTab, isToggleableModule } = await import('../../src/lib/eventModules.ts')
+const { eventProfile, eventPhase, normalizeAddedModules, resolveModules, panelTabs, defaultTab, isAddableModule } = await import('../../src/lib/eventModules.ts')
 
 const ctx = (over = {}) => ({ profile: 'general', status: 'published', functionCount: 1, ticketTypeCount: 1, phase: 'before', ...over })
 const byId = (mods) => Object.fromEntries(mods.map((m) => [m.id, m]))
@@ -42,15 +42,13 @@ describe('resolveModules', () => {
     const theatre = byId(resolveModules(ctx({ profile: 'funciones' }))).documents
     expect(theatre).toMatchObject({ enabled: false, suggested: false })
   })
-  it('lo activado a mano gana sobre el perfil', () => {
-    expect(byId(resolveModules(ctx({ profile: 'funciones' }), { documents: true })).documents.enabled).toBe(true)
-    expect(byId(resolveModules(ctx(), { faq: false })).faq.enabled).toBe(false)
+  it('lo agregado desde Más herramientas se suma a lo del tipo de evento', () => {
+    expect(byId(resolveModules(ctx({ profile: 'funciones' }), ['documents'])).documents).toMatchObject({ enabled: true, suggested: false })
   })
-  it('los core no se pueden apagar', () => {
-    expect(byId(resolveModules(ctx(), { tickets: false })).tickets.enabled).toBe(true)
-    expect(isToggleableModule('tickets')).toBe(false)
-    expect(isToggleableModule('faq')).toBe(true)
-    expect(isToggleableModule('no-existe')).toBe(false)
+  it('solo se pueden agregar módulos opcionales que existen', () => {
+    expect(isAddableModule('tickets')).toBe(false)
+    expect(isAddableModule('documents')).toBe(true)
+    expect(isAddableModule('no-existe')).toBe(false)
   })
   it('la serie de Instagram solo aplica publicado y antes del evento', () => {
     expect(byId(resolveModules(ctx({ status: 'draft' })))['social-series']).toBeUndefined()
@@ -68,11 +66,11 @@ describe('resolveModules', () => {
   })
 })
 
-describe('normalizeOverrides', () => {
-  it('descarta ids desconocidos, core y valores no booleanos', () => {
-    expect(normalizeOverrides({ faq: false, tickets: false, x: true, gallery: 'si' })).toEqual({ faq: false })
-    expect(normalizeOverrides(null)).toEqual({})
-    expect(normalizeOverrides([1])).toEqual({})
+describe('normalizeAddedModules', () => {
+  it('deja solo ids opcionales conocidos, sin repetir y en el orden del registro', () => {
+    expect(normalizeAddedModules(['gallery', 'tickets', 'x', 'documents', 'gallery'])).toEqual(['documents', 'gallery'])
+    expect(normalizeAddedModules(null)).toEqual([])
+    expect(normalizeAddedModules({ documents: true })).toEqual([])
   })
 })
 
@@ -83,9 +81,8 @@ describe('pestañas', () => {
     expect(defaultTab(ctx(), tabs)).toBe('ventas')
     expect(defaultTab(ctx({ phase: 'after' }), tabs)).toBe('despues')
   })
-  it('una pestaña con todo oculto se mantiene para volver a agregar sus herramientas', () => {
-    const tabs = panelTabs(resolveModules(ctx(), { community: false, reviews: false, gallery: false }))
-    const after = tabs.find((t) => t.id === 'despues')
-    expect(after.modules.map((m) => [m.id, m.enabled])).toEqual([['community', false], ['reviews', false], ['gallery', false]])
+  it('cada pestaña trae también las herramientas que no vienen para el tipo de evento (para Más herramientas)', () => {
+    const page = panelTabs(resolveModules(ctx({ profile: 'funciones' }))).find((t) => t.id === 'pagina')
+    expect(page.modules.map((m) => [m.id, m.enabled])).toEqual([['cover', true], ['faq', true], ['documents', false]])
   })
 })

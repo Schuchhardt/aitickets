@@ -5,9 +5,9 @@
 // Tres capas deciden si un módulo se ve:
 //   1. when(ctx): condición del evento (estado, número de funciones, fase). Si no se cumple, el módulo no aplica y
 //      no aparece ni en "Más herramientas".
-//   2. profiles: perfiles (derivados de la categoría) donde viene activo por defecto. Sin profiles = todos.
-//   3. events.panel_modules: lo que el productor agregó ("Más herramientas" de cada pestaña) u ocultó ({ id: boolean }).
-// Los módulos core siempre se ven y no se pueden apagar.
+//   2. profiles: perfiles (derivados de la categoría) a los que les sirve. Sin profiles = todos.
+//   3. events.panel_modules: los que el productor agregó desde "Más herramientas" de cada pestaña (lista de ids).
+// Lo que se muestra no se quita del panel: "Más herramientas" solo suma lo que no viene para este tipo de evento.
 
 export type EventProfile = "noche" | "musica" | "funciones" | "formacion" | "general";
 export type EventTab = "ventas" | "difusion" | "pagina" | "puerta" | "despues";
@@ -31,7 +31,6 @@ export type EventModule = {
     when?: (ctx: EventModuleContext) => boolean;
 };
 
-export type PanelModuleOverrides = Record<string, boolean>;
 
 export const PROFILE_LABELS: Record<EventProfile, string> = {
     noche: "fiestas y discotecas",
@@ -121,34 +120,28 @@ export function eventPhase(startDate: string | null | undefined, endDate: string
     return now.getTime() <= end ? "during" : "after";
 }
 
-/** Limpia lo guardado en events.panel_modules: solo ids de módulos opcionales con valor booleano. */
-export function normalizeOverrides(raw: unknown): PanelModuleOverrides {
-    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
-    const out: PanelModuleOverrides = {};
-    for (const m of EVENT_MODULES) {
-        const v = (raw as Record<string, unknown>)[m.id];
-        if (!m.core && typeof v === "boolean") out[m.id] = v;
-    }
-    return out;
+/** Limpia lo guardado en events.panel_modules: ids de módulos opcionales, sin repetir, en el orden del registro. */
+export function normalizeAddedModules(raw: unknown): string[] {
+    if (!Array.isArray(raw)) return [];
+    return EVENT_MODULES.filter((m) => !m.core && raw.includes(m.id)).map((m) => m.id);
 }
 
-export const isToggleableModule = (id: string) => EVENT_MODULES.some((m) => m.id === id && !m.core);
+export const isAddableModule = (id: string) => EVENT_MODULES.some((m) => m.id === id && !m.core);
 
 const suggestedFor = (m: EventModule, profile: EventProfile) => !m.profiles || m.profiles.includes(profile);
 
 export type ResolvedModule = EventModule & { enabled: boolean; suggested: boolean };
 
-/** Módulos que aplican a este evento, con si se muestran (enabled) y si vienen activos por su perfil (suggested). */
-export function resolveModules(ctx: EventModuleContext, overrides: PanelModuleOverrides = {}): ResolvedModule[] {
+/** Módulos que aplican a este evento, con si se muestran (enabled) y si le sirven a su tipo (suggested). */
+export function resolveModules(ctx: EventModuleContext, added: string[] = []): ResolvedModule[] {
     return EVENT_MODULES.filter((m) => !m.when || m.when(ctx)).map((m) => {
         const suggested = !!m.core || suggestedFor(m, ctx.profile);
-        const enabled = m.core ? true : (overrides[m.id] ?? suggested);
-        return { ...m, enabled, suggested };
+        return { ...m, enabled: suggested || added.includes(m.id), suggested };
     });
 }
 
-/** Pestañas con al menos un módulo que aplica, cada una con sus módulos en orden (los apagados también: se muestran
- *  en "Más herramientas" de esa pestaña para volver a agregarlos). */
+/** Pestañas con al menos un módulo que aplica, cada una con sus módulos en orden (también los que no se muestran:
+ *  van en "Más herramientas" de esa pestaña). */
 export function panelTabs(modules: ResolvedModule[]): { id: EventTab; label: string; modules: ResolvedModule[] }[] {
     return TABS.map((t) => ({ ...t, modules: modules.filter((m) => m.tab === t.id) })).filter((t) => t.modules.length > 0);
 }

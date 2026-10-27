@@ -1,9 +1,9 @@
-// "Más herramientas" del detalle del evento: activar o apagar un módulo del panel (events.panel_modules).
-// POST { eventId, moduleId, enabled } — enabled null vuelve al valor por defecto del perfil. Registro: src/lib/eventModules.ts.
+// "Más herramientas" del detalle del evento: agregar una herramienta al panel (events.panel_modules).
+// POST { eventId, moduleId }. Registro: src/lib/eventModules.ts.
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { getSessionContext, getOwnedEvent, hasRole, EVENT_MANAGER_ROLES, jsonResponse } from "../../../lib/supabaseServer";
-import { isToggleableModule, normalizeOverrides } from "../../../lib/eventModules";
+import { isAddableModule, normalizeAddedModules } from "../../../lib/eventModules";
 
 export const POST: APIRoute = async (context) => {
     const session = await getSessionContext(context);
@@ -13,8 +13,7 @@ export const POST: APIRoute = async (context) => {
 
     const body = await context.request.json().catch(() => null);
     const moduleId = String(body?.moduleId || "");
-    if (!isToggleableModule(moduleId)) return jsonResponse({ message: "Herramienta no válida" }, 400);
-    if (body.enabled !== null && typeof body.enabled !== "boolean") return jsonResponse({ message: "Valor no válido" }, 400);
+    if (!isAddableModule(moduleId)) return jsonResponse({ message: "Herramienta no válida" }, 400);
 
     const event = await getOwnedEvent<{ id: number }>(Number(body.eventId), dbUser.organization_id, "id", dbUser.id);
     if (!event) return jsonResponse({ message: "Evento no encontrado" }, 404);
@@ -31,13 +30,11 @@ export const POST: APIRoute = async (context) => {
         return jsonResponse({ message: "No se pudo guardar" }, 500);
     }
 
-    const overrides = normalizeOverrides(current?.panel_modules);
-    if (body.enabled === null) delete overrides[moduleId];
-    else overrides[moduleId] = body.enabled;
+    const added = normalizeAddedModules([...normalizeAddedModules(current?.panel_modules), moduleId]);
 
     const { error } = await supabase
         .from("events")
-        .update({ panel_modules: Object.keys(overrides).length ? overrides : null })
+        .update({ panel_modules: added })
         .eq("id", event.id)
         .eq("organization_id", dbUser.organization_id);
     if (missingColumn(error)) return unavailable();
@@ -45,5 +42,5 @@ export const POST: APIRoute = async (context) => {
         console.error("events/modules:", error.message);
         return jsonResponse({ message: "No se pudo guardar" }, 500);
     }
-    return jsonResponse({ ok: true, overrides });
+    return jsonResponse({ ok: true, added });
 };
