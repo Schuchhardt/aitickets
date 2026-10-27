@@ -6,6 +6,8 @@ import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import PromoteOverview from "../../../components/dashboard/promote/PromoteOverview.vue";
 import { loadAdConnections, loadAdsView } from "../../../lib/ads";
 import { adsEnabled } from "../../../../netlify/lib/zernio-ads.mjs";
+import { getStaffEventIds } from "../../../../netlify/lib/event-staff.mjs";
+import { SERIES_TABLE, LIVE_STATUSES } from "../../../lib/socialSeries";
 
 const guard = await requireDashboardSession(Astro, EVENT_MANAGER_ROLES);
 if (!guard.ok) return guard.response;
@@ -27,13 +29,28 @@ const { data: socialPosts } = await supabaseAdmin
   .order("created_at", { ascending: false })
   .limit(20);
 
-// Fetch published events for the CTA
-const { data: events } = await supabaseAdmin
+// Eventos a la venta que todavía no terminan, para "Promociona un evento" (con acceso por evento del miembro)
+const nowIso = new Date().toISOString();
+const { data: rawEvents } = await supabaseAdmin
   .from("events")
-  .select("id, name, title, image_url, status")
+  .select("id, name, title, image_url, status, start_date, end_date")
   .eq("organization_id", dbUser.organization_id)
   .eq("status", "published")
-  .order("created_at", { ascending: false });
+  .or(`end_date.gte.${nowIso},end_date.is.null`)
+  .order("start_date", { ascending: true, nullsFirst: false });
+const allowedEventIds = await getStaffEventIds(supabaseAdmin, dbUser.id);
+const events = (rawEvents || []).filter((e: any) => !allowedEventIds || allowedEventIds.includes(Number(e.id)));
+
+// Difusión automática en Instagram por evento (docs/specs/historias-automaticas.md). Sin la tabla: sin estado.
+const seriesByEvent: Record<number, string> = {};
+if (events.length) {
+  const { data: series } = await supabaseAdmin
+    .from(SERIES_TABLE)
+    .select("event_id, status")
+    .in("event_id", events.map((e: any) => e.id))
+    .in("status", [...LIVE_STATUSES]);
+  for (const s of series || []) seriesByEvent[Number(s.event_id)] ??= s.status;
+}
 
 // Anuncios en Meta vía Zernio (src/lib/ads.ts). Sin sincronizar aquí: la pestaña lo hace al abrirse.
 const enabledAds = adsEnabled();
@@ -50,23 +67,25 @@ if (enabledAds) {
   }
 }
 
-// Stats: conteos sobre TODOS los posts de la organización (la lista de arriba solo trae los 20 más recientes)
-const countPosts = (status?: string) => {
-  let q = supabaseAdmin.from("social_posts").select("id", { count: "exact", head: true }).eq("organization_id", dbUser.organization_id);
-  if (status) q = q.eq("status", status);
-  return q;
-};
-const [{ count: totalCount }, { count: publishedCount }, { count: scheduledCount }] = await Promise.all([
-  countPosts(),
-  countPosts("published"),
-  countPosts("scheduled"),
-]);
+// Total de posts de la organización (la lista solo trae los 20 más recientes)
+const { count: totalCount } = await supabaseAdmin
+  .from("social_posts")
+  .select("id", { count: "exact", head: true })
+  .eq("organization_id", dbUser.organization_id);
 const totalPosts = totalCount || 0;
-const publishedPosts = publishedCount || 0;
-const scheduledPosts = scheduledCount || 0;
 const activeCampaigns = ads.campaigns.filter((c) => c.status === "active").length;
 const totalAdSpend = ads.campaigns.filter((c) => !c.currency || c.currency === "CLP").reduce((s, c) => s + (Number(c.spend) || 0), 0);
 const hasMetaAds = ads.connections.some((c) => c.status === "active");
+const activeAdsByEvent: Record<number, number> = {};
+for (const c of ads.campaigns) if (c.status === "active") activeAdsByEvent[Number(c.event_id)] = (activeAdsByEvent[Number(c.event_id)] || 0) + 1;
+const promoteEvents = events.map((e: any) => ({
+  id: e.id,
+  name: e.title || e.name,
+  image_url: e.image_url,
+  start_date: e.start_date,
+  series: seriesByEvent[Number(e.id)] || null,
+  activeAds: activeAdsByEvent[Number(e.id)] || 0,
+}));
 
 const connected = Astro.url.searchParams.get("connected");
 const error = Astro.url.searchParams.get("error");
@@ -79,8 +98,8 @@ const tab = rawTab === "ads" && !enabledAds ? "" : rawTab;
     client:only="vue"
     accountsJson={JSON.stringify(socialAccounts || [])}
     postsJson={JSON.stringify(socialPosts || [])}
-    eventsJson={JSON.stringify(events || [])}
-    statsJson={JSON.stringify({ totalPosts, publishedPosts, scheduledPosts, activeCampaigns, totalAdSpend, hasMetaAds })}
+    eventsJson={JSON.stringify(promoteEvents)}
+    statsJson={JSON.stringify({ totalPosts, activeCampaigns, totalAdSpend, hasMetaAds })}
     connectedPlatform={connected || ""}
     errorType={error || ""}
     initialTab={tab || ""}
