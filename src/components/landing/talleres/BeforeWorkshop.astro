@@ -1,0 +1,207 @@
+---
+// 4 · Antes del taller: que nadie llegue perdido (SPEC_landing_talleres §4.4, ancla #antes): la foto impresa de la
+// tallerista preparando la mesa con el correo de recordatorio encima, y cinco ítems verificados en el código:
+//   entrada con QR, mapa y calendario → attendeePage.ts y shareActions.js
+//   recordatorio el día antes → send-event-reminders (automático); mensajes y recordatorios con texto propio →
+//               tools/messaging.ts (send_attendee_message / schedule_reminder, hoy solo desde el asistente de IA)
+//   asistente de la página y FAQ con IA → EventAssistant.vue, EventFAQManager.vue
+//   cerrar inscripciones → event_tickets.end_date (tools/tickets.ts, hoy desde el asistente de IA)
+//   preguntas al inscribirse → no existen ("Pronto": cada inscripción guarda nombre y correo de quien compra)
+// TL12: el correo entra deslizando desde la derecha cuando su bloque se revela. Mobile: foto a ancho completo con el
+// correo abajo sin giro; ítems y burbujas debajo.
+import SectionTab from "./SectionTab.astro";
+import Highlight from "./Highlight.astro";
+import PrintedPhoto from "./PrintedPhoto.astro";
+import Tick from "./Tick.astro";
+import IndexCard from "./IndexCard.astro";
+import SoonBadge from "../../ui/SoonBadge.vue";
+import { WORKSHOP_PHOTOS, presetById, workshopDates } from "./talleresLanding.js";
+
+const preset = presetById("ceramica");
+const first = workshopDates(preset, 1)[0];
+
+const items = [
+  {
+    title: "Su entrada, con todo.",
+    text: "Cada persona recibe su QR por correo, con la fecha, la hora y la dirección. Desde su entrada abre el mapa y lo agrega a su calendario.",
+  },
+  {
+    title: "Un recordatorio el día antes, automático.",
+    text: "Tú no mandas nada. ¿Quieres otro el mismo día, con \"traigan delantal y ropa que se pueda manchar\"? Lo programas con tu texto desde tu asistente de IA conectado.",
+  },
+  {
+    title: "Las dudas, respondidas en la página.",
+    text: "\"¿Incluye materiales?\", \"¿Sirve si nunca he hecho cerámica?\": la página de tu taller tiene un asistente que responde con lo que tú escribiste, y las preguntas frecuentes las armas con IA desde el panel.",
+  },
+  {
+    title: "Cierra las inscripciones cuando necesitas.",
+    text: "Si compras los materiales el jueves, las inscripciones se cierran el miércoles en la noche. Hoy se configura desde tu asistente de IA.",
+  },
+  {
+    title: "Preguntas al inscribirse (nivel, alergias, talla)",
+    text: "Hoy cada inscripción guarda el nombre y el correo de quien se inscribe.",
+    soon: true,
+  },
+];
+---
+
+<section id="antes" class="tl-section" aria-labelledby="tl-before-title" data-tl-section="antes">
+  <SectionTab text="Antes" />
+  <div class="tl-wrap tl-before-grid">
+    <div class="tl-before-desk" data-lp-reveal>
+      <PrintedPhoto
+        photo={WORKSHOP_PHOTOS.tallerista}
+        alt="Tallerista con delantal ordenando herramientas y piezas de arcilla sobre la mesa antes de la clase"
+        sizes="(min-width: 1024px) 420px, 100vw"
+        tilt={-1.5}
+        ratio="4 / 5"
+        caption="la mesa lista desde el viernes"
+        class="tl-before-photo"
+      />
+      <IndexCard label="Recordatorio · ejemplo" tilt={2} class="tl-before-mail" role="img" aria-label="Correo de recordatorio de ejemplo">
+        <p class="tl-display tl-mail-title">Mañana: {preset.title}</p>
+        <p class="tl-mail-meta">{first.label} · {preset.from} · {preset.place}, {preset.city}</p>
+        <span class="tl-btn tl-btn-lime tl-btn-sm tl-mail-btn">Ver mi entrada</span>
+        <span class="tl-mail-link">Agregar a mi calendario</span>
+      </IndexCard>
+    </div>
+
+    <div class="tl-before-copy">
+      <div data-lp-reveal>
+        <p class="tl-eyebrow" data-lp-step>Antes del taller</p>
+        <h2 id="tl-before-title" class="tl-h2 tl-before-title" data-lp-step>
+          Que nadie llegue <Highlight>sin saber qué traer.</Highlight>
+        </h2>
+      </div>
+      <ul class="tl-checklist tl-before-list" data-lp-reveal>
+        {
+          items.map((item) => (
+            <li data-lp-step>
+              <Tick />
+              <div>
+                <strong class="tl-soon-line">
+                  {item.title}
+                  {item.soon && <SoonBadge dark={false} />}
+                </strong>
+                <p>{item.text}</p>
+              </div>
+            </li>
+          ))
+        }
+      </ul>
+      <div class="tl-bubbles" data-lp-reveal aria-label="Ejemplo de conversación con el asistente de la página" role="group">
+        <p class="tl-bubble tl-bubble-me" data-lp-step>¿Tengo que llevar algo?</p>
+        <p class="tl-bubble tl-bubble-bot" data-lp-step>
+          No, los materiales están incluidos. Solo trae ropa que se pueda manchar. ¿Te ayudo con tu inscripción?
+          <span class="tl-example"> · ejemplo</span>
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .tl-before-grid {
+    display: grid;
+    gap: 48px;
+  }
+  .tl-before-desk {
+    position: relative;
+  }
+  /* Mobile: el correo debajo de la foto, sin giro */
+  .tl-before-desk :global(.tl-before-mail) {
+    position: relative;
+    width: min(280px, 100%);
+    margin: 16px auto 0;
+    transform: none;
+  }
+  /* El pie de la foto a la izquierda: el correo tapa la esquina derecha */
+  .tl-before-desk :global(.tl-photo-caption) {
+    padding-left: 8px;
+    text-align: left;
+  }
+  .tl-mail-title {
+    font-size: 18px;
+    line-height: 22px;
+    font-weight: 700;
+  }
+  .tl-mail-meta {
+    margin-top: 6px;
+    font-size: 13px;
+    line-height: 18px;
+    color: var(--tl-grafito-2);
+  }
+  .tl-mail-btn {
+    margin-top: 12px;
+  }
+  .tl-mail-link {
+    display: block;
+    margin-top: 10px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--tl-tinta);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .tl-before-title {
+    margin-top: 14px;
+  }
+  .tl-before-list {
+    margin-top: 32px;
+  }
+  .tl-bubbles {
+    display: grid;
+    gap: 10px;
+    max-width: 420px;
+    margin-top: 32px;
+  }
+  .tl-bubble {
+    padding: 12px 16px;
+    border-radius: 16px;
+    font-size: 15px;
+    line-height: 22px;
+  }
+  .tl-bubble-me {
+    justify-self: end;
+    border-bottom-right-radius: 4px;
+    background: var(--tl-grafito);
+    color: var(--tl-papel);
+  }
+  .tl-bubble-bot {
+    border: 1px solid var(--tl-line-strong);
+    border-bottom-left-radius: 4px;
+    background: var(--tl-ficha);
+  }
+  @media (min-width: 1024px) {
+    .tl-before-grid {
+      grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+      gap: 72px;
+      align-items: start;
+    }
+    .tl-before-desk {
+      max-width: 440px;
+      padding-bottom: 120px;
+    }
+    .tl-before-desk :global(.tl-before-mail) {
+      position: absolute;
+      right: -40px;
+      bottom: 0;
+      margin: 0;
+      transform: rotate(var(--tilt));
+    }
+  }
+  /* TL12: el correo entra deslizando */
+  :global(.lp-motion) .tl-before-desk:not(.is-in) :global(.tl-before-mail) {
+    opacity: 0;
+  }
+  @media (min-width: 1024px) {
+    :global(.lp-motion) .tl-before-desk.is-in :global(.tl-before-mail) {
+      animation: tl-mail-in 600ms var(--ease-out) 300ms both;
+    }
+  }
+  @media (max-width: 1023px) {
+    :global(.lp-motion) .tl-before-desk.is-in :global(.tl-before-mail) {
+      animation: tl-up 600ms var(--ease-out) 300ms both;
+    }
+  }
+</style>

@@ -1,0 +1,31 @@
+---
+// Pestaña de separador de cuaderno sobre el borde superior de cada sección (SPEC_landing_talleres §1 y §2): PENDIENTES,
+// TU TALLER, ANTES, EL DÍA, DIFUSIÓN, DESPUÉS, PRECIO, ESPACIOS, PREGUNTAS. aria-hidden: el H2 de la sección ya la nombra.
+// TL7: el script marca como activa (destacador, 4 px más arriba) la de la sección que cruza el 25 % superior de la
+// pantalla; las demás vuelven. Sin JS todas quedan en ficha.
+interface Props {
+  text: string;
+}
+const { text } = Astro.props;
+---
+
+<span class="tl-tab" aria-hidden="true" data-tl-tab>{text}</span>
+
+<script>
+  // Una sola vez para todas las pestañas (Astro agrupa el script): la sección "activa" es la que cruza la línea del
+  // 25 % de la pantalla (rootMargin), así queda una a la vez.
+  if ("IntersectionObserver" in window) {
+    const tabs = new Map<Element, HTMLElement>();
+    document.querySelectorAll<HTMLElement>("[data-tl-tab]").forEach((tab) => {
+      const section = tab.closest("section");
+      if (section) tabs.set(section, tab);
+    });
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) tabs.get(entry.target)?.classList.toggle("is-active", entry.isIntersecting);
+      },
+      { rootMargin: "-25% 0px -74% 0px", threshold: 0 },
+    );
+    tabs.forEach((_, section) => io.observe(section));
+  }
+</script>

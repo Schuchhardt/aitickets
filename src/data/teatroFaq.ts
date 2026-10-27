@@ -16,7 +16,7 @@ import { PRODUCER_FAQ, type FaqItem } from "./producerFaq";
 import { ORGANIZADORES_FAQ } from "./organizadoresFaq";
 import { getLanding } from "./landings";
 import { DEFAULT_MAX_PER_PURCHASE } from "../components/Reservation/pricing.js";
-import { INVITE_AUDIENCES } from "../../netlify/lib/reviews.mjs";
+import { INVITE_AUDIENCE_TEXT } from "./inviteAudience";
 
 const pick = (list: FaqItem[], q: string): FaqItem => {
     const item = list.find((f) => f.q === q);
@@ -26,18 +26,11 @@ const pick = (list: FaqItem[], q: string): FaqItem => {
 /** La misma respuesta de `from` con otra pregunta (y, si hace falta, una frase más al final). */
 const reword = (from: FaqItem, q: string, extra = ""): FaqItem => ({ ...from, q, a: extra ? `${from.a} ${extra}` : from.a });
 
-/** "Solo quienes calificaron con 4 o 5 estrellas" → "quienes calificaron con 4 o 5 estrellas" (para usarlo en una frase). */
-const audience = (label: string): string =>
-    label
-        .replace(/^Solo /, "")
-        .replace(/ \(check-in\)$/, "")
-        .replace(/^\p{Lu}/u, (c) => c.toLowerCase());
 /**
- * A quiénes puedes invitar a la próxima obra, con las audiencias que ofrece el panel (INVITE_AUDIENCES de reviews.mjs):
- * "todos los asistentes, a quienes ingresaron o a quienes calificaron con 4 o 5 estrellas". La usan esta FAQ y el
+ * A quiénes puedes invitar a la próxima obra (src/data/inviteAudience.ts, compartida con talleres). La usan esta FAQ y el
  * paso "Bajó el telón" de la temporada (TheatreSeason.astro).
  */
-export const INVITE_AUDIENCE_TEXT = `${audience(INVITE_AUDIENCES.all)}, a ${audience(INVITE_AUDIENCES.checked_in)} o a ${audience(INVITE_AUDIENCES.promoters)}`;
+export { INVITE_AUDIENCE_TEXT };
 
 const theatreLanding = getLanding("ticketera-teatro");
 if (!theatreLanding) throw new Error("Falta la landing ticketera-teatro en src/data/landings.ts");

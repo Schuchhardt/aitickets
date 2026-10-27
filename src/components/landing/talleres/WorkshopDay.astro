@@ -1,0 +1,127 @@
+---
+// 5 · El día del taller: pasar lista (SPEC_landing_talleres §4.5, ancla #el-dia): la pizarra, el único bloque oscuro de
+// la página. A la izquierda la lista de curso (ClassRoll) y a la derecha cuatro ítems verificados en el código:
+//   rol Puerta → permissions.ts; link de puerta que vence solo → /puerta/<token> (tools/access.ts, hoy solo desde el
+//               asistente de IA)
+//   sin señal, entrada usada no vuelve a entrar, búsqueda y reenvío → ValidateQR.vue, checkin.mjs, /api/orders/resend
+//   cortesías → CourtesyTicketsForm.vue y src/lib/courtesy.ts (no cuentan como venta)
+//   pasar lista en cada sesión de un curso con una sola entrada → no existe (confirm-ticket valida una vez: "Pronto")
+// Mobile: la lista arriba a ancho completo (6 filas y "y 4 más"), los ítems debajo.
+import SectionTab from "./SectionTab.astro";
+import Highlight from "./Highlight.astro";
+import ClassRoll from "./ClassRoll.vue";
+import SoonBadge from "../../ui/SoonBadge.vue";
+
+const items = [
+  {
+    title: "Escanea en la puerta o en la mesa.",
+    text: "Tú, tu ayudante o quien recibe: con el rol Puerta o con un link temporal que vence solo (lo creas desde tu asistente de IA). No necesitan tu cuenta.",
+  },
+  {
+    title: "Aunque el taller no tenga señal.",
+    text: "La lista se descarga antes y se sincroniza cuando vuelve la conexión. Una entrada usada no vuelve a entrar.",
+  },
+  { title: "¿Se le borró el correo?", text: "Lo buscas por nombre y se lo reenvías en un toque." },
+  {
+    title: "Becas y ayudantes, con su QR.",
+    text: "Les mandas una cortesía sin costo desde el panel: no cuenta como venta y entra igual.",
+  },
+];
+---
+
+<section id="el-dia" class="tl-section tl-on-pizarra" aria-labelledby="tl-day-title" data-tl-section="el-dia">
+  <SectionTab text="El día" />
+  <div class="tl-wrap">
+    <div class="tl-day-head" data-lp-reveal>
+      <p class="tl-eyebrow" data-lp-step>El día del taller</p>
+      <h2 id="tl-day-title" class="tl-h2 tl-day-title" data-lp-step>Pasa lista <Highlight>con el celular.</Highlight></h2>
+    </div>
+    <div class="tl-day-grid">
+      <div class="tl-day-roll">
+        <ClassRoll client:visible={{ rootMargin: "400px" }} />
+      </div>
+      <div data-lp-reveal>
+        <ul class="tl-day-list">
+          {
+            items.map((item) => (
+              <li data-lp-step>
+                <span class="tl-day-dot" aria-hidden="true" />
+                <div>
+                  <strong>{item.title}</strong>
+                  <p>{item.text}</p>
+                </div>
+              </li>
+            ))
+          }
+        </ul>
+        <p class="tl-day-note" data-lp-step>
+          En un curso de varias sesiones con una sola entrada, el QR se valida en la primera sesión.
+          <span class="tl-soon-line"><strong>Pasar lista en cada sesión</strong> <SoonBadge dark /></span>
+        </p>
+        <p class="tl-day-guide" data-lp-step>
+          <a href="/guias/como-hacer-check-in-con-qr" class="tl-link">Guía: check-in con QR →</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .tl-day-title {
+    margin-top: 14px;
+  }
+  .tl-day-grid {
+    display: grid;
+    gap: 40px;
+    margin-top: 40px;
+  }
+  .tl-day-list {
+    display: grid;
+    gap: 22px;
+  }
+  .tl-day-list li {
+    display: flex;
+    gap: 14px;
+  }
+  .tl-day-dot {
+    flex: 0 0 auto;
+    width: 10px;
+    height: 10px;
+    margin-top: 8px;
+    border-radius: 50%;
+    background: var(--brand-lime);
+  }
+  .tl-day-list strong {
+    display: block;
+    font-size: 17px;
+    line-height: 24px;
+    font-weight: 600;
+  }
+  .tl-day-list p {
+    margin-top: 2px;
+    font-size: 16px;
+    line-height: 25px;
+    color: var(--tl-tiza-2);
+  }
+  .tl-day-note {
+    margin-top: 28px;
+    font-size: 14px;
+    line-height: 21px;
+    color: var(--tl-tiza-2);
+  }
+  .tl-day-note .tl-soon-line {
+    margin-top: 4px;
+    color: var(--tl-tiza);
+  }
+  .tl-day-guide {
+    margin-top: 20px;
+  }
+  @media (min-width: 1024px) {
+    .tl-day-grid {
+      grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+      gap: 64px;
+      margin-top: 56px;
+      align-items: start;
+    }
+  }
+</style>

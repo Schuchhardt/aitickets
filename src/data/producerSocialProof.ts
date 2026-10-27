@@ -50,3 +50,11 @@ export const MUSIC_TESTIMONIAL: ProducerTestimonial | null = null;
  * renderiza.
  */
 export const THEATRE_TESTIMONIAL: ProducerTestimonial | null = null;
+
+/**
+ * Cita de "nota pegada" de /ticketera-talleres (SPEC_landing_talleres §4.10 y §0.8): solo si es real, con nombre,
+ * taller o espacio, ciudad y foto autorizados por escrito. company = "Taller o espacio · ciudad". null: la sección no se
+ * renderiza. highlight: la frase clave de la cita (un trozo literal de quote), que va con el destacador.
+ */
+export type WorkshopTestimonial = ProducerTestimonial & { highlight?: string };
+export const WORKSHOP_TESTIMONIAL: WorkshopTestimonial | null = null;

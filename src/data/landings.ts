@@ -172,34 +172,21 @@ export const LANDINGS: Landing[] = [
     {
         slug: "ticketera-talleres",
         kind: "vertical",
-        card: { title: "Talleres y charlas", text: "Cupos por fecha, inscripciones gratis o pagadas y recordatorios automáticos." },
-        title: "Venta de entradas e inscripciones para talleres | AI Tickets",
-        description: "Publica tus talleres, cursos cortos y charlas con cupos por fecha. Inscripciones gratis sin costo o pagadas con Webpay, recordatorio automático y asistencia con QR.",
-        eyebrow: "Para talleres, cursos cortos y charlas",
-        h1: "Inscripciones para tus talleres, con cupos y recordatorios automáticos",
+        // Sin "charlas": quedan para la futura landing de seminarios (SPEC_landing_talleres, Preguntas abiertas 8)
+        card: { title: "Talleres y cursos", text: "Cupos por fecha, inscripciones gratis o pagadas y recordatorio el día antes." },
+        title: "Inscripciones para talleres en Chile: cupos, Webpay y QR · 0% de comisión | AI Tickets",
+        description:
+            "Abre inscripciones para tus talleres y cursos cortos: cupos por fecha, gratis o con pago por Webpay, entrada con QR, recordatorio el día antes y lista de asistentes en el celular. 0% de comisión.",
+        eyebrow: "Para talleristas y espacios que dictan talleres",
+        h1: "Abre inscripciones con un link. El día del taller, solo enseña.",
         intro:
-            "Un taller tiene cupos chicos, fechas que se repiten y asistentes que hay que recordar. AI Tickets te da una página de inscripción, cobra si corresponde y le avisa a cada persona antes de la sesión.",
-        highlights: ["Gratis para eventos gratuitos", "Cupos por fecha", "Recordatorio por email antes de cada sesión"],
-        sections: [
-            {
-                heading: "Cupos claros en cada fecha",
-                body:
-                    "Agrega cada sesión como una función y define cuántos cupos tiene cada tipo de entrada. Cuando se llena, la página deja de vender esa entrada.",
-            },
-            {
-                heading: "Gratis o pagado",
-                items: [
-                    { title: "Eventos gratuitos", text: "Inscripción con nombre y email, entrada con QR y sin cargo por servicio." },
-                    { title: "Pagado con Webpay", text: `El participante paga con Webpay o tarjeta; el cargo por servicio es ${fee} y puedes absorberlo para mostrar un precio final.` },
-                    { title: "Códigos para tu comunidad", text: "Descuentos para ex alumnos, socios o grupos, con cupo y fecha límite." },
-                ],
-            },
-            {
-                heading: "Que nadie se olvide",
-                body:
-                    "Cada inscrito recibe su entrada por email al instante y un recordatorio antes de la sesión. Si cambias fecha u horario, les avisamos automáticamente.",
-            },
-        ],
+            "Cupos por fecha que se cierran solos, inscripción gratis o pagada con Webpay, la entrada con QR al correo de cada persona y un recordatorio el día antes. Sin DM preguntando si queda cupo, sin pantallazos de transferencias, sin planillas. 0% de comisión para ti.",
+        // "Recordatorio por correo el día antes" y no "antes de cada sesión": a quien tiene una entrada para todas las
+        // funciones (un curso) el recordatorio automático le llega solo antes de la primera fecha (send-event-reminders).
+        highlights: ["Gratis si tu taller es gratis", "Cupos por fecha", "Recordatorio por correo el día antes"],
+        // La página es propia (src/pages/ticketera-talleres.astro, SPEC_landing_talleres): las secciones viven en
+        // src/components/landing/talleres y las preguntas en src/data/talleresFaq.ts (que toma de aquí estas tres).
+        sections: [],
         faq: [
             {
                 q: "¿Puedo pedir datos adicionales al inscribirse?",
@@ -211,9 +198,11 @@ export const LANDINGS: Landing[] = [
             },
             { q: "¿Cuánto cuesta un taller gratuito?", a: "Nada. Las entradas gratis no pagan cargo por servicio y no hay mensualidad." },
         ],
+        // No hay un taller de ejemplo en demoEvent.mjs (Preguntas abiertas 9): mientras tanto, la inscripción gratuita
         demo: { url: "/eventos/evento-demo-gratis", label: "Ver una inscripción gratuita de ejemplo" },
-        cta: { label: "Publicar mi taller", campaign: "vertical_talleres" },
+        cta: { label: "Abrir inscripciones", campaign: "vertical_talleres" },
         related: ["academias", "entradas-con-qr", "guias/como-vender-entradas-online"],
+        dedicated: true,
     },
     {
         slug: "academias",

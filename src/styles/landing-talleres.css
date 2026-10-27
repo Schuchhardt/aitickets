@@ -1,0 +1,902 @@
+/* ------------------------------------------------------------------------------------------------
+ * Tema de la landing de talleres (/ticketera-talleres, docs/specs/rediseno/SPEC_landing_talleres_aitickets.md §1):
+ * "cuaderno de taller". Papel de cuaderno frío con cuadrícula azul, fichas blancas con renglones, destacador amarillo
+ * detrás de lo importante, notas al margen en lápiz pasta azul (Caveat), fotos impresas con clip y una pizarra verde
+ * para el día del taller. Página clara, táctil y asimétrica, con botones de cartón que se aprietan.
+ * Bricolage Grotesque 800/700 (nunca cursiva) en titulares y cifras; Prompt en el cuerpo; Caveat solo en notas al
+ * margen, siempre con su equivalente en texto normal o aria-label.
+ * Scope en [data-theme="talleres"]: no toca los tokens globales; los tokens puente (surface/text/border) hacen que los
+ * componentes compartidos (FAQ, badge "Pronto", barra mobile) se vean en el papel, como en academias, música y teatro.
+ * El lima va solo en acciones y confirmaciones ("✓ Presente", "Tú recibes"), nunca pegado al destacador. Prefijo tl-.
+ * Se carga junto a landing.css (.lp-sr-only y LandingMotion).
+ * ---------------------------------------------------------------------------------------------- */
+/* Bricolage Grotesque estática, solo latin 700 y 800 (≈ 44 KB en total, bajo los 70 KB de §7; la variable con ejes
+ * wght/opsz pesa más). La página precarga la 800 del H1 (Layout, slot head-extra). Como la hoja no declara
+ * unicode-range, las flechas y checks que no traiga el subconjunto caen glifo a glifo en la fuente de respaldo.
+ * Caveat 600 se declara en la página con font-display: optional y sin precarga (§7). */
+@import "@fontsource/bricolage-grotesque/latin-700.css";
+@import "@fontsource/bricolage-grotesque/latin-800.css";
+
+/* Respaldo con métricas aproximadas a Bricolage Grotesque sobre Arial (presente en macOS, iOS y Windows) para que el
+ * swap no mueva el hero (CLS < 0,05, §7). Ajustar si se cambia la fuente de acento (Preguntas abiertas 11). */
+@font-face {
+  font-family: "Bricolage Fallback";
+  src: local("Arial");
+  size-adjust: 98%;
+  ascent-override: 95%;
+  descent-override: 26%;
+  line-gap-override: 0%;
+}
+
+[data-theme="talleres"] {
+  --tl-papel: #f4f6f1; /* fondo principal: papel de cuaderno, levemente frío */
+  --tl-papel-2: #ecefe8; /* secciones alternas */
+  --tl-cuadro: rgba(37, 71, 197, 0.075); /* líneas de la cuadrícula */
+  --tl-margen: rgba(214, 92, 100, 0.45); /* línea de margen del cuaderno (decorativa) */
+  --tl-ficha: #ffffff; /* fichas y cards */
+  --tl-ficha-renglon: rgba(37, 71, 197, 0.14);
+  --tl-ficha-borde: #d65c64; /* línea superior de la ficha (2 px, decorativa) */
+  --tl-grafito: #1f2329; /* texto principal y borde de botones */
+  --tl-grafito-2: #424852;
+  --tl-grafito-3: #5a616c; /* meta y eyebrows (≈ 6:1 sobre papel) */
+  --tl-line: rgba(31, 35, 41, 0.12);
+  --tl-line-strong: rgba(31, 35, 41, 0.22);
+  --tl-tinta: #2547c5; /* azul lápiz pasta (≈ 7:1 sobre papel; ≥ 4,5:1 sobre ficha) */
+  --tl-destacador: #ffe45c; /* solo como fondo detrás de texto grafito */
+  --tl-pizarra: #1f3a30; /* bloque "El día del taller" */
+  --tl-pizarra-2: #284a3d; /* filas y cards sobre la pizarra */
+  --tl-tiza: #eef2ec; /* texto sobre pizarra (≈ 11:1) */
+  --tl-tiza-2: #b9c7be; /* meta sobre pizarra (≈ 6:1) */
+  --tl-madera: #8a6a48; /* marco de la pizarra (decorativo) */
+  --tl-sombra-papel: 0 1px 0 rgba(31, 35, 41, 0.05), 0 14px 28px -14px rgba(31, 35, 41, 0.28);
+  --tl-display: "Bricolage Grotesque", "Bricolage Fallback", "Arial", sans-serif;
+  --tl-mano: "Caveat", "Prompt", sans-serif;
+  --tl-sombra-boton: 4px;
+
+  /* Componentes compartidos dentro del tema (LandingFaq, LandingMobileBar, SoonBadge) */
+  --surface-0: var(--tl-papel);
+  --surface-1: var(--tl-ficha);
+  --surface-2: var(--tl-papel-2);
+  --text-1: var(--tl-grafito);
+  --text-2: var(--tl-grafito-2);
+  --text-3: var(--tl-grafito-3);
+  --border: var(--tl-line);
+  --border-strong: var(--tl-line-strong);
+
+  font-family: "Prompt", system-ui, sans-serif;
+  color: var(--tl-grafito);
+  background: var(--tl-papel);
+  -webkit-font-smoothing: antialiased;
+}
+/* §1: la cursiva es la firma de stand-up y academias. Nada en esta página va en cursiva, ni en versalitas. */
+[data-theme="talleres"] :is(em, i, cite, blockquote) {
+  font-style: normal;
+}
+
+.tl {
+  /* Giros, stickers y fichas superpuestas nunca generan scroll horizontal (clip no rompe los sticky) */
+  overflow-x: clip;
+}
+.tl [id] {
+  scroll-margin-top: 96px;
+}
+.tl-wrap {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-inline: 16px;
+}
+@media (min-width: 768px) {
+  .tl-wrap {
+    padding-inline: 40px;
+  }
+}
+
+/* ---------- Secciones ----------
+ * 72 px de padding vertical en mobile, 128 en desktop (§5). Cada una con su pestaña de separador (SectionTab). */
+.tl-section {
+  position: relative;
+  padding-block: 72px;
+  overflow-x: clip;
+}
+@media (min-width: 1024px) {
+  .tl-section {
+    padding-block: 128px;
+  }
+}
+.tl-on-papel-2 {
+  background-color: var(--tl-papel-2);
+}
+/* Cuadrícula del cuaderno: CSS puro, 22 px en mobile y 28 en desktop */
+.tl-grid {
+  background-image: linear-gradient(var(--tl-cuadro) 1px, transparent 1px),
+    linear-gradient(90deg, var(--tl-cuadro) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+@media (min-width: 1024px) {
+  .tl-grid {
+    background-size: 28px 28px;
+  }
+}
+/* Línea de margen: 1 px a 72 px del borde izquierdo del contenedor de 1200 px (solo desktop). El contenido "del
+ * cuaderno" va a su derecha (.tl-ruled, 32 px después de la línea); las notas al margen, a su izquierda. Decorativa. */
+.tl-margin {
+  position: relative;
+}
+@media (min-width: 1024px) {
+  .tl-margin::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(max(0px, (100% - 1200px) / 2) + 72px);
+    width: 1px;
+    background: var(--tl-margen);
+    pointer-events: none;
+  }
+  .tl-ruled {
+    padding-left: 64px;
+  }
+}
+
+/* Pizarra (solo §4.5): marco de madera arriba, tiza borrada muy sutil y tokens puente en oscuro */
+.tl-on-pizarra {
+  --text-1: var(--tl-tiza);
+  --text-2: var(--tl-tiza-2);
+  --text-3: var(--tl-tiza-2);
+  --surface-2: rgba(238, 242, 236, 0.14);
+  background: radial-gradient(ellipse 70% 50% at 30% 20%, rgba(238, 242, 236, 0.04), transparent 70%),
+    radial-gradient(ellipse 50% 40% at 80% 70%, rgba(238, 242, 236, 0.04), transparent 70%), var(--tl-pizarra);
+  border-top: 10px solid var(--tl-madera);
+  color: var(--tl-tiza);
+}
+
+/* ---------- Tipografía ----------
+ * Bricolage 800 en caja alta y baja, tracking −0,02em; H3 en 700. Escala desktop H1 88/90, H2 56/60, H3 28/34; mobile
+ * H1 44/46, H2 34/38, H3 22/28. Cifras tabulares. */
+.tl-h1,
+.tl-h2,
+.tl-h3,
+.tl-display {
+  font-family: var(--tl-display);
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: break-word;
+}
+.tl-h1 {
+  font-size: 44px;
+  line-height: 46px;
+  /* Nunca cortar una palabra a la mitad: el tamaño de desktop está pensado para que "inscripciones" quepa */
+  overflow-wrap: normal;
+}
+.tl-h2 {
+  font-size: 34px;
+  line-height: 38px;
+  text-wrap: balance;
+}
+.tl-h3 {
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 700;
+  text-wrap: balance;
+}
+.tl-num {
+  font-family: var(--tl-display);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+@media (min-width: 1024px) {
+  /* 88 px de la spec no caben en la columna del hero (6fr de 11 menos el margen): "inscripciones" mide 566 px a 88 */
+  .tl-h1 {
+    font-size: clamp(56px, 5.4vw, 80px);
+    line-height: 1.03;
+  }
+  .tl-h2 {
+    font-size: clamp(44px, 4.4vw, 56px);
+    line-height: 1.07;
+  }
+  .tl-h3 {
+    font-size: 28px;
+    line-height: 34px;
+  }
+}
+.tl-lead {
+  font-size: 16px;
+  line-height: 25px;
+  color: var(--tl-grafito-2);
+}
+.tl-on-pizarra .tl-lead {
+  color: var(--tl-tiza-2);
+}
+@media (min-width: 1024px) {
+  .tl-lead {
+    font-size: 18px;
+    line-height: 29px;
+  }
+}
+.tl-eyebrow {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tl-grafito-3);
+}
+.tl-on-pizarra .tl-eyebrow {
+  color: var(--tl-tiza-2);
+}
+/* Rótulo "ejemplo" de las cards con datos (§0.9) y encabezados de ficha */
+.tl-card-label,
+.tl-example {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tl-grafito-3);
+}
+
+/* ---------- Destacador (§1, Recursos) ----------
+ * Pseudo-elemento detrás de cada palabra en grafito (Highlight.astro), con borde irregular y un leve skew; los trazos de
+ * palabras vecinas se tocan sobre el espacio. El texto se ve desde el primer frame (LCP): solo el amarillo se revela
+ * (TL3). */
+.tl-mark {
+  background: none;
+  color: var(--tl-grafito);
+}
+.tl-mark-w {
+  position: relative;
+  z-index: 0;
+}
+.tl-mark-w::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0.08em -0.16em 0.02em -0.14em;
+  background: var(--tl-destacador);
+  border-radius: 0.2em 0.5em 0.3em 0.6em / 0.6em 0.3em 0.5em 0.2em;
+  transform: skewX(-6deg);
+  transform-origin: left center;
+}
+/* Sobre la pizarra el destacador también va (texto grafito sobre amarillo) */
+.tl-on-pizarra .tl-mark {
+  color: var(--tl-grafito);
+}
+
+/* ---------- Notas al margen (Caveat, azul) ----------
+ * Siempre ≥ 20 px (26/28 desktop, 22/24 mobile) y aria-hidden: el dato está también en el texto normal. Ancho fijo
+ * para que, si Caveat no llega (font-display: optional), caer a Prompt no mueva el layout. */
+.tl-hand {
+  font-family: var(--tl-mano);
+  font-weight: 600;
+  font-size: 22px;
+  line-height: 24px;
+  color: var(--tl-tinta);
+}
+.tl-on-pizarra .tl-hand {
+  color: var(--tl-tiza);
+}
+@media (min-width: 1024px) {
+  .tl-hand {
+    font-size: 26px;
+    line-height: 28px;
+  }
+}
+.tl-stroke {
+  fill: none;
+  stroke: var(--tl-tinta);
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.tl-on-pizarra .tl-stroke {
+  stroke: var(--tl-tiza);
+}
+
+/* ---------- Ficha (IndexCard) ----------
+ * Fondo blanco, radio 6, renglones cada 28 px y línea roja superior a 40 px del borde (decorativa). */
+.tl-card {
+  position: relative;
+  border-radius: 6px;
+  background-color: var(--tl-ficha);
+  /* La línea roja; el encabezado sin renglones (el patrón también se repite hacia arriba de los 41 px) y los renglones */
+  background-image: linear-gradient(
+    to bottom,
+    transparent 39px,
+    var(--tl-ficha-borde) 39px,
+    var(--tl-ficha-borde) 41px,
+    transparent 41px
+  ),
+    linear-gradient(to bottom, var(--tl-ficha) 0 41px, transparent 41px),
+    repeating-linear-gradient(to bottom, transparent 0 27px, var(--tl-ficha-renglon) 27px 28px);
+  background-position: 0 0, 0 0, 0 41px;
+  background-repeat: no-repeat, no-repeat, repeat;
+  box-shadow: var(--tl-sombra-papel);
+  color: var(--tl-grafito);
+  transform: rotate(var(--tilt, 0deg));
+}
+.tl-card-head {
+  min-height: 40px;
+  padding: 12px 20px 0;
+}
+.tl-card-body {
+  padding: 16px 20px 20px;
+}
+/* Ficha sin renglones (fichas con controles o mucho contenido: armador, cuenta, invitación, difusión, formatos): solo la
+ * línea superior. Las de contenido corto (hero, recordatorio, pendientes) llevan renglones. */
+.tl-card-plain {
+  background-image: linear-gradient(
+    to bottom,
+    transparent 39px,
+    var(--tl-ficha-borde) 39px,
+    var(--tl-ficha-borde) 41px,
+    transparent 41px
+  );
+}
+
+/* ---------- Foto impresa (PrintedPhoto) ----------
+ * Borde blanco de 10 px (12 abajo), radio 2, giro --tilt y un clip dibujado arriba a la izquierda. Sin overlays ni
+ * filtros. TL18: con puntero fino, al pasar se endereza y sube 4 px. */
+.tl-photo {
+  position: relative;
+  padding: 10px 10px 12px;
+  border-radius: 2px;
+  background: #fff;
+  box-shadow: var(--tl-sombra-papel);
+  transform: rotate(var(--tilt, 0deg));
+  transition: transform 250ms var(--ease-out);
+}
+.tl-photo picture,
+.tl-photo-img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.tl-photo-img {
+  aspect-ratio: var(--ratio, auto);
+  object-fit: cover;
+  border-radius: 1px;
+}
+.tl-clip {
+  position: absolute;
+  top: -14px;
+  left: 22px;
+  z-index: 2;
+  width: 22px;
+  height: 48px;
+  pointer-events: none;
+}
+.tl-clip path {
+  fill: none;
+  stroke: #8a9099;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+.tl-photo-caption {
+  display: block;
+  margin-top: 8px;
+  text-align: center;
+}
+@media (hover: hover) and (pointer: fine) {
+  .tl-photo:hover {
+    transform: rotate(0deg) translateY(-4px);
+  }
+}
+@media (max-width: 767px) {
+  /* §5: giros de ±1° como máximo en mobile */
+  .tl-photo,
+  .tl-card {
+    transform: rotate(clamp(-1deg, var(--tilt, 0deg), 1deg));
+  }
+}
+
+/* ---------- Botones de cartón (TL15) ----------
+ * Radio 10, borde 2 px grafito y sombra dura desplazada; al apretar se hunden. Altura ≥ 48 px. */
+.tl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 0 22px;
+  border: 2px solid var(--tl-grafito);
+  border-radius: 10px;
+  background: var(--tl-ficha);
+  color: var(--tl-grafito);
+  box-shadow: var(--tl-sombra-boton) var(--tl-sombra-boton) 0 var(--tl-grafito);
+  font-family: "Prompt", system-ui, sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 80ms var(--ease-out), box-shadow 80ms var(--ease-out);
+  -webkit-tap-highlight-color: transparent;
+}
+@media (max-width: 767px) {
+  [data-theme="talleres"] {
+    --tl-sombra-boton: 3px;
+  }
+}
+.tl-btn-lime {
+  background: var(--brand-lime);
+}
+.tl-btn-sm {
+  min-height: 40px;
+  padding: 0 14px;
+  font-size: 14px;
+  --tl-sombra-boton: 3px;
+}
+@media (hover: hover) {
+  .tl-btn:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: calc(var(--tl-sombra-boton) + 1px) calc(var(--tl-sombra-boton) + 1px) 0 var(--tl-grafito);
+  }
+}
+.tl-btn:active {
+  transform: translate(var(--tl-sombra-boton), var(--tl-sombra-boton));
+  box-shadow: 0 0 0 var(--tl-grafito);
+}
+.tl-btn:focus-visible {
+  outline: 3px solid var(--tl-tinta);
+  outline-offset: 3px;
+}
+.tl-on-pizarra .tl-btn {
+  border-color: var(--tl-grafito);
+}
+.tl-link {
+  color: var(--tl-tinta);
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 4px;
+  border-radius: 2px;
+}
+.tl-link:hover {
+  text-decoration-thickness: 2.5px;
+}
+.tl-link:focus-visible {
+  outline: 2px solid var(--tl-tinta);
+  outline-offset: 3px;
+}
+.tl-on-pizarra .tl-link {
+  color: var(--tl-tiza);
+}
+.tl-on-pizarra .tl-link:focus-visible {
+  outline-color: var(--tl-tiza);
+}
+
+/* ---------- Chips de ficha ---------- */
+.tl-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 4px 12px;
+  border: 1px solid var(--tl-line-strong);
+  border-radius: 6px;
+  background: var(--tl-ficha);
+  font-size: 14px;
+  line-height: 18px;
+  color: var(--tl-grafito);
+  white-space: nowrap;
+}
+
+/* ---------- Casillas y checks dibujados ----------
+ * Casilla de 14 px con borde grafito; el check azul es un trazo SVG que se dibuja con clip-path. */
+.tl-boxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+}
+.tl-box {
+  position: relative;
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--tl-grafito);
+  border-radius: 2px;
+  background: var(--tl-ficha);
+}
+.tl-box svg {
+  position: absolute;
+  left: -2px;
+  top: -5px;
+  width: 18px;
+  height: 18px;
+  overflow: visible;
+}
+.tl-box svg path {
+  fill: none;
+  stroke: var(--tl-tinta);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.tl-box-more {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tl-grafito-3);
+}
+/* Check suelto (listas): casilla de 20 px con el check azul */
+.tl-tick {
+  position: relative;
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  margin-top: 3px;
+  border: 1.5px solid var(--tl-grafito);
+  border-radius: 3px;
+  background: var(--tl-ficha);
+}
+.tl-tick svg {
+  position: absolute;
+  left: -2px;
+  top: -6px;
+  width: 26px;
+  height: 26px;
+  overflow: visible;
+}
+.tl-tick path {
+  fill: none;
+  stroke: var(--tl-tinta);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ---------- Controles de cartón (armador y cuenta) ---------- */
+.tl-control-label {
+  display: block;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--tl-grafito);
+}
+.tl-seg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.tl-seg-opt {
+  position: relative;
+  display: inline-flex;
+}
+.tl-seg-opt input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+}
+.tl-seg-opt span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 2px solid var(--tl-grafito);
+  border-radius: 8px;
+  background: var(--tl-ficha);
+  box-shadow: 2px 2px 0 var(--tl-grafito);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.15;
+  white-space: nowrap;
+  transition: transform 80ms var(--ease-out), box-shadow 80ms var(--ease-out), background-color 150ms var(--ease-out);
+}
+.tl-seg-opt input:checked + span {
+  background: var(--tl-destacador);
+  transform: translate(2px, 2px);
+  box-shadow: 0 0 0 var(--tl-grafito);
+}
+.tl-seg-opt input:focus-visible + span {
+  outline: 3px solid var(--tl-tinta);
+  outline-offset: 2px;
+}
+.tl-range {
+  display: block;
+  width: 100%;
+  height: 44px;
+  margin: 0;
+  accent-color: var(--tl-tinta);
+  cursor: pointer;
+}
+.tl-range:focus-visible {
+  outline: 2px solid var(--tl-tinta);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.tl-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.tl-step-btn {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--tl-grafito);
+  border-radius: 8px;
+  background: var(--tl-ficha);
+  box-shadow: 2px 2px 0 var(--tl-grafito);
+  color: var(--tl-grafito);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 80ms var(--ease-out), box-shadow 80ms var(--ease-out);
+}
+.tl-step-btn:active:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: 0 0 0 var(--tl-grafito);
+}
+.tl-step-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.tl-step-btn:focus-visible {
+  outline: 3px solid var(--tl-tinta);
+  outline-offset: 2px;
+}
+.tl-step-value {
+  min-width: 2.2ch;
+  font-size: 28px;
+  line-height: 1;
+  text-align: center;
+}
+
+/* ---------- Sticker de cupos (decorativo en el hero) ---------- */
+.tl-sticker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 96px;
+  height: 96px;
+  padding: 10px;
+  border: 2px solid var(--tl-grafito);
+  border-radius: 50%;
+  background: var(--tl-destacador);
+  color: var(--tl-grafito);
+  font-family: var(--tl-display);
+  font-weight: 700;
+  font-size: 17px;
+  line-height: 1.05;
+  text-align: center;
+  transform: rotate(-6deg);
+}
+
+/* ---------- Pestaña de sección (SectionTab, TL7) ----------
+ * Sobre el borde superior de la sección: inactiva en ficha con borde; la de la sección en pantalla, con destacador y
+ * 4 px más arriba. Decorativa para el lector (el H2 de la sección ya la nombra). */
+.tl-tab {
+  position: absolute;
+  top: 0;
+  left: 16px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 16px;
+  border: 1px solid var(--tl-line-strong);
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  background: var(--tl-ficha);
+  color: var(--tl-grafito);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  transform: translateY(-100%);
+  isolation: isolate;
+  transition: transform 250ms var(--ease-out);
+}
+.tl-tab::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--tl-destacador);
+  opacity: 0;
+  transition: opacity 250ms var(--ease-out);
+}
+.tl-tab.is-active {
+  transform: translateY(calc(-100% - 4px));
+}
+.tl-tab.is-active::before {
+  opacity: 1;
+}
+.tl-on-pizarra .tl-tab {
+  top: -10px;
+  border-color: rgba(238, 242, 236, 0.3);
+  background: var(--tl-pizarra);
+  color: var(--tl-tiza);
+}
+.tl-on-pizarra .tl-tab.is-active {
+  color: var(--tl-grafito);
+}
+@media (min-width: 768px) {
+  .tl-tab {
+    left: 40px;
+  }
+}
+@media (min-width: 1240px) {
+  .tl-tab {
+    left: calc((100% - 1200px) / 2 + 40px);
+  }
+}
+
+/* Lista con casillas (ítems de las secciones) */
+.tl-checklist {
+  display: grid;
+  gap: 20px;
+}
+.tl-checklist li {
+  display: flex;
+  gap: 14px;
+}
+.tl-checklist strong {
+  display: block;
+  font-weight: 600;
+  font-size: 17px;
+  line-height: 24px;
+}
+.tl-checklist p {
+  margin-top: 2px;
+  font-size: 16px;
+  line-height: 25px;
+  color: var(--tl-grafito-2);
+}
+.tl-terms {
+  margin-top: 20px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--tl-grafito-3);
+}
+.tl-terms a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.tl-soon-line {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ---------- Movimiento (§6) ----------
+ * Igual que las otras landings: todo cuelga de html.lp-motion (LandingMotion.astro: JS, IntersectionObserver y sin
+ * "reducir movimiento"); sin la clase cada elemento queda en su estado final (destacadores pintados, anotaciones
+ * dibujadas, pendientes tachados). Solo transform, opacity y clip-path. */
+@keyframes tl-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+}
+@keyframes tl-mark-in {
+  from {
+    transform: skewX(-6deg) scaleX(0);
+  }
+}
+@keyframes tl-draw {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 -2px 0 0);
+  }
+}
+@keyframes tl-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes tl-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(-16px) rotate(4deg);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(2px) rotate(1.2deg);
+  }
+}
+/* Variantes solo con transform para el hero (TL1 y TL2): el H1 y la foto se ven desde el primer frame (LCP, §7) */
+@keyframes tl-rise {
+  from {
+    transform: translateY(20px);
+  }
+}
+@keyframes tl-drop-in {
+  0% {
+    transform: translateY(-16px) rotate(4deg);
+  }
+  70% {
+    transform: translateY(2px) rotate(1.2deg);
+  }
+}
+@keyframes tl-slide-card {
+  from {
+    opacity: 0;
+    transform: translateY(24px) rotate(-6deg);
+  }
+}
+@keyframes tl-pop-sticker {
+  from {
+    opacity: 0;
+    transform: scale(0.6) rotate(-20deg);
+  }
+}
+@keyframes tl-fan {
+  from {
+    opacity: 0;
+    transform: translateX(var(--tl-fan-x, 0)) rotate(0deg);
+  }
+}
+@keyframes tl-mail-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px) rotate(6deg);
+  }
+}
+@keyframes tl-answer {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* Reveal genérico: fade + translateY 20 px */
+.lp-motion .tl .is-in [data-lp-step],
+.lp-motion .tl .is-in[data-lp-step] {
+  animation: tl-up 600ms var(--ease-out) var(--lp-d, 0ms) both;
+}
+/* TL3: el destacador se pinta desde la izquierda después de su línea */
+.lp-motion .tl [data-lp-reveal]:not(.is-in) .tl-mark-w::before {
+  transform: skewX(-6deg) scaleX(0);
+}
+.lp-motion .tl .is-in .tl-mark-w::before {
+  animation: tl-mark-in 360ms cubic-bezier(0.6, 0, 0.2, 1) calc(var(--lp-d, 0ms) + var(--tl-mark-d, 350ms) + var(--w) * 140ms)
+    both;
+}
+/* TL4: anotaciones que se dibujan y su texto Caveat que aparece 300 ms después */
+.lp-motion .tl [data-lp-reveal]:not(.is-in) .tl-draw {
+  clip-path: inset(0 100% 0 0);
+}
+.lp-motion .tl .is-in .tl-draw {
+  animation: tl-draw 600ms var(--ease-out) calc(var(--lp-d, 0ms) + var(--tl-draw-d, 400ms)) both;
+}
+.lp-motion .tl [data-lp-reveal]:not(.is-in) .tl-draw-text {
+  opacity: 0;
+}
+.lp-motion .tl .is-in .tl-draw-text {
+  animation: tl-fade 300ms var(--ease-out) calc(var(--lp-d, 0ms) + var(--tl-draw-d, 400ms) + 300ms) both;
+}
+
+/* Fondo del documento (rebote del scroll en iOS y macOS) del mismo color que la página */
+html:has(body [data-theme="talleres"]) {
+  background: #f4f6f1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tl-photo,
+  .tl-btn,
+  .tl-seg-opt span,
+  .tl-step-btn,
+  .tl-tab,
+  .tl-tab::before {
+    transition-duration: 1ms;
+  }
+}

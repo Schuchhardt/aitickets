@@ -1,0 +1,21 @@
+---
+// Ficha de cartulina (SPEC_landing_talleres §1): fondo blanco, radio 6, renglones cada 28 px, la línea roja superior a
+// 40 px del borde (decorativa) y un encabezado en mayúsculas ("RECORDATORIO · EJEMPLO"). tilt: giro en grados (en
+// mobile se limita a ±1°, §5). Los renglones van en las fichas de contenido corto (la de inscripción del hero, el
+// correo de recordatorio, la hoja de pendientes); plain los quita y deja solo la línea superior: es para las fichas con
+// controles o mucho contenido (el armador, la cuenta, la invitación, difusión y formatos), donde estorban. El resto de
+// atributos (role, aria-label, data-testid…) va a la raíz.
+import type { HTMLAttributes } from "astro/types";
+
+interface Props extends HTMLAttributes<"div"> {
+  label?: string;
+  tilt?: number;
+  plain?: boolean;
+}
+const { label, tilt = 0, plain = false, class: className, ...rest } = Astro.props;
+---
+
+<div class:list={["tl-card", { "tl-card-plain": plain }, className]} style={`--tilt: ${tilt}deg`} {...rest}>
+  {label && <p class="tl-card-head tl-card-label">{label}</p>}
+  <div class="tl-card-body"><slot /></div>
+</div>

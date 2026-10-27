@@ -1,0 +1,122 @@
+---
+// 12 · Cierre (SPEC_landing_talleres §4.12): la foto impresa del taller de escritura y el llamado final, sobre la
+// cuadrícula. data-final-cta: la barra flotante de mobile se esconde aquí. CTAs con los mismos destinos que las otras
+// landings (registro, WhatsApp y demo de 15 min), una nota al margen hacia el CTA y los links internos (SEO §9).
+// Mobile: la foto arriba a ancho completo (giro 1°), texto y CTAs debajo.
+import Highlight from "./Highlight.astro";
+import MarginNote from "./MarginNote.astro";
+import PrintedPhoto from "./PrintedPhoto.astro";
+import { WORKSHOP_PHOTOS } from "./talleresLanding.js";
+import { DEMO_CALL_URL, publishUrl, whatsappUrl } from "../links.js";
+
+interface Props {
+  ctaLabel: string;
+}
+const { ctaLabel } = Astro.props;
+---
+
+<section class="tl-section tl-grid tl-closing" aria-labelledby="tl-closing-title" data-final-cta data-tl-section="closing">
+  <div class="tl-wrap tl-closing-grid" data-lp-reveal>
+    <div class="tl-closing-photo" data-lp-step>
+      <PrintedPhoto
+        photo={WORKSHOP_PHOTOS.cierre}
+        alt="Grupo conversando alrededor de una mesa con cuadernos durante un taller de escritura"
+        sizes="(min-width: 1024px) 440px, 100vw"
+        tilt={-2}
+        ratio="4 / 5"
+        caption="el sábado, solo esto"
+      />
+    </div>
+    <div class="tl-closing-copy">
+      <h2 id="tl-closing-title" class="tl-h2 tl-closing-title" data-lp-step>
+        ¿Cuándo abres <Highlight>las inscripciones?</Highlight>
+      </h2>
+      <p class="tl-lead tl-closing-lead" data-lp-step>
+        Publica tu taller hoy. Crear tu cuenta es gratis y no hay costos fijos. Si quieres, lo armamos contigo.
+      </p>
+      <div class="tl-closing-ctas" data-lp-step>
+        <a href={publishUrl("talleres_closing")} class="tl-btn tl-btn-lime" data-cta="publish" data-section="closing">
+          {ctaLabel} <span aria-hidden="true">→</span>
+        </a>
+        <a
+          href={whatsappUrl("Hola, quiero abrir inscripciones para mi taller con AI Tickets")}
+          class="tl-btn"
+          target="_blank"
+          rel="noopener noreferrer"
+          data-cta="whatsapp"
+          data-section="closing"
+        >
+          Hablar por WhatsApp
+        </a>
+        <MarginNote text="10 minutos, de verdad" arrow="left" class="tl-closing-note" delay={700} />
+      </div>
+      <p class="tl-closing-help" data-lp-step>
+        <a href={DEMO_CALL_URL} class="tl-link" target="_blank" rel="noopener noreferrer" data-cta="demo_call" data-section="closing">Agenda una demo de 15 min</a>
+        ·
+        <a href="/organizadores" class="tl-link" data-cta="organizadores" data-section="closing">Todo lo que hace AI Tickets</a>
+      </p>
+      <p class="tl-closing-help tl-closing-also" data-lp-step>
+        También para <a href="/academias" class="tl-link">academias</a>, <a href="/ticketera-teatro" class="tl-link">teatro</a>,
+        <a href="/entradas-con-qr" class="tl-link">entradas con QR</a>, <a href="/ventas-por-promotor" class="tl-link">ventas por promotor</a>
+        y la guía para <a href="/guias/como-vender-entradas-online" class="tl-link">vender entradas online</a>.
+      </p>
+    </div>
+  </div>
+</section>
+
+<style>
+  .tl-closing-grid {
+    display: grid;
+    gap: 40px;
+  }
+  .tl-closing-photo {
+    max-width: 440px;
+  }
+  .tl-closing-title {
+    font-size: 40px;
+    line-height: 44px;
+  }
+  .tl-closing-lead {
+    margin-top: 18px;
+  }
+  .tl-closing-ctas {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: 28px;
+  }
+  .tl-closing-note {
+    display: none;
+  }
+  .tl-closing-help {
+    margin-top: 20px;
+    font-size: 15px;
+    line-height: 24px;
+    color: var(--tl-grafito-2);
+  }
+  .tl-closing-also {
+    margin-top: 10px;
+  }
+  @media (min-width: 768px) {
+    .tl-closing-ctas {
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+  }
+  @media (min-width: 1024px) {
+    .tl-closing-grid {
+      grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+      gap: 72px;
+      align-items: center;
+    }
+    .tl-closing-title {
+      font-size: clamp(56px, 5vw, 72px);
+      line-height: 1.04;
+    }
+    .tl-closing-note {
+      display: inline-flex;
+    }
+  }
+</style>

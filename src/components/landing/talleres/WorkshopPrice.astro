@@ -1,0 +1,85 @@
+---
+// 8 · Precio: la cuenta del cuaderno (SPEC_landing_talleres §4.8, ancla #precio): el texto armado con las constantes
+// (fees.mjs: cargo e IVA; producerFaq.ts: cómo se absorbe hoy) y la isla NotebookSum. Las garantías llevan el plazo de
+// legal.mjs (PAYOUT_RELEASE_HOURS, vía payoutGuaranteeText de talleresLanding.js) con el asterisco de TERMS_NOTE. La
+// spec pide PAYOUT_SHORT_TEXT, pero dice "después de cada show" y el curso vendido con una sola entrada se libera con la
+// última sesión (ledger.ts): se usa el texto del nicho, con la misma constante.
+import SectionTab from "./SectionTab.astro";
+import Highlight from "./Highlight.astro";
+import Tick from "./Tick.astro";
+import NotebookSum from "./NotebookSum.vue";
+import { ABSORB_FEE_ACTIVATION, TERMS_NOTE } from "../../../data/producerFaq";
+import { IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL } from "../../../../netlify/lib/fees.mjs";
+import { payoutGuaranteeText } from "./talleresLanding.js";
+
+const lead = `Crear tu cuenta y publicar es gratis, sin mensualidad. Si tu taller es gratis, nadie paga nada. Si cobras, quien se inscribe paga un cargo por servicio de ${SERVICE_FEE_PERCENT_LABEL} más IVA (${IVA_PERCENT_LABEL}) sobre ese cargo, y tú recibes el 100% de tu precio. Si prefieres un precio redondo, lo absorbes tú, por taller. ${ABSORB_FEE_ACTIVATION}`;
+const guarantees = ["Sin mensualidad", "Sin permanencia", `${payoutGuaranteeText}*`];
+---
+
+<section id="precio" class="tl-section tl-grid tl-margin" aria-labelledby="tl-price-title" data-tl-section="precio">
+  <SectionTab text="Precio" />
+  <div class="tl-wrap">
+    <div class="tl-ruled tl-price-head" data-lp-reveal>
+      <p class="tl-eyebrow" data-lp-step>Precio</p>
+      <h2 id="tl-price-title" class="tl-h2 tl-price-title" data-lp-step>
+        Para ti, 0% de comisión. <Highlight>Haz la cuenta.</Highlight>
+      </h2>
+      <p class="tl-lead tl-price-lead" data-lp-step>{lead}</p>
+    </div>
+    <div class="tl-ruled tl-price-calc">
+      <NotebookSum client:visible />
+    </div>
+    <div class="tl-ruled">
+      <ul class="tl-price-guarantees">
+        {
+          guarantees.map((text) => (
+            <li>
+              <Tick />
+              {text}
+            </li>
+          ))
+        }
+      </ul>
+      <p class="tl-terms"><a href={TERMS_NOTE.href}>{TERMS_NOTE.text}</a></p>
+    </div>
+  </div>
+</section>
+
+<style>
+  .tl-price-head {
+    max-width: 900px;
+  }
+  .tl-price-title {
+    margin-top: 14px;
+  }
+  .tl-price-lead {
+    max-width: 760px;
+    margin-top: 18px;
+  }
+  .tl-price-calc {
+    margin-top: 40px;
+  }
+  .tl-price-guarantees {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 24px;
+    margin-top: 28px;
+    font-size: 14px;
+    line-height: 20px;
+  }
+  .tl-price-guarantees li {
+    display: inline-flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .tl-price-guarantees :global(.tl-tick) {
+    width: 16px;
+    height: 16px;
+    margin-top: 2px;
+  }
+  .tl-price-guarantees :global(.tl-tick svg) {
+    width: 20px;
+    height: 20px;
+    top: -5px;
+  }
+</style>

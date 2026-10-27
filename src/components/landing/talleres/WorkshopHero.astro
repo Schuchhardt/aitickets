@@ -1,0 +1,343 @@
+---
+// 1 · Hero (SPEC_landing_talleres §4.1): el cuaderno a la izquierda (texto a la derecha del margen) y los objetos sobre
+// la mesa a la derecha: la foto impresa del taller de cerámica, la ficha de inscripción de ejemplo encima, el sticker de
+// cupos y una nota al margen. Debajo, la franja "Hecho para".
+// La ficha dice lo que dice la página real: el rótulo sale de cardLabel (eventView.js) para un taller pagado de 10
+// cupos con 7 inscritos ("Últimas entradas") y el precio final de priceQuote (fees.mjs): $28.000 → $30.666.
+// LCP (§7): la foto va con fetchpriority="high", sin lazy; el destacador del H1 es un pseudo-elemento (el texto se ve
+// desde el primer frame). Movimiento: TL1 (la foto cae sobre la mesa), TL2 (líneas del H1), TL3 (destacador), TL4
+// (nota), TL5 (la ficha se desliza y marca sus casillas) y TL6 (sticker), todo bajo html.lp-motion. TL1 y TL2 corren
+// al cargar y solo con transform; el resto espera el reveal (.is-in).
+// Mobile: texto arriba con los CTA a ancho completo, la foto a ancho completo y la ficha superpuesta abajo a la derecha
+// (240 px, sin giro), sin sticker ni nota; chips en scroll horizontal.
+import Highlight from "./Highlight.astro";
+import MarginNote from "./MarginNote.astro";
+import PrintedPhoto from "./PrintedPhoto.astro";
+import { MADE_FOR, WORKSHOP_PHOTOS, BUILDER_INITIAL, presetById, presetPrice, previewModel } from "./talleresLanding.js";
+import { publishUrl } from "../links.js";
+import { SERVICE_FEE_PERCENT_LABEL, FEE_INCLUDED_NOTE } from "../../../../netlify/lib/fees.mjs";
+
+interface Props {
+  /** Bajada del hero: landing.intro (landings.ts), la misma de la meta y la tarjeta */
+  lead: string;
+  ctaLabel: string;
+  demoHref: string;
+  demoLabel: string;
+}
+const { lead, ctaLabel, demoHref, demoLabel } = Astro.props;
+
+const preset = presetById(BUILDER_INITIAL.preset);
+const seats = preset.seats;
+const enrolled = seats - BUILDER_INITIAL.enrolledGap;
+const card = previewModel({ preset, format: "day", paid: true, price: presetPrice(preset, "day"), seats, enrolled });
+const left = seats - enrolled;
+---
+
+<section class="tl-hero tl-grid tl-margin" aria-labelledby="tl-hero-title" data-tl-section="hero">
+  <div class="tl-wrap tl-hero-grid" data-lp-reveal>
+    <div class="tl-ruled tl-hero-copy">
+      <p class="tl-eyebrow" data-lp-step>Para talleristas y espacios que dictan talleres</p>
+      <h1 id="tl-hero-title" class="tl-h1 tl-hero-title">
+        <span class="tl-hero-line">Abre inscripciones con un link.</span>
+        <span class="tl-hero-line">El día del taller, <Highlight>solo enseña.</Highlight></span>
+      </h1>
+      <p class="tl-lead tl-hero-lead" data-lp-step>{lead}</p>
+      <div class="tl-hero-ctas" data-lp-step>
+        <a href={publishUrl("talleres_hero")} class="tl-btn tl-btn-lime" data-cta="publish" data-section="hero" data-hero-cta>
+          {ctaLabel} <span aria-hidden="true">→</span>
+        </a>
+        <a href={demoHref} class="tl-btn" data-cta="demo" data-section="hero">{demoLabel}</a>
+      </div>
+      <p class="tl-hero-micro" data-lp-step>
+        Gratis si tu taller es gratis · Sin mensualidad · Cargo por servicio de {SERVICE_FEE_PERCENT_LABEL} + IVA: lo paga
+        quien se inscribe
+      </p>
+    </div>
+
+    <div class="tl-hero-desk">
+      <PrintedPhoto
+        photo={WORKSHOP_PHOTOS.hero}
+        alt="Tallerista ayudando a una alumna en el torno durante un taller de cerámica, con otras personas trabajando en la mesa"
+        sizes="(min-width: 1024px) 42vw, 100vw"
+        tilt={1.5}
+        priority
+        class="tl-hero-photo"
+      />
+      <div class="tl-sticker tl-hero-sticker" aria-hidden="true">Quedan {left} cupos</div>
+
+      <div class="tl-card tl-hero-card" style="--tilt: -2deg" data-testid="workshop-hero-card">
+        <p class="tl-card-head tl-card-label">Ficha de inscripción · ejemplo</p>
+        <div class="tl-card-body">
+          <p class="tl-display tl-hero-card-title">{preset.title}</p>
+          <p class="tl-hero-card-meta">con {preset.host} · {preset.place}, {preset.city}</p>
+          <p class="tl-hero-card-meta">{card.dateLine}</p>
+          <div class="tl-boxes tl-hero-boxes" aria-hidden="true">
+            {
+              Array.from({ length: seats }, (_, i) => (
+                <span class="tl-box" style={`--i: ${i}`}>
+                  {i < enrolled && (
+                    <svg viewBox="0 0 18 18">
+                      <path d="M3 9 L 7 13 L 15 2" />
+                    </svg>
+                  )}
+                </span>
+              ))
+            }
+          </div>
+          <p class="tl-hero-card-count">{enrolled} de {seats} cupos</p>
+          {card.label && <p class:list={["tl-hero-card-label", `is-${card.label.tone}`]}>{card.label.text}</p>}
+          <div class="tl-hero-card-buy">
+            <div>
+              <p class="tl-num tl-hero-card-price">{card.finalPrice}</p>
+              <p class="tl-hero-card-fee">{FEE_INCLUDED_NOTE}</p>
+            </div>
+            <span class="tl-btn tl-btn-lime tl-btn-sm" aria-hidden="true">{card.cta}</span>
+          </div>
+        </div>
+      </div>
+
+      <MarginNote text="así le llega a quien se inscribe" arrow="curve" class="tl-hero-note" delay={1200} />
+    </div>
+  </div>
+
+  <div class="tl-wrap tl-made" data-lp-reveal>
+    <div class="tl-ruled tl-made-inner" data-lp-step>
+      <p class="tl-eyebrow tl-made-label" id="tl-made-label">Hecho para</p>
+      <ul class="tl-made-list" aria-labelledby="tl-made-label">
+        {MADE_FOR.map((kind) => <li class="tl-chip">{kind}</li>)}
+      </ul>
+      <a href="/academias" class="tl-link tl-made-link">¿Academia con muestra de fin de año? Mira la página para muestras →</a>
+    </div>
+  </div>
+</section>
+
+<style>
+  .tl-hero {
+    position: relative;
+    padding: 104px 0 48px;
+  }
+  /* La línea de margen empieza debajo del header */
+  .tl-hero.tl-margin::before {
+    top: 72px;
+  }
+  .tl-hero-grid {
+    display: grid;
+    gap: 40px;
+  }
+  .tl-hero-title {
+    margin-top: 16px;
+  }
+  .tl-hero-line {
+    display: block;
+  }
+  .tl-hero-lead {
+    margin-top: 20px;
+    max-width: 600px;
+  }
+  .tl-hero-ctas {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: 28px;
+  }
+  .tl-hero-micro {
+    margin-top: 16px;
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--tl-grafito-3);
+  }
+  .tl-hero-desk {
+    position: relative;
+    padding-bottom: 150px;
+  }
+  .tl-hero-sticker,
+  .tl-hero-desk :global(.tl-hero-note) {
+    display: none;
+  }
+  .tl-hero-card {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    z-index: 3;
+    width: 240px;
+    transform: none;
+  }
+  .tl-hero-card-title {
+    font-size: 20px;
+    line-height: 24px;
+    font-weight: 700;
+  }
+  .tl-hero-card-meta {
+    margin-top: 4px;
+    font-size: 13px;
+    line-height: 18px;
+    color: var(--tl-grafito-2);
+  }
+  .tl-hero-boxes {
+    margin-top: 12px;
+  }
+  .tl-hero-card-count {
+    margin-top: 6px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .tl-hero-card-label {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .tl-hero-card-label.is-warning {
+    background: var(--tl-destacador);
+  }
+  .tl-hero-card-label.is-neutral {
+    background: var(--tl-papel-2);
+  }
+  .tl-hero-card-buy {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 10px;
+  }
+  .tl-hero-card-price {
+    font-size: 22px;
+    line-height: 26px;
+  }
+  .tl-hero-card-fee {
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--tl-grafito-3);
+  }
+  .tl-hero-card-buy .tl-btn {
+    pointer-events: none;
+  }
+
+  /* Franja "Hecho para": chips en scroll horizontal con snap en mobile */
+  .tl-made {
+    margin-top: 56px;
+  }
+  .tl-made-list {
+    display: flex;
+    gap: 8px;
+    margin: 12px -16px 0;
+    padding: 4px 16px 8px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  .tl-made-list::-webkit-scrollbar {
+    display: none;
+  }
+  .tl-made-list li {
+    scroll-snap-align: start;
+  }
+  .tl-made-link {
+    display: inline-block;
+    margin-top: 16px;
+    font-size: 16px;
+  }
+
+  @media (min-width: 768px) {
+    .tl-hero-ctas {
+      flex-direction: row;
+      flex-wrap: wrap;
+    }
+    .tl-hero-card {
+      width: 300px;
+    }
+    .tl-made-list {
+      flex-wrap: wrap;
+      margin-inline: 0;
+      padding-inline: 0;
+      overflow: visible;
+    }
+  }
+  @media (min-width: 1024px) {
+    .tl-hero {
+      min-height: min(100svh, 860px);
+      padding: 128px 0 56px;
+    }
+    .tl-hero-grid {
+      grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+      gap: 48px;
+      align-items: center;
+    }
+    .tl-hero-desk {
+      padding-bottom: 150px;
+    }
+    .tl-hero-card {
+      left: -48px;
+      right: auto;
+      bottom: 0;
+      transform: rotate(var(--tilt));
+    }
+    .tl-hero-sticker {
+      display: flex;
+      position: absolute;
+      top: -30px;
+      right: -22px;
+      z-index: 3;
+    }
+    /* Debajo de la foto, a la derecha de la ficha, con la flecha curva hacia ella */
+    .tl-hero-desk :global(.tl-hero-note) {
+      display: inline-flex;
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      z-index: 4;
+      width: 200px;
+      align-items: flex-end;
+      text-align: right;
+    }
+  }
+
+  /* ---- Movimiento (§6) ----
+   * Las reglas cuelgan de html.lp-motion, que está fuera del componente: va con :global() (Astro le agrega el atributo
+   * de scope a cada parte del selector). La foto es la raíz de PrintedPhoto: también :global().
+   * TL1 y TL2 corren al cargar, sin esperar el reveal por JS (como el hero de teatro), y solo con transform: el H1 y la
+   * foto son los candidatos a LCP y se ven desde el primer frame (§7), aunque LandingMotion cargue tarde. La ficha, el
+   * sticker, las casillas, el destacador y la nota sí esperan .is-in. */
+  :global(.lp-motion) .tl-hero-grid:not(.is-in) :is(.tl-hero-card, .tl-hero-sticker) {
+    opacity: 0;
+  }
+  /* TL2: cada línea del H1 sube 20 px, stagger 140 ms desde 300 ms; TL3 el destacador a los 800 ms */
+  :global(.lp-motion) .tl-hero-line {
+    animation: tl-rise 600ms var(--ease-out) 300ms both;
+  }
+  :global(.lp-motion) .tl-hero-line + .tl-hero-line {
+    animation-delay: 440ms;
+  }
+  .tl-hero-title {
+    --tl-mark-d: 800ms;
+  }
+  /* TL1: la foto cae sobre la mesa con un leve rebote (700 ms, desde 200 ms) */
+  :global(.lp-motion) .tl-hero-desk :global(.tl-hero-photo) {
+    animation: tl-drop-in 700ms var(--ease-out) 200ms both;
+  }
+  /* TL5: la ficha se desliza desde abajo (600 ms, a 1,0 s) y sus casillas se marcan con stagger 70 ms */
+  @media (min-width: 1024px) {
+    :global(.lp-motion) .tl-hero-grid.is-in .tl-hero-card {
+      animation: tl-slide-card 600ms var(--ease-out) 1000ms both;
+    }
+  }
+  @media (max-width: 1023px) {
+    :global(.lp-motion) .tl-hero-grid.is-in .tl-hero-card {
+      animation: tl-up 600ms var(--ease-out) 700ms both;
+    }
+  }
+  :global(.lp-motion) .tl-hero-grid:not(.is-in) .tl-box svg {
+    clip-path: inset(0 100% 0 0);
+  }
+  :global(.lp-motion) .tl-hero-grid.is-in .tl-box svg {
+    animation: tl-draw 260ms var(--ease-out) calc(1400ms + var(--i) * 70ms) both;
+  }
+  /* TL6: el sticker hace pop (450 ms, a 1,4 s) */
+  :global(.lp-motion) .tl-hero-grid.is-in .tl-hero-sticker {
+    animation: tl-pop-sticker 450ms cubic-bezier(0.34, 1.56, 0.64, 1) 1400ms both;
+  }
+</style>
