@@ -9,6 +9,7 @@ let db
 vi.mock('../../src/lib/auth-helpers', () => ({ getSupabaseAdmin: () => db, getFriendlyErrorMessage: (e) => String(e) }))
 
 const { generateAdminKey, authenticateAdminRequest } = await import('../../src/lib/admin-api/auth.ts')
+const { generateApiKey, hashApiKey } = await import('../../src/lib/producer-api/keys.ts')
 const { runAdminTool, adminEffectiveSchema } = await import('../../src/lib/admin-api/registry.ts')
 const { resetSupportUserCache } = await import('../../src/lib/admin-api/context.ts')
 const { getAdminTool, ADMIN_TOOLS } = await import('../../src/lib/admin-api/tools/index.ts')
@@ -76,7 +77,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  for (const k of ['SITE_URL', 'ADMIN_MCP_ENABLED', 'AITICKETS_ADMIN_KEY_SHA256', 'AITICKETS_ADMIN_READONLY_KEY_SHA256', 'INTERNAL_API_SECRET']) delete process.env[k]
+  for (const k of ['SITE_URL', 'ADMIN_MCP_ENABLED', 'AITICKETS_ADMIN_KEY_SHA256', 'AITICKETS_ADMIN_READONLY_KEY_SHA256', 'INTERNAL_API_SECRET', 'ADMIN_MCP_EMAILS']) delete process.env[k]
 })
 
 const req = (body, { key = full.key, host = 'aitickets.cl', method = 'POST' } = {}) =>
@@ -118,6 +119,34 @@ describe('autenticación', () => {
     expect((await adminRoute.POST({ request: req(rpc('ping'), { key: generateAdminKey().key }) })).status).toBe(401)
     expect((await adminRoute.POST({ request: req(rpc('ping'), { key: null }) })).status).toBe(401)
     expect((await adminRoute.POST({ request: req(rpc('ping'), { key: `aitk_${'a'.repeat(43)}` }) })).status).toBe(401)
+  })
+
+  it('token OAuth (aitk_) con email autorizado: acceso full', async () => {
+    const apiKey = generateApiKey()
+    db.tables.aitickets_api_keys.push({
+      id: 500, organization_id: 7, user_id: 1, name: 'OAuth key', key_prefix: apiKey.prefix,
+      key_hash: apiKey.hash, scopes: ['read', 'write'], last_used_at: null, expires_at: null, revoked_at: null, created_at: new Date().toISOString(),
+    })
+    process.env.ADMIN_MCP_EMAILS = 'ana@prod.cl,admin@aitickets.cl'
+    const auth = await authenticateAdminRequest(
+      new Request('https://aitickets.cl/api/admin/mcp', { method: 'POST', headers: { host: 'aitickets.cl', Authorization: `Bearer ${apiKey.key}` }, body: '{}' }),
+      db,
+    )
+    expect(auth).toMatchObject({ ok: true, keyKind: 'full' })
+  })
+
+  it('token OAuth (aitk_) con email no autorizado: 401', async () => {
+    const apiKey = generateApiKey()
+    db.tables.aitickets_api_keys.push({
+      id: 501, organization_id: 7, user_id: 1, name: 'OAuth key', key_prefix: apiKey.prefix,
+      key_hash: apiKey.hash, scopes: ['read'], last_used_at: null, expires_at: null, revoked_at: null, created_at: new Date().toISOString(),
+    })
+    process.env.ADMIN_MCP_EMAILS = 'admin@aitickets.cl'
+    const auth = await authenticateAdminRequest(
+      new Request('https://aitickets.cl/api/admin/mcp', { method: 'POST', headers: { host: 'aitickets.cl', Authorization: `Bearer ${apiKey.key}` }, body: '{}' }),
+      db,
+    )
+    expect(auth).toMatchObject({ ok: false, status: 401 })
   })
 
   it('el MCP de productores rechaza la llave de admin', async () => {
