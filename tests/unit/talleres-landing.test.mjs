@@ -128,7 +128,7 @@ describe('el armador (§4.3) dice lo que dice la página real', () => {
     expect(ids({ paid: false })).toEqual(['qr', 'reminder', 'free'])
     const course = builderNotes({ format: 'course', paid: true, enrolled: 7, seats: 10 })
     expect(course.find((n) => n.id === 'payout')?.text).toBe(`${courseReleaseText}.`)
-    expect(course.find((n) => n.id === 'roll')?.soon).toBe(true)
+    expect(course.find((n) => n.id === 'roll')?.soon).toBeUndefined()
     const weekly = builderNotes({ format: 'weekly', paid: false, enrolled: 7, seats: 10 })
     expect(weekly.find((n) => n.id === 'repeat')?.soon).toBeUndefined()
     const full = builderNotes({ format: 'day', paid: false, enrolled: 10, seats: 10 })

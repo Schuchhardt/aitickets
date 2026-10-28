@@ -107,7 +107,9 @@ const checkInAttendee: ToolDef = {
     title: "Marcar ingreso",
     description:
         "Marca el ingreso de una entrada (check-in manual, p. ej. si falla el escáner) por ticket_id (de list_attendees) o por el código QR. " +
-        "Una entrada solo puede ingresar una vez: si ya entró, responde conflicto con la hora de ingreso. Avisa si la entrada es de otra función.",
+        "Una entrada solo puede ingresar una vez: si ya entró, responde conflicto con la hora de ingreso. Avisa si la entrada es de otra función. " +
+        "Excepción: una entrada válida para todas las funciones de un evento con varias (pase de varios días, taller de varias sesiones) " +
+        "ingresa una vez en cada función (la de hoy, o la más cercana); responde sessions_attended de sessions_total.",
     scope: "attendees",
     permission: "checkin",
     annotations: { readOnlyHint: false, destructiveHint: false },
@@ -130,7 +132,9 @@ const checkInAttendee: ToolDef = {
         if (!result.ok) {
             if (result.code === "not_found") throw new ToolError("not_found", result.message);
             if (result.code === "already_validated") {
-                throw new ToolError("conflict", `Esta entrada ya ingresó${result.validated_at ? ` (${formatLocal(result.validated_at)})` : ""}. No se puede usar dos veces.`);
+                const when = result.validated_at ? ` (${formatLocal(result.validated_at)})` : "";
+                if (result.function_label) throw new ToolError("conflict", `${result.message.replace(/\.$/, "")}${when}: el pase entra una vez por función.`);
+                throw new ToolError("conflict", `Esta entrada ya ingresó${when}. No se puede usar dos veces.`);
             }
             throw new ToolError("conflict", `${result.message} No puede ingresar.`);
         }
@@ -143,6 +147,7 @@ const checkInAttendee: ToolDef = {
             holder: `${t.attendees?.first_name || ""} ${t.attendees?.last_name || ""}`.trim() || null,
             ticket_type: t.event_tickets?.ticket_name || null,
             complimentary: Boolean(t.is_complimentary),
+            ...(result.sessions_total ? { function: result.function_label, sessions_attended: result.sessions_attended, sessions_total: result.sessions_total } : {}),
             ...(result.function_mismatch
                 ? { warning: `Ojo: la entrada es para otra función (${result.function_label}). Se marcó el ingreso igual; revisa si corresponde.` }
                 : {}),
@@ -158,7 +163,7 @@ const getCheckinStats: ToolDef = {
     title: "Aforo en vivo",
     description:
         "Estado del acceso de un evento en vivo: entradas emitidas, ingresadas, pendientes, % de aforo (sobre la capacidad), desglose por tipo de " +
-        "entrada y por función, e ingresos cada 15 minutos en las últimas 3 horas.",
+        "entrada y por función, ingresos de los pases multifunción en cada función (multi_pass_check_ins_by_function) e ingresos cada 15 minutos en las últimas 3 horas.",
     scope: "attendees",
     permission: "checkin",
     annotations: { readOnlyHint: true },
@@ -190,6 +195,17 @@ const getCheckinStats: ToolDef = {
             byFunction.set(fnKey, bf);
         }
 
+        // Pases multifunción: ingresos por función (aitickets_attendee_checkins; vacío si la tabla aún no existe)
+        const multiPassByFunction = new Map<number, number>();
+        if (dates.length > 1 && byFunction.has("all")) {
+            const { data: sessionRows, error: sessionError } = await ctx.supabase
+                .from("aitickets_attendee_checkins")
+                .select("event_date_id")
+                .eq("event_id", event.id)
+                .limit(50_000);
+            if (!sessionError) for (const r of sessionRows || []) multiPassByFunction.set(Number(r.event_date_id), (multiPassByFunction.get(Number(r.event_date_id)) || 0) + 1);
+        }
+
         const now = Date.now();
         const bucketMs = BUCKET_MINUTES * 60_000;
         const end = Math.ceil(now / bucketMs) * bucketMs;
@@ -219,6 +235,11 @@ const getCheckinStats: ToolDef = {
                 ...v,
             })),
             functions_count: dates.length,
+            ...(multiPassByFunction.size
+                ? {
+                      multi_pass_check_ins_by_function: [...multiPassByFunction.entries()].map(([id, count]) => ({ function: functionInfo(dateById, id), checked_in: count })),
+                  }
+                : {}),
             arrivals_last_3h: arrivals.map((a) => ({ ...a, from_local: formatLocal(a.from) })),
         };
     },

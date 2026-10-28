@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { QrcodeStream } from 'vue-qrcode-reader'
 import { useClientStorage } from '../composables/useClientStorage'
+import { sessionView, addLocalSessionCheckin } from '../lib/sessionCheckin.mjs'
 
 const props = defineProps({
   event: {
@@ -85,20 +86,36 @@ const localFunctionCheck = (attendee) => {
   return { function_mismatch: String(fn.date).slice(0, 10) !== todayInSantiago(), function_label: functionLabel(fn) }
 }
 
+// ==== Entradas multifunción (pase de varios días): entran una vez en cada función ====
+const currentDates = () => localEvent.value?.dates || props.event.dates || []
+/** Estado de la entrada en la función que se valida ahora (src/lib/sessionCheckin.mjs). */
+const withSession = (attendee, dates = currentDates()) => sessionView(attendee, dates)
+const sessionLabel = (attendee) => {
+  const fn = currentDates().find(d => String(d.id) === String(attendee?.session_date_id))
+  return fn ? functionLabel(fn) : ''
+}
+const alreadyMessage = (attendee) => {
+  if (attendee?.session_date_id == null) return 'Este QR ya ha sido validado anteriormente.'
+  const fn = currentDates().find(d => String(d.id) === String(attendee.session_date_id))
+  return fn && String(fn.date).slice(0, 10) === todayInSantiago() ? 'Ya ingresó hoy con este pase.' : `Ya ingresó a la función ${sessionLabel(attendee)}.`
+}
+/** " · Ingreso 2 de 3" para una multifunción. */
+const sessionProgress = (attended, total) => (total > 1 && attended ? ` · Ingreso ${attended} de ${total}` : '')
+
 /**
  * Combina la lista fresca del servidor con el estado local: las entradas validadas offline que siguen
  * pendientes de sincronizar se mantienen como validadas (salvo que el servidor diga que están anuladas).
+ * Las multifunción quedan con el estado de la función de hoy.
  */
-const mergeWithLocalState = (serverAttendees) => {
+const mergeWithLocalState = (serverAttendees, dates) => {
   const pendingById = new Map((pendingValidations.value || []).map(p => [p.ticket_id, p]))
   const previousById = new Map((localEvent.value?.attendees || []).map(a => [a.id, a]))
   return (serverAttendees || []).map(a => {
     const previous = previousById.get(a.id)
     const pending = pendingById.get(a.id)
-    const merged = { ...a, event_order_id: a.event_order_id ?? previous?.event_order_id ?? null }
-    if (pending && isActiveStatus(a.status)) {
-      merged.status = 'validated'
-      merged.validated_at = pending.validated_at
+    let merged = withSession({ ...a, event_order_id: a.event_order_id ?? previous?.event_order_id ?? null }, dates)
+    if (pending && isActiveStatus(merged.status)) {
+      merged = withSession({ ...addLocalSessionCheckin(merged, dates, pending.validated_at, new Date(pending.validated_at)), status: 'validated', validated_at: pending.validated_at }, dates)
     }
     return merged
   })
@@ -106,11 +123,12 @@ const mergeWithLocalState = (serverAttendees) => {
 
 const applyServerList = (attendees, dates) => {
   const now = new Date().toISOString()
+  const eventDates = dates || localEvent.value?.dates || props.event.dates || []
   setLocalEvent({
     ...props.event,
     ...(localEvent.value?.id === props.event.id ? localEvent.value : {}),
-    dates: dates || localEvent.value?.dates || props.event.dates || [],
-    attendees: mergeWithLocalState(attendees),
+    dates: eventDates,
+    attendees: mergeWithLocalState(attendees, eventDates),
     last_sync: now
   })
   lastSyncDate.value = now
@@ -255,7 +273,8 @@ const lookupTicketOnServer = async (qrCode) => {
       last_name: (ticket.full_name || '').split(' ').slice(1).join(' '),
       email: ticket.email || ''
     },
-    event_tickets: { ticket_name: ticket.ticket_name || '', event_date_id: ticket.event_date_id ?? null }
+    event_tickets: { ticket_name: ticket.ticket_name || '', event_date_id: ticket.event_date_id ?? null },
+    ...(ticket.sessions_total ? { sessions_attended: ticket.sessions_attended, sessions_total: ticket.sessions_total } : {})
   }
   const others = (localEvent.value?.attendees || []).filter(a => a.id !== attendee.id)
   setLocalEvent({ ...localEvent.value, attendees: [...others, attendee] })
@@ -307,7 +326,7 @@ const onDetect = async ([result]) => {
 
     if (ticket.status === 'validated') {
       if (errorSound) errorSound.play()
-      resultMessage.value = '❌ Este QR ya ha sido validado anteriormente.'
+      resultMessage.value = `❌ ${alreadyMessage(ticket)}`
       return
     }
 
@@ -330,11 +349,13 @@ const onDetect = async ([result]) => {
 
 // Actualiza el estado local de una entrada
 const setLocalStatus = (ticketId, status, validatedAt = null) => {
+  const dates = currentDates()
   const updatedAttendees = (localEvent.value?.attendees || []).map(a => {
-    if (a.id === ticketId) {
-      return { ...a, status, validated_at: status === 'validated' ? (validatedAt || a.validated_at || new Date().toISOString()) : a.validated_at }
-    }
-    return a
+    if (a.id !== ticketId) return a
+    if (status !== 'validated') return { ...a, status, ticket_status: undefined }
+    const at = validatedAt || a.validated_at || new Date().toISOString()
+    // Multifunción: registra el ingreso a la función actual (y sigue pendiente en las demás)
+    return withSession({ ...addLocalSessionCheckin(a, dates, at), status, validated_at: at }, dates)
   })
   setLocalEvent({ ...localEvent.value, attendees: updatedAttendees })
 }
@@ -368,7 +389,7 @@ const validateTicket = async (ticketId) => {
       try { data = await res.json() } catch (e) { /* sin cuerpo */ }
       if (res.ok) {
         markLocalValidated(ticketId, data.validated_at)
-        return { ok: true, function_mismatch: data.function_mismatch, function_label: data.function_label }
+        return { ok: true, function_mismatch: data.function_mismatch, function_label: data.function_label, sessions_attended: data.sessions_attended, sessions_total: data.sessions_total }
       }
       if (res.status === 401) {
         return { ok: false, message: sessionExpiredMessage }
@@ -387,7 +408,8 @@ const validateTicket = async (ticketId) => {
   }
   markLocalValidated(ticketId)
   queuePendingValidation(ticketId)
-  return { ok: true, offline: true }
+  const local = (localEvent.value?.attendees || []).find(a => a.id === ticketId)
+  return { ok: true, offline: true, sessions_attended: local?.sessions_attended, sessions_total: local?.sessions_total }
 }
 
 // Confirmar validación del QR escaneado
@@ -403,7 +425,7 @@ const confirmValidation = async () => {
       const fnWarning = ticketData.value.function_mismatch && ticketData.value.function_label
         ? ` · Ojo: entrada para ${ticketData.value.function_label}`
         : ''
-      resultMessage.value = `✅ Entrada validada con éxito para ${ticketData.value.full_name}${result.offline ? ' (pendiente de sincronizar)' : ''}${fnWarning}`
+      resultMessage.value = `✅ Entrada validada con éxito para ${ticketData.value.full_name}${sessionProgress(result.sessions_attended, result.sessions_total)}${result.offline ? ' (pendiente de sincronizar)' : ''}${fnWarning}`
     } else {
       if (errorSound) errorSound.play()
       resultMessage.value = `❌ ${result.message}`
@@ -515,7 +537,7 @@ const toggleAttendeesList = () => {
 
 const manualValidation = async (attendee) => {
   if (attendee.status === 'validated') {
-    resultMessage.value = '❌ Este ticket ya fue validado'
+    resultMessage.value = `❌ ${attendee.session_date_id != null ? alreadyMessage(attendee) : 'Este ticket ya fue validado'}`
     return
   }
   if (!isActiveStatus(attendee.status)) {
@@ -530,7 +552,7 @@ const manualValidation = async (attendee) => {
   const result = await validateTicket(attendee.id)
   if (result.ok) {
     if (successSound) successSound.play()
-    resultMessage.value = `✅ Entrada validada manualmente para ${name}${result.offline ? ' (pendiente de sincronizar)' : ''}`
+    resultMessage.value = `✅ Entrada validada manualmente para ${name}${sessionProgress(result.sessions_attended, result.sessions_total)}${result.offline ? ' (pendiente de sincronizar)' : ''}`
   } else {
     if (errorSound) errorSound.play()
     resultMessage.value = `❌ ${result.message}`
@@ -768,6 +790,9 @@ const resendTickets = async (attendee) => {
               </button>
               <p v-if="attendee.validated_at" class="text-xs text-gray-500 mt-1">
                 Validado: {{ new Date(attendee.validated_at).toLocaleString('es-ES') }}
+              </p>
+              <p v-if="attendee.sessions_total > 1" class="text-xs text-gray-500 mt-1" data-testid="session-attendance">
+                Pase de {{ attendee.sessions_total }} funciones · fue a {{ attendee.sessions_attended || 0 }}<template v-if="sessionLabel(attendee)"> · hoy: {{ sessionLabel(attendee) }}</template>
               </p>
             </div>
             <div v-if="attendee.status === 'cancelled'" class="w-full sm:w-auto px-3 sm:px-4 py-2 bg-red-100 text-red-700 rounded text-xs sm:text-sm whitespace-nowrap text-center flex-shrink-0">

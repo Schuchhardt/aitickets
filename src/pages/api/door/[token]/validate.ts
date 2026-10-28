@@ -2,7 +2,7 @@
 import type { APIRoute } from "astro";
 import { authorizeDoor, doorJson, readDoorBody } from "../_door";
 import { findEventTicket } from "../../../../lib/checkinAccess";
-import { getFunctionCheck } from "../../../../../netlify/lib/checkin.mjs";
+import { getFunctionCheck, ticketSessionState } from "../../../../../netlify/lib/checkin.mjs";
 
 export const prerender = false;
 
@@ -28,6 +28,7 @@ export const POST: APIRoute = async ({ params, request }) => {
                 full_name: `${row.attendees?.first_name || ""} ${row.attendees?.last_name || ""}`.trim(),
                 ticket_name: row.event_tickets?.ticket_name || null,
                 ...fn,
+                ...(await ticketSessionState(auth.supabase, auth.event.id, row)),
             },
         });
     } catch (err: any) {

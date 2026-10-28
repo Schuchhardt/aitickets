@@ -43,7 +43,7 @@ Estado al 27-10-2026, rama `rediseno/aitickets`.
 | 13 | Ocupación de cada función en una vista | Teatro | P2 | S |
 | 14 | Borderó por función | Teatro | P2 | M |
 | 15 | Preguntas al inscribirse | Talleres | P2 | M |
-| 16 | Validar la misma entrada en varias sesiones o días | Talleres, seminarios | P1 | M |
+| 16 | ~~Validar la misma entrada en varias sesiones o días~~ **Hecho** | Talleres, seminarios | P1 | M |
 | 17 | Agenda con expositores y salas | Seminarios | P3 | L |
 | 18 | RUT y razón social de la empresa al comprar | Seminarios | P2 | M |
 | 19 | Nombre de cada asistente en una compra de varias entradas | Seminarios | P2 | M |
@@ -372,6 +372,26 @@ Cada inscripción guarda nombre y correo de quien compra.
 - Verlas en la lista de asistentes y en el CSV.
 
 ## 16. Validar la misma entrada en varias sesiones o días
+
+**Hecho (rama `feat/checkin-por-funcion`).** Tabla `aitickets_attendee_checkins` (migración
+`202610290200_attendee_checkins.sql`): una fila por entrada y función, con `UNIQUE (event_attendee_id, event_date_id)`.
+- Una entrada "para todas las funciones" de un evento con más de una función entra una vez en cada función
+  (`checkInSession` en `netlify/lib/checkin.mjs`). La función se deduce de la hora del escaneo en hora de Chile
+  (`pickSession` en `src/lib/sessionCheckin.mjs`): la de hoy; con dos el mismo día, la que ya empezó o empieza dentro
+  de 2 horas; si hoy no hay, la más cercana. Una validación offline se registra en el día en que se escaneó.
+- El segundo escaneo del mismo día responde 409 `already_validated` con "Ya ingresó hoy.". En el primer ingreso la
+  entrada queda `validated` (validated_at = primer ingreso), así "asistió" significa lo mismo en estadísticas,
+  reseñas y mensajes.
+- Lo usan `/api/confirm-ticket`, `/api/door/<token>/confirm` y `check_in_attendee` (este último responde
+  `sessions_attended` de `sessions_total`). `validate-ticket` y las 5 fuentes de la lista del escáner devuelven el
+  estado de la función de hoy (`session_checkins` + `sessionView`), también sin conexión.
+- El escáner (`ValidateQR.vue`) muestra "Ingreso 2 de 3" al validar y "Pase de N funciones · fue a X" en la lista.
+  `get_checkin_stats` agrega `multi_pass_check_ins_by_function`.
+- Backfill: las multifunción ya validadas quedan registradas en la función del día en que se validaron.
+- Si la tabla aún no existe, todo vuelve a la regla de un solo ingreso.
+- Landings: talleres (pasar lista en cada sesión) y seminarios (ingreso cada día con el mismo pase) sin "Pronto".
+
+Pendiente: la lista de asistentes de `/dashboard/tickets` sigue mostrando solo validado sí/no.
 
 **Dónde se promete**
 - `talleres/WorkshopDay.astro` ("Pasar lista en cada sesión")
