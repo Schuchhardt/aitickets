@@ -8,7 +8,9 @@
 // (previewEvent) y le pide el estado, el rótulo y los chips a cardState / cardLabel / cardFunctionChips (eventView.js);
 // el precio es el final con el cargo (priceQuote → fees.mjs), "por entrada, incluye cargo" como la card, y la fila del
 // checkout lleva SERVICE_FEE_NOTE o "Disponible desde el {formatSaleStart}" si la entrada espera la preventa.
-// Lo que no existe va con "Pronto": la agenda con expositores y salas.
+// La caja "La agenda" muestra el programa por día, como la sección "Agenda" de la página del evento (bloques con hora,
+// expositores y sala por función: src/lib/eventAgenda.mjs, EventSections.vue), que se carga en el panel o con el
+// asistente de IA (update_event_agenda) y que el asistente de la página usa para responder.
 // - SSR / sin JS: el congreso con entrada, el programa, la matriz de solo lectura con ✓ y la card de ejemplo; los
 //   controles quedan deshabilitados hasta hidratar.
 // - Mobile: el formato en scroll horizontal, el programa en pestañas por día, la matriz como una card por tipo de entrada
@@ -23,7 +25,6 @@
 // Analítica: se_program_format {format}, se_program_mode {mode}, se_matrix_change {ticket, scope} (con pausa) y
 // se_program_toggle {option, on}.
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import SoonBadge from '../../ui/SoonBadge.vue'
 import { formatCLP } from '../producerLanding.js'
 import { trackEvent } from '../../../composables/useGoogleAnalytics.js'
 import { useDelayedAnnouncement } from '../../../composables/usePriceCalculator.js'
@@ -381,8 +382,7 @@ onBeforeUnmount(() => {
               </ul>
             </template>
           </div>
-          <p class="se-note">El programa va en la descripción, con títulos y listas. El asistente de tu página lo usa para responder "¿a qué hora es el panel?".</p>
-          <p class="se-soon-chip pb-soon">Agenda con expositores y salas <SoonBadge /></p>
+          <p class="se-note">Cargas cada bloque con su hora, expositores y sala, en el día que va. Tu página la muestra como agenda por día, y el asistente de tu página la usa para responder "¿a qué hora es el panel?".</p>
         </div>
       </div>
     </div>
@@ -737,9 +737,6 @@ details[open] > .pb-summary::after {
   padding-left: 18px;
   list-style: disc;
   color: var(--se-text-2);
-}
-.pb-soon {
-  margin-top: 10px;
 }
 @media (min-width: 1024px) {
   .pb {

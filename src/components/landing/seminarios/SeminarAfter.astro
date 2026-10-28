@@ -6,7 +6,9 @@
 // con hasta MAX_PHOTOS_PER_PERSON fotos y mensaje privado (reviews.mjs, EventReviews.vue); mensajes a los inscritos desde
 // el asistente de IA (send_attendee_message); invitar a la próxima edición con INVITE_AUDIENCES (inviteAudience.ts) y
 // código de premio (REWARD_CODE_PREFIX); duplicar (eventDuplicate.ts), galería y reporte semanal del domingo
-// (send-weekly-reports). Certificados de asistencia: "Pronto".
+// (send-weekly-reports). Certificados de asistencia: PDF de quienes ingresaron (check-in), con mínimo de días en un pase,
+// para descargar o enviar por correo después del evento (CertificatesCard.vue, src/lib/certificates.ts,
+// send_attendance_certificates).
 // C15: las barras crecen con stagger de 90 ms (data-lp-grow) y el promedio cuenta de 0 a 4,5 en 800 ms (data-lp-count
 // con data-lp-count-decimals de LandingMotion; sin movimiento queda el valor del HTML). El ítem 4 lleva a /web-gratis
 // (la cartelera de la institución, §0.6).
@@ -14,7 +16,6 @@ import { Lock, ClipboardCheck } from "lucide-vue-next";
 import SeminarHeading from "./SeminarHeading.astro";
 import Slide from "./Slide.astro";
 import WayfindingSign from "./WayfindingSign.astro";
-import SoonBadge from "../../ui/SoonBadge.vue";
 import { SURVEY_DISTRIBUTION, surveyAverage } from "./seminariosLanding.js";
 import { formatRating } from "../../event/eventView.js";
 import { INVITE_AUDIENCE_TEXT } from "../../../data/inviteAudience";
@@ -41,8 +42,7 @@ const items = [
   },
   {
     title: "Certificados de asistencia.",
-    text: "Con los check-ins de la acreditación. Mientras, tu asistente de IA te da la lista de quienes ingresaron.",
-    soon: true,
+    text: "Salen de los check-ins de la acreditación, con el nombre, las fechas y las horas. Los descargas en PDF o se los envías por correo con un clic; en un pase de varios días, eliges cuántos días tuvo que venir.",
   },
 ];
 ---
@@ -87,7 +87,7 @@ const items = [
               <span class="seaf-n se-tabular">{i + 1}</span>
               <div>
                 <p class="se-item-title">
-                  {item.title} {item.soon && <SoonBadge dark={false} />}
+                  {item.title}
                 </p>
                 <p class="se-item-text">{item.text}</p>
                 {item.link && (

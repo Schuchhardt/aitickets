@@ -1,6 +1,8 @@
 <script setup>
 // Contenido de la página del evento bajo el póster (§4.8, §4.9): Sobre el evento, Funciones (si hay más de
-// una, v2 en §4.9b), Ubicación, Preguntas frecuentes, acceso al asistente y categorías. Sin tabs.
+// una, v2 en §4.9b), Agenda (si el productor cargó bloques; por día, src/lib/eventAgenda.mjs), Ubicación, Preguntas
+// frecuentes, acceso al asistente y categorías. Sin tabs. Todo va en la columna principal: la card de acción (v2)
+// sigue a la derecha en desktop y la agenda no la empuja.
 import { ref, computed, onMounted, nextTick } from "vue";
 import { Navigation } from "lucide-vue-next";
 import { categoryIcon } from "./categoryIcons.js";
@@ -64,6 +66,9 @@ const chooseAria = (fn) => `Elegir ${fn.label}${fnList.value.manyPlaces && fn.pl
 function chooseFunction(fn) {
   if (canChoose(fn)) emit("choose-function", fn.id);
 }
+
+// ---- Agenda: grupos por día ya armados en el servidor (agendaGroups) ----
+const agenda = computed(() => (Array.isArray(props.event.agenda) ? props.event.agenda.filter((g) => g.blocks?.length) : []));
 
 // ---- Ubicación ----
 const mapsKey = import.meta.env.PUBLIC_GOOGLE_MAPS_API_KEY;
@@ -181,6 +186,23 @@ function toggleFaq(i) {
         {{ fnExpanded ? "Ver menos" : `Ver las ${fnList.total} funciones` }}
       </button>
       <p class="sr-only" aria-live="polite">{{ fnAnnounce }}</p>
+    </section>
+
+    <section v-if="agenda.length" id="agenda" v-reveal class="section" aria-labelledby="agenda-title" data-testid="event-agenda">
+      <h2 id="agenda-title" class="section-title">Agenda</h2>
+      <div v-for="group in agenda" :key="group.key" class="ag-group">
+        <h3 v-if="group.title" class="ag-day">{{ group.title }}</h3>
+        <ol class="ag-list">
+          <li v-for="(block, i) in group.blocks" :key="block.id ?? i" class="ag-row" data-testid="agenda-row">
+            <span class="ag-time ev-tabular">{{ block.start }}<template v-if="block.end"> – {{ block.end }}</template></span>
+            <span class="ag-body">
+              <span class="ag-title">{{ block.title }}</span>
+              <span v-if="block.speakers" class="ag-speakers">{{ block.speakers }}</span>
+              <span v-if="block.room" class="ag-room">{{ block.room }}</span>
+            </span>
+          </li>
+        </ol>
+      </div>
     </section>
 
     <section v-if="mapQuery || event.has_secret_location" id="ubicacion" v-reveal class="section" aria-labelledby="ubicacion-title">
@@ -382,6 +404,63 @@ function toggleFaq(i) {
   border: 0;
   padding: 4px 0;
   cursor: pointer;
+}
+.ag-group + .ag-group {
+  margin-top: 24px;
+}
+.ag-day {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-1);
+  padding-bottom: 6px;
+}
+.ag-list {
+  display: flex;
+  flex-direction: column;
+}
+.ag-row {
+  display: grid;
+  grid-template-columns: 7.5rem 1fr;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.ag-time {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-2);
+  padding-top: 1px;
+}
+.ag-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ag-title {
+  font-size: 15px;
+  font-weight: 500;
+}
+.ag-speakers {
+  font-size: 14px;
+  color: var(--text-2);
+}
+.ag-room {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-1);
+  background: var(--surface-1);
+  border-radius: var(--r-pill);
+  padding: 2px 10px;
+}
+@media (max-width: 480px) {
+  .ag-row {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
 }
 .loc-name {
   font-size: 16px;

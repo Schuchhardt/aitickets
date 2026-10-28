@@ -15,6 +15,9 @@ import PromoterLinksManager from "../../../components/dashboard/PromoterLinksMan
 import SocialSeriesCard from "../../../components/dashboard/SocialSeriesCard.vue";
 import EventWaitlistManager from "../../../components/dashboard/EventWaitlistManager.vue";
 import LiveCapacityPanel from "../../../components/dashboard/LiveCapacityPanel.vue";
+import EventAgendaManager from "../../../components/dashboard/EventAgendaManager.vue";
+import CredentialsPrintCard from "../../../components/dashboard/CredentialsPrintCard.vue";
+import CertificatesCard from "../../../components/dashboard/CertificatesCard.vue";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { EVENT_MANAGER_ROLES, ORG_ADMIN_ROLES, hasRole } from "../../../lib/supabaseServer";
 import { adsEnabled } from "../../../../netlify/lib/zernio-ads.mjs";
@@ -23,6 +26,7 @@ import { requireDashboardSession } from "../_lib/guard";
 import { identityApproved, loadOrgIdentity, ticketsRequireIdentity, IDENTITY_FREE_PAID_CAPACITY } from "../../../lib/producerIdentity";
 import { canAccessEventByStaff } from "../../../../netlify/lib/event-staff.mjs";
 import { functionOccupancy, getEventSummary } from "../../../lib/eventAnalytics";
+import { formatFunctionLabel } from "../../../../netlify/lib/dates.mjs";
 import { PROFILE_LABELS, eventProfile, eventPhase, normalizeAddedModules, resolveModules, panelTabs, defaultTab } from "../../../lib/eventModules";
 import {
     Calendar,
@@ -62,7 +66,7 @@ const loadEvent = (coverColumn: string) => supabaseAdmin
       is_gift,
       status
     ),
-    event_dates ( id ),
+    event_dates ( id, date, start_time ),
     event_tags ( category_tags ( name ) ),
     event_locations (
       id,
@@ -97,6 +101,11 @@ const fmtPct = (v: number | null) => (v == null ? "—" : `${v.toLocaleString("e
 const ticketSalesMap = summary.issued_by_ticket_type_id;
 // Ocupación por función (solo con más de una función; módulo function-occupancy)
 const occupancyRows = (event.event_dates?.length || 0) > 1 ? await functionOccupancy(supabaseAdmin, Number(event.id)) : [];
+
+// Funciones en orden, con su rótulo (filtro de credenciales)
+const functionOptions = [...(event.event_dates || [])]
+    .sort((a: any, b: any) => `${a.date}|${a.start_time}`.localeCompare(`${b.date}|${b.start_time}`))
+    .map((d: any) => ({ id: Number(d.id), label: formatFunctionLabel(d, { withPlace: false }) }));
 
 const publicLink = `/eventos/${event.slug}`;
 const siteUrl = (siteUrlFromEnv() || Astro.url.origin).replace(/\/+$/, "");
@@ -454,10 +463,16 @@ const canCreateAds = adsEnabled() && hasRole(dbUser, ORG_ADMIN_ROLES);
                     {m.id === "live-capacity" && (
                         <LiveCapacityPanel client:visible eventId={Number(event.id)} checkinUrl={`/dashboard/events/${event.id}/checkin`} />
                     )}
+                    {/* Credenciales con nombre para imprimir (PDF, filtrable por función) */}
+                    {m.id === "credentials" && <CredentialsPrintCard client:visible eventId={Number(event.id)} options={functionOptions} />}
+                    {/* Agenda con expositores y salas (sección "Agenda" de la página del evento) */}
+                    {m.id === "agenda" && <EventAgendaManager client:visible eventId={Number(event.id)} />}
                     {m.id === "faq" && <EventFAQManager client:visible eventId={Number(event.id)} />}
                     {m.id === "documents" && <EventDocumentsManager client:visible eventId={Number(event.id)} />}
                     {/* Mensajes de asistentes y muro (reacciones) */}
                     {m.id === "community" && <EventCommunityManager client:visible eventId={Number(event.id)} eventName={event.name} />}
+                    {/* Certificados de asistencia de quienes ingresaron: PDF y envío por correo */}
+                    {m.id === "certificates" && <CertificatesCard client:visible eventId={Number(event.id)} />}
                     {/* Reseñas, fotos de asistentes e invitación al próximo evento */}
                     {m.id === "reviews" && <EventReviewsManager client:visible eventId={Number(event.id)} publicUrl={publicLink} />}
                     {/* Galería (al final de la página pública del evento) */}

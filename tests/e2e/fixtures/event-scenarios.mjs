@@ -5,6 +5,8 @@
 // Las entradas están como filas de event_tickets en la BD (max_quantity null = el productor no configuró un
 // máximo por compra); la página las pasa por toPublicTicket (src/lib/eventPage.ts), igual que la página real.
 
+import { agendaGroups } from "../../../src/lib/eventAgenda.mjs";
+
 export const FIXTURE_ROUTE = "/__e2e/eventos";
 
 export const TICKETS = {
@@ -74,6 +76,21 @@ const RUN_ANY_FUNCTION = {
   tickets: [TICKETS.general],
 };
 
+/**
+ * Congreso de 2 días con pase completo y agenda (tests/e2e/event-agenda.spec.ts): fn = índice de la función del
+ * bloque; sin fn, vale para todos los días.
+ */
+const CONGRESS = {
+  functions: [{ days: 30, venue: VENUE_PROVIDENCIA }, { days: 31, venue: VENUE_PROVIDENCIA }],
+  tickets: [TICKETS.general],
+  agenda: [
+    { start: "08:30", end: "09:00", title: "Acreditación y café", room: "Hall" },
+    { fn: 0, start: "09:30", end: "10:30", title: "Charla inaugural", speakers: "Ana Pérez (Empresa Ejemplo)", room: "Sala 1" },
+    { fn: 0, start: "09:00", end: "09:30", title: "Bienvenida" },
+    { fn: 1, start: "10:00", end: "11:30", title: "Panel: IA en la empresa", speakers: "Juan Soto, Marta Díaz", room: "Sala 2" },
+  ],
+};
+
 /** layout: diseño elegido por el productor (sin imagen el diseño siempre es compacto). */
 export const SCENARIOS = {
   "poster-una-entrada": { layout: "poster", tickets: [TICKETS.general] },
@@ -103,6 +120,8 @@ export const SCENARIOS = {
   agotado: { layout: "poster", tickets: [], unavailable: [{ ...TICKETS.general, reason: "sold_out" }], saleState: "sold_out" },
   "terminado-sin-resenas": { layout: "poster", tickets: [], ended: true },
   "venta-cerrada": { layout: "poster", tickets: [], saleState: "closed" },
+  // Agenda por día (tests/e2e/event-agenda.spec.ts)
+  "congreso-con-agenda": { layout: "poster", ...CONGRESS },
   // Vista previa privada de un borrador (status draft + is_preview, como /eventos/vista-previa/…)
   "vista-previa": { layout: "poster", tickets: [TICKETS.general], preview: true },
 };
@@ -203,6 +222,10 @@ export function fixtureEvent(name, { toPublicTicket, now = new Date() }) {
     cover_video: scenario.coverVideo ? FIXTURE_VIDEO : null,
     gallery_video: scenario.galleryVideo ? FIXTURE_VIDEO : null,
     dates,
+    agenda: agendaGroups(
+      (scenario.agenda || []).map((b, i) => ({ id: i + 1, function_id: functionId(b), start: b.start, end: b.end ?? null, title: b.title, speakers: b.speakers ?? null, room: b.room ?? null, position: i })),
+      dates,
+    ),
     tickets: scenario.tickets.map((t) =>
       toPublicTicket({ ...t, init_date: null, end_date: null, event_date_id: functionId(t) }, { remaining: t.total_quantity ?? null, feeAbsorbed: false }),
     ),

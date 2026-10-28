@@ -78,6 +78,7 @@ export const SAMPLES = {
   'payout-failed': () => emails.renderPayoutFailedEmail({ orgName: 'Productora Sur', amount: 1250000, reason: 'El banco rechazó la transferencia: la cuenta está cerrada.', dashboardUrl: `${SITE}/dashboard/settings#datos-bancarios` }),
   'waitlist-open': () => emails.renderWaitlistOpenEmail({ eventName: 'Concierto de Primavera', organizerName: 'Productora Sur', opened: true, whenLabel: 'sábado, 14 de noviembre · 20:00 h', eventUrl: `${SITE}/eventos/concierto-de-primavera?ref=lista-espera` }),
   'waitlist-released': () => emails.renderWaitlistOpenEmail({ eventName: 'Concierto de Primavera', eventUrl: `${SITE}/eventos/concierto-de-primavera?ref=lista-espera` }),
+  'attendance-certificate': () => emails.renderCertificateEmail({ eventName: 'Congreso de Recursos Humanos 2026', organizerName: 'Productora Sur', note: 'Gracias por participar. Nos vemos en la próxima edición.' }),
   'review-request': () => emails.renderReviewRequestEmail({ eventName: 'Festival de Jazz de Valparaíso', organizerName: 'Jazz Prod', rewardLabel: '10% de descuento' }),
   'review-link': () => emails.renderReviewLinkEmail({ eventName: 'Festival de Jazz de Valparaíso', reviewUrl: `${SITE}/eventos/festival-jazz#resena=ejemplo` }),
   'review-thanks': () => emails.renderReviewThanksEmail({ eventName: 'Festival de Jazz de Valparaíso', organizerName: 'Jazz Prod', rewardCode: 'GRACIAS-7KQ2MX', rewardLabel: '10% de descuento', validUntil: 'domingo, 20 de diciembre de 2026', eventsUrl: `${SITE}/eventos` }),

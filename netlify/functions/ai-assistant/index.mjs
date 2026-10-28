@@ -10,6 +10,7 @@ import { isValidEmail } from '../../lib/mailer.mjs'
 import { TICKET_COLUMNS, isTicketOnSale, maxPerPurchase, getSoldCounts, ticketsWaitingOnPrevious } from '../../lib/tickets.mjs'
 import { IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL, computeBuyerTotal } from '../../lib/fees.mjs'
 import { isDemoEventSlug, getDemoFunctionDate } from '../../../src/lib/demoEvent.mjs'
+import { agendaGroups, agendaText, loadAgenda } from '../../../src/lib/eventAgenda.mjs'
 import { EVENT_DATE_COLUMNS, todayInTimeZone, formatDateOnlyLong, formatTimeShort, formatEventLocation } from '../../lib/dates.mjs'
 import { rateLimit } from '../../lib/rate-limit.mjs'
 import { configuredProviders, runAssistantTurn, alertAssistantError } from '../../lib/assistant-llm.mjs'
@@ -89,10 +90,12 @@ async function loadEventContext(supabase, eventId) {
   if (!event) return null
   const isDemo = isDemoEventSlug(event.slug)
 
-  const [{ data: dates }, { data: tickets }, { data: faqs }] = await Promise.all([
+  const [{ data: dates }, { data: tickets }, { data: faqs }, agendaBlocks] = await Promise.all([
     supabase.from('event_dates').select(EVENT_DATE_COLUMNS).eq('event_id', eventId).order('date', { ascending: true }).order('start_time', { ascending: true }).limit(20),
     supabase.from('event_tickets').select(TICKET_COLUMNS).eq('event_id', eventId).order('price', { ascending: true }),
     supabase.from('event_faqs').select('question, answer').eq('event_id', eventId).limit(30),
+    // Agenda con expositores y salas (vacía sin la tabla aitickets_event_agenda)
+    loadAgenda(supabase, eventId).catch(() => []),
   ])
 
   const now = new Date()
@@ -116,14 +119,14 @@ async function loadEventContext(supabase, eventId) {
 
   // Evento demo: fecha dinámica (misma fecha que muestra la página)
   const eventDates = (dates || []).map(d => (isDemo ? { ...d, date: getDemoFunctionDate(d.date, now, event.slug) } : d))
-  return { event, isDemo, feeAbsorbed, dates: eventDates, tickets: saleTickets, faqs: faqs || [] }
+  return { event, isDemo, feeAbsorbed, dates: eventDates, tickets: saleTickets, faqs: faqs || [], agenda: agendaText(agendaGroups(agendaBlocks, dates || [])) }
 }
 
 function paymentMethodsLine() {
   return 'El pago se hace con Webpay.'
 }
 
-export function buildSystemPrompt({ event, isDemo, feeAbsorbed = false, dates, tickets, faqs }) {
+export function buildSystemPrompt({ event, isDemo, feeAbsorbed = false, dates, tickets, faqs, agenda = '' }) {
   const today = todayInTimeZone()
   const upcoming = dates.filter(d => d.date >= today)
   const dateLines = (upcoming.length ? upcoming : dates).map(d => {
@@ -153,7 +156,7 @@ Información del evento (ID ${event.id}):
 Nombre: ${event.name}
 Descripción: ${stripHtml(event.description).slice(0, 3000) || 'Sin descripción'}
 Fechas y lugar:
-${dateLines.join('\n') || '- Por confirmar'}
+${dateLines.join('\n') || '- Por confirmar'}${agenda ? `\nAgenda (hora, título, expositores y sala):\n${String(agenda).slice(0, 4000)}` : ''}
 Entradas a la venta:
 ${ticketLines.join('\n') || '- No hay entradas a la venta en este momento'}
 Preguntas frecuentes:

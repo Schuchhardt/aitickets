@@ -301,12 +301,13 @@ export const LANDINGS: Landing[] = [
         // Verificado:
         //   varios días → hasta MAX_EVENT_FUNCTIONS funciones (schedule.ts); cada entrada para una función o para todas
         //                 (event_date_id NULL); el pase completo se valida una vez (confirm-ticket): ingreso diario "Pronto"
-        //   programa → descripción con títulos y listas (sanitize.ts) y el asistente de la página (EventAssistant.vue);
-        //              agenda con expositores y salas "Pronto"
+        //   programa → agenda por día con hora, expositores y sala (aitickets_event_agenda, eventAgenda.mjs; panel y
+        //              update_event_agenda), que también usa el asistente de la página (EventAssistant.vue)
         //   documentos → terms.astro §3 (boleta del cargo; el precio de la entrada lo documenta el productor), pendiente de
         //                validar con abogado y contador; RUT y razón social al comprar "Pronto"
         //   convenios → códigos de descuento por evento o de la organización (discounts.mjs); sin entradas ocultas
-        //   certificados de asistencia → "Pronto"; hoy, la lista de quienes ingresaron (list_attendees)
+        //   certificados de asistencia → PDF de quienes ingresaron, con mínimo de días en un pase (certificates.ts;
+        //              panel, get_attendance_certificates y send_attendance_certificates)
         //   sin transmisión online ni pago con orden de compra o transferencia
         sections: [],
         faq: [
@@ -317,7 +318,7 @@ export const LANDINGS: Landing[] = [
             },
             {
                 q: "¿Dónde va el programa con los expositores?",
-                a: "En la descripción del evento, con un título por día y una lista por bloque. El asistente de tu página lo usa para responder preguntas como \"¿a qué hora es el panel?\". Una sección propia de agenda, con expositores y salas, todavía no existe.",
+                a: "En la agenda del evento: cargas cada bloque con su hora, expositores y sala, en el día que va, desde tu panel o tu asistente de IA. La página la muestra por día, y el asistente de tu página la usa para responder preguntas como \"¿a qué hora es el panel?\".",
             },
             {
                 q: "¿Pueden pedirme factura?",
@@ -338,7 +339,7 @@ export const LANDINGS: Landing[] = [
             },
             {
                 q: "¿Entregan certificado de asistencia?",
-                a: "Todavía no: está en camino. Hoy tu asistente de IA te da la lista de quienes ingresaron, con su hora, para que emitas los certificados.",
+                a: "Sí. Desde tu panel descargas en un PDF el certificado de cada persona que ingresó, con su nombre, el evento, las fechas y las horas. Cuando termina el evento, se los envías por correo con un clic: a cada una le llega el link para descargar el suyo. En un pase de varios días puedes pedir un mínimo de días con ingreso.",
             },
             {
                 q: "¿Puedo hacer un evento solo para mi empresa o mis socios?",
