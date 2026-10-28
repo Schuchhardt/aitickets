@@ -2,14 +2,13 @@
 // Ranking de RRPP (SPEC_landing_clubs §4.4): visitas, inscritos en la lista free, cover, mesas e ingresos de cada link
 // de ejemplo (rrppBoard: ingresos = cantidades × precios de CLUB_TICKETS, lo que recibe el club sin cargo) y la venta
 // directa (DIRECT_CHANNEL de eventAnalytics.ts, llega por props). Es lo que ya muestran las métricas por canal
-// (eventAnalytics.ts, channelConversion), inscripciones gratis incluidas con ingreso $0. "Entraron" (check-ins por canal)
-// no existe: la columna va con "—" y "Pronto".
+// (eventAnalytics.ts, channelConversion), inscripciones gratis incluidas con ingreso $0. El panel también trae
+// "Entraron" por canal (check-ins), pero este ranking es de las 20:00, antes de abrir: no va la columna.
 // Selector "Por inscritos / Por ingresos" (radiogroup) que reordena con FLIP (TransitionGroup, 320 ms); al tocar una
 // fila aparece su link de ejemplo con "Copiar" (copia el texto y avisa que es un ejemplo). C10: las barras crecen al
 // hidratarse (client:visible), stagger 80 ms. Mobile: cada fila es una card con nombre, barra y tres cifras.
 // Analítica: cl_rrpp_sort { by }, cl_rrpp_select { rrpp }, cl_link_copy.
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import SoonBadge from '../../ui/SoonBadge.vue'
 import { trackEvent } from '../../../composables/useGoogleAnalytics.js'
 import { formatCLP } from '../producerLanding.js'
 import { rrppBoard, rrppLink, sortRrpp } from './clubsLanding.js'
@@ -102,7 +101,6 @@ onBeforeUnmount(() => clearTimeout(toastTimer))
           <th scope="col" role="columnheader" class="rb-num">Cover</th>
           <th scope="col" role="columnheader" class="rb-num rb-hide-sm">Mesas</th>
           <th scope="col" role="columnheader" class="rb-num">Ingresos</th>
-          <th scope="col" role="columnheader" class="rb-num rb-hide-sm rb-soon">Entraron <SoonBadge dark /></th>
         </tr>
       </thead>
       <TransitionGroup tag="tbody" name="rb-move" role="rowgroup">
@@ -132,7 +130,6 @@ onBeforeUnmount(() => clearTimeout(toastTimer))
           <td class="rb-num" role="cell" data-label="Cover">{{ num(row.cover) }}</td>
           <td class="rb-num rb-hide-sm" role="cell" data-label="Mesas">{{ num(row.mesa) }}</td>
           <td class="rb-num rb-money" role="cell" data-label="Ingresos">{{ formatCLP(row.revenue) }}</td>
-          <td class="rb-num rb-hide-sm rb-dim" role="cell">—</td>
         </tr>
       </TransitionGroup>
     </table>
@@ -211,9 +208,6 @@ onBeforeUnmount(() => clearTimeout(toastTimer))
   color: var(--cl-text-3);
   white-space: nowrap;
 }
-.rb-soon :deep(.soon) {
-  margin-left: 4px;
-}
 .rb-num {
   text-align: right !important;
 }
@@ -283,9 +277,6 @@ onBeforeUnmount(() => clearTimeout(toastTimer))
 }
 .rb-money {
   font-weight: 600;
-}
-.rb-dim {
-  color: var(--cl-text-3);
 }
 .rb-link {
   display: flex;
