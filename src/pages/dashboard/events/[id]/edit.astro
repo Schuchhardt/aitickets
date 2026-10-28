@@ -13,6 +13,7 @@ import { normalizeReviewSettings } from "../../../../../netlify/lib/reviews.mjs"
 import { siteUrl as siteUrlFromEnv } from "../../../api/_lib/server-utils";
 import { loadTicketChain } from "../../../../../netlify/lib/tickets.mjs";
 import { loadEntryDeadlines } from "../../../../../netlify/lib/checkin.mjs";
+import { loadSecretLocation } from "../../../../../netlify/lib/secret-location.mjs";
 
 const { id } = Astro.params;
 const guard = await requireDashboardSession(Astro, EVENT_MANAGER_ROLES);
@@ -73,6 +74,8 @@ if (error || !event) {
 const ticketChain = await loadTicketChain(supabaseAdmin, event.id);
 // Hora límite de ingreso por entrada (vacío si la migración 202610300300 aún no está aplicada)
 const entryDeadlines = await loadEntryDeadlines(supabaseAdmin, event.id);
+// Dirección que solo ven quienes compran (secret_location) y cuándo se revela
+const secretLocation = await loadSecretLocation(supabaseAdmin, event.id).catch(() => ({ address: null, revealHours: null }));
 // Solo cuenta si la anterior sigue en el formulario (las retiradas de la venta no se muestran)
 const visibleTicketIds = new Set((event.event_tickets || []).filter((t: any) => t.status !== "unavailable").map((t: any) => Number(t.id)));
 
@@ -89,6 +92,8 @@ const initialFormState = {
         pageSettings: normalizePageSettings(event.page_settings),
         category: (event as any).event_tags?.[0]?.category_tags?.name || "",
         isPrivate: event.accessibility === "private",
+        secretLocation: secretLocation.address || "",
+        secretLocationRevealHours: secretLocation.revealHours ?? "",
     },
     // Toggle al final del formulario: correo "¿Cómo estuvo?" 24 h después de cada función
     reviews: { enabled: normalizeReviewSettings(event.review_settings).enabled },

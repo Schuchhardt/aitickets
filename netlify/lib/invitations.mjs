@@ -24,6 +24,7 @@ import {
   functionEndsAt,
 } from './reviews.mjs'
 import { signInviteOptoutToken } from './review-token.mjs'
+import { hasSecretLocation, publicPlace } from './secret-location.mjs'
 
 export const INVITATION_BATCH_SIZE = 50
 
@@ -79,7 +80,8 @@ function nextFunctionSummary(event, dates, now = new Date()) {
   const more = (dates || []).filter((fn) => (functionEndsAt(fn)?.getTime() ?? 0) > now.getTime()).length - 1
   return {
     dateLabel: `${formatDateOnlyLong(next.date)}${time ? ` · ${time} hrs` : ''}${more > 0 ? ` (+${more} ${more === 1 ? 'función' : 'funciones'})` : ''}`,
-    venue: formatEventLocation(next.event_locations) || event?.location || '',
+    // Con dirección privada, sin la calle: la invitación llega a quien todavía no compra
+    venue: (event?.has_secret_location ? publicPlace(next.event_locations) : formatEventLocation(next.event_locations)) || event?.location || '',
   }
 }
 
@@ -98,6 +100,7 @@ async function loadEventWithDates(supabase, eventId, organizationId) {
     .order('date', { ascending: true })
     .order('start_time', { ascending: true })
   if (dError) throw dError
+  event.has_secret_location = await hasSecretLocation(supabase, event.id)
   return { event, dates: dates || [] }
 }
 

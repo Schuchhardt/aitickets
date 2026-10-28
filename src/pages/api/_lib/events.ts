@@ -10,6 +10,7 @@ import { identityPublishBlocker } from "../../../lib/producerIdentity";
 import { refreshEventRisk } from "../../../lib/eventRisk";
 import { chainError } from "../../../../netlify/lib/tickets.mjs";
 import { normalizeEntryUntil } from "../../../lib/entryDeadline.mjs";
+import { hasSecretLocation, saveSecretLocation } from "../../../../netlify/lib/secret-location.mjs";
 
 /** Guarda la categoría del evento vía category_tags(name) + event_tags (reemplaza las anteriores). */
 export async function syncEventCategory(eventId: number, category: string | null | undefined) {
@@ -41,17 +42,19 @@ export async function syncEventCategory(eventId: number, category: string | null
 
 /**
  * Recalcula los campos denormalizados en `events` (start_date, end_date, location) a partir de
- * event_dates + event_locations/venues. Devuelve los valores calculados.
+ * event_dates + event_locations/venues. Devuelve los valores calculados. Con dirección privada
+ * (secret_location), location queda sin la calle: la leen los listados y sitios públicos.
  */
 export async function refreshEventDenorm(eventId: number) {
     const supabase = getSupabaseAdmin();
-    const [{ data: dates }, { data: locations }] = await Promise.all([
+    const [{ data: dates }, { data: locations }, secret] = await Promise.all([
         supabase.from("event_dates").select("date, start_time, end_time, event_location_id").eq("event_id", eventId),
         supabase
             .from("event_locations")
             .select("id, created_at, venues ( name, address_line1, city )")
             .eq("event_id", eventId)
             .order("created_at", { ascending: true }),
+        hasSecretLocation(supabase, eventId),
     ]);
 
     const range = computeEventRange((dates || []).map((d: any) => ({
@@ -62,7 +65,7 @@ export async function refreshEventDenorm(eventId: number) {
 
     const firstVenue: any = (locations || [])[0]?.venues;
     const venue = Array.isArray(firstVenue) ? firstVenue[0] : firstVenue;
-    const location = formatLocation(venue ? { name: venue.name, address: venue.address_line1, city: venue.city } : null);
+    const location = formatLocation(venue ? { name: venue.name, address: secret ? null : venue.address_line1, city: venue.city } : null);
 
     const { error } = await supabase
         .from("events")
@@ -246,6 +249,10 @@ export type EventGraphInput = {
         isPrivate?: boolean;
         category?: string | null;
         coverSettings?: unknown;
+        /** Dirección que solo ven quienes compran (events.secret_location). ""/null = sin dirección privada. */
+        secretLocation?: string | null;
+        /** Horas antes de la función en que se revela (null = apenas compran). */
+        secretLocationRevealHours?: number | string | null;
     };
     locations: Array<{
         venueId?: string | null;
@@ -316,6 +323,10 @@ export async function createEventGraph(
     }
     const eventId = eventData.id as number;
     state.eventId = eventId;
+    // Dirección privada antes de refreshEventDenorm (la ubicación pública queda sin la calle)
+    if (general.secretLocation) {
+        await saveSecretLocation(supabaseAdmin, eventId, { address: general.secretLocation, revealHours: general.secretLocationRevealHours ?? null });
+    }
     if (general.coverSettings) await saveCoverSettings(eventId, actor.orgId, general.coverSettings);
 
     // 2. Ubicaciones y funciones (antes que las entradas, para mapear la función de cada entrada — R1)

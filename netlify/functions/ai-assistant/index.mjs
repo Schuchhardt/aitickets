@@ -2,7 +2,8 @@
 // Reemplaza la AWS Lambda functions/aiAssistant.mjs.
 // Body: { eventId, messages: [{ role: 'user'|'assistant', text }] }
 // El contexto del evento se arma EN EL SERVIDOR desde la BD (solo eventos publicados, columnas
-// explícitas, nunca secret_location); el cliente no puede inyectar instrucciones de sistema.
+// explícitas, nunca secret_location: con dirección privada el lugar va sin la calle, solo nombre y comuna); el cliente
+// no puede inyectar instrucciones de sistema.
 // Responde Claude y, si falla (sin saldo, clave inválida, caída), ChatGPT como respaldo; los errores que
 // necesitan a una persona avisan a Slack (netlify/lib/assistant-llm.mjs).
 import { getSupabaseAdmin, json } from '../../lib/supabase.mjs'
@@ -12,6 +13,7 @@ import { IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL, computeBuyerTotal } from 
 import { isDemoEventSlug, getDemoFunctionDate } from '../../../src/lib/demoEvent.mjs'
 import { EVENT_DATE_COLUMNS, todayInTimeZone, formatDateOnlyLong, formatTimeShort, formatEventLocation } from '../../lib/dates.mjs'
 import { rateLimit } from '../../lib/rate-limit.mjs'
+import { hasSecretLocation as eventHasSecretLocation, publicPlace } from '../../lib/secret-location.mjs'
 import { configuredProviders, runAssistantTurn, alertAssistantError } from '../../lib/assistant-llm.mjs'
 
 const MAX_HISTORY = 10
@@ -89,10 +91,11 @@ async function loadEventContext(supabase, eventId) {
   if (!event) return null
   const isDemo = isDemoEventSlug(event.slug)
 
-  const [{ data: dates }, { data: tickets }, { data: faqs }] = await Promise.all([
+  const [{ data: dates }, { data: tickets }, { data: faqs }, hasSecretLocation] = await Promise.all([
     supabase.from('event_dates').select(EVENT_DATE_COLUMNS).eq('event_id', eventId).order('date', { ascending: true }).order('start_time', { ascending: true }).limit(20),
     supabase.from('event_tickets').select(TICKET_COLUMNS).eq('event_id', eventId).order('price', { ascending: true }),
     supabase.from('event_faqs').select('question, answer').eq('event_id', eventId).limit(30),
+    eventHasSecretLocation(supabase, eventId),
   ])
 
   const now = new Date()
@@ -116,18 +119,18 @@ async function loadEventContext(supabase, eventId) {
 
   // Evento demo: fecha dinámica (misma fecha que muestra la página)
   const eventDates = (dates || []).map(d => (isDemo ? { ...d, date: getDemoFunctionDate(d.date, now, event.slug) } : d))
-  return { event, isDemo, feeAbsorbed, dates: eventDates, tickets: saleTickets, faqs: faqs || [] }
+  return { event, isDemo, feeAbsorbed, hasSecretLocation, dates: eventDates, tickets: saleTickets, faqs: faqs || [] }
 }
 
 function paymentMethodsLine() {
   return 'El pago se hace con Webpay.'
 }
 
-export function buildSystemPrompt({ event, isDemo, feeAbsorbed = false, dates, tickets, faqs }) {
+export function buildSystemPrompt({ event, isDemo, feeAbsorbed = false, hasSecretLocation = false, dates, tickets, faqs }) {
   const today = todayInTimeZone()
   const upcoming = dates.filter(d => d.date >= today)
   const dateLines = (upcoming.length ? upcoming : dates).map(d => {
-    const place = formatEventLocation(d.event_locations) || event.location || 'por confirmar'
+    const place = (hasSecretLocation ? publicPlace(d.event_locations) : formatEventLocation(d.event_locations)) || event.location || 'por confirmar'
     const time = `${formatTimeShort(d.start_time)}${d.end_time ? ` a ${formatTimeShort(d.end_time)}` : ''}`
     return `- ${formatDateOnlyLong(d.date)}, ${time} hrs. Lugar: ${place}`
   })
@@ -153,7 +156,7 @@ Información del evento (ID ${event.id}):
 Nombre: ${event.name}
 Descripción: ${stripHtml(event.description).slice(0, 3000) || 'Sin descripción'}
 Fechas y lugar:
-${dateLines.join('\n') || '- Por confirmar'}
+${dateLines.join('\n') || '- Por confirmar'}${hasSecretLocation ? '\nLa dirección exacta solo la reciben quienes compran (en su orden y por correo). No la conoces: si la piden, explica eso.' : ''}
 Entradas a la venta:
 ${ticketLines.join('\n') || '- No hay entradas a la venta en este momento'}
 Preguntas frecuentes:

@@ -484,6 +484,9 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
   const permit = trust.is_massive === true ? { status: trust.permit_status === "approved" ? "approved" : "pending" } : null;
 
   const hasSecretLocation = raw.hasSecretLocation;
+  // Dirección que solo ven quienes compran: el recinto público queda sin calle ni coordenadas (nombre y comuna)
+  const publicVenue = (venue: ReturnType<typeof buildVenue>) =>
+    venue && hasSecretLocation ? { ...venue, address: null, postal_code: null, latitude: null, longitude: null } : venue;
 
   // Entradas (C2): a la venta = available, no regalo, dentro de la ventana (NULL = abierta)
   const allTickets: any[] = raw.tickets;
@@ -522,7 +525,7 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
   let dates: any[] = raw.dates
     .map((d: any) => (isDemo ? { ...d, date: getDemoFunctionDate(d.date, now, event.slug) } : d))
     .map((d: any) => {
-      const venue = buildVenue(pickOne(d.event_locations));
+      const venue = publicVenue(buildVenue(pickOne(d.event_locations)));
       const tz = venue?.timezone || DEFAULT_EVENT_TIMEZONE;
       const start = zonedDateTimeToDate(d.date, d.start_time, tz);
       let end = d.end_time ? zonedDateTimeToDate(d.date, d.end_time, tz) : null;
@@ -569,8 +572,12 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
   const primaryVenue = dates.find((d) => d.venue)?.venue || null;
   const eventTimezone = primaryVenue?.timezone || DEFAULT_EVENT_TIMEZONE;
 
-  const location =
-    event.location || (primaryVenue ? [primaryVenue.name, primaryVenue.address, primaryVenue.city].filter(Boolean).join(", ") : "");
+  // Con dirección privada, nunca events.location (puede venir de antes, con la calle): nombre y comuna del recinto
+  const location = hasSecretLocation
+    ? primaryVenue
+      ? [primaryVenue.name, primaryVenue.city].filter(Boolean).join(", ")
+      : ""
+    : event.location || (primaryVenue ? [primaryVenue.name, primaryVenue.address, primaryVenue.city].filter(Boolean).join(", ") : "");
 
   // Tickets asignados a una función que ya no existe (o ya pasó y fue borrada) => tratarlos como "cualquier función"
   // y ocultar las entradas de una función que ya terminó.

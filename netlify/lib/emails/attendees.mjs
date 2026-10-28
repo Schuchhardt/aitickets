@@ -8,9 +8,10 @@ export const ORDER_URL_PLACEHOLDER = '%recipient.order_url%'
 
 /**
  * Recordatorio: el evento es mañana.
- * @param {{ eventName?: string, eventDate?: string, startTime?: string, venue?: string }} opts
+ * @param {{ eventName?: string, eventDate?: string, startTime?: string, venue?: string, venueNote?: string }} opts
+ * venueNote: aviso bajo el lugar (p. ej. la dirección privada que llega horas antes).
  */
-export async function renderReminderEmail({ eventName, eventDate, startTime, venue } = {}) {
+export async function renderReminderEmail({ eventName, eventDate, startTime, venue, venueNote } = {}) {
   const name = str(eventName).trim() || 'Tu evento'
   const subject = `🎪 Recordatorio: ${name} es mañana`
   const element = h(
@@ -31,7 +32,8 @@ export async function renderReminderEmail({ eventName, eventDate, startTime, ven
           { label: 'Hora', value: startTime ? `${str(startTime)} hrs` : '' },
           { label: 'Lugar', value: str(venue) },
         ],
-      })
+      }),
+      venueNote ? h(Paragraph, { small: true, style: { margin: '12px 0 0' } }, str(venueNote)) : null
     ),
     h(PrimaryButton, { href: ORDER_URL_PLACEHOLDER, hint: 'Muestra el código QR de cada entrada en la puerta.' }, 'Ver mis entradas'),
     h(Paragraph, { small: true, muted: true, align: 'center', style: { margin: 0 } }, 'Tip: llega con tiempo y con la batería del celular cargada.')
@@ -94,4 +96,37 @@ export async function renderProducerMessageEmail({ eventName, organizerName, sub
     h(PrimaryButton, { href: ORDER_URL_PLACEHOLDER, hint: 'Muestra el código QR de cada entrada en la puerta.' }, 'Ver mis entradas')
   )
   return renderEmail(finalSubject, element)
+}
+
+/**
+ * La dirección que solo ven quienes compran, cuando se revela (send-secret-location, netlify/lib/secret-location.mjs).
+ * @param {{ eventName?: string, eventDate?: string, startTime?: string, address?: string }} opts
+ */
+export async function renderSecretLocationEmail({ eventName, eventDate, startTime, address } = {}) {
+  const name = str(eventName).trim() || 'Tu evento'
+  const subject = `📍 La dirección de ${name}`
+  const element = h(
+    EmailLayout,
+    {
+      preview: `Ya tienes la dirección de ${name}.`,
+      footer: { reason: 'Recibiste este correo porque tienes entradas para este evento. El evento es organizado por su productora.' },
+    },
+    h(Badge, null, 'Dirección'),
+    h(Title, null, `¡Hola ${NAME_PLACEHOLDER}, aquí está la dirección!`),
+    h(Subtitle, null, name),
+    h(
+      Panel,
+      { tone: 'warn' },
+      h(KeyValueTable, {
+        rows: [
+          { label: 'Dirección', value: str(address) },
+          { label: 'Fecha', value: str(eventDate) },
+          { label: 'Hora', value: startTime ? `${str(startTime)} hrs` : '' },
+        ],
+      })
+    ),
+    h(PrimaryButton, { href: ORDER_URL_PLACEHOLDER, hint: 'También está en tu orden, junto al QR de cada entrada.' }, 'Ver mis entradas'),
+    h(Paragraph, { small: true, muted: true, align: 'center', style: { margin: 0 } }, 'Es solo para asistentes: no la compartas.')
+  )
+  return renderEmail(subject, element)
 }

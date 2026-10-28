@@ -134,6 +134,8 @@ CREATE TABLE public.events (
   end_date timestamp with time zone,
   organization_id bigint,
   secret_location text,
+  -- 202610300310: horas antes de la función en que se revela secret_location (NULL = apenas compran)
+  secret_location_reveal_hours integer CHECK (secret_location_reveal_hours IS NULL OR secret_location_reveal_hours BETWEEN 1 AND 168),
   CONSTRAINT events_pkey PRIMARY KEY (id),
   CONSTRAINT events_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id)
 );

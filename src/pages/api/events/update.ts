@@ -5,6 +5,7 @@ import { callInternalFunction, notifySlack, siteUrl } from "../_lib/server-utils
 import { IDENTITY_REQUIRED_MESSAGE, eventRequiresIdentity, identityApproved, loadOrgIdentity, ticketsRequireIdentity } from "../../../lib/producerIdentity";
 import { syncEventCategory, refreshEventDenorm, normalizeTicket, isClientTempId, isValidDateInput, resolveTicketDateId, setEventStatus, EventInputError, saveCoverSettings, savePageSettings, validateFormTicketChain, saveFormTicketChain, saveFormEntryDeadlines, assertFunctionCount } from "../_lib/events";
 import { sanitizeRichText } from "../../../lib/sanitize";
+import { saveSecretLocation } from "../../../../netlify/lib/secret-location.mjs";
 import { listOrgVenues, isVenueAllowed, insertOrgVenue } from "../../../lib/orgVenues";
 import { loadSchedule, describeScheduleChange } from "../_lib/eventSchedule";
 import { changeEventSlug, EventSlugError, type SlugChangeResult } from "../../../lib/eventSlug";
@@ -152,6 +153,13 @@ export const POST: APIRoute = async (context) => {
         if (updateError) throw updateError;
 
         await syncEventCategory(event.id, general.category);
+        // Dirección que solo ven quienes compran (solo si el formulario la envía; antes de refreshEventDenorm)
+        if (general.secretLocation !== undefined) {
+            await saveSecretLocation(supabaseAdmin, event.id, {
+                address: general.secretLocation,
+                revealHours: general.secretLocation ? general.secretLocationRevealHours ?? null : null,
+            });
+        }
         // Ajuste de portada (solo si el formulario lo envía: clientes antiguos no lo conocen)
         if (general.coverSettings !== undefined) {
             await saveCoverSettings(event.id, dbUser.organization_id, general.imageUrl ? general.coverSettings : null);

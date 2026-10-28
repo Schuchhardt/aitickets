@@ -261,7 +261,7 @@ export const LANDINGS: Landing[] = [
             },
             {
                 q: "¿Puedo avisar la dirección a última hora?",
-                a: "Sí. Publica la comuna o un punto de referencia y, el mismo día, programa un correo a todos los que compraron con la dirección exacta desde tu asistente de IA. Ten en cuenta que un evento sin dirección exacta puede quedar con una parte de lo vendido en reserva (ver términos).",
+                a: "Sí. En el evento activas «Dirección solo para quienes compran»: la página muestra la comuna y la dirección exacta va en la entrada y en el correo de cada comprador. Si eliges revelarla unas horas antes, a esa hora se la mandamos por correo a todos los que compraron. Ten en cuenta que un evento sin dirección exacta puede quedar con una parte de lo vendido en reserva (ver términos).",
                 terms: true,
             },
             {

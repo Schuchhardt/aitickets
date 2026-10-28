@@ -8,6 +8,7 @@ import { normalizeSlug, SLUG_MIN, SLUG_PATTERN } from '../../lib/eventSlugFormat
 import { plainTextLength, sanitizeClient } from '../../lib/richTextClient'
 import { prepareImageForUpload, MAX_UPLOAD_BYTES, MAX_SOURCE_BYTES } from '../../lib/clientImage'
 import { chainOptions, pruneChain, chainSummary } from './ticketChain'
+import { REVEAL_HOURS_OPTIONS } from '../../../netlify/lib/secret-location.mjs'
 import { applyRepeat, applyTicketCopy } from './functionRepeat'
 import FunctionRepeat from './FunctionRepeat.vue'
 import TicketCopyToFunctions from './TicketCopyToFunctions.vue'
@@ -197,6 +198,15 @@ const repeatFunctions = (locationIndex, pattern) => applyRepeat(form.value.locat
 const canPinTicket = (t) => Number(t.id) > 1000000000000
 const copyTicketsToFunctions = () =>
   applyTicketCopy(form.value.tickets, functionOptions.value.map((o) => o.id), newTempId, { canPin: canPinTicket })
+
+// Dirección que solo ven quienes compran: al apagar el interruptor se borra al guardar
+const secretLocationOn = ref(Boolean(form.value.general.secretLocation))
+watch(secretLocationOn, (on) => {
+  if (!on) {
+    form.value.general.secretLocation = ''
+    form.value.general.secretLocationRevealHours = ''
+  }
+})
 
 // Logic Step 3 (Tickets)
 const addTicket = () => {
@@ -764,6 +774,31 @@ const submitEvent = async ({ exit = false } = {}) => {
            <button @click="addLocation" class="w-full py-3 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 font-medium hover:border-black hover:text-black transition-colors flex items-center justify-center gap-2">
              <Plus size="20" /> Agregar otra Ubicación
            </button>
+
+           <!-- Dirección que solo ven quienes compran (events.secret_location, netlify/lib/secret-location.mjs) -->
+           <div class="p-4 sm:p-6 bg-gray-50 rounded-xl border border-gray-200" data-testid="secret-location">
+             <label class="flex items-start gap-3 cursor-pointer">
+               <input type="checkbox" v-model="secretLocationOn" class="mt-1 h-4 w-4 accent-black" />
+               <span>
+                 <span class="font-bold block">Dirección solo para quienes compran</span>
+                 <span class="text-sm text-gray-500">La página muestra el lugar y la comuna, sin la calle ni el mapa. La dirección exacta aparece en la orden, la entrada y el correo.</span>
+               </span>
+             </label>
+             <div v-if="secretLocationOn" class="mt-4 grid gap-3 sm:grid-cols-3">
+               <div class="sm:col-span-2">
+                 <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Dirección exacta</label>
+                 <input v-model="form.general.secretLocation" type="text" maxlength="300" placeholder="Ej: Av. Irarrázaval 1234, depto 5, Ñuñoa" class="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black outline-none bg-white" data-testid="secret-location-address" />
+               </div>
+               <div>
+                 <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Se revela</label>
+                 <select v-model="form.general.secretLocationRevealHours" class="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black outline-none bg-white" data-testid="secret-location-reveal">
+                   <option value="">Apenas compran</option>
+                   <option v-for="h in REVEAL_HOURS_OPTIONS" :key="h" :value="h">{{ h === 1 ? '1 hora' : `${h} horas` }} antes</option>
+                 </select>
+               </div>
+               <p v-if="form.general.secretLocationRevealHours" class="sm:col-span-3 text-xs text-gray-500">Quien compra antes ve «te llega por correo {{ form.general.secretLocationRevealHours }} h antes» y a esa hora le mandamos la dirección.</p>
+             </div>
+           </div>
         </div>
 
         <!-- Step 3: Tickets -->
