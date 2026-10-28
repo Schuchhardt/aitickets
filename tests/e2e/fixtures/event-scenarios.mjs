@@ -83,6 +83,14 @@ export const SCENARIOS = {
   "maximo-configurado": { layout: "poster", tickets: [TICKETS.generalMax3] },
   // Evento que ya terminó (hace 2 días), con reseñas y fotos de asistentes (tests/e2e/event-reviews.spec.ts)
   "terminado-con-resenas": { layout: "poster", tickets: [], ended: true, reviews: true },
+  // Obra en cartelera: una función pasada con reseñas y dos a la venta (review_settings.show_while_on_sale)
+  "cartelera-con-resenas": {
+    layout: "poster",
+    functions: [{ days: -3 }, { days: 10 }, { days: 12 }],
+    tickets: [{ ...TICKETS.general, fn: 1 }, { ...TICKETS.general, id: 9106, fn: 2 }],
+    reviews: true,
+    reviewsDuringRun: true,
+  },
   // Videos del evento (tests/e2e/event-video.spec.ts): de portada en cada diseño (compacto se muestra como póster)
   // y opcional en la galería
   "con-video-portada": { layout: "poster", tickets: [TICKETS.general], coverVideo: true },
@@ -217,6 +225,7 @@ export function fixtureEvent(name, { toPublicTicket, now = new Date() }) {
     theme: image ? { tint: "75 60% 94%", poster_width: 1200, poster_height: 630 } : null,
     sale_state: scenario.saleState || (scenario.tickets.length ? "on_sale" : "closed"),
     reviews: scenario.reviews ? FIXTURE_REVIEWS : null,
+    reviews_during_run: scenario.reviewsDuringRun === true,
     sale_starts_at: scenario.saleStartsInDays ? new Date(now.getTime() + scenario.saleStartsInDays * 24 * 3600 * 1000).toISOString() : null,
     has_secret_location: false,
     organization: { name: "Productora de Prueba", website: null, instagram: null },

@@ -2,8 +2,8 @@
 // 4 · Acto II · La temporada (SPEC_landing_teatro §4.4, ancla #temporada, firma de la página): encabezado y la isla
 // de la cartelera con el fader (SeasonBoard + LightFader). Los textos de cada momento se arman aquí con las constantes
 // del código y llegan por props (no se cargan esos módulos en el navegador):
-//   reseñas → REVIEW_REQUEST_DELAY_HOURS (netlify/lib/reviews.mjs); en la página pública se muestran cuando el evento
-//             terminó (EventDetail.vue, showReviews): mostrarlas durante la temporada va con "Pronto"
+//   reseñas → REVIEW_REQUEST_DELAY_HOURS (netlify/lib/reviews.mjs); en la página pública, mientras la obra sigue en
+//             cartelera si la productora lo activa (review_settings.show_while_on_sale, EventDetail.vue showReviews)
 //   cobro → PAYOUT_SHORT_TEXT (legal.mjs) con el asterisco de TERMS_NOTE (reserva por riesgo, Preguntas abiertas 1)
 //   Instagram → DEFAULT_KEYWORD (socialSeriesCadence.ts): con funciones cada semana la próxima siempre está a menos de
 //               daily_from_days días, así que la historia sale diaria toda la temporada (socialSeries.ts)
@@ -14,7 +14,6 @@
 // que hidratar no mueve el contenido de abajo (CLS, §7).
 import ActEyebrow from "./ActEyebrow.astro";
 import SeasonBoard from "./SeasonBoard.vue";
-import SoonBadge from "../../ui/SoonBadge.vue";
 import { INVITE_AUDIENCE_TEXT } from "../../../data/teatroFaq";
 import { TERMS_NOTE } from "../../../data/producerFaq";
 import { PAYOUT_SHORT_TEXT } from "../../../../netlify/lib/legal.mjs";
@@ -35,7 +34,7 @@ const items = [
       text: `${REVIEW_REQUEST_DELAY_HOURS} h después de cada función les llega un correo para calificar con estrellas, comentar y subir fotos. Tú lo ves en el panel.`,
     },
     { icon: "wallet", title: "Lo de la semana 1, disponible.", text: `${PAYOUT_SHORT_TEXT}.*` },
-    { icon: "quote", title: "Mostrar las reseñas en la página mientras la obra sigue en cartelera", text: "", soon: true },
+    { icon: "quote", title: "Las reseñas, ya en cartelera.", text: "Si lo activas, la página las muestra junto al botón de compra." },
   ],
   [
     {
@@ -101,7 +100,6 @@ const moments = SEASON_STEPS.map((s, i) => ({ title: s.label, items: items[i] })
                   {m.items.map((item) => (
                     <li>
                       <strong>{item.title}</strong>
-                      {item.soon && <SoonBadge dark class="ts-soon" />}
                       {item.text && <span> {item.text}</span>}
                     </li>
                   ))}
@@ -159,9 +157,6 @@ const moments = SEASON_STEPS.map((s, i) => ({ title: s.label, items: items[i] })
   }
   .ts-moment strong {
     color: var(--te-text-1);
-  }
-  .ts-moments :global(.ts-soon) {
-    margin-left: 6px;
   }
   .ts-terms {
     margin-top: 24px;

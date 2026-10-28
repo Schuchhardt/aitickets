@@ -8,7 +8,7 @@
 //               tools/guests.ts (hoy solo desde el asistente de IA)
 //   otra función en la puerta → ValidateQR.vue (function_mismatch, "Validar de todas formas")
 //   máximo por compra → DEFAULT_MAX_PER_PURCHASE (Reservation/pricing.js); subirlo → tools/tickets.ts (max_per_order)
-//   reseñas en la página → EventDetail.vue (showReviews: cuando el evento terminó)
+//   reseñas en la página → EventDetail.vue (showReviews: al terminar o, con review_settings.show_while_on_sale, en cartelera)
 //   invitar a la próxima obra → invitations.ts y filterInviteRecipients de reviews.mjs (INVITE_AUDIENCES, bajas y
 //               quienes ya tienen entrada quedan fuera)
 //   CSV de órdenes → /api/events/orders-csv (fecha, entradas, montos, cortesía, ref/UTM)
@@ -67,7 +67,7 @@ export const TEATRO_FAQ: FaqItem[] = [
     reword(
         pick(ORGANIZADORES_FAQ, "¿Cómo funcionan las reseñas?"),
         "¿Cómo funcionan las reseñas?",
-        "En la página de la obra se muestran cuando termina la temporada.",
+        "Si lo activas, la página de la obra muestra las reseñas mientras sigue en cartelera, junto al botón de compra.",
     ),
     {
         q: "¿Puedo invitar a mi público a la próxima obra?",

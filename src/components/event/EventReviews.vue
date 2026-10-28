@@ -1,5 +1,6 @@
 <script setup>
-// Reseñas en la página del evento terminado (o con el link del correo "¿Cómo estuvo?"): resumen de
+// Reseñas en la página del evento terminado, en cartelera si la productora lo activó (review_settings.show_while_on_sale)
+// o con el link del correo "¿Cómo estuvo?": resumen de
 // calificaciones, formulario para calificar de 1 a 5 con comentario público y privado, subida de fotos a la
 // galería compartida, comentarios de otros asistentes y la galería de fotos de los asistentes.
 // Para calificar hay que validar la asistencia (las APIs devuelven un token firmado, netlify/lib/review-token.mjs):

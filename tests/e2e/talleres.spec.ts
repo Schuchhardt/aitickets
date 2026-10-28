@@ -122,14 +122,15 @@ test("con 'reducir movimiento' los pendientes quedan tachados y el pase de lista
 
 test("lo que no existe va con Pronto y sin testimonio real no hay cita", async ({ page }) => {
   await open(page);
-  // Preguntas al inscribirse (antes), pasar lista por sesión (el día), Facebook/TikTok/reels (difusión), reseñas
-  // mientras quedan fechas (después)
+  // Preguntas al inscribirse (antes) y Facebook/TikTok/reels (difusión); pasar lista por sesión y las reseñas
+  // mientras quedan fechas ya existen
   await expect(page.locator("#antes").getByTestId("soon-badge")).toHaveCount(1);
   // Pasar lista en cada sesión ya existe
   await expect(page.locator("#el-dia").getByTestId("soon-badge")).toHaveCount(0);
   await expect(page.locator("#el-dia")).toContainText("una vez en cada sesión");
   await expect(page.locator("#difusion").getByTestId("soon-badge")).toHaveCount(3);
-  await expect(page.locator("#despues").getByTestId("soon-badge")).toHaveCount(1);
+  await expect(page.locator("#despues").getByTestId("soon-badge")).toHaveCount(0);
+  await expect(page.locator("#despues")).toContainText("Mientras sigue con fechas");
   await expect(page.locator('[data-tl-section="testimonio"]')).toHaveCount(0);
 });
 

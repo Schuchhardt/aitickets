@@ -101,7 +101,8 @@ test("el fader se mueve con el teclado y cambia la cartelera y el panel", async 
   await page.keyboard.press("ArrowRight");
   await expect(season.getByTestId("theatre-season-title")).toHaveText("Semana 2");
   await expect(fader).toHaveAttribute("aria-valuetext", "Semana 2");
-  await expect(season.getByTestId("soon-badge")).toHaveCount(1);
+  // Las reseñas en la página durante la temporada ya existen
+  await expect(season.getByTestId("soon-badge")).toHaveCount(0);
 });
 
 test("con 'reducir movimiento' el escáner queda fijo en el aviso de otra función, con el botón", async ({ page }) => {

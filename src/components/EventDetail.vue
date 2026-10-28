@@ -122,7 +122,7 @@ const badges = computed(() => {
   else if (s === "sold_out") list.push({ label: "Agotado", tone: "neutral" });
   else if (s === "ended") list.push({ label: "Evento finalizado", tone: "neutral" });
   const reviewSummary = props.event.reviews?.summary;
-  if (s === "ended" && reviewSummary?.count) list.push({ label: `★ ${formatRating(reviewSummary.average)} · ${reviewsCountLabel(reviewSummary.count)}`, tone: "neutral" });
+  if ((s === "ended" || props.event.reviews_during_run) && reviewSummary?.count) list.push({ label: `★ ${formatRating(reviewSummary.average)} · ${reviewsCountLabel(reviewSummary.count)}`, tone: "neutral" });
   if (s === "free" && stock.value?.few) list.push({ label: `Quedan ${stock.value.remaining} ${stock.value.remaining === 1 ? "cupo" : "cupos"}`, tone: "warning", pulse: true });
   if (isPaidOnSale.value && stock.value?.few) list.push({ label: "Últimas entradas", tone: "warning", pulse: true });
   if (isPrivate.value) list.push({ label: "Evento privado", tone: "neutral" });
@@ -131,10 +131,13 @@ const badges = computed(() => {
 
 // ---- Compra en dominio propio: el checkout vive en aitickets.cl ----
 const externalUrl = ref("");
-// Reseñas (EventReviews.vue): en el evento terminado o cuando se llega con el link del correo "¿Cómo estuvo?"
-// (#resena=…, p. ej. una gira con funciones pendientes). Se decide al montar: el servidor no ve el fragmento.
+// Reseñas (EventReviews.vue): en el evento terminado, mientras quedan funciones si la productora lo activó
+// (reviews_during_run: la obra en cartelera muestra las reseñas y el botón de compra) o cuando se llega con el link
+// del correo "¿Cómo estuvo?" (#resena=…). El link se decide al montar: el servidor no ve el fragmento.
 const reviewsFromLink = ref(false);
-const showReviews = computed(() => !props.event?.is_preview && !props.event?.is_demo && (state.value === "ended" || reviewsFromLink.value));
+const showReviews = computed(
+  () => !props.event?.is_preview && !props.event?.is_demo && (state.value === "ended" || props.event?.reviews_during_run === true || reviewsFromLink.value),
+);
 const reviewsOrigin = ref("");
 const isAiticketsHost = (host) =>
   host === "aitickets.cl" || host.endsWith(".aitickets.cl") || host === "localhost" || host === "127.0.0.1" || host.endsWith(".netlify.app");

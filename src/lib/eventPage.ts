@@ -20,6 +20,7 @@ import { isEventEnded } from "../components/event/eventView.js";
 import { resolveCoverMeta, eventThemeFrom } from "./eventCoverMeta";
 import { normalizePageSettings, stripDemoSuffix } from "./eventPageSettings";
 import { computeFeeSplit } from "../../netlify/lib/fees.mjs";
+import { normalizeReviewSettings } from "../../netlify/lib/reviews.mjs";
 import { maxPerPurchase, loadTicketChain, waitingOnPrevious } from "../../netlify/lib/tickets.mjs";
 import { clientIpFrom } from "./sites";
 
@@ -192,6 +193,13 @@ async function loadAvailability(
 }
 
 const pickOne = (v: any) => (Array.isArray(v) ? v[0] : v) || null;
+
+/** review_settings.show_while_on_sale del evento (false si la columna aún no existe). */
+async function showsReviewsWhileOnSale(supabase: ReturnType<typeof getSupabaseAdmin>, eventId: number): Promise<boolean> {
+  const { data, error } = await supabase.from("events").select("review_settings").eq("id", eventId).maybeSingle();
+  if (error) return false;
+  return normalizeReviewSettings((data as any)?.review_settings).show_while_on_sale;
+}
 
 const buildVenue = (loc: any) => {
   if (!loc) return null;
@@ -624,8 +632,11 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
       })),
   ].filter((t) => liveFunction(t.event_date_id));
 
-  // Reseñas y fotos de los asistentes: solo cuando el evento ya terminó (src/lib/eventReviews.ts)
+  // Reseñas y fotos de los asistentes: cuando el evento ya terminó (src/lib/eventReviews.ts) o, si la productora lo
+  // activó (review_settings.show_while_on_sale), desde que pasa la primera función aunque queden otras a la venta
   const ended = !isDemo && !isPreview && isEventEnded({ dates, end_date: endDate, is_demo: isDemo }, now);
+  const pastFunction = !ended && !isDemo && !isPreview && dates.some((d) => d.end_iso && new Date(d.end_iso) < now);
+  const reviewsDuringRun = pastFunction ? await showsReviewsWhileOnSale(supabase, Number(event.id)) : false;
 
   // Póster: proporción real y tinte de la página (events.cover_meta, src/lib/eventCoverMeta.ts)
   const [coverMeta, reviews] = await Promise.all([
@@ -635,7 +646,7 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
         return typeof ctx?.waitUntil === "function" ? (p: Promise<unknown>) => ctx.waitUntil(p) : undefined;
       })(),
     }),
-    ended ? loadPublicReviews(Number(event.id)).catch(() => null) : Promise.resolve(null),
+    ended || reviewsDuringRun ? loadPublicReviews(Number(event.id)).catch(() => null) : Promise.resolve(null),
   ]);
 
   const { cover_meta: _coverMeta, page_settings: rawPageSettings, cover_video: rawCoverVideo, gallery_video: rawGalleryVideo, ...eventRow } = event;
@@ -656,6 +667,8 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
     gallery_video: normalizeEventVideo(rawGalleryVideo),
     // Evento terminado: { summary, reviews, comments_total, photos } (null si no terminó o sin tablas)
     reviews,
+    // Quedan funciones y la productora muestra las reseñas de las pasadas (solo si ya hay alguna)
+    reviews_during_run: reviewsDuringRun && Number(reviews?.summary?.count) > 0,
     dates,
     tickets: publicTickets,
     unavailable_tickets: unavailableTickets,

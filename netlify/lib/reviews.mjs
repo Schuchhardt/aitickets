@@ -60,8 +60,10 @@ const clampInt = (value, min, max) => {
 
 /**
  * Configuración de reseñas de un evento (events.review_settings). NULL o basura => valores por defecto:
- * correo activado, sin premio, fotos sin moderación previa.
- * @returns {{ enabled: boolean, reward: { value: number, valid_days: number } | null, moderate_photos: boolean }}
+ * correo activado, sin premio, fotos sin moderación previa y reseñas en la página solo cuando el evento terminó.
+ * show_while_on_sale: la página muestra las reseñas de las funciones pasadas mientras quedan funciones a la venta
+ * (una obra en cartelera, un taller con fechas).
+ * @returns {{ enabled: boolean, reward: { value: number, valid_days: number } | null, moderate_photos: boolean, show_while_on_sale: boolean }}
  */
 export function normalizeReviewSettings(raw) {
   const s = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}
@@ -71,7 +73,7 @@ export function normalizeReviewSettings(raw) {
     const days = clampInt(s.reward.valid_days ?? REWARD_LIMITS.defaultDays, REWARD_LIMITS.minDays, REWARD_LIMITS.maxDays)
     if (value != null && days != null) reward = { value, valid_days: days }
   }
-  return { enabled: s.enabled !== false, reward, moderate_photos: s.moderate_photos === true }
+  return { enabled: s.enabled !== false, reward, moderate_photos: s.moderate_photos === true, show_while_on_sale: s.show_while_on_sale === true }
 }
 
 /** Estrellas válidas (entero 1-5) o null. */

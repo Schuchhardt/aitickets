@@ -2,14 +2,13 @@
 // 7 · Después: del taller de prueba al nivel 2 (SPEC_landing_talleres §4.7, ancla #despues): tres pasos numerados a
 // mano y la demo de invitación (InviteNextLevel). Verificado en el código:
 //   reseñas → REVIEW_REQUEST_DELAY_HOURS / REVIEW_REQUEST_WINDOW_HOURS / MAX_PHOTOS_PER_PERSON (reviews.mjs), código para
-//             quien califica (EventReviewsManager.vue, REWARD_CODE_PREFIX); en la página, cuando el evento terminó
-//             (EventDetail.vue): mostrarlas mientras quedan fechas va con "Pronto"
+//             quien califica (EventReviewsManager.vue, REWARD_CODE_PREFIX); en la página, mientras quedan fechas si
+//             se activa en la configuración de reseñas (review_settings.show_while_on_sale, EventDetail.vue)
 //   invitar → invitations.ts con INVITE_AUDIENCES (reviews.mjs), sin bajas ni quienes ya tienen entrada
 //   duplicar → eventDuplicate.ts (copia datos, lugares, entradas y FAQ; no las fechas)
 import SectionTab from "./SectionTab.astro";
 import Highlight from "./Highlight.astro";
 import InviteNextLevel from "./InviteNextLevel.vue";
-import SoonBadge from "../../ui/SoonBadge.vue";
 import { INVITE_AUDIENCE_TEXT } from "../../../data/inviteAudience";
 import {
   INVITE_AUDIENCES,
@@ -60,9 +59,8 @@ const audiences = (["all", "checked_in", "promoters"] as const).map((value) => (
       </ol>
       <div>
         <InviteNextLevel client:visible audiences={audiences} />
-        <p class="tl-after-soon">
-          <span class="tl-soon-line"><strong>Mostrar las reseñas en la página mientras el taller sigue con fechas</strong> <SoonBadge dark={false} /></span>
-          Hoy se muestran cuando termina.
+        <p class="tl-after-note">
+          <strong>Las reseñas, en la página del taller.</strong> Mientras sigue con fechas, junto al botón para inscribirse.
         </p>
       </div>
     </div>
@@ -103,13 +101,13 @@ const audiences = (["all", "checked_in", "promoters"] as const).map((value) => (
     line-height: 25px;
     color: var(--tl-grafito-2);
   }
-  .tl-after-soon {
+  .tl-after-note {
     margin-top: 16px;
     font-size: 14px;
     line-height: 21px;
     color: var(--tl-grafito-3);
   }
-  .tl-after-soon strong {
+  .tl-after-note strong {
     font-weight: 600;
     color: var(--tl-grafito);
   }

@@ -159,7 +159,7 @@ describe('TEATRO_FAQ (§4.10)', () => {
     const teaser = TEATRO_FAQ.find((f) => f.q === '¿Puedo poner el teaser de la obra como portada?')
     expect(teaser?.a).toBe(ORGANIZADORES_FAQ.find((f) => f.q === '¿Puedo poner un video como portada del evento?')?.a)
     const reviews = TEATRO_FAQ.find((f) => f.q === '¿Cómo funcionan las reseñas?')
-    expect(reviews?.a.endsWith('En la página de la obra se muestran cuando termina la temporada.')).toBe(true)
+    expect(reviews?.a.endsWith('Si lo activas, la página de la obra muestra las reseñas mientras sigue en cartelera, junto al botón de compra.')).toBe(true)
     const first = TEATRO_FAQ.find((f) => f.q === '¿Me ayudan a publicar mi primera obra?')
     expect(first?.a).toBe(PRODUCER_FAQ.find((f) => f.q === '¿Me ayudan a publicar mi primer evento?')?.a)
   })
