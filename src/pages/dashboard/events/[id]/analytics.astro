@@ -251,6 +251,7 @@ const peakDatasets = JSON.stringify([
                                     {row.event_date_id != null && (
                                         <a href={`?funcion=${row.event_date_id}#canales`} class="text-blue-600 hover:underline">Por canal</a>
                                     )}
+                                    <a href={`/dashboard/events/${event.id}/bordero?funcion=${row.event_date_id ?? "all"}`} class="ml-3 text-blue-600 hover:underline">Borderó</a>
                                 </td>
                             </tr>
                         ))}

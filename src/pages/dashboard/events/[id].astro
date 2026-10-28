@@ -342,6 +342,7 @@ const canCreateAds = adsEnabled() && hasRole(dbUser, ORG_ADMIN_ROLES);
                                             <th class="px-4 py-2 text-right font-medium whitespace-nowrap">Cortesías</th>
                                             <th class="px-4 py-2 text-right font-medium whitespace-nowrap">Cupo</th>
                                             <th class="px-4 py-2 text-left font-medium whitespace-nowrap min-w-[8rem]">Ocupación</th>
+                                            <th class="px-4 py-2 text-right font-medium"><span class="sr-only">Borderó</span></th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-gray-100">
@@ -363,13 +364,16 @@ const canCreateAds = adsEnabled() && hasRole(dbUser, ORG_ADMIN_ROLES);
                                                         </div>
                                                     )}
                                                 </td>
+                                                <td class="px-4 py-2 text-right whitespace-nowrap">
+                                                    <a href={`/dashboard/events/${event.id}/bordero?funcion=${r.event_date_id ?? "all"}`} class="text-black font-medium hover:underline" data-testid="function-bordero-link">Borderó</a>
+                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
                             </div>
                             <p class="px-4 sm:px-6 py-3 text-xs text-gray-500 border-t border-gray-100">
-                                Ocupación = entradas emitidas (vendidas y cortesías, sin anuladas) ÷ cupo de los tipos de entrada de esa función. Las entradas válidas para cualquier función van en su propia fila.
+                                Ocupación = entradas emitidas (vendidas y cortesías, sin anuladas) ÷ cupo de los tipos de entrada de esa función. Las entradas válidas para cualquier función van en su propia fila. El borderó de cada función sirve para liquidar con la sala.
                             </p>
                         </section>
                     )}

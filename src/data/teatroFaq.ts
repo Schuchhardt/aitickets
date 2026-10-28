@@ -12,6 +12,7 @@
 //   invitar a la próxima obra → invitations.ts y filterInviteRecipients de reviews.mjs (INVITE_AUDIENCES, bajas y
 //               quienes ya tienen entrada quedan fuera)
 //   CSV de órdenes → /api/events/orders-csv (fecha, entradas, montos, cortesía, ref/UTM)
+//   borderó por función → src/lib/functionSettlement.ts (/dashboard/events/<id>/bordero y planilla)
 import { PRODUCER_FAQ, type FaqItem } from "./producerFaq";
 import { ORGANIZADORES_FAQ } from "./organizadoresFaq";
 import { getLanding } from "./landings";
@@ -75,7 +76,7 @@ export const TEATRO_FAQ: FaqItem[] = [
     },
     {
         q: "¿Puedo descargar las ventas para rendir cuentas?",
-        a: "Sí. Descargas las órdenes de cada obra en CSV, con fecha, entradas, montos, cortesías y el canal de cada compra, para la sala, tu contador o un fondo.",
+        a: "Sí. Cada función tiene su borderó, con las entradas por tipo y precio, cortesías, bruto, descuentos, cargo por servicio y lo que te queda, para imprimir, guardar en PDF o descargar en planilla. También descargas las órdenes de cada obra en CSV, con fecha, entradas, montos, cortesías y el canal de cada compra, para la sala, tu contador o un fondo.",
     },
     pick(PRODUCER_FAQ, "¿Qué pasa si tengo que cambiar o cancelar una función?"),
     reword(pick(PRODUCER_FAQ, "¿Me ayudan a publicar mi primer evento?"), "¿Me ayudan a publicar mi primera obra?"),
