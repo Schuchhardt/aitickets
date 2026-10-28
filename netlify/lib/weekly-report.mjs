@@ -383,7 +383,7 @@ const CHANNEL_PLAYS = {
   whatsapp: { title: 'Haz rendir WhatsApp', body: 'Tu público compra por WhatsApp: envía el link con seguimiento a tus listas de difusión y pídele a tu equipo que lo comparta en sus grupos.' },
   email: { title: 'Vuelve a escribirle a tu lista', body: 'El correo te está vendiendo: manda un recordatorio corto con la fecha, lo que van a vivir y un botón directo para comprar.' },
   google: { title: 'Te están buscando en Google', body: 'Llegan buscando el evento: revisa que el nombre y la descripción digan qué es, dónde y cuándo, con las palabras que usaría tu público.' },
-  x: { title: 'Sigue la conversación en X', body: 'Es tu mejor canal: publica novedades del evento y fija el post con el link con seguimiento.' },
+  x: { title: 'Sigue la conversación en X', body: 'Es tu mejor canal: publica novedades del evento y fija la publicación con el link con seguimiento.' },
   youtube: { title: 'Saca partido a YouTube', body: 'Te llegan desde YouTube: agrega el link con seguimiento en la descripción y en el comentario fijado de tus videos.' },
   promoter: { title: 'Tu promotor está vendiendo', body: 'Dale un código de descuento exclusivo para su público y arma links de promotor para más personas de tu equipo.' },
   meta: { title: 'Tus anuncios están vendiendo', body: 'Los anuncios en Facebook e Instagram son tu canal que más vende: si el costo por entrada te conviene, súbeles el presupuesto o alárgalos unos días.' },
@@ -452,8 +452,8 @@ export function fallbackSuggestions(m, { adsInApp = false } = {}) {
   out.push({
     type: 'content',
     channel: net,
-    title: `Crea un post para ${NET_LABEL[net]}`,
-    body: `Genera con IA en AI Tickets un post con imagen para ${NET_LABEL[net]}: muestra qué se va a vivir y termina con un llamado claro a comprar.${urgency}`,
+    title: `Crea una publicación para ${NET_LABEL[net]}`,
+    body: `Genera con IA en AI Tickets una publicación con imagen para ${NET_LABEL[net]}: muestra qué se va a vivir y termina con un llamado claro a comprar.${urgency}`,
   })
   out.push(adsSuggestion(m, net, adsInApp))
   return out.slice(0, SUGGESTIONS_PER_EVENT)

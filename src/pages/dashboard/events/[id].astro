@@ -416,26 +416,26 @@ const canCreateAds = adsEnabled() && hasRole(dbUser, ORG_ADMIN_ROLES);
                             </div>
                         </div>
                     )}
-                    {/* Difusión automática: historias y posts en Instagram hasta el evento (docs/specs/historias-automaticas.md) */}
+                    {/* Difusión automática: historias y publicaciones en Instagram hasta el evento (docs/specs/historias-automaticas.md) */}
                     {m.id === "social-series" && <SocialSeriesCard client:visible eventId={Number(event.id)} eventName={event.name} />}
                     {/* Atajos a Promocionar con el evento elegido (?event=<id>) */}
                     {m.id === "promote" && (
                         <div class="bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-sm" data-testid="event-promote">
                             <div class="flex items-center justify-between gap-3 mb-1">
-                                <h3 class="font-bold text-lg">Posts y anuncios</h3>
+                                <h3 class="font-bold text-lg">Publicaciones y anuncios</h3>
                                 <a href="/dashboard/promote" class="text-sm text-black font-medium hover:underline">Ver en Promocionar</a>
                             </div>
                             <p class="text-sm text-gray-500 mb-4">
                                 {canCreateAds
-                                    ? "Publica un post en tus redes conectadas o crea un anuncio pagado en Instagram y Facebook."
-                                    : "Publica un post en tus redes conectadas."}
+                                    ? "Publica en tus redes conectadas o crea un anuncio pagado en Instagram y Facebook."
+                                    : "Publica en tus redes conectadas."}
                             </p>
                             <div class="flex flex-wrap gap-2">
                                 <a
                                     href={`/dashboard/promote/create?event=${event.id}`}
                                     class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-black text-white text-sm font-medium hover:bg-gray-900 transition"
                                 >
-                                    <Send size={16} /> Crear post
+                                    <Send size={16} /> Crear publicación
                                 </a>
                                 {canCreateAds && (
                                     <a

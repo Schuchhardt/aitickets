@@ -7,7 +7,7 @@ import {
 
 const props = defineProps({
   posts: { type: Array, default: () => [] },
-  // Anuncios vía Zernio disponibles y el usuario puede crearlos: botón "Promocionar" en los posts publicados
+  // Anuncios vía Zernio disponibles y el usuario puede crearlos: botón "Promocionar" en las publicaciones publicadas
   canBoost: { type: Boolean, default: false },
 })
 
@@ -19,18 +19,18 @@ const filteredPosts = computed(() => {
 })
 
 const filters = [
-  { id: 'all', label: 'Todos', icon: ListFilter },
-  { id: 'published', label: 'Publicados', icon: CheckCircle },
-  { id: 'scheduled', label: 'Programados', icon: Clock },
+  { id: 'all', label: 'Todas', icon: ListFilter },
+  { id: 'published', label: 'Publicadas', icon: CheckCircle },
+  { id: 'scheduled', label: 'Programadas', icon: Clock },
   { id: 'draft', label: 'Borradores', icon: FileText },
-  { id: 'failed', label: 'Fallidos', icon: XCircle },
+  { id: 'failed', label: 'Fallidas', icon: XCircle },
 ]
 
 const statusConfig = {
   draft: { label: 'Borrador', class: 'bg-gray-100 text-gray-600' },
-  scheduled: { label: 'Programado', class: 'bg-blue-100 text-blue-700' },
-  published: { label: 'Publicado', class: 'bg-green-100 text-green-700' },
-  failed: { label: 'Fallido', class: 'bg-red-100 text-red-700' },
+  scheduled: { label: 'Programada', class: 'bg-blue-100 text-blue-700' },
+  published: { label: 'Publicada', class: 'bg-green-100 text-green-700' },
+  failed: { label: 'Fallida', class: 'bg-red-100 text-red-700' },
 }
 
 const platformIcons = {
@@ -75,13 +75,13 @@ const retryPublish = async (postId) => {
       <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-400">
         <Send :size="32" />
       </div>
-      <h3 class="text-xl font-bold mb-2">No tienes posts aún</h3>
-      <p class="text-gray-500 mb-6">Crea tu primer post para promocionar tus eventos en redes sociales.</p>
+      <h3 class="text-xl font-bold mb-2">Aún no tienes publicaciones</h3>
+      <p class="text-gray-500 mb-6">Crea tu primera publicación para promocionar tus eventos en redes sociales.</p>
       <a
         href="/dashboard/promote/create"
         class="inline-flex bg-black text-white px-6 py-3 rounded-lg hover:bg-gray-800 transition font-medium"
       >
-        Crear Post
+        Crear publicación
       </a>
     </div>
 
@@ -100,7 +100,7 @@ const retryPublish = async (postId) => {
         </button>
       </div>
 
-      <!-- Posts List -->
+      <!-- Lista de publicaciones -->
       <div class="space-y-3">
         <div
           v-for="post in filteredPosts"
@@ -154,7 +154,7 @@ const retryPublish = async (postId) => {
                   {{ new Date(post.scheduled_for).toLocaleString('es-CL') }}
                 </span>
 
-                <!-- Promocionar con un anuncio pagado (posts publicados desde AI Tickets) -->
+                <!-- Promocionar con un anuncio pagado (publicaciones hechas desde AI Tickets) -->
                 <a
                   v-if="canBoost && post.status === 'published' && post.zernio_post_id"
                   :href="`/dashboard/promote/ads/create?event=${post.event_id}&post=${post.id}`"
@@ -184,7 +184,7 @@ const retryPublish = async (postId) => {
 
       <!-- Empty filtered state -->
       <div v-if="filteredPosts.length === 0" class="text-center py-8 text-gray-400">
-        <p class="text-sm">No hay posts con el filtro seleccionado.</p>
+        <p class="text-sm">No hay publicaciones con el filtro seleccionado.</p>
       </div>
     </div>
   </div>

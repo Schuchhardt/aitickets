@@ -277,7 +277,7 @@ const getSystemHealth: AdminToolDef = {
                 { ...proc("outreach", outreachEvent.at, 24, "Solo con OUTREACH_ENABLED=true.", outreachEvent.missing), paused: pausedValue?.paused ?? false },
                 { process: "expire-pending-orders", pending_overdue: pendingOverdue, processing_stuck: processingStuck, note: "Corre cada 10 min: concilia con Flow y expira pendientes." },
                 {
-                    ...proc("social-series-dispatch (historias automáticas)", seriesQueued.at, 24, "Corre cada 15 min; solo escribe cuando hay historias o posts por publicar en las próximas 2 h.", seriesQueued.missing),
+                    ...proc("social-series-dispatch (historias automáticas)", seriesQueued.at, 24, "Corre cada 15 min; solo escribe cuando hay historias o publicaciones por salir en las próximas 2 h.", seriesQueued.missing),
                     overdue_planned: seriesOverdue,
                 },
                 {

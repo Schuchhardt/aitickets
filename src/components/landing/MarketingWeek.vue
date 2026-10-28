@@ -26,7 +26,7 @@ const count = computed(() => marketingPostCount(week.value))
 const toggles = [
   // La semana del ejemplo es la última antes de la función: ahí la historia ya es diaria (antes, cada pocos días)
   { key: 'story', label: 'Historia con cuenta regresiva' },
-  { key: 'post', label: 'Post diario la última semana' },
+  { key: 'post', label: 'Publicación diaria la última semana' },
   { key: 'reel', label: 'Reel con el video del evento' },
 ]
 const networks = [
@@ -91,7 +91,7 @@ const slotText = (slot) => (slot.state === 'past' ? 'Publicado ✓' : slot.state
     <p class="lp-small mw-note">
       Se publican a la hora en que más visitas tiene tu evento ({{ props.dailyTime }} mientras no hay datos). Apruebas la
       serie una vez, con vista previa de cada pieza, y sale igual en tu Instagram, tu página de Facebook y tu TikTok. Quien
-      responde una historia o comenta un post con la palabra clave recibe el link de compra por DM, con su propio
+      responde una historia o comenta una publicación con la palabra clave recibe el link de compra por DM, con su propio
       seguimiento en las métricas.
     </p>
     <p class="lp-example mw-example">Datos de ejemplo</p>

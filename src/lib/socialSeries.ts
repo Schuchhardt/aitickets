@@ -1149,14 +1149,14 @@ async function dispatchSlot(supabase: any, series: any, event: any, slot: any, o
         }),
     });
     const zernioPostId = created?.post?._id || created?.post?.id || null;
-    if (!zernioPostId) throw new ZernioError(502, { error: "Zernio no devolvió el id del post" });
+    if (!zernioPostId) throw new ZernioError(502, { error: "Zernio no devolvió el id de la publicación" });
     let automationId: string | null = null;
     let error: string | null = null;
     if (slot.kind !== "story" && platform !== "tiktok" && !series.sold_out_at) {
         try {
             automationId = await createPostAutomation(series, event, slot, zernioPostId, origin, accountId, platform);
         } catch (err: any) {
-            error = `Post programado, pero no se pudo activar el DM por comentarios: ${String(err?.message || err).slice(0, 300)}`;
+            error = `Publicación programada, pero no se pudo activar el DM por comentarios: ${String(err?.message || err).slice(0, 300)}`;
         }
     }
     await supabase

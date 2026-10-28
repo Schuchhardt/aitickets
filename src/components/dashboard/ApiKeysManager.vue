@@ -13,7 +13,7 @@ const props = defineProps({
 
 const SCOPES = [
   { id: 'read', label: 'Ver', help: 'Eventos, entradas, descuentos y estadísticas', locked: true },
-  { id: 'write', label: 'Crear y editar', help: 'Eventos (en borrador), entradas, descuentos, imágenes y posts' },
+  { id: 'write', label: 'Crear y editar', help: 'Eventos (en borrador), entradas, descuentos, imágenes y publicaciones' },
   { id: 'publish', label: 'Publicar', help: 'Publicar/pausar eventos y publicar en redes sociales' },
   { id: 'attendees', label: 'Compradores', help: 'Nombre, email y teléfono de quienes compraron' },
 ]
