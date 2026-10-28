@@ -2,6 +2,7 @@
 // Página de una entrada individual (event_attendees.id, uuid): el link "Ver QR" de cada entrada del correo, para
 // pasársela a un acompañante. Muestra la dirección secreta solo si la entrada está vigente (active/validated/NULL)
 // y su orden (si tiene) está pagada. El muro de asistentes se ve en modo lectura (publica quien tiene la orden).
+// Titular: el asistente que se escribió al comprar (event_attendees.holder_name) o, si no, quien compró.
 import { getSupabaseAdmin } from "../../lib/auth-helpers";
 import { cdnImage } from "../../lib/imageCdn.js";
 import { loadAttendeeEvent, functionsForTickets, upcomingFirst, calendarUrl, mapsUrl } from "../../lib/attendeePage";
@@ -36,11 +37,11 @@ let functionId: number | null = null;
 if (!id || !UUID_RE.test(id)) {
   errorMessage = "No encontramos esta entrada. Revisa que el link esté completo.";
 } else {
-  const { data: ticketData } = await supabase
-    .from("event_attendees")
-    .select("id, event_id, attendee_id, qr_code, status, event_order_id, event_tickets ( ticket_name, event_date_id )")
-    .eq("id", id)
-    .maybeSingle();
+  const selectTicket = (extra: string) =>
+    supabase.from("event_attendees").select(`id, event_id, attendee_id, qr_code, status, event_order_id,${extra} event_tickets ( ticket_name, event_date_id )`).eq("id", id).maybeSingle();
+  // holder_name / seat_number son opcionales (base sin migrar)
+  let { data: ticketData, error: ticketError }: { data: any; error: any } = await selectTicket(" holder_name, seat_number,");
+  if (ticketError) ({ data: ticketData } = await selectTicket(""));
 
   if (!ticketData) {
     errorMessage = "No encontramos esta entrada. Revisa que el link esté completo.";
@@ -81,8 +82,8 @@ if (!id || !UUID_RE.test(id)) {
 
     ticket = {
       id: ticketData.id,
-      ticket_name: ticketType?.ticket_name || "Entrada General",
-      attendee_name: `${attendee?.first_name || ""} ${attendee?.last_name || ""}`.trim(),
+      ticket_name: `${ticketType?.ticket_name || "Entrada General"}${ticketData.seat_number ? ` · invitado ${ticketData.seat_number}` : ""}`,
+      attendee_name: ticketData.holder_name || `${attendee?.first_name || ""} ${attendee?.last_name || ""}`.trim(),
       // Entrada anulada (p. ej. orden reembolsada): no se muestra el QR
       qr_code: ticketData.status === "cancelled" ? null : ticketData.qr_code || null,
       status: ticketData.status,

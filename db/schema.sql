@@ -134,6 +134,8 @@ CREATE TABLE public.events (
   end_date timestamp with time zone,
   organization_id bigint,
   secret_location text,
+  -- 202610300100: datos extra del checkout (asistentes, empresa, preguntas)
+  checkout_fields jsonb,
   CONSTRAINT events_pkey PRIMARY KEY (id),
   CONSTRAINT events_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id)
 );
@@ -156,6 +158,9 @@ CREATE TABLE public.event_tickets (
   event_date_id bigint,
   -- 202610290100: tanda anterior (se abre sola cuando esa se agota)
   opens_after_ticket_id bigint REFERENCES public.event_tickets(id) ON DELETE SET NULL,
+  -- 202610300110: mesa para N (un QR por persona; cupo y precio por unidad)
+  people_per_ticket smallint NOT NULL DEFAULT 1,
+  CONSTRAINT event_tickets_people_per_ticket_range CHECK (people_per_ticket BETWEEN 1 AND 30),
   CONSTRAINT event_tickets_pkey PRIMARY KEY (id),
   CONSTRAINT event_tickets_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.events(id)
 );
@@ -213,6 +218,11 @@ CREATE TABLE public.event_orders (
   buyer_phone text,
   email_claimed_at timestamp with time zone,
   processing_started_at timestamp with time zone,
+  -- 202610300100: asistentes por QR, respuestas a las preguntas y datos de empresa (no es boleta ni factura)
+  attendee_holders jsonb,
+  registration_answers jsonb,
+  company_rut text,
+  company_name text,
   CONSTRAINT event_orders_pkey PRIMARY KEY (id),
   CONSTRAINT event_orders_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.events(id),
   CONSTRAINT event_orders_attendee_id_fkey FOREIGN KEY (attendee_id) REFERENCES public.attendees(id)
@@ -315,6 +325,12 @@ CREATE TABLE public.event_attendees (
   id uuid NOT NULL DEFAULT gen_random_uuid() UNIQUE,
   event_order_id uuid,
   validated_at timestamp with time zone,
+  -- 202610300100: asistente de este QR (NULL = quien compró)
+  holder_name text,
+  holder_email text,
+  -- 202610300110: mesa para N (mismo unit_id en los QR de una mesa; seat_number 1..N)
+  unit_id uuid,
+  seat_number smallint,
   CONSTRAINT event_attendees_pkey PRIMARY KEY (id),
   CONSTRAINT event_attendees_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.events(id),
   CONSTRAINT event_attendees_event_ticket_id_fkey FOREIGN KEY (event_ticket_id) REFERENCES public.event_tickets(id),

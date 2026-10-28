@@ -3,9 +3,12 @@
 // y purchase-tickets (órdenes gratis). Idempotente vía event_orders.email_sent_at.
 // Cada intento (también los reenvíos con force) queda en aitickets_email_log con el id de Resend o el error;
 // el webhook de Resend (/api/webhooks/resend) completa la entrega, el rebote o la queja.
+// Asistentes por QR (event_attendees.holder_email, migración 202610300100): quien compra recibe todas las entradas
+// y, en el primer envío, cada asistente con correo distinto recibe la suya (renderHolderTicketEmail).
+// Mesa para N (unit_id, migración 202610300110): el comprobante cuenta mesas, no QR.
 import { getSupabaseAdmin } from './supabase.mjs'
 import { sendEmail, SITE_URL, formatRecipient, isValidEmail } from './mailer.mjs'
-import { renderTicketsEmail } from './emails/index.mjs'
+import { renderTicketsEmail, renderHolderTicketEmail } from './emails/index.mjs'
 import { LEGAL } from './legal.mjs'
 import { orderBuyerBreakdown } from './fees.mjs'
 import { orderDiscount } from './discounts.mjs'
@@ -123,7 +126,7 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
   // e IVA del cargo (202609290100)
   let order = null
   let orderError = null
-  for (const extra of [' service_fee_tax, discount_amount, discount_code, fee_absorbed,', ' service_fee_tax, discount_amount, discount_code,', ' service_fee_tax,', '']) {
+  for (const extra of [' service_fee_tax, discount_amount, discount_code, fee_absorbed, company_rut, company_name,', ' service_fee_tax, discount_amount, discount_code, fee_absorbed,', ' service_fee_tax, discount_amount, discount_code,', ' service_fee_tax,', '']) {
     ;({ data: order, error: orderError } = await selectOrder(extra))
     if (!orderError || !['42703', 'PGRST204'].includes(String(orderError.code || ''))) break
   }
@@ -169,12 +172,19 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
   }
 
   try {
-    // Entradas reales de la orden (sirve también para cortesías sin ticket_details)
-    const { data: attendeeRows, error: attendeesError } = await supabase
+    // Entradas reales de la orden (sirve también para cortesías sin ticket_details). Columnas de asistentes y mesas
+    // opcionales (base sin migrar)
+    const selectAttendees = (extra) => supabase
       .from('event_attendees')
-      .select('id, event_ticket_id, qr_code, event_tickets ( ticket_name, price, event_date_id )')
+      .select(`id, event_ticket_id, qr_code,${extra} event_tickets ( ticket_name, price, event_date_id )`)
       .eq('event_order_id', order.id)
       .or('status.is.null,status.neq.cancelled')
+    let attendeeRows = null
+    let attendeesError = null
+    for (const extra of [' holder_name, holder_email, unit_id, seat_number,', ' holder_name, holder_email,', '']) {
+      ;({ data: attendeeRows, error: attendeesError } = await selectAttendees(extra))
+      if (!attendeesError || !['42703', 'PGRST204'].includes(String(attendeesError.code || ''))) break
+    }
     if (attendeesError) throw new Error(attendeesError.message)
     if (!attendeeRows?.length) throw new Error('La orden no tiene entradas emitidas')
 
@@ -189,11 +199,14 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
         name: row.event_tickets?.ticket_name || 'Entrada',
         unitPrice: detailPrice.has(key) && Number.isFinite(detailPrice.get(key)) ? detailPrice.get(key) : Number(row.event_tickets?.price) || 0,
         quantity: 0,
+        units: new Set(),
       }
-      current.quantity += 1
+      // Una mesa para N es una unidad del comprobante (sus N QR comparten unit_id)
+      current.units.add(row.unit_id || row.id)
+      current.quantity = current.units.size
       grouped.set(key, current)
     }
-    const ticketLines = [...grouped.values()]
+    const ticketLines = [...grouped.values()].map(({ units: _units, ...line }) => line)
 
     // amount = subtotal; ticket_fee = cargo neto (8%); service_fee_tax = IVA del cargo (0 en órdenes antiguas).
     // Cargo absorbido por el productor: subtotal = total pagado y feeIncluded (no se suma cargo encima).
@@ -273,6 +286,7 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
           total: withQr.length,
           label: row.event_tickets?.ticket_name || 'Entrada',
           functionLabel: fn ? formatFunctionLabel(fn, { withPlace: false }) : '',
+          holder: row.holder_name || '',
         })
         qrAttachments.push({ filename: `entrada-${i + 1}.png`, content: png, contentType: 'image/png', contentId: cid })
       } catch (err) {
@@ -320,6 +334,8 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
       orderDate: formatInstantLong(order.created_at),
       orderUrl,
       calendarUrl,
+      companyName: order.company_name || '',
+      companyRut: order.company_rut || '',
     })
 
     const attachments = start
@@ -350,6 +366,47 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
       .eq('id', order.id)
     if (markError) console.error(`Orden ${order.id}: correo enviado pero no se pudo marcar email_sent_at:`, markError.message)
     console.log(`✉️ Entradas enviadas para la orden ${order.id} (${attendeeRows.length} entradas)`)
+
+    // Cada asistente con correo propio recibe su entrada (solo en el primer envío: un reenvío va a quien compró).
+    // Un fallo aquí no reintenta la orden: quien compró ya tiene todas las entradas.
+    if (!force) {
+      const buyerEmail = String(buyer.email).toLowerCase()
+      const own = attendeeRows.filter(r => r.holder_email && isValidEmail(r.holder_email) && String(r.holder_email).toLowerCase() !== buyerEmail)
+      const buyerName = `${buyer.first_name || ''} ${buyer.last_name || ''}`.trim()
+      for (const row of own) {
+        try {
+          const fnId = row.event_tickets?.event_date_id
+          const fn = fnId != null ? datesById.get(Number(fnId)) : null
+          const png = await QRCode.toBuffer(String(row.qr_code), { type: 'png', margin: 1, width: 400, errorCorrectionLevel: 'M' })
+          const ticketUrl = `${SITE_URL}/ticket/${row.id}`
+          const holderEmail = await renderHolderTicketEmail({
+            holderName: greetingName(String(row.holder_name || '').split(' ')[0], '', 'asistente'),
+            buyerName,
+            organizerName,
+            eventName: event.name || 'Tu evento',
+            ticketName: row.event_tickets?.ticket_name || 'Entrada',
+            functionLabel: fn ? formatFunctionLabel(fn, { withPlace: false }) : '',
+            dateLines: fn ? [{ date: formatDateOnlyLong(fn.date), time: formatTimeShort(fn.start_time), place: formatEventLocation(fn.event_locations) || event.location || '' }] : dateLines,
+            secretLocation: event.secret_location || '',
+            qrCid: 'qr-entrada',
+            ticketUrl,
+          })
+          const sentHolder = await sendEmail({
+            to: formatRecipient(row.holder_name || '', row.holder_email),
+            subject: holderEmail.subject,
+            html: holderEmail.html,
+            text: holderEmail.text,
+            replyTo: LEGAL.supportEmail,
+            attachments: [{ filename: 'entrada.png', content: png, contentType: 'image/png', contentId: 'qr-entrada' }],
+            tags: ['tickets', 'holder'],
+          })
+          await logEmailAttempt(supabase, { orderId: order.id, eventId: order.event_id, recipient: row.holder_email, providerMessageId: sentHolder?.id || null, status: 'sent' })
+        } catch (err) {
+          console.error(`Orden ${order.id}: no se pudo enviar la entrada a su asistente:`, err?.message)
+          await logEmailAttempt(supabase, { orderId: order.id, eventId: order.event_id, recipient: row.holder_email, status: 'failed', error: err?.message || 'Error enviando correo' })
+        }
+      }
+    }
     return { ok: true, status: 'sent' }
   } catch (error) {
     console.error(`❌ Error enviando entradas de la orden ${order.id}:`, error?.message)

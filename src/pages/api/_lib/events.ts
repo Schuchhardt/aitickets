@@ -9,6 +9,7 @@ import { isDefaultPageSettings, normalizePageSettings } from "../../../lib/event
 import { identityPublishBlocker } from "../../../lib/producerIdentity";
 import { refreshEventRisk } from "../../../lib/eventRisk";
 import { chainError } from "../../../../netlify/lib/tickets.mjs";
+import { normalizeCheckoutFields, isDefaultCheckoutFields, normalizePeoplePerTicket } from "../../../lib/checkoutFields.mjs";
 
 /** Guarda la categoría del evento vía category_tags(name) + event_tags (reemplaza las anteriores). */
 export async function syncEventCategory(eventId: number, category: string | null | undefined) {
@@ -85,6 +86,8 @@ export type TicketInput = {
     maxPerOrder?: number | null;
     /** Tanda anterior: id (real o temporal) de otra entrada del formulario. ""/null = se vende desde ya. */
     opensAfterId?: number | string | null;
+    /** Personas por entrada (mesa para N, migración 202610300110). 1/omitido = entrada normal. */
+    peoplePerTicket?: number | string | null;
 };
 
 /** Normaliza un ticket del formulario. Devuelve null si es inválido. */
@@ -147,6 +150,40 @@ export async function saveFormTicketChain(eventId: number, tickets: TicketInput[
             throw error;
         }
     }
+}
+
+/**
+ * Guarda las personas por entrada (mesa para N) de las entradas que lo traen. Formularios anteriores no lo mandan.
+ * Sin la columna aún (deploy preview) no hace nada, salvo que se pida una mesa: ahí avisa.
+ */
+export async function saveFormTicketPeople(eventId: number, tickets: TicketInput[], idOf: (formId: unknown) => number | undefined) {
+    const supabaseAdmin = getSupabaseAdmin();
+    for (const t of tickets) {
+        if (t?.peoplePerTicket === undefined) continue;
+        const id = idOf(t.id);
+        if (!id) continue;
+        const people = normalizePeoplePerTicket(t.peoplePerTicket);
+        const { error } = await supabaseAdmin.from("event_tickets").update({ people_per_ticket: people }).eq("id", id).eq("event_id", eventId);
+        if (error) {
+            if (["42703", "PGRST204"].includes(String(error.code || ""))) {
+                if (people > 1) throw new EventInputError("Las mesas para varias personas estarán disponibles después del próximo deploy.");
+                return;
+            }
+            throw error;
+        }
+    }
+}
+
+/** Guarda los datos extra del checkout (events.checkout_fields). Tolera que la columna aún no exista. */
+export async function saveCheckoutFields(eventId: number, orgId: number, raw: unknown): Promise<void> {
+    const fields = normalizeCheckoutFields(raw);
+    const { error } = await getSupabaseAdmin()
+        .from("events")
+        .update({ checkout_fields: isDefaultCheckoutFields(fields) ? null : fields })
+        .eq("id", eventId)
+        .eq("organization_id", orgId);
+    if (error && error.code !== "42703" && error.code !== "PGRST204") throw error;
+    if (error) console.warn("checkout_fields no disponible todavía:", error.message);
 }
 
 /** true si el id viene del cliente (Date.now()) y no de la base de datos. */
@@ -221,6 +258,8 @@ export type EventGraphInput = {
         isPrivate?: boolean;
         category?: string | null;
         coverSettings?: unknown;
+        /** Datos extra del checkout (src/lib/checkoutFields.mjs). */
+        checkoutFields?: unknown;
     };
     locations: Array<{
         venueId?: string | null;
@@ -292,6 +331,7 @@ export async function createEventGraph(
     const eventId = eventData.id as number;
     state.eventId = eventId;
     if (general.coverSettings) await saveCoverSettings(eventId, actor.orgId, general.coverSettings);
+    if (general.checkoutFields) await saveCheckoutFields(eventId, actor.orgId, general.checkoutFields);
 
     // 2. Ubicaciones y funciones (antes que las entradas, para mapear la función de cada entrada — R1)
     const dateIdMap = new Map<string, number>();
@@ -346,10 +386,13 @@ export async function createEventGraph(
         .select("id");
     if (ticketsError) throw ticketsError;
     // Tandas encadenadas: el insert devuelve las filas en el mismo orden del formulario
+    const ticketIdMap = new Map(tickets.map((t, i) => [String(t.id), Number((insertedTickets as any[])?.[i]?.id)]));
     if (tickets.some(hasOpensAfter)) {
-        const ticketIdMap = new Map(tickets.map((t, i) => [String(t.id), Number((insertedTickets as any[])?.[i]?.id)]));
         await saveFormTicketChain(eventId, tickets, (formId) => ticketIdMap.get(String(formId)) || undefined);
     }
+    // Mesas para N (solo las que piden más de una persona: el resto queda con el valor por defecto)
+    const tables = tickets.filter((t) => normalizePeoplePerTicket(t?.peoplePerTicket) > 1);
+    if (tables.length) await saveFormTicketPeople(eventId, tables, (formId) => ticketIdMap.get(String(formId)) || undefined);
 
     // 4. Categoría + campos denormalizados (start_date, end_date, location)
     await syncEventCategory(eventId, general.category);

@@ -153,18 +153,24 @@ export async function findOversell(supabase, order, { includeHolds = false } = {
   if (!limited.length) return null
   const sold = await getSoldCounts(supabase, order.event_id, limited.map(t => Number(t.id)), { includePending: includeHolds })
 
-  // Entradas propias ya emitidas (se filtra el estado en JS: NULL cuenta como vigente)
-  const { data: own, error: ownError } = await supabase
+  // Entradas propias ya emitidas (se filtra el estado en JS: NULL cuenta como vigente). Una mesa para N cuenta una
+  // vez (mismo unit_id, migración 202610300110), igual que en aitickets_ticket_availability.
+  let { data: own, error: ownError } = await supabase
     .from('event_attendees')
-    .select('event_ticket_id, status')
+    .select('id, event_ticket_id, status, unit_id')
     .eq('event_order_id', order.id)
+  if (ownError && isMissingSchemaError(ownError)) {
+    ;({ data: own, error: ownError } = await supabase.from('event_attendees').select('id, event_ticket_id, status').eq('event_order_id', order.id))
+  }
   if (ownError) throw new Error(`Error contando entradas de la orden: ${ownError.message}`)
-  const ownIssued = new Map()
+  const ownUnits = new Map()
   for (const a of own || []) {
     if (a?.status === 'cancelled') continue
     const id = Number(a?.event_ticket_id)
-    ownIssued.set(id, (ownIssued.get(id) || 0) + 1)
+    if (!ownUnits.has(id)) ownUnits.set(id, new Set())
+    ownUnits.get(id).add(a?.unit_id || a?.id || ownUnits.get(id).size)
   }
+  const ownIssued = new Map([...ownUnits].map(([id, units]) => [id, units.size]))
 
   const problems = []
   for (const t of limited) {

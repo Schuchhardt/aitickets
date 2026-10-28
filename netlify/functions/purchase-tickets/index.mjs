@@ -9,6 +9,11 @@
 // El precio se calcula SIEMPRE en el servidor desde event_tickets; se ignora cualquier total/precio/evento del cliente.
 // buyer.fullName (checkout rediseñado, un solo campo "Nombre y apellido"): se divide en el servidor (primer token =>
 // nombre, resto => apellido, que puede quedar vacío). Clientes antiguos siguen enviando firstName/lastName.
+// Datos extra según el evento (events.checkout_fields, src/lib/checkoutFields.mjs): holders [{ticket_id, name, email}]
+// (un asistente por QR, en orden), answers { [preguntaId]: valor } y company { rut, name } (solo compras pagadas). Se
+// validan aquí contra la configuración del evento y se guardan en la orden después de reservar; al emitir, cada QR
+// toma su asistente (netlify/lib/tickets.mjs). Errores de validación: 400 { message, field: 'holders'|'answers'|'company' }.
+// Mesa para N (event_tickets.people_per_ticket): la línea de ticket_details lleva `people` y cupo/precio son por mesa.
 // Respuesta: pagado -> { paymentLink, provider, orderId }; gratis -> { orderId, redirectUrl: '/order/<orderId>', provider: 'free' }
 // Orden gratis de un email que ya tiene una orden gratis pagada para el evento: 409 { code: 'ALREADY_REGISTERED' }
 // (no se crea un duplicado; la página ofrece reenviar la entrada). Agotado: 409 { code: 'SOLD_OUT' }.
@@ -32,6 +37,7 @@ import {
   maxPerPurchase,
   getSoldCounts,
   ensureOrderAttendees,
+  loadPeoplePerTicket,
   PENDING_HOLD_MINUTES,
 } from '../../lib/tickets.mjs'
 import { sendOrderTicketsEmail } from '../../lib/tickets-email.mjs'
@@ -47,6 +53,7 @@ import {
 } from '../../lib/discounts.mjs'
 import { isDemoEventSlug } from '../../../src/lib/demoEvent.mjs'
 import { splitFullName, normalizeNameParts } from '../../lib/buyer-name.mjs'
+import { holderSlots, validateHolders, validateAnswers, validateCompany } from '../../../src/lib/checkoutFields.mjs'
 
 const MAX_TICKET_LINES = 20
 const MAX_PENDING_PER_BUYER = 2
@@ -136,7 +143,14 @@ function validateRequest(body) {
   }
 
   const utm = body?.utm && typeof body.utm === 'object' ? body.utm : {}
+  // Datos extra del checkout: se validan contra el evento más adelante
+  const extras = {
+    holders: Array.isArray(body?.holders) ? body.holders.slice(0, 600) : null,
+    answers: body?.answers && typeof body.answers === 'object' && !Array.isArray(body.answers) ? body.answers : null,
+    company: body?.company && typeof body.company === 'object' ? body.company : null,
+  }
   return {
+    extras,
     eventId,
     discountCode,
     paymentProvider,
@@ -336,7 +350,7 @@ export default async function handler(req) {
   if (input.error) {
     return json(input.discountError ? { message: input.error, discountError: true, reason: input.discountError } : { message: input.error }, 400)
   }
-  const { eventId, buyer, quantities, attribution, cfToken, paymentProvider, termsVersion, discountCode } = input
+  const { eventId, buyer, quantities, attribution, cfToken, paymentProvider, termsVersion, discountCode, extras } = input
 
   const captcha = await verifyTurnstile(cfToken, ip)
   if (!captcha.success) return json({ message: captcha.message, captcha: true }, 403)
@@ -356,10 +370,14 @@ export default async function handler(req) {
       .eq('id', eventId)
       .eq('status', 'published')
       .maybeSingle()
-    let { data: event, error: eventError } = await loadEvent('id, name, slug, status, end_date, organization_id, fee_absorbed')
-    if (eventError && isMissingSchemaError(eventError)) {
-      // Base sin events.fee_absorbed (202610090200): el comprador paga el cargo, como siempre
-      ;({ data: event, error: eventError } = await loadEvent('id, name, slug, status, end_date, organization_id'))
+    // Columnas opcionales, de la más completa a la mínima: datos extra del checkout (202610300100) y cargo absorbido
+    // (202610090200; sin ella el comprador paga el cargo, como siempre)
+    const EVENT_COLS = 'id, name, slug, status, end_date, organization_id'
+    let event = null
+    let eventError = null
+    for (const cols of [`${EVENT_COLS}, fee_absorbed, checkout_fields`, `${EVENT_COLS}, fee_absorbed`, EVENT_COLS]) {
+      ;({ data: event, error: eventError } = await loadEvent(cols))
+      if (!eventError || !isMissingSchemaError(eventError)) break
     }
     if (eventError) throw new Error(`Error cargando evento: ${eventError.message}`)
     if (!event) return json({ message: 'El evento no está disponible para la venta' }, 404)
@@ -428,12 +446,14 @@ export default async function handler(req) {
       }
     }
 
-    // 4. Precio calculado en el servidor
+    // 4. Precio calculado en el servidor (mesa para N: precio y cantidad por mesa; `people` = QR por mesa)
+    const people = await loadPeoplePerTicket(supabase, eventId)
     const ticketDetails = ticketIds.map(id => {
       const ticket = byId.get(id)
       const price = Math.round(Number(ticket.price) || 0)
       const quantity = quantities.get(id)
-      return { id, name: ticket.ticket_name, price, quantity, total: price * quantity, event_date_id: ticket.event_date_id ?? null }
+      const perUnit = people.get(id) || 1
+      return { id, name: ticket.ticket_name, price, quantity, total: price * quantity, event_date_id: ticket.event_date_id ?? null, ...(perUnit > 1 ? { people: perUnit } : {}) }
     })
     const grossSubtotal = ticketDetails.reduce((sum, t) => sum + t.total, 0)
 
@@ -453,6 +473,22 @@ export default async function handler(req) {
     if (discount) discount.amount = discountAmount
     const ticketQty = ticketDetails.reduce((sum, t) => sum + t.quantity, 0)
     const provider = total === 0 ? 'free' : paymentProvider
+
+    // 4c. Datos extra del checkout según el evento (asistentes por QR, preguntas y empresa)
+    const checkoutFields = event.checkout_fields ?? null
+    const fullName = `${buyer.firstName} ${buyer.lastName}`.trim()
+    const slots = holderSlots(ticketDetails, (id) => people.get(Number(id)) || 1)
+    const holderCheck = validateHolders(checkoutFields, slots, extras.holders, { name: fullName, email: buyer.email })
+    if (holderCheck.error) return json({ message: holderCheck.error, field: 'holders' }, 400)
+    const answerCheck = validateAnswers(checkoutFields, extras.answers)
+    if (answerCheck.error) return json({ message: answerCheck.error, field: 'answers' }, 400)
+    const companyCheck = validateCompany(checkoutFields, extras.company, { paid: total > 0 })
+    if (companyCheck.error) return json({ message: companyCheck.error, field: 'company' }, 400)
+    const orderExtras = {
+      ...(holderCheck.holders ? { attendee_holders: holderCheck.holders } : {}),
+      ...(answerCheck.answers ? { registration_answers: answerCheck.answers } : {}),
+      ...(companyCheck.company ? { company_rut: companyCheck.company.rut, company_name: companyCheck.company.name } : {}),
+    }
 
     // Inscripción gratis repetida: no se duplica (la página ofrece reenviar la entrada)
     if (total === 0 && grossSubtotal === 0 && (await hasFreeRegistration(supabase, eventId, buyer.email))) {
@@ -524,6 +560,16 @@ export default async function handler(req) {
     if (feeAbsorbed && total > 0) {
       const { error: absorbedError } = await supabase.from('event_orders').update({ fee_absorbed: true }).eq('id', order.id)
       if (absorbedError) console.error(`No se pudo marcar fee_absorbed en la orden ${order.id}:`, absorbedError.message)
+    }
+
+    // Datos extra del checkout: aparte de la reserva atómica (que no los conoce), antes de emitir las entradas.
+    // Sin la migración 202610300100 la compra sigue igual, sin esos datos.
+    if (Object.keys(orderExtras).length) {
+      const { error: extrasError } = await supabase.from('event_orders').update(orderExtras).eq('id', order.id)
+      if (extrasError) {
+        if (isMissingSchemaError(extrasError)) console.warn(`Orden ${order.id}: datos extra del checkout sin guardar (falta la migración 202610300100)`)
+        else console.error(`No se pudieron guardar los datos extra de la orden ${order.id}:`, extrasError.message)
+      }
     }
 
     // 5a. Orden gratis: pagada por $0 + una entrada por unidad + correo

@@ -3,6 +3,8 @@ import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { getSessionContext, getOwnedEvent, hasRole, EVENT_MANAGER_ROLES, jsonResponse } from "../../../lib/supabaseServer";
 import { csvCell, slugify } from "../_lib/server-utils";
 import { ALL_FUNCTIONS, lineFunctionKey, loadEventFunctions } from "../../../lib/eventAnalytics";
+import { normalizeCheckoutFields, answerFor, formatRut } from "../../../lib/checkoutFields.mjs";
+import { fetchAll } from "../../../lib/producer-api/tools/common";
 
 const BASE_COLUMNS = "id, created_at, status, amount, ticket_fee, payment_fee, total_payment, ticket_qty, ticket_details, attendees ( first_name, last_name, email, phone )";
 
@@ -13,6 +15,8 @@ const providerLabel = (p: string | null | undefined) => (p ? PROVIDER_LABELS[p] 
  * Exporta las órdenes pagadas de un evento de la organización como CSV (separador ;). Con varias funciones agrega la
  * columna "Función"; `event_date_id` deja solo las órdenes con entradas de esa función (o válidas para cualquiera) y
  * "Entradas de la función" cuenta solo esas. Los montos son los de la orden completa.
+ * Datos extra del checkout (202610300100): "Asistentes" (nombre y correo de cada QR, si se escribieron), empresa
+ * (razón social y RUT; no es boleta ni factura) y una columna por pregunta del evento.
  */
 export const GET: APIRoute = async (context) => {
     const session = await getSessionContext(context);
@@ -42,6 +46,7 @@ export const GET: APIRoute = async (context) => {
     // Descuento (discount_code/discount_amount, 202609300200; sin ellas las columnas van vacías/0).
     // Se intenta de la más completa a la mínima (los deploy previews pueden correr contra una base sin migrar).
     const variants = [
+        { cols: `${BASE_COLUMNS}, ref, utm_source, utm_medium, utm_campaign, payment_provider, currency, service_fee_tax, discount_code, discount_amount, registration_answers, company_rut, company_name`, attribution: true, provider: true, extras: true },
         { cols: `${BASE_COLUMNS}, ref, utm_source, utm_medium, utm_campaign, payment_provider, currency, service_fee_tax, discount_code, discount_amount`, attribution: true, provider: true },
         { cols: `${BASE_COLUMNS}, ref, utm_source, utm_medium, utm_campaign, payment_provider, currency, service_fee_tax`, attribution: true, provider: true },
         { cols: `${BASE_COLUMNS}, ref, utm_source, utm_medium, utm_campaign, payment_provider, currency`, attribution: true, provider: true },
@@ -50,6 +55,7 @@ export const GET: APIRoute = async (context) => {
     ];
     let withAttribution = false;
     let withProvider = false;
+    let withExtras = false;
     let orders: any[] | null = null;
     let error: any = null;
     for (const v of variants) {
@@ -62,12 +68,33 @@ export const GET: APIRoute = async (context) => {
         if (!error) {
             withAttribution = v.attribution;
             withProvider = v.provider;
+            withExtras = (v as any).extras === true;
             break;
         }
     }
     if (error) {
         console.error("orders-csv error:", error);
         return jsonResponse({ message: "No se pudieron obtener las órdenes" }, 500);
+    }
+
+    // Asistentes de cada QR y preguntas del evento (solo con la migración 202610300100)
+    const holdersByOrder = new Map<string, string[]>();
+    let questions: Array<{ id: string; label: string }> = [];
+    let withCompany = false;
+    if (withExtras) {
+        const [holderRows, { data: cfg }] = await Promise.all([
+            fetchAll<any>(() => supabase.from("event_attendees").select("id, event_order_id, holder_name, holder_email, status").eq("event_id", event.id).not("holder_name", "is", null).order("id", { ascending: true })).catch(() => []),
+            supabase.from("events").select("checkout_fields").eq("id", event.id).maybeSingle(),
+        ]);
+        for (const a of holderRows) {
+            if (a.status === "cancelled" || !(a.holder_name || a.holder_email)) continue;
+            const list = holdersByOrder.get(a.event_order_id) || [];
+            list.push([a.holder_name, a.holder_email ? `<${a.holder_email}>` : ""].filter(Boolean).join(" "));
+            holdersByOrder.set(a.event_order_id, list);
+        }
+        const fields = normalizeCheckoutFields((cfg as any)?.checkout_fields);
+        questions = fields.questions;
+        withCompany = fields.company || (orders || []).some((o: any) => o.company_rut);
     }
 
     const inFunction = (d: any) => !onlyFunction || [String(onlyFunction.id), ALL_FUNCTIONS].includes(fnKey(d));
@@ -81,6 +108,9 @@ export const GET: APIRoute = async (context) => {
         "Monto entradas (a pagar al productor)", "Cargo por servicio neto (comprador)", "IVA cargo por servicio", "Total pagado", "Comisión pasarela", "Cortesía",
         ...(withProvider ? ["Medio de pago", "Moneda"] : []),
         ...(withAttribution ? ["Ref", "UTM source", "UTM medium", "UTM campaign"] : []),
+        ...(holdersByOrder.size ? ["Asistentes"] : []),
+        ...(withCompany ? ["Empresa (razón social)", "RUT empresa"] : []),
+        ...questions.map((q) => q.label),
     ];
 
     const rows = selected.map((o: any) => {
@@ -109,6 +139,9 @@ export const GET: APIRoute = async (context) => {
             isCourtesy ? "Sí" : "No",
             ...(withProvider ? [providerLabel(o.payment_provider), o.currency || "CLP"] : []),
             ...(withAttribution ? [o.ref, o.utm_source, o.utm_medium, o.utm_campaign] : []),
+            ...(holdersByOrder.size ? [(holdersByOrder.get(o.id) || []).join(" | ")] : []),
+            ...(withCompany ? [o.company_name || "", o.company_rut ? formatRut(o.company_rut) : ""] : []),
+            ...questions.map((q) => answerFor(o.registration_answers, q)),
         ].map(csvCell).join(";");
     });
 

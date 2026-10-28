@@ -187,7 +187,7 @@ export const LANDINGS: Landing[] = [
         // src/components/landing/clubs y las preguntas en src/data/clubsFaq.ts, que toma de aquí estas seis (las propias
         // de clubs; las de dinero, plazos, redes y anuncios vienen de PRODUCER_FAQ y ORGANIZADORES_FAQ). Verificado:
         //   lista con hora de cierre → ventana de venta por entrada (isTicketOnSale), hoy desde tools/tickets.ts
-        //   mesas → un QR por unidad (buildAttendeeRows); cortesías → CourtesyTicketsForm.vue
+        //   mesas → un QR por invitado con "Personas por entrada" (people_per_ticket, buildAttendeeRows); cortesías → CourtesyTicketsForm.vue
         //   transferir una entrada → transfer_ticket (tools/postsale.ts); lista de invitados → tools/guests.ts
         //   sin preguntas en el checkout (edad, RUT) ni venta en la puerta (POS)
         sections: [],
@@ -198,7 +198,7 @@ export const LANDINGS: Landing[] = [
             },
             {
                 q: "¿Cómo vendo mesas?",
-                a: "Cada mesa es un tipo de entrada con su precio, su cupo y la descripción de lo que incluye. Quien la compra recibe un QR para la mesa. Si quieres que cada invitado tenga su propia entrada, envíaselas como cortesías. No hay plano para elegir mesa.",
+                a: "Cada mesa es un tipo de entrada con su precio, su cupo y la descripción de lo que incluye. Si le pones cuántas personas entran con ella (por ejemplo, 6), cada mesa vendida deja 6 QR en la orden: quien compra le pasa el suyo a cada invitado y la puerta los valida uno por uno. El cupo y el precio son por mesa. No hay plano para elegir mesa.",
             },
             {
                 q: "¿Puedo pedir que sean mayores de 18?",
@@ -304,7 +304,8 @@ export const LANDINGS: Landing[] = [
         //   programa → agenda por día con hora, expositores y sala (aitickets_event_agenda, eventAgenda.mjs; panel y
         //              update_event_agenda), que también usa el asistente de la página (EventAssistant.vue)
         //   documentos → terms.astro §3 (boleta del cargo; el precio de la entrada lo documenta el productor), pendiente de
-        //                validar con abogado y contador; RUT y razón social al comprar "Pronto"
+        //                validar con abogado y contador; RUT y razón social al comprar → events.checkout_fields.company
+        //                (en el comprobante, que no es boleta ni factura, y en el CSV)
         //   convenios → códigos de descuento por evento o de la organización (discounts.mjs); sin entradas ocultas
         //   certificados de asistencia → PDF de quienes ingresaron, con mínimo de días en un pase (certificates.ts;
         //              panel, get_attendance_certificates y send_attendance_certificates)
@@ -322,7 +323,7 @@ export const LANDINGS: Landing[] = [
             },
             {
                 q: "¿Pueden pedirme factura?",
-                a: "El cargo por servicio lo documenta AI Tickets con boleta electrónica. El valor de la entrada lo documentas tú, como organizador: si una empresa necesita factura, se la emites con los datos de su compra. Desde tu panel exportas las órdenes a CSV con comprador, correo, entradas, montos y medio de pago.",
+                a: "El cargo por servicio lo documenta AI Tickets con boleta electrónica. El valor de la entrada lo documentas tú, como organizador: si una empresa necesita factura, se la emites con los datos de su compra. Si lo activas en tu evento, quien compra puede dejar el RUT y la razón social de su empresa: salen en su comprobante de compra (que no es boleta ni factura) y en el CSV de órdenes, junto al comprador, correo, entradas, montos y medio de pago.",
                 terms: true,
             },
             {
@@ -377,7 +378,7 @@ export const LANDINGS: Landing[] = [
         faq: [
             {
                 q: "¿Puedo pedir datos adicionales al inscribirse?",
-                a: "Cada inscripción guarda el nombre y el email de la persona. Puedes exportar las órdenes a CSV para tu registro.",
+                a: "Sí. Al crear o editar el taller agregas preguntas (texto corto, elegir una opción o sí o no), obligatorias u opcionales, y se responden al inscribirse. Las respuestas salen en tu lista de asistentes y en el CSV de órdenes. Si hay varios cupos en una compra, también puedes pedir el nombre y el correo de cada persona.",
             },
             {
                 q: "¿Puedo escribirle a los inscritos?",

@@ -23,6 +23,7 @@ import { orderLines, lineSoldQty } from "../../orderKinds";
 import { sendTicketsEmail, notifySlack, callInternalFunction } from "../../../pages/api/_lib/server-utils";
 import { sendEmail, formatRecipient, isValidEmail, legalFooterHtml, legalFooterText } from "../../../../netlify/lib/mailer.mjs";
 import { loadOrderEmailLog, summarizeEmailDelivery } from "../../../../netlify/lib/email-log.mjs";
+import { formatRut } from "../../checkoutFields.mjs";
 
 const UUID_PATTERN = "^[0-9a-fA-F-]{36}$";
 const orderIdSchema = { type: "string" as const, pattern: UUID_PATTERN, description: "ID de la orden (uuid; ver list_orders o get_order)." };
@@ -50,10 +51,11 @@ async function loadOrder(ctx: ToolContext, orderId: string) {
 }
 
 async function loadOrderTickets(ctx: ToolContext, orderId: string) {
-    const { data, error } = await ctx.supabase
-        .from("event_attendees")
-        .select("id, event_ticket_id, attendee_id, status, validated_at, is_complimentary")
-        .eq("event_order_id", orderId);
+    // Asistente de cada QR y lugar en la mesa: columnas opcionales (migraciones 202610300100 y 202610300110)
+    const select = (extra: string) =>
+        ctx.supabase.from("event_attendees").select(`id, event_ticket_id, attendee_id, status, validated_at, is_complimentary${extra}`).eq("event_order_id", orderId);
+    let { data, error } = await select(", holder_name, holder_email, seat_number");
+    if (error && ["42703", "PGRST204"].includes(String(error.code || ""))) ({ data, error } = await select(""));
     if (error) throw error;
     const rows = (data || []) as any[];
     const typeIds = [...new Set(rows.map((r) => Number(r.event_ticket_id)).filter(Boolean))];
@@ -92,6 +94,9 @@ function presentOrder(o: any, tickets: any[], refunds: any[]) {
             discount_clp: Number(o.discount_amount) || 0,
             fee_absorbed_by_producer: Boolean(o.fee_absorbed),
         },
+        // Datos de empresa que dio quien compra (no es boleta ni factura) y respuestas a las preguntas del evento
+        company: o.company_rut ? { name: o.company_name || null, rut: formatRut(o.company_rut) } : null,
+        answers: Array.isArray(o.registration_answers) ? o.registration_answers.map((a: any) => ({ question: a.question, answer: a.answer })) : [],
         payment: { provider: o.payment_provider || null, reference: o.payment_external_id || null },
         channel: o.ref ? `ref:${o.ref}` : [o.utm_source, o.utm_medium, o.utm_campaign].filter(Boolean).join(" / ") || "directo",
         tickets_email_sent_at: o.email_sent_at || null,
@@ -103,6 +108,9 @@ function presentOrder(o: any, tickets: any[], refunds: any[]) {
             status: ticketStatus(t.status),
             checked_in_at: t.validated_at || null,
             complimentary: Boolean(t.is_complimentary),
+            // Asistente escrito al comprar (null = quien compró) y lugar en una mesa para N
+            holder: t.holder_name || t.holder_email ? { name: t.holder_name || null, email: t.holder_email || null } : null,
+            ...(t.seat_number ? { seat: Number(t.seat_number) } : {}),
         })),
         refunds: refunds.map((r) => ({
             id: r.id,
@@ -126,7 +134,9 @@ const getOrder: ToolDef = {
     name: "get_order",
     title: "Detalle de una orden",
     description:
-        "Detalle de una orden para resolver el reclamo de un comprador: entradas (id, tipo, estado, si ya ingresó), montos, pago, reembolsos, canal " +
+        "Detalle de una orden para resolver el reclamo de un comprador: entradas (id, tipo, estado, si ya ingresó, asistente si se escribió al comprar), " +
+        "montos, pago, reembolsos, canal, datos de empresa (company: razón social y RUT; el comprobante no es boleta ni factura), respuestas a las " +
+        "preguntas del evento (answers) " +
         "y email_delivery (si el correo de entradas se envió, se entregó, rebotó o lo marcaron como spam, a qué dirección y cuándo). " +
         "Busca por order_id, o por event_id + buyer_email (devuelve hasta 10 órdenes). Contiene datos personales.",
     scope: "attendees",

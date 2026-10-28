@@ -108,7 +108,9 @@ test("lo que no existe va con Pronto y sin testimonio real no hay cita", async (
   await expect(page.getByTestId("club-night").getByTestId("soon-badge")).toHaveCount(1);
   await expect(page.getByTestId("club-night")).toContainText("Aforo en vivo en tu panel");
   await expect(page.locator("#puerta").getByTestId("soon-badge")).toHaveCount(1);
-  await expect(page.locator("#mesas").getByTestId("soon-badge")).toHaveCount(1);
+  // Un QR para cada invitado de la mesa ya existe (people_per_ticket)
+  await expect(page.locator("#mesas").getByTestId("soon-badge")).toHaveCount(0);
+  await expect(page.getByTestId("club-table-guests")).toContainText("6 QR en la orden");
   await expect(page.locator("[data-cl-testimonial]")).toHaveCount(0);
 });
 

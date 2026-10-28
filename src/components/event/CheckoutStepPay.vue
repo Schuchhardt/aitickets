@@ -1,9 +1,12 @@
 <script setup>
 // Paso 2 del checkout (§6.4): resumen, "Tus datos" (2 campos), código de descuento colapsado y casilla de no
 // retracto. El botón de pago vive en el footer del sheet y llama a submit(). Sin paso "Confirmar".
+// Si el evento lo pide (events.checkout_fields), CheckoutExtras agrega asistentes por entrada, preguntas y datos de
+// empresa después de "Tus datos".
 import { ref, computed, onMounted, nextTick } from "vue";
 import AnimatedNumber from "./AnimatedNumber.vue";
 import QuantityStepper from "./QuantityStepper.vue";
+import CheckoutExtras from "./CheckoutExtras.vue";
 import { suggestEmail } from "./emailSuggest.js";
 import { formatCLP, formatFunctionShort, ticketMax } from "./eventView.js";
 import { createOrder, previewDiscount, rememberBuyer, rememberedBuyer, trackFunnel } from "./checkoutApi.js";
@@ -37,6 +40,7 @@ const nameInput = ref(null);
 const emailInput = ref(null);
 const withdrawalInput = ref(null);
 const captchaEl = ref(null);
+const extrasRef = ref(null);
 const captcha = useTurnstile(captchaEl, { disabled: () => Boolean(props.event?.is_demo) });
 
 const isFree = computed(() => props.totals.total === 0);
@@ -110,6 +114,12 @@ async function submit() {
     else withdrawalInput.value?.focus();
     return;
   }
+  const extrasError = await extrasRef.value?.validate();
+  if (extrasError) {
+    shake.value++;
+    liveMessage.value = extrasError;
+    return;
+  }
   serverError.value = "";
   if (props.event?.is_demo) {
     emit("demo", { email: email.value.trim(), total: props.totals.total, free: isFree.value });
@@ -126,6 +136,7 @@ async function submit() {
     discountCode: props.discount && props.totals.discountAmount > 0 ? props.discount.code : undefined,
     cfToken,
     termsAccepted: true,
+    ...(extrasRef.value?.payload() || {}),
   });
   if (res.ok && res.data?.paymentLink) {
     // Se mantiene "Redirigiendo a Webpay…" hasta que el navegador cambie de página
@@ -143,6 +154,8 @@ async function submit() {
     serverError.value = `${res.data.message || "El código de descuento ya no es válido."} Quitamos el código: revisa el nuevo total.`;
   } else if (res.data?.code === "SOLD_OUT") {
     emit("sold-out", res.data.message);
+  } else if (res.data?.field && extrasRef.value) {
+    extrasRef.value.showServerError(res.data.field, res.data.message);
   } else if (res.network) {
     serverError.value = "No pudimos conectar. Revisa tu conexión e inténtalo de nuevo.";
   } else if (res.status >= 400 && res.status < 500 && res.data?.message) {
@@ -274,6 +287,8 @@ onMounted(() => {
         </div>
       </div>
     </section>
+
+    <CheckoutExtras ref="extrasRef" :event="event" :lines="lines" :paid="!isFree" :buyer-name="name" :buyer-email="email" :disabled="busy" />
 
     <!-- Código de descuento -->
     <section v-if="canUseCode || discount" class="block code">
