@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { Instagram, Facebook, Music2, Clapperboard, CalendarClock, Pause, Play, X, RefreshCw, ImagePlus, MessageCircle, Check, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-vue-next'
+import { CANVA_REEL_URL } from '../../lib/socialPlatforms'
 
 // Difusión automática (docs/specs/historias-automaticas.md): el productor aprueba una vez y AI Tickets publica
 // historias (y posts la última semana) en Instagram hasta el día del evento, con el link por DM a quien responda la
@@ -338,6 +339,10 @@ const done = computed(() => (view.value?.slots || []).filter((s) => ['published'
                 <label for="series-reel" class="cursor-pointer">
                   <span class="inline-flex items-center gap-1 font-medium"><Clapperboard :size="16" /> Reel antes de la función</span>
                   <span class="text-gray-500"> · {{ view.reel?.note }}</span>
+                  <span v-if="!view.reel?.available" class="text-gray-500">
+                    ¿No tienes video? Hazlo en <a :href="CANVA_REEL_URL" target="_blank" rel="noopener" class="underline" data-track="Hacer reel en Canva">Canva</a>
+                    con tu afiche y súbelo como video del evento (Portada o Galería).
+                  </span>
                 </label>
               </div>
             </fieldset>

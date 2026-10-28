@@ -73,7 +73,8 @@ serie; `platform` y `video_url` en los slots, con `kind` 'reel'.
 - El reel usa el video vertical del evento (3 a 60 s) y sale cerca de D-3 en cada red activa.
 - Sin las columnas, la serie queda solo en Instagram.
 - **AI Tickets no genera video desde el afiche**: Zernio no lo hace y las funciones no tienen codificador. Las landings
-  dicen "Reel con tu video" en vez de "Reels".
+  dicen "Reel con tu video" en vez de "Reels". El panel (subir video y la tarjeta de difusión) enlaza a las plantillas de
+  reel de Canva (`CANVA_REEL_URL` en `src/lib/socialPlatforms.ts`) para armarlo con el afiche y subirlo.
 
 **Dónde se promete**
 - `src/components/landing/organizadores/MarketingSection.astro` ("Reel antes de la función", "Facebook y TikTok")
@@ -360,9 +361,11 @@ Comprar "Mesa VIP · 6 personas" deja 6 QR distintos en la orden, que se pueden 
 - La orden, la entrada, el correo y el recordatorio la muestran desde que se revela; antes dicen cuándo llega.
 - `send-secret-location` (cada 15 min) la manda por correo una vez por persona. Lógica en
   `netlify/lib/secret-location.mjs`.
-- Ojo:
-  - El nombre del lugar sigue siendo público.
-  - Los eventos antiguos conservan la calle en `events.location` hasta que se vuelven a guardar.
+- Lo público dice "Lugar secreto" y la comuna (`SECRET_PLACE_NAME`, `publicPlace`): ni el nombre del recinto, que en un
+  lugar conocido delata la dirección. Lo mismo las piezas de la difusión automática y el copy de redes.
+- Cuándo se revela: el día del evento (por defecto al activarla: a las 9:00, o al empezar si es antes; valor 0,
+  migración `202610310200_secret_location_event_day.sql`), N horas antes o apenas compran.
+- Ojo: los eventos antiguos conservan la calle en `events.location` hasta que se vuelven a guardar.
 - Landing de fiestas sin "Pronto".
 
 **Dónde se promete**

@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "./auth-helpers";
 import { storeOptimizedImage } from "./imageStorage";
 import { dedupeLocation, serverEnv } from "../pages/api/_lib/server-utils";
 import { tiktokSettings, tiktokTitle } from "./socialPlatforms";
+import { SECRET_PLACE_NAME } from "../../netlify/lib/secret-location.mjs";
 
 /** HTML de la descripción a texto plano (párrafos y viñetas como saltos de línea). */
 export function htmlToPlainText(html: string | null | undefined): string {
@@ -37,11 +38,11 @@ const isPublicTicket = (t: any, now: Date) =>
  * pesos chilenos ("$10.000"), horas "21:00 a 02:00" y solo las entradas que el público puede comprar.
  */
 export function buildEventContext(event: any, now = new Date()): string {
-    // Dirección que solo ven quienes compran (secret_location): el copy público va sin la calle
+    // Dirección que solo ven quienes compran (secret_location): el copy público dice "Lugar secreto" y la comuna
     const secret = typeof event.secret_location === "string" && event.secret_location.trim() !== "";
     const venues = event.event_locations?.map((loc: any) => {
         if (!loc.venues) return "Ubicación por definir";
-        const parts = [loc.venues.name, secret ? null : loc.venues.address_line1, loc.venues.city].map((p: unknown) => String(p || "").trim()).filter(Boolean);
+        const parts = (secret ? [SECRET_PLACE_NAME, loc.venues.city] : [loc.venues.name, loc.venues.address_line1, loc.venues.city]).map((p: unknown) => String(p || "").trim()).filter(Boolean);
         return dedupeLocation(parts.join(", ")) || "Ubicación por definir";
     }).join("; ") || "Sin ubicación";
 

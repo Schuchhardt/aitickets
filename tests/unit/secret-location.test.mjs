@@ -1,6 +1,7 @@
 // Dirección que solo ven quienes compran (ítem 10): no sale en la página pública (ni en su JSON-LD, que se arma con
 // los mismos datos), ni en el chat del comprador ni en el copy de marketing; quien compró la ve en la orden y el correo,
-// o desde N horas antes, cuando le llega el aviso programado. Sin red ni BD.
+// desde que se revela (el día del evento, N horas antes o apenas compra), cuando le llega el aviso programado. Lo
+// público dice "Lugar secreto" y la comuna: ni el nombre del recinto (un lugar conocido la delata). Sin red ni BD.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createFakeSupabase } from '../fixtures/fake-supabase.mjs'
 import {
@@ -37,7 +38,9 @@ describe('cuándo se revela', () => {
     expect(normalizeSecretLocation('  Pasaje   Los Aromos 77 ')).toBe('Pasaje Los Aromos 77')
     expect(normalizeSecretLocation('   ')).toBeNull()
     expect(normalizeRevealHours('6')).toBe(6)
-    expect(normalizeRevealHours(0)).toBeNull()
+    // 0 = el día de la función
+    expect(normalizeRevealHours(0)).toBe(0)
+    expect(normalizeRevealHours(-1)).toBeNull()
     expect(normalizeRevealHours(500)).toBeNull()
     const dates = [...DATES, { id: 502, date: '2026-12-12', start_time: '22:00:00' }]
     expect(firstRelevantStart(dates, [502]).toISOString()).toBe('2026-12-13T01:00:00.000Z')
@@ -51,8 +54,20 @@ describe('cuándo se revela', () => {
     expect(pendingRevealText(6, revealAt(start, 6))).toBe('La dirección exacta te llega por correo 6 horas antes (sábado, 5 de diciembre de 2026 a las 16:00). También aparecerá en tu orden.')
   })
 
-  it('lo público va sin la calle: nombre y comuna', () => {
-    expect(publicPlace(LOC)).toBe('Casa Sur, Ñuñoa')
+  it('el día del evento: a las 9:00, o al empezar si la función es antes', () => {
+    const start = firstRelevantStart(DATES, [501])
+    expect(revealAt(start, 0).toISOString()).toBe(at('2026-12-05T09:00:00').toISOString())
+    expect(isRevealed({ revealHours: 0, start, now: at('2026-12-05T08:59:00') })).toBe(false)
+    expect(isRevealed({ revealHours: 0, start, now: at('2026-12-05T09:00:00') })).toBe(true)
+    expect(pendingRevealText(0, revealAt(start, 0))).toBe('La dirección exacta te llega por correo el día del evento (sábado, 5 de diciembre de 2026 a las 09:00). También aparecerá en tu orden.')
+    // Una función de madrugada se revela al empezar
+    const early = firstRelevantStart([{ id: 1, date: '2026-12-05', start_time: '02:00:00' }], [1])
+    expect(revealAt(early, 0).toISOString()).toBe(early.toISOString())
+  })
+
+  it('lo público dice "Lugar secreto" y la comuna, sin el nombre del recinto', () => {
+    expect(publicPlace(LOC)).toBe('Lugar secreto, Ñuñoa')
+    expect(publicPlace(null)).toBe('Lugar secreto')
   })
 })
 
@@ -77,7 +92,7 @@ describe('la página pública no trae la dirección', () => {
     })
   }
 
-  it('con dirección privada: sin calle, sin coordenadas ni events.location antiguo', async () => {
+  it('con dirección privada: sin nombre del recinto, calle, coordenadas ni events.location antiguo', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(at('2026-11-20T12:00:00'))
     seed(true)
@@ -86,9 +101,10 @@ describe('la página pública no trae la dirección', () => {
     expect(json).not.toContain(STREET)
     expect(json).not.toContain(SECRET)
     expect(json).not.toContain('-70.6')
+    expect(json).not.toContain('Casa Sur')
     expect(page.eventData.has_secret_location).toBe(true)
-    expect(page.eventData.location).toBe('Casa Sur, Ñuñoa')
-    expect(page.eventData.venue).toMatchObject({ name: 'Casa Sur', city: 'Ñuñoa', address: null, latitude: null })
+    expect(page.eventData.location).toBe('Lugar secreto, Ñuñoa')
+    expect(page.eventData.venue).toMatchObject({ name: 'Lugar secreto', city: 'Ñuñoa', address: null, latitude: null })
   })
 
   it('sin dirección privada se ve la calle, como siempre', async () => {
@@ -101,7 +117,7 @@ describe('la página pública no trae la dirección', () => {
 })
 
 describe('lo demás que es público', () => {
-  it('events.location (listados y sitios) queda sin la calle', async () => {
+  it('events.location (listados y sitios) queda sin la calle ni el nombre del recinto', async () => {
     db = createFakeSupabase({
       tables: {
         events: [{ id: 10, secret_location: SECRET, location: null }],
@@ -110,7 +126,7 @@ describe('lo demás que es público', () => {
       },
     })
     const res = await refreshEventDenorm(10)
-    expect(res.location).toBe('Casa Sur, Ñuñoa')
+    expect(res.location).toBe('Lugar secreto, Ñuñoa')
     db.tables.events[0].secret_location = null
     expect((await refreshEventDenorm(10)).location).toContain(STREET)
   })
@@ -123,12 +139,13 @@ describe('lo demás que es público', () => {
     expect(buildSystemPrompt(base)).toContain(STREET)
   })
 
-  it('el copy de marketing y redes va sin la calle', () => {
+  it('el copy de marketing y redes va sin la calle ni el nombre del recinto', () => {
     const event = { name: 'Fiesta', description: '', secret_location: SECRET, event_dates: [], event_tickets: [], event_locations: [{ venues: { name: 'Casa Sur', city: 'Ñuñoa', address_line1: STREET } }] }
     const text = buildEventContext(event)
     expect(text).not.toContain(STREET)
     expect(text).not.toContain(SECRET)
-    expect(text).toContain('Casa Sur, Ñuñoa')
+    expect(text).not.toContain('Casa Sur')
+    expect(text).toContain('Lugar secreto, Ñuñoa')
   })
 })
 

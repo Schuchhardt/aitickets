@@ -8,7 +8,7 @@ import { normalizeSlug, SLUG_MIN, SLUG_PATTERN } from '../../lib/eventSlugFormat
 import { plainTextLength, sanitizeClient } from '../../lib/richTextClient'
 import { prepareImageForUpload, MAX_UPLOAD_BYTES, MAX_SOURCE_BYTES } from '../../lib/clientImage'
 import { chainOptions, pruneChain, chainSummary } from './ticketChain'
-import { REVEAL_HOURS_OPTIONS } from '../../../netlify/lib/secret-location.mjs'
+import { REVEAL_HOURS_OPTIONS, REVEAL_EVENT_DAY, DEFAULT_REVEAL_HOURS, revealOptionLabel } from '../../../netlify/lib/secret-location.mjs'
 import { applyRepeat, applyTicketCopy } from './functionRepeat'
 import FunctionRepeat from './FunctionRepeat.vue'
 import TicketCopyToFunctions from './TicketCopyToFunctions.vue'
@@ -205,7 +205,9 @@ const copyTicketsToFunctions = () =>
 if (!form.value.general.checkoutFields) form.value.general.checkoutFields = { attendee_names: 'off', company: false, questions: [] }
 // Dirección que solo ven quienes compran: al apagar el interruptor se borra al guardar
 const secretLocationOn = ref(Boolean(form.value.general.secretLocation))
+// Al prenderlo, por defecto se revela el día del evento
 watch(secretLocationOn, (on) => {
+  if (on && form.value.general.secretLocationRevealHours === '') form.value.general.secretLocationRevealHours = DEFAULT_REVEAL_HOURS
   if (!on) {
     form.value.general.secretLocation = ''
     form.value.general.secretLocationRevealHours = ''
@@ -786,7 +788,7 @@ const submitEvent = async ({ exit = false } = {}) => {
                <input type="checkbox" v-model="secretLocationOn" class="mt-1 h-4 w-4 accent-black" />
                <span>
                  <span class="font-bold block">Dirección solo para quienes compran</span>
-                 <span class="text-sm text-gray-500">La página muestra el lugar y la comuna, sin la calle ni el mapa. La dirección exacta aparece en la orden, la entrada y el correo.</span>
+                 <span class="text-sm text-gray-500">La página pública dice «Lugar secreto» y la comuna: sin el nombre del lugar, la calle ni el mapa. Quienes compran ven la dirección en su orden, su entrada y por correo desde el momento que elijas.</span>
                </span>
              </label>
              <div v-if="secretLocationOn" class="mt-4 grid gap-3 sm:grid-cols-3">
@@ -797,11 +799,13 @@ const submitEvent = async ({ exit = false } = {}) => {
                <div>
                  <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Se revela</label>
                  <select v-model="form.general.secretLocationRevealHours" class="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black outline-none bg-white" data-testid="secret-location-reveal">
+                   <option :value="REVEAL_EVENT_DAY">{{ revealOptionLabel(REVEAL_EVENT_DAY) }}</option>
+                   <option v-for="h in REVEAL_HOURS_OPTIONS" :key="h" :value="h">{{ revealOptionLabel(h) }}</option>
                    <option value="">Apenas compran</option>
-                   <option v-for="h in REVEAL_HOURS_OPTIONS" :key="h" :value="h">{{ h === 1 ? '1 hora' : `${h} horas` }} antes</option>
                  </select>
                </div>
-               <p v-if="form.general.secretLocationRevealHours" class="sm:col-span-3 text-xs text-gray-500">Quien compra antes ve «te llega por correo {{ form.general.secretLocationRevealHours }} h antes» y a esa hora le mandamos la dirección.</p>
+               <p v-if="form.general.secretLocationRevealHours === REVEAL_EVENT_DAY" class="sm:col-span-3 text-xs text-gray-500">Quien compra antes ve «te llega por correo el día del evento». Ese día a las 9:00 (o al empezar, si es antes) le mandamos la dirección.</p>
+               <p v-else-if="form.general.secretLocationRevealHours !== ''" class="sm:col-span-3 text-xs text-gray-500">Quien compra antes ve «te llega por correo {{ revealOptionLabel(form.general.secretLocationRevealHours) }}» y a esa hora le mandamos la dirección.</p>
              </div>
            </div>
         </div>

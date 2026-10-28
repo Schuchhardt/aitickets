@@ -1,15 +1,22 @@
 // Dirección que solo ven quienes compran (events.secret_location) y cuándo se revela
-// (events.secret_location_reveal_hours, migración 202610300310: NULL = apenas compran; N = N horas antes de la primera
-// función de la entrada).
+// (events.secret_location_reveal_hours, migraciones 202610300310 y 202610310200: NULL = apenas compran; 0 = el día de la
+// función, a las 9:00 o al empezar si es antes; N = N horas antes de la primera función de la entrada).
 // Mientras hay dirección privada, lo público (página, JSON-LD, meta, listados, chat del comprador, invitaciones) muestra
-// el lugar sin calle ni coordenadas: nombre y comuna (publicPlace). La orden, la entrada, el correo de la entrada, el
+// solo la comuna, sin el nombre del lugar, la calle ni las coordenadas (publicPlace, SECRET_PLACE_NAME). La orden, la entrada, el correo de la entrada, el
 // recordatorio y el aviso programado (send-secret-location) la muestran desde que se revela.
 import { zonedDateTimeToUtc, formatDateOnlyLong, formatTimeShort } from './dates.mjs'
 
 export const SECRET_LOCATION_MAX = 300
 export const MAX_REVEAL_HOURS = 168
+/** 0 = el día de la función (a las 9:00, o al empezar si es antes). */
+export const REVEAL_EVENT_DAY = 0
+const EVENT_DAY_TIME = '09:00'
 /** Opciones del formulario del panel (horas antes de la función). */
 export const REVEAL_HOURS_OPTIONS = Object.freeze([1, 2, 3, 6, 12, 24, 48])
+/** Cuándo se revela, por defecto, una dirección nueva: el día del evento. */
+export const DEFAULT_REVEAL_HOURS = REVEAL_EVENT_DAY
+/** Lo que se ve en lo público en vez del nombre del lugar. */
+export const SECRET_PLACE_NAME = 'Lugar secreto'
 
 const MISSING_COLUMN = new Set(['42703', 'PGRST204'])
 
@@ -20,15 +27,28 @@ export function normalizeSecretLocation(value) {
   return s || null
 }
 
-/** Horas antes de la función en que se revela (1 a 168) o null (apenas compran). */
+/** Horas antes de la función en que se revela (1 a 168), 0 (el día de la función) o null (apenas compran). */
 export function normalizeRevealHours(value) {
   if (value === null || value === undefined || value === '') return null
   const n = Math.floor(Number(value))
-  return Number.isFinite(n) && n >= 1 && n <= MAX_REVEAL_HOURS ? n : null
+  return Number.isFinite(n) && n >= REVEAL_EVENT_DAY && n <= MAX_REVEAL_HOURS ? n : null
 }
 
 /** "24 horas" / "1 hora". */
 export const revealHoursLabel = (hours) => (Number(hours) === 1 ? '1 hora' : `${Number(hours)} horas`)
+
+/** "El día del evento" / "24 horas antes" / "Apenas compran" (formularios y respuestas de la API). */
+export function revealOptionLabel(hours) {
+  const h = normalizeRevealHours(hours)
+  if (h === null) return 'Apenas compran'
+  if (h === REVEAL_EVENT_DAY) return 'El día del evento'
+  return `${revealHoursLabel(h)} antes`
+}
+
+/** Fecha (YYYY-MM-DD) en hora de Chile de un instante. */
+function chileDate(instant) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(instant))
+}
 
 /** Inicio (Date, UTC) de una función { date, start_time } en hora de Chile. */
 export const functionStart = (fn) => (fn?.date ? zonedDateTimeToUtc(String(fn.date).slice(0, 10), fn.start_time || '00:00') : null)
@@ -56,7 +76,11 @@ export function firstRelevantStart(dates, functionIds = null) {
 /** Instante en que se revela (null = ya, apenas compran). */
 export function revealAt(start, revealHours) {
   const hours = normalizeRevealHours(revealHours)
-  if (!hours || !start) return null
+  if (hours === null || !start) return null
+  if (hours === REVEAL_EVENT_DAY) {
+    const morning = zonedDateTimeToUtc(chileDate(start), EVENT_DAY_TIME)
+    return morning && morning.getTime() < new Date(start).getTime() ? morning : new Date(start)
+  }
   return new Date(new Date(start).getTime() - hours * 3_600_000)
 }
 
@@ -80,20 +104,18 @@ export function formatRevealMoment(instant) {
 
 /** Aviso para quien compró antes de que se revele. */
 export function pendingRevealText(revealHours, at) {
-  return `La dirección exacta te llega por correo ${revealHoursLabel(revealHours)} antes${at ? ` (${formatRevealMoment(at)})` : ''}. También aparecerá en tu orden.`
+  const when = normalizeRevealHours(revealHours) === REVEAL_EVENT_DAY ? 'el día del evento' : `${revealHoursLabel(revealHours)} antes`
+  return `La dirección exacta te llega por correo ${when}${at ? ` (${formatRevealMoment(at)})` : ''}. También aparecerá en tu orden.`
 }
 
 /**
- * Lugar de un event_location (con join a venues) sin calle ni coordenadas: nombre y comuna. Para lo público cuando
- * hay dirección privada.
+ * Lugar de un event_location (con join a venues) para lo público cuando hay dirección privada: "Lugar secreto, comuna".
+ * Ni el nombre del recinto (un lugar conocido delata la dirección), ni la calle, ni las coordenadas.
  */
 export function publicPlace(loc) {
-  if (!loc) return ''
-  const venue = (Array.isArray(loc.venues) ? loc.venues[0] : loc.venues) || {}
-  const internalName = loc.name && loc.name !== 'Main' ? loc.name : ''
-  const name = loc.display_name || venue.name || internalName || ''
-  const city = loc.city_override || venue.city || ''
-  return [name, city].filter(Boolean).filter((v, i, arr) => arr.indexOf(v) === i).join(', ')
+  const venue = (Array.isArray(loc?.venues) ? loc.venues[0] : loc?.venues) || {}
+  const city = loc?.city_override || venue.city || ''
+  return [SECRET_PLACE_NAME, city].filter(Boolean).join(', ')
 }
 
 /**
@@ -132,7 +154,8 @@ export async function saveSecretLocation(supabase, eventId, { address, revealHou
   if (revealHours !== undefined) {
     const { error } = await supabase.from('events').update({ secret_location_reveal_hours: normalizeRevealHours(revealHours) }).eq('id', eventId)
     if (error) {
-      if (!MISSING_COLUMN.has(String(error.code || ''))) throw new Error(error.message)
+      // 23514: "el día del evento" (0) antes de la migración 202610310200, que amplía el CHECK
+      if (!MISSING_COLUMN.has(String(error.code || '')) && String(error.code || '') !== '23514') throw new Error(error.message)
       revealSaved = false
     }
   }
@@ -177,7 +200,7 @@ export async function sendSecretLocationReveals(supabase, { now = new Date(), se
     if (MISSING_COLUMN.has(String(error.code || ''))) return { sent: 0, events: 0 }
     throw new Error(error.message)
   }
-  const withAddress = (events || []).filter((e) => normalizeSecretLocation(e.secret_location) && normalizeRevealHours(e.secret_location_reveal_hours))
+  const withAddress = (events || []).filter((e) => normalizeSecretLocation(e.secret_location) && normalizeRevealHours(e.secret_location_reveal_hours) !== null)
   if (!withAddress.length) return { sent: 0, events: 0 }
 
   const { data: dates, error: datesError } = await supabase

@@ -136,8 +136,8 @@ CREATE TABLE public.events (
   secret_location text,
   -- 202610300100: datos extra del checkout (asistentes, empresa, preguntas)
   checkout_fields jsonb,
-  -- 202610300310: horas antes de la función en que se revela secret_location (NULL = apenas compran)
-  secret_location_reveal_hours integer CHECK (secret_location_reveal_hours IS NULL OR secret_location_reveal_hours BETWEEN 1 AND 168),
+  -- 202610300310 y 202610310200: cuándo se revela secret_location (NULL = apenas compran, 0 = el día de la función, N = horas antes)
+  secret_location_reveal_hours integer CHECK (secret_location_reveal_hours IS NULL OR secret_location_reveal_hours BETWEEN 0 AND 168),
   CONSTRAINT events_pkey PRIMARY KEY (id),
   CONSTRAINT events_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id)
 );

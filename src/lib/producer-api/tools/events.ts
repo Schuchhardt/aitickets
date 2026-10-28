@@ -10,7 +10,7 @@ import {
 import { isCourtesyOrder, isTransferOrder, orderSoldQty } from "../../orderKinds";
 import { createPreviewLink, listPreviewLinks, revokePreviewLink, PreviewLinkError, PREVIEW_DEFAULT_HOURS } from "../../eventPreview";
 import { createEventGraph, setEventStatus, syncEventCategory, refreshEventDenorm, EventInputError, type EventGraphInput } from "../../../pages/api/_lib/events";
-import { loadSecretLocation, saveSecretLocation, MAX_REVEAL_HOURS, SECRET_LOCATION_MAX } from "../../../../netlify/lib/secret-location.mjs";
+import { loadSecretLocation, saveSecretLocation, MAX_REVEAL_HOURS, SECRET_LOCATION_MAX, DEFAULT_REVEAL_HOURS } from "../../../../netlify/lib/secret-location.mjs";
 import { listOrgVenues } from "../../orgVenues";
 import { sanitizeRichText } from "../../sanitize";
 import { changeEventSlug, EventSlugError, SLUG_MAX, SLUG_MIN } from "../../eventSlug";
@@ -385,9 +385,10 @@ const updateEvent: ToolDef = {
         "slug cambia el link público (/eventos/<slug>); cambiar el nombre NO cambia el slug. Si el evento está publicado o ya tiene registrados " +
         "(órdenes pagadas, entradas o invitados), el link anterior queda redirigiendo (301) al nuevo, así no se rompen los links ya " +
         "compartidos ni los QR; en un borrador sin registrados, el link anterior se libera. " +
-        "private_address: dirección que solo ven quienes compran (la página pública, el mapa y los listados muestran el lugar y la comuna, " +
-        "sin la calle); va en la orden, la entrada, el correo y el recordatorio. private_address_reveal_hours la revela N horas antes de la " +
-        "función (se manda por correo a esa hora); null = apenas compran. private_address null o \"\" la quita. " +
+        "private_address: dirección que solo ven quienes compran (la página pública, el mapa y los listados dicen \"Lugar secreto\" y la comuna, " +
+        "sin el nombre del lugar ni la calle); va en la orden, la entrada, el correo y el recordatorio desde que se revela. " +
+        "private_address_reveal_hours: 0 = el día de la función (a las 9:00; es lo que se usa si no lo indicas al poner una dirección nueva), " +
+        "N = N horas antes, null = apenas compran; se manda por correo a esa hora. private_address null o \"\" la quita. " +
         "Fechas y horarios de las funciones se cambian con update_event_functions (avisa a los asistentes); el lugar, desde el panel o " +
         "update_venue. Para entradas usa las herramientas de ticket_type. Para un video de portada (en vez de la imagen) usa set_event_video. " +
         "checkout_fields cambia lo que pide el checkout además del nombre y correo de quien compra: attendee_names (nombre y correo de cada " +
@@ -427,10 +428,10 @@ const updateEvent: ToolDef = {
             },
             private_address_reveal_hours: {
                 type: "integer",
-                minimum: 1,
+                minimum: 0,
                 maximum: MAX_REVEAL_HOURS,
                 nullable: true,
-                description: "Horas antes de la función en que se revela private_address (se manda por correo a esa hora). null = apenas compran.",
+                description: "Cuándo se revela private_address (se manda por correo a esa hora): 0 = el día de la función, N = N horas antes, null = apenas compran.",
             },
             page_background: {
                 type: "string",
@@ -542,11 +543,13 @@ const updateEvent: ToolDef = {
             const current = await loadSecretLocation(ctx.supabase, Number(event.id));
             const address = args.private_address !== undefined ? args.private_address : current.address;
             if (!address && args.private_address === undefined) throw new ToolError("invalid_input", "El evento no tiene dirección privada: envía private_address.");
+            // Una dirección nueva sin indicar cuándo se revela: el día del evento
+            const revealHours = args.private_address_reveal_hours !== undefined ? args.private_address_reveal_hours : current.address ? undefined : DEFAULT_REVEAL_HOURS;
             const { revealSaved } = await saveSecretLocation(ctx.supabase, Number(event.id), {
                 address: args.private_address,
-                revealHours: address ? (args.private_address_reveal_hours !== undefined ? args.private_address_reveal_hours : undefined) : null,
+                revealHours: address ? revealHours : null,
             });
-            if (!revealSaved) warnings.push("Revelar la dirección horas antes estará disponible después del próximo deploy: por ahora la ven apenas compran.");
+            if (!revealSaved) warnings.push("Elegir cuándo se revela la dirección estará disponible después del próximo deploy: por ahora la ven apenas compran.");
             await refreshEventDenorm(Number(event.id));
             secret = await loadSecretLocation(ctx.supabase, Number(event.id));
         }
