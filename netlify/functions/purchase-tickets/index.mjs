@@ -28,6 +28,7 @@ import { todayInTimeZone, zonedDateTimeToUtc } from '../../lib/dates.mjs'
 import {
   TICKET_COLUMNS,
   isTicketOnSale,
+  ticketsWaitingOnPrevious,
   maxPerPurchase,
   getSoldCounts,
   ensureOrderAttendees,
@@ -385,6 +386,13 @@ export default async function handler(req) {
       if (qty > max) {
         return json({ message: `Puedes comprar como máximo ${max} entrada(s) de "${ticket.ticket_name}" por compra` }, 400)
       }
+    }
+
+    // 2a. Tandas encadenadas: la siguiente se abre sola cuando la anterior se agota (migración 202610290100)
+    const waiting = await ticketsWaitingOnPrevious(supabase, eventId, now)
+    for (const id of quantities.keys()) {
+      const prev = waiting.get(id)
+      if (prev) return json({ message: `"${byId.get(id).ticket_name}" se abre cuando se agote "${prev.ticket_name}"` }, 409)
     }
 
     // 2b. R1: entradas de una función específica -> la función debe ser de este evento y no haber terminado

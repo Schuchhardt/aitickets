@@ -3,6 +3,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createFakeSupabase } from '../fixtures/fake-supabase.mjs'
 import { notifyWaitlist, buyableTickets, isWaitlistRowOpen, waitlistEventUrl } from '../../netlify/lib/waitlist.mjs'
+import { runTool } from '../../src/lib/producer-api/registry.ts'
+import { waitlistTools } from '../../src/lib/producer-api/tools/waitlist.ts'
 
 const NOW = new Date('2026-10-27T15:00:00Z')
 
@@ -118,5 +120,26 @@ describe('notifyWaitlist', () => {
   it('sin el conteo de stock no avisa', async () => {
     db = createFakeSupabase({ tables: db.tables })
     expect(await notifyWaitlist(db, { now: NOW, sendEmail })).toEqual({ events: 0, sent: 0, failed: 0 })
+  })
+})
+
+describe('list_waitlist (API de productores)', () => {
+  const actor = { keyId: 'k1', userId: 1, orgId: 7, role: 'producer', name: 'Ana', email: 'ana@prod.cl', scopes: ['read', 'attendees'], eventIds: null }
+  const ctx = (over = {}) => ({ supabase: db, actor: { ...actor, ...over }, origin: 'https://aitickets.test', requestUrl: new URL('https://aitickets.test/api/mcp'), channel: 'mcp' })
+  const tool = waitlistTools.find((t) => t.name === 'list_waitlist')
+
+  it('resume pendientes por función y filtra los ya avisados', async () => {
+    db.tables.aitickets_event_waitlist.find((r) => r.id === 'c').notified_at = '2026-10-26T13:00:00Z'
+    const res = await runTool(tool, { event_id: 3 }, ctx())
+    expect(res.ok).toBe(true)
+    expect(res.result.summary).toEqual({ total: 2, notified: 1, pending: 1, pending_by_function: { 'sáb, 21 nov · 20:00': 1 } })
+    const pending = await runTool(tool, { event_id: 3, only_pending: true }, ctx())
+    expect(pending.result.entries.map((e) => e.email)).toEqual(['dani@x.cl'])
+    expect(pending.result.entries[0]).toMatchObject({ reason: 'Agotado', joined_at_local: '2026-10-20T09:00' })
+  })
+
+  it('exige el permiso de datos de asistentes y que el evento sea de la organización', async () => {
+    expect((await runTool(tool, { event_id: 3 }, ctx({ scopes: ['read'] }))).ok).toBe(false)
+    expect((await runTool(tool, { event_id: 3 }, ctx({ orgId: 8 }))).code).toBe('not_found')
   })
 })

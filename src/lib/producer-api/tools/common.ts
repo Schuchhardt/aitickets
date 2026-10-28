@@ -1,7 +1,7 @@
 // Utilidades compartidas por las herramientas de la API de productores.
 // La service role se salta RLS: TODA consulta filtra por ctx.actor.orgId (o por un evento ya verificado).
 import { ToolError, type JsonSchema, type ToolContext } from "../registry";
-import { getSoldCountsLegacy, isTicketOnSale } from "../../../../netlify/lib/tickets.mjs";
+import { getSoldCountsLegacy, isTicketOnSale, loadTicketChain, waitingOnPrevious } from "../../../../netlify/lib/tickets.mjs";
 
 export const TZ = "America/Santiago";
 
@@ -110,7 +110,20 @@ export async function ticketAvailability(ctx: ToolContext, eventId: number, tick
  * es del sistema, nunca se vende y solo sirve para emitir cortesías (issue_complimentary_tickets).
  * on_sale_now exige además que el evento esté publicado (si se pasa `event`).
  */
-export function presentTicket(t: any, availability?: { sold: number; pending: number }, event?: { status?: string | null }) {
+/** Tandas encadenadas de un evento para presentTicket: a cuál espera cada una y si hoy sigue esperando. */
+export async function ticketChainInfo(ctx: ToolContext, eventId: number, tickets: any[], availability: Map<number, { sold: number; pending: number }>) {
+    const chain: Map<number, number> = await loadTicketChain(ctx.supabase, eventId);
+    const remainingOf = (t: any) => Number(t.total_quantity) - (availability.get(Number(t.id))?.sold || 0) - (availability.get(Number(t.id))?.pending || 0);
+    const waiting: Map<number, any> = waitingOnPrevious(tickets, chain, remainingOf);
+    return (id: number) => ({ opensAfter: chain.get(Number(id)) ?? null, waiting: waiting.has(Number(id)) });
+}
+
+export function presentTicket(
+    t: any,
+    availability?: { sold: number; pending: number },
+    event?: { status?: string | null },
+    chain?: { opensAfter?: number | null; waiting?: boolean },
+) {
     const sold = availability?.sold ?? 0;
     const pending = availability?.pending ?? 0;
     const capacity = t.total_quantity ?? null;
@@ -126,11 +139,14 @@ export function presentTicket(t: any, availability?: { sold: number; pending: nu
         sold,
         reserved_in_checkout: pending,
         remaining: isSystem || capacity == null ? null : Math.max(0, capacity - sold - pending),
-        on_sale_now: !isSystem && isTicketOnSale(t) && (!event || event.status === "published"),
+        on_sale_now: !isSystem && isTicketOnSale(t) && !chain?.waiting && (!event || event.status === "published"),
         status: isSystem ? "system" : t.status,
         sales_start: t.init_date ?? null,
         sales_end: t.end_date ?? null,
         event_date_id: t.event_date_id ?? null,
+        // Tanda encadenada: se abre sola cuando se agota la anterior
+        opens_after_ticket_type_id: chain?.opensAfter ?? null,
+        waiting_on_previous: chain?.waiting === true,
     };
 }
 

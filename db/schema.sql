@@ -154,6 +154,8 @@ CREATE TABLE public.event_tickets (
   total_quantity integer,
   -- 20260926_D: NULL = válida para cualquier función (FK a event_dates más abajo)
   event_date_id bigint,
+  -- 202610290100: tanda anterior (se abre sola cuando esa se agota)
+  opens_after_ticket_id bigint REFERENCES public.event_tickets(id) ON DELETE SET NULL,
   CONSTRAINT event_tickets_pkey PRIMARY KEY (id),
   CONSTRAINT event_tickets_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.events(id)
 );
