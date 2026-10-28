@@ -5,18 +5,21 @@
 // canal, cierre de la inscripción a una hora (ventana de venta por entrada, isTicketOnSale; hoy desde el asistente de IA,
 // tools/tickets.ts), lista de invitados (tools/guests.ts, solo desde el asistente: AI Tickets no envía WhatsApp, deja
 // los links listos) y cortesías con su QR (CourtesyTicketsForm.vue).
-// Cuántos de cada lista entraron: columna "Entraron" de Ventas por canal en la analítica y by_channel de
-// get_checkin_stats (eventAnalytics.ts, loadOrderCheckins). "Pronto": acceso propio de cada RRPP a sus números. La comisión
+// Cada RRPP ve sus números con su link privado (/promotor/<token>, src/lib/promoterLinks.ts). Cuántos de cada lista
+// entraron: columna "Entraron" de Ventas por canal en la analítica y by_channel de get_checkin_stats (eventAnalytics.ts,
+// loadOrderCheckins). La comisión
 // automática por RRPP no existe y no se muestra (Preguntas abiertas 5).
 // Mobile: los ítems arriba y el ranking como cards debajo.
 import LedHeading from "./LedHeading.astro";
 import NightHour from "./NightHour.astro";
 import RrppBoard from "./RrppBoard.vue";
-import SoonBadge from "../../ui/SoonBadge.vue";
 import { DIRECT_CHANNEL } from "../../../lib/eventAnalytics";
 
 const items = [
-  { title: "Un link por RRPP, en un minuto.", text: "Le pones su nombre y se lo mandas. No necesita cuenta." },
+  {
+    title: "Un link por RRPP, en un minuto.",
+    text: "Le pones su nombre y se lo mandas. No necesita cuenta: en su celular ve cuántas entradas vendió cada noche, sin datos de quienes compraron.",
+  },
   {
     title: "La lista se cierra sola.",
     text: "La inscripción a la lista free se corta a la hora que elijas, o cuando se llena el cupo. Hoy la hora se programa desde tu asistente de IA conectado o escribiéndonos por WhatsApp.",
@@ -66,7 +69,6 @@ const items = [
       <div class="cll-board" data-lp-step>
         <RrppBoard client:visible directLabel={DIRECT_CHANNEL} />
         <ul class="cll-soon" data-testid="club-rrpp-soon">
-          <li>Cada RRPP ve sus números en su celular <SoonBadge dark /></li>
           <li>Cuántos de cada lista entraron, en las métricas de tu noche</li>
         </ul>
         <p class="cll-links">

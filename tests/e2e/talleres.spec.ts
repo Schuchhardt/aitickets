@@ -71,7 +71,7 @@ test("el armador lleno muestra el rótulo real y el Pronto de la lista de espera
   await expect(builder.getByTestId("workshop-label")).toHaveText("Agotado");
 });
 
-test("el curso de 4 sesiones muestra la entrada del curso y el Pronto de pasar lista por sesión", async ({ page }) => {
+test("el curso de 4 sesiones muestra la entrada del curso y que se pasa lista en cada sesión", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await open(page);
   const builder = page.getByTestId("workshop-builder");
@@ -82,7 +82,8 @@ test("el curso de 4 sesiones muestra la entrada del curso y el Pronto de pasar l
   await expect(builder.getByTestId("workshop-phone")).toContainText("Sáb 14, 21 y 28 nov y sáb 5 dic · 10:00");
   // $95.000 con el cargo del checkout
   await expect(builder.getByTestId("workshop-final")).toHaveText("$104.044");
-  await expect(builder.locator('[data-note="roll"]').getByTestId("soon-badge")).toHaveCount(1);
+  await expect(builder.locator('[data-note="roll"]')).toContainText("entra una vez por sesión");
+  await expect(builder.locator('[data-note="roll"]').getByTestId("soon-badge")).toHaveCount(0);
   await expect(builder.locator('[data-note="payout"]')).toContainText("después de la última sesión");
 });
 
@@ -124,7 +125,9 @@ test("lo que no existe va con Pronto y sin testimonio real no hay cita", async (
   // Preguntas al inscribirse (antes), pasar lista por sesión (el día), Facebook/TikTok/reels (difusión), reseñas
   // mientras quedan fechas (después)
   await expect(page.locator("#antes").getByTestId("soon-badge")).toHaveCount(1);
-  await expect(page.locator("#el-dia").getByTestId("soon-badge")).toHaveCount(1);
+  // Pasar lista en cada sesión ya existe
+  await expect(page.locator("#el-dia").getByTestId("soon-badge")).toHaveCount(0);
+  await expect(page.locator("#el-dia")).toContainText("una vez en cada sesión");
   await expect(page.locator("#difusion").getByTestId("soon-badge")).toHaveCount(3);
   await expect(page.locator("#despues").getByTestId("soon-badge")).toHaveCount(1);
   await expect(page.locator('[data-tl-section="testimonio"]')).toHaveCount(0);

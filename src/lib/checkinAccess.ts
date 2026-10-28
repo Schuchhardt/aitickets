@@ -2,7 +2,7 @@
 // (/puerta/<token>, links en aitickets_checkin_links: solo se guarda el sha256 del token).
 // La service role se salta RLS: todo filtra por evento (ya verificado) u organización.
 import { createHash, randomBytes } from "node:crypto";
-import { getFunctionCheck } from "../../netlify/lib/checkin.mjs";
+import { checkInSession, getFunctionCheck } from "../../netlify/lib/checkin.mjs";
 import { zonedDateTimeToUtc } from "../../netlify/lib/dates.mjs";
 
 export const DOOR_PATH = "/puerta";
@@ -156,8 +156,18 @@ export function resolveValidatedAt(value: unknown, now = Date.now()): string {
 }
 
 export type CheckInResult =
-    | { ok: true; ticket_id: string; validated_at: string; function_mismatch: boolean; function_label: string | null; ticket: any }
-    | { ok: false; code: "not_found" | "already_validated" | "invalid_status"; message: string; validated_at?: string | null; status?: string | null };
+    | {
+          ok: true;
+          ticket_id: string;
+          validated_at: string;
+          function_mismatch: boolean;
+          function_label: string | null;
+          /** Entradas multifunción: a cuántas funciones lleva entrando y cuántas tiene el evento. */
+          sessions_attended?: number;
+          sessions_total?: number;
+          ticket: any;
+      }
+    | { ok: false; code: "not_found" | "already_validated" | "invalid_status"; message: string; validated_at?: string | null; status?: string | null; function_label?: string | null };
 
 const TICKET_SELECT = "id, event_id, qr_code, status, validated_at, event_order_id, is_complimentary, attendees ( first_name, last_name, email ), event_tickets ( ticket_name, event_date_id )";
 
@@ -178,7 +188,8 @@ export async function findEventTicket(supabase: any, eventId: number, ref: { tic
 /**
  * Marca el ingreso de una entrada (misma regla que /api/confirm-ticket): solo si su estado es activo
  * (NULL en entradas antiguas = activa). El UPDATE va condicionado al estado, así que dos dispositivos no
- * pueden validar la misma entrada dos veces.
+ * pueden validar la misma entrada dos veces. Una entrada multifunción entra una vez en cada función
+ * (checkInSession, netlify/lib/checkin.mjs).
  */
 export async function checkInTicket(
     supabase: any,
@@ -192,9 +203,14 @@ export async function checkInTicket(
         row.status === "validated"
             ? { ok: false, code: "already_validated", message: "Entrada ya validada.", validated_at: row.validated_at ?? null }
             : { ok: false, code: "invalid_status", message: `Entrada no válida (estado: ${row.status || "desconocido"}).`, status: row.status ?? null };
-    if (ticket.status != null && ticket.status !== "active") return reject(ticket);
+    if (ticket.status != null && ticket.status !== "active" && ticket.status !== "validated") return reject(ticket);
 
     const validatedAt = resolveValidatedAt(validatedAtInput);
+    // Entrada multifunción (pase de varios días): una vez por función, no una vez en total.
+    const session: any = await checkInSession(supabase, eventId, ticket, validatedAt);
+    if (session?.ok) return { ...session, ok: true, ticket_id: ticket.id, ticket };
+    if (session) return session as CheckInResult;
+    if (ticket.status === "validated") return reject(ticket);
     const patch = { status: "validated", validated_at: validatedAt };
     // Dos UPDATE condicionados (status = 'active' y status IS NULL) en vez de .or(): mismo efecto atómico por fila.
     let updated = 0;
@@ -229,6 +245,7 @@ export function presentDoorTicket(row: any) {
         is_complimentary: Boolean(row.is_complimentary),
         attendees: { first_name: row.attendees?.first_name || "", last_name: row.attendees?.last_name || "" },
         event_tickets: { ticket_name: row.event_tickets?.ticket_name || "", event_date_id: row.event_tickets?.event_date_id ?? null },
+        ...(Array.isArray(row.session_checkins) ? { session_checkins: row.session_checkins } : {}),
     };
 }
 

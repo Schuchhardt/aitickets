@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from "../../../../lib/auth-helpers";
 import ValidateQR from "../../../../components/ValidateQR.vue";
 import { requireDashboardSession } from "../../_lib/guard";
 import { canAccessEventByStaff } from "../../../../../netlify/lib/event-staff.mjs";
+import { attachSessionCheckins } from "../../../../../netlify/lib/checkin.mjs";
 
 // Check-in: todos los roles del equipo (incluidos validadores)
 const CHECKIN_ROLES = ["admin", "producer", "editor", "validator"];
@@ -73,7 +74,9 @@ const { data: eventDates } = await supabaseAdmin
     .order("start_time", { ascending: true });
 
 if (attendeesError) console.error("Error loading attendees:", attendeesError);
-const event = { ...eventRow, dates: eventDates || [], attendees: event_attendees };
+// Entradas multifunción: a qué funciones ya entró cada una
+const attendeesWithSessions = await attachSessionCheckins(supabaseAdmin, eventRow.id, event_attendees, eventDates || []);
+const event = { ...eventRow, dates: eventDates || [], attendees: attendeesWithSessions };
 const backHref = dbUser.role === "validator" ? "/dashboard/events" : `/dashboard/events/${event.id}`;
 ---
 
