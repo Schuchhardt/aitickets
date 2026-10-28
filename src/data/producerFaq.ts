@@ -3,6 +3,7 @@
 // atribución por link en eventos/[slug].astro (sessionStorage) y cambios/cancelación en postsale.ts.
 import { SERVICE_FEE_PERCENT_LABEL, IVA_PERCENT_LABEL, computeFeeSplit } from "../../netlify/lib/fees.mjs";
 import { PAYOUT_SCHEDULE_TEXT } from "../../netlify/lib/legal.mjs";
+import { MAX_FUNCTIONS } from "../lib/functionPattern.mjs";
 
 /** terms: la respuesta promete algo condicionado (pagos, devoluciones) y termina con "*Se aplican términos y condiciones". */
 export type FaqItem = { q: string; a: string; terms?: boolean };
@@ -14,10 +15,10 @@ export const TERMS_NOTE = { text: "*Se aplican términos y condiciones", href: "
 export const ABSORB_FEE_ACTIVATION = "Hoy se activa desde tu asistente de IA conectado o escribiéndonos por WhatsApp.";
 
 /**
- * Tope de funciones (fechas) por evento: el mismo MAX_FUNCTIONS de src/lib/producer-api/tools/schedule.ts. Ese módulo
- * carga código de servidor y no se puede importar en las landings; tests/unit/musica-landing.test.mjs revisa que calcen.
+ * Tope de funciones (fechas) por evento: el MAX_FUNCTIONS de src/lib/functionPattern.mjs, el mismo que usan los
+ * formularios de evento y update_event_functions.
  */
-export const MAX_EVENT_FUNCTIONS = 60;
+export const MAX_EVENT_FUNCTIONS = MAX_FUNCTIONS;
 
 const clp = (n: number) => `$${Math.round(n).toLocaleString("es-CL")}`;
 const absorbed = computeFeeSplit(10000, { absorbed: true });
@@ -38,7 +39,7 @@ export const PRODUCER_FAQ: FaqItem[] = [
     },
     {
         q: "¿Puedo publicar varias funciones de una misma obra o show?",
-        a: `Sí. Un evento puede tener hasta ${MAX_EVENT_FUNCTIONS} funciones, con entradas para una función específica o válidas para todas. Para la semana siguiente también puedes duplicar el evento y solo cambiar las fechas.`,
+        a: `Sí. Un evento puede tener hasta ${MAX_EVENT_FUNCTIONS} funciones (con "Repetir en varios días" las creas de una vez, p. ej. jueves a domingo hasta fin de mes), con entradas para una función específica o válidas para todas. Para la semana siguiente también puedes duplicar el evento y solo cambiar las fechas.`,
     },
     {
         q: "¿Puedo saber cuántas entradas vende cada promotor?",
