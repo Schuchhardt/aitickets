@@ -3,6 +3,7 @@
 import type { APIRoute } from "astro";
 import { authorizeDoor, doorJson } from "../_door";
 import { DOOR_TICKET_SELECT, presentDoorTicket } from "../../../../lib/checkinAccess";
+import { attachSessionCheckins } from "../../../../../netlify/lib/checkin.mjs";
 
 export const prerender = false;
 
@@ -28,7 +29,8 @@ export const GET: APIRoute = async ({ params, request }) => {
             .eq("event_id", auth.event.id)
             .order("date", { ascending: true })
             .order("start_time", { ascending: true });
-        return doorJson({ attendees: attendees.map(presentDoorTicket), dates: dates || [] });
+        const withSessions = await attachSessionCheckins(auth.supabase, auth.event.id, attendees, dates || []);
+        return doorJson({ attendees: withSessions.map(presentDoorTicket), dates: dates || [] });
     } catch (err: any) {
         console.error("door attendees:", err?.message);
         return doorJson({ message: "No se pudieron obtener los asistentes." }, 500);

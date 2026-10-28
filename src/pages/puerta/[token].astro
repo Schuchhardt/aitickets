@@ -5,6 +5,7 @@ import Layout from "../../layouts/Layout.astro";
 import ValidateQR from "../../components/ValidateQR.vue";
 import { getSupabaseAdmin } from "../../lib/auth-helpers";
 import { DOOR_TICKET_SELECT, presentDoorTicket, resolveCheckinToken, touchCheckinLink } from "../../lib/checkinAccess";
+import { attachSessionCheckins } from "../../../netlify/lib/checkin.mjs";
 
 export const prerender = false;
 
@@ -40,7 +41,8 @@ if (resolved) {
         .eq("event_id", resolved.event.id)
         .order("date", { ascending: true })
         .order("start_time", { ascending: true });
-    event = { ...resolved.event, dates: dates || [], attendees: attendees.map(presentDoorTicket) };
+    const withSessions = await attachSessionCheckins(supabase, resolved.event.id, attendees, dates || []);
+    event = { ...resolved.event, dates: dates || [], attendees: withSessions.map(presentDoorTicket) };
 } else {
     Astro.response.status = 404;
 }

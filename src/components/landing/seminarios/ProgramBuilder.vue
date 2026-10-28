@@ -8,7 +8,7 @@
 // (previewEvent) y le pide el estado, el rótulo y los chips a cardState / cardLabel / cardFunctionChips (eventView.js);
 // el precio es el final con el cargo (priceQuote → fees.mjs), "por entrada, incluye cargo" como la card, y la fila del
 // checkout lleva SERVICE_FEE_NOTE o "Disponible desde el {formatSaleStart}" si la entrada espera la preventa.
-// Lo que no existe va con "Pronto": ingreso cada día con el mismo pase y la agenda con expositores y salas.
+// Lo que no existe va con "Pronto": la agenda con expositores y salas.
 // - SSR / sin JS: el congreso con entrada, el programa, la matriz de solo lectura con ✓ y la card de ejemplo; los
 //   controles quedan deshabilitados hasta hidratar.
 // - Mobile: el formato en scroll horizontal, el programa en pestañas por día, la matriz como una card por tipo de entrada
@@ -314,8 +314,7 @@ onBeforeUnmount(() => {
             </li>
           </ul>
 
-          <p class="se-note pb-rule">Una entrada sirve para un día o para todos. El pase completo se acredita una vez, el primer día que la persona llega.</p>
-          <p class="se-soon-chip">Ingreso cada día con el mismo pase <SoonBadge /></p>
+          <p class="se-note pb-rule">Una entrada sirve para un día o para todos. El pase completo entra una vez cada día con el mismo QR.</p>
         </div>
       </div>
 
@@ -564,9 +563,6 @@ onBeforeUnmount(() => {
 .pb-rule {
   margin-top: 14px;
   max-width: 560px;
-}
-.pb-matrix .se-soon-chip {
-  margin-top: 10px;
 }
 .pb-box {
   padding: 14px 0;

@@ -5,12 +5,11 @@
 //               asistente de IA)
 //   sin señal, entrada usada no vuelve a entrar, búsqueda y reenvío → ValidateQR.vue, checkin.mjs, /api/orders/resend
 //   cortesías → CourtesyTicketsForm.vue y src/lib/courtesy.ts (no cuentan como venta)
-//   pasar lista en cada sesión de un curso con una sola entrada → no existe (confirm-ticket valida una vez: "Pronto")
+//   pasar lista en cada sesión de un curso con una sola entrada → checkInSession (checkin.mjs): una vez por sesión
 // Mobile: la lista arriba a ancho completo (6 filas y "y 4 más"), los ítems debajo.
 import SectionTab from "./SectionTab.astro";
 import Highlight from "./Highlight.astro";
 import ClassRoll from "./ClassRoll.vue";
-import SoonBadge from "../../ui/SoonBadge.vue";
 
 const items = [
   {
@@ -55,8 +54,8 @@ const items = [
           }
         </ul>
         <p class="tl-day-note" data-lp-step>
-          En un curso de varias sesiones con una sola entrada, el QR se valida en la primera sesión.
-          <span class="tl-soon-line"><strong>Pasar lista en cada sesión</strong> <SoonBadge dark /></span>
+          <strong>Pasar lista en cada sesión.</strong> En un curso de varias sesiones con una sola entrada, el mismo QR entra
+          una vez en cada sesión y el escáner te dice a cuántas ha venido.
         </p>
         <p class="tl-day-guide" data-lp-step>
           <a href="/guias/como-hacer-check-in-con-qr" class="tl-link">Guía: check-in con QR →</a>
@@ -109,8 +108,7 @@ const items = [
     line-height: 21px;
     color: var(--tl-tiza-2);
   }
-  .tl-day-note .tl-soon-line {
-    margin-top: 4px;
+  .tl-day-note strong {
     color: var(--tl-tiza);
   }
   .tl-day-guide {
