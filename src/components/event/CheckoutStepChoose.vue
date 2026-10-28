@@ -157,6 +157,7 @@ async function onRadioKey(e, items, current, select, keyOf) {
             <p class="row-price ev-tabular">{{ Number(t.price) > 0 ? formatCLP(t.final_price ?? t.price) : "Gratis" }}</p>
             <p class="row-name">{{ t.ticket_name }}</p>
             <p v-if="t.status === 'sold_out'" class="row-sub">Agotada</p>
+            <p v-else-if="t.status === 'upcoming' && t.opens_after" class="row-sub">Se abre al agotarse {{ t.opens_after }}</p>
             <p v-else-if="t.status === 'upcoming'" class="row-sub">Disponible desde el {{ formatSaleStart(t.sales_start, event.timezone) }}</p>
           </div>
           <div class="row-side">

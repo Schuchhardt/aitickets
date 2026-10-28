@@ -20,6 +20,84 @@ export function isTicketOnSale(ticket, now = new Date()) {
   return true
 }
 
+// ---------------------------------------------------------------------------------------------------------
+// Tandas encadenadas (event_tickets.opens_after_ticket_id, migración 202610290100): una tanda espera a que la
+// anterior deje de venderse. La anterior "sigue vendiéndose" si está disponible, no cerró su ventana y le queda cupo
+// (vendidas + reservas vigentes < cupo); sin cupo definido nunca se agota. Si su venta aún no abre, también espera.
+// ---------------------------------------------------------------------------------------------------------
+
+export function isStillSelling(prev, remaining, now = new Date()) {
+  if (!prev || prev.status !== 'available' || prev.is_gift === true) return false
+  if (prev.end_date && new Date(prev.end_date) < now) return false
+  if (prev.total_quantity === null || prev.total_quantity === undefined) return true
+  return Number(remaining) > 0
+}
+
+/**
+ * Tandas que esperan a la anterior.
+ * @param tickets filas de event_tickets del evento (las anteriores incluidas; una que falte cuenta como cerrada)
+ * @param chain Map<ticketId, anteriorId> (loadTicketChain)
+ * @param remainingOf (ticket) => cupo que le queda (total - vendidas - reservas)
+ * @returns {Map<number, object>} ticketId -> fila de la anterior
+ */
+export function waitingOnPrevious(tickets, chain, remainingOf, now = new Date()) {
+  const waiting = new Map()
+  if (!chain?.size) return waiting
+  const byId = new Map((tickets || []).map((t) => [Number(t.id), t]))
+  for (const [id, prevId] of chain) {
+    const prev = byId.get(Number(prevId))
+    if (prev && isStillSelling(prev, remainingOf(prev), now)) waiting.set(Number(id), prev)
+  }
+  return waiting
+}
+
+/**
+ * Valida encadenar `ticketId` detrás de `prevId` (null = quitar). `tickets`: los del evento; `chain`: el encadenamiento
+ * actual. Devuelve el motivo del rechazo o null.
+ */
+export function chainError(tickets, chain, ticketId, prevId) {
+  if (prevId == null) return null
+  const prev = (tickets || []).find((t) => Number(t.id) === Number(prevId))
+  if (!prev) return 'La tanda anterior no es de este evento'
+  if (Number(prevId) === Number(ticketId)) return 'Una tanda no puede esperar a sí misma'
+  if (prev.is_gift === true) return 'No se puede encadenar a las cortesías'
+  if ((prev.total_quantity === null || prev.total_quantity === undefined) && !prev.end_date) {
+    return `"${prev.ticket_name}" no tiene cupo ni fecha de cierre: nunca se agotaría`
+  }
+  // Sin ciclos: subiendo desde la anterior no se puede volver a esta
+  const seen = new Set()
+  for (let id = Number(prevId); id && !seen.has(id); id = chain.get(id)) {
+    if (id === Number(ticketId)) return 'Ese orden de tandas forma un círculo'
+    seen.add(id)
+  }
+  return null
+}
+
+/** Map<ticketId, anteriorId> de un evento. Vacío si la columna aún no existe (deploy preview sin migrar). */
+export async function loadTicketChain(supabase, eventId) {
+  const { data, error } = await supabase
+    .from('event_tickets')
+    .select('id, opens_after_ticket_id')
+    .eq('event_id', Number(eventId))
+    .not('opens_after_ticket_id', 'is', null)
+  if (error) {
+    if (!['42703', 'PGRST204'].includes(String(error.code || ''))) console.warn('loadTicketChain:', error.message)
+    return new Map()
+  }
+  return new Map((data || []).map((t) => [Number(t.id), Number(t.opens_after_ticket_id)]))
+}
+
+/** Lo mismo con todo cargado: tandas del evento que hoy esperan a la anterior (compra y asistente). */
+export async function ticketsWaitingOnPrevious(supabase, eventId, now = new Date()) {
+  const chain = await loadTicketChain(supabase, eventId)
+  if (!chain.size) return new Map()
+  const { data: tickets } = await supabase.from('event_tickets').select(TICKET_COLUMNS).eq('event_id', Number(eventId))
+  const prevIds = [...new Set(chain.values())]
+  const sold = await getSoldCounts(supabase, eventId, prevIds)
+  const remainingOf = (t) => Number(t.total_quantity) - (sold.get(Number(t.id)) || 0)
+  return waitingOnPrevious(tickets, chain, remainingOf, now)
+}
+
 export function maxPerPurchase(ticket) {
   const max = Number(ticket?.max_quantity)
   return Number.isInteger(max) && max > 0 ? max : DEFAULT_MAX_PER_PURCHASE

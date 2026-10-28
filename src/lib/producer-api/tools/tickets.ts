@@ -1,6 +1,7 @@
 // Herramientas: tipos de entrada y órdenes (compradores).
 import { ToolError, type ToolDef } from "../registry";
-import { eventIdSchema, loadOwnedEvent, ticketAvailability, presentTicket, TICKET_SELECT, isoOrNull, rejectCourtesyName, clp } from "./common";
+import { eventIdSchema, loadOwnedEvent, ticketAvailability, presentTicket, TICKET_SELECT, isoOrNull, rejectCourtesyName, clp, ticketChainInfo } from "./common";
+import { chainError, loadTicketChain } from "../../../../netlify/lib/tickets.mjs";
 import { normalizeTicket } from "../../../pages/api/_lib/events";
 import { isTransferOrder } from "../../orderKinds";
 import { IDENTITY_REQUIRED_MESSAGE, identityApproved, loadCapacityTickets, loadOrgIdentity, ticketsRequireIdentity } from "../../producerIdentity";
@@ -33,6 +34,7 @@ async function loadTicket(ctx: any, eventId: number, ticketId: number, { allowSy
 
 const FIELD_LABELS: Record<string, string> = {
     ticket_name: "Nombre", price: "Precio", total_quantity: "Capacidad", max_quantity: "Máximo por compra", status: "Venta", init_date: "Inicio de venta", end_date: "Fin de venta",
+    opens_after_ticket_id: "Se abre tras",
 };
 const fmtField = (field: string, v: unknown) =>
     v == null ? "—" : field === "price" ? clp(Number(v)).replace(" CLP", "") : field === "status" ? (v === "available" ? "activa" : "pausada") : String(v);
@@ -49,10 +51,40 @@ function checkWindow(start: string | null, end: string | null) {
     if (start && end && new Date(end) <= new Date(start)) throw new ToolError("invalid_input", "sales_end debe ser posterior a sales_start.");
 }
 
+// Tandas encadenadas (event_tickets.opens_after_ticket_id, migración 202610290100)
+const opensAfterSchema = {
+    type: "integer" as const,
+    minimum: 1,
+    nullable: true,
+    description:
+        "Tanda anterior (otro tipo de entrada del evento): este tipo se abre solo cuando esa se agota o cierra su venta. " +
+        "La anterior necesita cupo o fecha de cierre. null = quitar el encadenamiento.",
+};
+
+async function assertChainable(ctx: any, eventId: number, ticketId: number | null, prevId: number | null) {
+    const { error: columnError } = await ctx.supabase.from("event_tickets").select("opens_after_ticket_id").limit(1);
+    if (columnError) throw new ToolError("unavailable", "Las tandas que se abren solas estarán disponibles después del próximo deploy.");
+    const [{ data: tickets }, chain] = await Promise.all([
+        ctx.supabase.from("event_tickets").select(TICKET_SELECT).eq("event_id", eventId),
+        loadTicketChain(ctx.supabase, eventId),
+    ]);
+    const reason = chainError(tickets || [], chain, ticketId ?? 0, prevId);
+    if (reason) throw new ToolError("invalid_input", reason);
+    return chain;
+}
+
+async function presentWithChain(ctx: any, event: any, row: any, availability?: Map<number, { sold: number; pending: number }>) {
+    const { data: tickets } = await ctx.supabase.from("event_tickets").select(TICKET_SELECT).eq("event_id", event.id);
+    const avail = availability || (await ticketAvailability(ctx, event.id, (tickets || []).map((t: any) => Number(t.id))));
+    const chainOf = await ticketChainInfo(ctx, Number(event.id), tickets || [], avail);
+    return presentTicket(row, avail.get(Number(row.id)), event, chainOf(row.id));
+}
+
 const createTicketType: ToolDef = {
     name: "create_ticket_type",
     title: "Crear tipo de entrada",
-    description: "Agrega un tipo de entrada a un evento (ej: Preventa 2, VIP). Precio en CLP. No uses el nombre \"Cortesía\": ese tipo ya lo crea el sistema.",
+    description: "Agrega un tipo de entrada a un evento (ej: Preventa 2, VIP). Precio en CLP. No uses el nombre \"Cortesía\": ese tipo ya lo crea el sistema. " +
+        "Para que una tanda se abra sola al agotarse la anterior, pasa opens_after_ticket_type_id.",
     scope: "write",
     audit: (args, result) => ({ summary: `Nuevo tipo ${args.name}: ${clp(args.price).replace(" CLP", "")}`, target: `ticket_type:${(result as any).ticket_type?.id ?? ""}` }),
     annotations: { readOnlyHint: false, destructiveHint: false },
@@ -69,6 +101,7 @@ const createTicketType: ToolDef = {
             sales_end: { type: "string", format: "date-time", nullable: true },
             function_id: { type: "integer", minimum: 1, nullable: true, description: "Solo para esa función (get_event → functions). Omitir = todas." },
             max_per_order: { type: "integer", minimum: 1, maximum: 50, default: 10 },
+            opens_after_ticket_type_id: opensAfterSchema,
         },
     },
     async handler(args, ctx) {
@@ -79,13 +112,23 @@ const createTicketType: ToolDef = {
         checkWindow(normalized.init_date, normalized.end_date);
         await assertCanSellPaid(ctx, event, { price: normalized.price, total_quantity: normalized.total_quantity });
         const functionId = await resolveFunctionId(ctx, event.id, args.function_id);
+        const prevId = args.opens_after_ticket_type_id ?? null;
+        if (prevId != null) await assertChainable(ctx, event.id, null, prevId);
         const { data, error } = await ctx.supabase
             .from("event_tickets")
-            .insert({ ...normalized, event_id: event.id, event_date_id: functionId ?? null, max_quantity: args.max_per_order, is_gift: false, status: "available" })
+            .insert({
+                ...normalized,
+                event_id: event.id,
+                event_date_id: functionId ?? null,
+                max_quantity: args.max_per_order,
+                is_gift: false,
+                status: "available",
+                ...(prevId != null ? { opens_after_ticket_id: prevId } : {}),
+            })
             .select(TICKET_SELECT)
             .single();
         if (error) throw error;
-        return { event_id: Number(event.id), ticket_type: presentTicket(data, undefined, event) };
+        return { event_id: Number(event.id), ticket_type: prevId != null ? await presentWithChain(ctx, event, data) : presentTicket(data, undefined, event) };
     },
 };
 
@@ -93,7 +136,8 @@ const updateTicketType: ToolDef = {
     name: "update_ticket_type",
     title: "Editar tipo de entrada",
     description:
-        "Cambia nombre, precio, capacidad, ventana de venta o pausa/reanuda la venta (on_sale) de un tipo de entrada. " +
+        "Cambia nombre, precio, capacidad, ventana de venta, pausa/reanuda la venta (on_sale) o encadena la tanda a la anterior " +
+        "(opens_after_ticket_type_id: se abre sola cuando esa se agota) de un tipo de entrada. " +
         "La capacidad no puede quedar bajo lo ya vendido. Un cambio de precio aplica solo a compras nuevas.",
     scope: "write",
     audit: (args, result) => {
@@ -119,6 +163,7 @@ const updateTicketType: ToolDef = {
             sales_end: { type: "string", format: "date-time", nullable: true },
             on_sale: { type: "boolean", description: "false = retirar de la venta (pausar); true = volver a vender." },
             max_per_order: { type: "integer", minimum: 1, maximum: 50 },
+            opens_after_ticket_type_id: opensAfterSchema,
         },
     },
     async handler(args, ctx) {
@@ -148,6 +193,11 @@ const updateTicketType: ToolDef = {
             }
             patch.total_quantity = args.quantity;
         }
+        if (args.opens_after_ticket_type_id !== undefined) {
+            const chain = await assertChainable(ctx, event.id, Number(ticket.id), args.opens_after_ticket_type_id);
+            (ticket as any).opens_after_ticket_id = chain.get(Number(ticket.id)) ?? null;
+            patch.opens_after_ticket_id = args.opens_after_ticket_type_id;
+        }
         if (!Object.keys(patch).length) throw new ToolError("invalid_input", "No enviaste cambios.");
         if (patch.price !== undefined || patch.total_quantity !== undefined) {
             const change: { id: number; price?: number; total_quantity?: number | null } = { id: Number(ticket.id) };
@@ -166,7 +216,7 @@ const updateTicketType: ToolDef = {
         const changes = Object.keys(patch)
             .filter((k) => String((ticket as any)[k] ?? "") !== String(patch[k] ?? ""))
             .map((k) => ({ field: k, from: (ticket as any)[k] ?? null, to: patch[k] ?? null }));
-        return { event_id: Number(event.id), ticket_type: presentTicket(data, availability.get(Number(ticket.id)), event), changes };
+        return { event_id: Number(event.id), ticket_type: await presentWithChain(ctx, event, data), changes };
     },
 };
 

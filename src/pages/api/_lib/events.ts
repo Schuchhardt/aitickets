@@ -7,6 +7,7 @@ import { isDefaultCoverSettings, normalizeCoverSettings } from "../../../lib/eve
 import { isDefaultPageSettings, normalizePageSettings } from "../../../lib/eventPageSettings";
 import { identityPublishBlocker } from "../../../lib/producerIdentity";
 import { refreshEventRisk } from "../../../lib/eventRisk";
+import { chainError } from "../../../../netlify/lib/tickets.mjs";
 
 /** Guarda la categoría del evento vía category_tags(name) + event_tags (reemplaza las anteriores). */
 export async function syncEventCategory(eventId: number, category: string | null | undefined) {
@@ -81,6 +82,8 @@ export type TicketInput = {
     eventDateId?: number | string | null;
     /** Máximo de entradas de este tipo por compra (por defecto 10). */
     maxPerOrder?: number | null;
+    /** Tanda anterior: id (real o temporal) de otra entrada del formulario. ""/null = se vende desde ya. */
+    opensAfterId?: number | string | null;
 };
 
 /** Normaliza un ticket del formulario. Devuelve null si es inválido. */
@@ -103,6 +106,46 @@ export function normalizeTicket(t: TicketInput) {
         init_date: toIso(t?.initDate),
         end_date: toIso(t?.endDate),
     };
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Tandas encadenadas desde el formulario (event_tickets.opens_after_ticket_id, migración 202610290100)
+// ---------------------------------------------------------------------------------------------------------
+
+const hasOpensAfter = (t: TicketInput) => t?.opensAfterId !== undefined && t?.opensAfterId !== null && t?.opensAfterId !== "";
+
+/** Valida el encadenamiento del formulario antes de guardar (ids del formulario, reales o temporales). */
+export function validateFormTicketChain(tickets: TicketInput[]) {
+    const rows = tickets.map((t) => {
+        const n = normalizeTicket(t);
+        return { id: Number(t.id), ticket_name: n?.ticket_name || "", total_quantity: n?.total_quantity ?? null, end_date: n?.end_date ?? null, is_gift: false };
+    });
+    const chain = new Map(tickets.filter(hasOpensAfter).map((t) => [Number(t.id), Number(t.opensAfterId)]));
+    for (const [id, prevId] of chain) {
+        const others = new Map(chain);
+        others.delete(id);
+        const reason = chainError(rows, others, id, prevId);
+        if (reason) throw new EventInputError(`Revisa las tandas: ${reason}`);
+    }
+}
+
+/**
+ * Guarda a qué tanda espera cada entrada. `idOf` traduce el id del formulario al id real. Solo toca las entradas
+ * que traen opensAfterId (formularios anteriores no lo mandan). Sin la columna aún (deploy preview) no hace nada.
+ */
+export async function saveFormTicketChain(eventId: number, tickets: TicketInput[], idOf: (formId: unknown) => number | undefined) {
+    const supabaseAdmin = getSupabaseAdmin();
+    for (const t of tickets) {
+        if (t?.opensAfterId === undefined) continue;
+        const id = idOf(t.id);
+        if (!id) continue;
+        const prev = hasOpensAfter(t) ? idOf(t.opensAfterId) ?? null : null;
+        const { error } = await supabaseAdmin.from("event_tickets").update({ opens_after_ticket_id: prev }).eq("id", id).eq("event_id", eventId);
+        if (error) {
+            if (["42703", "PGRST204"].includes(String(error.code || ""))) return;
+            throw error;
+        }
+    }
 }
 
 /** true si el id viene del cliente (Date.now()) y no de la base de datos. */
@@ -213,6 +256,7 @@ export async function createEventGraph(
     }
     const ticketsPayload = tickets.map(normalizeTicket);
     if (ticketsPayload.some((t) => !t)) throw new EventInputError("Revisa las entradas: nombre, precio y cantidad deben ser válidos");
+    validateFormTicketChain(tickets);
 
     // 1. Crear evento (siempre como borrador; se publica aparte)
     const name = String(general.name).trim().slice(0, 200);
@@ -279,17 +323,25 @@ export async function createEventGraph(
     }
 
     // 3. Entradas (ventana de venta NULL salvo que el productor la defina)
-    const { error: ticketsError } = await supabaseAdmin.from("event_tickets").insert(
-        ticketsPayload.map((t: any, i: number) => ({
-            ...t,
-            event_date_id: resolveTicketDateId(tickets[i]?.eventDateId, dateIdMap),
-            event_id: eventId,
-            max_quantity: Number(tickets[i]?.maxPerOrder) > 0 ? Math.floor(Number(tickets[i]?.maxPerOrder)) : 10,
-            is_gift: false,
-            status: "available",
-        })),
-    );
+    const { data: insertedTickets, error: ticketsError } = await supabaseAdmin
+        .from("event_tickets")
+        .insert(
+            ticketsPayload.map((t: any, i: number) => ({
+                ...t,
+                event_date_id: resolveTicketDateId(tickets[i]?.eventDateId, dateIdMap),
+                event_id: eventId,
+                max_quantity: Number(tickets[i]?.maxPerOrder) > 0 ? Math.floor(Number(tickets[i]?.maxPerOrder)) : 10,
+                is_gift: false,
+                status: "available",
+            })),
+        )
+        .select("id");
     if (ticketsError) throw ticketsError;
+    // Tandas encadenadas: el insert devuelve las filas en el mismo orden del formulario
+    if (tickets.some(hasOpensAfter)) {
+        const ticketIdMap = new Map(tickets.map((t, i) => [String(t.id), Number((insertedTickets as any[])?.[i]?.id)]));
+        await saveFormTicketChain(eventId, tickets, (formId) => ticketIdMap.get(String(formId)) || undefined);
+    }
 
     // 4. Categoría + campos denormalizados (start_date, end_date, location)
     await syncEventCategory(eventId, general.category);

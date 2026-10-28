@@ -2,7 +2,8 @@
 // 3 · La curva de un concierto (SPEC_landing_musica §4.3, ancla #como-se-vende): encabezado y la isla de la curva con
 // los seis momentos. Los números de los momentos salen del código: la última semana y el umbral de escasez de
 // DEFAULT_CADENCE (socialSeriesCadence.ts), el plazo de pago de legal.mjs. El aviso automático a la lista de "Avísame"
-// existe (netlify/lib/waitlist.mjs); abrir sola la siguiente tanda no, y va con "Pronto". La hora de apertura de una tanda hoy se programa
+// existe (netlify/lib/waitlist.mjs) y la siguiente tanda se abre sola al agotarse la anterior (opens_after_ticket_id,
+// netlify/lib/tickets.mjs). La hora de apertura de una tanda hoy se programa
 // desde el asistente de IA (tools/tickets.ts), por eso el chip dice "Venta abre el …" sin prometer el formulario.
 import MusicSalesCurve from "./MusicSalesCurve.vue";
 import { DEFAULT_CADENCE } from "../../../lib/socialSeriesCadence";
@@ -26,8 +27,8 @@ const moments = [
     tag: "D-44 · Preventa",
     title: "La primera ola se agota en horas.",
     text:
-      "Cuando se acaba la Preventa 1, aparece agotada y tu público ve la siguiente tanda con su precio. Los códigos de descuento tienen cupo, límite por persona y fecha de término.",
-    chips: [{ label: "Tandas con cupo" }, { label: "Códigos con fecha límite" }, { label: "Siguiente tanda automática", soon: true }],
+      "Cuando se acaba la Preventa 1, aparece agotada y la Preventa 2 se abre sola con su precio. Los códigos de descuento tienen cupo, límite por persona y fecha de término.",
+    chips: [{ label: "Tandas con cupo" }, { label: "Códigos con fecha límite" }, { label: "Siguiente tanda automática" }],
   },
   {
     tag: "D-30 · La meseta",

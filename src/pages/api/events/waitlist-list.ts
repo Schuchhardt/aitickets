@@ -34,7 +34,7 @@ export const GET: APIRoute = async (context) => {
 
     if (context.url.searchParams.get("format") === "csv") {
         const header = ["Email", "Motivo", "Función", "Anotado", "Avisado"];
-        const lines = rows.map((r) => [r.email, r.kind_label, r.function_label || "Todas", fmtDateTime(r.created_at), fmtDateTime(r.notified_at)].map(csvCell).join(";"));
+        const lines = rows.map((r: any) => [r.email, r.kind_label, r.function_label || "Todas", fmtDateTime(r.created_at), fmtDateTime(r.notified_at)].map(csvCell).join(";"));
         const csv = "﻿" + [header.map(csvCell).join(";"), ...lines].join("\r\n");
         return new Response(csv, {
             status: 200,
