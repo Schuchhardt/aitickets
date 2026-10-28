@@ -2,10 +2,9 @@
 // Card de anuncios de "Tu fecha en Instagram" (SPEC_landing_musica §4.8, card 2): papel con texto tinta. Misma lógica
 // que la demo de stand-up (useAdsDemo: presupuesto × días, estado activo y foco), con la piel del afiche. Los anuncios
 // existen (Meta vía Zernio, netlify/lib/zernio-ads.mjs): presupuesto diario, días (AD_LIMITS, llegan por props), ciudad
-// con radio y edad; Meta cobra el gasto directo. Segmentar por gustos musicales no existe: chip deshabilitado con
-// "Pronto". Es una demostración: no crea nada ni muestra alcances o resultados estimados.
+// con radio, edad e intereses de Meta (hasta 3; el chip "Gustos musicales" es el ejemplo); Meta cobra el gasto directo.
+// Es una demostración: no crea nada ni muestra alcances o resultados estimados.
 // Mobile: un solo slider (presupuesto) y los días fijos en 3. Analítica: mu_ads_demo { budget, days }. M15: pop del check.
-import SoonBadge from '../../ui/SoonBadge.vue'
 import { trackEvent } from '../../../composables/useGoogleAnalytics.js'
 import { useAdsDemo } from '../../../composables/useAdsDemo.js'
 import { formatCLP } from '../producerLanding.js'
@@ -30,7 +29,8 @@ const demoMaxDays = Math.min(ADS_DEMO.daysMax, props.maxDays)
     <p class="mu-mono ad-badge">Quedan 38 entradas · Faltan 3 días</p>
     <h3 class="mu-h3 ad-title">¿Necesitas un empujón? <span class="mu-red">Impulsa con anuncios.</span></h3>
     <p class="ad-text">
-      Lanza un anuncio en Instagram y Facebook desde tu panel, para Chile o para tu ciudad. Tú defines cuánto invertir
+      Lanza un anuncio en Instagram y Facebook desde tu panel, para Chile o para tu ciudad, y según los gustos musicales de
+      tu público. Tú defines cuánto invertir
       por día y por cuántos días, y lo pausas cuando quieras. Meta cobra el gasto directo en tu cuenta publicitaria y ves
       cuántas entradas vendió cada anuncio.
     </p>
@@ -58,7 +58,7 @@ const demoMaxDays = Math.min(ADS_DEMO.daysMax, props.maxDays)
         <ul class="ad-chips" aria-label="Público">
           <li class="ad-chip">Santiago · 25 km</li>
           <li class="ad-chip">18–45 años</li>
-          <li class="ad-chip is-disabled" aria-disabled="true">Gustos musicales <SoonBadge /></li>
+          <li class="ad-chip">Gustos musicales</li>
         </ul>
         <button ref="launchButton" type="button" class="mu-btn mu-btn-ink ad-cta" data-testid="music-ads-launch" @click="setLaunched(true)">
           <span class="ad-wide">Impulsar · <span class="ev-tabular">{{ formatCLP(total) }}</span> en total</span>
@@ -146,9 +146,6 @@ const demoMaxDays = Math.min(ADS_DEMO.daysMax, props.maxDays)
   border-radius: 4px;
   background: var(--mu-paper);
   font-size: 12px;
-}
-.ad-chip.is-disabled {
-  color: var(--mu-ink-3);
 }
 .ad-cta {
   min-height: 48px;

@@ -2,11 +2,10 @@
 // Card de anuncios de "La última semana" (SPEC_landing_fiestas §4.5): piel sticker sobre la misma lógica de las demos
 // de stand-up, música y clubs (useAdsDemo: presupuesto × días, estado activo y foco). Los anuncios existen (Meta vía
 // Zernio, netlify/lib/zernio-ads.mjs): presupuesto diario, días, ciudad con radio y edad desde AD_LIMITS.defaultAgeMin
-// (AD_LIMITS llega por props); Meta cobra el gasto directo. Segmentar por gustos ("Reggaetón") no existe: chip
-// deshabilitado con "Pronto". Es una demostración: no crea nada ni muestra alcances o resultados estimados, y la pieza
+// (AD_LIMITS llega por props) e intereses de Meta (hasta 3; "Reggaetón" es el ejemplo); Meta cobra el gasto directo.
+// Es una demostración: no crea nada ni muestra alcances o resultados estimados, y la pieza
 // de ejemplo no muestra alcohol (§0.11). Mobile: un solo slider (presupuesto) y los días fijos en 3.
 // Analítica: fi_ads_demo { budget, days }.
-import SoonBadge from '../../ui/SoonBadge.vue'
 import { trackEvent } from '../../../composables/useGoogleAnalytics.js'
 import { useAdsDemo } from '../../../composables/useAdsDemo.js'
 import { formatCLP } from '../producerLanding.js'
@@ -33,7 +32,7 @@ const demoMaxDays = Math.min(PARTY_ADS_DEMO.daysMax, props.maxDays)
     <p class="fi-tag fi-tag-amarillo pad-badge">Preventa 3 · Quedan 64</p>
     <h3 class="fi-h3 pad-title">¿Se frenó la venta? Impúlsala.</h3>
     <p class="pad-text">
-      Lanza un anuncio en Instagram y Facebook desde tu panel, para tu ciudad y desde los {{ props.minAge }} años. Tú
+      Lanza un anuncio en Instagram y Facebook desde tu panel, para tu ciudad, desde los {{ props.minAge }} años y por gustos. Tú
       defines cuánto invertir por día y por cuántos días, y lo pausas cuando quieras. Meta cobra el gasto directo en tu
       cuenta publicitaria y ves cuántas entradas vendió cada anuncio.
     </p>
@@ -61,7 +60,7 @@ const demoMaxDays = Math.min(PARTY_ADS_DEMO.daysMax, props.maxDays)
         <ul class="pad-chips" aria-label="Público">
           <li class="pad-chip">Santiago · {{ props.radiusKm }} km</li>
           <li class="pad-chip">{{ props.minAge }}–{{ PARTY_ADS_DEMO.ageMax }} años</li>
-          <li class="pad-chip is-disabled" aria-disabled="true">Reggaetón <SoonBadge /></li>
+          <li class="pad-chip">Reggaetón</li>
         </ul>
         <button ref="launchButton" type="button" class="fi-btn fi-btn-tinta pad-cta" data-testid="party-ads-launch" @click="setLaunched(true)">
           <span class="pad-wide">Impulsar · <span class="fi-tabular">{{ formatCLP(total) }}</span> en total</span>
@@ -138,10 +137,6 @@ const demoMaxDays = Math.min(PARTY_ADS_DEMO.daysMax, props.maxDays)
   background: var(--fi-crema);
   font-size: 12px;
   font-weight: 600;
-}
-.pad-chip.is-disabled {
-  border-style: dashed;
-  color: var(--fi-text-3);
 }
 .pad-cta {
   min-height: 48px;

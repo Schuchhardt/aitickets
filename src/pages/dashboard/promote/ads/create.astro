@@ -48,7 +48,7 @@ const { data: posts } = eventIds.length
       .limit(50)
   : { data: [] };
 
-const limits = { cityRadiiKm: AD_LIMITS.cityRadiiKm, callsToAction: AD_CALLS_TO_ACTION };
+const limits = { cityRadiiKm: AD_LIMITS.cityRadiiKm, callsToAction: AD_CALLS_TO_ACTION, maxInterests: AD_LIMITS.maxInterests, maxWorkPositions: AD_LIMITS.maxWorkPositions };
 ---
 
 <DashboardLayout title="Crear anuncio">
