@@ -36,6 +36,17 @@ export const SAMPLES = {
     orderUrl: `${SITE}/order/8f2c1e4a-1234-4c1a-9e1f-0a1b2c3d4e5f`,
     calendarUrl: 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=Festival',
   }),
+  'tickets-holder': () => emails.renderHolderTicketEmail({
+    holderName: 'Pedro',
+    buyerName: 'Camila Rojas',
+    organizerName: 'Productora Sur',
+    eventName: 'Seminario de Liderazgo',
+    ticketName: 'General',
+    functionLabel: 'jueves 12 de noviembre · 09:00',
+    dateLines: [{ date: 'jueves 12 de noviembre de 2026', time: '09:00', place: 'Centro de Eventos, Santiago' }],
+    qrCid: 'qr-entrada',
+    ticketUrl: `${SITE}/ticket/8f2c1e4a-1234-4c1a-9e1f-0a1b2c3d4e5f`,
+  }),
   'tickets-free': () => emails.renderTicketsEmail({
     kind: 'rsvp',
     customerName: 'Camila',

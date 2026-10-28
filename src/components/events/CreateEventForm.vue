@@ -9,6 +9,8 @@ import { chainOptions, pruneChain, chainSummary } from './ticketChain'
 import { applyRepeat, applyTicketCopy } from './functionRepeat'
 import FunctionRepeat from './FunctionRepeat.vue'
 import TicketCopyToFunctions from './TicketCopyToFunctions.vue'
+import CheckoutFieldsEditor from './CheckoutFieldsEditor.vue'
+import { MAX_PEOPLE_PER_TICKET } from '../../lib/checkoutFields.mjs'
 
 const props = defineProps({
   initialVenues: {
@@ -124,9 +126,13 @@ const repeatFunctions = (locationIndex, pattern) => applyRepeat(form.value.locat
 const copyTicketsToFunctions = () =>
   applyTicketCopy(form.value.tickets, functionOptions.value.map((o) => o.id), newTempId)
 
+// Qué pedir al comprar (events.checkout_fields): asistentes por entrada, empresa y preguntas (CheckoutFieldsEditor)
+if (!form.value.general.checkoutFields) form.value.general.checkoutFields = { attendee_names: 'off', company: false, questions: [] }
+
 // Logic Step 3 (Tickets)
+// peoplePerTicket: mesa para N (un QR por persona; cupo y precio por mesa). 1 = entrada normal.
 const addTicket = () => {
-  form.value.tickets.push({ id: newTempId(), name: '', price: 0, quantity: 100, description: '', eventDateId: '', opensAfterId: '' })
+  form.value.tickets.push({ id: newTempId(), name: '', price: 0, quantity: 100, description: '', eventDateId: '', opensAfterId: '', peoplePerTicket: 1 })
 }
 
 const removeTicket = (index) => {
@@ -532,6 +538,15 @@ if (form.value.tickets.length === 0) addTicket()
                   <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Cantidad</label>
                   <input v-model="ticket.quantity" type="number" class="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black outline-none" />
                </div>
+               <div class="col-span-2">
+                  <label class="block text-xs font-bold text-gray-500 uppercase mb-1" :for="`people-${ticket.id}`">Personas por entrada</label>
+                  <input :id="`people-${ticket.id}`" v-model.number="ticket.peoplePerTicket" type="number" min="1" :max="MAX_PEOPLE_PER_TICKET" placeholder="1" class="w-28 px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black outline-none" data-testid="ticket-people" />
+                  <p class="mt-1 text-xs text-gray-500">
+                    {{ Number(ticket.peoplePerTicket) > 1
+                      ? `Mesa o pack para ${ticket.peoplePerTicket}: cada compra emite ${ticket.peoplePerTicket} QR, uno por invitado. Precio y cantidad son por mesa.`
+                      : '1 = entrada normal. Para una mesa, pon cuántas personas entran con ella.' }}
+                  </p>
+               </div>
                <div v-if="functionOptions.length > 1" class="col-span-2">
                   <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Función</label>
                   <select v-model="ticket.eventDateId" class="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black outline-none bg-white">
@@ -553,6 +568,8 @@ if (form.value.tickets.length === 0) addTicket()
            <button @click="addTicket" class="w-full py-3 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 font-medium hover:border-black hover:text-black transition-colors flex items-center justify-center gap-2">
              <Plus size="20" /> Agregar Ticket
            </button>
+
+           <CheckoutFieldsEditor v-model="form.general.checkoutFields" />
         </div>
 
         <!-- Step 4: Review -->

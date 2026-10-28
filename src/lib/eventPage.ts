@@ -20,7 +20,8 @@ import { isEventEnded } from "../components/event/eventView.js";
 import { resolveCoverMeta, eventThemeFrom } from "./eventCoverMeta";
 import { normalizePageSettings, stripDemoSuffix } from "./eventPageSettings";
 import { computeFeeSplit } from "../../netlify/lib/fees.mjs";
-import { maxPerPurchase, loadTicketChain, waitingOnPrevious } from "../../netlify/lib/tickets.mjs";
+import { maxPerPurchase, loadTicketChain, waitingOnPrevious, loadPeoplePerTicket } from "../../netlify/lib/tickets.mjs";
+import { normalizeCheckoutFields } from "./checkoutFields.mjs";
 import { clientIpFrom } from "./sites";
 
 // Columnas públicas del evento. NUNCA incluir secret_location (C4).
@@ -432,6 +433,19 @@ export function toPublicTicket(t: any, { remaining, feeAbsorbed }: { remaining: 
 }
 
 /**
+ * Datos extra que pide el checkout (events.checkout_fields, migración 202610300100) y personas por entrada de las
+ * mesas (202610300110). Aparte de aitickets_public_event_page para no tocar esa función; sin las migraciones devuelve
+ * el checkout de siempre.
+ */
+async function loadCheckoutConfig(supabase: ReturnType<typeof getSupabaseAdmin>, eventId: number) {
+  const [fieldsRes, people] = await Promise.all([
+    supabase.from("events").select("checkout_fields").eq("id", eventId).maybeSingle(),
+    loadPeoplePerTicket(supabase, eventId),
+  ]);
+  return { fields: normalizeCheckoutFields(fieldsRes.error ? null : (fieldsRes.data as any)?.checkout_fields), people: people as Map<number, number> };
+}
+
+/**
  * Carga un evento publicado con todo lo necesario para su página pública.
  * Devuelve null si no existe, no está publicado o (con organizationId) pertenece a otra organización.
  */
@@ -621,7 +635,7 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
   const ended = !isDemo && !isPreview && isEventEnded({ dates, end_date: endDate, is_demo: isDemo }, now);
 
   // Póster: proporción real y tinte de la página (events.cover_meta, src/lib/eventCoverMeta.ts)
-  const [coverMeta, reviews] = await Promise.all([
+  const [coverMeta, reviews, checkoutConfig] = await Promise.all([
     resolveCoverMeta(event, {
       waitUntil: (() => {
         const ctx = opts.locals?.netlify?.context;
@@ -629,6 +643,7 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
       })(),
     }),
     ended ? loadPublicReviews(Number(event.id)).catch(() => null) : Promise.resolve(null),
+    loadCheckoutConfig(supabase, Number(event.id)),
   ]);
 
   const { cover_meta: _coverMeta, page_settings: rawPageSettings, cover_video: rawCoverVideo, gallery_video: rawGalleryVideo, ...eventRow } = event;
@@ -650,8 +665,11 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
     // Evento terminado: { summary, reviews, comments_total, photos } (null si no terminó o sin tablas)
     reviews,
     dates,
-    tickets: publicTickets,
+    // Mesa para N: people_per_ticket > 1 (un QR por persona; precio y cupo por mesa)
+    tickets: publicTickets.map((t) => ({ ...t, people_per_ticket: checkoutConfig.people.get(Number(t.id)) || 1 })),
     unavailable_tickets: unavailableTickets,
+    // Asistentes por entrada, datos de empresa y preguntas al inscribirse (src/lib/checkoutFields.mjs)
+    checkout_fields: checkoutConfig.fields,
     theme: eventThemeFrom(coverMeta),
     sale_state: saleState,
     sale_starts_at: upcomingSaleDates[0] || null,

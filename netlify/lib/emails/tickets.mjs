@@ -5,6 +5,7 @@ import { LEGAL } from '../legal.mjs'
 import { FEE_INCLUDED_NOTE, SERVICE_FEE_TAX_LABEL, serviceFeeLabelFor } from '../fees.mjs'
 import { discountLineLabel } from '../discounts.mjs'
 import { orderCopy, isPaidKind } from '../order-kind.mjs'
+import { formatRut, COMPANY_RECEIPT_NOTE } from '../../../src/lib/checkoutFields.mjs'
 import { h, str, safeHref, COLORS, FONT_FAMILY, EmailLayout, TABLE_PROPS, Title, Subtitle, Paragraph, Badge, PrimaryButton, Panel, renderEmail } from './layout.mjs'
 
 export const clp = (n) => `$${Math.round(Number(n) || 0).toLocaleString('es-CL')}`
@@ -101,7 +102,7 @@ function QrTickets({ qrTickets, moreCount }) {
         { key: t.cid, style: card },
         h(Img, { src: `cid:${t.cid}`, width: 200, height: 200, alt: `Código QR de tu entrada ${str(t.index)}`, style: { display: 'block', margin: '0 auto', width: '200px', height: '200px' } }),
         h('p', { style: label }, str(t.label)),
-        h('p', { style: sub }, `Entrada ${str(t.index)} de ${str(t.total)}${t.functionLabel ? ` · ${str(t.functionLabel)}` : ''}`)
+        h('p', { style: sub }, `Entrada ${str(t.index)} de ${str(t.total)}${t.holder ? ` · ${str(t.holder)}` : ''}${t.functionLabel ? ` · ${str(t.functionLabel)}` : ''}`)
       )
     ),
     moreCount > 0
@@ -164,7 +165,10 @@ const FOOTER_REASON = {
  *   ticketLines?: Array<{ name: string, quantity: number, unitPrice: number, url?: string }>,
  *   subtotal?: number, discountCode?: string, discountAmount?: number, fee?: number, feeNet?: number, feeIva?: number, feeIncluded?: boolean, total?: number,
  *   orderId: string, orderDate?: string, orderUrl: string, contactUrl?: string, calendarUrl?: string | null,
+ *   companyName?: string, companyRut?: string,
  * }} data
+ * companyName/companyRut: datos de empresa que dio quien compra (opcionales); van en el comprobante con la aclaración
+ * de que no es boleta ni factura.
  * kind (netlify/lib/order-kind.mjs): sin él se deduce de los montos (todo en $0 y sin descuento => 'rsvp'). Solo
  * 'purchase' habla de compra y lleva comprobante; las gratis son una confirmación de asistencia.
  */
@@ -229,10 +233,53 @@ export async function renderTicketsEmail(data = {}) {
           Panel,
           { label: LEGAL.receiptLabel, tone: 'outline' },
           h(ReceiptRows, { ticketLines, subtotal: data.subtotal, discountCode: data.discountCode, discountAmount: data.discountAmount, fee: data.fee, feeNet: data.feeNet, feeIva: data.feeIva, feeIncluded: data.feeIncluded === true, total: data.total }),
+          str(data.companyName).trim() && str(data.companyRut).trim()
+            ? h(
+                Paragraph,
+                { small: true, style: { margin: '12px 0 0', fontSize: '13px' } },
+                `Empresa: ${str(data.companyName).trim()} · RUT ${formatRut(data.companyRut)}`,
+                h('br'),
+                h('span', { style: { color: COLORS.subtle, fontSize: '12px' } }, COMPANY_RECEIPT_NOTE)
+              )
+            : null,
           h(Paragraph, { small: true, style: { margin: '12px 0 0', color: COLORS.subtle, fontSize: '12px' } }, `Orden ${str(data.orderId)}${data.orderDate ? ` · ${str(data.orderDate)}` : ''}`)
         )
       : h(Panel, { label: kind === 'rsvp' ? 'Tu registro' : 'Tus entradas', tone: 'outline' }, h(TicketList, { ticketLines })),
     h(ContactProducer, { contactUrl: data.contactUrl, organizerName: data.organizerName })
+  )
+  return renderEmail(subject, element)
+}
+
+/**
+ * Entrada de un asistente de una compra de varias (event_attendees.holder_email): su QR, cuándo y dónde, y el link a
+ * su entrada (/ticket/<id>). Sin montos: quien compró recibe el comprobante.
+ * @param {{ holderName?: string, buyerName?: string, organizerName?: string, eventName?: string, ticketName?: string,
+ *   functionLabel?: string, dateLines?: Array<{ date: string, time?: string, place?: string }>, secretLocation?: string,
+ *   qrCid: string, ticketUrl: string }} data
+ */
+export async function renderHolderTicketEmail(data = {}) {
+  const holderName = str(data.holderName).trim() || 'asistente'
+  const eventName = str(data.eventName).trim() || 'Tu evento'
+  const buyerName = str(data.buyerName).trim()
+  const dateLines = Array.isArray(data.dateLines) ? data.dateLines : []
+  const subject = `🎟️ Tu entrada para ${eventName}`
+  const element = h(
+    EmailLayout,
+    {
+      preview: `${buyerName ? `${buyerName} te inscribió en` : 'Tu entrada para'} ${eventName}. Muestra el QR en la puerta.`,
+      footer: { reason: 'Recibes este correo porque quien compró las entradas te anotó como asistente en AI Tickets. El evento es organizado por su productora.' },
+    },
+    h(Badge, null, 'Entrada a tu nombre'),
+    h(Title, null, `¡Hola ${holderName}! Esta es tu entrada`),
+    h(Subtitle, null, eventName),
+    buyerName ? h(Paragraph, { align: 'center', muted: true }, `${buyerName} compró las entradas y te anotó como asistente.`) : null,
+    h(QrTickets, { qrTickets: [{ cid: data.qrCid, index: 1, total: 1, label: str(data.ticketName) || 'Entrada', functionLabel: str(data.functionLabel) }], moreCount: 0 }),
+    h(PrimaryButton, { href: data.ticketUrl, hint: 'Muestra el QR en la puerta. Es solo para ti: cada entrada se valida una vez.' }, 'Ver mi entrada (QR)'),
+    h(Panel, { label: 'Cuándo y dónde' }, h(DateRows, { dateLines })),
+    data.secretLocation
+      ? h(Panel, { label: 'Dirección exclusiva para asistentes', tone: 'warn' }, h(Paragraph, { style: { margin: 0 } }, str(data.secretLocation)))
+      : null,
+    data.organizerName ? h(Paragraph, { small: true, align: 'center', muted: true }, `Organiza ${str(data.organizerName)}.`) : null
   )
   return renderEmail(subject, element)
 }

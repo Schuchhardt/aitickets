@@ -6,7 +6,8 @@
 //               tools/messaging.ts (send_attendee_message / schedule_reminder, hoy solo desde el asistente de IA)
 //   asistente de la página y FAQ con IA → EventAssistant.vue, EventFAQManager.vue
 //   cerrar inscripciones → event_tickets.end_date (tools/tickets.ts, hoy desde el asistente de IA)
-//   preguntas al inscribirse → no existen ("Pronto": cada inscripción guarda nombre y correo de quien compra)
+//   preguntas al inscribirse → events.checkout_fields.questions (texto corto, una opción, sí o no; obligatorias u
+//               opcionales), en el checkout y en RsvpForm (CheckoutExtras.vue); se ven en la lista de asistentes y el CSV
 // TL12: el correo entra deslizando desde la derecha cuando su bloque se revela. Mobile: foto a ancho completo con el
 // correo abajo sin giro; ítems y burbujas debajo.
 import SectionTab from "./SectionTab.astro";
@@ -14,7 +15,6 @@ import Highlight from "./Highlight.astro";
 import PrintedPhoto from "./PrintedPhoto.astro";
 import Tick from "./Tick.astro";
 import IndexCard from "./IndexCard.astro";
-import SoonBadge from "../../ui/SoonBadge.vue";
 import { WORKSHOP_PHOTOS, presetById, workshopDates } from "./talleresLanding.js";
 
 const preset = presetById("ceramica");
@@ -39,8 +39,7 @@ const items = [
   },
   {
     title: "Preguntas al inscribirse (nivel, alergias, talla)",
-    text: "Hoy cada inscripción guarda el nombre y el correo de quien se inscribe.",
-    soon: true,
+    text: "Las agregas al crear el taller: texto corto, elegir una opción o sí o no, obligatorias u opcionales. Ves las respuestas en tu lista de asistentes y en el CSV.",
   },
 ];
 ---
@@ -79,10 +78,7 @@ const items = [
             <li data-lp-step>
               <Tick />
               <div>
-                <strong class="tl-soon-line">
-                  {item.title}
-                  {item.soon && <SoonBadge dark={false} />}
-                </strong>
+                <strong class="tl-soon-line">{item.title}</strong>
                 <p>{item.text}</p>
               </div>
             </li>

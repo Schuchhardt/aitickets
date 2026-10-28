@@ -118,8 +118,10 @@ test("lo que no existe va con Pronto y sin testimonio real no hay cita", async (
   await open(page);
   // La agenda con expositores (el ingreso diario con el mismo pase ya existe)
   await expect(page.locator("#programa").getByTestId("soon-badge")).toHaveCount(1);
-  // Datos de cada asistente y de facturación al comprar
-  await expect(page.locator("#empresas").getByTestId("soon-badge")).toHaveCount(2);
+  // El nombre de cada asistente y el RUT y la razón social al comprar ya existen
+  await expect(page.locator("#empresas").getByTestId("soon-badge")).toHaveCount(0);
+  await expect(page.getByTestId("seminar-team-names")).toContainText("a cada una le llega su QR");
+  await expect(page.getByTestId("seminar-company-fields")).toContainText("no es boleta ni factura");
   // Facebook, TikTok y reels en la serie, LinkedIn desde el panel y segmentar por profesión
   await expect(page.locator("#difusion").getByTestId("soon-badge")).toHaveCount(5);
   // La lista de espera ya existe: sin "Pronto"

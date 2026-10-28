@@ -6,6 +6,7 @@ import { requireDashboardSession } from "../_lib/guard";
 import { getStaffEventIds } from "../../../../netlify/lib/event-staff.mjs";
 import { fetchAll } from "../../../lib/producer-api/tools/common";
 import { formatFunctionLabel } from "../../../../netlify/lib/dates.mjs";
+import { formatRut } from "../../../lib/checkoutFields.mjs";
 import {
     Ticket,
     Calendar,
@@ -110,6 +111,12 @@ type AttendeeRow = {
     /** Función del tipo de entrada (event_date_id); null = válida para cualquier función. */
     functionId: number | null;
     functionLabel: string | null;
+    /** Quien compró, si el asistente de este QR es otra persona (event_attendees.holder_name). */
+    boughtBy: string | null;
+    /** Respuestas a las preguntas del evento ("Talla: M · Alergias: no"), de la orden. */
+    answers: string;
+    /** Empresa de la orden ("Acme SpA · 76.123.456-7"). */
+    company: string;
 };
 type TicketStats = {
     /** Entradas vendidas: vigentes, de órdenes pagadas (o gratis sin orden), sin cortesías. */
@@ -133,13 +140,31 @@ function eventFunctionList(event: any): { id: number; label: string }[] {
         .map((d: any) => ({ id: Number(d.id), label: formatFunctionLabel(d, { withPlace: false }) }));
 }
 
+// Asistente de cada QR (holder_*, 202610300100) y mesa (unit_id, 202610300110): columnas opcionales (base sin migrar)
+const ATTENDEE_EXTRA_COLUMNS = ["holder_name, holder_email, unit_id,", "holder_name, holder_email,", ""];
+const ORDER_EXTRA_COLUMNS = ["buyer_first_name, buyer_last_name, buyer_email, registration_answers, company_rut, company_name", "buyer_first_name, buyer_last_name, buyer_email"];
+
+async function fetchWithFallback<T>(variants: string[], build: (cols: string) => any): Promise<T[]> {
+    let lastError: any = null;
+    for (const cols of variants) {
+        try {
+            return await fetchAll<T>(() => build(cols));
+        } catch (err: any) {
+            lastError = err;
+            if (!["42703", "PGRST204"].includes(String(err?.code || ""))) throw err;
+        }
+    }
+    throw lastError;
+}
+
 async function loadEventTickets(event: any): Promise<{ stats: TicketStats; attendees: AttendeeRow[] }> {
     const functionLabels = new Map(eventFunctionList(event).map((f) => [f.id, f.label]));
     const [eventAttendeesRows, paidOrders] = await Promise.all([
-        fetchAll<any>(() => supabaseAdmin
+        fetchWithFallback<any>(ATTENDEE_EXTRA_COLUMNS, (extra) => supabaseAdmin
             .from("event_attendees")
             .select(
                 `
+      ${extra}
       id,
       created_at,
       event_order_id,
@@ -164,23 +189,28 @@ async function loadEventTickets(event: any): Promise<{ stats: TicketStats; atten
             .eq("event_id", event.id)
             .order("created_at", { ascending: false })
             .order("id", { ascending: true })),
-        fetchAll<{ id: string }>(() => supabaseAdmin
+        fetchWithFallback<any>(ORDER_EXTRA_COLUMNS, (cols) => supabaseAdmin
             .from("event_orders")
-            .select("id")
+            .select(`id, ${cols}`)
             .eq("event_id", event.id)
             .eq("status", "paid")
             .order("id", { ascending: true })),
     ]);
     const paidOrderIds = new Set(paidOrders.map((o) => o.id));
+    const ordersById = new Map<string, any>(paidOrders.map((o) => [o.id, o]));
 
     // Entradas de órdenes pagadas o sin orden (gratis antiguas)
     const valid = eventAttendeesRows.filter((a: any) => a.event_order_id === null || paidOrderIds.has(a.event_order_id));
     const active = valid.filter((a: any) => a.status !== "cancelled"); // anuladas (reembolsos) no cuentan
     const byTicketType: Record<number, number> = {};
     let courtesy = 0;
+    // Stock usado: una mesa para N cuenta una vez (sus QR comparten unit_id)
+    const seenUnits = new Set<string>();
     for (const a of active) {
-        byTicketType[a.event_ticket_id] = (byTicketType[a.event_ticket_id] || 0) + 1;
         if (a.is_complimentary === true) courtesy += 1;
+        if (a.unit_id && seenUnits.has(a.unit_id)) continue;
+        if (a.unit_id) seenUnits.add(a.unit_id);
+        byTicketType[a.event_ticket_id] = (byTicketType[a.event_ticket_id] || 0) + 1;
     }
     const limited = (event.event_tickets || []).filter((t: any) => !t.is_gift && t.total_quantity != null);
     const capacity = limited.reduce((sum: number, t: any) => sum + (Number(t.total_quantity) || 0), 0);
@@ -193,12 +223,20 @@ async function loadEventTickets(event: any): Promise<{ stats: TicketStats; atten
             byTicketType,
             occupancyPct: capacity > 0 ? Math.min(100, Math.round((issued / capacity) * 100)) : 0,
         },
-        attendees: valid.map((a: any) => ({
+        attendees: valid.map((a: any) => {
+            const order = a.event_order_id ? ordersById.get(a.event_order_id) : null;
+            const buyerName = order?.buyer_email
+                ? `${order.buyer_first_name || ""} ${order.buyer_last_name || ""}`.trim()
+                : `${a.attendees?.first_name || ""} ${a.attendees?.last_name || ""}`.trim();
+            const buyerEmail = order?.buyer_email || a.attendees?.email || "";
+            const holderIsOther = Boolean(a.holder_name || a.holder_email) && (a.holder_name || "") !== buyerName;
+            return {
             id: a.id,
-            name:
-                `${a.attendees?.first_name || ""} ${a.attendees?.last_name || ""}`.trim() ||
-                "Sin nombre",
-            email: a.attendees?.email || "Sin email",
+            name: a.holder_name || buyerName || "Sin nombre",
+            email: a.holder_email || (a.holder_name ? "" : buyerEmail) || "Sin email",
+            boughtBy: holderIsOther ? buyerName || buyerEmail : null,
+            answers: (Array.isArray(order?.registration_answers) ? order.registration_answers : []).map((x: any) => `${x.question}: ${x.answer}`).join(" · "),
+            company: order?.company_name ? `${order.company_name} · ${formatRut(order.company_rut)}` : "",
             ticketType: a.event_tickets?.ticket_name || "N/A",
             price: a.event_tickets?.price || 0,
             isFree: a.event_order_id === null,
@@ -213,7 +251,8 @@ async function loadEventTickets(event: any): Promise<{ stats: TicketStats; atten
                         ? "Todas las funciones"
                         : functionLabels.get(Number(a.event_tickets.event_date_id)) || null
                     : null,
-        })),
+            };
+        }),
     };
 }
 
@@ -615,6 +654,9 @@ function formatDate(dateString: string | null): string {
                                                                                                 attendee.email
                                                                                             }
                                                                                         </p>
+                                                                                        {attendee.boughtBy && <p class="text-xs text-gray-400 attendee-buyer">Compró {attendee.boughtBy}</p>}
+                                                                                        {attendee.company && <p class="text-xs text-gray-400 attendee-company">{attendee.company}</p>}
+                                                                                        {attendee.answers && <p class="text-xs text-gray-500 mt-0.5 max-w-xs attendee-answers">{attendee.answers}</p>}
                                                                                     </div>
                                                                                 </td>
                                                                                 <td class="px-4 py-3">
@@ -990,6 +1032,9 @@ function formatDate(dateString: string | null): string {
                                                                                                 attendee.email
                                                                                             }
                                                                                         </p>
+                                                                                        {attendee.boughtBy && <p class="text-xs text-gray-400 attendee-buyer">Compró {attendee.boughtBy}</p>}
+                                                                                        {attendee.company && <p class="text-xs text-gray-400 attendee-company">{attendee.company}</p>}
+                                                                                        {attendee.answers && <p class="text-xs text-gray-500 mt-0.5 max-w-xs attendee-answers">{attendee.answers}</p>}
                                                                                     </div>
                                                                                 </td>
                                                                                 <td class="px-4 py-3">

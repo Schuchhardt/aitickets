@@ -16,6 +16,8 @@ import { changeEventSlug, EventSlugError, SLUG_MAX, SLUG_MIN } from "../../event
 import { EVENT_PAGE_BACKGROUNDS, EVENT_PAGE_LAYOUTS, isDefaultPageSettings, normalizePageSettings, type EventPageSettings } from "../../eventPageSettings";
 import { normalizeEventVideo } from "../../eventVideo";
 import { notifySlack, dedupeLocation } from "../../../pages/api/_lib/server-utils";
+import { normalizeCheckoutFields, isDefaultCheckoutFields, ATTENDEE_NAME_MODES, QUESTION_TYPES, MAX_QUESTIONS, MAX_OPTIONS, MAX_LABEL } from "../../checkoutFields.mjs";
+import { loadPeoplePerTicket } from "../../../../netlify/lib/tickets.mjs";
 
 const EVENT_LIST_COLUMNS = "id, name, slug, status, accessibility, start_date, end_date, location, image_url, created_at";
 
@@ -142,7 +144,9 @@ const getEvent: ToolDef = {
     title: "Detalle de evento",
     description:
         "Detalle completo de un evento: estado (publicado o borrador), descripción, funciones (fechas/horas), lugares, tipos de entrada " +
-        "con precio, capacidad, vendidas y disponibles, y links privados de vista previa. Si is_published es false, el link público " +
+        "con precio, capacidad, vendidas, disponibles y personas por entrada (people_per_ticket > 1 = mesa para N, un QR por persona), " +
+        "checkout_fields (qué pide el checkout además del nombre y correo: asistentes por entrada, datos de empresa y preguntas al inscribirse) " +
+        "y links privados de vista previa. Si is_published es false, el link público " +
         "NO funciona todavía: comparte un link de vista previa (create_preview_link).",
     scope: "read",
     annotations: { readOnlyHint: true },
@@ -155,6 +159,12 @@ async function loadPageSettings(ctx: ToolContext, eventId: number): Promise<Even
     const { data, error } = await ctx.supabase.from("events").select("page_settings").eq("id", eventId).eq("organization_id", ctx.actor.orgId).maybeSingle();
     if (error && error.code !== "42703") throw error;
     return normalizePageSettings((data as any)?.page_settings);
+}
+/** Datos extra del checkout (events.checkout_fields, migración 202610300100). Sin la migración: los de siempre. */
+async function loadCheckoutFields(ctx: ToolContext, eventId: number) {
+    const { data, error } = await ctx.supabase.from("events").select("checkout_fields").eq("id", eventId).eq("organization_id", ctx.actor.orgId).maybeSingle();
+    if (error && !["42703", "PGRST204"].includes(String(error.code || ""))) throw error;
+    return normalizeCheckoutFields((data as any)?.checkout_fields);
 }
 const PAGE_LAYOUT_HELP = EVENT_PAGE_LAYOUTS.map((l) => `${l.value} (${l.label}: ${l.hint})`).join("; ");
 
@@ -179,6 +189,7 @@ async function eventDetail(ctx: ToolContext, eventId: number) {
     const previewLinks = await listPreviewLinks(Number(event.id), ctx.actor.orgId, ctx.supabase).catch(() => []);
     const pageSettings = await loadPageSettings(ctx, Number(event.id));
     const videos = await loadEventVideos(ctx, Number(event.id));
+    const [checkoutFields, people] = await Promise.all([loadCheckoutFields(ctx, Number(event.id)), loadPeoplePerTicket(ctx.supabase, Number(event.id))]);
     const venueOf = new Map<string, any>();
     for (const l of locations || []) {
         const v = Array.isArray((l as any).venues) ? (l as any).venues[0] : (l as any).venues;
@@ -214,7 +225,11 @@ async function eventDetail(ctx: ToolContext, eventId: number) {
         dashboard_url: eventDashboardUrl(ctx, Number(event.id)),
         preview_links: previewLinks.filter((l) => l.status === "active").map(({ event_id, ...l }) => l),
         functions,
-        ticket_types: (tickets || []).map((t: any) => presentTicket(t, availability.get(Number(t.id)), event, chainOf(t.id))),
+        ticket_types: (tickets || []).map((t: any) => ({
+            ...presentTicket(t, availability.get(Number(t.id)), event, chainOf(t.id)),
+            people_per_ticket: people.get(Number(t.id)) || 1,
+        })),
+        checkout_fields: checkoutFields,
         courtesy_note:
             "El tipo con is_system = true (Cortesía) lo crea AI Tickets con cada evento: no se vende y sirve para emitir cortesías (issue_complimentary_tickets).",
         ...(warnings.length ? { warnings } : {}),
@@ -366,7 +381,10 @@ const updateEvent: ToolDef = {
         "(órdenes pagadas, entradas o invitados), el link anterior queda redirigiendo (301) al nuevo, así no se rompen los links ya " +
         "compartidos ni los QR; en un borrador sin registrados, el link anterior se libera. " +
         "Fechas y horarios de las funciones se cambian con update_event_functions (avisa a los asistentes); el lugar, desde el panel o " +
-        "update_venue. Para entradas usa las herramientas de ticket_type. Para un video de portada (en vez de la imagen) usa set_event_video.",
+        "update_venue. Para entradas usa las herramientas de ticket_type. Para un video de portada (en vez de la imagen) usa set_event_video. " +
+        "checkout_fields cambia lo que pide el checkout además del nombre y correo de quien compra: attendee_names (nombre y correo de cada " +
+        "asistente en compras de varias entradas; cada QR llega a su correo), company (RUT y razón social opcionales; el comprobante NO es " +
+        "boleta ni factura) y questions (preguntas al inscribirse; reemplaza la lista completa). Solo cambia las claves enviadas.",
     scope: "write",
     audit: (args, result) => ({ summary: `Editó ${((result as any).updated || []).join(", ") || "el evento"}`, target: `event:${args.event_id}` }),
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
@@ -398,6 +416,36 @@ const updateEvent: ToolDef = {
                 enum: EVENT_PAGE_BACKGROUNDS.map((b) => b.value),
                 description: `Fondo animado muy suave de la página pública (iridiscente, tonos claros): ${EVENT_PAGE_BACKGROUNDS.map((b) => `${b.value} (${b.label})`).join(", ")}. none = sin fondo.`,
             },
+            checkout_fields: {
+                type: "object",
+                additionalProperties: false,
+                description: "Qué pide el checkout además del nombre y correo de quien compra (get_event → checkout_fields).",
+                properties: {
+                    attendee_names: {
+                        type: "string",
+                        enum: ATTENDEE_NAME_MODES,
+                        description: "off = no se piden; optional = se piden y se pueden dejar en blanco; required = nombre obligatorio de cada asistente.",
+                    },
+                    company: { type: "boolean", description: "Ofrecer RUT y razón social de la empresa (opcionales, solo compras pagadas)." },
+                    questions: {
+                        type: "array",
+                        maxItems: MAX_QUESTIONS,
+                        description: "Preguntas al inscribirse (una vez por compra, también en eventos gratis). Reemplaza la lista completa; [] = sin preguntas.",
+                        items: {
+                            type: "object",
+                            required: ["label", "type"],
+                            additionalProperties: false,
+                            properties: {
+                                id: { type: "string", maxLength: 40, description: "Mantén el id de una pregunta existente para no separar sus respuestas en el CSV." },
+                                label: { type: "string", minLength: 1, maxLength: MAX_LABEL },
+                                type: { type: "string", enum: QUESTION_TYPES, description: "text = texto corto; choice = elegir una opción; yes_no = sí o no." },
+                                options: { type: "array", maxItems: MAX_OPTIONS, items: { type: "string", maxLength: 60 }, description: "Solo choice: 2 o más opciones." },
+                                required: { type: "boolean", default: false },
+                            },
+                        },
+                    },
+                },
+            },
         },
     },
     async handler(args, ctx) {
@@ -411,7 +459,18 @@ const updateEvent: ToolDef = {
         if (args.image_url !== undefined) patch.image_url = args.image_url;
         if (args.is_private !== undefined) patch.accessibility = args.is_private ? "private" : "public";
         const pageChange = args.page_layout !== undefined || args.show_organizer !== undefined || args.page_background !== undefined;
-        if (!Object.keys(patch).length && args.category === undefined && args.slug === undefined && !pageChange) throw new ToolError("invalid_input", "No enviaste cambios.");
+        const checkoutChange = args.checkout_fields !== undefined && Object.keys(args.checkout_fields || {}).length > 0;
+        if (!Object.keys(patch).length && args.category === undefined && args.slug === undefined && !pageChange && !checkoutChange) throw new ToolError("invalid_input", "No enviaste cambios.");
+        // Datos extra del checkout: se valida antes de guardar nada (una pregunta de opciones necesita 2 o más)
+        let checkoutFields: ReturnType<typeof normalizeCheckoutFields> | null = null;
+        if (checkoutChange) {
+            const current = await loadCheckoutFields(ctx, Number(event.id));
+            const next = { ...current, ...args.checkout_fields };
+            checkoutFields = normalizeCheckoutFields(next);
+            if (Array.isArray(args.checkout_fields.questions) && checkoutFields.questions.length < args.checkout_fields.questions.length) {
+                throw new ToolError("invalid_input", "Revisa las preguntas: cada una necesita texto y las de tipo choice, al menos 2 opciones.");
+            }
+        }
         // El slug primero: si choca con otro evento, no se aplica nada
         let slugChange: Awaited<ReturnType<typeof changeEventSlug>> | null = null;
         if (args.slug !== undefined) {
@@ -445,6 +504,15 @@ const updateEvent: ToolDef = {
             if (error?.code === "42703" || error?.code === "PGRST204") throw new ToolError("unavailable", "El diseño de la página aún no está disponible en este entorno.");
             if (error) throw error;
         }
+        if (checkoutFields) {
+            const { error } = await ctx.supabase
+                .from("events")
+                .update({ checkout_fields: isDefaultCheckoutFields(checkoutFields) ? null : checkoutFields })
+                .eq("id", event.id)
+                .eq("organization_id", ctx.actor.orgId);
+            if (error?.code === "42703" || error?.code === "PGRST204") throw new ToolError("unavailable", "Los datos extra del checkout estarán disponibles después del próximo deploy.");
+            if (error) throw error;
+        }
         let warnings: string[] = [];
         if (args.description !== undefined) {
             const { data: dates } = await ctx.supabase.from("event_dates").select("date").eq("event_id", event.id);
@@ -459,7 +527,9 @@ const updateEvent: ToolDef = {
                 ...(args.page_layout !== undefined ? ["page_layout"] : []),
                 ...(args.show_organizer !== undefined ? ["show_organizer"] : []),
                 ...(args.page_background !== undefined ? ["page_background"] : []),
+                ...(checkoutFields ? ["checkout_fields"] : []),
             ],
+            ...(checkoutFields ? { checkout_fields: checkoutFields } : {}),
             ...(pageSettings ? { page_layout: pageSettings.layout, show_organizer: pageSettings.show_organizer, page_background: pageSettings.background } : {}),
             ...eventUrls(ctx, event),
             ...(slugChange ? { slug_change: slugChangeSummary(ctx, slugChange) } : {}),

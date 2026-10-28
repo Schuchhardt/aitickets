@@ -3,7 +3,7 @@ import { getSupabaseAdmin, getFriendlyErrorMessage } from "../../../lib/auth-hel
 import { getSessionContext, getOwnedEvent, hasRole, EVENT_MANAGER_ROLES, jsonResponse } from "../../../lib/supabaseServer";
 import { callInternalFunction, notifySlack, siteUrl } from "../_lib/server-utils";
 import { IDENTITY_REQUIRED_MESSAGE, eventRequiresIdentity, identityApproved, loadOrgIdentity, ticketsRequireIdentity } from "../../../lib/producerIdentity";
-import { syncEventCategory, refreshEventDenorm, normalizeTicket, isClientTempId, isValidDateInput, resolveTicketDateId, setEventStatus, EventInputError, saveCoverSettings, savePageSettings, validateFormTicketChain, saveFormTicketChain, assertFunctionCount } from "../_lib/events";
+import { syncEventCategory, refreshEventDenorm, normalizeTicket, isClientTempId, isValidDateInput, resolveTicketDateId, setEventStatus, EventInputError, saveCoverSettings, savePageSettings, validateFormTicketChain, saveFormTicketChain, assertFunctionCount, saveCheckoutFields, saveFormTicketPeople } from "../_lib/events";
 import { sanitizeRichText } from "../../../lib/sanitize";
 import { listOrgVenues, isVenueAllowed, insertOrgVenue } from "../../../lib/orgVenues";
 import { loadSchedule, describeScheduleChange } from "../_lib/eventSchedule";
@@ -160,6 +160,10 @@ export const POST: APIRoute = async (context) => {
         if (general.pageSettings !== undefined) {
             await savePageSettings(event.id, dbUser.organization_id, general.pageSettings);
         }
+        // Datos extra del checkout: asistentes por entrada, empresa y preguntas (idem)
+        if (general.checkoutFields !== undefined) {
+            await saveCheckoutFields(event.id, dbUser.organization_id, general.checkoutFields);
+        }
         // Reseñas: correo "¿Cómo estuvo?" activado o no (idem)
         if (typeof body?.reviewsEnabled === "boolean") {
             await saveReviewsEnabled(supabaseAdmin, event.id, dbUser.organization_id, body.reviewsEnabled);
@@ -298,6 +302,12 @@ export const POST: APIRoute = async (context) => {
         }
 
         await saveFormTicketChain(event.id, tickets, (formId) => ticketIdMap.get(String(formId)));
+        try {
+            await saveFormTicketPeople(event.id, tickets, (formId) => ticketIdMap.get(String(formId)));
+        } catch (err) {
+            if (err instanceof EventInputError) return jsonResponse({ message: err.message }, 400);
+            throw err;
+        }
 
         // Entradas eliminadas en el formulario: se borran si no tienen ventas; si tienen, se retiran de la venta
         for (const ticketId of existingTicketIds) {

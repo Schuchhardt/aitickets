@@ -55,7 +55,7 @@ export const NIGHT_EVENT_URL = 'aitickets.cl/eventos/viernes-ultravioleta'
 /**
  * Tipos de entrada de la noche de ejemplo: cada uno es un tipo de entrada con precio (la lista es de $0) y cupo
  * (EditEventForm.vue). Las cortesías no se venden: se envían desde el panel (CourtesyTicketsForm.vue) y no cuentan como
- * venta. capacity = cupo del tipo de entrada; en mesas, una unidad es una mesa y un QR (buildAttendeeRows).
+ * venta. capacity = cupo del tipo de entrada; en mesas, el cupo cuenta mesas (una mesa para N emite N QR, buildAttendeeRows).
  */
 export const CLUB_TICKETS = Object.freeze({
   lista: { name: 'Lista free', short: 'Lista', price: 0, capacity: 200 },
@@ -212,8 +212,8 @@ export const NIGHT_ARRIVALS = Object.freeze([
 
 /**
  * Fotogramas de la noche (§4.5): ingresados y emitidas por tipo de entrada en seis momentos. Entre fotogramas se
- * interpola (nightState). Al final: emitidas 200 + 300 + 9 + 30 = 539 (las mesas son un QR por mesa: el escáner cuenta 9
- * y no 54 personas) e ingresaron 178 + 283 + 9 + 28 = 498. Las sumas las cuadra tests/unit/clubs-landing.test.mjs.
+ * interpola (nightState). Al final: emitidas 200 + 300 + 9 + 30 = 539 (la fila de mesas cuenta mesas, igual que el cupo;
+ * con "Personas por entrada" cada mesa trae 6 QR, pero el resumen del ejemplo no los desglosa) e ingresaron 178 + 283 + 9 + 28 = 498. Las sumas las cuadra tests/unit/clubs-landing.test.mjs.
  * sign: mensaje del letrero de la puerta ({cover} = precio del cover, {pct} = aforo del momento).
  */
 export const NIGHT_FRAMES = Object.freeze([

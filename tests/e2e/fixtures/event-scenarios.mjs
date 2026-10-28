@@ -17,6 +17,18 @@ export const TICKETS = {
   free: { id: 9105, ticket_name: "Entrada liberada", price: 0, max_quantity: null, total_quantity: null },
   // Quedan 8 cupos: "Gratis · Quedan 8 cupos"
   freeFew: { id: 9106, ticket_name: "Entrada liberada", price: 0, max_quantity: null, total_quantity: 8 },
+  // Mesa para 4 (people_per_ticket): un QR por persona, precio y cupo por mesa
+  table: { id: 9107, ticket_name: "Mesa VIP", price: 120000, max_quantity: null, total_quantity: 10, people: 4 },
+};
+
+/** Datos extra del checkout (events.checkout_fields) para tests/e2e/checkout-extras.spec.ts */
+const SEMINAR_FIELDS = {
+  attendee_names: "required",
+  company: true,
+  questions: [
+    { id: "nivel", label: "Nivel", type: "choice", options: ["Básico", "Avanzado"], required: true },
+    { id: "auto", label: "¿Vienes en auto?", type: "yes_no", required: false },
+  ],
 };
 
 /** Lugares para los eventos con varias funciones (el de una función es "Teatro de Prueba", en fixtureEvent). */
@@ -103,6 +115,9 @@ export const SCENARIOS = {
   agotado: { layout: "poster", tickets: [], unavailable: [{ ...TICKETS.general, reason: "sold_out" }], saleState: "sold_out" },
   "terminado-sin-resenas": { layout: "poster", tickets: [], ended: true },
   "venta-cerrada": { layout: "poster", tickets: [], saleState: "closed" },
+  // Datos extra al comprar (tests/e2e/checkout-extras.spec.ts): asistentes, empresa y preguntas; y una mesa para 4
+  "datos-al-comprar": { layout: "poster", tickets: [TICKETS.general], checkoutFields: SEMINAR_FIELDS },
+  "mesa-para-cuatro": { layout: "poster", tickets: [TICKETS.table], checkoutFields: { attendee_names: "optional" } },
   // Vista previa privada de un borrador (status draft + is_preview, como /eventos/vista-previa/…)
   "vista-previa": { layout: "poster", tickets: [TICKETS.general], preview: true },
 };
@@ -203,9 +218,11 @@ export function fixtureEvent(name, { toPublicTicket, now = new Date() }) {
     cover_video: scenario.coverVideo ? FIXTURE_VIDEO : null,
     gallery_video: scenario.galleryVideo ? FIXTURE_VIDEO : null,
     dates,
-    tickets: scenario.tickets.map((t) =>
-      toPublicTicket({ ...t, init_date: null, end_date: null, event_date_id: functionId(t) }, { remaining: t.total_quantity ?? null, feeAbsorbed: false }),
-    ),
+    tickets: scenario.tickets.map((t) => ({
+      ...toPublicTicket({ ...t, init_date: null, end_date: null, event_date_id: functionId(t) }, { remaining: t.total_quantity ?? null, feeAbsorbed: false }),
+      people_per_ticket: t.people || 1,
+    })),
+    checkout_fields: scenario.checkoutFields || null,
     unavailable_tickets: (scenario.unavailable || []).map((t) => ({
       id: t.id,
       ticket_name: t.ticket_name,

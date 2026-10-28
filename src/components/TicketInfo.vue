@@ -1,6 +1,8 @@
 <script setup>
 // Tarjeta de una entrada (páginas de la orden, de la entrada y de confirmación de pago): QR grande, evento, función,
 // lugar y titular, autocontenida para que sirva como captura de pantalla en la puerta. "PDF" descarga la tarjeta.
+// Con shareUrl (la página /ticket/<id> de esta entrada), "Compartir" la manda por WhatsApp, correo, etc.: así quien
+// compró varias (o una mesa) le pasa a cada invitado su propio QR.
 import { ref, computed } from 'vue';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -18,7 +20,31 @@ const props = defineProps({
   functionLabel: { type: String, required: false },
   // Lugar a mostrar (la dirección secreta si corresponde); sin él, el del evento
   place: { type: String, required: false },
+  // Link de esta entrada sola (/ticket/<id>) para pasársela a otra persona
+  shareUrl: { type: String, required: false },
 });
+
+const shareState = ref('');
+async function shareTicket() {
+  const url = props.shareUrl;
+  if (!url) return;
+  const title = props.event?.name || 'Entrada';
+  if (navigator.share) {
+    try {
+      await navigator.share({ title, text: `Tu entrada para ${title}`, url });
+      return;
+    } catch (err) {
+      if (err?.name === 'AbortError') return;
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    shareState.value = 'copied';
+    setTimeout(() => (shareState.value = ''), 2000);
+  } catch {
+    window.prompt('Copia el link de esta entrada:', url);
+  }
+}
 
 const isDownloading = ref(false);
 const captureEl = ref(null);
@@ -314,6 +340,17 @@ const downloadAsPDF = async () => {
         <span v-if="holder && count > 1"> · </span>
         <span v-if="count > 1">Entrada {{ position }} de {{ count }}</span>
       </p>
+      <div class="shrink-0 flex items-center gap-2">
+      <button
+        v-if="ticket.qr_code && shareUrl"
+        type="button"
+        class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:border-gray-900 transition"
+        data-testid="ticket-share"
+        @click="shareTicket"
+      >
+        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M7 17 17 7M9 7h8v8"></path></svg>
+        {{ shareState === 'copied' ? '¡Link copiado!' : 'Compartir' }}
+      </button>
       <button
         v-if="ticket.qr_code"
         type="button"
@@ -332,6 +369,7 @@ const downloadAsPDF = async () => {
         </svg>
         PDF
       </button>
+      </div>
     </div>
   </article>
 </template>
