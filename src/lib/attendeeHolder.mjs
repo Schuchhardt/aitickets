@@ -11,7 +11,17 @@ const clean = (v) => String(v ?? '').replace(/\s+/g, ' ').trim()
 const one = (v) => (Array.isArray(v) ? v[0] : v) || null
 
 /** Columna que no existe (aún sin migrar). */
-export const isMissingColumn = (error) => error?.code === '42703' || /column .* does not exist|could not find the .* column/i.test(error?.message || '')
+export const isMissingColumn = (error) => ['42703', 'PGRST204'].includes(error?.code) || /column .* does not exist|could not find the .* column/i.test(error?.message || '')
+
+/**
+ * ¿Terminó el evento? events.end_date (se recalcula con las funciones) o, sin ella, el inicio. Hasta entonces cada
+ * persona puede completar sus datos desde su entrada (/api/tickets/holder).
+ * @param {{ end_date?: string|null, start_date?: string|null }} event
+ */
+export function eventEnded(event, now = Date.now()) {
+  const end = Date.parse(event?.end_date || event?.start_date || '')
+  return Number.isFinite(end) && end < now
+}
 
 /**
  * Nombre y correo de una entrada (fila de event_attendees con `attendees` y, si viene, `event_orders` embebidos).

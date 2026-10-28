@@ -159,3 +159,82 @@ describe('purchase-tickets: mesa para N', () => {
     expect(rows.map((r) => r.holder_name ?? null)).toEqual(['Bea Soto', 'Ana', null, 'Caro'])
   })
 })
+
+describe('purchase-tickets: preguntas por persona', () => {
+  const PER_PERSON = {
+    attendee_names: 'optional',
+    questions: [
+      { id: 'talla', label: 'Talla', type: 'choice', options: ['S', 'M'], required: true, per: 'attendee' },
+      { id: 'como', label: '¿Cómo supiste?', type: 'text' },
+    ],
+  }
+
+  it('quien compra responde por cada persona: viajan en la orden y cada QR emite las suyas', async () => {
+    setup({ fields: PER_PERSON })
+    const res = await handler(
+      request({
+        holders: [{ ticket_id: 50, answers: { talla: 'M' } }, { ticket_id: 50, name: 'Ana Pérez', email: 'ana@mail.cl', answers: { talla: 'S' } }],
+        answers: { como: 'Instagram' },
+      }),
+    )
+    expect(res.status).toBe(200)
+    const order = db.tables.event_orders[0]
+    expect(order.attendee_holders[1]).toEqual({ ticket_id: 50, name: 'Ana Pérez', email: 'ana@mail.cl', answers: [{ id: 'talla', question: 'Talla', answer: 'S' }] })
+    expect(order.registration_answers).toEqual([{ id: 'como', question: '¿Cómo supiste?', answer: 'Instagram' }])
+    expect(db.tables.event_attendees.map((a) => a.registration_answers)).toEqual([
+      [{ id: 'talla', question: 'Talla', answer: 'M' }],
+      [{ id: 'talla', question: 'Talla', answer: 'S' }],
+    ])
+  })
+
+  it('falta la respuesta de una persona: 400 con el número de entrada', async () => {
+    setup({ fields: PER_PERSON })
+    const res = await handler(request({ holders: [{ answers: { talla: 'M' } }, { name: 'Ana' }] }))
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject({ field: 'holders', message: 'Responde "Talla" (entrada 2).' })
+    expect(db.tables.event_orders).toHaveLength(0)
+  })
+
+  it('invitar por correo: el invitado queda sin respuestas (las completa él) y su correo es obligatorio', async () => {
+    setup({ fields: { ...PER_PERSON, holders: 'invite' } })
+    const missing = await handler(request({ holders: [{ answers: { talla: 'M' } }, { name: 'Ana' }] }))
+    expect(missing.status).toBe(400)
+    expect(await missing.json()).toMatchObject({ field: 'holders', message: expect.stringContaining('correo de la entrada 2') })
+
+    const res = await handler(request({ holders: [{ answers: { talla: 'M' } }, { email: 'ana@mail.cl', answers: { talla: 'S' } }] }))
+    expect(res.status).toBe(200)
+    const [mine, guest] = db.tables.event_attendees
+    expect(mine).toMatchObject({ holder_name: 'Bea Soto', registration_answers: [{ id: 'talla', question: 'Talla', answer: 'M' }] })
+    expect(guest.holder_email).toBe('ana@mail.cl')
+    expect(guest.holder_name).toBeUndefined()
+    expect(guest.registration_answers).toBeUndefined()
+  })
+
+  it('una sola entrada: las responde quien compra para su propia entrada', async () => {
+    setup({ fields: PER_PERSON })
+    const res = await handler(request({ holders: [{ ticket_id: 50, answers: { talla: 'S' } }] }, 1))
+    expect(res.status).toBe(200)
+    expect(db.tables.event_attendees[0]).toMatchObject({ holder_name: 'Bea Soto', registration_answers: [{ id: 'talla', question: 'Talla', answer: 'S' }] })
+  })
+
+  it('base sin la columna nueva: emite igual, con nombre y correo de cada uno', async () => {
+    setup({ fields: PER_PERSON })
+    let calls = 0
+    const realFrom = db.from.bind(db)
+    db.from = (table) => {
+      const b = realFrom(table)
+      if (table !== 'event_attendees') return b
+      const realInsert = b.insert.bind(b)
+      b.insert = (rows) => {
+        calls++
+        if ((Array.isArray(rows) ? rows : [rows]).some((r) => 'registration_answers' in r)) return Promise.resolve({ data: null, error: { code: 'PGRST204', message: "Could not find the 'registration_answers' column" } })
+        return realInsert(rows)
+      }
+      return b
+    }
+    const res = await handler(request({ holders: [{ answers: { talla: 'M' } }, { name: 'Ana', answers: { talla: 'S' } }] }))
+    expect(res.status).toBe(200)
+    expect(calls).toBe(2)
+    expect(db.tables.event_attendees.map((a) => a.holder_name)).toEqual(['Bea Soto', 'Ana'])
+  })
+})

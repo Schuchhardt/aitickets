@@ -17,7 +17,7 @@ import { changeEventSlug, EventSlugError, SLUG_MAX, SLUG_MIN } from "../../event
 import { EVENT_PAGE_BACKGROUNDS, EVENT_PAGE_LAYOUTS, isDefaultPageSettings, normalizePageSettings, type EventPageSettings } from "../../eventPageSettings";
 import { normalizeEventVideo } from "../../eventVideo";
 import { notifySlack, dedupeLocation } from "../../../pages/api/_lib/server-utils";
-import { normalizeCheckoutFields, isDefaultCheckoutFields, ATTENDEE_NAME_MODES, QUESTION_TYPES, MAX_QUESTIONS, MAX_OPTIONS, MAX_LABEL } from "../../checkoutFields.mjs";
+import { normalizeCheckoutFields, isDefaultCheckoutFields, ATTENDEE_NAME_MODES, HOLDER_MODES, QUESTION_SCOPES, QUESTION_TYPES, MAX_QUESTIONS, MAX_OPTIONS, MAX_LABEL } from "../../checkoutFields.mjs";
 import { loadPeoplePerTicket } from "../../../../netlify/lib/tickets.mjs";
 
 const EVENT_LIST_COLUMNS = "id, name, slug, status, accessibility, start_date, end_date, location, image_url, created_at";
@@ -146,7 +146,8 @@ const getEvent: ToolDef = {
     description:
         "Detalle completo de un evento: estado (publicado o borrador), descripción, funciones (fechas/horas), lugares, tipos de entrada " +
         "con precio, capacidad, vendidas, disponibles y personas por entrada (people_per_ticket > 1 = mesa para N, un QR por persona), " +
-        "checkout_fields (qué pide el checkout además del nombre y correo: asistentes por entrada, datos de empresa y preguntas al inscribirse) " +
+        "checkout_fields (qué pide el checkout además del nombre y correo: asistentes por entrada, quién completa los datos de cada persona, " +
+        "datos de empresa y preguntas al inscribirse, cada una por compra o por persona) " +
         "y links privados de vista previa. Si is_published es false, el link público " +
         "NO funciona todavía: comparte un link de vista previa (create_preview_link).",
     scope: "read",
@@ -391,8 +392,12 @@ const updateEvent: ToolDef = {
         "Fechas y horarios de las funciones se cambian con update_event_functions (avisa a los asistentes); el lugar, desde el panel o " +
         "update_venue. Para entradas usa las herramientas de ticket_type. Para un video de portada (en vez de la imagen) usa set_event_video. " +
         "checkout_fields cambia lo que pide el checkout además del nombre y correo de quien compra: attendee_names (nombre y correo de cada " +
-        "asistente en compras de varias entradas; cada QR llega a su correo), company (RUT y razón social opcionales; el comprobante NO es " +
-        "boleta ni factura) y questions (preguntas al inscribirse; reemplaza la lista completa). Solo cambia las claves enviadas.",
+        "asistente en compras de varias entradas; cada QR llega a su correo), holders (quién completa los datos de cada persona en compras de " +
+        "varias entradas: buyer = quien compra en el checkout; invite = quien compra solo escribe el correo de cada invitado y cada uno " +
+        "completa su nombre y sus respuestas desde el correo de su entrada; el QR sirve igual mientras tanto y list_attendees muestra " +
+        "data_pending), company (RUT y razón social opcionales; el comprobante NO es boleta ni factura) y questions (preguntas al " +
+        "inscribirse, cada una per order = una vez por compra o per attendee = una vez por persona; reemplaza la lista completa). " +
+        "Solo cambia las claves enviadas.",
     scope: "write",
     audit: (args, result) => ({ summary: `Editó ${((result as any).updated || []).join(", ") || "el evento"}`, target: `event:${args.event_id}` }),
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
@@ -447,11 +452,19 @@ const updateEvent: ToolDef = {
                         enum: ATTENDEE_NAME_MODES,
                         description: "off = no se piden; optional = se piden y se pueden dejar en blanco; required = nombre obligatorio de cada asistente.",
                     },
+                    holders: {
+                        type: "string",
+                        enum: HOLDER_MODES,
+                        description:
+                            "Quién completa los datos de cada persona (nombre y preguntas per attendee) cuando se compra más de una entrada: " +
+                            "buyer = quien compra, en el checkout; invite = cada invitado desde su correo (quien compra solo escribe su correo). " +
+                            "Quien compra siempre completa los suyos al comprar.",
+                    },
                     company: { type: "boolean", description: "Ofrecer RUT y razón social de la empresa (opcionales, solo compras pagadas)." },
                     questions: {
                         type: "array",
                         maxItems: MAX_QUESTIONS,
-                        description: "Preguntas al inscribirse (una vez por compra, también en eventos gratis). Reemplaza la lista completa; [] = sin preguntas.",
+                        description: "Preguntas al inscribirse (también en eventos gratis). Reemplaza la lista completa; [] = sin preguntas.",
                         items: {
                             type: "object",
                             required: ["label", "type"],
@@ -462,6 +475,12 @@ const updateEvent: ToolDef = {
                                 type: { type: "string", enum: QUESTION_TYPES, description: "text = texto corto; choice = elegir una opción; yes_no = sí o no." },
                                 options: { type: "array", maxItems: MAX_OPTIONS, items: { type: "string", maxLength: 60 }, description: "Solo choice: 2 o más opciones." },
                                 required: { type: "boolean", default: false },
+                                per: {
+                                    type: "string",
+                                    enum: QUESTION_SCOPES,
+                                    default: "order",
+                                    description: "order = una respuesta por compra; attendee = una por persona (cada QR), p. ej. talla o restricción alimentaria.",
+                                },
                             },
                         },
                     },

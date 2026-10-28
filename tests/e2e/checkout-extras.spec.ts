@@ -96,3 +96,65 @@ test("una mesa para 4 pide un asistente por invitado", async ({ page }) => {
   expect(sent[0].company).toBeUndefined();
   expect(sent[0].answers).toBeUndefined();
 });
+
+test("preguntas por persona: con una entrada las responde quien compra; con dos, una por cada asistente", async ({ page }) => {
+  const sent = await interceptPurchase(page);
+  const dialog = await openCheckout(page, "preguntas-por-persona");
+  await dialog.getByLabel("Nombre y apellido").fill("Bea Soto");
+  await dialog.getByLabel("Email").fill("bea.e2e@gmail.com");
+  await dialog.getByTestId("resv-terms-checkbox").check();
+
+  // Una entrada: sin bloque de asistentes; la talla va junto a la pregunta por compra
+  const questions = dialog.getByTestId("checkout-questions");
+  await expect(dialog.getByTestId("checkout-holders")).toHaveCount(0);
+  await expect(questions.getByLabel("Talla de polera")).toBeVisible();
+  await expect(questions.getByLabel("¿Cómo supiste del taller? (opcional)")).toBeVisible();
+
+  // Dos entradas: la talla se pide por cada persona
+  await dialog.getByTestId("pay-qty").getByRole("button", { name: `Agregar una entrada ${TICKETS.general.ticket_name}`, exact: true }).click();
+  const holders = dialog.getByTestId("checkout-holders");
+  await expect(holders.getByTestId("holder-questions")).toHaveCount(2);
+  await expect(questions.getByLabel("Talla de polera")).toHaveCount(0);
+  await holders.getByTestId("holder-questions").nth(0).getByLabel("Talla de polera").selectOption("M");
+  await holders.getByTestId("holder-name").nth(1).fill("Ana Pérez");
+  await dialog.getByTestId("resv-pay-button").click();
+  await expect(holders.getByRole("alert")).toHaveText('Responde "Talla de polera" (entrada 2).');
+  await holders.getByTestId("holder-questions").nth(1).getByLabel("Talla de polera").selectOption("S");
+  await questions.getByLabel("¿Cómo supiste del taller? (opcional)").fill("Instagram");
+
+  await dialog.getByTestId("resv-pay-button").click();
+  await page.waitForURL(/#webpay-e2e$/);
+  expect(sent[0].holders).toEqual([
+    { ticket_id: TICKETS.general.id, name: "", email: "", answers: { talla: "M" } },
+    { ticket_id: TICKETS.general.id, name: "Ana Pérez", email: "", answers: { talla: "S" } },
+  ]);
+  expect(sent[0].answers).toEqual({ como: "Instagram" });
+});
+
+test("invitar por correo: del invitado solo se pide el correo; quien compra completa lo suyo", async ({ page }) => {
+  const sent = await interceptPurchase(page);
+  const dialog = await openCheckout(page, "invitar-por-correo");
+  await dialog.getByTestId("pay-qty").getByRole("button", { name: `Agregar una entrada ${TICKETS.general.ticket_name}`, exact: true }).click();
+  await dialog.getByLabel("Nombre y apellido").fill("Bea Soto");
+  await dialog.getByLabel("Email").fill("bea.e2e@gmail.com");
+  await dialog.getByTestId("resv-terms-checkbox").check();
+
+  const holders = dialog.getByTestId("checkout-holders");
+  await expect(holders.getByTestId("holders-help")).toContainText("Escribe el correo de cada invitado");
+  // Las preguntas por persona solo para quien compra; el invitado las completa desde su correo
+  await expect(holders.getByTestId("holder-questions")).toHaveCount(1);
+  await expect(holders.getByTestId("holder-invite-note")).toHaveText("Completa sus datos desde el correo.");
+  await expect(holders.getByTestId("holder-name").nth(1)).toHaveAttribute("placeholder", "Nombre (opcional)");
+
+  await holders.getByTestId("holder-questions").getByLabel("Talla de polera").selectOption("L");
+  await dialog.getByTestId("resv-pay-button").click();
+  await expect(holders.getByRole("alert")).toContainText("correo de la entrada 2");
+  await holders.getByTestId("holder-email").nth(1).fill("ana.e2e@gmail.com");
+
+  await dialog.getByTestId("resv-pay-button").click();
+  await page.waitForURL(/#webpay-e2e$/);
+  expect(sent[0].holders).toEqual([
+    { ticket_id: TICKETS.general.id, name: "", email: "", answers: { talla: "L" } },
+    { ticket_id: TICKETS.general.id, name: "", email: "ana.e2e@gmail.com" },
+  ]);
+});

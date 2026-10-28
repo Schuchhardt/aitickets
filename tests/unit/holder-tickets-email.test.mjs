@@ -87,6 +87,26 @@ describe('sendOrderTicketsEmail con asistentes y mesas', () => {
     expect(mocks.db.tables.event_orders[0].email_sent_at).toBeTruthy()
     expect(mocks.db.tables.aitickets_email_log[1]).toMatchObject({ recipient: 'ana@mail.cl', status: 'failed' })
   })
+
+  it('invitado con datos pendientes: su correo le pide completarlos en su entrada', async () => {
+    setup()
+    mocks.db.tables.events = [{ id: 10, checkout_fields: { attendee_names: 'required', holders: 'invite', questions: [{ id: 'talla', label: 'Talla de polera', required: true, per: 'attendee' }, { id: 'x', label: 'Por compra', required: true }] } }]
+    mocks.db.tables.event_attendees[1].holder_name = null
+    await sendOrderTicketsEmail(ORDER)
+    const holderMail = mocks.sendEmail.mock.calls[1][0]
+    expect(holderMail.subject).toContain('completa tus datos')
+    expect(holderMail.text).toContain('Nombre, Talla de polera')
+    expect(holderMail.text).not.toContain('Por compra')
+    expect(holderMail.text).toContain('/ticket/t2')
+  })
+
+  it('invitado con todo completo: el correo de siempre', async () => {
+    setup()
+    mocks.db.tables.events = [{ id: 10, checkout_fields: { attendee_names: 'required', questions: [{ id: 'talla', label: 'Talla', required: true, per: 'attendee' }] } }]
+    mocks.db.tables.event_attendees[1].registration_answers = [{ id: 'talla', question: 'Talla', answer: 'M' }]
+    await sendOrderTicketsEmail(ORDER)
+    expect(mocks.sendEmail.mock.calls[1][0].subject).toBe('🎟️ Tu entrada para Noche VIP')
+  })
 })
 
 describe('renderHolderTicketEmail', () => {

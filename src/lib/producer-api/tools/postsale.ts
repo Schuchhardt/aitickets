@@ -23,7 +23,7 @@ import { orderLines, lineSoldQty } from "../../orderKinds";
 import { sendTicketsEmail, notifySlack, callInternalFunction } from "../../../pages/api/_lib/server-utils";
 import { sendEmail, formatRecipient, isValidEmail, legalFooterHtml, legalFooterText } from "../../../../netlify/lib/mailer.mjs";
 import { loadOrderEmailLog, summarizeEmailDelivery } from "../../../../netlify/lib/email-log.mjs";
-import { formatRut } from "../../checkoutFields.mjs";
+import { formatRut, missingAttendeeData } from "../../checkoutFields.mjs";
 
 const UUID_PATTERN = "^[0-9a-fA-F-]{36}$";
 const orderIdSchema = { type: "string" as const, pattern: UUID_PATTERN, description: "ID de la orden (uuid; ver list_orders o get_order)." };
@@ -51,10 +51,12 @@ async function loadOrder(ctx: ToolContext, orderId: string) {
 }
 
 async function loadOrderTickets(ctx: ToolContext, orderId: string) {
-    // Asistente de cada QR y lugar en la mesa: columnas opcionales (migraciones 202610300100 y 202610300110)
+    // Asistente de cada QR, lugar en la mesa y respuestas por persona: columnas opcionales (migraciones 202610300100,
+    // 202610300110 y 202610310100)
     const select = (extra: string) =>
         ctx.supabase.from("event_attendees").select(`id, event_ticket_id, attendee_id, status, validated_at, is_complimentary${extra}`).eq("event_order_id", orderId);
-    let { data, error } = await select(", holder_name, holder_email, seat_number");
+    let { data, error } = await select(", holder_name, holder_email, seat_number, registration_answers");
+    if (error && ["42703", "PGRST204"].includes(String(error.code || ""))) ({ data, error } = await select(", holder_name, holder_email, seat_number"));
     if (error && ["42703", "PGRST204"].includes(String(error.code || ""))) ({ data, error } = await select(""));
     if (error) throw error;
     const rows = (data || []) as any[];
@@ -79,7 +81,15 @@ async function loadRefunds(ctx: ToolContext, filter: { orderId?: string; eventId
     return (data || []) as any[];
 }
 
-function presentOrder(o: any, tickets: any[], refunds: any[]) {
+/** Qué pide el checkout del evento (events.checkout_fields); null sin la columna. */
+async function loadCheckoutFields(ctx: ToolContext, eventId: number) {
+    const { data, error } = await ctx.supabase.from("events").select("checkout_fields").eq("id", eventId).maybeSingle();
+    return error ? null : (data as any)?.checkout_fields ?? null;
+}
+
+function presentOrder(o: any, tickets: any[], refunds: any[], checkoutFields: any = null) {
+    const pendingOf = (t: any) =>
+        ticketStatus(t.status) === "cancelled" ? [] : missingAttendeeData(checkoutFields, t, { buyerEmail: o.buyer_email, orderAnswers: o.registration_answers });
     return {
         id: o.id,
         event_id: Number(o.event_id),
@@ -111,6 +121,11 @@ function presentOrder(o: any, tickets: any[], refunds: any[]) {
             // Asistente escrito al comprar (null = quien compró) y lugar en una mesa para N
             holder: t.holder_name || t.holder_email ? { name: t.holder_name || null, email: t.holder_email || null } : null,
             ...(t.seat_number ? { seat: Number(t.seat_number) } : {}),
+            // Respuestas de esa persona (preguntas por persona) y lo que aún le falta (invitado sin completar sus datos)
+            ...(Array.isArray(t.registration_answers) && t.registration_answers.length
+                ? { attendee_answers: t.registration_answers.map((a: any) => ({ question: a.question, answer: a.answer })) }
+                : {}),
+            ...(pendingOf(t).length ? { data_pending: pendingOf(t) } : {}),
         })),
         refunds: refunds.map((r) => ({
             id: r.id,
@@ -136,7 +151,8 @@ const getOrder: ToolDef = {
     description:
         "Detalle de una orden para resolver el reclamo de un comprador: entradas (id, tipo, estado, si ya ingresó, asistente si se escribió al comprar), " +
         "montos, pago, reembolsos, canal, datos de empresa (company: razón social y RUT; el comprobante no es boleta ni factura), respuestas a las " +
-        "preguntas del evento (answers) " +
+        "preguntas por compra (answers); en cada entrada, las respuestas por persona (attendee_answers) y data_pending (lo que un invitado aún no " +
+        "completa desde su correo; el QR sirve igual) " +
         "y email_delivery (si el correo de entradas se envió, se entregó, rebotó o lo marcaron como spam, a qué dirección y cuándo). " +
         "Busca por order_id, o por event_id + buyer_email (devuelve hasta 10 órdenes). Contiene datos personales.",
     scope: "attendees",
@@ -171,8 +187,11 @@ const getOrder: ToolDef = {
             if (!orders.length) throw new ToolError("not_found", "No hay órdenes con ese email en este evento.");
         }
         const out = [];
+        const fieldsByEvent = new Map<number, any>();
         for (const o of orders) {
-            const view = presentOrder(o, await loadOrderTickets(ctx, o.id), await loadRefunds(ctx, { orderId: o.id }));
+            const eventId = Number(o.event_id);
+            if (!fieldsByEvent.has(eventId)) fieldsByEvent.set(eventId, await loadCheckoutFields(ctx, eventId));
+            const view = presentOrder(o, await loadOrderTickets(ctx, o.id), await loadRefunds(ctx, { orderId: o.id }), fieldsByEvent.get(eventId));
             view.order_url_for_buyer = `${ctx.origin}/order/${o.id}`;
             const emailDelivery = summarizeEmailDelivery(await loadOrderEmailLog(ctx.supabase, o.id), { emailSentAt: o.email_sent_at || null });
             out.push({ ...view, email_delivery: emailDelivery });

@@ -6,7 +6,7 @@ import { requireDashboardSession } from "../_lib/guard";
 import { getStaffEventIds } from "../../../../netlify/lib/event-staff.mjs";
 import { fetchAll } from "../../../lib/producer-api/tools/common";
 import { formatFunctionLabel } from "../../../../netlify/lib/dates.mjs";
-import { formatRut } from "../../../lib/checkoutFields.mjs";
+import { formatRut, answersText, missingAttendeeData } from "../../../lib/checkoutFields.mjs";
 import {
     Ticket,
     Calendar,
@@ -113,8 +113,10 @@ type AttendeeRow = {
     functionLabel: string | null;
     /** Quien compró, si el asistente de este QR es otra persona (event_attendees.holder_name). */
     boughtBy: string | null;
-    /** Respuestas a las preguntas del evento ("Talla: M · Alergias: no"), de la orden. */
+    /** Respuestas a las preguntas del evento ("Talla: M · Alergias: no"): las de esta persona y las de la orden. */
     answers: string;
+    /** Lo que le falta a esta persona (invitado que aún no completa sus datos): 'Nombre' o el texto de cada pregunta. */
+    pending: string[];
     /** Empresa de la orden ("Acme SpA · 76.123.456-7"). */
     company: string;
 };
@@ -140,8 +142,9 @@ function eventFunctionList(event: any): { id: number; label: string }[] {
         .map((d: any) => ({ id: Number(d.id), label: formatFunctionLabel(d, { withPlace: false }) }));
 }
 
-// Asistente de cada QR (holder_*, 202610300100) y mesa (unit_id, 202610300110): columnas opcionales (base sin migrar)
-const ATTENDEE_EXTRA_COLUMNS = ["holder_name, holder_email, unit_id,", "holder_name, holder_email,", ""];
+// Asistente de cada QR (holder_*, 202610300100), mesa (unit_id, 202610300110) y respuestas por persona
+// (registration_answers, 202610310100): columnas opcionales (base sin migrar)
+const ATTENDEE_EXTRA_COLUMNS = ["holder_name, holder_email, unit_id, registration_answers,", "holder_name, holder_email, unit_id,", "holder_name, holder_email,", ""];
 const ORDER_EXTRA_COLUMNS = ["buyer_first_name, buyer_last_name, buyer_email, registration_answers, company_rut, company_name", "buyer_first_name, buyer_last_name, buyer_email"];
 
 async function fetchWithFallback<T>(variants: string[], build: (cols: string) => any): Promise<T[]> {
@@ -159,7 +162,7 @@ async function fetchWithFallback<T>(variants: string[], build: (cols: string) =>
 
 async function loadEventTickets(event: any): Promise<{ stats: TicketStats; attendees: AttendeeRow[] }> {
     const functionLabels = new Map(eventFunctionList(event).map((f) => [f.id, f.label]));
-    const [eventAttendeesRows, paidOrders] = await Promise.all([
+    const [eventAttendeesRows, paidOrders, fieldsRes] = await Promise.all([
         fetchWithFallback<any>(ATTENDEE_EXTRA_COLUMNS, (extra) => supabaseAdmin
             .from("event_attendees")
             .select(
@@ -195,7 +198,9 @@ async function loadEventTickets(event: any): Promise<{ stats: TicketStats; atten
             .eq("event_id", event.id)
             .eq("status", "paid")
             .order("id", { ascending: true })),
+        supabaseAdmin.from("events").select("checkout_fields").eq("id", event.id).maybeSingle(),
     ]);
+    const checkoutFields = fieldsRes.error ? null : (fieldsRes.data as any)?.checkout_fields;
     const paidOrderIds = new Set(paidOrders.map((o) => o.id));
     const ordersById = new Map<string, any>(paidOrders.map((o) => [o.id, o]));
 
@@ -230,12 +235,15 @@ async function loadEventTickets(event: any): Promise<{ stats: TicketStats; atten
                 : `${a.attendees?.first_name || ""} ${a.attendees?.last_name || ""}`.trim();
             const buyerEmail = order?.buyer_email || a.attendees?.email || "";
             const holderIsOther = Boolean(a.holder_name || a.holder_email) && (a.holder_name || "") !== buyerName;
+            // Invitado por correo que aún no escribe su nombre
+            const unnamedGuest = !a.holder_name && Boolean(a.holder_email) && String(a.holder_email).toLowerCase() !== String(buyerEmail).toLowerCase();
             return {
             id: a.id,
-            name: a.holder_name || buyerName || "Sin nombre",
+            name: a.holder_name || (unnamedGuest ? "Invitado (sin nombre)" : buyerName) || "Sin nombre",
             email: a.holder_email || (a.holder_name ? "" : buyerEmail) || "Sin email",
             boughtBy: holderIsOther ? buyerName || buyerEmail : null,
-            answers: (Array.isArray(order?.registration_answers) ? order.registration_answers : []).map((x: any) => `${x.question}: ${x.answer}`).join(" · "),
+            answers: [answersText(a.registration_answers), answersText(order?.registration_answers)].filter(Boolean).join(" · "),
+            pending: a.status === "cancelled" ? [] : missingAttendeeData(checkoutFields, a, { buyerEmail, orderAnswers: order?.registration_answers }),
             company: order?.company_name ? `${order.company_name} · ${formatRut(order.company_rut)}` : "",
             ticketType: a.event_tickets?.ticket_name || "N/A",
             price: a.event_tickets?.price || 0,
@@ -657,6 +665,7 @@ function formatDate(dateString: string | null): string {
                                                                                         {attendee.boughtBy && <p class="text-xs text-gray-400 attendee-buyer">Compró {attendee.boughtBy}</p>}
                                                                                         {attendee.company && <p class="text-xs text-gray-400 attendee-company">{attendee.company}</p>}
                                                                                         {attendee.answers && <p class="text-xs text-gray-500 mt-0.5 max-w-xs attendee-answers">{attendee.answers}</p>}
+                                                                                        {attendee.pending.length > 0 && <p class="text-xs font-medium text-amber-700 mt-0.5 max-w-xs attendee-pending" title="Su QR sirve igual. Le llegó un correo para completarlos.">Datos pendientes: {attendee.pending.join(", ")}</p>}
                                                                                     </div>
                                                                                 </td>
                                                                                 <td class="px-4 py-3">
@@ -1035,6 +1044,7 @@ function formatDate(dateString: string | null): string {
                                                                                         {attendee.boughtBy && <p class="text-xs text-gray-400 attendee-buyer">Compró {attendee.boughtBy}</p>}
                                                                                         {attendee.company && <p class="text-xs text-gray-400 attendee-company">{attendee.company}</p>}
                                                                                         {attendee.answers && <p class="text-xs text-gray-500 mt-0.5 max-w-xs attendee-answers">{attendee.answers}</p>}
+                                                                                        {attendee.pending.length > 0 && <p class="text-xs font-medium text-amber-700 mt-0.5 max-w-xs attendee-pending" title="Su QR sirve igual. Le llegó un correo para completarlos.">Datos pendientes: {attendee.pending.join(", ")}</p>}
                                                                                     </div>
                                                                                 </td>
                                                                                 <td class="px-4 py-3">
