@@ -1,0 +1,147 @@
+---
+// Números de un promotor / RRPP SIN cuenta: /promotor/<token> (aitickets_promoter_links, src/lib/promoterLinks.ts).
+// Muestra solo sus ventas (órdenes pagadas con su ?ref=): entradas y monto por evento y función, y su link para
+// compartir cada evento a la venta. Nunca nombres, correos ni teléfonos de compradores. Se calcula en cada visita.
+import Layout from "../../layouts/Layout.astro";
+import { getSupabaseAdmin } from "../../lib/auth-helpers";
+import { promoterStats, resolvePromoterToken, touchPromoterLink } from "../../lib/promoterLinks";
+
+export const prerender = false;
+
+Astro.response.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+Astro.response.headers.set("Referrer-Policy", "no-referrer");
+Astro.response.headers.set("Cache-Control", "no-store");
+
+const supabase = getSupabaseAdmin();
+const resolved = await resolvePromoterToken(supabase, String(Astro.params.token || ""));
+let stats: Awaited<ReturnType<typeof promoterStats>> | null = null;
+let loadError = false;
+if (resolved) {
+    await touchPromoterLink(supabase, resolved.link);
+    try {
+        stats = await promoterStats(supabase, resolved.link, Astro.url.origin);
+    } catch (err: any) {
+        console.error("promotor:", err?.message);
+        loadError = true;
+    }
+} else {
+    Astro.response.status = 404;
+}
+
+const clp = (n: number) => `$${Math.round(n).toLocaleString("es-CL")}`;
+const tz = "America/Santiago";
+const dateLabel = (iso: string | null) =>
+    iso ? new Date(iso).toLocaleDateString("es-CL", { timeZone: tz, weekday: "short", day: "numeric", month: "short" }) : "";
+const timeLabel = (iso: string) => new Date(iso).toLocaleString("es-CL", { timeZone: tz, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const asOf = stats ? new Date(stats.as_of).toLocaleTimeString("es-CL", { timeZone: tz, hour: "2-digit", minute: "2-digit" }) : "";
+const plural = (n: number, one: string, many: string) => `${n.toLocaleString("es-CL")} ${n === 1 ? one : many}`;
+---
+
+<Layout title={resolved ? `Tus ventas · ${resolved.link.name} | AI Tickets` : "Link de promotor | AI Tickets"} noindex={true} analytics={false}>
+    <main class="min-h-screen bg-gray-50 py-6 font-[Prompt]">
+        {resolved ? (
+            <div class="max-w-xl mx-auto px-4" data-testid="promoter-page">
+                <p class="text-xs text-gray-500">{resolved.organizationName} · Link de promotor</p>
+                <h1 class="text-2xl font-bold font-[Unbounded] mt-1 break-words">Hola, {resolved.link.name}</h1>
+                <p class="text-sm text-gray-600 mt-1">
+                    Estas son las ventas que entraron con tu link (<span class="font-mono">ref={resolved.link.ref}</span>).
+                </p>
+
+                {loadError || !stats ? (
+                    <p class="mt-6 text-sm text-red-600">No pudimos cargar tus números. Vuelve a intentarlo en un momento.</p>
+                ) : (
+                    <>
+                        <div class="grid grid-cols-2 gap-3 mt-5" data-testid="promoter-totals">
+                            <div class="bg-white rounded-xl border border-gray-200 p-4">
+                                <p class="text-xs text-gray-500">Entradas vendidas</p>
+                                <p class="text-3xl font-bold mt-1">{stats.totals.tickets.toLocaleString("es-CL")}</p>
+                            </div>
+                            <div class="bg-white rounded-xl border border-gray-200 p-4">
+                                <p class="text-xs text-gray-500">Monto</p>
+                                <p class="text-3xl font-bold mt-1">{clp(stats.totals.revenue_clp)}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between mt-2 text-xs text-gray-500">
+                            <span>Actualizado a las {asOf}</span>
+                            <a href="" class="underline hover:text-black">Actualizar</a>
+                        </div>
+
+                        {stats.events.length === 0 ? (
+                            <p class="mt-8 text-sm text-gray-600">Todavía no hay eventos a la venta. Cuando el organizador publique uno, aparecerá aquí con tu link.</p>
+                        ) : (
+                            <ul class="mt-6 space-y-3">
+                                {stats.events.map((e) => (
+                                    <li class="bg-white rounded-xl border border-gray-200 p-4" data-testid="promoter-event">
+                                        <div class="flex items-start justify-between gap-3">
+                                            <div class="min-w-0">
+                                                <p class="font-semibold break-words">{e.name}</p>
+                                                <p class="text-xs text-gray-500 mt-0.5">
+                                                    {dateLabel(e.start_date)}{e.on_sale ? " · a la venta" : ""}
+                                                </p>
+                                            </div>
+                                            <div class="text-right flex-shrink-0">
+                                                <p class="text-xl font-bold">{e.tickets.toLocaleString("es-CL")}</p>
+                                                <p class="text-xs text-gray-500">{e.tickets === 1 ? "entrada" : "entradas"}</p>
+                                            </div>
+                                        </div>
+                                        {e.orders > 0 ? (
+                                            <p class="text-sm text-gray-700 mt-2">
+                                                {clp(e.revenue_clp)} en {plural(e.orders, "compra", "compras")}
+                                                {e.last_sale_at && <span class="text-gray-500"> · última {timeLabel(e.last_sale_at)}</span>}
+                                            </p>
+                                        ) : (
+                                            <p class="text-sm text-gray-500 mt-2">Aún sin ventas con tu link.</p>
+                                        )}
+                                        {e.by_function.length > 0 && (
+                                            <ul class="mt-2 text-xs text-gray-600 divide-y divide-gray-100" data-testid="promoter-functions">
+                                                {e.by_function.map((f) => (
+                                                    <li class="flex justify-between py-1">
+                                                        <span>{f.label}</span>
+                                                        <span>{plural(f.tickets, "entrada", "entradas")} · {clp(f.revenue_clp)}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        )}
+                                        {e.share_url && e.on_sale && (
+                                            <div class="mt-3 flex items-center gap-2">
+                                                <input readonly value={e.share_url} class="flex-1 min-w-0 font-mono text-xs bg-gray-50 border border-gray-200 rounded-lg px-2 py-2" aria-label="Tu link para compartir" />
+                                                <button type="button" data-copy={e.share_url} class="px-3 py-2 rounded-lg bg-black text-white text-xs font-medium whitespace-nowrap">Copiar link</button>
+                                            </div>
+                                        )}
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                        <p class="mt-6 text-xs text-gray-500">
+                            Cuentan las compras pagadas que llegaron por tu link; las cortesías no. El monto es el valor de las entradas, con descuentos y sin el cargo por servicio.
+                            No ves datos de quienes compraron.
+                        </p>
+                    </>
+                )}
+            </div>
+        ) : (
+            <div class="max-w-md mx-auto px-6 py-16 text-center">
+                <h1 class="text-2xl font-bold font-[Unbounded] mb-3">Link no disponible</h1>
+                <p class="text-gray-600">Este link de promotor no existe o fue revocado. Pídele uno nuevo al organizador.</p>
+            </div>
+        )}
+    </main>
+</Layout>
+
+<script>
+    document.querySelectorAll<HTMLButtonElement>("[data-copy]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+            const text = btn.dataset.copy || "";
+            try {
+                await navigator.clipboard.writeText(text);
+            } catch {
+                const input = btn.previousElementSibling as HTMLInputElement | null;
+                input?.select();
+                document.execCommand("copy");
+            }
+            const original = btn.textContent;
+            btn.textContent = "¡Copiado!";
+            setTimeout(() => (btn.textContent = original), 1500);
+        });
+    });
+</script>

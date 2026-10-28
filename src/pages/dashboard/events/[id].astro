@@ -11,6 +11,7 @@ import EventGalleryManager from "../../../components/dashboard/EventGalleryManag
 import EventReviewsManager from "../../../components/dashboard/EventReviewsManager.vue";
 import EventCommunityManager from "../../../components/dashboard/EventCommunityManager.vue";
 import TrackingLinkBuilder from "../../../components/dashboard/TrackingLinkBuilder.vue";
+import PromoterLinksManager from "../../../components/dashboard/PromoterLinksManager.vue";
 import SocialSeriesCard from "../../../components/dashboard/SocialSeriesCard.vue";
 import EventWaitlistManager from "../../../components/dashboard/EventWaitlistManager.vue";
 import LiveCapacityPanel from "../../../components/dashboard/LiveCapacityPanel.vue";
@@ -389,6 +390,7 @@ const canCreateAds = adsEnabled() && hasRole(dbUser, ORG_ADMIN_ROLES);
                     {m.id === "tracking-links" && (
                         <TrackingLinkBuilder client:visible baseUrl={`${siteUrl}${publicLink}`} analyticsUrl={`/dashboard/events/${event.id}/analytics`} />
                     )}
+                    {m.id === "promoter-links" && <PromoterLinksManager client:visible eventId={Number(event.id)} />}
                     {m.id === "preview-links" && <PreviewLinksManager client:visible eventId={Number(event.id)} status={event.status} />}
                     {/* Portada (vista Desktop / Mobile, ajuste y generación con IA) */}
                     {m.id === "cover" && (

@@ -322,7 +322,7 @@ export function builderNotes({ format, paid, enrolled, seats }) {
     notes.push({ id: 'one-ticket', text: `Una sola inscripción para las ${COURSE_SESSIONS} sesiones.` })
     if (paid) notes.push({ id: 'payout', text: `${courseReleaseText}.`, star: true })
     notes.push({ id: 'session-reminder', text: 'Antes de cada sesión, un recordatorio extra que programas desde tu asistente de IA.' })
-    notes.push({ id: 'roll', text: 'Pasar lista en cada sesión del curso', soon: true, hint: 'Hoy el QR se valida en la primera sesión.' })
+    notes.push({ id: 'roll', text: 'Pasar lista en cada sesión del curso: el mismo QR entra una vez por sesión.' })
   } else {
     if (paid) notes.push({ id: 'payout', text: `${dateReleaseText}.`, star: true })
     if (format === 'weekly') {

@@ -116,16 +116,17 @@ test("la mesa de acreditación llega al aviso de otra función y a la validació
 
 test("lo que no existe va con Pronto y sin testimonio real no hay cita", async ({ page }) => {
   await open(page);
-  // Ingreso diario con el mismo pase y la agenda con expositores
-  await expect(page.locator("#programa").getByTestId("soon-badge")).toHaveCount(2);
+  // La agenda con expositores (el ingreso diario con el mismo pase ya existe)
+  await expect(page.locator("#programa").getByTestId("soon-badge")).toHaveCount(1);
   // Datos de cada asistente y de facturación al comprar
   await expect(page.locator("#empresas").getByTestId("soon-badge")).toHaveCount(2);
   // Facebook, TikTok y reels en la serie, LinkedIn desde el panel y segmentar por profesión
   await expect(page.locator("#difusion").getByTestId("soon-badge")).toHaveCount(5);
   // La lista de espera ya existe: sin "Pronto"
   await expect(page.locator("#pagina").getByTestId("soon-badge")).toHaveCount(0);
-  // Ingreso diario y credenciales impresas (el aforo en vivo en el panel ya existe)
-  await expect(page.locator("#acreditacion").getByTestId("soon-badge")).toHaveCount(2);
+  // Credenciales impresas (el ingreso diario y el aforo en vivo en el panel ya existen)
+  await expect(page.locator("#acreditacion").getByTestId("soon-badge")).toHaveCount(1);
+  await expect(page.locator("#acreditacion")).toContainText("El pase completo, cada día.");
   await expect(page.locator("#acreditacion")).toContainText("en tu panel ves el aforo en vivo");
   // Certificados de asistencia
   await expect(page.locator('[data-se-section="despues"]').getByTestId("soon-badge")).toHaveCount(1);

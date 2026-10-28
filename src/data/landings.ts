@@ -313,7 +313,7 @@ export const LANDINGS: Landing[] = [
             { q: "¿Cuánto cuesta una charla gratuita?", a: "Nada. Las inscripciones gratis no pagan cargo por servicio y no hay mensualidad." },
             {
                 q: "¿Cómo publico un congreso de varios días?",
-                a: `Un solo evento con un día por función (hasta ${MAX_EVENT_FUNCTIONS}), y entradas que sirven para un día o para todos (pase completo). Tu público ve las fechas en la página y elige. El pase completo se acredita una vez, el primer día que la persona llega.`,
+                a: `Un solo evento con un día por función (hasta ${MAX_EVENT_FUNCTIONS}), y entradas que sirven para un día o para todos (pase completo). Tu público ve las fechas en la página y elige. El pase completo entra una vez cada día con el mismo QR.`,
             },
             {
                 q: "¿Dónde va el programa con los expositores?",
@@ -578,7 +578,7 @@ export const LANDINGS: Landing[] = [
         faq: [
             {
                 q: "¿Los promotores necesitan cuenta?",
-                a: "No. Solo necesitan su link. Las métricas las ve tu equipo en el panel según su rol.",
+                a: "No. Solo necesitan su link para compartir. Si quieres que vean sus números, les mandas un link privado de promotor: en su celular, sin cuenta, ven cuántas entradas vendieron en cada evento y función, sin datos de quienes compraron. El resto de las métricas las ve tu equipo en el panel según su rol.",
             },
             {
                 q: "¿Puedo comparar el mismo promotor en varias fechas?",

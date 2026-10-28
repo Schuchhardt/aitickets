@@ -15,10 +15,13 @@ export const POST: APIRoute = async ({ params, request }) => {
     try {
         const result = await checkInTicket(auth.supabase, auth.event.id, { ticketId }, body?.validated_at);
         if (result.ok) {
-            return doorJson({ message: "Entrada validada exitosamente", validated_at: result.validated_at, function_mismatch: result.function_mismatch, function_label: result.function_label });
+            const { ticket: _ticket, ticket_id: _id, ok: _ok, ...rest } = result;
+            return doorJson({ message: "Entrada validada exitosamente", ...rest });
         }
         if (result.code === "not_found") return doorJson({ message: "La entrada no pertenece a este evento" }, 404);
-        if (result.code === "already_validated") return doorJson({ message: "Entrada ya validada", code: "already_validated", validated_at: result.validated_at }, 409);
+        if (result.code === "already_validated") {
+            return doorJson({ message: result.function_label ? result.message : "Entrada ya validada", code: "already_validated", validated_at: result.validated_at }, 409);
+        }
         return doorJson({ message: result.message, code: "invalid_status", status: result.status }, 409);
     } catch (err: any) {
         console.error("door confirm:", err?.message);

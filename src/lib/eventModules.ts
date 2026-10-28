@@ -99,6 +99,14 @@ export const EVENT_MODULES: EventModule[] = [
         tab: "difusion",
         when: (ctx) => ctx.status === "published",
     },
+    {
+        id: "promoter-links",
+        title: "Promotores y RRPP",
+        description: "Cada promotor ve sus ventas en su celular, sin cuenta.",
+        tab: "difusion",
+        profiles: ["noche", "musica"],
+        when: (ctx) => ctx.status === "published",
+    },
     // Solo en borrador: publicado, el link público ya muestra la página
     {
         id: "preview-links",
