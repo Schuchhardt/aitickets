@@ -27,18 +27,19 @@ import { identityApproved, loadOrgIdentity, ticketsRequireIdentity, IDENTITY_FRE
 import { canAccessEventByStaff } from "../../../../netlify/lib/event-staff.mjs";
 import { functionOccupancy, getEventSummary } from "../../../lib/eventAnalytics";
 import { formatFunctionLabel } from "../../../../netlify/lib/dates.mjs";
+import { categoryIcon } from "../../../components/event/categoryIcons.js";
 import { PROFILE_LABELS, eventProfile, eventPhase, normalizeAddedModules, resolveModules, panelTabs, defaultTab } from "../../../lib/eventModules";
 import {
     Calendar,
     MapPin,
     Ticket,
-    CheckCircle,
     AlertCircle,
     Eye,
+    EyeOff,
+    ScanLine,
     Edit,
     Share2,
     BarChart3,
-    Pause,
     Rocket,
     Send,
     Target,
@@ -126,6 +127,8 @@ const { count: waitlistCount } = await supabaseAdmin.from(WAITLIST_TABLE).select
 
 // Módulos del panel por perfil (categoría), condiciones del evento y los que el productor agregó: src/lib/eventModules.ts
 const categoryTag = event.event_tags?.[0]?.category_tags;
+// Categorías del evento como tag junto a la fecha (ícono según categoryIcons.js)
+const categoryNames: string[] = [...new Set<string>((event.event_tags || []).flatMap((t: any) => [t.category_tags].flat()).map((c: any) => c?.name).filter(Boolean))];
 const moduleCtx = {
     profile: eventProfile(Array.isArray(categoryTag) ? categoryTag[0]?.name : categoryTag?.name),
     status: event.status,
@@ -140,6 +143,11 @@ const modules = resolveModules(moduleCtx, normalizeAddedModules(event.panel_modu
 const tabs = panelTabs(modules);
 const activeTab = defaultTab(moduleCtx, tabs);
 const canCreateAds = adsEnabled() && hasRole(dbUser, ORG_ADMIN_ROLES);
+// Evento gratis (todas las entradas a $0 y sin ventas pagadas): sin tarjeta de ingresos
+const statCard = "block bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-sm min-w-0 hover:border-gray-400 hover:shadow transition";
+const isFreeEvent = activeTickets.length > 0 && activeTickets.every((t: any) => !(Number(t.price) > 0)) && summary.revenue_clp === 0;
+// Ingresos lleva a Finanzas filtrada por el evento: solo para quien puede ver Finanzas
+const canSeeFinance = hasRole(dbUser, [...ORG_ADMIN_ROLES, "finance"]);
 ---
 
 <DashboardLayout title={event.name}>
@@ -161,7 +169,7 @@ const canCreateAds = adsEnabled() && hasRole(dbUser, ORG_ADMIN_ROLES);
             <h1 class="text-2xl md:text-3xl font-bold font-[Unbounded] mb-2 break-words">
                 {event.name}
             </h1>
-            <div class="flex items-center gap-4 text-sm text-gray-600">
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-600">
                 <span class="flex items-center gap-1">
                     <Calendar size={16} />
                     {
@@ -170,76 +178,86 @@ const canCreateAds = adsEnabled() && hasRole(dbUser, ORG_ADMIN_ROLES);
                             : "Fecha por definir"
                     }
                 </span>
+                {categoryNames.map((name) => {
+                    const CategoryIcon = categoryIcon(name) as any;
+                    return (
+                        <a
+                            href={`/dashboard/events/${event.id}/edit`}
+                            class="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-200 transition"
+                            title="Categoría del evento (cámbiala en Editar)"
+                            data-testid="event-category-tag"
+                        >
+                            <CategoryIcon size={13} aria-hidden="true" />
+                            {name}
+                        </a>
+                    );
+                })}
             </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3">
+        <div class="flex flex-wrap items-center gap-2 sm:gap-3">
             <a
                 href={publicLink}
                 target="_blank"
-                class="flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium text-sm sm:text-base"
+                title={event.status === "published" ? "Ver página" : "Vista previa"}
+                aria-label={event.status === "published" ? "Ver página" : "Vista previa"}
+                class="flex items-center justify-center h-10 w-10 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition"
             >
-                <Eye size={18} /> {event.status === "published" ? "Ver Página" : "Vista previa"}
+                <Eye size={18} />
             </a>
             <a
                 href={`/dashboard/events/${event.id}/checkin`}
-                class="flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium text-sm sm:text-base"
+                title="Check-in"
+                aria-label="Check-in"
+                class="flex items-center justify-center h-10 w-10 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition"
             >
-                <CheckCircle size={18} /> Check-in
-            </a>
-            <a
-                href={`/dashboard/events/${event.id}/analytics`}
-                class="flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium text-sm sm:text-base"
-            >
-                <BarChart3 size={18} /> Analytics
+                <ScanLine size={18} />
             </a>
             <a
                 href={`/dashboard/events/${event.id}/edit`}
-                class="flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2 bg-black text-white rounded-lg hover:bg-gray-900 transition font-medium text-sm sm:text-base"
+                class="flex items-center justify-center gap-2 h-10 px-4 bg-black text-white rounded-lg hover:bg-gray-900 transition font-medium text-sm sm:text-base"
             >
                 <Edit size={18} /> Editar
             </a>
+            <button
+                id="toggleStatusBtn"
+                data-event-id={event.id}
+                data-current-status={event.status}
+                class={`flex items-center justify-center gap-2 h-10 px-4 rounded-lg font-medium text-sm sm:text-base transition ${event.status === "published" ? "bg-white border border-gray-300 text-gray-800 hover:bg-gray-50" : "bg-green-600 text-white hover:bg-green-700"}`}
+            >
+                {event.status === "published" ? <EyeOff size={16} /> : <Rocket size={16} />}
+                <span>{event.status === "published" ? "Despublicar evento" : "Publicar evento"}</span>
+            </button>
         </div>
     </div>
 
-    <!-- Estado del evento (publicar / pausar) -->
+    <!-- Estado del evento (el botón publicar / despublicar va arriba, junto a Editar) -->
     <div
-        class={`mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl border p-4 ${event.status === "published" ? "bg-green-50 border-green-200" : "bg-yellow-50 border-yellow-200"}`}
+        class={`mb-8 flex items-start gap-3 rounded-xl border p-4 ${event.status === "published" ? "bg-green-50 border-green-200" : "bg-yellow-50 border-yellow-200"}`}
         data-testid="event-status"
     >
-        <div class="flex items-start gap-3">
-            <span class={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${event.status === "published" ? "bg-green-500" : "bg-yellow-500"}`}></span>
-            <div>
-                <p class="font-semibold text-gray-900">
-                    {event.status === "published" ? "Publicado: las entradas están a la venta" : "Borrador: el evento no está a la venta"}
+        <span class={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${event.status === "published" ? "bg-green-500" : "bg-yellow-500"}`}></span>
+        <div>
+            <p class="font-semibold text-gray-900">
+                {event.status === "published" ? "Publicado: las entradas están a la venta" : "Borrador: el evento no está a la venta"}
+            </p>
+            {event.status !== "published" && publishBlockers.length > 0 ? (
+                <ul class="mt-1 text-sm text-yellow-800 list-disc pl-5">
+                    {publishBlockers.map((b) => <li>{b}</li>)}
+                </ul>
+            ) : (
+                <p class="text-sm text-gray-600">
+                    {event.status === "published"
+                        ? "Si lo despublicas, vuelve a borrador: se dejan de vender entradas y sale de la cartelera."
+                        : "Cuando esté listo, publícalo para empezar a vender."}
                 </p>
-                {event.status !== "published" && publishBlockers.length > 0 ? (
-                    <ul class="mt-1 text-sm text-yellow-800 list-disc pl-5">
-                        {publishBlockers.map((b) => <li>{b}</li>)}
-                    </ul>
-                ) : (
-                    <p class="text-sm text-gray-600">
-                        {event.status === "published"
-                            ? "Si pausas las ventas, el evento vuelve a borrador y deja de aparecer en la cartelera."
-                            : "Cuando esté listo, publícalo para empezar a vender."}
-                    </p>
-                )}
-            </div>
+            )}
         </div>
-        <button
-            id="toggleStatusBtn"
-            data-event-id={event.id}
-            data-current-status={event.status}
-            class={`shrink-0 flex items-center justify-center gap-2 px-5 py-2 rounded-lg font-bold transition ${event.status === "published" ? "bg-white border border-gray-300 text-gray-800 hover:bg-gray-50" : "bg-black text-white hover:bg-gray-900"}`}
-        >
-            {event.status === "published" ? <Pause size={16} /> : <Rocket size={16} />}
-            <span>{event.status === "published" ? "Pausar Ventas" : "Publicar Evento"}</span>
-        </button>
     </div>
 
     <!-- Stats Grid -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-8">
-        <div class="bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-sm min-w-0">
+    <div class={`grid grid-cols-2 gap-3 sm:gap-6 mb-8 ${isFreeEvent ? "lg:grid-cols-3" : "lg:grid-cols-4"}`} data-testid="event-stats">
+        <a href={`/dashboard/events/${event.id}/analytics`} class={statCard} data-testid="stat-visits">
             <div class="flex justify-between items-start mb-3 sm:mb-4">
                 <div class="p-2 bg-blue-50 text-blue-600 rounded-lg">
                     <Eye size={20} />
@@ -248,9 +266,9 @@ const canCreateAds = adsEnabled() && hasRole(dbUser, ORG_ADMIN_ROLES);
             <p class="text-gray-500 text-sm mb-1">Visitas Totales</p>
             <h3 class="text-xl sm:text-2xl font-bold break-words">{summary.visits.toLocaleString("es-CL")}</h3>
             <p class="text-xs text-gray-400 mt-1">{summary.unique_visitors.toLocaleString("es-CL")} visitantes únicos</p>
-        </div>
+        </a>
 
-        <div class="bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-sm min-w-0">
+        <a href={`/dashboard/tickets?event=${event.id}`} class={statCard} data-testid="stat-tickets">
             <div class="flex justify-between items-start mb-3 sm:mb-4">
                 <div class="p-2 bg-purple-50 text-purple-600 rounded-lg">
                     <Ticket size={20} />
@@ -262,9 +280,23 @@ const canCreateAds = adsEnabled() && hasRole(dbUser, ORG_ADMIN_ROLES);
                 {summary.capacity == null ? "Capacidad sin límite" : `Capacidad: ${summary.capacity.toLocaleString("es-CL")}`}
                 {summary.courtesy_tickets > 0 && ` · + ${summary.courtesy_tickets.toLocaleString("es-CL")} cortesías`}
             </p>
-        </div>
+        </a>
 
-        <div class="bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-sm min-w-0">
+        {!isFreeEvent && (
+        <Fragment>
+        {canSeeFinance ? (
+        <a href={`/dashboard/finance?event=${event.id}`} class={statCard} data-testid="stat-revenue">
+            <div class="flex justify-between items-start mb-3 sm:mb-4">
+                <div class="p-2 bg-green-50 text-green-600 rounded-lg">
+                    <BarChart3 size={20} />
+                </div>
+            </div>
+            <p class="text-gray-500 text-sm mb-1">Ingresos Totales</p>
+            <h3 class="text-xl sm:text-2xl font-bold break-words">${summary.revenue_clp.toLocaleString("es-CL")}</h3>
+            <p class="text-xs text-gray-400 mt-1">{summary.paid_orders.toLocaleString("es-CL")} órdenes pagadas</p>
+        </a>
+        ) : (
+        <div class="bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-sm min-w-0" data-testid="stat-revenue">
             <div class="flex justify-between items-start mb-3 sm:mb-4">
                 <div class="p-2 bg-green-50 text-green-600 rounded-lg">
                     <BarChart3 size={20} />
@@ -274,7 +306,10 @@ const canCreateAds = adsEnabled() && hasRole(dbUser, ORG_ADMIN_ROLES);
             <h3 class="text-xl sm:text-2xl font-bold break-words">${summary.revenue_clp.toLocaleString("es-CL")}</h3>
             <p class="text-xs text-gray-400 mt-1">{summary.paid_orders.toLocaleString("es-CL")} órdenes pagadas</p>
         </div>
-        <div class="bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-sm min-w-0">
+        )}
+        </Fragment>
+        )}
+        <a href={`/dashboard/events/${event.id}/analytics`} class={statCard} data-testid="stat-conversion">
             <div class="flex justify-between items-start mb-3 sm:mb-4">
                 <div class="p-2 bg-orange-50 text-orange-600 rounded-lg">
                     <Share2 size={20} />
@@ -283,7 +318,7 @@ const canCreateAds = adsEnabled() && hasRole(dbUser, ORG_ADMIN_ROLES);
             <p class="text-gray-500 text-sm mb-1">Conversión</p>
             <h3 class="text-xl sm:text-2xl font-bold break-words">{fmtPct(summary.conversion_pct)}</h3>
             <p class="text-xs text-gray-400 mt-1">órdenes ÷ visitantes únicos · Ocupación {fmtPct(summary.sell_through_pct)}</p>
-        </div>
+        </a>
     </div>
 
     <!-- Pestañas: cada módulo vive en una (src/lib/eventModules.ts); las vacías no se muestran -->
@@ -597,7 +632,7 @@ const canCreateAds = adsEnabled() && hasRole(dbUser, ORG_ADMIN_ROLES);
       const eventId = btn.dataset.eventId;
       const currentStatus = btn.dataset.currentStatus;
       const newStatus = currentStatus === 'published' ? 'draft' : 'published';
-      const idleText = currentStatus === 'published' ? 'Pausar Ventas' : 'Publicar Evento';
+      const idleText = currentStatus === 'published' ? 'Despublicar evento' : 'Publicar evento';
 
       btn.disabled = true;
       if (label) label.textContent = 'Actualizando...';
