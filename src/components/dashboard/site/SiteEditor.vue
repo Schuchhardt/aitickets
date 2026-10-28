@@ -1,7 +1,11 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { Globe, ExternalLink, Copy, Check, RefreshCw, Upload, X, Eye, EyeOff, AlertTriangle } from 'lucide-vue-next'
+import { Globe, ExternalLink, Copy, Check, RefreshCw, Upload, X, Eye, EyeOff, AlertTriangle, Monitor, Smartphone } from 'lucide-vue-next'
 import { apiRequest, uploadSiteImage, copyText, htmlToPlain, plainToHtml } from './siteApi.js'
+import { TEMPLATE_INFO, defaultSections, fontStack, sanitizeSections } from '../../../lib/siteTemplates'
+import SectionsEditor from './SectionsEditor.vue'
+import SiteAiPanel from './SiteAiPanel.vue'
+import '../../../styles/site-niches.css'
 
 const props = defineProps({
   initialJson: { type: String, required: true },
@@ -14,19 +18,9 @@ const org = initial.org || {}
 const templates = initial.templates || ['clasico', 'nocturno']
 const fonts = initial.fonts || ['Unbounded', 'Prompt', 'Inter']
 
-// Valores por defecto de cada plantilla (mismos que src/lib/sites.ts)
-const TEMPLATE_INFO = {
-  clasico: {
-    name: 'Clásico',
-    description: 'Fondo claro, tipografía marcada. Ideal para teatro, charlas y ferias.',
-    defaults: { primary: '#111827', accent: '#a3e635', background: '#ffffff', text: '#111827', font: 'Unbounded' },
-  },
-  nocturno: {
-    name: 'Nocturno',
-    description: 'Fondo oscuro y acentos neón. Ideal para fiestas, música y vida nocturna.',
-    defaults: { primary: '#a78bfa', accent: '#f472b6', background: '#0b0b12', text: '#f5f5f5', font: 'Space Grotesk' },
-  },
-}
+// Plantillas por nicho primero (mismo estilo que cada landing de nicho) y luego las generales
+const nicheTemplates = templates.filter((t) => TEMPLATE_INFO[t]?.group === 'nicho')
+const generalTemplates = templates.filter((t) => TEMPLATE_INFO[t] && TEMPLATE_INFO[t].group !== 'nicho')
 const COLOR_FIELDS = [
   { key: 'primary', label: 'Principal' },
   { key: 'accent', label: 'Acento' },
@@ -61,6 +55,8 @@ function formFromSite(s) {
       whatsapp: socials.whatsapp || '',
     },
     seo: { title: s.seo?.title || '', description: s.seo?.description || '', og_image: s.seo?.og_image || '' },
+    // Sin secciones guardadas: las sugeridas de la plantilla (el sitio sigue con la plantilla original hasta guardar)
+    sections: Array.isArray(content.sections) ? sanitizeSections(content.sections) : defaultSections(templates.includes(s.template) ? s.template : 'clasico'),
   }
 }
 
@@ -74,6 +70,71 @@ const isError = ref(false)
 const publishing = ref(false)
 
 const templateDefaults = computed(() => TEMPLATE_INFO[form.template]?.defaults || TEMPLATE_INFO.clasico.defaults)
+const templateName = computed(() => TEMPLATE_INFO[form.template]?.name || form.template)
+
+// --- Plantilla y secciones ---
+const withoutIds = (sections) => JSON.stringify(sections.map(({ id, ...rest }) => rest))
+const usingSuggested = computed(() => withoutIds(form.sections) === withoutIds(defaultSections(form.template)))
+function clearStyleOverrides() {
+  for (const f of COLOR_FIELDS) delete form.theme[f.key]
+  delete form.theme.font
+  delete form.theme.dark
+}
+function selectTemplate(key) {
+  if (key === form.template) return
+  pushHistory()
+  // Si las secciones siguen como las sugirió la plantilla anterior, se cambian por las de la nueva (sus textos son del nicho)
+  if (usingSuggested.value) form.sections = defaultSections(key)
+  clearStyleOverrides()
+  form.template = key
+}
+function useSuggestedSections() {
+  pushHistory()
+  form.sections = defaultSections(form.template)
+}
+
+// --- Deshacer (cambios de la IA y de plantilla) ---
+const history = ref([])
+function pushHistory() {
+  history.value.push(JSON.stringify(form))
+  if (history.value.length > 20) history.value.shift()
+}
+function undo() {
+  const previous = history.value.pop()
+  if (previous) Object.assign(form, JSON.parse(previous))
+}
+
+// --- IA ---
+const aiPanel = ref(null)
+const aiTarget = ref(null)
+const draft = () => ({
+  template: form.template,
+  theme: form.theme,
+  title: form.title,
+  tagline: form.tagline,
+  about: form.about,
+  sections: form.sections,
+})
+function applyAi(changes) {
+  pushHistory()
+  if (changes.template && templates.includes(changes.template)) {
+    form.template = changes.template
+    if (!changes.theme) clearStyleOverrides()
+  }
+  if (changes.theme) form.theme = { ...changes.theme }
+  if (typeof changes.title === 'string') form.title = changes.title
+  if (typeof changes.tagline === 'string') form.tagline = changes.tagline
+  if (typeof changes.about === 'string') form.about = changes.about
+  if (Array.isArray(changes.sections)) {
+    form.sections = changes.sections
+    if (aiTarget.value) aiTarget.value = form.sections.find((s) => s.id === aiTarget.value.id) || null
+  }
+}
+function editSectionWithAi(section) {
+  aiTarget.value = section
+  aiPanel.value?.$el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  aiPanel.value?.focus()
+}
 const colorValue = (key) => form.theme[key] || templateDefaults.value[key]
 const setColor = (key, value) => {
   form.theme[key] = value
@@ -81,10 +142,7 @@ const setColor = (key, value) => {
 const removeThemeImage = (key) => {
   delete form.theme[key]
 }
-const resetColors = () => {
-  for (const f of COLOR_FIELDS) delete form.theme[f.key]
-  delete form.theme.font
-}
+const resetColors = () => clearStyleOverrides()
 
 // --- Dirección (slug) ---
 const slugInput = ref(site.value.slug)
@@ -198,11 +256,12 @@ async function save() {
       body: {
         template: form.template,
         theme: form.theme,
-        content: { title: form.title, tagline: form.tagline, about: plainToHtml(form.about), socials },
+        content: { title: form.title, tagline: form.tagline, about: plainToHtml(form.about), socials, sections: form.sections },
         seo: form.seo,
       },
     })
     applyServer(data)
+    history.value = []
     flash('Cambios guardados. Ya se ven en tu sitio.')
   } catch (e) {
     flash(e.message, true)
@@ -224,15 +283,40 @@ async function togglePublished() {
   }
 }
 
-// --- Vista previa ---
+// --- Vista previa en vivo ---
+// /o/<slug>?editor=1 se hidrata solo para el dueño y redibuja con el borrador que le mandamos por postMessage
+// (src/components/sites/SitePage.vue): los cambios se ven antes de guardar.
 const previewKey = ref(Date.now())
-const previewUrl = computed(() => `/o/${site.value.slug}?plantilla=${site.value.template}&v=${previewKey.value}`)
+const previewFrame = ref(null)
+const previewMode = ref('desktop')
+const previewUrl = computed(() => `/o/${site.value.slug}?editor=1&v=${previewKey.value}`)
 function reloadPreview() {
   previewKey.value = Date.now()
 }
+function postDraft() {
+  const win = previewFrame.value?.contentWindow
+  if (!win) return
+  win.postMessage({ type: 'aitickets:site-draft', draft: JSON.parse(JSON.stringify(draft())) }, window.location.origin)
+}
+let draftTimer = null
+watch(form, () => {
+  clearTimeout(draftTimer)
+  draftTimer = setTimeout(postDraft, 200)
+}, { deep: true })
+function onPreviewMessage(event) {
+  if (event.origin !== window.location.origin || event.source !== previewFrame.value?.contentWindow) return
+  if (event.data?.type === 'aitickets:site-preview-ready') postDraft()
+}
 const onSiteUpdated = () => reloadPreview()
-onMounted(() => window.addEventListener('aitickets:site-updated', onSiteUpdated))
-onBeforeUnmount(() => window.removeEventListener('aitickets:site-updated', onSiteUpdated))
+onMounted(() => {
+  window.addEventListener('aitickets:site-updated', onSiteUpdated)
+  window.addEventListener('message', onPreviewMessage)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('aitickets:site-updated', onSiteUpdated)
+  window.removeEventListener('message', onPreviewMessage)
+  clearTimeout(draftTimer)
+})
 
 const copied = ref('')
 async function copy(url) {
@@ -294,53 +378,47 @@ const visibleToPublic = computed(() => site.value.published && org.emailVerified
 
     <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
       <div class="space-y-6">
-        <!-- Dirección -->
-        <section class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6 space-y-3">
-          <h3 class="font-bold">Dirección de tu sitio</h3>
-          <div class="flex flex-col sm:flex-row gap-2">
-            <div class="flex flex-1 items-center rounded-lg border border-gray-300 focus-within:ring-2 focus-within:ring-black overflow-hidden">
-              <span class="px-3 py-2 text-sm text-gray-500 bg-gray-50 border-r border-gray-200 whitespace-nowrap">aitickets.cl/o/</span>
-              <input v-model="slugInput" type="text" maxlength="40" class="flex-1 min-w-0 px-3 py-2 text-sm outline-none" aria-label="Dirección del sitio" />
-            </div>
-            <button
-              type="button"
-              class="px-4 py-2 text-sm bg-black text-white rounded-lg hover:bg-gray-800 disabled:opacity-40"
-              :disabled="slugInput === site.slug || !slugState.available || slugState.checking || slugSaving"
-              @click="saveSlug"
-            >
-              {{ slugSaving ? 'Guardando…' : 'Cambiar' }}
-            </button>
-          </div>
-          <p v-if="slugMessage" class="text-xs" :class="slugState.available && !slugState.checking ? 'text-green-700' : 'text-gray-500'">{{ slugMessage }}</p>
-        </section>
+        <SiteAiPanel ref="aiPanel" :get-draft="draft" :target="aiTarget" :can-undo="history.length > 0" @apply="applyAi" @undo="undo" @clear-target="aiTarget = null" />
 
         <!-- Plantilla -->
         <section class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6 space-y-4">
-          <h3 class="font-bold">Plantilla</h3>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <button
-              v-for="key in templates"
-              :key="key"
-              type="button"
-              class="text-left rounded-xl border-2 overflow-hidden transition-colors"
-              :class="form.template === key ? 'border-black' : 'border-gray-200 hover:border-gray-400'"
-              @click="form.template = key"
-            >
-              <div class="h-24 p-3 flex flex-col justify-between" :style="{ background: TEMPLATE_INFO[key]?.defaults.background }">
-                <div class="h-2 w-16 rounded" :style="{ background: TEMPLATE_INFO[key]?.defaults.text }"></div>
-                <div class="flex gap-2">
-                  <div class="h-8 flex-1 rounded" :style="{ background: TEMPLATE_INFO[key]?.defaults.primary, opacity: 0.85 }"></div>
-                  <div class="h-8 flex-1 rounded" :style="{ background: TEMPLATE_INFO[key]?.defaults.accent, opacity: 0.85 }"></div>
-                  <div class="h-8 flex-1 rounded border border-gray-300/40"></div>
-                </div>
-              </div>
-              <div class="p-3">
-                <p class="font-semibold text-sm">{{ TEMPLATE_INFO[key]?.name || key }}</p>
-                <p class="text-xs text-gray-500">{{ TEMPLATE_INFO[key]?.description }}</p>
-              </div>
-            </button>
+          <div>
+            <h3 class="font-bold">Plantilla</h3>
+            <p class="text-sm text-gray-500">Cada plantilla tiene el estilo de su tipo de evento. Al cambiarla se usan sus colores; luego puedes ajustarlos.</p>
           </div>
+          <div v-for="group in [{ label: 'Según lo que produces', keys: nicheTemplates }, { label: 'Generales', keys: generalTemplates }]" :key="group.label" class="space-y-2">
+            <p v-if="group.keys.length" class="text-xs font-bold text-gray-500 uppercase">{{ group.label }}</p>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <button
+                v-for="key in group.keys"
+                :key="key"
+                type="button"
+                class="text-left rounded-xl border-2 overflow-hidden transition-colors"
+                :class="form.template === key ? 'border-black' : 'border-gray-200 hover:border-gray-400'"
+                :aria-pressed="form.template === key"
+                @click="selectTemplate(key)"
+              >
+                <div class="h-20 p-2.5 flex flex-col justify-between" :style="{ background: TEMPLATE_INFO[key].defaults.background, color: TEMPLATE_INFO[key].defaults.text }">
+                  <span class="text-xl leading-none truncate" :style="{ fontFamily: fontStack(TEMPLATE_INFO[key].defaults.font) }">Aa</span>
+                  <div class="flex gap-1.5">
+                    <span class="h-4 w-8 rounded-full" :style="{ background: TEMPLATE_INFO[key].defaults.primary }"></span>
+                    <span class="h-4 w-4 rounded-full" :style="{ background: TEMPLATE_INFO[key].defaults.accent }"></span>
+                  </div>
+                </div>
+                <div class="p-2.5">
+                  <p class="font-semibold text-sm leading-tight">{{ TEMPLATE_INFO[key].name }}</p>
+                  <p class="text-[11px] leading-snug text-gray-500 mt-0.5">{{ TEMPLATE_INFO[key].description }}</p>
+                </div>
+              </button>
+            </div>
+          </div>
+          <p v-if="!usingSuggested" class="text-xs text-gray-500">
+            Mantuvimos tus secciones.
+            <button type="button" class="underline" @click="useSuggestedSections">Usar las sugeridas para {{ templateName }}</button>
+          </p>
         </section>
+
+        <SectionsEditor :form="form" :contact-form-enabled="site.contact_form_enabled" @ai="editSectionWithAi" @error="(m) => flash(m, true)" />
 
         <!-- Colores, tipografía e imágenes -->
         <section class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6 space-y-4">
@@ -401,10 +479,6 @@ const visibleToPublic = computed(() => site.value.published && org.emailVerified
             <span class="block text-xs font-bold text-gray-500 uppercase mb-1">Frase corta</span>
             <input v-model="form.tagline" type="text" maxlength="200" placeholder="Ej: Las mejores fiestas de Valparaíso desde 2015" class="w-full px-3 py-2 rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-black" />
           </label>
-          <label class="block">
-            <span class="block text-xs font-bold text-gray-500 uppercase mb-1">Sobre nosotros</span>
-            <textarea v-model="form.about" rows="5" maxlength="5000" placeholder="Cuenta quiénes son y qué tipo de eventos hacen. Separa los párrafos con una línea en blanco." class="w-full px-3 py-2 rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-black"></textarea>
-          </label>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label v-for="s in SOCIAL_FIELDS" :key="s.key" class="block">
               <span class="block text-xs font-bold text-gray-500 uppercase mb-1">{{ s.label }}</span>
@@ -415,6 +489,26 @@ const visibleToPublic = computed(() => site.value.published && org.emailVerified
               <input v-model="form.socials.whatsapp" type="tel" placeholder="56912345678" class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-black" />
             </label>
           </div>
+        </section>
+
+        <!-- Dirección -->
+        <section class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6 space-y-3">
+          <h3 class="font-bold">Dirección de tu sitio</h3>
+          <div class="flex flex-col sm:flex-row gap-2">
+            <div class="flex flex-1 items-center rounded-lg border border-gray-300 focus-within:ring-2 focus-within:ring-black overflow-hidden">
+              <span class="px-3 py-2 text-sm text-gray-500 bg-gray-50 border-r border-gray-200 whitespace-nowrap">aitickets.cl/o/</span>
+              <input v-model="slugInput" type="text" maxlength="40" class="flex-1 min-w-0 px-3 py-2 text-sm outline-none" aria-label="Dirección del sitio" />
+            </div>
+            <button
+              type="button"
+              class="px-4 py-2 text-sm bg-black text-white rounded-lg hover:bg-gray-800 disabled:opacity-40"
+              :disabled="slugInput === site.slug || !slugState.available || slugState.checking || slugSaving"
+              @click="saveSlug"
+            >
+              {{ slugSaving ? 'Guardando…' : 'Cambiar' }}
+            </button>
+          </div>
+          <p v-if="slugMessage" class="text-xs" :class="slugState.available && !slugState.checking ? 'text-green-700' : 'text-gray-500'">{{ slugMessage }}</p>
         </section>
 
         <!-- SEO -->
@@ -462,13 +556,25 @@ const visibleToPublic = computed(() => site.value.published && org.emailVerified
       <!-- Vista previa -->
       <section class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden xl:sticky xl:top-4">
         <div class="flex items-center justify-between gap-2 px-4 py-3 border-b border-gray-100">
-          <p class="text-sm font-semibold min-w-0">Vista previa <span class="font-normal text-gray-500">(cambios guardados)</span></p>
+          <p class="text-sm font-semibold min-w-0">Vista previa <span class="font-normal text-gray-500">{{ dirty ? '(con cambios sin guardar)' : '(en vivo)' }}</span></p>
           <div class="flex items-center gap-2">
+            <button type="button" class="p-1.5" :class="previewMode === 'desktop' ? 'text-black' : 'text-gray-400 hover:text-black'" title="Computador" :aria-pressed="previewMode === 'desktop'" @click="previewMode = 'desktop'"><Monitor size="16" /></button>
+            <button type="button" class="p-1.5" :class="previewMode === 'mobile' ? 'text-black' : 'text-gray-400 hover:text-black'" title="Celular" :aria-pressed="previewMode === 'mobile'" @click="previewMode = 'mobile'"><Smartphone size="16" /></button>
             <button type="button" class="p-1.5 text-gray-500 hover:text-black" title="Recargar" @click="reloadPreview"><RefreshCw size="16" /></button>
             <a :href="`/o/${site.slug}`" target="_blank" rel="noopener" class="p-1.5 text-gray-500 hover:text-black" title="Abrir en otra pestaña"><ExternalLink size="16" /></a>
           </div>
         </div>
-        <iframe :key="previewKey" :src="previewUrl" title="Vista previa del sitio" class="w-full h-[560px] md:h-[720px] bg-gray-50" loading="lazy"></iframe>
+        <div class="bg-gray-100 flex justify-center">
+          <iframe
+            ref="previewFrame"
+            :key="previewKey"
+            :src="previewUrl"
+            title="Vista previa del sitio"
+            class="h-[560px] md:h-[760px] bg-white transition-[width] duration-200"
+            :class="previewMode === 'mobile' ? 'w-[390px] max-w-full border-x border-gray-200' : 'w-full'"
+            @load="postDraft"
+          ></iframe>
+        </div>
       </section>
     </div>
   </div>

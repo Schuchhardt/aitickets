@@ -1,0 +1,1130 @@
+/* ------------------------------------------------------------------------------------------------
+ * Sitios de productor con secciones (src/components/sites/SitePage.vue). Prefijo sn-.
+ * Los colores salen SIEMPRE del tema (--site-primary, --site-accent, --site-bg, --site-text y sus "on-*" calculados en
+ * SitePage), así el productor puede cambiarlos; cada plantilla de nicho ([data-niche="<plantilla>"]) solo agrega el
+ * lenguaje de su landing (src/styles/landing-<nicho>.css): tipografía, radios, filetes, texturas y la forma de las
+ * piezas. Los derivados usan color-mix para que funcionen sobre fondo claro y oscuro.
+ * ---------------------------------------------------------------------------------------------- */
+/* Fuentes de titulares de las plantillas de nicho, servidas desde el sitio (solo se descargan si se usan) */
+@import "@fontsource-variable/bodoni-moda/wght.css";
+@import "@fontsource/anton/latin-400.css";
+@import "@fontsource/bagel-fat-one/latin-400.css";
+@import "@fontsource/doto/latin-800.css";
+@import "@fontsource-variable/archivo/wdth.css";
+@import "@fontsource/bricolage-grotesque/latin-700.css";
+@import "@fontsource/bricolage-grotesque/latin-800.css";
+@import "@fontsource/fraunces/400-italic.css";
+
+.sn-page {
+  --sn-surface: color-mix(in srgb, var(--site-text) 5%, var(--site-bg));
+  --sn-surface-2: color-mix(in srgb, var(--site-text) 10%, var(--site-bg));
+  --sn-line: color-mix(in srgb, var(--site-text) 14%, transparent);
+  --sn-muted: color-mix(in srgb, var(--site-text) 74%, var(--site-bg));
+  /* Primario como texto: se acerca al color del texto para leerse en fondos claros y oscuros */
+  --sn-primary-ink: color-mix(in srgb, var(--site-primary) 72%, var(--site-text));
+  --sn-radius: 16px;
+  --sn-btn-radius: 999px;
+  --sn-display: var(--site-font);
+  --sn-display-case: none;
+  --sn-display-weight: 700;
+  --sn-display-tracking: -0.01em;
+  --sn-eyebrow-font: "Prompt", system-ui, sans-serif;
+
+  min-height: 100vh;
+  background: var(--site-bg);
+  color: var(--site-text);
+  font-family: "Prompt", system-ui, sans-serif;
+  overflow-x: clip;
+}
+
+.sn-wrap {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 0 1.25rem;
+}
+@media (min-width: 1024px) {
+  .sn-wrap {
+    padding: 0 2rem;
+  }
+}
+
+/* --- Tipografía --- */
+.sn-h1,
+.sn-h2,
+.sn-h3,
+.sn-display {
+  font-family: var(--sn-display);
+  text-transform: var(--sn-display-case);
+  font-weight: var(--sn-display-weight);
+  letter-spacing: var(--sn-display-tracking);
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+.sn-h1 {
+  font-size: clamp(2.4rem, 6.5vw, 4.6rem);
+}
+.sn-h2 {
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
+}
+.sn-h3 {
+  font-size: 1.25rem;
+  line-height: 1.2;
+}
+.sn-eyebrow {
+  display: inline-block;
+  font-family: var(--sn-eyebrow-font);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--sn-primary-ink);
+  margin-bottom: 0.75rem;
+}
+.sn-lead {
+  font-size: 1.125rem;
+  line-height: 1.6;
+  color: var(--sn-muted);
+  max-width: 40rem;
+  white-space: pre-line;
+}
+.sn-muted {
+  color: var(--sn-muted);
+}
+.sn-head {
+  margin-bottom: 2rem;
+}
+
+/* --- Botones --- */
+.sn-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.8rem 1.5rem;
+  border-radius: var(--sn-btn-radius);
+  background: var(--site-primary);
+  color: var(--site-on-primary);
+  font-weight: 700;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  text-align: center;
+  border: 2px solid transparent;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+.sn-btn:hover {
+  transform: translateY(-1px);
+  opacity: 0.92;
+}
+.sn-btn--ghost {
+  background: transparent;
+  color: inherit;
+  border-color: currentColor;
+}
+.sn-btn--sm {
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+}
+
+/* --- Encabezado --- */
+.sn-header {
+  position: relative;
+  z-index: 20;
+  border-bottom: 1px solid var(--sn-line);
+}
+.sn-header--over {
+  position: absolute;
+  inset: 0 0 auto 0;
+  border-bottom: 0;
+  color: #fff;
+}
+.sn-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+.sn-logo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  font-family: var(--sn-display);
+  text-transform: var(--sn-display-case);
+  font-weight: var(--sn-display-weight);
+  font-size: 1.15rem;
+}
+.sn-logo img {
+  height: 2.5rem;
+  width: auto;
+  max-width: 160px;
+  object-fit: contain;
+}
+.sn-logo span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sn-nav {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+.sn-nav a:not(.sn-btn) {
+  padding: 0.5rem 0;
+}
+.sn-nav a:not(.sn-btn):hover {
+  opacity: 0.7;
+}
+@media (max-width: 639px) {
+  .sn-nav .sn-nav-extra {
+    display: none;
+  }
+}
+
+/* --- Secciones --- */
+.sn-section {
+  padding: 4rem 0;
+}
+.sn-section--alt {
+  background: var(--sn-surface);
+}
+@media (min-width: 768px) {
+  .sn-section {
+    padding: 5.5rem 0;
+  }
+}
+
+/* --- Portada --- */
+.sn-hero {
+  position: relative;
+}
+.sn-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 2rem;
+}
+.sn-hero-sub {
+  margin-top: 1.25rem;
+}
+/* split: texto y foto lado a lado */
+.sn-hero--split .sn-hero-grid {
+  display: grid;
+  gap: 2.5rem;
+  align-items: center;
+  padding-top: 3.5rem;
+  padding-bottom: 3.5rem;
+}
+@media (min-width: 900px) {
+  .sn-hero--split .sn-hero-grid.has-media {
+    grid-template-columns: 1.1fr 0.9fr;
+  }
+}
+.sn-hero--split .sn-hero-img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: var(--sn-radius);
+}
+/* overlay y centered: foto a todo el ancho con sombra */
+.sn-hero--overlay,
+.sn-hero--centered {
+  min-height: 72vh;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  color: #fff;
+}
+.sn-hero--centered {
+  align-items: center;
+  text-align: center;
+}
+.sn-hero--overlay.no-media,
+.sn-hero--centered.no-media {
+  color: var(--site-text);
+  min-height: 60vh;
+}
+.sn-hero-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.sn-hero-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, var(--site-bg) 0%, rgba(0, 0, 0, 0.55) 45%, rgba(0, 0, 0, 0.3) 100%);
+}
+.no-media .sn-hero-shade {
+  background: radial-gradient(ellipse 70% 60% at 50% 0%, color-mix(in srgb, var(--site-primary) 22%, transparent), transparent 70%);
+}
+.sn-hero--overlay .sn-hero-body,
+.sn-hero--centered .sn-hero-body {
+  position: relative;
+  width: 100%;
+  padding-top: 8rem;
+  padding-bottom: 4rem;
+}
+.sn-hero--centered .sn-hero-body > * {
+  margin-left: auto;
+  margin-right: auto;
+}
+.sn-hero--centered .sn-hero-actions {
+  justify-content: center;
+}
+.sn-hero--overlay:not(.no-media) .sn-lead,
+.sn-hero--centered:not(.no-media) .sn-lead {
+  color: rgba(255, 255, 255, 0.85);
+}
+.sn-hero--overlay:not(.no-media) .sn-eyebrow,
+.sn-hero--centered:not(.no-media) .sn-eyebrow {
+  color: var(--site-primary);
+}
+.sn-hero--overlay:not(.no-media) .sn-btn--ghost,
+.sn-hero--centered:not(.no-media) .sn-btn--ghost {
+  color: #fff;
+}
+
+/* --- Eventos --- */
+.sn-events-cards,
+.sn-events-posters {
+  display: grid;
+  gap: 1.5rem;
+}
+@media (min-width: 640px) {
+  .sn-events-cards,
+  .sn-events-posters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1024px) {
+  .sn-events-cards,
+  .sn-events-posters {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.sn-ecard {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--sn-radius);
+  background: var(--sn-surface);
+  border: 1px solid var(--sn-line);
+  transition: transform 0.2s ease;
+}
+.sn-ecard:hover,
+.sn-poster:hover {
+  transform: translateY(-3px);
+}
+.sn-ecard-img {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  background: var(--sn-surface-2);
+}
+.sn-ecard-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 1.1rem 1.2rem 1.3rem;
+  flex: 1;
+}
+.sn-ecard-date {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sn-primary-ink);
+}
+.sn-ecard-name {
+  font-family: var(--sn-display);
+  text-transform: var(--sn-display-case);
+  font-weight: var(--sn-display-weight);
+  font-size: 1.3rem;
+  line-height: 1.15;
+}
+.sn-ecard-place {
+  font-size: 0.875rem;
+  color: var(--sn-muted);
+}
+.sn-ecard .sn-btn {
+  margin-top: auto;
+  align-self: flex-start;
+}
+.sn-ecard-cta {
+  padding-top: 0.75rem;
+}
+.sn-poster {
+  display: block;
+  position: relative;
+  transition: transform 0.2s ease;
+}
+.sn-poster-img {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  background: var(--sn-surface-2);
+  border-radius: var(--sn-radius);
+}
+.sn-poster-date {
+  position: absolute;
+  left: 0.75rem;
+  top: 0.75rem;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--site-primary);
+  color: var(--site-on-primary);
+}
+.sn-poster-body {
+  padding-top: 0.9rem;
+}
+.sn-events-list {
+  border-top: 1px solid var(--sn-line);
+}
+.sn-erow {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1rem 1.5rem;
+  align-items: center;
+  padding: 1.25rem 0;
+  border-bottom: 1px solid var(--sn-line);
+}
+@media (min-width: 640px) {
+  .sn-erow {
+    grid-template-columns: 7rem 1fr auto;
+  }
+}
+.sn-erow-date {
+  font-family: var(--sn-display);
+  text-transform: uppercase;
+  line-height: 1;
+}
+.sn-erow-day {
+  display: block;
+  font-size: 2.2rem;
+  font-weight: var(--sn-display-weight);
+}
+.sn-erow-month {
+  display: block;
+  font-size: 0.8rem;
+  letter-spacing: 0.15em;
+  color: var(--sn-primary-ink);
+  margin-top: 0.25rem;
+}
+.sn-erow-name {
+  font-family: var(--sn-display);
+  text-transform: var(--sn-display-case);
+  font-weight: var(--sn-display-weight);
+  font-size: 1.35rem;
+  line-height: 1.15;
+}
+.sn-erow:hover .sn-erow-name {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.sn-erow-cta {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+@media (min-width: 640px) {
+  .sn-erow-cta {
+    grid-column: auto;
+  }
+}
+.sn-empty {
+  padding: 2rem 0;
+  color: var(--sn-muted);
+}
+
+/* --- Destacados --- */
+.sn-grid3 {
+  display: grid;
+  gap: 1.25rem;
+}
+@media (min-width: 768px) {
+  .sn-grid3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.sn-hl {
+  padding: 1.5rem;
+  border-radius: var(--sn-radius);
+  background: var(--sn-surface);
+  border: 1px solid var(--sn-line);
+}
+.sn-hl-num {
+  display: block;
+  font-family: var(--sn-display);
+  font-size: 1.1rem;
+  color: var(--sn-primary-ink);
+  margin-bottom: 0.75rem;
+}
+.sn-hl p {
+  color: var(--sn-muted);
+  margin-top: 0.5rem;
+  line-height: 1.55;
+  white-space: pre-line;
+}
+
+/* --- Sobre nosotros --- */
+.sn-about {
+  display: grid;
+  gap: 1.5rem;
+}
+@media (min-width: 900px) {
+  .sn-about {
+    grid-template-columns: 1fr 2fr;
+    gap: 3rem;
+  }
+}
+.sn-prose {
+  font-size: 1.05rem;
+  line-height: 1.75;
+}
+.sn-prose p + p {
+  margin-top: 1rem;
+}
+.sn-prose a {
+  text-decoration: underline;
+}
+
+/* --- Galería, video --- */
+.sn-gallery {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (min-width: 768px) {
+  .sn-gallery {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.sn-gallery img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: calc(var(--sn-radius) * 0.6);
+}
+.sn-gallery figcaption {
+  font-size: 0.8rem;
+  color: var(--sn-muted);
+  margin-top: 0.4rem;
+}
+.sn-video {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--sn-radius);
+  overflow: hidden;
+  background: #000;
+}
+.sn-video iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+/* --- Preguntas frecuentes --- */
+.sn-faq {
+  border-top: 1px solid var(--sn-line);
+  max-width: 48rem;
+}
+.sn-faq details {
+  border-bottom: 1px solid var(--sn-line);
+}
+.sn-faq summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.2rem 0;
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+.sn-faq summary::-webkit-details-marker {
+  display: none;
+}
+.sn-faq summary::after {
+  content: "+";
+  font-size: 1.4rem;
+  line-height: 1;
+  color: var(--sn-primary-ink);
+}
+.sn-faq details[open] summary::after {
+  content: "–";
+}
+.sn-faq p {
+  padding-bottom: 1.25rem;
+  color: var(--sn-muted);
+  line-height: 1.65;
+  white-space: pre-line;
+}
+
+/* --- Opiniones --- */
+.sn-quotes {
+  display: grid;
+  gap: 1.25rem;
+}
+@media (min-width: 768px) {
+  .sn-quotes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.sn-quote {
+  padding: 1.75rem;
+  border-radius: var(--sn-radius);
+  background: var(--sn-surface);
+  border: 1px solid var(--sn-line);
+}
+.sn-quote blockquote {
+  font-size: 1.15rem;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+.sn-quote blockquote::before {
+  content: "“";
+  display: block;
+  font-family: var(--sn-display);
+  font-size: 3rem;
+  line-height: 0.8;
+  color: var(--sn-primary-ink);
+}
+.sn-quote figcaption {
+  margin-top: 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--sn-muted);
+}
+
+/* --- Llamado y contacto --- */
+.sn-cta {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 2.5rem 2rem;
+  border-radius: calc(var(--sn-radius) * 1.4);
+  background: var(--site-primary);
+  color: var(--site-on-primary);
+}
+@media (min-width: 768px) {
+  .sn-cta {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 3rem;
+  }
+}
+.sn-cta p {
+  opacity: 0.85;
+  margin-top: 0.5rem;
+  white-space: pre-line;
+}
+.sn-cta .sn-btn {
+  background: var(--site-accent);
+  color: var(--site-on-accent);
+  flex-shrink: 0;
+}
+.sn-contact {
+  text-align: center;
+  padding: 3rem 1.5rem;
+  border-radius: calc(var(--sn-radius) * 1.4);
+  border: 1px solid var(--sn-line);
+  background: var(--sn-surface);
+}
+.sn-contact p {
+  color: var(--sn-muted);
+  margin: 0.75rem auto 1.75rem;
+  max-width: 32rem;
+  white-space: pre-line;
+}
+
+/* ================================================================================================
+ * Plantillas de nicho
+ * ============================================================================================== */
+
+/* Teatro: programa de mano y luz de sala. Bodoni redonda, composición centrada, filetes dorados y rombos. */
+[data-niche="teatro"] {
+  --sn-radius: 2px;
+  --sn-btn-radius: 2px;
+  --sn-display-weight: 500;
+  --sn-display-tracking: 0;
+}
+[data-niche="teatro"] .sn-head {
+  text-align: center;
+}
+[data-niche="teatro"] .sn-head .sn-lead {
+  margin-left: auto;
+  margin-right: auto;
+}
+[data-niche="teatro"] .sn-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.8rem;
+  letter-spacing: 0.3em;
+}
+[data-niche="teatro"] .sn-eyebrow::before,
+[data-niche="teatro"] .sn-eyebrow::after {
+  content: "";
+  width: 2.25rem;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.7;
+}
+[data-niche="teatro"] .sn-hero-shade {
+  background: radial-gradient(ellipse 60% 55% at 50% 0%, color-mix(in srgb, var(--site-primary) 30%, transparent), transparent 70%),
+    linear-gradient(to top, var(--site-bg) 2%, rgba(0, 0, 0, 0.6) 55%, rgba(0, 0, 0, 0.45));
+}
+[data-niche="teatro"] .sn-section--alt {
+  background: color-mix(in srgb, var(--site-accent) 40%, var(--site-bg));
+}
+[data-niche="teatro"] .sn-ecard,
+[data-niche="teatro"] .sn-hl,
+[data-niche="teatro"] .sn-quote,
+[data-niche="teatro"] .sn-contact {
+  border-color: color-mix(in srgb, var(--site-primary) 45%, transparent);
+  background: transparent;
+}
+[data-niche="teatro"] .sn-hl,
+[data-niche="teatro"] .sn-quote {
+  text-align: center;
+}
+[data-niche="teatro"] .sn-hl-num::before {
+  content: "◆ ";
+}
+[data-niche="teatro"] .sn-poster-img {
+  outline: 1px solid color-mix(in srgb, var(--site-primary) 55%, transparent);
+  outline-offset: 6px;
+}
+[data-niche="teatro"] .sn-poster-body {
+  text-align: center;
+  padding-top: 1.25rem;
+}
+[data-niche="teatro"] .sn-poster-date {
+  left: 50%;
+  top: auto;
+  bottom: -0.6rem;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+[data-niche="teatro"] .sn-cta {
+  background: color-mix(in srgb, var(--site-accent) 70%, var(--site-bg));
+  color: var(--site-text);
+  border: 1px solid color-mix(in srgb, var(--site-primary) 45%, transparent);
+}
+[data-niche="teatro"] .sn-cta .sn-btn {
+  background: var(--site-primary);
+  color: var(--site-on-primary);
+}
+
+/* Música en vivo: afiche de gira. Anton en mayúsculas, todo cuadrado, grano y rojo de sala. */
+[data-niche="musica"] {
+  --sn-radius: 0px;
+  --sn-btn-radius: 4px;
+  --sn-display-case: uppercase;
+  --sn-display-weight: 400;
+  --sn-display-tracking: 0.01em;
+  --sn-eyebrow-font: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.05'/%3E%3C/svg%3E");
+}
+[data-niche="musica"] .sn-h1 {
+  font-size: clamp(3rem, 10vw, 7.5rem);
+  line-height: 0.9;
+}
+[data-niche="musica"] .sn-h2 {
+  font-size: clamp(2.4rem, 6vw, 4rem);
+  line-height: 0.95;
+}
+[data-niche="musica"] .sn-eyebrow {
+  letter-spacing: 0.12em;
+}
+[data-niche="musica"] .sn-eyebrow::before {
+  content: "● ";
+  color: var(--site-primary);
+}
+[data-niche="musica"] .sn-hero-bg {
+  filter: grayscale(1) contrast(1.15);
+}
+[data-niche="musica"] .sn-hero-shade {
+  background: linear-gradient(to top, var(--site-bg) 0%, transparent 55%),
+    color-mix(in srgb, var(--site-primary) 28%, transparent);
+}
+[data-niche="musica"] .sn-erow-day {
+  font-size: 2.8rem;
+}
+[data-niche="musica"] .sn-erow-month,
+[data-niche="musica"] .sn-ecard-date {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+[data-niche="musica"] .sn-erow-date {
+  color: var(--site-primary);
+}
+[data-niche="musica"] .sn-hl,
+[data-niche="musica"] .sn-quote {
+  border-left: 4px solid var(--site-primary);
+}
+[data-niche="musica"] .sn-section--alt {
+  background: var(--site-accent);
+  color: var(--site-on-accent);
+  --sn-muted: color-mix(in srgb, var(--site-on-accent) 75%, var(--site-accent));
+  --sn-line: color-mix(in srgb, var(--site-on-accent) 18%, transparent);
+  --sn-surface: color-mix(in srgb, var(--site-on-accent) 6%, var(--site-accent));
+  --sn-primary-ink: color-mix(in srgb, var(--site-primary) 70%, var(--site-on-accent));
+}
+
+/* Fiestas: pulsera, sticker y desechable. Bagel Fat One, contornos de tinta, sombras planas y piezas giradas. */
+[data-niche="fiestas"] {
+  --sn-radius: 22px;
+  --sn-display-weight: 400;
+  --sn-display-tracking: 0;
+}
+[data-niche="fiestas"] .sn-btn {
+  border: 3px solid var(--site-text);
+  box-shadow: 4px 4px 0 var(--site-text);
+}
+[data-niche="fiestas"] .sn-btn:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 5px 5px 0 var(--site-text);
+}
+[data-niche="fiestas"] .sn-btn--ghost {
+  background: var(--site-bg);
+  color: var(--site-text);
+}
+[data-niche="fiestas"] .sn-eyebrow {
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  background: var(--site-accent);
+  color: var(--site-on-accent);
+  letter-spacing: 0.12em;
+  transform: rotate(-2deg);
+}
+[data-niche="fiestas"] .sn-hero--split {
+  background:
+    radial-gradient(circle at 8% 20%, #ffe14d 0 7px, transparent 8px),
+    radial-gradient(circle at 92% 14%, var(--site-accent) 0 6px, transparent 7px),
+    radial-gradient(circle at 78% 86%, var(--site-primary) 0 8px, transparent 9px),
+    radial-gradient(circle at 18% 88%, var(--site-accent) 0 5px, transparent 6px),
+    radial-gradient(circle at 50% 6%, var(--site-primary) 0 5px, transparent 6px);
+}
+[data-niche="fiestas"] .sn-hero--split .sn-hero-img {
+  border: 10px solid #fff;
+  border-bottom-width: 42px;
+  border-radius: 4px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
+  transform: rotate(2.5deg);
+}
+[data-niche="fiestas"] .sn-ecard,
+[data-niche="fiestas"] .sn-hl,
+[data-niche="fiestas"] .sn-quote,
+[data-niche="fiestas"] .sn-contact {
+  border: 3px solid var(--site-text);
+  box-shadow: 6px 6px 0 var(--site-text);
+  background: #fff;
+  color: #16110d;
+  --sn-muted: #4a3f35;
+}
+[data-niche="fiestas"] .sn-poster-img {
+  border: 3px solid var(--site-text);
+  box-shadow: 6px 6px 0 var(--site-text);
+}
+[data-niche="fiestas"] .sn-events-posters > :nth-child(odd),
+[data-niche="fiestas"] .sn-grid3 > :nth-child(odd) {
+  transform: rotate(-1.2deg);
+}
+[data-niche="fiestas"] .sn-events-posters > :nth-child(even),
+[data-niche="fiestas"] .sn-grid3 > :nth-child(even) {
+  transform: rotate(1.2deg);
+}
+[data-niche="fiestas"] .sn-poster-date {
+  border-radius: 999px;
+  border: 2px solid var(--site-text);
+  transform: rotate(-4deg);
+}
+[data-niche="fiestas"] .sn-section--alt {
+  background: var(--site-accent);
+  color: var(--site-on-accent);
+  --sn-muted: color-mix(in srgb, var(--site-on-accent) 80%, var(--site-accent));
+  --sn-primary-ink: var(--site-on-accent);
+}
+[data-niche="fiestas"] .sn-section--alt .sn-eyebrow {
+  background: var(--site-primary);
+  color: var(--site-on-primary);
+}
+[data-niche="fiestas"] .sn-cta {
+  border: 3px solid var(--site-text);
+  box-shadow: 8px 8px 0 var(--site-text);
+}
+
+/* Clubs y discotecas: luz negra. Letrero LED (Doto), halos violeta y rosa flúor encendido. */
+[data-niche="clubs"] {
+  --sn-radius: 14px;
+  --sn-display-case: uppercase;
+  --sn-display-weight: 800;
+  --sn-display-tracking: 0.02em;
+}
+[data-niche="clubs"] .sn-h1,
+[data-niche="clubs"] .sn-h2 {
+  color: var(--site-primary);
+  text-shadow: 0 0 18px color-mix(in srgb, var(--site-primary) 55%, transparent);
+}
+[data-niche="clubs"] .sn-hero .sn-h1 {
+  color: var(--site-primary);
+}
+[data-niche="clubs"] .sn-eyebrow {
+  color: color-mix(in srgb, var(--site-accent) 55%, var(--site-text));
+}
+[data-niche="clubs"] .sn-hero-shade {
+  background: radial-gradient(ellipse 60% 50% at 50% 100%, color-mix(in srgb, var(--site-accent) 45%, transparent), transparent 70%),
+    linear-gradient(to top, var(--site-bg) 5%, rgba(7, 6, 11, 0.65) 55%, rgba(7, 6, 11, 0.4));
+}
+[data-niche="clubs"] .sn-ecard,
+[data-niche="clubs"] .sn-hl,
+[data-niche="clubs"] .sn-quote,
+[data-niche="clubs"] .sn-contact {
+  border-color: color-mix(in srgb, var(--site-accent) 45%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--site-accent) 15%, transparent), 0 10px 40px -12px color-mix(in srgb, var(--site-accent) 45%, transparent);
+}
+[data-niche="clubs"] .sn-erow-date {
+  color: var(--site-primary);
+  text-shadow: 0 0 14px color-mix(in srgb, var(--site-primary) 50%, transparent);
+}
+[data-niche="clubs"] .sn-btn {
+  box-shadow: 0 0 22px -4px color-mix(in srgb, var(--site-primary) 70%, transparent);
+}
+[data-niche="clubs"] .sn-cta {
+  background: color-mix(in srgb, var(--site-accent) 22%, var(--site-bg));
+  color: var(--site-text);
+  border: 1px solid color-mix(in srgb, var(--site-accent) 50%, transparent);
+}
+[data-niche="clubs"] .sn-cta .sn-btn {
+  background: var(--site-primary);
+  color: var(--site-on-primary);
+}
+
+/* Stand-up: un foco sobre fondo cálido y oscuro, notas en cursiva (Fraunces) y lima solo en acciones. */
+[data-niche="standup"] {
+  --sn-radius: 14px;
+  --sn-eyebrow-font: "Fraunces", Georgia, serif;
+}
+[data-niche="standup"] .sn-eyebrow {
+  font-style: italic;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 1.15rem;
+  color: var(--site-accent);
+}
+[data-niche="standup"] .sn-hero-shade {
+  background: radial-gradient(circle at 50% 18%, transparent 0 18%, rgba(0, 0, 0, 0.55) 48%),
+    linear-gradient(to top, var(--site-bg) 2%, transparent 60%);
+}
+[data-niche="standup"] .no-media .sn-hero-shade {
+  background: radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--site-accent) 22%, transparent) 0 22%, transparent 55%);
+}
+[data-niche="standup"] .sn-quote blockquote {
+  font-family: "Fraunces", Georgia, serif;
+  font-style: italic;
+  font-size: 1.35rem;
+}
+[data-niche="standup"] .sn-cta {
+  background: var(--sn-surface-2);
+  color: var(--site-text);
+}
+[data-niche="standup"] .sn-cta .sn-btn {
+  background: var(--site-primary);
+  color: var(--site-on-primary);
+}
+
+/* Seminarios y congresos: credencial y programa. Archivo angosta, grilla con filetes finos y banda turquesa. */
+[data-niche="seminarios"] {
+  --sn-radius: 6px;
+  --sn-btn-radius: 6px;
+  --sn-display-tracking: -0.02em;
+}
+[data-niche="seminarios"] .sn-h1,
+[data-niche="seminarios"] .sn-h2,
+[data-niche="seminarios"] .sn-erow-name,
+[data-niche="seminarios"] .sn-ecard-name {
+  font-stretch: 82%;
+}
+[data-niche="seminarios"] .sn-eyebrow {
+  padding-left: 0.85rem;
+  border-left: 4px solid var(--site-accent);
+  letter-spacing: 0.16em;
+}
+[data-niche="seminarios"] .sn-head {
+  border-top: 2px solid var(--site-text);
+  padding-top: 1.25rem;
+}
+[data-niche="seminarios"] .sn-hero--split .sn-hero-img {
+  border: 10px solid #fff;
+  box-shadow: 0 1px 0 var(--sn-line), 0 20px 50px -20px rgba(0, 0, 0, 0.35);
+}
+[data-niche="seminarios"] .sn-ecard,
+[data-niche="seminarios"] .sn-hl,
+[data-niche="seminarios"] .sn-quote {
+  border-top: 4px solid var(--site-accent);
+  background: color-mix(in srgb, #fff 70%, var(--site-bg));
+}
+[data-niche="seminarios"] .sn-erow-date {
+  font-variant-numeric: tabular-nums;
+}
+[data-niche="seminarios"] .sn-section--alt {
+  background: var(--site-primary);
+  color: var(--site-on-primary);
+  --sn-muted: color-mix(in srgb, var(--site-on-primary) 82%, var(--site-primary));
+  --sn-line: color-mix(in srgb, var(--site-on-primary) 25%, transparent);
+  --sn-primary-ink: var(--site-on-primary);
+}
+[data-niche="seminarios"] .sn-section--alt .sn-head {
+  border-top-color: currentColor;
+}
+[data-niche="seminarios"] .sn-section--alt .sn-hl,
+[data-niche="seminarios"] .sn-section--alt .sn-quote {
+  background: color-mix(in srgb, var(--site-on-primary) 10%, var(--site-primary));
+  border-color: var(--sn-line);
+  border-top-color: var(--site-on-primary);
+}
+[data-niche="seminarios"] .sn-section--alt .sn-eyebrow {
+  border-left-color: currentColor;
+}
+
+/* Talleres: cuaderno de taller. Papel cuadriculado, fichas con línea roja, destacador y botones de cartón. */
+[data-niche="talleres"] {
+  --sn-radius: 6px;
+  --sn-btn-radius: 10px;
+  --sn-display-weight: 800;
+  --sn-display-tracking: -0.02em;
+  background-image: linear-gradient(color-mix(in srgb, var(--site-primary) 9%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--site-primary) 9%, transparent) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+[data-niche="talleres"] .sn-h2 > span,
+[data-niche="talleres"] .sn-h1 > span {
+  background: linear-gradient(transparent 55%, var(--site-accent) 55%, var(--site-accent) 92%, transparent 92%);
+  padding: 0 0.15em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+[data-niche="talleres"] .sn-btn {
+  border: 2px solid var(--site-text);
+  box-shadow: 0 4px 0 var(--site-text);
+}
+[data-niche="talleres"] .sn-btn:hover {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 var(--site-text);
+}
+[data-niche="talleres"] .sn-ecard,
+[data-niche="talleres"] .sn-hl,
+[data-niche="talleres"] .sn-quote,
+[data-niche="talleres"] .sn-contact {
+  background: #fff;
+  color: #1f2329;
+  --sn-muted: #424852;
+  border: 1px solid rgba(31, 35, 41, 0.12);
+  border-top: 3px solid #d65c64;
+  box-shadow: 0 8px 22px -14px rgba(31, 35, 41, 0.45);
+}
+[data-niche="talleres"] .sn-grid3 > :nth-child(3n + 1) {
+  transform: rotate(-0.8deg);
+}
+[data-niche="talleres"] .sn-grid3 > :nth-child(3n) {
+  transform: rotate(0.8deg);
+}
+[data-niche="talleres"] .sn-hero--split .sn-hero-img {
+  border: 8px solid #fff;
+  border-radius: 2px;
+  box-shadow: 0 16px 36px -14px rgba(0, 0, 0, 0.45);
+  transform: rotate(-1.5deg);
+}
+[data-niche="talleres"] .sn-section--alt {
+  background: #1f3a30;
+  color: #eef2ec;
+  --sn-muted: #b9c7be;
+  --sn-line: rgba(238, 242, 236, 0.18);
+  --sn-primary-ink: #eef2ec;
+}
+[data-niche="talleres"] .sn-section--alt .sn-hl,
+[data-niche="talleres"] .sn-section--alt .sn-quote {
+  background: #284a3d;
+  color: #eef2ec;
+  --sn-muted: #b9c7be;
+  border-color: rgba(238, 242, 236, 0.18);
+}
+
+/* Academias y cursos: papel cálido, tinta y notas en cursiva (Fraunces). */
+[data-niche="academias"] {
+  --sn-radius: 18px;
+  --sn-eyebrow-font: "Fraunces", Georgia, serif;
+}
+[data-niche="academias"] .sn-eyebrow {
+  font-style: italic;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 1.2rem;
+  color: color-mix(in srgb, #7a5c3e 80%, var(--site-text));
+}
+[data-niche="academias"] .sn-ecard,
+[data-niche="academias"] .sn-hl,
+[data-niche="academias"] .sn-quote,
+[data-niche="academias"] .sn-contact {
+  background: #fff;
+  color: #1b1712;
+  --sn-muted: #3e372f;
+  border-color: rgba(27, 23, 18, 0.08);
+  box-shadow: 0 12px 30px -18px rgba(27, 23, 18, 0.35);
+}
+[data-niche="academias"] .sn-section--alt {
+  background: color-mix(in srgb, #f1eadf 80%, var(--site-bg));
+}
+[data-niche="academias"] .sn-cta .sn-btn {
+  background: var(--site-accent);
+  color: var(--site-on-accent);
+}
+
+/* --- Generales --- */
+[data-niche="clasico"] .sn-h2 {
+  display: inline-block;
+  border-bottom: 4px solid var(--site-accent);
+  padding-bottom: 0.2rem;
+}
+[data-niche="clasico"] .sn-btn,
+[data-niche="nocturno"] .sn-btn,
+[data-niche="festival"] .sn-btn {
+  background: var(--site-accent);
+  color: var(--site-on-accent);
+}
+[data-niche="clasico"] .sn-cta .sn-btn,
+[data-niche="nocturno"] .sn-cta .sn-btn {
+  background: var(--site-accent);
+}
+[data-niche="nocturno"] .sn-eyebrow {
+  color: var(--site-accent);
+  letter-spacing: 0.3em;
+}
+[data-niche="minimal"] {
+  --sn-radius: 8px;
+  --sn-btn-radius: 8px;
+}
+[data-niche="festival"] {
+  --sn-radius: 0px;
+  --sn-display-case: uppercase;
+  --sn-display-weight: 400;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sn-page * {
+    transition: none !important;
+  }
+}

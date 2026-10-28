@@ -16,10 +16,11 @@ import {
   mainOrigin,
   type SiteTemplate,
 } from "../../../../lib/sites";
+import { NICHE_TEMPLATES, sanitizeSections } from "../../../../lib/siteTemplates";
 import { domainView, getDomainProvider } from "../../../../../netlify/lib/domains/index.mjs";
 
-/** Plantillas que ofrece el editor (el renderizador soporta más; ver src/lib/sites.ts). */
-export const EDITOR_TEMPLATES: SiteTemplate[] = ["clasico", "nocturno"];
+/** Plantillas que ofrece el editor: las de cada nicho y las generales (el renderizador soporta más; ver src/lib/siteTemplates.ts). */
+export const EDITOR_TEMPLATES: SiteTemplate[] = [...NICHE_TEMPLATES, "clasico", "nocturno"];
 export const MAX_BANNERS = 10;
 export const EDITOR_FONTS = SITE_FONTS;
 
@@ -227,7 +228,7 @@ export function sanitizeTheme(input: any): Record<string, unknown> {
 
 export function sanitizeContent(input: any, previous: any = {}): Record<string, unknown> {
   const c = input && typeof input === "object" ? input : {};
-  // Conserva claves que el editor no maneja (p. ej. section_order futuro)
+  // Conserva claves que el editor no maneja
   const out: Record<string, unknown> = { ...(previous && typeof previous === "object" ? previous : {}) };
   out.title = text(c.title, 80) || undefined;
   out.tagline = text(c.tagline, 200) || undefined;
@@ -242,6 +243,8 @@ export function sanitizeContent(input: any, previous: any = {}): Record<string, 
   const wa = String(s.whatsapp || "").replace(/[^\d]/g, "");
   if (wa.length >= 8 && wa.length <= 15) socials.whatsapp = wa;
   out.socials = socials;
+  // Secciones de la página de inicio (src/lib/siteTemplates.ts). Sin la clave, se conservan las guardadas.
+  if (Array.isArray(c.sections)) out.sections = sanitizeSections(c.sections);
   return Object.fromEntries(Object.entries(out).filter(([, v]) => v !== undefined));
 }
 

@@ -6,8 +6,10 @@ import Clasico from "../../../components/sites/templates/Clasico.vue";
 import Nocturno from "../../../components/sites/templates/Nocturno.vue";
 import Minimal from "../../../components/sites/templates/Minimal.vue";
 import Festival from "../../../components/sites/templates/Festival.vue";
+import SitePage from "../../../components/sites/SitePage.vue";
 import { getSiteBanners, getSiteEvents, publicSiteProps, siteShareImageSource, siteUrl } from "../../../lib/sites";
 import { sanitizeRichText } from "../../../lib/sanitize";
+import { defaultSections, isNicheTemplate, sanitizeSections } from "../../../lib/siteTemplates";
 import { stripHtml, truncate } from "../../../lib/eventPage";
 import { loadSiteForPage } from "../_site";
 
@@ -19,14 +21,21 @@ const loaded = await loadSiteForPage(Astro);
 if (!loaded) {
   return notFound();
 }
-const { site, preview, base, template } = loaded;
+const { site, preview, base, template, owner } = loaded;
 
 const [events, banners] = await Promise.all([getSiteEvents(site), getSiteBanners(site)]);
 const props = publicSiteProps(site, template);
 const aboutHtml = sanitizeRichText(site.content?.about || "");
 
 const TEMPLATES = { clasico: Clasico, nocturno: Nocturno, minimal: Minimal, festival: Festival } as const;
-const Template = TEMPLATES[template] || Clasico;
+const Template = (TEMPLATES as Record<string, any>)[template] || Clasico;
+
+// Secciones (src/lib/siteTemplates.ts): las guardadas o, en una plantilla de nicho sin secciones (o al probar una
+// plantilla con ?plantilla=), las sugeridas. Sin secciones y en una plantilla general se usa la plantilla original.
+// ?editor=1 (solo el dueño): vista previa en vivo del editor, que redibuja con el borrador sin guardar.
+const live = owner && Astro.url.searchParams.get("editor") === "1";
+const savedSections = Array.isArray(site.content?.sections) ? sanitizeSections(site.content.sections) : null;
+const sections = savedSections || (isNicheTemplate(template) || live ? defaultSections(template) : null);
 
 // SEO: canónico en el origen del sitio (dominio propio > /o/<slug>). noindex hasta tener eventos publicados.
 const canonicalUrl = siteUrl(site, "/");
@@ -38,7 +47,7 @@ const description = truncate(
   158
 );
 const ogImage = await siteShareImageSource(site, { banners, events });
-const noindex = preview || site.is_demo || events.length === 0;
+const noindex = preview || live || site.is_demo || events.length === 0;
 
 const jsonLd = JSON.stringify({
   "@context": "https://schema.org",
@@ -61,5 +70,13 @@ const jsonLd = JSON.stringify({
     noindex={noindex}
     jsonLd={jsonLd}
   />
-  <Template site={props} events={events} banners={banners} aboutHtml={aboutHtml} base={base} />
+  {sections ? (
+    live ? (
+      <SitePage client:load site={props} sections={sections} events={events} banners={banners} aboutHtml={aboutHtml} base={base} fallbackName={site.org?.public_name || ""} live />
+    ) : (
+      <SitePage site={props} sections={sections} events={events} banners={banners} aboutHtml={aboutHtml} base={base} fallbackName="" live={false} />
+    )
+  ) : (
+    <Template site={props} events={events} banners={banners} aboutHtml={aboutHtml} base={base} />
+  )}
 </SiteLayout>
