@@ -44,6 +44,42 @@ export function isWaitlistRowOpen(row, buyable) {
 }
 
 /** Link del correo, con el canal para medir las ventas que trae. */
+// Lista de un evento para el panel y la API de productores: más reciente primero, con el motivo y la función en texto.
+export async function listWaitlist(supabase, eventId, { limit = 5000 } = {}) {
+  const { data, error } = await supabase
+    .from(WAITLIST_TABLE)
+    .select('id, email, kind, event_date_id, created_at, notified_at')
+    .eq('event_id', eventId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+
+  const dateIds = [...new Set((data || []).map((r) => r.event_date_id).filter((id) => id != null))]
+  const { data: dates } = dateIds.length
+    ? await supabase.from('event_dates').select('id, date, start_time').in('id', dateIds)
+    : { data: [] }
+  const fnLabel = new Map(
+    (dates || []).map((d) => [
+      String(d.id),
+      [new Date(`${d.date}T12:00:00Z`).toLocaleDateString('es-CL', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' }), d.start_time?.slice(0, 5)]
+        .filter(Boolean)
+        .join(' · '),
+    ]),
+  )
+  const rows = (data || []).map((r) => ({
+    id: r.id,
+    email: r.email,
+    kind: r.kind,
+    kind_label: WAITLIST_KIND_LABELS[r.kind] || r.kind,
+    event_date_id: r.event_date_id,
+    function_label: r.event_date_id != null ? fnLabel.get(String(r.event_date_id)) || 'Función eliminada' : null,
+    created_at: r.created_at,
+    notified_at: r.notified_at,
+  }))
+  const notified = rows.filter((r) => r.notified_at).length
+  return { total: rows.length, notified, pending: rows.length - notified, rows }
+}
+
 export const waitlistEventUrl = (slug) => `${SITE_URL}/eventos/${encodeURIComponent(slug || '')}?ref=${WAITLIST_REF}`
 
 async function pendingRows(supabase, now) {

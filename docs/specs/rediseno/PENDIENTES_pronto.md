@@ -118,7 +118,7 @@ Un anuncio creado con 1 a 3 intereses llega a Meta con esa segmentación, y se v
 `send-waitlist-notifications` (cada 15 min) avisan una vez por persona y evento cuando hay una entrada comprable para
 su evento o función; la tarjeta "Lista de espera" del panel (`EventWaitlistManager.vue`, `/api/events/waitlist-list`,
 con CSV) aparece cuando hay anotados. Se quitaron los "Pronto" de música, fiestas, talleres y seminarios. Sin enlace
-de baja: es un solo aviso que la persona pidió. Falta: verla desde el asistente de IA.
+de baja: es un solo aviso que la persona pidió. El asistente de IA la ve con `list_waitlist`.
 
 **Dónde se promete**
 - `musica/MusicPresale.astro` ("Aviso automático")
