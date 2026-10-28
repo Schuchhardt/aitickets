@@ -236,7 +236,8 @@ const peakDatasets = JSON.stringify([
                             <th class="py-2 pr-4 font-medium text-right whitespace-nowrap">Órdenes</th>
                             <th class="py-2 pr-4 font-medium text-right whitespace-nowrap">Conversión</th>
                             <th class="py-2 pr-4 font-medium text-right whitespace-nowrap">Entradas</th>
-                            <th class="py-2 font-medium text-right whitespace-nowrap">Ingresos</th>
+                            <th class="py-2 pr-4 font-medium text-right whitespace-nowrap">Ingresos</th>
+                            <th class="py-2 font-medium text-right whitespace-nowrap" title="Entradas de esas ventas que ya pasaron por la puerta">Entraron</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -247,7 +248,8 @@ const peakDatasets = JSON.stringify([
                                 <td class="py-2 pr-4 text-right whitespace-nowrap">{row.orders}</td>
                                 <td class="py-2 pr-4 text-right whitespace-nowrap">{fmtPct(row.conversion_pct)}</td>
                                 <td class="py-2 pr-4 text-right whitespace-nowrap">{row.tickets}</td>
-                                <td class="py-2 text-right whitespace-nowrap">${row.revenue_clp.toLocaleString("es-CL")}</td>
+                                <td class="py-2 pr-4 text-right whitespace-nowrap">${row.revenue_clp.toLocaleString("es-CL")}</td>
+                                <td class="py-2 text-right whitespace-nowrap" data-testid="channel-checked-in">{row.orders ? (row.checked_in ?? 0).toLocaleString("es-CL") : "—"}</td>
                             </tr>
                         ))}
                     </tbody>
@@ -256,7 +258,8 @@ const peakDatasets = JSON.stringify([
         )}
         <p class="text-xs text-gray-400 mt-3">
             Visitantes según el link con que llegaron; órdenes según la atribución guardada en la compra. Las visitas empezaron a registrar <code>ref</code> con esta versión de la analítica: en ventas por <code>ref</code> anteriores la conversión puede no mostrarse.
-            Ventas sin cortesías ni transferencias. Fechas y horas en horario de Chile continental.
+            Ventas sin cortesías ni transferencias. "Entraron" son las entradas de esas ventas que ya se validaron en la puerta (una entrada transferida cuenta en su venta original).
+            Fechas y horas en horario de Chile continental.
         </p>
     </div>
 

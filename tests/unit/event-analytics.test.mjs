@@ -167,6 +167,58 @@ describe('conversión por canal', () => {
   })
 })
 
+describe('entraron por canal (check-ins por link de RRPP)', () => {
+  const attendee = (id, orderId, status) => ({ id, event_id: 10, event_order_id: orderId, status })
+  const tables = () => ({
+    event_orders: [
+      sale('o1', { ref: 'cata', ticket_qty: 2, ticket_details: [{ name: 'General', price: 10000, quantity: 2, transferred_out: 1 }] }),
+      sale('o2', { ref: 'nico' }),
+      sale('o3'),
+      // La entrada que o1 le transfirió a otro titular: entra con la orden de la transferencia, cuenta para cata
+      sale('t1', { amount: 0, payment_provider: 'transfer', ticket_details: [{ name: 'General', price: 0, quantity: 1, transferred_from_order: 'o1' }] }),
+      // Cortesía con ref: no es venta, no cuenta
+      sale('c1', { ref: 'cata', amount: 0, payment_provider: 'courtesy', ticket_details: [{ name: 'Cortesía', price: 0, quantity: 1, complimentary: true }] }),
+    ],
+    event_attendees: [
+      attendee(1, 'o1', 'validated'),
+      attendee(2, 'o1', 'active'),
+      attendee(3, 't1', 'validated'),
+      attendee(4, 'o2', 'cancelled'),
+      attendee(5, 'o3', 'validated'),
+      attendee(6, 'c1', 'validated'),
+      attendee(7, null, 'validated'),
+    ],
+  })
+
+  it('la analítica del panel trae "entraron" por canal, con la transferida en su venta original', async () => {
+    db = fakeDb(tables())
+    const r = await analytics.getEventAnalytics(db, EVENT)
+    const byChannel = Object.fromEntries(r.channels.map((c) => [c.channel, c]))
+    expect(byChannel['ref:cata']).toMatchObject({ orders: 1, tickets: 3, checked_in: 2 })
+    expect(byChannel['ref:nico']).toMatchObject({ orders: 1, checked_in: 0 })
+    expect(byChannel['Directo / sin seguimiento']).toMatchObject({ checked_in: 1 })
+  })
+
+  it('get_checkin_stats responde cuántos de cada lista entraron; get_event_performance también', async () => {
+    const { accessTools } = await import('../../src/lib/producer-api/tools/access.ts')
+    const { eventPerformance } = await import('../../src/lib/producer-api/tools/analytics.ts')
+    db = fakeDb({ ...tables(), events: [{ id: 10, organization_id: 1, status: 'published', name: 'Noche', capacity: 100 }], event_dates: [] })
+    const ctx = { supabase: db, actor: { orgId: 1, eventIds: null }, origin: 'https://aitickets.cl' }
+    const stats = await accessTools.find((t) => t.name === 'get_checkin_stats').handler({ event_id: 10 }, ctx)
+    expect(stats.by_channel).toEqual([
+      { channel: 'ref:cata', tickets: 3, checked_in: 2, pending: 1, checked_in_pct: 66.7 },
+      { channel: 'Directo / sin seguimiento', tickets: 1, checked_in: 1, pending: 0, checked_in_pct: 100 },
+    ])
+    // La anulada no cuenta: nico no tiene entradas vigentes
+    const perf = await eventPerformance(ctx, 10, 7)
+    expect(perf.channel_conversion.find((c) => c.channel === 'ref:cata')).toMatchObject({ checked_in: 2 })
+  })
+
+  it('sin check-ins cargados, checked_in es null', () => {
+    expect(analytics.channelConversion([], [sale('o1', { ref: 'x' })])[0].checked_in).toBeNull()
+  })
+})
+
 describe('recordEventVisit guarda ref', () => {
   const request = (headers = {}) => new Request('https://aitickets.cl/api/events/visit', { headers: { 'user-agent': 'Mozilla/5.0', 'x-nf-client-connection-ip': '1.2.3.4', ...headers } })
 
