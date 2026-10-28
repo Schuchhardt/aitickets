@@ -59,6 +59,15 @@ export const TABS: { id: EventTab; label: string }[] = [
 // Orden de la lista = orden dentro de cada pestaña
 export const EVENT_MODULES: EventModule[] = [
     { id: "tickets", title: "Tipos de entrada", description: "Precios, cupos y entradas emitidas.", tab: "ventas", core: true },
+    // Con más de una función: una fila por función (functionOccupancy en eventAnalytics.ts)
+    {
+        id: "function-occupancy",
+        title: "Ocupación por función",
+        description: "Vendidas, cortesías, cupo y % de cada función.",
+        tab: "ventas",
+        core: true,
+        when: (ctx) => ctx.functionCount > 1,
+    },
     // Solo si alguien se anotó: sin anotados no hay nada que ver
     {
         id: "waitlist",

@@ -265,6 +265,72 @@ export async function loadEventFunctions(supabase: any, eventId: number) {
     return { functions, ticketFunction };
 }
 
+export type FunctionOccupancy = {
+    event_date_id: number | null;
+    label: string;
+    sold: number;
+    courtesy: number;
+    issued: number;
+    checked_in: number;
+    /** Suma del cupo de sus tipos de entrada; null si alguno es sin límite (o no tiene tipos con cupo). */
+    capacity: number | null;
+    occupancy_pct: number | null;
+};
+
+/**
+ * Ocupación de cada función (panel y get_event_performance): por función, entradas vendidas, cortesías, emitidas
+ * (vigentes, sin anuladas), ingresadas, cupo y % (emitidas ÷ cupo). La función de una entrada es la de su tipo de
+ * entrada; las de tipos sin función (pase completo, cortesías del tipo "Cortesía") van en una fila aparte, que no se
+ * suma al cupo de cada función.
+ */
+export async function functionOccupancy(supabase: any, eventId: number): Promise<FunctionOccupancy[]> {
+    const [{ functions }, { data: tickets }, attendees] = await Promise.all([
+        loadEventFunctions(supabase, eventId),
+        supabase.from("event_tickets").select("id, ticket_name, event_date_id, total_quantity, is_gift").eq("event_id", eventId),
+        fetchAll<any>(() =>
+            supabase.from("event_attendees").select("id, event_ticket_id, status, is_complimentary").eq("event_id", eventId).order("id", { ascending: true }),
+        ),
+    ]);
+    const keyOf = (dateId: unknown) => (dateId == null ? ALL_FUNCTIONS : String(dateId));
+    const rows = new Map<string, FunctionOccupancy & { unlimited: boolean; capacitySum: number; types: number }>();
+    for (const f of functions) {
+        rows.set(String(f.id), { event_date_id: f.id, label: f.label, sold: 0, courtesy: 0, issued: 0, checked_in: 0, capacity: null, occupancy_pct: null, unlimited: false, capacitySum: 0, types: 0 });
+    }
+    const row = (key: string) => {
+        let r = rows.get(key);
+        if (!r) {
+            r = { event_date_id: null, label: "Válidas para cualquier función", sold: 0, courtesy: 0, issued: 0, checked_in: 0, capacity: null, occupancy_pct: null, unlimited: false, capacitySum: 0, types: 0 };
+            rows.set(key, r);
+        }
+        return r;
+    };
+    const ticketById = new Map<number, any>(((tickets || []) as any[]).map((t) => [Number(t.id), t]));
+    for (const t of (tickets || []) as any[]) {
+        // El tipo de cortesía del sistema no es cupo a la venta (igual que eventCapacity)
+        if (t.is_gift || isCourtesyName(t.ticket_name)) continue;
+        const r = row(keyOf(t.event_date_id));
+        r.types += 1;
+        if (t.total_quantity == null) r.unlimited = true;
+        else r.capacitySum += Number(t.total_quantity) || 0;
+    }
+    for (const a of attendees) {
+        if (a.status === "cancelled") continue;
+        const t = ticketById.get(Number(a.event_ticket_id));
+        const r = row(keyOf(t?.event_date_id));
+        const courtesy = a.is_complimentary === true || isCourtesyName(t?.ticket_name);
+        r.issued += 1;
+        if (courtesy) r.courtesy += 1;
+        else r.sold += 1;
+        if (a.status === "validated") r.checked_in += 1;
+    }
+    return [...rows.values()]
+        .filter((r) => r.event_date_id != null || r.issued > 0 || r.types > 0)
+        .map(({ unlimited, capacitySum, types, ...r }) => {
+            const capacity = unlimited || !types ? null : capacitySum;
+            return { ...r, capacity, occupancy_pct: capacity ? pct(r.issued, capacity) : null };
+        });
+}
+
 /**
  * Ventas por función (sin cortesías ni transferencias): órdenes, entradas e ingresos de cada función, y aparte las
  * entradas válidas para cualquier función. Una orden con entradas de dos funciones cuenta en ambas.

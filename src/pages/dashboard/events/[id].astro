@@ -22,7 +22,7 @@ import { WAITLIST_TABLE } from "../../../../netlify/lib/waitlist.mjs";
 import { requireDashboardSession } from "../_lib/guard";
 import { identityApproved, loadOrgIdentity, ticketsRequireIdentity, IDENTITY_FREE_PAID_CAPACITY } from "../../../lib/producerIdentity";
 import { canAccessEventByStaff } from "../../../../netlify/lib/event-staff.mjs";
-import { getEventSummary } from "../../../lib/eventAnalytics";
+import { functionOccupancy, getEventSummary } from "../../../lib/eventAnalytics";
 import { PROFILE_LABELS, eventProfile, eventPhase, normalizeAddedModules, resolveModules, panelTabs, defaultTab } from "../../../lib/eventModules";
 import {
     Calendar,
@@ -95,6 +95,8 @@ if (error || !event) {
 const summary = await getEventSummary(supabaseAdmin, { id: Number(event.id), status: event.status });
 const fmtPct = (v: number | null) => (v == null ? "—" : `${v.toLocaleString("es-CL")}%`);
 const ticketSalesMap = summary.issued_by_ticket_type_id;
+// Ocupación por función (solo con más de una función; módulo function-occupancy)
+const occupancyRows = (event.event_dates?.length || 0) > 1 ? await functionOccupancy(supabaseAdmin, Number(event.id)) : [];
 
 const publicLink = `/eventos/${event.slug}`;
 const siteUrl = (siteUrlFromEnv() || Astro.url.origin).replace(/\/+$/, "");
@@ -323,6 +325,52 @@ const canCreateAds = adsEnabled() && hasRole(dbUser, ORG_ADMIN_ROLES);
                                     <div class="p-8 text-center text-gray-500">No hay entradas configuradas.</div>
                                 )}
                             </div>
+                        </section>
+                    )}
+                    {m.id === "function-occupancy" && (
+                        <section class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden" data-testid="function-occupancy">
+                            <div class="p-4 sm:p-6 border-b border-gray-100 flex justify-between items-center gap-3">
+                                <h3 class="font-bold text-lg">Ocupación por función</h3>
+                                <a href={`/dashboard/events/${event.id}/analytics`} class="text-sm text-black font-medium hover:underline">Ventas por función</a>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-sm">
+                                    <thead class="bg-gray-50 text-gray-600">
+                                        <tr>
+                                            <th class="px-4 py-2 text-left font-medium">Función</th>
+                                            <th class="px-4 py-2 text-right font-medium whitespace-nowrap">Vendidas</th>
+                                            <th class="px-4 py-2 text-right font-medium whitespace-nowrap">Cortesías</th>
+                                            <th class="px-4 py-2 text-right font-medium whitespace-nowrap">Cupo</th>
+                                            <th class="px-4 py-2 text-left font-medium whitespace-nowrap min-w-[8rem]">Ocupación</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-100">
+                                        {occupancyRows.map((r) => (
+                                            <tr data-testid="function-occupancy-row">
+                                                <td class="px-4 py-2 text-gray-900">{r.label}</td>
+                                                <td class="px-4 py-2 text-right tabular-nums">{r.sold.toLocaleString("es-CL")}</td>
+                                                <td class="px-4 py-2 text-right tabular-nums">{r.courtesy.toLocaleString("es-CL")}</td>
+                                                <td class="px-4 py-2 text-right tabular-nums">{r.capacity == null ? "Sin límite" : r.capacity.toLocaleString("es-CL")}</td>
+                                                <td class="px-4 py-2">
+                                                    {r.occupancy_pct == null ? (
+                                                        <span class="text-gray-500">{r.issued.toLocaleString("es-CL")} emitidas</span>
+                                                    ) : (
+                                                        <div class="flex items-center gap-2">
+                                                            <div class="flex-1 h-2 rounded-full bg-gray-100 overflow-hidden">
+                                                                <div class={`h-full rounded-full ${r.occupancy_pct >= 100 ? "bg-red-500" : r.occupancy_pct >= 80 ? "bg-amber-500" : "bg-black"}`} style={`width: ${Math.min(100, r.occupancy_pct)}%`}></div>
+                                                            </div>
+                                                            <span class="tabular-nums whitespace-nowrap">{fmtPct(r.occupancy_pct)}</span>
+                                                        </div>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <p class="px-4 sm:px-6 py-3 text-xs text-gray-500 border-t border-gray-100">
+                                Ocupación = entradas emitidas (vendidas y cortesías, sin anuladas) ÷ cupo de los tipos de entrada de esa función. Las entradas válidas para cualquier función van en su propia fila.
+                            </p>
                         </section>
                     )}
                     {m.id === "waitlist" && <EventWaitlistManager client:visible eventId={Number(event.id)} />}
