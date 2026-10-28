@@ -1200,6 +1200,18 @@ function formatDate(dateString: string | null): string {
     document.querySelectorAll(".function-filter").forEach((select) => {
         select.addEventListener("change", () => applyFilters(select.getAttribute("data-event-id")));
     });
+
+    // ?event=<id> (desde la tarjeta "Entradas vendidas" del evento): abre su pestaña y su acordeón
+    const preselected = new URLSearchParams(window.location.search).get("event");
+    const target = preselected ? document.querySelector<HTMLElement>(`.event-accordion[data-event-id="${CSS.escape(preselected)}"]`) : null;
+    if (target) {
+        const tabId = target.closest(".tab-content")?.id.replace("tab-", "");
+        document.querySelector<HTMLButtonElement>(`.tab-btn[data-tab="${tabId}"]`)?.click();
+        if (target.querySelector(".accordion-content")?.classList.contains("hidden")) {
+            target.querySelector<HTMLButtonElement>(".accordion-trigger")?.click();
+        }
+        target.scrollIntoView({ block: "start" });
+    }
 </script>
 
 <style>

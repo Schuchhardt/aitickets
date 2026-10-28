@@ -493,7 +493,7 @@ CSV de órdenes (`src/pages/api/events/orders-csv.ts`).
 **Hecho (rama `feat/pronto-resto`).** Hasta 8 preguntas por evento (texto corto, elegir una opción, sí o no; obligatorias u opcionales)
 en `events.checkout_fields.questions` (migración `202610300100_checkout_fields.sql`, reglas en
 `src/lib/checkoutFields.mjs`).
-- Se editan en crear/editar evento ("Qué pedir al comprar", `CheckoutFieldsEditor.vue`) y con `update_event`.
+- Se editan en crear/editar evento ("Pedir datos adicionales", `CheckoutFieldsEditor.vue`) y con `update_event`.
 - Se piden una vez por compra en el checkout y en el registro gratis (`CheckoutExtras.vue`).
 - El servidor las valida y las guarda en `event_orders.registration_answers`.
 - Se ven en `/dashboard/tickets`, en el CSV de órdenes (una columna por pregunta), en `list_attendees`, `get_order` y

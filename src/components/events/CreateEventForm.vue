@@ -129,7 +129,7 @@ const repeatFunctions = (locationIndex, pattern) => applyRepeat(form.value.locat
 const copyTicketsToFunctions = () =>
   applyTicketCopy(form.value.tickets, functionOptions.value.map((o) => o.id), newTempId)
 
-// Qué pedir al comprar (events.checkout_fields): asistentes por entrada, empresa y preguntas (CheckoutFieldsEditor)
+// Pedir datos adicionales (events.checkout_fields): asistentes por entrada, empresa y preguntas (CheckoutFieldsEditor)
 if (!form.value.general.checkoutFields) form.value.general.checkoutFields = { attendee_names: 'off', holders: 'buyer', company: false, questions: [] }
 // Dirección que solo ven quienes compran: al apagar el interruptor se borra al guardar
 const secretLocationOn = ref(Boolean(form.value.general.secretLocation))
