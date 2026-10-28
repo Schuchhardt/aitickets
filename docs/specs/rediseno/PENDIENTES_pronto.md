@@ -38,7 +38,7 @@ Estado al 27-10-2026, rama `rediseno/aitickets`.
 | 8 | Validar la hora de ingreso de la lista | Clubs | P3 | S |
 | 9 | Una entrada para cada invitado de la mesa | Clubs | P2 | M |
 | 10 | Dirección que solo ven quienes compran | Fiestas | P2 | S |
-| 11 | Repetir funciones con un patrón y copiar entradas a cada función | Teatro, talleres | P1 | M |
+| 11 | ~~Repetir funciones con un patrón y copiar entradas a cada función~~ **Hecho** | Teatro, talleres | P1 | M |
 | 12 | Mostrar reseñas mientras quedan fechas | Teatro, talleres | P2 | S |
 | 13 | Ocupación de cada función en una vista | Teatro | P2 | S |
 | 14 | Borderó por función | Teatro | P2 | M |
@@ -285,6 +285,19 @@ La página muestra la comuna. La dirección se manda con un correo programado de
 La dirección no aparece en el HTML público del evento ni en su JSON-LD, y sí en la orden de quien compró.
 
 ## 11. Repetir funciones con un patrón y copiar entradas a cada función
+
+**Hecho (rama `feat/repetir-funciones`).** El patrón vive en `src/lib/functionPattern.mjs` (`MAX_FUNCTIONS`,
+`repeatDates`) y lo usan los dos lados:
+- Formularios de crear y editar evento: "Repetir en varios días" bajo las funciones de cada lugar
+  (`FunctionRepeat.vue`: días, desde, hasta, hora) muestra cuántas funciones agrega y avisa antes de pasar de 60.
+  En el paso de entradas, "Copiar a cada función" (`TicketCopyToFunctions.vue`) copia las entradas de la primera
+  función con entradas propias (o las de "Todas las funciones", que pasan a la primera) a cada función que no tiene,
+  con las tandas encadenadas dentro de cada función. En el editor no reasigna entradas guardadas de "Todas las
+  funciones" (pueden tener ventas). Lógica en `src/components/events/functionRepeat.js`.
+- El servidor rechaza más de 60 funciones al crear o guardar (`assertFunctionCount`).
+- `update_event_functions` acepta `repeat` (`weekdays`, `from`, `until`, `start_time`, `end_time`) y
+  `copy_tickets_from_function_id`; omite fechas repetidas o pasadas y, si quedarían más de 60, no crea nada.
+- Landings: sin "Pronto" en teatro (Acto I) ni en la nota `repeat` de talleres.
 
 **Dónde se promete**
 - `teatro/TheatreActOne.astro` ("Repetir funciones de jueves a domingo", "Copiar las entradas a cada función")

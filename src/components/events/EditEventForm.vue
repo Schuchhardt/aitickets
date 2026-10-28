@@ -8,6 +8,9 @@ import { normalizeSlug, SLUG_MIN, SLUG_PATTERN } from '../../lib/eventSlugFormat
 import { plainTextLength, sanitizeClient } from '../../lib/richTextClient'
 import { prepareImageForUpload, MAX_UPLOAD_BYTES, MAX_SOURCE_BYTES } from '../../lib/clientImage'
 import { chainOptions, pruneChain, chainSummary } from './ticketChain'
+import { applyRepeat, applyTicketCopy } from './functionRepeat'
+import FunctionRepeat from './FunctionRepeat.vue'
+import TicketCopyToFunctions from './TicketCopyToFunctions.vue'
 import { EVENT_PAGE_LAYOUTS, EVENT_PAGE_BACKGROUNDS, normalizePageSettings } from '../../lib/eventPageSettings'
 import IridescenceBg from '../event/IridescenceBg.vue'
 
@@ -187,6 +190,13 @@ const addDate = (locationIndex) => {
 const removeDate = (locationIndex, dateIndex) => {
   form.value.locations[locationIndex].dates.splice(dateIndex, 1)
 }
+
+// Repetir funciones con un patrón y copiar las entradas a cada función (functionRepeat.js)
+const repeatFunctions = (locationIndex, pattern) => applyRepeat(form.value.locations, locationIndex, pattern, newTempId)
+// Entradas guardadas para «Todas las funciones» pueden tener ventas: solo las nuevas se asignan a una función al copiar
+const canPinTicket = (t) => Number(t.id) > 1000000000000
+const copyTicketsToFunctions = () =>
+  applyTicketCopy(form.value.tickets, functionOptions.value.map((o) => o.id), newTempId, { canPin: canPinTicket })
 
 // Logic Step 3 (Tickets)
 const addTicket = () => {
@@ -747,6 +757,7 @@ const submitEvent = async ({ exit = false } = {}) => {
                <button @click="addDate(locIndex)" class="text-sm text-blue-600 font-medium hover:underline flex items-center gap-1">
                  <Plus size="14" /> Agregar otra fecha
                </button>
+               <FunctionRepeat :locations="form.locations" :loc-index="locIndex" @apply="(pattern) => repeatFunctions(locIndex, pattern)" />
              </div>
            </div>
 
@@ -760,6 +771,13 @@ const submitEvent = async ({ exit = false } = {}) => {
            <p v-if="functionOptions.length > 1" class="text-sm text-gray-600 bg-blue-50 border border-blue-100 rounded-lg p-3">
              Para vender cupos separados por función, crea un tipo de entrada por función. Una entrada con "Todas las funciones" comparte su cupo entre todas las fechas.
            </p>
+           <TicketCopyToFunctions
+             v-if="functionOptions.length > 1"
+             :tickets="form.tickets"
+             :function-ids="functionOptions.map((o) => o.id)"
+             :can-pin="canPinTicket"
+             @apply="copyTicketsToFunctions"
+           />
            <div v-for="(ticket, index) in form.tickets" :key="ticket.id" class="p-4 sm:p-6 bg-gray-50 rounded-xl border border-gray-200 relative flex gap-4 sm:gap-6 items-start">
              <button @click="removeTicket(index)" v-if="form.tickets.length > 1" class="absolute top-3 right-3 sm:top-4 sm:right-4 p-1 text-gray-400 hover:text-red-500">
                <Trash2 size="18" />
