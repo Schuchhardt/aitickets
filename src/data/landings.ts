@@ -578,7 +578,7 @@ export const LANDINGS: Landing[] = [
         faq: [
             {
                 q: "¿Los promotores necesitan cuenta?",
-                a: "No. Solo necesitan su link. Las métricas las ve tu equipo en el panel según su rol.",
+                a: "No. Solo necesitan su link para compartir. Si quieres que vean sus números, les mandas un link privado de promotor: en su celular, sin cuenta, ven cuántas entradas vendieron en cada evento y función, sin datos de quienes compraron. El resto de las métricas las ve tu equipo en el panel según su rol.",
             },
             {
                 q: "¿Puedo comparar el mismo promotor en varias fechas?",

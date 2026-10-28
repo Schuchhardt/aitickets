@@ -32,7 +32,7 @@ Estado al 27-10-2026, rama `rediseno/aitickets`.
 | 2 | Segmentar anuncios por intereses o profesión | Stand-up, música, clubs, fiestas, seminarios | P2 | M |
 | 3 | ~~Aviso automático a la lista de espera y verla en el panel~~ **Hecho** | Música, fiestas, talleres, seminarios | P1 | M |
 | 4 | ~~Abrir sola la siguiente tanda cuando se agota la anterior~~ **Hecho** | Música, fiestas | P1 | M |
-| 5 | Que cada promotor o RRPP vea sus números | Clubs, fiestas | P1 | M |
+| 5 | ~~Que cada promotor o RRPP vea sus números~~ **Hecho** | Clubs, fiestas | P1 | M |
 | 6 | Check-ins por canal ("cuántos de cada lista entraron") | Clubs | P2 | S |
 | 7 | Aforo en vivo en el panel | Clubs, fiestas, seminarios | P2 | S |
 | 8 | Validar la hora de ingreso de la lista | Clubs | P3 | S |
@@ -180,6 +180,19 @@ Con Preventa 1 (cupo 100) y Preventa 2 encadenada, la compra número 100 de la p
 intervención. Dos compras simultáneas no sobrevenden la primera.
 
 ## 5. Que cada promotor o RRPP vea sus números
+
+**Hecho (rama `feat/links-promotores`).** Link privado por promotor, sin cuenta y revocable: tabla
+`aitickets_promoter_links` (migración `202610290300_promoter_links.sql`; solo el sha256 del token, como los links de
+puerta) y página `/promotor/<token>` (`src/lib/promoterLinks.ts`).
+- El promotor ve solo las órdenes pagadas con su `ref` (sin mayúsculas/minúsculas; sin cortesías ni transferencias):
+  entradas, monto y compras por evento, desglose por función y su link `?ref=` para copiar en cada evento a la venta.
+  Nunca nombres, correos ni teléfonos. Se calcula en cada visita ("Actualizar").
+- Alcance: todos los eventos de la productora (un RRPP de todas las noches) o un evento. Muestra los eventos con ventas
+  suyas y los publicados que no terminaron hace más de 2 días.
+- Se crea desde el panel del evento (módulo "Promotores y RRPP" en Difusión, sugerido para noche y música;
+  `PromoterLinksManager.vue`, `/api/events/promoter-links`) o el asistente de IA (`create_promoter_link`,
+  `list_promoter_links`, `revoke_promoter_link`). Un miembro con acceso solo a algunos eventos crea links de esos eventos.
+- Landings de clubs y fiestas y la FAQ de ventas por promotor sin "Pronto".
 
 **Dónde se promete**
 - `clubs/ClubList.astro` ("Cada RRPP ve sus números en su celular", `data-testid="club-rrpp-soon"`)
