@@ -3,7 +3,7 @@ import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { getSessionContext, getOwnedEvent, hasRole, EVENT_MANAGER_ROLES, jsonResponse } from "../../../lib/supabaseServer";
 import { csvCell, slugify } from "../_lib/server-utils";
 import { ALL_FUNCTIONS, lineFunctionKey, loadEventFunctions } from "../../../lib/eventAnalytics";
-import { normalizeCheckoutFields, answerFor, formatRut } from "../../../lib/checkoutFields.mjs";
+import { normalizeCheckoutFields, answerFor, answersText, missingAttendeeData, formatRut } from "../../../lib/checkoutFields.mjs";
 import { fetchAll } from "../../../lib/producer-api/tools/common";
 
 const BASE_COLUMNS = "id, created_at, status, amount, ticket_fee, payment_fee, total_payment, ticket_qty, ticket_details, attendees ( first_name, last_name, email, phone )";
@@ -15,8 +15,10 @@ const providerLabel = (p: string | null | undefined) => (p ? PROVIDER_LABELS[p] 
  * Exporta las órdenes pagadas de un evento de la organización como CSV (separador ;). Con varias funciones agrega la
  * columna "Función"; `event_date_id` deja solo las órdenes con entradas de esa función (o válidas para cualquiera) y
  * "Entradas de la función" cuenta solo esas. Los montos son los de la orden completa.
- * Datos extra del checkout (202610300100): "Asistentes" (nombre y correo de cada QR, si se escribieron), empresa
- * (razón social y RUT; no es boleta ni factura) y una columna por pregunta del evento.
+ * Datos extra del checkout (202610300100): "Asistentes" (nombre y correo de cada QR, si se escribieron, con sus
+ * respuestas por persona y "datos pendientes" si un invitado aún no completa lo que pide el evento), empresa (razón
+ * social y RUT; no es boleta ni factura) y una columna por pregunta del evento. Las preguntas por persona
+ * (202610310100) juntan la respuesta de cada asistente de la orden, separadas por " | ".
  */
 export const GET: APIRoute = async (context) => {
     const session = await getSessionContext(context);
@@ -77,25 +79,48 @@ export const GET: APIRoute = async (context) => {
         return jsonResponse({ message: "No se pudieron obtener las órdenes" }, 500);
     }
 
-    // Asistentes de cada QR y preguntas del evento (solo con la migración 202610300100)
+    // Asistentes de cada QR y preguntas del evento (solo con la migración 202610300100; las respuestas por persona,
+    // con la 202610310100)
     const holdersByOrder = new Map<string, string[]>();
-    let questions: Array<{ id: string; label: string }> = [];
+    const ticketsByOrder = new Map<string, any[]>();
+    let questions: Array<{ id: string; label: string; per?: string }> = [];
     let withCompany = false;
     if (withExtras) {
+        const loadHolders = (cols: string) => fetchAll<any>(() => supabase.from("event_attendees").select(cols).eq("event_id", event.id).order("id", { ascending: true }));
         const [holderRows, { data: cfg }] = await Promise.all([
-            fetchAll<any>(() => supabase.from("event_attendees").select("id, event_order_id, holder_name, holder_email, status").eq("event_id", event.id).not("holder_name", "is", null).order("id", { ascending: true })).catch(() => []),
+            loadHolders("id, event_order_id, holder_name, holder_email, status, registration_answers")
+                .catch(() => loadHolders("id, event_order_id, holder_name, holder_email, status"))
+                .catch(() => []),
             supabase.from("events").select("checkout_fields").eq("id", event.id).maybeSingle(),
         ]);
+        const fields = normalizeCheckoutFields((cfg as any)?.checkout_fields);
+        const orderById = new Map((orders || []).map((o: any) => [o.id, o]));
         for (const a of holderRows) {
-            if (a.status === "cancelled" || !(a.holder_name || a.holder_email)) continue;
+            if (a.status === "cancelled" || !a.event_order_id) continue;
+            const order: any = orderById.get(a.event_order_id);
+            const buyer = Array.isArray(order?.attendees) ? order.attendees[0] : order?.attendees;
+            ticketsByOrder.set(a.event_order_id, [...(ticketsByOrder.get(a.event_order_id) || []), a]);
+            const own = answersText(a.registration_answers, "; ");
+            const pending = missingAttendeeData(fields, a, { buyerEmail: buyer?.email, orderAnswers: order?.registration_answers });
+            if (!(a.holder_name || a.holder_email || own || pending.length)) continue;
             const list = holdersByOrder.get(a.event_order_id) || [];
-            list.push([a.holder_name, a.holder_email ? `<${a.holder_email}>` : ""].filter(Boolean).join(" "));
+            list.push([
+                a.holder_name,
+                a.holder_email ? `<${a.holder_email}>` : "",
+                own ? `(${own})` : "",
+                pending.length ? `[datos pendientes: ${pending.join(", ")}]` : "",
+            ].filter(Boolean).join(" "));
             holdersByOrder.set(a.event_order_id, list);
         }
-        const fields = normalizeCheckoutFields((cfg as any)?.checkout_fields);
         questions = fields.questions;
         withCompany = fields.company || (orders || []).some((o: any) => o.company_rut);
     }
+    // Pregunta por persona: la respuesta de cada asistente de la orden (o la de la orden, si antes era por compra)
+    const answerOf = (o: any, q: any) => {
+        if (q.per !== "attendee") return answerFor(o.registration_answers, q);
+        const each = (ticketsByOrder.get(o.id) || []).map((t) => answerFor(t.registration_answers, q)).filter(Boolean);
+        return each.length ? each.join(" | ") : answerFor(o.registration_answers, q);
+    };
 
     const inFunction = (d: any) => !onlyFunction || [String(onlyFunction.id), ALL_FUNCTIONS].includes(fnKey(d));
     const selected = (orders || []).filter((o: any) => !onlyFunction || (Array.isArray(o.ticket_details) ? o.ticket_details : []).some(inFunction));
@@ -141,7 +166,7 @@ export const GET: APIRoute = async (context) => {
             ...(withAttribution ? [o.ref, o.utm_source, o.utm_medium, o.utm_campaign] : []),
             ...(holdersByOrder.size ? [(holdersByOrder.get(o.id) || []).join(" | ")] : []),
             ...(withCompany ? [o.company_name || "", o.company_rut ? formatRut(o.company_rut) : ""] : []),
-            ...questions.map((q) => answerFor(o.registration_answers, q)),
+            ...questions.map((q) => answerOf(o, q)),
         ].map(csvCell).join(";");
     });
 

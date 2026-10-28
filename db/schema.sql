@@ -335,6 +335,8 @@ CREATE TABLE public.event_attendees (
   -- 202610300110: mesa para N (mismo unit_id en los QR de una mesa; seat_number 1..N)
   unit_id uuid,
   seat_number smallint,
+  -- 202610310100: respuestas de esta persona a las preguntas por persona [{id, question, answer}]
+  registration_answers jsonb,
   CONSTRAINT event_attendees_pkey PRIMARY KEY (id),
   CONSTRAINT event_attendees_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.events(id),
   CONSTRAINT event_attendees_event_ticket_id_fkey FOREIGN KEY (event_ticket_id) REFERENCES public.event_tickets(id),

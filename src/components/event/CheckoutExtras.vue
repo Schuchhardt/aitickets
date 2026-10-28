@@ -1,18 +1,26 @@
 <script setup>
 // Datos extra que pide el evento (events.checkout_fields, src/lib/checkoutFields.mjs), en el checkout pagado
 // (CheckoutStepPay) y en el registro gratis (RsvpForm):
-//   - Asistentes: nombre y correo de cada entrada cuando la compra trae más de un QR (o una mesa para varios). Cada
-//     uno recibe su entrada por correo. La primera vacía queda a nombre de quien compra.
-//   - Preguntas al inscribirse (texto corto, una opción, sí o no), obligatorias u opcionales.
+//   - Asistentes: nombre y correo de cada entrada cuando la compra trae más de un QR (o una mesa para varios) y el
+//     evento pide nombres o tiene preguntas por persona. Cada uno recibe su entrada por correo. La primera vacía queda
+//     a nombre de quien compra.
+//     Con holders 'invite', de cada invitado solo se pide el correo (nombre opcional): completa sus datos desde su
+//     correo (/ticket/<id>). El lugar de quien compra siempre se llena aquí.
+//   - Preguntas al inscribirse (texto corto, una opción, sí o no), obligatorias u opcionales. Las por compra van en
+//     "Antes de terminar"; las por persona, en cada asistente (con un solo QR, también en "Antes de terminar").
 //   - Datos de empresa (RUT y razón social), opcionales y solo en compras pagadas. El comprobante NO es boleta ni
 //     factura: se dice junto a los campos.
 // Sin nada configurado no muestra nada. validate() usa las mismas reglas que el servidor; payload() arma lo que se
 // manda a /api/purchase-ticket.
 import { ref, computed, watch, nextTick } from "vue";
+import QuestionFields from "./QuestionFields.vue";
 import {
   normalizeCheckoutFields,
   holderSlots,
   asksHolders,
+  invitesHolders,
+  collectsHolders,
+  requiresAttendeeData,
   validateHolders,
   validateAnswers,
   validateCompany,
@@ -34,15 +42,23 @@ const fields = computed(() => normalizeCheckoutFields(props.event?.checkout_fiel
 const peopleOf = (id) => Number((props.event?.tickets || []).find((t) => String(t.id) === String(id))?.people_per_ticket) || 1;
 const slots = computed(() => holderSlots(props.lines, peopleOf));
 const showHolders = computed(() => asksHolders(fields.value, slots.value.length));
-const questions = computed(() => fields.value.questions);
+const invite = computed(() => invitesHolders(fields.value, slots.value.length));
+const guestEmailRequired = computed(() => requiresAttendeeData(fields.value));
+const orderQs = computed(() => fields.value.questions.filter((q) => q.per !== "attendee"));
+const personQs = computed(() => fields.value.questions.filter((q) => q.per === "attendee"));
+// Con un solo QR, las preguntas por persona son de quien compra: van junto a las de la compra
+const ownPersonQs = computed(() => (!showHolders.value && collectsHolders(fields.value, slots.value.length) ? personQs.value : []));
+const showQuestions = computed(() => orderQs.value.length > 0 || ownPersonQs.value.length > 0);
 const showCompany = computed(() => fields.value.company && props.paid);
+/** ¿Este lugar lo completa su invitado desde el correo? (Nunca el de quien compra.) */
+const isGuest = (i) => invite.value && i > 0;
 
 const holders = ref([]);
 watch(
   () => slots.value.length,
   (n) => {
     const next = holders.value.slice(0, n);
-    while (next.length < n) next.push({ name: "", email: "" });
+    while (next.length < n) next.push({ name: "", email: "", answers: {} });
     holders.value = next;
   },
   { immediate: true },
@@ -61,6 +77,15 @@ const slotLabel = (s, i) => {
     : `Entrada ${i + 1}`;
 };
 const firstPlaceholder = computed(() => (props.buyerName.trim() ? `${props.buyerName.trim()} (tú)` : "Tú"));
+const holdersHelp = computed(() => {
+  if (invite.value) {
+    return `Escribe el correo de cada invitado: le llega su entrada con QR y ahí completa ${personQs.value.length ? "su nombre y sus datos" : "su nombre"}. Tus datos los completas aquí.`;
+  }
+  return `Cada uno recibe su entrada con QR en su correo.${fields.value.attendee_names === "required" || personQs.value.some((q) => q.required) ? "" : " Puedes dejarlos en blanco."}`;
+});
+const clearError = (field) => {
+  if (errorField.value === field) error.value = "";
+};
 
 function onRutBlur() {
   if (isValidRut(company.value.rut)) company.value.rut = formatRut(company.value.rut);
@@ -68,15 +93,23 @@ function onRutBlur() {
 
 function payload() {
   const out = {};
-  if (showHolders.value) {
-    out.holders = slots.value.map((s, i) => ({ ticket_id: s.ticketId, name: holders.value[i]?.name?.trim() || "", email: holders.value[i]?.email?.trim() || "" }));
+  if (collectsHolders(fields.value, slots.value.length)) {
+    out.holders = slots.value.map((s, i) => ({
+      ticket_id: s.ticketId,
+      name: showHolders.value ? holders.value[i]?.name?.trim() || "" : "",
+      email: showHolders.value ? holders.value[i]?.email?.trim() || "" : "",
+      ...(personQs.value.length && !isGuest(i) ? { answers: { ...(holders.value[i]?.answers || {}) } } : {}),
+    }));
   }
-  if (questions.value.length) out.answers = { ...answers.value };
+  if (orderQs.value.length) out.answers = { ...answers.value };
   if (showCompany.value && companyOpen.value && (company.value.rut.trim() || company.value.name.trim())) {
     out.company = { rut: company.value.rut.trim(), name: company.value.name.trim() };
   }
   return out;
 }
+
+// Con un solo QR los errores de las preguntas por persona se muestran junto a las preguntas
+const sectionOf = (field) => (field === "holders" && !showHolders.value ? "answers" : field);
 
 /** Valida con las reglas del servidor. Devuelve el mensaje del primer error ("" si está todo bien) y lo enfoca. */
 async function validate() {
@@ -88,17 +121,17 @@ async function validate() {
   ];
   const failed = checks.find(([, c]) => c.error);
   error.value = failed ? failed[1].error : "";
-  errorField.value = failed ? failed[0] : "";
+  errorField.value = failed ? sectionOf(failed[0]) : "";
   if (failed) {
     await nextTick();
-    root.value?.querySelector(`[data-extras="${failed[0]}"] input, [data-extras="${failed[0]}"] select, [data-extras="${failed[0]}"] button`)?.focus();
+    root.value?.querySelector(`[data-extras="${errorField.value}"] input, [data-extras="${errorField.value}"] select, [data-extras="${errorField.value}"] button`)?.focus();
   }
   return error.value;
 }
 
 /** Error del servidor (400 con field) para mostrarlo junto a su sección. */
 function showServerError(field, message) {
-  errorField.value = field;
+  errorField.value = sectionOf(field);
   error.value = message;
 }
 
@@ -106,13 +139,13 @@ defineExpose({ validate, payload, showServerError });
 </script>
 
 <template>
-  <div v-if="showHolders || questions.length || showCompany" ref="root" class="extras">
+  <div v-if="showHolders || showQuestions || showCompany" ref="root" class="extras">
     <!-- Asistentes -->
     <section v-if="showHolders" class="block" data-extras="holders" data-testid="checkout-holders" aria-labelledby="extras-holders-title">
       <h3 id="extras-holders-title" class="block-title">{{ slots.length > 1 ? "¿Quiénes van?" : "Asistente" }}</h3>
-      <p class="help">Cada uno recibe su entrada con QR en su correo.{{ fields.attendee_names === "required" ? "" : " Puedes dejarlos en blanco." }}</p>
+      <p class="help" data-testid="holders-help">{{ holdersHelp }}</p>
       <ol class="holders">
-        <li v-for="(s, i) in slots" :key="`${s.ticketId}-${s.unit}-${s.seat}`" class="holder">
+        <li v-for="(s, i) in slots" :key="`${s.ticketId}-${s.unit}-${s.seat}`" class="holder" :data-guest="isGuest(i) ? 'true' : undefined">
           <p class="holder-label">{{ slotLabel(s, i) }}</p>
           <div class="holder-fields">
             <label class="sr-only" :for="`holder-name-${event.id}-${i}`">Nombre del asistente {{ i + 1 }}</label>
@@ -124,10 +157,10 @@ defineExpose({ validate, payload, showServerError });
               autocomplete="off"
               autocapitalize="words"
               maxlength="120"
-              :placeholder="i === 0 ? firstPlaceholder : 'Nombre y apellido'"
+              :placeholder="i === 0 ? firstPlaceholder : isGuest(i) ? 'Nombre (opcional)' : 'Nombre y apellido'"
               :readonly="disabled"
               data-testid="holder-name"
-              @input="errorField === 'holders' && (error = '')"
+              @input="clearError('holders')"
             />
             <label class="sr-only" :for="`holder-email-${event.id}-${i}`">Correo del asistente {{ i + 1 }}</label>
             <input
@@ -140,51 +173,33 @@ defineExpose({ validate, payload, showServerError });
               autocapitalize="off"
               spellcheck="false"
               maxlength="254"
-              :placeholder="i === 0 ? 'Tu correo' : 'Correo (opcional)'"
+              :placeholder="i === 0 ? 'Tu correo' : isGuest(i) && guestEmailRequired ? 'Su correo' : 'Correo (opcional)'"
               :readonly="disabled"
               data-testid="holder-email"
-              @input="errorField === 'holders' && (error = '')"
+              @input="clearError('holders')"
             />
           </div>
+          <QuestionFields
+            v-if="personQs.length && !isGuest(i)"
+            :questions="personQs"
+            :answers="holders[i].answers"
+            :id-prefix="`hq-${event.id}-${i}`"
+            :disabled="disabled"
+            class="holder-questions"
+            data-testid="holder-questions"
+            @change="clearError('holders')"
+          />
+          <p v-else-if="personQs.length" class="help" data-testid="holder-invite-note">Completa sus datos desde el correo.</p>
         </li>
       </ol>
       <p v-if="errorField === 'holders' && error" class="ev-error" role="alert">{{ error }}</p>
     </section>
 
     <!-- Preguntas al inscribirse -->
-    <section v-if="questions.length" class="block" data-extras="answers" data-testid="checkout-questions" aria-labelledby="extras-questions-title">
+    <section v-if="showQuestions" class="block" data-extras="answers" data-testid="checkout-questions" aria-labelledby="extras-questions-title">
       <h3 id="extras-questions-title" class="block-title">Antes de terminar</h3>
-      <div class="questions">
-        <div v-for="q in questions" :key="q.id">
-          <template v-if="q.type === 'yes_no'">
-            <p class="ev-label" :id="`q-${event.id}-${q.id}`">{{ q.label }}<span v-if="!q.required" class="optional"> (opcional)</span></p>
-            <div class="yesno" role="radiogroup" :aria-labelledby="`q-${event.id}-${q.id}`">
-              <button
-                v-for="opt in ['Sí', 'No']"
-                :key="opt"
-                type="button"
-                role="radio"
-                class="chip"
-                :class="{ 'is-on': answers[q.id] === opt }"
-                :aria-checked="answers[q.id] === opt ? 'true' : 'false'"
-                :disabled="disabled"
-                @click="answers[q.id] = opt; errorField === 'answers' && (error = '')"
-              >{{ opt }}</button>
-            </div>
-          </template>
-          <template v-else-if="q.type === 'choice'">
-            <label class="ev-label" :for="`q-${event.id}-${q.id}`">{{ q.label }}<span v-if="!q.required" class="optional"> (opcional)</span></label>
-            <select :id="`q-${event.id}-${q.id}`" v-model="answers[q.id]" class="ev-field" :disabled="disabled" @change="errorField === 'answers' && (error = '')">
-              <option :value="undefined" disabled>Elige una opción</option>
-              <option v-for="opt in q.options" :key="opt" :value="opt">{{ opt }}</option>
-            </select>
-          </template>
-          <template v-else>
-            <label class="ev-label" :for="`q-${event.id}-${q.id}`">{{ q.label }}<span v-if="!q.required" class="optional"> (opcional)</span></label>
-            <input :id="`q-${event.id}-${q.id}`" v-model="answers[q.id]" class="ev-field" type="text" maxlength="300" :readonly="disabled" @input="errorField === 'answers' && (error = '')" />
-          </template>
-        </div>
-      </div>
+      <QuestionFields v-if="ownPersonQs.length" :questions="ownPersonQs" :answers="holders[0].answers" :id-prefix="`hq-${event.id}-0`" :disabled="disabled" @change="clearError('answers')" />
+      <QuestionFields v-if="orderQs.length" :questions="orderQs" :answers="answers" :id-prefix="`q-${event.id}`" :disabled="disabled" @change="clearError('answers')" />
       <p v-if="errorField === 'answers' && error" class="ev-error" role="alert">{{ error }}</p>
     </section>
 
@@ -196,11 +211,11 @@ defineExpose({ validate, payload, showServerError });
         <div class="company-fields">
           <div>
             <label class="ev-label" :for="`company-rut-${event.id}`">RUT</label>
-            <input :id="`company-rut-${event.id}`" v-model="company.rut" class="ev-field" type="text" inputmode="text" autocomplete="off" maxlength="12" placeholder="76.123.456-0" :readonly="disabled" data-testid="company-rut" @blur="onRutBlur" @input="errorField === 'company' && (error = '')" />
+            <input :id="`company-rut-${event.id}`" v-model="company.rut" class="ev-field" type="text" inputmode="text" autocomplete="off" maxlength="12" placeholder="76.123.456-0" :readonly="disabled" data-testid="company-rut" @blur="onRutBlur" @input="clearError('company')" />
           </div>
           <div>
             <label class="ev-label" :for="`company-name-${event.id}`">Razón social</label>
-            <input :id="`company-name-${event.id}`" v-model="company.name" class="ev-field" type="text" autocomplete="organization" maxlength="160" :readonly="disabled" data-testid="company-name" @input="errorField === 'company' && (error = '')" />
+            <input :id="`company-name-${event.id}`" v-model="company.name" class="ev-field" type="text" autocomplete="organization" maxlength="160" :readonly="disabled" data-testid="company-name" @input="clearError('company')" />
           </div>
         </div>
         <p class="help" data-testid="company-note">{{ COMPANY_RECEIPT_NOTE }}</p>
@@ -258,31 +273,9 @@ defineExpose({ validate, payload, showServerError });
 .company-fields {
   margin-top: 8px;
 }
-.questions {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  margin-top: 8px;
-}
-.yesno {
-  display: flex;
-  gap: 8px;
-}
-.chip {
-  min-width: 64px;
-  height: 40px;
-  padding: 0 16px;
-  border: 1px solid var(--border-strong);
-  border-radius: 999px;
-  background: var(--surface-0);
-  font: inherit;
-  font-size: 14px;
-  cursor: pointer;
-}
-.chip.is-on {
-  background: var(--brand-ink);
-  border-color: var(--brand-ink);
-  color: #fff;
+.holder-questions {
+  padding-left: 12px;
+  border-left: 2px solid var(--border-strong);
 }
 .company-toggle {
   font-size: 14px;

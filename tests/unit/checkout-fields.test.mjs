@@ -14,13 +14,21 @@ import {
   validateAnswers,
   validateCompany,
   answerFor,
+  answersText,
+  orderQuestions,
+  attendeeQuestions,
+  invitesHolders,
+  collectsHolders,
+  requiresAttendeeData,
+  missingAttendeeData,
+  validateHolderUpdate,
   MAX_QUESTIONS,
 } from '../../src/lib/checkoutFields.mjs'
 
 describe('normalizeCheckoutFields', () => {
   it('vacío o inválido = el checkout de siempre', () => {
     for (const raw of [null, undefined, 'x', [], {}]) {
-      expect(normalizeCheckoutFields(raw)).toEqual({ attendee_names: 'off', company: false, questions: [] })
+      expect(normalizeCheckoutFields(raw)).toEqual({ attendee_names: 'off', holders: 'buyer', company: false, questions: [] })
       expect(isDefaultCheckoutFields(raw)).toBe(true)
     }
   })
@@ -41,12 +49,24 @@ describe('normalizeCheckoutFields', () => {
     expect(f.attendee_names).toBe('required')
     expect(f.company).toBe(true)
     expect(f.questions).toEqual([
-      { id: 'talla', label: 'Talla de polera', type: 'choice', required: true, options: ['S', 'M', 'L'] },
-      { id: 'q2', label: '¿Alergias?', type: 'text', required: false },
-      { id: 'q3', label: '¿Vienes en auto?', type: 'yes_no', required: false },
-      { id: 'q4', label: 'Nivel', type: 'text', required: false },
+      { id: 'talla', label: 'Talla de polera', type: 'choice', required: true, per: 'order', options: ['S', 'M', 'L'] },
+      { id: 'q2', label: '¿Alergias?', type: 'text', required: false, per: 'order' },
+      { id: 'q3', label: '¿Vienes en auto?', type: 'yes_no', required: false, per: 'order' },
+      { id: 'q4', label: 'Nivel', type: 'text', required: false, per: 'order' },
     ])
     expect(isDefaultCheckoutFields(f)).toBe(false)
+  })
+
+  it('configuraciones guardadas antes: quien compra llena todo y las preguntas son por compra', () => {
+    const old = normalizeCheckoutFields({ attendee_names: 'optional', questions: [{ id: 'a', label: 'Talla' }] })
+    expect(old.holders).toBe('buyer')
+    expect(old.questions[0].per).toBe('order')
+    const f = normalizeCheckoutFields({ holders: 'invite', questions: [{ id: 'a', label: 'Talla', per: 'attendee' }, { label: 'Otra', per: 'raro' }] })
+    expect(f.holders).toBe('invite')
+    expect(f.questions.map((q) => q.per)).toEqual(['attendee', 'order'])
+    expect(normalizeCheckoutFields({ holders: 'nadie' }).holders).toBe('buyer')
+    expect(orderQuestions(f).map((q) => q.label)).toEqual(['Otra'])
+    expect(attendeeQuestions(f).map((q) => q.label)).toEqual(['Talla'])
   })
 
   it(`hasta ${MAX_QUESTIONS} preguntas`, () => {
@@ -170,5 +190,86 @@ describe('datos de empresa', () => {
     expect(validateCompany({ company: true }, { rut: '77.893.286-4', name: 'Acme SpA' }).error).toMatch(/dígito verificador/)
     expect(validateCompany({ company: true }, { name: 'Acme SpA' }).error).toMatch(/RUT/)
     expect(validateCompany({ company: true }, { rut: '77.893.286-5' }).error).toMatch(/razón social/)
+  })
+})
+
+describe('preguntas por persona', () => {
+  const fields = {
+    attendee_names: 'optional',
+    questions: [
+      { id: 'talla', label: 'Talla', type: 'choice', options: ['S', 'M'], required: true, per: 'attendee' },
+      { id: 'dieta', label: 'Dieta', type: 'text', per: 'attendee' },
+      { id: 'factura', label: '¿Cómo supiste?', type: 'text', required: true },
+    ],
+  }
+  const slots = holderSlots([{ id: 1, quantity: 2 }])
+
+  it('las preguntas por persona activan los asistentes aunque no se pidan nombres', () => {
+    const f = { questions: [{ label: 'Talla', per: 'attendee' }] }
+    expect(asksHolders(f, 2)).toBe(true)
+    expect(asksHolders(f, 1)).toBe(false)
+    // Con un solo QR las responde quien compra para su entrada
+    expect(collectsHolders(f, 1)).toBe(true)
+    expect(collectsHolders({ questions: [{ label: 'Talla' }] }, 1)).toBe(false)
+  })
+
+  it('quien compra responde por cada persona; la pregunta por compra va aparte', () => {
+    const r = validateHolders(fields, slots, [{ answers: { talla: 'M' } }, { name: 'Ana', answers: { talla: 'S', dieta: ' vegana ' } }], { name: 'Bea', email: 'bea@x.cl' })
+    expect(r.holders).toEqual([
+      { ticket_id: 1, name: 'Bea', email: 'bea@x.cl', answers: [{ id: 'talla', question: 'Talla', answer: 'M' }] },
+      { ticket_id: 1, name: 'Ana', email: null, answers: [{ id: 'talla', question: 'Talla', answer: 'S' }, { id: 'dieta', question: 'Dieta', answer: 'vegana' }] },
+    ])
+    expect(validateHolders(fields, slots, [{ answers: { talla: 'M' } }, { name: 'Ana' }], { name: 'Bea' }).error).toBe('Responde "Talla" (entrada 2).')
+    expect(validateHolders(fields, slots, [{ answers: { talla: 'XL' } }, {}], { name: 'Bea' }).error).toMatch(/Elige una opción de "Talla" \(entrada 1\)/)
+    // validateAnswers solo mira las preguntas por compra
+    expect(validateAnswers(fields, { factura: 'Instagram' }).answers).toEqual([{ id: 'factura', question: '¿Cómo supiste?', answer: 'Instagram' }])
+    expect(validateAnswers(fields, {}).error).toMatch(/Cómo supiste/)
+  })
+
+  it('un solo QR: las respuestas por persona quedan en la entrada de quien compra', () => {
+    const one = holderSlots([{ id: 1, quantity: 1 }])
+    const r = validateHolders(fields, one, [{ answers: { talla: 'S' } }], { name: 'Bea', email: 'bea@x.cl' })
+    expect(r.holders).toEqual([{ ticket_id: 1, name: 'Bea', email: 'bea@x.cl', answers: [{ id: 'talla', question: 'Talla', answer: 'S' }] }])
+    expect(validateHolders(fields, one, [{}], { name: 'Bea' }).error).toBe('Responde "Talla".')
+  })
+
+  it('invitar: el invitado solo trae correo (sus respuestas se ignoran); si el evento exige datos, el correo es obligatorio', () => {
+    const invite = { ...fields, holders: 'invite' }
+    expect(invitesHolders(invite, 2)).toBe(true)
+    expect(invitesHolders(invite, 1)).toBe(false)
+    expect(requiresAttendeeData(invite)).toBe(true)
+    const r = validateHolders(invite, slots, [{ answers: { talla: 'M' } }, { email: 'ana@x.cl', answers: { talla: 'S' } }], { name: 'Bea', email: 'bea@x.cl' })
+    expect(r.holders[1]).toEqual({ ticket_id: 1, name: null, email: 'ana@x.cl' })
+    expect(r.holders[0].answers).toHaveLength(1)
+    expect(validateHolders(invite, slots, [{ answers: { talla: 'M' } }, { name: 'Ana' }], { name: 'Bea' }).error).toMatch(/correo de la entrada 2/)
+    // El lugar de quien compra siempre se llena en el checkout
+    expect(validateHolders(invite, slots, [{}, { email: 'ana@x.cl' }], { name: 'Bea' }).error).toBe('Responde "Talla" (entrada 1).')
+    // Nombres obligatorios: el invitado puede venir sin nombre (lo completa él)
+    const named = { attendee_names: 'required', holders: 'invite' }
+    expect(validateHolders(named, slots, [{}, { email: 'ana@x.cl' }], { name: 'Bea Soto' }).holders[1]).toEqual({ ticket_id: 1, name: null, email: 'ana@x.cl' })
+    // Sin nada obligatorio, el correo del invitado es opcional
+    expect(validateHolders({ attendee_names: 'optional', holders: 'invite' }, slots, [{}, {}], { name: 'Bea' }).error).toBeUndefined()
+  })
+
+  it('datos pendientes: nombre de otra persona sin escribir y preguntas obligatorias sin responder', () => {
+    const f = { attendee_names: 'required', holders: 'invite', questions: fields.questions }
+    const ctx = { buyerEmail: 'bea@x.cl' }
+    expect(missingAttendeeData(f, { holder_email: 'ana@x.cl' }, ctx)).toEqual(['Nombre', 'Talla'])
+    expect(missingAttendeeData(f, { holder_email: 'ana@x.cl', holder_name: 'Ana', registration_answers: [{ id: 'talla', question: 'Talla', answer: 'S' }] }, ctx)).toEqual([])
+    // La entrada de quien compra no pide nombre; vale la respuesta de la orden si la pregunta antes era por compra
+    expect(missingAttendeeData(f, { holder_email: 'BEA@x.cl' }, { ...ctx, orderAnswers: [{ id: 'talla', question: 'Talla', answer: 'M' }] })).toEqual([])
+    expect(missingAttendeeData({ attendee_names: 'optional' }, { holder_email: 'ana@x.cl' }, ctx)).toEqual([])
+    expect(answersText([{ question: 'Talla', answer: 'S' }, { question: 'Dieta', answer: '' }])).toBe('Talla: S')
+  })
+
+  it('lo que completa la persona: mismas reglas que el checkout', () => {
+    const f = { attendee_names: 'required', questions: fields.questions }
+    expect(validateHolderUpdate(f, { name: ' Ana  Rojas ', answers: { talla: 'S' } })).toEqual({ name: 'Ana Rojas', answers: [{ id: 'talla', question: 'Talla', answer: 'S' }] })
+    expect(validateHolderUpdate(f, { answers: { talla: 'S' } })).toMatchObject({ error: 'Escribe tu nombre y apellido.', field: 'name' })
+    expect(validateHolderUpdate(f, { answers: { talla: 'S' } }, { currentName: 'Ana' }).name).toBe('Ana')
+    expect(validateHolderUpdate(f, { name: 'Ana', answers: {} })).toMatchObject({ error: 'Responde "Talla".', field: 'answers' })
+    expect(validateHolderUpdate(f, { name: 'Ana', answers: { talla: 'XL' } }).error).toMatch(/Elige una opción/)
+    // La pregunta por compra no se responde aquí
+    expect(validateHolderUpdate(f, { name: 'Ana', answers: { talla: 'S', factura: 'x' } }).answers).toHaveLength(1)
   })
 })

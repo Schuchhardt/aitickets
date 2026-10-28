@@ -9,8 +9,9 @@
 // El precio se calcula SIEMPRE en el servidor desde event_tickets; se ignora cualquier total/precio/evento del cliente.
 // buyer.fullName (checkout rediseñado, un solo campo "Nombre y apellido"): se divide en el servidor (primer token =>
 // nombre, resto => apellido, que puede quedar vacío). Clientes antiguos siguen enviando firstName/lastName.
-// Datos extra según el evento (events.checkout_fields, src/lib/checkoutFields.mjs): holders [{ticket_id, name, email}]
-// (un asistente por QR, en orden), answers { [preguntaId]: valor } y company { rut, name } (solo compras pagadas). Se
+// Datos extra según el evento (events.checkout_fields, src/lib/checkoutFields.mjs): holders [{ticket_id, name, email,
+// answers?}] (un asistente por QR, en orden; answers = preguntas por persona), answers { [preguntaId]: valor } (preguntas
+// por compra) y company { rut, name } (solo compras pagadas). Con holders 'invite' los invitados solo traen correo. Se
 // validan aquí contra la configuración del evento y se guardan en la orden después de reservar; al emitir, cada QR
 // toma su asistente (netlify/lib/tickets.mjs). Errores de validación: 400 { message, field: 'holders'|'answers'|'company' }.
 // Mesa para N (event_tickets.people_per_ticket): la línea de ticket_details lleva `people` y cupo/precio son por mesa.

@@ -33,6 +33,15 @@ const SEMINAR_FIELDS = {
   ],
 };
 
+/** Preguntas por persona (una por QR) y una por compra; quien compra llena todo o invita a cada uno por correo. */
+const PER_PERSON_FIELDS = {
+  attendee_names: "optional",
+  questions: [
+    { id: "talla", label: "Talla de polera", type: "choice", options: ["S", "M", "L"], required: true, per: "attendee" },
+    { id: "como", label: "¿Cómo supiste del taller?", type: "text", required: false },
+  ],
+};
+
 /** Lugares para los eventos con varias funciones (el de una función es "Teatro de Prueba", en fixtureEvent). */
 const VENUE_PROVIDENCIA = { name: "Sala Agustín Siré", address: "Morandé 750", city: "Providencia" };
 const VENUE_NUNOA = { name: "Teatro Ñuñoa", address: "Av. Irarrázaval 1564", city: "Ñuñoa" };
@@ -145,6 +154,9 @@ export const SCENARIOS = {
   // Datos extra al comprar (tests/e2e/checkout-extras.spec.ts): asistentes, empresa y preguntas; y una mesa para 4
   "datos-al-comprar": { layout: "poster", tickets: [TICKETS.general], checkoutFields: SEMINAR_FIELDS },
   "mesa-para-cuatro": { layout: "poster", tickets: [TICKETS.table], checkoutFields: { attendee_names: "optional" } },
+  // Preguntas por persona: quien compra responde por todos, o cada invitado completa desde su correo
+  "preguntas-por-persona": { layout: "poster", tickets: [TICKETS.general], checkoutFields: PER_PERSON_FIELDS },
+  "invitar-por-correo": { layout: "poster", tickets: [TICKETS.general], checkoutFields: { ...PER_PERSON_FIELDS, attendee_names: "required", holders: "invite" } },
   // Vista previa privada de un borrador (status draft + is_preview, como /eventos/vista-previa/…)
   "vista-previa": { layout: "poster", tickets: [TICKETS.general], preview: true },
 };

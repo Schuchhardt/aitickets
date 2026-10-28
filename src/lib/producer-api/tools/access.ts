@@ -7,6 +7,7 @@ import {
 import { formatFunctionLabel } from "../../../../netlify/lib/dates.mjs";
 import { checkinsByChannel, loadOrderCheckins, loadPaidOrders, summarizeSales } from "../../eventAnalytics";
 import { loadPeoplePerTicket } from "../../../../netlify/lib/tickets.mjs";
+import { missingAttendeeData } from "../../checkoutFields.mjs";
 
 const timeFmt = new Intl.DateTimeFormat("es-CL", { timeZone: TZ, hour: "2-digit", minute: "2-digit", day: "2-digit", month: "short" });
 const formatLocal = (iso: string | null | undefined) => (iso ? timeFmt.format(new Date(iso)) : null);
@@ -37,7 +38,9 @@ const listAttendees: ToolDef = {
         "Entradas emitidas de un evento con su titular (nombre, email), tipo de entrada, función, estado (active = sin ingresar, validated = ya entró, " +
         "cancelled = anulada), hora de ingreso y si es cortesía. El titular es el asistente que se escribió al comprar (compras de varias entradas) " +
         "o, si no, quien compró; buyer aparece cuando son personas distintas. seat = lugar en una mesa para N. answers = respuestas a las preguntas " +
-        "del evento (de la orden). Filtra por checked_in, tipo, función o búsqueda por nombre/email. " +
+        "por compra (de la orden); attendee_answers = respuestas de esa persona a las preguntas por persona. data_pending = lo que el evento pide " +
+        "de esa persona y aún falta (p. ej. un invitado que no completa sus datos desde su correo; su QR sirve igual). " +
+        "Filtra por checked_in, tipo, función, data_pending o búsqueda por nombre/email. " +
         "Contiene datos personales: úsalos solo para gestionar el evento.",
     scope: "attendees",
     permission: "attendees.read",
@@ -53,6 +56,7 @@ const listAttendees: ToolDef = {
             ticket_type_id: { type: "integer", minimum: 1, description: "Solo este tipo de entrada (get_event → ticket_types)." },
             function_id: { type: "integer", minimum: 1, description: "Solo entradas de esta función (get_event → functions)." },
             search: { type: "string", maxLength: 120, description: "Busca por nombre o email del titular (contiene)." },
+            data_pending: { type: "boolean", description: "true = solo quienes tienen datos pendientes (data_pending); false = solo quienes los tienen completos." },
             limit: { type: "integer", minimum: 1, maximum: 500, default: 100 },
             offset: { type: "integer", minimum: 0, maximum: 100000, default: 0 },
         },
@@ -60,7 +64,8 @@ const listAttendees: ToolDef = {
     async handler(args, ctx) {
         const event = await loadOwnedEvent<any>(ctx, args.event_id, "id, name");
         const { ticketById, dateById } = await loadEventStructure(ctx, event.id);
-        // Asistente de cada QR y lugar en la mesa: columnas opcionales (migraciones 202610300100 y 202610300110)
+        // Asistente de cada QR, lugar en la mesa y respuestas por persona: columnas opcionales (migraciones 202610300100,
+        // 202610300110 y 202610310100)
         const loadRows = (extra: string) =>
             fetchAll<any>(() =>
                 ctx.supabase
@@ -70,7 +75,7 @@ const listAttendees: ToolDef = {
                     .order("created_at", { ascending: true }),
             );
         let rows: any[] = [];
-        for (const extra of [" holder_name, holder_email, seat_number,", ""]) {
+        for (const extra of [" holder_name, holder_email, seat_number, registration_answers,", " holder_name, holder_email, seat_number,", ""]) {
             try {
                 rows = await loadRows(extra);
                 break;
@@ -80,8 +85,21 @@ const listAttendees: ToolDef = {
         }
         const buyerOf = (r: any) => ({ name: `${r.attendees?.first_name || ""} ${r.attendees?.last_name || ""}`.trim() || null, email: r.attendees?.email || null });
         const holderOf = (r: any) => (r.holder_name || r.holder_email ? { name: r.holder_name || null, email: r.holder_email || null } : buyerOf(r));
+        // Datos pendientes de cada persona según lo que pide el evento (events.checkout_fields)
+        const { data: cfg, error: cfgError } = await ctx.supabase.from("events").select("checkout_fields").eq("id", event.id).maybeSingle();
+        const checkoutFields = cfgError ? null : (cfg as any)?.checkout_fields ?? null;
+        const answersByOrder = new Map<string, any[]>();
+        const orderIdsAll = [...new Set(rows.map((r) => r.event_order_id).filter(Boolean))];
+        for (let i = 0; i < orderIdsAll.length; i += 200) {
+            const { data: orders, error } = await ctx.supabase.from("event_orders").select("id, registration_answers").in("id", orderIdsAll.slice(i, i + 200));
+            if (error) break;
+            for (const o of orders || []) if (Array.isArray(o.registration_answers)) answersByOrder.set(o.id, o.registration_answers);
+        }
+        const pendingOf = (r: any) =>
+            isCancelled(r) ? [] : missingAttendeeData(checkoutFields, r, { buyerEmail: r.attendees?.email, orderAnswers: answersByOrder.get(r.event_order_id) });
         const query = (args.search || "").toLowerCase();
         const filtered = rows.filter((r) => {
+            if (args.data_pending !== undefined && pendingOf(r).length > 0 !== args.data_pending) return false;
             const status = r.status ?? "active";
             if (args.status !== "all" && (args.status === "cancelled" ? !isCancelled(r) : status !== args.status)) return false;
             if (args.checked_in === true && !isCheckedIn(r)) return false;
@@ -95,13 +113,6 @@ const listAttendees: ToolDef = {
             return true;
         });
         const page = filtered.slice(args.offset, args.offset + args.limit);
-        // Respuestas a las preguntas del evento, por orden (sin la migración no hay)
-        const orderIds = [...new Set(page.map((r) => r.event_order_id).filter(Boolean))];
-        const answersByOrder = new Map<string, any[]>();
-        if (orderIds.length) {
-            const { data: orders, error } = await ctx.supabase.from("event_orders").select("id, registration_answers").in("id", orderIds);
-            if (!error) for (const o of orders || []) if (Array.isArray(o.registration_answers)) answersByOrder.set(o.id, o.registration_answers);
-        }
         return {
             event_id: Number(event.id),
             total: filtered.length,
@@ -109,12 +120,17 @@ const listAttendees: ToolDef = {
             offset: args.offset,
             attendees: page.map((r) => {
                 const ticket = ticketById.get(Number(r.event_ticket_id));
+                const pending = pendingOf(r);
                 return {
                     ticket_id: r.id,
                     holder: holderOf(r),
                     ...(r.holder_name || r.holder_email ? { buyer: buyerOf(r) } : {}),
                     ...(r.seat_number ? { seat: Number(r.seat_number) } : {}),
                     ...(answersByOrder.has(r.event_order_id) ? { answers: answersByOrder.get(r.event_order_id)!.map((a: any) => ({ question: a.question, answer: a.answer })) } : {}),
+                    ...(Array.isArray(r.registration_answers) && r.registration_answers.length
+                        ? { attendee_answers: r.registration_answers.map((a: any) => ({ question: a.question, answer: a.answer })) }
+                        : {}),
+                    ...(pending.length ? { data_pending: pending } : {}),
                     ticket_type: { id: Number(r.event_ticket_id) || null, name: ticket?.ticket_name || null },
                     function: functionInfo(dateById, ticket?.event_date_id),
                     status: isCancelled(r) ? "cancelled" : r.status ?? "active",
