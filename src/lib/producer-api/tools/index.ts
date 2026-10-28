@@ -17,11 +17,12 @@ import { auditTools } from "./audit";
 import { scheduleTools } from "./schedule";
 import { reviewTools } from "./reviews";
 import { complianceTools } from "./compliance";
+import { waitlistTools } from "./waitlist";
 
 export const TOOLS: ToolDef[] = [
     ...eventTools, ...scheduleTools, ...ticketTools, ...discountTools, ...analyticsTools, ...marketingTools, ...socialSeriesTools,
     ...financeTools, ...complianceTools, ...teamTools, ...guestTools, ...accessTools, ...postsaleTools,
-    ...messagingTools, ...reviewTools, ...lifecycleTools, ...auditTools,
+    ...messagingTools, ...waitlistTools, ...reviewTools, ...lifecycleTools, ...auditTools,
 ];
 
 const BY_NAME = new Map(TOOLS.map((t) => [t.name, t]));
