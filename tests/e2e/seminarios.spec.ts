@@ -116,8 +116,9 @@ test("la mesa de acreditación llega al aviso de otra función y a la validació
 
 test("lo que no existe va con Pronto y sin testimonio real no hay cita", async ({ page }) => {
   await open(page);
-  // La agenda con expositores (el ingreso diario con el mismo pase ya existe)
-  await expect(page.locator("#programa").getByTestId("soon-badge")).toHaveCount(1);
+  // La agenda con expositores y el ingreso diario con el mismo pase ya existen
+  await expect(page.locator("#programa").getByTestId("soon-badge")).toHaveCount(0);
+  await expect(page.locator("#programa")).toContainText("Tu página la muestra como agenda por día");
   // Datos de cada asistente y de facturación al comprar
   await expect(page.locator("#empresas").getByTestId("soon-badge")).toHaveCount(2);
   // Facebook, TikTok y el reel en la serie, LinkedIn desde el panel y segmentar por cargo ya existen
@@ -125,12 +126,14 @@ test("lo que no existe va con Pronto y sin testimonio real no hay cita", async (
   await expect(page.getByTestId("seminar-linkedin-publish")).toContainText("página de tu empresa");
   // La lista de espera ya existe: sin "Pronto"
   await expect(page.locator("#pagina").getByTestId("soon-badge")).toHaveCount(0);
-  // Credenciales impresas (el ingreso diario y el aforo en vivo en el panel ya existen)
-  await expect(page.locator("#acreditacion").getByTestId("soon-badge")).toHaveCount(1);
+  // Las credenciales impresas, el ingreso diario y el aforo en vivo en el panel ya existen
+  await expect(page.locator("#acreditacion").getByTestId("soon-badge")).toHaveCount(0);
+  await expect(page.getByTestId("seminar-print-credentials")).toContainText("Credenciales con nombre, listas para imprimir.");
   await expect(page.locator("#acreditacion")).toContainText("El pase completo, cada día.");
   await expect(page.locator("#acreditacion")).toContainText("en tu panel ves el aforo en vivo");
-  // Certificados de asistencia
-  await expect(page.locator('[data-se-section="despues"]').getByTestId("soon-badge")).toHaveCount(1);
+  // Los certificados de asistencia ya existen
+  await expect(page.locator('[data-se-section="despues"]').getByTestId("soon-badge")).toHaveCount(0);
+  await expect(page.locator('[data-se-section="despues"]')).toContainText("Los descargas en PDF o se los envías por correo");
   await expect(page.locator("[data-se-testimonial]")).toHaveCount(0);
 });
 

@@ -305,8 +305,8 @@ export function buyerCard(model, opts = {}) {
 }
 
 /**
- * La agenda en la descripción (§4.3): un título por día ("Jueves 3 de diciembre") y una línea por bloque, como queda con
- * los títulos y listas que acepta la descripción (sanitize.ts).
+ * La agenda de ejemplo (§4.3): un título por día ("Jueves 3 de diciembre") y una línea por bloque, como la sección
+ * "Agenda" de la página del evento (src/lib/eventAgenda.mjs).
  */
 export function agendaText(model) {
   const now = new Date(`${model.functions[0].date}T12:00:00Z`)

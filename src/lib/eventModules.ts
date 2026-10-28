@@ -133,7 +133,24 @@ export const EVENT_MODULES: EventModule[] = [
         core: true,
         when: (ctx) => ctx.hasAttendees,
     },
+    // Imprimir credenciales con nombre, empresa, tipo de entrada y QR (CredentialsPrintCard.vue, /api/events/credentials)
+    {
+        id: "credentials",
+        title: "Credenciales con nombre",
+        description: "Un PDF para imprimir, con una credencial por asistente.",
+        tab: "puerta",
+        profiles: ["formacion"],
+        when: (ctx) => ctx.hasAttendees,
+    },
     { id: "cover", title: "Portada", description: "Imagen de la página, ajuste por dispositivo y generación con IA.", tab: "pagina", core: true },
+    // Bloques con hora, expositores y sala por día; la página la muestra solo si hay bloques (EventAgendaManager.vue)
+    {
+        id: "agenda",
+        title: "Agenda",
+        description: "Bloques con hora, expositores y sala, por día.",
+        tab: "pagina",
+        profiles: ["formacion"],
+    },
     { id: "faq", title: "Preguntas frecuentes", description: "Respuestas que se muestran en la página del evento.", tab: "pagina" },
     { id: "gallery", title: "Galería", description: "Fotos y video al final de la página del evento.", tab: "pagina" },
     // Fuera de un evento masivo queda en Más herramientas: desde la tarjeta se marca "Es un evento masivo"
@@ -150,6 +167,15 @@ export const EVENT_MODULES: EventModule[] = [
         description: "Mensajes de quienes compraron y reacciones.",
         tab: "despues",
         when: (ctx) => ctx.status === "published" || ctx.hasAttendees,
+    },
+    // Desde que alguien pudo ingresar: certificados en PDF de quienes hicieron check-in (CertificatesCard.vue)
+    {
+        id: "certificates",
+        title: "Certificados de asistencia",
+        description: "Un PDF por asistente que ingresó, para descargar o enviar por correo.",
+        tab: "despues",
+        profiles: ["formacion"],
+        when: (ctx) => ctx.hasAttendees && ctx.phase !== "before",
     },
     {
         id: "reviews",

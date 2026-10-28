@@ -2,7 +2,7 @@
 // 7 · Mesa de acreditación (SPEC_landing_seminarios §4.7, la única sección turquesa, HALL · ACREDITACIÓN ↓, ancla
 // #acreditacion): la firma 2 (isla AccreditationDesk) en una grilla 1fr 300px 1fr, con la credencial colgando sobre la
 // columna 3 desde el borde de la sección (por eso la sección recorta en vertical) y, a la derecha, la foto del hall o
-// los siete ítems; después el chip de credenciales impresas, la nota de pago y los links. Verificado en el código:
+// los siete ítems; después las credenciales impresas, la nota de pago y los links. Verificado en el código:
 //   varias mesas → rol Puerta (permissions.ts) o link de escáner sin cuenta que vence solo (tools/access.ts, hoy desde el
 //                  asistente de IA)
 //   sin señal → ValidateQR.vue descarga la lista, valida offline y sincroniza (y rechaza lo que ese celular ya escaneó)
@@ -11,6 +11,8 @@
 //   el pase completo entra una vez cada día (checkInSession en checkin.mjs, aitickets_attendee_checkins); aforo en vivo
 //   por tipo en el panel (pestaña Puerta, LiveCapacityPanel.vue) y en el asistente (get_checkin_stats)
 //   acreditar cuenta para el pago → ledger.ts (CHECKIN_RELEASE_THRESHOLD o acreditar que se realizó) y términos §8
+//   credenciales con nombre → PDF de 4 por hoja con nombre, tipo de entrada y el QR de la entrada, por función
+//                             (pestaña Puerta del panel: CredentialsPrintCard.vue, src/lib/credentials.ts)
 // La foto de referencia muestra una pistola lectora (AI Tickets escanea con la cámara del celular): es "solo staging"
 // (§8) y no hay staging, así que no se muestra (SHOW_DESK_PHOTO) y la columna 3 lleva los ítems (§4.7). Con una foto
 // con celular, los ítems vuelven a dos columnas bajo la mesa.
@@ -20,7 +22,6 @@ import AccreditationDesk from "./AccreditationDesk.vue";
 import Figure from "./Figure.astro";
 import SeminarHeading from "./SeminarHeading.astro";
 import WayfindingSign from "./WayfindingSign.astro";
-import SoonBadge from "../../ui/SoonBadge.vue";
 import { PHOTO_ALT, SEMINAR_PHOTOS, SHOW_DESK_PHOTO } from "./seminariosLanding.js";
 import { TERMS_NOTE } from "../../../data/producerFaq";
 
@@ -80,8 +81,8 @@ const items = [
     </div>
 
     <div class="sea-print" data-lp-step>
-      <p class="se-soon-chip">Imprimir credenciales con nombre <SoonBadge dark /></p>
-      <p class="se-meta sea-print-note">Mientras, exportas tus inscritos a CSV para preparar las credenciales con tu plantilla.</p>
+      <p class="se-item-title" data-testid="seminar-print-credentials">Credenciales con nombre, listas para imprimir.</p>
+      <p class="se-meta sea-print-note">Desde tu panel descargas un PDF con una credencial por inscrito, en orden alfabético: nombre, tipo de entrada y el QR de su entrada, que también sirve para acreditar. Si el evento tiene varios días, las sacas por día.</p>
     </div>
     <p class="se-note sea-note" data-lp-step>
       *Acreditar también cuenta para tu pago: los check-ins acreditan que el evento se realizó, una de las condiciones para

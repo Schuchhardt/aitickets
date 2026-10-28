@@ -25,4 +25,5 @@ export {
 } from './reviews.mjs'
 export { renderWeeklyReportEmail, weeklyReportSubject } from './weekly-report.mjs'
 export { renderWaitlistOpenEmail } from './waitlist.mjs'
+export { renderCertificateEmail, CERTIFICATE_URL_PLACEHOLDER } from './certificates.mjs'
 export { logoUrl, siteUrl } from './layout.mjs'

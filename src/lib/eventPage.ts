@@ -16,6 +16,7 @@ import { normalizeCoverSettings } from "./eventCover";
 import { loadEventGallery, type GalleryImage } from "./eventGallery";
 import { normalizeEventVideo } from "./eventVideo";
 import { loadPublicReviews } from "./eventReviews";
+import { agendaGroups, loadAgenda } from "./eventAgenda.mjs";
 import { isEventEnded } from "../components/event/eventView.js";
 import { resolveCoverMeta, eventThemeFrom } from "./eventCoverMeta";
 import { normalizePageSettings, stripDemoSuffix } from "./eventPageSettings";
@@ -621,7 +622,7 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
   const ended = !isDemo && !isPreview && isEventEnded({ dates, end_date: endDate, is_demo: isDemo }, now);
 
   // Póster: proporción real y tinte de la página (events.cover_meta, src/lib/eventCoverMeta.ts)
-  const [coverMeta, reviews] = await Promise.all([
+  const [coverMeta, reviews, agendaBlocks] = await Promise.all([
     resolveCoverMeta(event, {
       waitUntil: (() => {
         const ctx = opts.locals?.netlify?.context;
@@ -629,6 +630,8 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
       })(),
     }),
     ended ? loadPublicReviews(Number(event.id)).catch(() => null) : Promise.resolve(null),
+    // Agenda con expositores y salas (aitickets_event_agenda; vacía sin la tabla)
+    loadAgenda(supabase, Number(event.id)).catch(() => []),
   ]);
 
   const { cover_meta: _coverMeta, page_settings: rawPageSettings, cover_video: rawCoverVideo, gallery_video: rawGalleryVideo, ...eventRow } = event;
@@ -650,6 +653,8 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
     // Evento terminado: { summary, reviews, comments_total, photos } (null si no terminó o sin tablas)
     reviews,
     dates,
+    // Agenda por día: [{ key, function_id, title, blocks: [{ start, end, title, speakers, room }] }] ([] = sin sección)
+    agenda: agendaGroups(agendaBlocks, dates),
     tickets: publicTickets,
     unavailable_tickets: unavailableTickets,
     theme: eventThemeFrom(coverMeta),
