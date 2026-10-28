@@ -199,13 +199,19 @@ export async function attachEntryDeadlines(supabase, eventId, attendees) {
  * Estado de la hora límite de una entrada (con `event_ticket_id` y `event_tickets.event_date_id`) en `at`.
  * null si su tipo no tiene hora límite; si no, { late, entry_until, deadline_at }.
  */
-export async function entryDeadlineState(supabase, eventId, ticket, at = new Date(), dates = null) {
+export async function entryDeadlineState(supabase, eventId, ticket, at = new Date()) {
+  const until = await loadEntryUntil(supabase, eventId, ticket)
+  if (!until) return null
+  const sessions = await loadEventSessions(supabase, eventId)
+  return entryDeadlineCheck({ entryUntil: until, eventDateId: ticket.event_tickets?.event_date_id ?? null, dates: sessions, at })
+}
+
+/** Hora límite del tipo de la entrada ("01:00") o null (sin hora límite, o columna aún sin migrar). */
+async function loadEntryUntil(supabase, eventId, ticket) {
   const typeId = ticket?.event_ticket_id
   if (typeId == null) return null
   const { data, error } = await supabase.from('event_tickets').select('entry_until').eq('id', typeId).eq('event_id', eventId).maybeSingle()
-  if (error || !normalizeEntryUntil(data?.entry_until)) return null
-  const sessions = dates || (await loadEventSessions(supabase, eventId))
-  return entryDeadlineCheck({ entryUntil: data.entry_until, eventDateId: ticket.event_tickets?.event_date_id ?? null, dates: sessions, at })
+  return error ? null : normalizeEntryUntil(data?.entry_until)
 }
 
 /**
@@ -214,11 +220,14 @@ export async function entryDeadlineState(supabase, eventId, ticket, at = new Dat
  * para sumar a la respuesta).
  */
 export async function lateEntryGate(supabase, eventId, ticket, validatedAt, force = false) {
-  if (ticket?.event_ticket_id == null) return null
+  // Solo las entradas con hora límite cuestan las consultas de funciones
+  const until = await loadEntryUntil(supabase, eventId, ticket)
+  if (!until) return null
   const sessions = await loadEventSessions(supabase, eventId)
+  const eventDateId = ticket.event_tickets?.event_date_id ?? null
   // Una entrada de una sola vez que ya entró responde "ya validada", no "fuera de horario"
-  if (ticket.status === 'validated' && !isMultiSession(ticket.event_tickets?.event_date_id ?? null, sessions)) return null
-  const state = await entryDeadlineState(supabase, eventId, ticket, new Date(validatedAt), sessions)
+  if (ticket.status === 'validated' && !isMultiSession(eventDateId, sessions)) return null
+  const state = entryDeadlineCheck({ entryUntil: until, eventDateId, dates: sessions, at: new Date(validatedAt) })
   if (!state?.late) return null
   if (force) return { forced: true, late_entry: true, entry_until: state.entry_until }
   return { ok: false, code: 'late_entry', message: lateEntryMessage(state.entry_until), entry_until: state.entry_until, deadline_at: state.deadline_at }
