@@ -2,6 +2,7 @@
 import { getSupabaseAdmin } from "./auth-helpers";
 import { storeOptimizedImage } from "./imageStorage";
 import { dedupeLocation, serverEnv } from "../pages/api/_lib/server-utils";
+import { tiktokSettings, tiktokTitle } from "./socialPlatforms";
 
 /** HTML de la descripción a texto plano (párrafos y viñetas como saltos de línea). */
 export function htmlToPlainText(html: string | null | undefined): string {
@@ -165,6 +166,25 @@ export type PublishResult =
     | { ok: false; httpStatus: number; message: string };
 
 /**
+ * Cuerpo de POST /v1/posts de Zernio para un post manual: una entrada por cuenta conectada. TikTok lleva sus ajustes
+ * obligatorios (photo post: el texto va como descripción y el título es la primera línea).
+ */
+export function socialPostPayload(post: { content: string; image_urls?: string[] | null }, accounts: { platform: string; zernio_account_id: string }[]): Record<string, any> {
+    const images = post.image_urls || [];
+    const payload: Record<string, any> = {
+        content: post.content,
+        platforms: accounts.map((a) => ({
+            platform: a.platform,
+            accountId: a.zernio_account_id,
+            ...(a.platform === "tiktok" ? { customContent: tiktokTitle(post.content) || post.content.slice(0, 90) } : {}),
+        })),
+    };
+    if (images.length) payload.mediaItems = images.map((url) => ({ type: "image", url }));
+    if (accounts.some((a) => a.platform === "tiktok")) payload.tiktokSettings = tiktokSettings({ photo: true, description: post.content });
+    return payload;
+}
+
+/**
  * Publica (o programa, si tiene scheduled_for) un post de la organización en sus cuentas conectadas vía Zernio.
  */
 export async function publishSocialPost(organizationId: number, postId: number | string): Promise<PublishResult> {
@@ -190,13 +210,7 @@ export async function publishSocialPost(organizationId: number, postId: number |
         return { ok: false, httpStatus: 400, message: "No hay cuentas conectadas para las plataformas seleccionadas" };
     }
 
-    const zernioPayload: Record<string, any> = {
-        content: post.content,
-        platforms: accounts.map((a: any) => ({ platform: a.platform, accountId: a.zernio_account_id })),
-    };
-    if (post.image_urls?.length > 0) {
-        zernioPayload.mediaItems = post.image_urls.map((url: string) => ({ type: "image", url }));
-    }
+    const zernioPayload = socialPostPayload(post, accounts);
     if (post.scheduled_for) {
         zernioPayload.scheduledFor = post.scheduled_for;
         zernioPayload.timezone = "America/Santiago";

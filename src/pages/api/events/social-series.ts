@@ -1,4 +1,5 @@
-// Tarjeta "Difusión automática" del evento (/dashboard/events/[id]): historias y posts automáticos en Instagram.
+// Tarjeta "Difusión automática" del evento (/dashboard/events/[id]): historias y posts automáticos en Instagram, y
+// en Facebook y TikTok si el productor las activa.
 // Usa las herramientas *_social_series de la API de productores (permisos por rol, confirmación en dos pasos y
 // bitácora), así el panel valida lo mismo que el MCP.
 //   GET  ?event_id=                                        → get_social_series
@@ -21,7 +22,7 @@ const TOOLS: Record<string, string> = {
     resume: "resume_social_series",
     cancel: "cancel_social_series",
 };
-const PREPARE_FIELDS = ["feed_posts_enabled", "sold_out_story_enabled", "keyword", "extra_keywords", "dm_message", "base_image_url"];
+const PREPARE_FIELDS = ["feed_posts_enabled", "sold_out_story_enabled", "keyword", "extra_keywords", "dm_message", "base_image_url", "facebook_enabled", "tiktok_enabled", "reel_enabled"];
 
 const run = async (context: Parameters<APIRoute>[0], tool: string, args: Record<string, unknown>) => {
     const auth = await dashboardToolContext(context);

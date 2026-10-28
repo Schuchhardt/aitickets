@@ -4,13 +4,13 @@
 // última semana, post diario esa semana, DM con DEFAULT_KEYWORD, "Quedan N" bajo el umbral y la serie que se ajusta si
 // se agota). La tira de negativo lleva el texto real de cada pieza (pieceText, por props desde la página); la leyenda
 // cuenta historias y posts de las últimas dos semanas con seriesMarks y DEFAULT_CADENCE. Debajo, las piezas con IA
-// (MAX_REFERENCE_IMAGES) y los anuncios (AD_LIMITS). Facebook, TikTok y reels en la serie no existen: "Pronto".
+// (MAX_REFERENCE_IMAGES) y los anuncios (AD_LIMITS). La serie sale también en Facebook y TikTok si se conectan, y el
+// reel usa el video vertical de la fiesta (AI Tickets no lo genera).
 import AiPieceCard from "./AiPieceCard.astro";
 import FilmStrip, { type StoryFrame } from "./FilmStrip.astro";
 import PartyAdsDemo from "./PartyAdsDemo.vue";
 import StickerHeading from "./StickerHeading.astro";
 import Wristband from "./Wristband.astro";
-import SoonBadge from "../../ui/SoonBadge.vue";
 import { seriesCounts, seriesMarks } from "../musica/musicaLanding.js";
 import { DEFAULT_CADENCE, DEFAULT_KEYWORD } from "../../../lib/socialSeriesCadence";
 import { MAX_REFERENCE_IMAGES } from "../../../lib/marketing";
@@ -52,9 +52,9 @@ const counts = seriesCounts(seriesMarks(DEFAULT_CADENCE, 14));
     </p>
     <ul class="fd-chips" aria-label="Redes" data-lp-step>
       <li class="fd-chip is-on"><span aria-hidden="true">●</span> Instagram</li>
-      <li class="fd-chip">Facebook <SoonBadge dark={false} /></li>
-      <li class="fd-chip">TikTok <SoonBadge dark={false} /></li>
-      <li class="fd-chip">Reels <SoonBadge dark={false} /></li>
+      <li class="fd-chip is-on"><span aria-hidden="true">●</span> Facebook</li>
+      <li class="fd-chip is-on"><span aria-hidden="true">●</span> TikTok</li>
+      <li class="fd-chip is-on"><span aria-hidden="true">●</span> Reel con tu video</li>
     </ul>
 
     <div class="fd-cards">

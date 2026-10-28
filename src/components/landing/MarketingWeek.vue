@@ -1,13 +1,13 @@
 <script setup>
-// Demo del calendario de difusión automática (SPEC_landing_productores §5.4b). Muestra solo lo que existe hoy
-// (src/lib/socialSeries.ts): historias y posts de feed automáticos en Instagram. Lo que aún no existe (Facebook y
-// TikTok automáticos, reels) va con la etiqueta "Pronto" y su switch deshabilitado. Las horas vienen de DEFAULT_CADENCE.
+// Demo del calendario de difusión automática (SPEC_landing_productores §5.4b). Muestra lo que hace el producto
+// (src/lib/socialSeries.ts): historias y posts de feed automáticos en Instagram, la misma serie en Facebook y TikTok si
+// se conectan, y el reel con el video del evento (switch apagado de partida: necesita un video vertical corto). Las
+// horas vienen de DEFAULT_CADENCE.
 // Movimiento (§5.4b, con html.lp-motion de LandingMotion.astro): cuando la sección entra en pantalla, las publicaciones
 // aparecen día por día (70 ms por día, 40 ms entre publicaciones del mismo día); al prender un switch, sus publicaciones
 // entran igual. El contador interpola como el total de la calculadora y, como ahí, el lector de pantalla lee solo el valor
 // final desde una región aparte (sin los números intermedios). Analítica (§11): lp_mk_toggle { type, on } por switch.
 import { computed, reactive } from 'vue'
-import SoonBadge from '../ui/SoonBadge.vue'
 import AnimatedNumber from '../event/AnimatedNumber.vue'
 import { marketingPostCount, marketingWeek } from './producerLanding.js'
 import { trackEvent } from '../../composables/useGoogleAnalytics.js'
@@ -19,7 +19,7 @@ const props = defineProps({
   eventDayTime: { type: String, required: true },
 })
 
-const on = reactive({ story: true, post: true })
+const on = reactive({ story: true, post: true, reel: false })
 const week = computed(() => marketingWeek(on, { daily: props.dailyTime, eventDay: props.eventDayTime }))
 const count = computed(() => marketingPostCount(week.value))
 
@@ -27,11 +27,12 @@ const toggles = [
   // La semana del ejemplo es la última antes de la función: ahí la historia ya es diaria (antes, cada pocos días)
   { key: 'story', label: 'Historia con cuenta regresiva' },
   { key: 'post', label: 'Post diario la última semana' },
+  { key: 'reel', label: 'Reel con el video del evento' },
 ]
 const networks = [
   { label: 'Instagram', connected: true },
-  { label: 'Facebook', connected: false },
-  { label: 'TikTok', connected: false },
+  { label: 'Facebook', connected: true },
+  { label: 'TikTok', connected: true },
 ]
 
 function flip(key) {
@@ -53,7 +54,6 @@ const slotText = (slot) => (slot.state === 'past' ? 'Publicado ✓' : slot.state
         <li v-for="n in networks" :key="n.label" class="lp-chip" :class="{ 'mw-net-on': n.connected }">
           <span class="mw-dot" :class="{ 'is-on': n.connected }" aria-hidden="true"></span>
           {{ n.label }}<span v-if="n.connected" class="lp-sr-only"> (conectada)</span>
-          <SoonBadge v-if="!n.connected" />
         </li>
       </ul>
     </div>
@@ -85,18 +85,14 @@ const slotText = (slot) => (slot.state === 'past' ? 'Publicado ✓' : slot.state
         <span class="mw-track" :class="{ 'is-on': on[t.key] }" aria-hidden="true"><span class="mw-knob"></span></span>
         {{ t.label }}
       </button>
-      <button type="button" role="switch" class="mw-switch" aria-checked="false" aria-disabled="true" disabled>
-        <span class="mw-track" aria-hidden="true"><span class="mw-knob"></span></span>
-        Reel antes de la función
-        <SoonBadge />
-      </button>
       <p class="mw-count" aria-hidden="true"><AnimatedNumber :value="count" format="plain" /> publicaciones esta semana</p>
       <p class="lp-sr-only" aria-live="polite">{{ count }} publicaciones esta semana</p>
     </div>
     <p class="lp-small mw-note">
       Se publican a la hora en que más visitas tiene tu evento ({{ props.dailyTime }} mientras no hay datos). Apruebas la
-      serie una vez, con vista previa de cada pieza. Quien responde una historia o comenta un post con la palabra
-      clave recibe el link de compra por DM, con su propio seguimiento en las métricas.
+      serie una vez, con vista previa de cada pieza, y sale igual en tu Instagram, tu página de Facebook y tu TikTok. Quien
+      responde una historia o comenta un post con la palabra clave recibe el link de compra por DM, con su propio
+      seguimiento en las métricas.
     </p>
     <p class="lp-example mw-example">Datos de ejemplo</p>
   </div>

@@ -1,6 +1,8 @@
 <script setup>
+// Cuentas de redes de la productora (Promocionar → Cuentas): Instagram, Facebook (página), TikTok y LinkedIn (perfil o
+// página de empresa, se elige al conectar). Conectar pasa por /api/promote/connect (OAuth de Zernio).
 import { ref } from 'vue'
-import { Instagram, Facebook, Plus, Unplug, Loader2, CheckCircle } from 'lucide-vue-next'
+import { Instagram, Facebook, Linkedin, Music2, Plus, Unplug, Loader2, CheckCircle } from 'lucide-vue-next'
 
 const props = defineProps({
   accounts: { type: Array, default: () => [] },
@@ -8,7 +10,7 @@ const props = defineProps({
 
 const emit = defineEmits(['disconnect'])
 
-const connecting = ref(null) // 'instagram' | 'facebook' | null
+const connecting = ref(null) // id de la red que se está conectando
 
 const platforms = [
   {
@@ -28,6 +30,27 @@ const platforms = [
     bgColor: 'bg-blue-50',
     borderColor: 'border-blue-200',
     textColor: 'text-blue-700',
+    hint: 'Una página de Facebook (la eliges al conectar).',
+  },
+  {
+    id: 'tiktok',
+    name: 'TikTok',
+    icon: Music2,
+    color: 'from-gray-900 to-gray-700',
+    bgColor: 'bg-gray-50',
+    borderColor: 'border-gray-300',
+    textColor: 'text-gray-800',
+    hint: 'Publica fotos y videos en tu cuenta de TikTok.',
+  },
+  {
+    id: 'linkedin',
+    name: 'LinkedIn',
+    icon: Linkedin,
+    color: 'from-sky-700 to-sky-800',
+    bgColor: 'bg-sky-50',
+    borderColor: 'border-sky-200',
+    textColor: 'text-sky-800',
+    hint: 'Tu perfil o la página de tu empresa (la eliges al conectar).',
   },
 ]
 
@@ -70,6 +93,7 @@ const handleDisconnect = (accountId) => {
       <div
         v-for="platform in platforms"
         :key="platform.id"
+        :data-testid="`connect-${platform.id}`"
         class="bg-white rounded-xl shadow-sm border overflow-hidden"
         :class="getAccountForPlatform(platform.id) ? platform.borderColor : 'border-gray-100'"
       >
@@ -90,6 +114,7 @@ const handleDisconnect = (accountId) => {
                   Conectado
                 </p>
                 <p v-else class="text-sm text-gray-400">No conectado</p>
+                <p v-if="platform.hint && !getAccountForPlatform(platform.id)" class="text-xs text-gray-400 mt-0.5">{{ platform.hint }}</p>
               </div>
             </div>
           </div>

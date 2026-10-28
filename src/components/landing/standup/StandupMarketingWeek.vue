@@ -1,14 +1,13 @@
 <script setup>
 // Calendario semanal de "Marketing en piloto automático" en la landing de stand-up (SPEC_landing_standup §4.4, S11 y
 // S12). Misma semana y misma cadencia real que la demo de /organizadores (marketingWeek de producerLanding.js, horas de
-// DEFAULT_CADENCE): historias e Instagram existen hoy (src/lib/socialSeries.ts); Facebook, TikTok y reels no, así que
-// van con "Pronto" y el switch del reel queda deshabilitado. Por eso los posts no son "lun · mié · vie 12:00" ni las
+// DEFAULT_CADENCE): la serie de src/lib/socialSeries.ts en Instagram, Facebook y TikTok, y el reel con el video del
+// evento (switch apagado de partida: necesita un video vertical corto). Por eso los posts no son "lun · mié · vie 12:00" ni las
 // historias "19:00" como en el prototipo: se muestra lo que hace el producto. Como en la spec, hay función el viernes y
 // el sábado (SHOW_DAYS): el sábado también lleva su historia de la mañana, porque la serie se replanifica hacia la
 // siguiente función cuando pasa una.
 // En mobile solo se ven los switches y el contador, junto a la historia de ejemplo; el calendario y la nota, desde 900 px.
 import { computed, reactive } from 'vue'
-import SoonBadge from '../../ui/SoonBadge.vue'
 import AnimatedNumber from '../../event/AnimatedNumber.vue'
 import { trackEvent } from '../../../composables/useGoogleAnalytics.js'
 import { MK_SHOW, marketingPostCount, marketingWeek } from '../producerLanding.js'
@@ -25,18 +24,19 @@ const props = defineProps({
 /** Funciones de la semana de ejemplo: viernes y sábado */
 const SHOW_DAYS = [MK_SHOW, MK_SHOW + 1]
 
-const on = reactive({ story: true, post: true })
+const on = reactive({ story: true, post: true, reel: false })
 const week = computed(() => marketingWeek(on, { daily: props.dailyTime, eventDay: props.eventDayTime }, SHOW_DAYS))
 const count = computed(() => marketingPostCount(week.value))
 
 const toggles = [
   { key: 'story', label: 'Historia con cuenta regresiva' },
   { key: 'post', label: 'Post diario la última semana' },
+  { key: 'reel', label: 'Reel con el video del evento' },
 ]
 const networks = [
   { label: 'Instagram', connected: true },
-  { label: 'Facebook', connected: false },
-  { label: 'TikTok', connected: false },
+  { label: 'Facebook', connected: true },
+  { label: 'TikTok', connected: true },
 ]
 
 function flip(key) {
@@ -57,7 +57,6 @@ const slotText = (slot) => (slot.state === 'past' ? 'Publicado ✓' : slot.state
         <li v-for="n in networks" :key="n.label" class="smw-net" :class="{ 'is-on': n.connected }">
           <span class="smw-dot" aria-hidden="true"></span>
           {{ n.label }}<template v-if="n.connected"> · conectado</template>
-          <SoonBadge v-else dark />
         </li>
       </ul>
     </div>
@@ -89,17 +88,14 @@ const slotText = (slot) => (slot.state === 'past' ? 'Publicado ✓' : slot.state
         <span class="smw-track" :class="{ 'is-on': on[t.key] }" aria-hidden="true"><span class="smw-knob"></span></span>
         <span class="smw-switch-label">{{ t.label }}</span>
       </button>
-      <button type="button" role="switch" class="smw-switch" aria-checked="false" aria-disabled="true" disabled>
-        <span class="smw-track" aria-hidden="true"><span class="smw-knob"></span></span>
-        <span class="smw-switch-label">Reel antes de la función <SoonBadge dark /></span>
-      </button>
       <p class="smw-count" aria-hidden="true"><AnimatedNumber :value="count" format="plain" /> publicaciones esta semana</p>
       <p class="lp-sr-only" aria-live="polite">{{ count }} publicaciones esta semana</p>
     </div>
     <p class="smw-note">
       Se publican a la hora en que más visitas tiene tu evento ({{ props.dailyTime }} mientras no hay datos). Apruebas la
-      serie una vez, con vista previa de cada pieza. A quien responde una historia o comenta un post con la palabra clave
-      le llega el link de compra por DM, con su propio seguimiento: ves cuántas entradas vendió.
+      serie una vez, con vista previa de cada pieza, y sale igual en Instagram, Facebook y TikTok. A quien responde una
+      historia o comenta un post con la palabra clave le llega el link de compra por DM, con su propio seguimiento: ves
+      cuántas entradas vendió.
     </p>
     <p class="su-example smw-example">Datos de ejemplo</p>
   </div>

@@ -1,7 +1,11 @@
+// Conectar una red desde Promocionar: Instagram, Facebook (página), TikTok o LinkedIn (perfil o página de empresa).
+// Pide a Zernio la URL de OAuth (GET /v1/connect/{platform}, modo estándar: Zernio muestra la elección de página u
+// organización) y la devuelve al panel. Al volver, /api/promote/callback guarda la cuenta en social_accounts.
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { getSessionContext, hasRole, EVENT_MANAGER_ROLES } from "../../../lib/supabaseServer";
 import { createOAuthState } from "../../../lib/crypto";
+import { isSocialPlatform } from "../../../lib/socialPlatforms";
 
 const ZERNIO_BASE = "https://zernio.com/api/v1";
 
@@ -19,7 +23,7 @@ export const POST: APIRoute = async (context) => {
         const body = await context.request.json();
         const { platform } = body;
 
-        if (!platform || !["instagram", "facebook"].includes(platform)) {
+        if (!isSocialPlatform(platform)) {
             return new Response(JSON.stringify({ message: "Plataforma no válida" }), { status: 400 });
         }
 

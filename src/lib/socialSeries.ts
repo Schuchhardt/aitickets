@@ -15,6 +15,17 @@
 // DM: una automatización story_reply por cuenta de Instagram (compartida por sus series vivas: responde con el evento
 // más próximo y la página de la organización) + una automatización de comentarios por cada post de feed. Los links
 // llevan ref=ig-story-dm / ig-post-dm, así las ventas aparecen como canal propio en la analítica del evento.
+//
+// Redes extra (por evento, columna networks): Facebook (página) y TikTok publican con la misma cadencia, cada pieza
+// en su propia fila de slots (platform), así una red que falla o se desconecta no frena a las otras: sus pendientes se
+// omiten, la tarjeta lo avisa y al reconectarla se retoma desde hoy. Instagram es la base (DM por historias).
+//   Facebook: historias de página (sin DM por respuesta: la pieza dice dónde comprar) y posts con el link en el texto
+//             y DM por Messenger a quien comente la palabra clave (fb-post-dm, link fb-serie).
+//   TikTok:   un post de foto vertical (photo post de Zernio) cada día de la última semana, con el link en la
+//             descripción (tiktok-serie; TikTok no lo hace clickeable).
+//   Reel:     si el evento tiene un video vertical de 3 a 60 s (portada o galería), sale como reel unos días antes
+//             en cada red activa (en TikTok, como video). AI Tickets no genera video desde el afiche: no hay un
+//             codificador de video que quepa en las funciones (sin ffmpeg).
 import { getSupabaseAdmin } from "./auth-helpers";
 import { serverEnv, notifySlack } from "../pages/api/_lib/server-utils";
 import { fetchAll, localDay, localDateTime } from "./producer-api/tools/common";
@@ -25,9 +36,14 @@ import { fetchPublic } from "./safe-fetch";
 import { IMAGE_BUCKET } from "./imageStorage";
 import { isCourtesyOrder, isTransferOrder } from "./orderKinds";
 import { siteUrl as orgSiteUrl } from "./sites";
-import { choosePublishTime, DEFAULT_KEYWORD, normalizeCadence, nextFunctionStart, planSlots, type CadenceConfig, type PlannedSlot } from "./socialSeriesCadence";
+import {
+    choosePublishTime, DEFAULT_KEYWORD, EXTRA_NETWORKS, expandNetworkSlots, normalizeCadence, nextFunctionStart, planSlots,
+    type CadenceConfig, type ExtraNetwork, type PlannedSlot, type SeriesPlatform,
+} from "./socialSeriesCadence";
 import { longDateLabel, renderPiece, type BaseImageOptions, type PieceData } from "./socialSeriesRender";
 import { normalizeCoverSettings } from "./eventCover";
+import { normalizeEventVideo } from "./eventVideo";
+import { tiktokSettings, tiktokTitle } from "./socialPlatforms";
 import { zernioRequest, ZernioError } from "../../netlify/lib/zernio-ads.mjs";
 import { sendEmail } from "../../netlify/lib/mailer.mjs";
 import { escapeHtml } from "../../netlify/lib/supabase.mjs";
@@ -35,7 +51,11 @@ import { escapeHtml } from "../../netlify/lib/supabase.mjs";
 export const SERIES_TABLE = "aitickets_social_series";
 export const SLOTS_TABLE = "aitickets_social_series_slots";
 export const LIVE_STATUSES = ["draft", "active", "paused"] as const;
-export const DM_REFS = { story: "ig-story-dm", post: "ig-post-dm" } as const;
+export const DM_REFS = { story: "ig-story-dm", post: "ig-post-dm", facebook_post: "fb-post-dm" } as const;
+/** Links en el texto de Facebook y TikTok: las ventas de cada red aparecen como canal propio. */
+export const LINK_REFS = { facebook: "fb-serie", tiktok: "tiktok-serie" } as const;
+const SERIES_REFS = [...Object.values(DM_REFS), ...Object.values(LINK_REFS)];
+export const NETWORK_NAMES: Record<string, string> = { instagram: "Instagram", facebook: "Facebook", tiktok: "TikTok" };
 export { DEFAULT_KEYWORD };
 export const DEFAULT_EXTRA_KEYWORDS = ["entrada", "link"];
 const CADENCE_SETTING = "social_series_cadence";
@@ -72,14 +92,14 @@ export class SeriesError extends Error {
 // ---------------------------------------------------------------------------
 
 export const SERIES_EVENT_SELECT =
-    "id, name, title, slug, status, organization_id, description, start_date, end_date, image_url, cover_video, cover_settings, cancelled_at, archived_at, location, " +
+    "id, name, title, slug, status, organization_id, description, start_date, end_date, image_url, cover_video, gallery_video, cover_settings, cancelled_at, archived_at, location, " +
     "event_dates(date, start_time, end_time), event_locations(venues(name, city))";
 
 export async function loadSeriesEvent(supabase: any, eventId: number): Promise<any | null> {
     let { data, error } = await supabase.from("events").select(SERIES_EVENT_SELECT).eq("id", eventId).maybeSingle();
     // Deploy sin las migraciones de cover_video / cover_settings
     if (error && isMissing(error)) {
-        ({ data, error } = await supabase.from("events").select(SERIES_EVENT_SELECT.replace("cover_video, cover_settings, ", "")).eq("id", eventId).maybeSingle());
+        ({ data, error } = await supabase.from("events").select(SERIES_EVENT_SELECT.replace("cover_video, gallery_video, cover_settings, ", "")).eq("id", eventId).maybeSingle());
     }
     if (error) throw error;
     return data || null;
@@ -120,13 +140,13 @@ export async function saveCadenceConfig(supabase: any, config: CadenceConfig) {
     if (error) throw error;
 }
 
-/** Cuenta de Instagram conectada (activa) de la organización y su perfil de Zernio. */
-export async function instagramAccount(supabase: any, orgId: number): Promise<{ accountId: string; name: string | null; profileId: string | null } | null> {
+/** Cuenta conectada (activa) de una red de la organización y su perfil de Zernio. */
+export async function socialAccount(supabase: any, orgId: number, platform: SeriesPlatform): Promise<{ accountId: string; name: string | null; profileId: string | null } | null> {
     const { data: accounts } = await supabase
         .from("social_accounts")
         .select("id, zernio_account_id, account_name, status, created_at")
         .eq("organization_id", orgId)
-        .eq("platform", "instagram")
+        .eq("platform", platform)
         .eq("status", "active")
         .order("id", { ascending: false })
         .limit(1);
@@ -136,11 +156,90 @@ export async function instagramAccount(supabase: any, orgId: number): Promise<{ 
     return { accountId: String(account.zernio_account_id), name: account.account_name || null, profileId: org?.zernio_profile_id || null };
 }
 
+/** Cuenta de Instagram conectada (la base de la serie). */
+export const instagramAccount = (supabase: any, orgId: number) => socialAccount(supabase, orgId, "instagram");
+
 const accountActive = async (supabase: any, orgId: number, accountId: string | null) => {
     if (!accountId) return false;
     const { data } = await supabase.from("social_accounts").select("id").eq("organization_id", orgId).eq("platform", "instagram").eq("zernio_account_id", accountId).eq("status", "active").limit(1);
     return Boolean(data?.length);
 };
+
+// ---------------------------------------------------------------------------
+// Redes extra (Facebook, TikTok) y reel
+// ---------------------------------------------------------------------------
+
+export type NetworkState = { enabled: boolean; account_id: string | null; status: "active" | "disconnected" | null; error: string | null };
+
+/** Estado de Facebook y TikTok de la serie (columna networks; sin la columna, ambas apagadas). */
+export function networkStates(series: any): Record<ExtraNetwork, NetworkState> {
+    const raw = series?.networks && typeof series.networks === "object" ? series.networks : {};
+    const out = {} as Record<ExtraNetwork, NetworkState>;
+    for (const n of EXTRA_NETWORKS) {
+        const r = raw[n] && typeof raw[n] === "object" ? raw[n] : {};
+        out[n] = {
+            enabled: r.enabled === true,
+            account_id: r.account_id ? String(r.account_id) : null,
+            status: r.status === "active" || r.status === "disconnected" ? r.status : null,
+            error: r.error ? String(r.error).slice(0, 300) : null,
+        };
+    }
+    return out;
+}
+
+/** Redes donde la serie publica ahora: Instagram y las extra activadas con su cuenta conectada. */
+export function activePlatforms(series: any): SeriesPlatform[] {
+    const states = networkStates(series);
+    return ["instagram", ...EXTRA_NETWORKS.filter((n) => states[n].enabled && states[n].status === "active" && states[n].account_id)] as SeriesPlatform[];
+}
+
+/** Cuenta de Zernio con la que publica cada red de la serie. */
+export function accountIdFor(series: any, platform: string): string | null {
+    if (!platform || platform === "instagram") return series?.zernio_account_id || null;
+    const st = networkStates(series)[platform as ExtraNetwork];
+    return st?.enabled && st.status === "active" ? st.account_id : null;
+}
+
+/** Conecta cada red extra activada con la cuenta vigente de la organización (al aprobar y reanudar). */
+async function resolveNetworks(supabase: any, series: any, orgId: number): Promise<Record<ExtraNetwork, NetworkState>> {
+    const states = networkStates(series);
+    for (const n of EXTRA_NETWORKS) {
+        if (!states[n].enabled) {
+            states[n] = { enabled: false, account_id: null, status: null, error: null };
+            continue;
+        }
+        const acc = await socialAccount(supabase, orgId, n);
+        states[n] = { enabled: true, account_id: acc?.accountId || null, status: acc ? "active" : "disconnected", error: null };
+    }
+    return states;
+}
+
+/** Duración aceptada para el reel: Facebook pide de 3 a 60 s (Instagram y TikTok aceptan más). */
+export const REEL_SECONDS = { min: 3, max: 60 } as const;
+
+/** Video del evento que sirve como reel: vertical, MP4 o MOV y de 3 a 60 s (portada o, si no, el de la galería). */
+export function reelVideoFor(event: any): { url: string; poster_url: string | null; duration: number } | null {
+    for (const raw of [event?.cover_video, event?.gallery_video]) {
+        const v = normalizeEventVideo(raw);
+        if (!v) continue;
+        const mp4 = v.mime ? v.mime !== "video/webm" : /\.(mp4|mov)(\?|$)/i.test(v.url);
+        if (!mp4 || !v.width || !v.height || v.height <= v.width) continue;
+        if (!v.duration || v.duration < REEL_SECONDS.min || v.duration > REEL_SECONDS.max) continue;
+        return { url: v.url, poster_url: v.poster_url, duration: v.duration };
+    }
+    return null;
+}
+
+/** "aitickets.cl/eventos/slug": el link que muestran las piezas de Facebook y TikTok (sin https ni ref). */
+export function shortEventLink(origin: string, slug: string): string {
+    let host = "aitickets.cl";
+    try {
+        host = new URL(origin).host.replace(/^www\./, "");
+    } catch {
+        /* origen inválido: el dominio principal */
+    }
+    return `${host}/eventos/${slug}`;
+}
 
 /** Hora de publicación: hora pico de visitas del evento o, con pocas, de la organización; si no, la por defecto. */
 export async function publishTimeFor(supabase: any, event: { id: number; organization_id: number }, config: CadenceConfig) {
@@ -307,16 +406,19 @@ export async function syncStoryAutomation(supabase: any, accountId: string | nul
     await supabase.from(SERIES_TABLE).update({ zernio_story_automation_id: keep, updated_at: nowIso() }).in("id", live.map((s) => s.id));
 }
 
-/** Automatización de comentarios de un post de feed (keyword → DM), atada al post de Zernio aún no publicado. */
-async function createPostAutomation(series: any, event: any, slot: any, zernioPostId: string, origin: string): Promise<string | null> {
-    const link = dmTrackingUrl(origin, event.slug, DM_REFS.post);
+/**
+ * Automatización de comentarios de un post de feed o reel (keyword → DM), atada al post de Zernio aún no publicado.
+ * Instagram y Facebook (Messenger): las únicas redes donde Zernio puede responder un comentario por mensaje privado.
+ */
+async function createPostAutomation(series: any, event: any, slot: any, zernioPostId: string, origin: string, accountId: string, platform: SeriesPlatform): Promise<string | null> {
+    const link = dmTrackingUrl(origin, event.slug, platform === "facebook" ? DM_REFS.facebook_post : DM_REFS.post);
     const created: any = await zernioRequest("/comment-automations", {
         method: "POST",
         idempotencyKey: `aitickets-post-dm-${slot.id}`,
         body: {
             profileId: series.zernio_profile_id,
-            accountId: series.zernio_account_id,
-            name: `AI Tickets · post ${localDay(slot.publish_at)} · ${String(event.name || "").slice(0, 40)}`,
+            accountId,
+            name: `AI Tickets · ${platform === "facebook" ? "Facebook" : "post"} ${localDay(slot.publish_at)} · ${String(event.name || "").slice(0, 40)}`,
             trigger: "comment",
             postId: zernioPostId,
             keywords: seriesKeywords(series),
@@ -355,7 +457,7 @@ export async function refreshDmStats(supabase: any, series: any, slots: any[], f
     return out;
 }
 
-/** Ventas atribuidas a la serie: órdenes pagadas con ref ig-story-dm / ig-post-dm (sin cortesías ni transferencias). */
+/** Ventas atribuidas a la serie: órdenes pagadas con las refs de la serie (DM de Instagram y Facebook, links de Facebook y TikTok), sin cortesías ni transferencias. */
 export async function attributedSales(supabase: any, eventIds: number[], range?: { fromIso: string; toIso: string }) {
     if (!eventIds.length) return { orders: 0, tickets: 0, gross_clp: 0, fee_net_clp: 0, by_ref: {} as Record<string, number> };
     const rows: any[] = [];
@@ -368,7 +470,7 @@ export async function attributedSales(supabase: any, eventIds: number[], range?:
                     .select("id, event_id, ref, status, created_at, ticket_qty, ticket_details, total_payment, ticket_fee, service_fee_tax, payment_provider")
                     .in("event_id", chunk)
                     .eq("status", "paid")
-                    .in("ref", [DM_REFS.story, DM_REFS.post]);
+                    .in("ref", SERIES_REFS);
                 if (range) q = q.gte("created_at", range.fromIso).lt("created_at", range.toIso);
                 return q.order("id", { ascending: true });
             }).catch(() => [])),
@@ -404,19 +506,45 @@ export async function buildPlan(supabase: any, event: any, opts: { feedPosts: bo
     return { anchorStart, publishTime, slots };
 }
 
-async function insertSlots(supabase: any, series: any, slots: PlannedSlot[], anchor: Date | null, variant: "countdown" | "sold_out" = "countdown") {
+/**
+ * Guarda los slots del plan en cada red activa de la serie (o solo en `platforms`, al reconectar una red). El reel va
+ * si la serie lo tiene activado y el evento tiene un video que sirve (reelVideoFor). La historia "agotado" sale en
+ * Instagram y Facebook (TikTok no tiene historias).
+ */
+async function insertSlots(
+    supabase: any,
+    series: any,
+    slots: PlannedSlot[],
+    anchor: Date | null,
+    { variant = "countdown", event = null, platforms = null }: { variant?: "countdown" | "sold_out"; event?: any; platforms?: SeriesPlatform[] | null } = {},
+) {
     if (!slots.length) return;
-    const rows = slots.map((s) => ({
+    const active = activePlatforms(series);
+    const on = platforms ? active.filter((p) => platforms.includes(p)) : active;
+    if (!on.length) return;
+    const video = variant === "countdown" && series.reel_enabled !== false && event ? reelVideoFor(event) : null;
+    const expanded =
+        variant === "sold_out"
+            ? slots.flatMap((s) => on.filter((p) => p !== "tiktok").map((platform) => ({ ...s, platform })))
+            : expandNetworkSlots(slots, { platforms: on, reel: Boolean(video), config: normalizeCadence(series.cadence_config) });
+    const rows = expanded.map((s) => ({
         series_id: series.id,
         organization_id: series.organization_id,
+        platform: s.platform,
         kind: s.kind,
         variant,
         publish_at: s.publish_at,
         days_to_event: Math.max(0, s.days_to_event),
         anchor_starts_at: anchor ? anchor.toISOString() : null,
+        video_url: s.kind === "reel" ? video?.url || null : null,
         status: "planned",
     }));
-    const { error } = await supabase.from(SLOTS_TABLE).insert(rows);
+    let { error } = await supabase.from(SLOTS_TABLE).insert(rows);
+    if (error && isMissing(error)) {
+        // Deploy sin la migración de redes: solo Instagram, sin reel
+        const legacy = rows.filter((r) => r.platform === "instagram" && r.kind !== "reel").map(({ platform: _p, video_url: _v, ...r }) => r);
+        ({ error } = legacy.length ? await supabase.from(SLOTS_TABLE).insert(legacy) : { error: null });
+    }
     if (error) throw error;
 }
 
@@ -424,9 +552,10 @@ async function insertSlots(supabase: any, series: any, slots: PlannedSlot[], anc
  * Saca de Zernio y marca omitidos los slots futuros que aún no se publicaron (planned, queued y claims huérfanos).
  * Lo usan pausar, cancelar, replanificar y agotado.
  */
-async function skipPendingSlots(supabase: any, seriesId: number, reason: string, now = new Date()) {
+async function skipPendingSlots(supabase: any, seriesId: number, reason: string, now = new Date(), platform: SeriesPlatform | null = null) {
     const slots = await loadSlots(supabase, seriesId);
     for (const s of slots) {
+        if (platform && (s.platform || "instagram") !== platform) continue;
         const pending = s.status === "planned" || s.status === "queued" || (s.status === "rendering" && Date.parse(s.claimed_at || "0") < now.getTime() - STALE_CLAIM_MS);
         if (!pending) continue;
         if (s.status === "queued" && Date.parse(s.publish_at) <= now.getTime()) continue; // ya salió o está saliendo: lo confirma el webhook
@@ -453,10 +582,16 @@ export type SeriesOptions = {
     extra_keywords?: string[];
     dm_message?: string | null;
     base_image_url?: string | null;
+    facebook_enabled?: boolean;
+    tiktok_enabled?: boolean;
+    reel_enabled?: boolean;
 };
 
-/** Requisitos para activar: evento publicado y con funciones futuras, Instagram conectado, Zernio configurado. */
-export async function activationBlockers(supabase: any, event: any, orgId: number, now = new Date()): Promise<string[]> {
+/**
+ * Requisitos para activar: evento publicado y con funciones futuras, Instagram conectado, Zernio configurado y, si se
+ * pasa la serie, cada red extra que activó (Facebook, TikTok) conectada.
+ */
+export async function activationBlockers(supabase: any, event: any, orgId: number, now = new Date(), series: any = null): Promise<string[]> {
     const out: string[] = [];
     if (!socialSeriesEnabled()) out.push("Las historias automáticas están desactivadas en AI Tickets.");
     if (!zernioConfigured()) out.push("La publicación en redes no está configurada en AI Tickets (Zernio).");
@@ -464,6 +599,11 @@ export async function activationBlockers(supabase: any, event: any, orgId: numbe
     if (event.cancelled_at) out.push("El evento está cancelado.");
     if (!anchorFor(event, now)) out.push("El evento no tiene funciones futuras.");
     if (!(await instagramAccount(supabase, orgId))) out.push("Conecta la cuenta de Instagram (Business o Creator) de la organización en Promocionar.");
+    if (series) {
+        const states = networkStates(series);
+        if (states.facebook.enabled && !(await socialAccount(supabase, orgId, "facebook"))) out.push("Conecta tu página de Facebook en Promocionar o desactiva Facebook para este evento.");
+        if (states.tiktok.enabled && !(await socialAccount(supabase, orgId, "tiktok"))) out.push("Conecta tu TikTok en Promocionar o desactiva TikTok para este evento.");
+    }
     return out;
 }
 
@@ -482,17 +622,34 @@ export async function prepareSeries(supabase: any, actor: Actor, eventId: number
     if (opts.extra_keywords !== undefined) patch.extra_keywords = opts.extra_keywords.map((k) => String(k).trim()).filter(Boolean).slice(0, 5);
     if (opts.dm_message !== undefined) patch.dm_message = opts.dm_message ? String(opts.dm_message).trim().slice(0, 600) : null;
     if (opts.base_image_url !== undefined) patch.base_image_url = opts.base_image_url || null;
+    if (opts.reel_enabled !== undefined) patch.reel_enabled = Boolean(opts.reel_enabled);
+    if (opts.facebook_enabled !== undefined || opts.tiktok_enabled !== undefined) {
+        const states = networkStates(live);
+        if (opts.facebook_enabled !== undefined) states.facebook = { ...states.facebook, enabled: Boolean(opts.facebook_enabled) };
+        if (opts.tiktok_enabled !== undefined) states.tiktok = { ...states.tiktok, enabled: Boolean(opts.tiktok_enabled) };
+        patch.networks = states;
+    }
+    // Deploy sin la migración de redes: solo Instagram (si se pidió una red extra, se avisa)
+    const withoutNetworks = () => {
+        const wanted = Object.values((patch.networks as Record<string, NetworkState>) || {}).some((n) => n.enabled);
+        if (wanted) throw new SeriesError("unavailable", "Facebook, TikTok y el reel aún no están disponibles (falta la migración).");
+        const { networks: _n, reel_enabled: _r, ...rest } = patch;
+        return rest;
+    };
     let series = live;
     if (series) {
-        const { data, error } = await supabase.from(SERIES_TABLE).update(patch).eq("id", series.id).eq("status", "draft").select("*").single();
+        let { data, error } = await supabase.from(SERIES_TABLE).update(patch).eq("id", series.id).eq("status", "draft").select("*").single();
+        if (error && isMissing(error) && ("networks" in patch || "reel_enabled" in patch)) {
+            ({ data, error } = await supabase.from(SERIES_TABLE).update(withoutNetworks()).eq("id", series.id).eq("status", "draft").select("*").single());
+        }
         if (error) throw error;
         series = data;
     } else {
-        const { data, error } = await supabase
-            .from(SERIES_TABLE)
-            .insert({ ...patch, organization_id: actor.orgId, event_id: eventId, status: "draft", created_by: actor.userId, created_via: actor.channel })
-            .select("*")
-            .single();
+        const row = { organization_id: actor.orgId, event_id: eventId, status: "draft", created_by: actor.userId, created_via: actor.channel };
+        let { data, error } = await supabase.from(SERIES_TABLE).insert({ ...patch, ...row }).select("*").single();
+        if (error && isMissing(error) && ("networks" in patch || "reel_enabled" in patch)) {
+            ({ data, error } = await supabase.from(SERIES_TABLE).insert({ ...withoutNetworks(), ...row }).select("*").single());
+        }
         if (error) {
             if (String(error.code) === "23505") throw new SeriesError("conflict", "Ya hay una difusión automática en preparación para este evento. Vuelve a intentarlo.");
             if (isMissing(error)) throw new SeriesError("unavailable", "Las historias automáticas aún no están disponibles (falta la migración).");
@@ -510,9 +667,10 @@ export async function approveSeries(supabase: any, actor: Actor, eventId: number
     let series = await loadLiveSeries(supabase, eventId);
     if (!series) series = await prepareSeries(supabase, actor, eventId, {});
     if (series.status !== "draft") throw new SeriesError("conflict", "La difusión automática de este evento ya está aprobada.");
-    const blockers = await activationBlockers(supabase, event, actor.orgId, now);
+    const blockers = await activationBlockers(supabase, event, actor.orgId, now, series);
     if (blockers.length) throw new SeriesError("invalid_input", blockers.join(" "));
     const account = (await instagramAccount(supabase, actor.orgId))!;
+    const networks = await resolveNetworks(supabase, series, actor.orgId);
     const config = await loadCadenceConfig(supabase);
     const plan = await buildPlan(supabase, event, { feedPosts: series.feed_posts_enabled, config, now });
     if (!plan.slots.length) throw new SeriesError("invalid_input", "No quedan horarios para publicar antes del evento (empieza en menos de una hora).");
@@ -527,6 +685,7 @@ export async function approveSeries(supabase: any, actor: Actor, eventId: number
             anchor_starts_at: plan.anchorStart!.toISOString(),
             zernio_account_id: account.accountId,
             zernio_profile_id: account.profileId,
+            ...(Object.values(networks).some((n) => n.enabled) ? { networks } : {}),
             approved_by: actor.userId,
             approved_at: now.toISOString(),
             notice: null,
@@ -539,7 +698,7 @@ export async function approveSeries(supabase: any, actor: Actor, eventId: number
         .single();
     if (error) throw error;
     series = updated;
-    await insertSlots(supabase, series, plan.slots, plan.anchorStart);
+    await insertSlots(supabase, series, plan.slots, plan.anchorStart, { event });
     try {
         await syncStoryAutomation(supabase, series.zernio_account_id, actor.origin);
     } catch (err: any) {
@@ -572,6 +731,9 @@ export async function resumeSeries(supabase: any, series: any, origin: string, n
     const blockers = await activationBlockers(supabase, event, Number(series.organization_id), now);
     if (blockers.length) throw new SeriesError("invalid_input", blockers.join(" "));
     const account = (await instagramAccount(supabase, Number(series.organization_id)))!;
+    const networks = await resolveNetworks(supabase, series, Number(series.organization_id));
+    const offline = EXTRA_NETWORKS.filter((n) => networks[n].enabled && networks[n].status !== "active").map((n) => NETWORK_NAMES[n]);
+    if (offline.length) notice = [notice, `${offline.join(" y ")} no está conectado: esas publicaciones se retoman cuando lo reconectes en Promocionar.`].filter(Boolean).join(" ");
     const config = normalizeCadence(series.cadence_config);
     const plan = await buildPlan(supabase, event, { feedPosts: series.feed_posts_enabled, config, publishTime: series.cadence_config?.publish_time, now });
     await skipPendingSlots(supabase, series.id, "reanudada", now);
@@ -585,6 +747,7 @@ export async function resumeSeries(supabase: any, series: any, origin: string, n
             anchor_starts_at: plan.anchorStart ? plan.anchorStart.toISOString() : series.anchor_starts_at,
             zernio_account_id: account.accountId,
             zernio_profile_id: account.profileId,
+            ...(Object.values(networks).some((n) => n.enabled) ? { networks } : {}),
             updated_at: nowIso(),
         })
         .eq("id", series.id)
@@ -593,7 +756,7 @@ export async function resumeSeries(supabase: any, series: any, origin: string, n
         .single();
     if (error) throw error;
     const tickets = await ticketState(supabase, event, config);
-    if (!tickets.soldOut) await insertSlots(supabase, data, plan.slots, plan.anchorStart);
+    if (!tickets.soldOut) await insertSlots(supabase, data, plan.slots, plan.anchorStart, { event });
     if (series.zernio_account_id && series.zernio_account_id !== account.accountId) await syncStoryAutomation(supabase, series.zernio_account_id, origin).catch(() => {});
     await syncStoryAutomation(supabase, account.accountId, origin).catch((err) => console.error("social series: DM al reanudar:", err?.message || err));
     return { series: data, plan };
@@ -672,7 +835,7 @@ async function markSoldOut(supabase: any, series: any, event: any, origin: strin
         const anchor = series.anchor_starts_at ? new Date(series.anchor_starts_at) : null;
         if (!anchor || at.getTime() < anchor.getTime()) {
             const days = anchor ? Math.max(0, Math.round((Date.parse(`${localDay(anchor)}T00:00:00Z`) - Date.parse(`${localDay(at)}T00:00:00Z`)) / 86400000)) : 0;
-            await insertSlots(supabase, current, [{ kind: "story", variant: "countdown", days_to_event: days, local_date: localDay(at), publish_at: at.toISOString() }], anchor, "sold_out").catch((err: any) =>
+            await insertSlots(supabase, current, [{ kind: "story", variant: "countdown", days_to_event: days, local_date: localDay(at), publish_at: at.toISOString() }], anchor, { variant: "sold_out" }).catch((err: any) =>
                 console.warn("social series: historia de agotado:", err?.message || err),
             );
         }
@@ -734,6 +897,9 @@ export async function reconcileSeries(supabase: any, series: any, origin: string
     }
 
     let current = series;
+    // Facebook / TikTok: desconectada → se omiten sus pendientes (Instagram sigue); reconectada → sus piezas desde hoy
+    const net = await syncNetworks(supabase, current, event, anchor, now, Boolean(series.sold_out_at));
+    current = net.series;
     let replanReason: string | null = null;
     if (!tickets.soldOut && series.sold_out_at) {
         const { data } = await supabase.from(SERIES_TABLE).update({ sold_out_at: null, notice: "Volvió a haber entradas: retomamos las publicaciones.", updated_at: nowIso() }).eq("id", series.id).select("*").single();
@@ -757,7 +923,7 @@ export async function reconcileSeries(supabase: any, series: any, origin: string
     if (replanReason && anchor && !tickets.soldOut) {
         await skipPendingSlots(supabase, series.id, `replanificada: ${replanReason}`, now);
         const plan = planSlots({ anchorStart: anchor, now, publishTime: publishTimeOf(current), feedPosts: current.feed_posts_enabled, config });
-        await insertSlots(supabase, current, plan, anchor);
+        await insertSlots(supabase, current, plan, anchor, { event });
         await syncStoryAutomation(supabase, current.zernio_account_id, origin).catch(() => {});
         return `replanned:${replanReason}`;
     }
@@ -770,7 +936,55 @@ export async function reconcileSeries(supabase: any, series: any, origin: string
             console.warn("social series: DM pendiente:", err?.message || err);
         }
     }
-    return "ok";
+    return net.changes.length ? `networks:${net.changes.join(",")}` : "ok";
+}
+
+/**
+ * Revisa las redes extra activadas contra las cuentas conectadas: si una se desconectó, omite sus pendientes y avisa
+ * (las demás siguen); si volvió (o cambió de cuenta), planifica sus piezas desde ahora.
+ */
+async function syncNetworks(supabase: any, series: any, event: any, anchor: Date | null, now: Date, soldOut: boolean): Promise<{ series: any; changes: string[] }> {
+    const states = networkStates(series);
+    const changes: string[] = [];
+    const notices: string[] = [];
+    for (const n of EXTRA_NETWORKS) {
+        const st = states[n];
+        if (!st.enabled) continue;
+        const acc = await socialAccount(supabase, Number(series.organization_id), n);
+        if (st.status === "active" && acc?.accountId === st.account_id) continue;
+        if (st.status !== "active" && !acc) continue;
+        if (st.status === "active") await skipPendingSlots(supabase, series.id, `${NETWORK_NAMES[n]} desconectado`, now, n);
+        if (!acc) {
+            states[n] = { ...st, status: "disconnected" };
+            changes.push(`${n}_disconnected`);
+            notices.push(`${NETWORK_NAMES[n]} se desconectó: dejamos de publicar ahí (las demás redes siguen). Reconéctalo en Promocionar y retomamos desde hoy.`);
+            continue;
+        }
+        states[n] = { enabled: true, account_id: acc.accountId, status: "active", error: null };
+        if (anchor && !soldOut) {
+            const plan = planSlots({ anchorStart: anchor, now, publishTime: publishTimeOf(series), feedPosts: series.feed_posts_enabled, config: normalizeCadence(series.cadence_config) });
+            await insertSlots(supabase, { ...series, networks: states }, plan, anchor, { event, platforms: [n] }).catch((err: any) =>
+                console.warn(`social series ${series.id}: ${n} reconectado:`, err?.message || err),
+            );
+        }
+        changes.push(`${n}_reconnected`);
+        notices.push(`${NETWORK_NAMES[n]} conectado: publicamos ahí desde hoy.`);
+    }
+    if (!changes.length) return { series, changes };
+    const { data } = await supabase.from(SERIES_TABLE).update({ networks: states, notice: notices.join(" ").slice(0, 500), updated_at: nowIso() }).eq("id", series.id).select("*").single();
+    return { series: data || { ...series, networks: states }, changes };
+}
+
+/** Una red extra dejó de responder (cuenta desconectada o acceso vencido): solo esa red se detiene. */
+async function disconnectNetwork(supabase: any, series: any, platform: ExtraNetwork, error: string | null) {
+    const states = networkStates(series);
+    const accountId = states[platform].account_id;
+    if (accountId) await supabase.from("social_accounts").update({ status: "expired" }).eq("organization_id", series.organization_id).eq("platform", platform).eq("zernio_account_id", accountId);
+    await skipPendingSlots(supabase, series.id, `${NETWORK_NAMES[platform]} desconectado`, new Date(), platform);
+    states[platform] = { ...states[platform], status: "disconnected", error: error ? error.slice(0, 300) : null };
+    const notice = `${NETWORK_NAMES[platform]} se desconectó o su acceso venció: dejamos de publicar ahí (las demás redes siguen). Reconéctalo en Promocionar y retomamos desde hoy.`;
+    const { data } = await supabase.from(SERIES_TABLE).update({ networks: states, notice, updated_at: nowIso() }).eq("id", series.id).select("*").single();
+    return data || { ...series, networks: states, notice };
 }
 
 /** Hora de publicación elegida al aprobar (la usan reanudar y replanificar). */
@@ -790,6 +1004,21 @@ async function uploadPiece(supabase: any, series: any, slot: any, buffer: Buffer
 
 /** Caption de un post de feed: IA desde la descripción (o texto fijo) + el cierre con la palabra clave. */
 export async function seriesCaption(supabase: any, event: any, slot: { days_to_event: number }, keyword: string, previous: string[] = [], anchor: Date | null = null): Promise<string> {
+    return `${await seriesCaptionBody(supabase, event, slot, previous, anchor)}\n\n${captionClosing("instagram", keyword, "")}`.slice(0, 2200);
+}
+
+/**
+ * Cierre del caption según la red: en Instagram, comentar la palabra clave (DM); en Facebook, eso mismo (Messenger) más
+ * el link; en TikTok, solo el link (no hay DM por comentarios ni links clickeables).
+ */
+export function captionClosing(platform: string, keyword: string, link: string): string {
+    if (platform === "facebook") return `Comenta ${keyword} y te mandamos el link por Messenger 📩\nEntradas: ${link}`;
+    if (platform === "tiktok") return `Entradas: ${link}`;
+    return `Comenta ${keyword} y te mandamos el link 📩`;
+}
+
+/** Texto del post sin el cierre: IA desde la descripción del evento o, si no hay, el texto fijo. */
+export async function seriesCaptionBody(supabase: any, event: any, slot: { days_to_event: number }, previous: string[] = [], anchor: Date | null = null): Promise<string> {
     let body = "";
     if (isTextGenerationConfigured()) {
         try {
@@ -800,7 +1029,7 @@ export async function seriesCaption(supabase: any, event: any, slot: { days_to_e
         }
     }
     if (!body) body = fallbackCaption(event, slot.days_to_event, anchor);
-    return `${body}\n\nComenta ${keyword} y te mandamos el link 📩`.slice(0, 2200);
+    return body;
 }
 
 export function fallbackCaption(event: any, daysToEvent: number, anchor: Date | null): string {
@@ -842,42 +1071,87 @@ export async function loadBaseImage(url: string | null): Promise<Buffer | null> 
     }
 }
 
-/** Renderiza, sube y programa en Zernio un slot ya reclamado ('rendering'). */
-async function dispatchSlot(supabase: any, series: any, event: any, slot: any, origin: string, now: Date, previousCaptions: string[]) {
+/**
+ * Cuerpo de POST /v1/posts de Zernio para una pieza de la serie (una red por post, así cada red tiene su estado):
+ * - historia: Instagram o Facebook con contentType story;
+ * - post de feed: imagen con caption (en TikTok, photo post: título corto y el caption como descripción);
+ * - reel: el video del evento (Instagram lo publica como reel, Facebook con contentType reel, TikTok como video).
+ */
+export function slotPostBody({
+    platform, kind, accountId, imageUrl, videoUrl, caption, scheduledFor, metadata,
+}: {
+    platform: SeriesPlatform; kind: string; accountId: string; imageUrl: string | null; videoUrl: string | null; caption: string | null; scheduledFor: string; metadata: Record<string, string>;
+}): Record<string, any> {
+    const entry: Record<string, any> = { platform, accountId };
+    if ((platform === "instagram" || platform === "facebook") && kind === "story") entry.platformSpecificData = { contentType: "story" };
+    if (platform === "facebook" && kind === "reel") entry.platformSpecificData = { contentType: "reel" };
+    const media = kind === "reel" ? [{ type: "video", url: videoUrl }] : [{ type: "image", url: imageUrl }];
+    let content = caption;
+    if (platform === "tiktok" && kind !== "reel" && caption) content = tiktokTitle(caption) || caption.slice(0, 90);
+    return {
+        ...(content ? { content } : {}),
+        mediaItems: media,
+        platforms: [entry],
+        ...(platform === "tiktok" ? { tiktokSettings: tiktokSettings({ photo: kind !== "reel", description: caption || "" }) } : {}),
+        scheduledFor,
+        timezone: TZ,
+        metadata,
+    };
+}
+
+/** Renderiza, sube y programa en Zernio un slot ya reclamado ('rendering'). `bodies` = textos ya escritos por día. */
+async function dispatchSlot(supabase: any, series: any, event: any, slot: any, origin: string, now: Date, previousCaptions: string[], bodies: Map<number, string>) {
+    const platform: SeriesPlatform = slot.platform || "instagram";
+    const accountId = accountIdFor(series, platform);
+    if (!accountId) throw new ZernioError(409, { error: `${NETWORK_NAMES[platform]} no está conectado`, code: "ACCOUNT_DISCONNECTED" });
     const config = normalizeCadence(series.cadence_config);
     const anchor = slot.anchor_starts_at ? new Date(slot.anchor_starts_at) : series.anchor_starts_at ? new Date(series.anchor_starts_at) : anchorFor(event, now);
-    const data = await pieceDataFor(supabase, series, event, slot, config, anchor);
-    const image = await renderPiece(data, await loadBaseImage(baseImageUrlFor(series, event)), baseImageOptionsFor(series, event));
-    const imageUrl = await uploadPiece(supabase, series, slot, image);
-    const caption = slot.kind === "feed_post" ? await seriesCaption(supabase, event, slot, data.keyword, previousCaptions, anchor) : null;
+    const keyword = String(series?.keyword || DEFAULT_KEYWORD);
+    let imageUrl: string | null = null;
+    if (slot.kind !== "reel") {
+        // TikTok: formato vertical (como la historia); Facebook y TikTok muestran dónde comprar en vez de la palabra clave
+        const pieceSlot = { ...slot, kind: platform === "tiktok" ? "story" : slot.kind };
+        const data = await pieceDataFor(supabase, series, event, pieceSlot, config, anchor);
+        if (platform !== "instagram") data.linkLabel = shortEventLink(origin, event.slug);
+        const image = await renderPiece(data, await loadBaseImage(baseImageUrlFor(series, event)), baseImageOptionsFor(series, event));
+        imageUrl = await uploadPiece(supabase, series, slot, image);
+    } else if (!slot.video_url) {
+        throw new ZernioError(400, { error: "El evento ya no tiene un video para el reel" });
+    }
+    let caption: string | null = null;
+    if (slot.kind !== "story") {
+        let body = bodies.get(Number(slot.days_to_event));
+        if (!body) {
+            body = await seriesCaptionBody(supabase, event, slot, previousCaptions, anchor);
+            bodies.set(Number(slot.days_to_event), body);
+        }
+        const ref = platform === "facebook" ? LINK_REFS.facebook : platform === "tiktok" ? LINK_REFS.tiktok : null;
+        caption = `${body}\n\n${captionClosing(platform, keyword, ref ? dmTrackingUrl(origin, event.slug, ref) : "")}`.slice(0, 2200);
+    }
     await supabase.from(SLOTS_TABLE).update({ image_url: imageUrl, caption, rendered_at: nowIso(), updated_at: nowIso() }).eq("id", slot.id);
 
     const scheduledFor = new Date(Math.max(Date.parse(slot.publish_at), now.getTime() + 2 * 60_000)).toISOString();
     const created: any = await zernioRequest("/posts", {
         method: "POST",
         idempotencyKey: `aitickets-series-slot-${slot.id}`,
-        body: {
-            ...(caption ? { content: caption } : {}),
-            mediaItems: [{ type: "image", url: imageUrl }],
-            platforms: [
-                {
-                    platform: "instagram",
-                    accountId: series.zernio_account_id,
-                    ...(slot.kind === "story" ? { platformSpecificData: { contentType: "story" } } : {}),
-                },
-            ],
+        body: slotPostBody({
+            platform,
+            kind: slot.kind,
+            accountId,
+            imageUrl,
+            videoUrl: slot.video_url || null,
+            caption,
             scheduledFor,
-            timezone: TZ,
             metadata: { aitickets_slot_id: String(slot.id), aitickets_series_id: String(series.id), aitickets_event_id: String(series.event_id) },
-        },
+        }),
     });
     const zernioPostId = created?.post?._id || created?.post?.id || null;
     if (!zernioPostId) throw new ZernioError(502, { error: "Zernio no devolvió el id del post" });
     let automationId: string | null = null;
     let error: string | null = null;
-    if (slot.kind === "feed_post" && !series.sold_out_at) {
+    if (slot.kind !== "story" && platform !== "tiktok" && !series.sold_out_at) {
         try {
-            automationId = await createPostAutomation(series, event, slot, zernioPostId, origin);
+            automationId = await createPostAutomation(series, event, slot, zernioPostId, origin, accountId, platform);
         } catch (err: any) {
             error = `Post programado, pero no se pudo activar el DM por comentarios: ${String(err?.message || err).slice(0, 300)}`;
         }
@@ -937,9 +1211,17 @@ export async function runSeriesJobs(supabase: any, { origin, now = new Date(), b
     );
     const events = new Map<number, any>();
     const captions = new Map<number, string[]>();
+    // Texto de cada día por serie: Instagram, Facebook y TikTok del mismo día comparten el texto (una sola llamada a la IA)
+    const bodies = new Map<number, Map<number, string>>();
     for (const slot of due) {
         const series = byId.get(Number(slot.series_id));
         if (!series) continue;
+        const platform: SeriesPlatform = slot.platform || "instagram";
+        if (platform !== "instagram" && !accountIdFor(series, platform)) {
+            await supabase.from(SLOTS_TABLE).update({ status: "skipped", skip_reason: `${NETWORK_NAMES[platform]} desconectado`, updated_at: nowIso() }).eq("id", slot.id).eq("status", "planned");
+            summary.skipped++;
+            continue;
+        }
         const lead = normalizeCadence(series.cadence_config).lead_minutes * 60_000;
         if (Date.parse(slot.publish_at) > now.getTime() + lead) continue;
         if (Date.now() - started > budgetMs) {
@@ -970,12 +1252,20 @@ export async function runSeriesJobs(supabase: any, { origin, now = new Date(), b
                 const prev = await loadSlots(supabase, series.id);
                 captions.set(series.id, prev.map((p) => p.caption).filter(Boolean));
             }
-            const caption = await dispatchSlot(supabase, series, event, slot, origin, now, captions.get(series.id)!);
+            if (!bodies.has(series.id)) bodies.set(series.id, new Map());
+            const caption = await dispatchSlot(supabase, series, event, slot, origin, now, captions.get(series.id)!, bodies.get(series.id)!);
             if (caption) captions.get(series.id)!.push(caption);
             summary.dispatched++;
         } catch (err: any) {
             const message = String(err?.userMessage || err?.message || err).slice(0, 480);
             const disconnected = err instanceof ZernioError && (err.code === "ACCOUNT_DISCONNECTED" || err.code === "reconnect_required" || (err.status === 403 && /disconnect|reconnect/i.test(message)));
+            if (disconnected && platform !== "instagram") {
+                // Solo esa red se detiene: Instagram y la otra red siguen
+                await supabase.from(SLOTS_TABLE).update({ status: "failed", claimed_at: null, error: message, updated_at: nowIso() }).eq("id", slot.id);
+                byId.set(Number(series.id), await disconnectNetwork(supabase, series, platform as ExtraNetwork, message));
+                summary.failed++;
+                continue;
+            }
             if (disconnected) {
                 await supabase.from(SLOTS_TABLE).update({ status: "planned", claimed_at: null, error: message, updated_at: nowIso() }).eq("id", slot.id);
                 await supabase.from("social_accounts").update({ status: "expired" }).eq("organization_id", series.organization_id).eq("zernio_account_id", series.zernio_account_id);
@@ -991,7 +1281,7 @@ export async function runSeriesJobs(supabase: any, { origin, now = new Date(), b
             } else {
                 await supabase.from(SLOTS_TABLE).update({ status: "failed", claimed_at: null, error: message, updated_at: nowIso() }).eq("id", slot.id);
                 summary.failed++;
-                await notifySlack(`⚠️ *Historia automática fallida* (serie ${series.id}, evento ${series.event_id}, slot ${slot.id} ${slot.kind} ${localDateTime(slot.publish_at)}): ${message}`);
+                await notifySlack(`⚠️ *Historia automática fallida* (serie ${series.id}, evento ${series.event_id}, slot ${slot.id} ${NETWORK_NAMES[platform]} ${slot.kind} ${localDateTime(slot.publish_at)}): ${message}`);
             }
         }
     }
@@ -1021,7 +1311,8 @@ export async function handleZernioWebhook(supabase: any, payload: any, origin: s
         const slot = await slotForPost(supabase, post);
         if (!slot) return "post ajeno a las series";
         const platforms: any[] = Array.isArray(post.platforms) ? post.platforms : [];
-        const ig = (payload.platform?.platform === "instagram" ? payload.platform : null) || platforms.find((p) => p?.platform === "instagram") || platforms[0] || {};
+        const slotPlatform: SeriesPlatform = slot.platform || "instagram";
+        const ig = (payload.platform?.platform === slotPlatform ? payload.platform : null) || platforms.find((p) => p?.platform === slotPlatform) || platforms[0] || {};
         if (event === "post.platform.published" || event === "post.published") {
             await supabase
                 .from(SLOTS_TABLE)
@@ -1031,11 +1322,13 @@ export async function handleZernioWebhook(supabase: any, payload: any, origin: s
             return `slot ${slot.id} publicado`;
         }
         if (event === "post.platform.failed" || event === "post.failed" || event === "post.partial") {
-            const error = String(ig.error || ig.platformError?.message || "Instagram rechazó la publicación").slice(0, 480);
+            const error = String(ig.error || ig.platformError?.message || `${NETWORK_NAMES[slotPlatform]} rechazó la publicación`).slice(0, 480);
             await supabase.from(SLOTS_TABLE).update({ status: "failed", error, updated_at: nowIso() }).eq("id", slot.id).in("status", ["queued", "rendering", "planned"]);
             if (ig.errorCategory === "auth_expired" || ig.errorCategory === "account_issue") {
                 const { data: series } = await supabase.from(SERIES_TABLE).select("*").eq("id", slot.series_id).maybeSingle();
-                if (series?.status === "active") {
+                if (series?.status === "active" && slotPlatform !== "instagram") {
+                    await disconnectNetwork(supabase, series, slotPlatform as ExtraNetwork, error);
+                } else if (series?.status === "active") {
                     await supabase.from("social_accounts").update({ status: "expired" }).eq("organization_id", series.organization_id).eq("zernio_account_id", series.zernio_account_id);
                     await pauseSeries(supabase, series, "instagram_disconnected", origin, IG_DISCONNECTED_NOTICE).catch(() => null);
                     await notifyInstagramDisconnected(supabase, series, await loadSeriesEvent(supabase, Number(series.event_id)), origin);
@@ -1051,6 +1344,18 @@ export async function handleZernioWebhook(supabase: any, payload: any, origin: s
     }
     if (event === "account.disconnected") {
         const account = payload.account || {};
+        if ((account.platform === "facebook" || account.platform === "tiktok") && account.accountId) {
+            const platform = account.platform as ExtraNetwork;
+            await supabase
+                .from("social_accounts")
+                .update({ status: account.disconnectionType === "intentional" ? "revoked" : "expired" })
+                .eq("platform", platform)
+                .eq("zernio_account_id", String(account.accountId));
+            const live = await fetchAll<any>(() => supabase.from(SERIES_TABLE).select("*").eq("status", "active").order("id", { ascending: true }));
+            const affected = live.filter((s) => networkStates(s)[platform].status === "active" && networkStates(s)[platform].account_id === String(account.accountId));
+            for (const s of affected) await disconnectNetwork(supabase, s, platform, "La cuenta se desconectó");
+            return `${affected.length} serie(s) sin ${NETWORK_NAMES[platform]}`;
+        }
         if (account.platform !== "instagram" || !account.accountId) return "cuenta no Instagram";
         await supabase
             .from("social_accounts")
@@ -1112,6 +1417,6 @@ export async function platformSeriesStats(supabase: any, period: { fromIso: stri
         upcoming_published_events: upcoming.length,
         upcoming_events_with_series_pct: upcoming.length ? Math.round((upcoming.filter((e) => withSeries.has(Number(e.id))).length / upcoming.length) * 1000) / 10 : null,
         attributed_in_period: { orders: attributed.orders, tickets: attributed.tickets, gross_clp: attributed.gross_clp, aitickets_fee_net_clp: attributed.fee_net_clp },
-        note: "Ventas atribuidas = órdenes con ref ig-story-dm / ig-post-dm (link del DM automático), sin cortesías ni transferencias.",
+        note: "Ventas atribuidas = órdenes con ref ig-story-dm / ig-post-dm / fb-post-dm (link del DM automático) o fb-serie / tiktok-serie (link en el texto), sin cortesías ni transferencias.",
     };
 }

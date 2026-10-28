@@ -2,10 +2,9 @@
 // La serie en el tiempo (SPEC_landing_musica §4.8, card 1): de D-14 al día del show, una marca por pieza calculada con
 // la cadencia real (seriesMarks + DEFAULT_CADENCE, que la página pasa por props): historias = barras rojas altas,
 // posts de feed = barras de papel bajas, como un ecualizador. La leyenda cuenta las piezas y dice la hora (la de más
-// visitas del evento o default_time; la del día del show, event_day_time). Hoy la serie publica solo en Instagram:
-// Facebook, TikTok y reels van con "Pronto". No necesita JS: se renderiza en el servidor (sin client:*); M14 (pop de
+// visitas del evento o default_time; la del día del show, event_day_time). La serie sale en Instagram y, si se conectan,
+// en Facebook y TikTok; el reel usa el video vertical del evento. No necesita JS: se renderiza en el servidor (sin client:*); M14 (pop de
 // las barras con 40 ms por día) cuelga del [data-lp-reveal] de la sección.
-import SoonBadge from '../../ui/SoonBadge.vue'
 import { seriesCounts, seriesMarks } from './musicaLanding.js'
 
 const props = defineProps({
@@ -16,7 +15,7 @@ const props = defineProps({
 const marks = seriesMarks(props.cadence)
 const counts = seriesCounts(marks)
 const labeled = new Set([14, props.cadence.sparse_start_days, props.cadence.daily_from_days, 3, 0])
-const soon = ['Facebook', 'TikTok', 'Reels']
+const nets = ['Instagram', 'Facebook', 'TikTok', 'Reel con tu video']
 </script>
 
 <template>
@@ -40,8 +39,7 @@ const soon = ['Facebook', 'TikTok', 'Reels']
       evento, o {{ props.cadence.default_time }}. El día del show, a las {{ props.cadence.event_day_time }}.
     </p>
     <ul class="st-nets" aria-label="Redes">
-      <li class="mu-chip st-net st-net-on"><span class="st-net-dot" aria-hidden="true">●</span> Instagram</li>
-      <li v-for="net in soon" :key="net" class="mu-chip st-net">{{ net }} <SoonBadge dark /></li>
+      <li v-for="net in nets" :key="net" class="mu-chip st-net st-net-on"><span class="st-net-dot" aria-hidden="true">●</span> {{ net }}</li>
     </ul>
   </div>
 </template>

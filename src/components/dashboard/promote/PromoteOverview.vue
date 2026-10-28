@@ -33,7 +33,7 @@ const notification = ref({ show: false, type: '', message: '' })
 
 onMounted(() => {
   if (props.connectedPlatform) {
-    const platformName = props.connectedPlatform === 'ads' ? 'Cuenta publicitaria de Meta' : props.connectedPlatform === 'instagram' ? 'Instagram' : 'Facebook'
+    const platformName = props.connectedPlatform === 'ads' ? 'Cuenta publicitaria de Meta' : ({ instagram: 'Instagram', facebook: 'Facebook', tiktok: 'TikTok', linkedin: 'LinkedIn' })[props.connectedPlatform] || 'Cuenta'
     notification.value = { show: true, type: 'success', message: `${platformName} conectada exitosamente` }
     setTimeout(() => { notification.value.show = false }, 5000)
   }
@@ -134,7 +134,8 @@ const handleDisconnect = async (accountId) => {
       <h2 class="font-bold text-lg mb-1">Promociona un evento</h2>
       <p class="text-sm text-gray-500 mb-4">
         Cada evento tiene su pestaña <strong>Difusión</strong> con el link para compartir, links por canal o promotor e
-        historias automáticas en Instagram. Desde aquí también puedes publicar un post o crear un anuncio pagado.
+        difusión automática en Instagram, Facebook y TikTok. Desde aquí también puedes publicar un post (también en LinkedIn) o
+        crear un anuncio pagado.
       </p>
       <div v-if="events.length" class="bg-white rounded-xl border border-gray-200 shadow-sm divide-y divide-gray-100">
         <div

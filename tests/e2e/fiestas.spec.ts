@@ -109,8 +109,8 @@ test("lo que no existe va con Pronto y sin testimonio real no hay cita", async (
   // El acceso del promotor a sus números ya existe
   await expect(page.locator("#promotores").getByTestId("soon-badge")).toHaveCount(0);
   await expect(page.locator("#promotores")).toContainText("Cada promotor ve sus números.");
-  // Facebook, TikTok y reels en la serie; gustos en los anuncios
-  await expect(page.locator("#difusion").getByTestId("soon-badge")).toHaveCount(4);
+  // Facebook, TikTok y el reel en la serie, y los gustos en los anuncios, ya existen
+  await expect(page.locator("#difusion").getByTestId("soon-badge")).toHaveCount(0);
   // Dirección que solo ven quienes compran
   await expect(page.locator("#pagina").getByTestId("soon-badge")).toHaveCount(1);
   // El aforo en vivo en el panel ya existe

@@ -1,10 +1,12 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { Instagram, CalendarClock, Pause, Play, X, RefreshCw, ImagePlus, MessageCircle, Check, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-vue-next'
+import { Instagram, Facebook, Music2, Clapperboard, CalendarClock, Pause, Play, X, RefreshCw, ImagePlus, MessageCircle, Check, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-vue-next'
 
-// Difusión automática en Instagram (docs/specs/historias-automaticas.md): el productor aprueba una vez y AI Tickets
-// publica historias (y posts la última semana) hasta el día del evento, con el link por DM a quien responda la
-// palabra clave. Habla con /api/events/social-series (herramientas *_social_series de la API de productores).
+// Difusión automática (docs/specs/historias-automaticas.md): el productor aprueba una vez y AI Tickets publica
+// historias (y posts la última semana) en Instagram hasta el día del evento, con el link por DM a quien responda la
+// palabra clave. Por evento puede sumar la página de Facebook y TikTok (misma cadencia; cada red con su estado, una que
+// falla no frena a las otras) y un reel con el video vertical del evento. Habla con /api/events/social-series
+// (herramientas *_social_series de la API de productores).
 
 const props = defineProps({
   eventId: { type: Number, required: true },
@@ -17,7 +19,12 @@ const busy = ref('')
 const error = ref('')
 const configuring = ref(false)
 const previewVersion = ref(Date.now())
-const form = ref({ feed_posts_enabled: true, sold_out_story_enabled: false, keyword: 'ENTRADAS', dm_message: '', base_image_url: '' })
+const form = ref({ feed_posts_enabled: true, sold_out_story_enabled: false, keyword: 'ENTRADAS', dm_message: '', base_image_url: '', facebook_enabled: false, tiktok_enabled: false, reel_enabled: true })
+const NETWORKS = [
+  { id: 'facebook', name: 'Facebook', icon: Facebook, what: 'Las mismas historias y posts en tu página' },
+  { id: 'tiktok', name: 'TikTok', icon: Music2, what: 'Un post de foto vertical cada día de la última semana' },
+]
+const PLATFORM_ICON = { instagram: Instagram, facebook: Facebook, tiktok: Music2 }
 
 const series = computed(() => view.value?.series || null)
 const status = computed(() => series.value?.status || 'none')
@@ -47,7 +54,7 @@ const fmt = (local) => {
 }
 const clp = (n) => `$${Math.round(Number(n) || 0).toLocaleString('es-CL')}`
 const previewUrl = (s) =>
-  `/api/events/social-series-preview?event_id=${props.eventId}&kind=${s.kind}&days=${s.days_to_event}${s.variant === 'sold_out' ? '&variant=sold_out' : ''}&v=${previewVersion.value}`
+  `/api/events/social-series-preview?event_id=${props.eventId}&kind=${s.kind}&days=${s.days_to_event}${s.variant === 'sold_out' ? '&variant=sold_out' : ''}${s.platform && s.platform !== 'instagram' ? `&platform=${s.platform}` : ''}&v=${previewVersion.value}`
 const track = (name, data) => { try { window.aitTrack?.(name, data) } catch { /* bitácora opcional */ } }
 
 const api = async (method, body) => {
@@ -74,6 +81,9 @@ const load = async () => {
         keyword: s.keyword,
         dm_message: s.dm_message || '',
         base_image_url: s.base_image_url || '',
+        facebook_enabled: Boolean(s.networks?.facebook?.enabled),
+        tiktok_enabled: Boolean(s.networks?.tiktok?.enabled),
+        reel_enabled: s.reel_enabled !== false,
       }
     }
   } catch (e) {
@@ -124,6 +134,9 @@ const savePreview = async () => {
       keyword: form.value.keyword.trim().toUpperCase(),
       dm_message: form.value.dm_message.trim(),
       base_image_url: form.value.base_image_url,
+      facebook_enabled: form.value.facebook_enabled,
+      tiktok_enabled: form.value.tiktok_enabled,
+      reel_enabled: form.value.reel_enabled,
     })
     previewVersion.value = Date.now()
     track('difusion_preview', { piezas: view.value.plan?.slots?.length || 0 })
@@ -200,6 +213,28 @@ const uploadPhoto = async (event) => {
 }
 
 const upcoming = computed(() => (view.value?.slots || []).filter((s) => ['planned', 'rendering', 'queued'].includes(s.status)))
+// Redes donde publica la serie viva, con su estado (una desconectada se muestra en ámbar; las demás siguen)
+const liveNetworks = computed(() => {
+  const nets = series.value?.networks || {}
+  return [
+    { id: 'instagram', name: 'Instagram', ok: true, label: view.value?.instagram?.account || 'Instagram' },
+    ...NETWORKS.filter((n) => nets[n.id]?.enabled).map((n) => ({
+      id: n.id,
+      name: n.name,
+      ok: nets[n.id].status === 'active',
+      label: nets[n.id].status === 'active' ? view.value?.networks?.[n.id]?.account || n.name : `${n.name}: desconectado`,
+    })),
+  ]
+})
+const extraSummary = computed(() => {
+  const p = plan.value
+  if (!p) return ''
+  const parts = []
+  if (p.facebook_posts) parts.push(`${p.facebook_posts} en Facebook`)
+  if (p.tiktok_posts) parts.push(`${p.tiktok_posts} en TikTok`)
+  if (p.reels?.length) parts.push(`un reel el ${fmt(p.reels[0].publish_local)}`)
+  return parts.join(', ')
+})
 const done = computed(() => (view.value?.slots || []).filter((s) => ['published', 'failed'].includes(s.status)).reverse())
 </script>
 
@@ -210,6 +245,7 @@ const done = computed(() => (view.value?.slots || []).filter((s) => ['published'
         <h3 class="font-bold text-lg flex items-center gap-2"><Instagram :size="18" /> Difusión automática</h3>
         <p class="text-sm text-gray-500 mt-1">
           Historias en tu Instagram hasta el día del evento, sin que tengas que hacer nada. Quien responde la historia recibe el link por DM.
+          Si quieres, también en tu página de Facebook y en TikTok.
         </p>
       </div>
       <span v-if="series && status !== 'draft'" class="px-2 py-1 rounded text-xs font-medium shrink-0" :class="STATUS_CLASS[status]">{{ series.status_label }}</span>
@@ -241,6 +277,7 @@ const done = computed(() => (view.value?.slots || []).filter((s) => ['published'
             <p v-if="plan" class="text-sm text-gray-700">
               Se publicarían <strong>{{ plan.stories }} historias</strong><template v-if="plan.feed_posts"> y <strong>{{ plan.feed_posts }} posts</strong></template>
               en <strong>{{ view.instagram.account || 'tu Instagram' }}</strong>, cada vez más seguido a medida que se acerca el evento, a las {{ plan.publish_time }}.
+              Puedes sumar Facebook y TikTok.
             </p>
             <p v-if="status === 'completed' || status === 'cancelled'" class="text-xs text-gray-500">La difusión anterior quedó {{ series.status_label.toLowerCase() }}.</p>
             <button
@@ -278,6 +315,33 @@ const done = computed(() => (view.value?.slots || []).filter((s) => ['published'
               <span class="block text-xs text-gray-400 mt-1">Escribe {link} donde va el link (si no, va al final). Vacío = el mensaje de ejemplo.</span>
             </label>
 
+            <fieldset class="space-y-2" data-testid="social-series-networks">
+              <legend class="block text-xs font-bold text-gray-500 uppercase mb-1">Dónde publicar</legend>
+              <p class="flex items-center gap-2 text-sm text-gray-700"><Instagram :size="16" /> Instagram <span class="text-gray-400">· {{ view.instagram.account || 'conectado' }} (siempre)</span></p>
+              <div v-for="n in NETWORKS" :key="n.id" class="flex items-start gap-2 text-sm text-gray-700">
+                <input
+                  :id="`series-${n.id}`"
+                  v-model="form[`${n.id}_enabled`]"
+                  type="checkbox"
+                  class="mt-1"
+                  :disabled="!view.networks?.[n.id]?.connected"
+                  @change="savePreview"
+                />
+                <label :for="`series-${n.id}`" class="cursor-pointer">
+                  <span class="inline-flex items-center gap-1 font-medium"><component :is="n.icon" :size="16" /> {{ n.name }}</span>
+                  <span v-if="view.networks?.[n.id]?.connected" class="text-gray-500"> · {{ view.networks[n.id].account || 'conectado' }}. {{ n.what }}.</span>
+                  <span v-else class="text-gray-500"> · <a href="/dashboard/promote" class="underline">Conéctalo en Promocionar</a> para sumarlo.</span>
+                </label>
+              </div>
+              <div class="flex items-start gap-2 text-sm text-gray-700">
+                <input id="series-reel" v-model="form.reel_enabled" type="checkbox" class="mt-1" :disabled="!view.reel?.available" @change="savePreview" />
+                <label for="series-reel" class="cursor-pointer">
+                  <span class="inline-flex items-center gap-1 font-medium"><Clapperboard :size="16" /> Reel antes de la función</span>
+                  <span class="text-gray-500"> · {{ view.reel?.note }}</span>
+                </label>
+              </div>
+            </fieldset>
+
             <div class="flex flex-wrap items-center gap-2">
               <label class="inline-flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm cursor-pointer hover:bg-gray-50" data-track="Cambiar foto base">
                 <ImagePlus :size="16" /> {{ busy === 'photo' ? 'Subiendo…' : 'Cambiar foto base' }}
@@ -292,7 +356,7 @@ const done = computed(() => (view.value?.slots || []).filter((s) => ['published'
             <div v-if="plan" class="space-y-2">
               <p class="text-sm text-gray-700">
                 <strong>{{ plan.stories }} historias</strong><template v-if="plan.feed_posts"> y <strong>{{ plan.feed_posts }} posts</strong></template>
-                a las {{ plan.publish_time }} <span class="text-gray-500">({{ plan.publish_time_source }})</span>.
+                a las {{ plan.publish_time }} <span class="text-gray-500">({{ plan.publish_time_source }})</span><template v-if="extraSummary">; además {{ extraSummary }}</template>.
                 La cuenta de entradas se actualiza al publicar.
               </p>
               <div class="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1" data-track-section="Calendario de la difusión">
@@ -359,8 +423,18 @@ const done = computed(() => (view.value?.slots || []).filter((s) => ['published'
             </div>
           </div>
           <p v-if="view.attributed_sales.orders" class="text-xs text-gray-500">
-            {{ view.attributed_sales.orders }} compras por el link del DM ({{ clp(view.attributed_sales.gross_clp) }}). Aparecen como canales ig-story-dm e ig-post-dm en la analítica.
+            {{ view.attributed_sales.orders }} compras por la difusión ({{ clp(view.attributed_sales.gross_clp) }}). Aparecen como canales ig-story-dm, ig-post-dm, fb-post-dm, fb-serie y tiktok-serie en la analítica.
           </p>
+          <ul class="flex flex-wrap gap-2" data-testid="social-series-live-networks">
+            <li
+              v-for="n in liveNetworks"
+              :key="n.id"
+              class="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium"
+              :class="n.ok ? 'bg-gray-100 text-gray-700' : 'bg-amber-100 text-amber-800'"
+            >
+              <component :is="PLATFORM_ICON[n.id]" :size="14" /> {{ n.label }}
+            </li>
+          </ul>
 
           <div v-if="view.next_slot && status === 'active'" class="flex items-center gap-3 p-3 rounded-lg border border-gray-200">
             <button
@@ -372,7 +446,7 @@ const done = computed(() => (view.value?.slots || []).filter((s) => ['published'
               <img :src="view.next_slot.image_url || previewUrl(view.next_slot)" alt="Próxima publicación" class="w-14 rounded border border-gray-200 hover:opacity-90 transition" :class="view.next_slot.kind === 'story' ? 'aspect-[9/16]' : 'aspect-[4/5]'" />
             </button>
             <div class="text-sm">
-              <p class="font-semibold">Próxima: {{ view.next_slot.kind_label }} · {{ view.next_slot.stage }}</p>
+              <p class="font-semibold">Próxima: {{ view.next_slot.kind_label }} en {{ view.next_slot.platform_label }} · {{ view.next_slot.stage }}</p>
               <p class="text-gray-500">{{ fmt(view.next_slot.publish_local) }} · {{ view.next_slot.status_label }}</p>
             </div>
           </div>
@@ -382,7 +456,7 @@ const done = computed(() => (view.value?.slots || []).filter((s) => ['published'
             <ul class="mt-2 divide-y divide-gray-100">
               <li v-for="s in [...done, ...upcoming]" :key="s.id" class="py-2 flex items-center justify-between gap-2">
                 <div class="min-w-0">
-                  <p class="font-medium text-gray-800">{{ s.kind_label }} · {{ s.stage }}</p>
+                  <p class="font-medium text-gray-800 flex items-center gap-1"><component :is="PLATFORM_ICON[s.platform || 'instagram']" :size="14" class="shrink-0" /> {{ s.kind_label }} · {{ s.stage }}</p>
                   <p class="text-xs text-gray-500">{{ fmt(s.publish_local) }}<template v-if="s.error"> · <span class="text-red-600">{{ s.error }}</span></template></p>
                 </div>
                 <div class="flex items-center gap-2 shrink-0">

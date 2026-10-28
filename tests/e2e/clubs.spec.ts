@@ -97,9 +97,9 @@ test("la noche en vivo se mueve con el crossfader y el teclado", async ({ page }
 
 test("lo que no existe va con Pronto y sin testimonio real no hay cita", async ({ page }) => {
   await open(page);
-  // Facebook, TikTok y reels en la serie; gustos en los anuncios
-  await expect(page.getByTestId("club-series").getByTestId("soon-badge")).toHaveCount(3);
-  await expect(page.getByTestId("club-ads-demo").getByTestId("soon-badge")).toHaveCount(1);
+  // Facebook, TikTok y el reel en la serie, y los gustos en los anuncios, ya existen
+  await expect(page.getByTestId("club-series").getByTestId("soon-badge")).toHaveCount(0);
+  await expect(page.getByTestId("club-ads-demo").getByTestId("soon-badge")).toHaveCount(0);
   // El acceso del RRPP a sus números y cuántos de cada lista entraron ya existen
   await expect(page.locator("#lista").getByTestId("soon-badge")).toHaveCount(0);
   await expect(page.locator("#lista")).toContainText("en su celular ve cuántas entradas vendió");

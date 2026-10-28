@@ -2,6 +2,7 @@ import type { APIRoute } from "astro";
 import { getSupabaseAdmin } from "../../../../lib/auth-helpers";
 import { getSessionContext, hasRole, EVENT_MANAGER_ROLES } from "../../../../lib/supabaseServer";
 import { canAccessEventByStaff } from "../../../../../netlify/lib/event-staff.mjs";
+import { postMediaProblem } from "../../../../lib/socialPlatforms";
 
 export const POST: APIRoute = async (context) => {
     const session = await getSessionContext(context);
@@ -17,9 +18,11 @@ export const POST: APIRoute = async (context) => {
         const body = await context.request.json();
         const { eventId, content, imageUrls, platforms, scheduledFor } = body;
 
-        if (!eventId || !content || !platforms?.length) {
+        if (!eventId || !content || !Array.isArray(platforms) || !platforms.length) {
             return new Response(JSON.stringify({ message: "Faltan datos requeridos (evento, contenido, plataformas)" }), { status: 400 });
         }
+        const problem = postMediaProblem([...new Set<string>(platforms)], Array.isArray(imageUrls) ? imageUrls.length : 0, String(content).length);
+        if (problem) return new Response(JSON.stringify({ message: problem }), { status: 400 });
 
         const supabaseAdmin = getSupabaseAdmin();
 
@@ -51,7 +54,7 @@ export const POST: APIRoute = async (context) => {
                 event_id: eventId,
                 content,
                 image_urls: imageUrls || [],
-                platforms,
+                platforms: [...new Set<string>(platforms)],
                 status,
                 scheduled_for: scheduledFor || null,
             })

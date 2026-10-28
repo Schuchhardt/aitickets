@@ -9,6 +9,7 @@
 // - Hora: la hora pico de visitas del evento (o de la organización) con al menos 50 visitas; si no, 19:30. D-0 sale
 //   a las 09:00 y siempre al menos 3 horas antes del inicio.
 // - Las bandas y horas son configuración (aitickets_platform_settings 'social_series_cadence'), no constantes.
+// - Facebook y TikTok usan los mismos días y horas (expandNetworkSlots), más un reel si el evento tiene video.
 import { addDays } from "./eventAnalytics";
 import { localDay } from "./producer-api/tools/common";
 import { santiagoToDate } from "../pages/api/_lib/server-utils";
@@ -183,6 +184,50 @@ export function planSlots({
         }
     }
     return out.sort((a, b) => a.publish_at.localeCompare(b.publish_at) || (a.kind === "feed_post" ? -1 : 1));
+}
+
+// ---------------------------------------------------------------------------
+// Redes: la misma cadencia en Facebook y TikTok, y el reel
+// ---------------------------------------------------------------------------
+
+export type SeriesPlatform = "instagram" | "facebook" | "tiktok";
+export const SERIES_PLATFORMS: readonly SeriesPlatform[] = ["instagram", "facebook", "tiktok"];
+export const EXTRA_NETWORKS = ["facebook", "tiktok"] as const;
+export type ExtraNetwork = (typeof EXTRA_NETWORKS)[number];
+
+export type NetworkSlot = Omit<PlannedSlot, "kind"> & { platform: SeriesPlatform; kind: "story" | "feed_post" | "reel" };
+
+/** El reel sale el día con historia más cercano a D-3 (en la última semana). */
+export const REEL_DAYS = 3;
+
+/** Día del reel entre los slots planificados (null si no hay ninguno en la banda diaria). */
+export function reelSlot(slots: PlannedSlot[], config: CadenceConfig = DEFAULT_CADENCE): PlannedSlot | null {
+    const candidates = slots.filter((s) => s.kind === "story" && s.days_to_event >= 1 && s.days_to_event <= Math.max(1, config.daily_from_days));
+    candidates.sort((a, b) => Math.abs(a.days_to_event - REEL_DAYS) - Math.abs(b.days_to_event - REEL_DAYS) || b.days_to_event - a.days_to_event);
+    return candidates[0] || null;
+}
+
+/**
+ * Reparte el plan de Instagram entre las redes activas, con los mismos días y horas:
+ * - Instagram: todo (historias y posts de feed).
+ * - Facebook (página): las mismas historias y posts.
+ * - TikTok: no tiene historias; un post de foto (formato vertical) cada día de la banda diaria (D-7 a D-0).
+ * - Reel (si hay video): un día, en cada red activa; ese día TikTok publica el video en vez de la foto.
+ */
+export function expandNetworkSlots(
+    slots: PlannedSlot[],
+    { platforms, reel, config = DEFAULT_CADENCE }: { platforms: SeriesPlatform[]; reel: boolean; config?: CadenceConfig },
+): NetworkSlot[] {
+    const on = new Set(platforms);
+    const reelDay = reel ? reelSlot(slots, config) : null;
+    const out: NetworkSlot[] = [];
+    for (const s of slots) {
+        if (on.has("instagram")) out.push({ ...s, platform: "instagram" });
+        if (on.has("facebook")) out.push({ ...s, platform: "facebook" });
+        if (on.has("tiktok") && s.kind === "story" && s.days_to_event <= config.daily_from_days && s !== reelDay) out.push({ ...s, kind: "feed_post", platform: "tiktok" });
+    }
+    if (reelDay) for (const p of SERIES_PLATFORMS) if (on.has(p)) out.push({ ...reelDay, kind: "reel", platform: p });
+    return out.sort((a, b) => a.publish_at.localeCompare(b.publish_at) || SERIES_PLATFORMS.indexOf(a.platform) - SERIES_PLATFORMS.indexOf(b.platform));
 }
 
 export type FunctionDate = { date: string; start_time: string | null };

@@ -2,15 +2,14 @@
 // 6 · Para llenar los últimos cupos (SPEC_landing_talleres §4.6, ancla #difusion): tres fichas con un mockup chico
 // cada una. Verificado en el código:
 //   Instagram automático → socialSeries.ts / socialSeriesCadence.ts (DEFAULT_KEYWORD por DM); el sticker de la historia
-//               dice "Quedan N entradas" (socialSeriesRender.ts), no "cupos" (Preguntas abiertas 6). Facebook, TikTok y
-//               reels en la serie → "Pronto"
+//               dice "Quedan N entradas" (socialSeriesRender.ts), no "cupos" (Preguntas abiertas 6). La serie sale
+//               también en Facebook y TikTok si se conectan, y el reel usa el video vertical del taller
 //   links por comunidad → TrackingLinkBuilder.vue y eventAnalytics.ts (ventas por canal)
 //   códigos de descuento → DiscountCodesManager.vue y discounts.mjs (porcentaje o monto, usos, fechas)
 //   anuncios → zernio-ads.mjs (cuenta publicitaria de Meta del productor): solo una línea, sin demo
 // TL14: la barra de la historia corre en loop de 5 s solo mientras se ve ([data-tl-play] → .is-playing).
 import SectionTab from "./SectionTab.astro";
 import Highlight from "./Highlight.astro";
-import SoonBadge from "../../ui/SoonBadge.vue";
 import { DISCOUNT_DEMO, LINK_SALES_DEMO, presetById } from "./talleresLanding.js";
 import { DEFAULT_KEYWORD } from "../../../lib/socialSeriesCadence";
 
@@ -50,9 +49,9 @@ const max = Math.max(...LINK_SALES_DEMO.map((r) => r.tickets));
           </div>
           <ul class="tl-diff-chips">
             <li class="tl-chip tl-chip-on"><span aria-hidden="true">●</span> Instagram</li>
-            <li class="tl-chip">Facebook <SoonBadge dark={false} /></li>
-            <li class="tl-chip">TikTok <SoonBadge dark={false} /></li>
-            <li class="tl-chip">Reels <SoonBadge dark={false} /></li>
+            <li class="tl-chip tl-chip-on"><span aria-hidden="true">●</span> Facebook</li>
+            <li class="tl-chip tl-chip-on"><span aria-hidden="true">●</span> TikTok</li>
+            <li class="tl-chip tl-chip-on"><span aria-hidden="true">●</span> Reel con tu video</li>
           </ul>
         </div>
       </li>

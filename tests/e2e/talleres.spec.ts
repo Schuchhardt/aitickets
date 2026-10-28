@@ -128,7 +128,8 @@ test("lo que no existe va con Pronto y sin testimonio real no hay cita", async (
   // Pasar lista en cada sesión ya existe
   await expect(page.locator("#el-dia").getByTestId("soon-badge")).toHaveCount(0);
   await expect(page.locator("#el-dia")).toContainText("una vez en cada sesión");
-  await expect(page.locator("#difusion").getByTestId("soon-badge")).toHaveCount(3);
+  // Facebook, TikTok y el reel ya existen: difusión sin "Pronto"
+  await expect(page.locator("#difusion").getByTestId("soon-badge")).toHaveCount(0);
   await expect(page.locator("#despues").getByTestId("soon-badge")).toHaveCount(1);
   await expect(page.locator('[data-tl-section="testimonio"]')).toHaveCount(0);
 });

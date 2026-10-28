@@ -23,7 +23,7 @@ export const ORGANIZADORES_FAQ: FaqItem[] = [
     producerFaq("¿Puedo saber cuántas entradas vende cada promotor?"),
     {
         q: "¿Cómo funciona la publicación automática en redes?",
-        a: "Conectas tu Instagram una vez y apruebas la serie con una vista previa de cada pieza. Con el póster y los datos de tu evento armamos historias con cuenta regresiva, que se vuelven diarias la última semana, y un post diario en el feed esa semana, y se publican solos hasta el día de la función. A quien responde una historia o comenta un post con la palabra clave le llega el link de compra por DM. Si se agota, cambias la fecha o cancelas, la serie se ajusta o se detiene sola. Hoy funciona con Instagram: Facebook, TikTok y reels todavía no.",
+        a: "Conectas tu Instagram una vez y apruebas la serie con una vista previa de cada pieza. Con el póster y los datos de tu evento armamos historias con cuenta regresiva, que se vuelven diarias la última semana, y un post diario en el feed esa semana, y se publican solos hasta el día de la función. A quien responde una historia o comenta un post con la palabra clave le llega el link de compra por DM. Si se agota, cambias la fecha o cancelas, la serie se ajusta o se detiene sola. Si conectas tu página de Facebook o tu TikTok, la serie sale también ahí con la misma cadencia, y si el evento tiene un video vertical corto (3 a 60 segundos), se publica como reel unos días antes. Si una red falla, las demás siguen.",
     },
     {
         q: "¿Tengo que pagar anuncios?",

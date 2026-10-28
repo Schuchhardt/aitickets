@@ -119,10 +119,12 @@ test("con 'reducir movimiento' el escáner queda fijo en el aviso de otra funci�
 
 test("lo que no existe va con Pronto y sin testimonio real no hay crítica", async ({ page }) => {
   await open(page);
-  // Repetir funciones y copiar entradas ya existen (Acto I, sin Pronto); Facebook, TikTok y reels (entreacto), borderó (salas)
+  // Repetir funciones y copiar entradas ya existen (Acto I, sin Pronto); Facebook, TikTok y el reel con el teaser también
+  // (entreacto, sin Pronto); borderó (salas) no
   await expect(page.locator("#obra").getByTestId("soon-badge")).toHaveCount(0);
   await expect(page.locator("#obra")).toContainText("Repetir funciones de jueves a domingo");
-  await expect(page.getByTestId("theatre-series").getByTestId("soon-badge")).toHaveCount(3);
+  await expect(page.getByTestId("theatre-series").getByTestId("soon-badge")).toHaveCount(0);
+  await expect(page.getByTestId("theatre-series")).toContainText("Reel con tu teaser");
   await expect(page.locator("#salas").getByTestId("soon-badge")).toHaveCount(1);
   await expect(page.locator("[data-te-testimonial]")).toHaveCount(0);
   // Las butacas numeradas no son "Pronto": se dice que no hay

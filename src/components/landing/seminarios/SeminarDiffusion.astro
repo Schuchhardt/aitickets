@@ -4,15 +4,15 @@
 // Instagram (la serie automática con los textos reales de pieceText, por props desde la página), LinkedIn y anuncios
 // (isla SeminarAdsDemo con AD_LIMITS). Verificado: TrackingLinkBuilder.vue y eventAnalytics.ts (ref, LinkedIn por
 // categorizeReferrer, DIRECT_CHANNEL), compartir en LinkedIn (ShareSheet.vue), serie de Instagram (socialSeries.ts,
-// DEFAULT_KEYWORD) y anuncios (zernio-ads.mjs). Facebook, TikTok y reels en la serie, publicar en LinkedIn desde el
-// panel y segmentar por profesión: "Pronto". Mobile: tabla de 3 columnas, cards apiladas e historias en scroll.
+// DEFAULT_KEYWORD) y anuncios (zernio-ads.mjs, con cargo e intereses). La serie sale también en Facebook y TikTok si se
+// conectan y el reel usa el video vertical del evento; los posts del panel se publican también en LinkedIn (perfil o
+// página de empresa, src/lib/socialPlatforms.ts). Mobile: tabla de 3 columnas, cards apiladas e historias en scroll.
 import { Megaphone } from "lucide-vue-next";
 import ChannelTable from "./ChannelTable.vue";
 import SeminarAdsDemo from "./SeminarAdsDemo.vue";
 import SeminarHeading from "./SeminarHeading.astro";
 import Slide from "./Slide.astro";
 import WayfindingSign from "./WayfindingSign.astro";
-import SoonBadge from "../../ui/SoonBadge.vue";
 import { SEMINAR_PHOTOS } from "./seminariosLanding.js";
 import { DIRECT_CHANNEL } from "../../../lib/eventAnalytics";
 import { DEFAULT_KEYWORD } from "../../../lib/socialSeriesCadence";
@@ -83,9 +83,9 @@ const hero = SEMINAR_PHOTOS.hero;
           </ul>
           <ul class="sed-chips" aria-label="Redes">
             <li class="sed-chip is-on"><span aria-hidden="true">●</span> Instagram</li>
-            <li class="sed-chip">Facebook <SoonBadge dark={false} /></li>
-            <li class="sed-chip">TikTok <SoonBadge dark={false} /></li>
-            <li class="sed-chip">Reels <SoonBadge dark={false} /></li>
+            <li class="sed-chip is-on"><span aria-hidden="true">●</span> Facebook</li>
+            <li class="sed-chip is-on"><span aria-hidden="true">●</span> TikTok</li>
+            <li class="sed-chip is-on"><span aria-hidden="true">●</span> Reel con tu video</li>
           </ul>
         </article>
 
@@ -95,7 +95,10 @@ const hero = SEMINAR_PHOTOS.hero;
             Las visitas que llegan desde LinkedIn aparecen como canal propio en tus métricas, y tu página trae el botón para
             compartir en LinkedIn. Pide a tus expositores que publiquen su link.
           </p>
-          <p class="se-soon-chip sed-soon">Publicar en LinkedIn desde tu panel <SoonBadge dark={false} /></p>
+          <p class="sed-text sed-linkedin" data-testid="seminar-linkedin-publish">
+            Y publica el anuncio de tu seminario en la página de tu empresa (o en tu perfil) directo desde tu panel, con el
+            texto y la imagen que armes ahí.
+          </p>
         </article>
 
         <div data-lp-step>
@@ -243,7 +246,7 @@ const hero = SEMINAR_PHOTOS.hero;
   .sed-chip.is-on span {
     color: var(--se-cordon);
   }
-  .sed-soon {
+  .sed-linkedin {
     margin-top: 12px;
   }
   .sed-links {
