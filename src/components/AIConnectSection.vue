@@ -113,12 +113,12 @@
                 </div>
               </div>
               <div class="flex justify-end">
-                <p class="bg-lime-400 text-black rounded-2xl rounded-br-sm px-4 py-2 max-w-[85%]">Dale. 15% hasta el jueves, y arma un post para Instagram.</p>
+                <p class="bg-lime-400 text-black rounded-2xl rounded-br-sm px-4 py-2 max-w-[85%]">Dale. 15% hasta el jueves, y arma una publicación para Instagram.</p>
               </div>
               <div class="flex gap-2">
                 <span class="shrink-0 w-7 h-7 rounded-full bg-white/10 flex items-center justify-center"><Sparkles class="h-4 w-4 text-lime-400" /></span>
                 <div class="bg-white/10 rounded-2xl rounded-tl-sm px-4 py-3 max-w-[85%] space-y-2">
-                  <p>Listo: creé <strong class="font-mono">ULTIMASEMANA15</strong> (15%, vence el jueves 23:59) y dejé el post en borrador con imagen y link de seguimiento. ¿Lo publico?</p>
+                  <p>Listo: creé <strong class="font-mono">ULTIMASEMANA15</strong> (15%, vence el jueves 23:59) y dejé la publicación en borrador con imagen y link de seguimiento. ¿La publico?</p>
                   <p class="text-[11px] text-white/40 font-mono">create_discount_code ✓ · generate_image ✓ · create_social_post ✓</p>
                 </div>
               </div>
@@ -154,7 +154,7 @@ const items = [
   { icon: CalendarPlus, title: 'Crea eventos y entradas', text: 'Funciones, precios, preventas y cupos con una frase.' },
   { icon: Tag, title: 'Descuentos al instante', text: 'Códigos para promotores, influencers o última semana.' },
   { icon: LineChart, title: 'Pregunta cómo va', text: 'Ventas, ritmo, conversión y qué canal vende más.' },
-  { icon: Megaphone, title: 'Marketing con IA', text: 'Posts, imágenes y links con seguimiento, listos para publicar.' },
+  { icon: Megaphone, title: 'Marketing con IA', text: 'Publicaciones, imágenes y links con seguimiento, listos para publicar.' },
 ]
 
 const clients = ['Claude Code', 'Cursor', 'VS Code', 'n8n / Zapier']

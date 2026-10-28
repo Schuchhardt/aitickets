@@ -325,8 +325,8 @@ const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('es-CL', { week
               <p class="text-sm text-gray-500">Imagen y texto pensados para vender, con IA.</p>
             </button>
             <button type="button" @click="eventPosts.length && (form.type = 'boost')" :disabled="!eventPosts.length" class="p-4 rounded-lg border text-left transition disabled:opacity-50 disabled:cursor-not-allowed" :class="form.type === 'boost' ? 'border-black bg-gray-50' : 'border-gray-200 hover:border-gray-400'">
-              <p class="font-medium">Promocionar un post</p>
-              <p class="text-sm text-gray-500">{{ eventPosts.length ? 'Usa un post que ya publicaste desde AI Tickets.' : 'Aún no publicas posts de este evento.' }}</p>
+              <p class="font-medium">Promocionar una publicación</p>
+              <p class="text-sm text-gray-500">{{ eventPosts.length ? 'Usa una publicación que ya hiciste desde AI Tickets.' : 'Aún no tienes publicaciones de este evento.' }}</p>
             </button>
           </div>
         </div>
@@ -386,7 +386,7 @@ const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('es-CL', { week
         </template>
 
         <template v-else>
-          <h2 class="text-lg font-semibold">¿Qué post promocionas?</h2>
+          <h2 class="text-lg font-semibold">¿Qué publicación promocionas?</h2>
           <div class="grid gap-2">
             <button
               v-for="p in eventPosts" :key="p.id" type="button" @click="form.socialPostId = p.id"
@@ -508,7 +508,7 @@ const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('es-CL', { week
         <div class="rounded-xl bg-gray-50 border border-gray-200 p-4 text-sm space-y-1">
           <p class="font-semibold mb-2 flex items-center gap-2"><Megaphone :size="16" /> Resumen</p>
           <p><span class="text-gray-500">Evento:</span> {{ event?.title || event?.name }}</p>
-          <p><span class="text-gray-500">Anuncio:</span> {{ form.type === 'boost' ? 'Post promocionado' : form.headline }}</p>
+          <p><span class="text-gray-500">Anuncio:</span> {{ form.type === 'boost' ? 'Publicación promocionada' : form.headline }}</p>
           <p><span class="text-gray-500">Público:</span> {{ audienceLabel }}</p>
           <p><span class="text-gray-500">Presupuesto:</span> {{ money(form.dailyBudget) }} al día × {{ form.days }} días</p>
           <p class="text-base pt-1"><span class="text-gray-500">Gasto máximo:</span> <strong>{{ money(total) }}</strong></p>

@@ -104,7 +104,7 @@ export function marketingWeek(on, times, showDays = [MK_SHOW]) {
     const isShow = showDays.includes(i)
     const state = i < MK_TODAY ? 'past' : i === MK_TODAY ? 'today' : 'future'
     if (on.story && i <= lastShow) slots.push({ kind: 'story', label: 'Historia', time: isShow ? times.eventDay : times.daily, state })
-    if (on.post && i < firstShow) slots.push({ kind: 'post', label: 'Post', time: times.daily, state })
+    if (on.post && i < firstShow) slots.push({ kind: 'post', label: 'Publicación', time: times.daily, state })
     if (on.reel && i === Math.max(0, firstShow - MK_REEL_DAYS)) slots.push({ kind: 'reel', label: 'Reel', time: times.daily, state })
     return { ...day, isToday: i === MK_TODAY, isShow, slots }
   })

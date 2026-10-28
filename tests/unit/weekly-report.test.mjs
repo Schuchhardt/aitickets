@@ -298,7 +298,7 @@ describe('correo', () => {
         insight: 'Instagram trajo dos tercios de las ventas.',
         suggestions: [
           { type: 'channel', title: 'Más historias', body: 'Cuenta regresiva.', trackingUrl: 'https://aitickets.cl/eventos/ai-talks?utm_source=instagram&utm_medium=social&utm_campaign=reporte-semanal', trackingLabel: 'Link con seguimiento para Instagram' },
-          { type: 'content', title: 'Un carrusel', body: 'Con los speakers.', action: { href: 'https://aitickets.cl/dashboard/promote/create?event=10', label: 'Crear el post con IA' } },
+          { type: 'content', title: 'Un carrusel', body: 'Con los speakers.', action: { href: 'https://aitickets.cl/dashboard/promote/create?event=10', label: 'Crear la publicación con IA' } },
           { type: 'ads', title: 'Anuncio chico', body: '$5.000 diarios por 4 días.', trackingUrl: 'https://aitickets.cl/eventos/ai-talks?utm_source=instagram&utm_medium=paid&utm_campaign=reporte-semanal', trackingLabel: 'Link para tus anuncios' },
         ],
       }],

@@ -98,11 +98,11 @@ async function generateText(apiKey: string, eventContext: string, tone?: string)
         output_config: { effort: "low" },
         betas: ["server-side-fallback-2026-07-01"],
         fallbacks: "default",
-        system: `Eres un experto en marketing de eventos y redes sociales. Genera posts promocionales en español de Chile para Instagram y Facebook. ${toneInstruction} Incluye emojis relevantes. Usa como máximo 5 hashtags. El post debe ser conciso pero impactante. No incluyas URLs. Responde solo con el texto del post, sin introducción ni comentarios.`,
+        system: `Eres un experto en marketing de eventos y redes sociales. Genera publicaciones promocionales en español de Chile para Instagram y Facebook. ${toneInstruction} Incluye emojis relevantes. Usa como máximo 5 hashtags. La publicación debe ser concisa pero impactante. No incluyas URLs. Responde solo con el texto de la publicación, sin introducción ni comentarios.`,
         messages: [
             {
                 role: "user",
-                content: `Genera un post promocional para redes sociales basado en este evento:\n\n${eventContext}`,
+                content: `Genera una publicación promocional para redes sociales basado en este evento:\n\n${eventContext}`,
             },
         ],
     });
