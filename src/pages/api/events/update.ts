@@ -3,7 +3,7 @@ import { getSupabaseAdmin, getFriendlyErrorMessage } from "../../../lib/auth-hel
 import { getSessionContext, getOwnedEvent, hasRole, EVENT_MANAGER_ROLES, jsonResponse } from "../../../lib/supabaseServer";
 import { callInternalFunction, notifySlack, siteUrl } from "../_lib/server-utils";
 import { IDENTITY_REQUIRED_MESSAGE, eventRequiresIdentity, identityApproved, loadOrgIdentity, ticketsRequireIdentity } from "../../../lib/producerIdentity";
-import { syncEventCategory, refreshEventDenorm, normalizeTicket, isClientTempId, isValidDateInput, resolveTicketDateId, setEventStatus, EventInputError, saveCoverSettings, savePageSettings, validateFormTicketChain, saveFormTicketChain } from "../_lib/events";
+import { syncEventCategory, refreshEventDenorm, normalizeTicket, isClientTempId, isValidDateInput, resolveTicketDateId, setEventStatus, EventInputError, saveCoverSettings, savePageSettings, validateFormTicketChain, saveFormTicketChain, assertFunctionCount } from "../_lib/events";
 import { sanitizeRichText } from "../../../lib/sanitize";
 import { listOrgVenues, isVenueAllowed, insertOrgVenue } from "../../../lib/orgVenues";
 import { loadSchedule, describeScheduleChange } from "../_lib/eventSchedule";
@@ -96,6 +96,7 @@ export const POST: APIRoute = async (context) => {
             return jsonResponse({ message: "Revisa las entradas: nombre, precio y cantidad deben ser válidos" }, 400);
         }
         try {
+            assertFunctionCount(locations);
             validateFormTicketChain(tickets);
         } catch (err) {
             if (err instanceof EventInputError) return jsonResponse({ message: err.message }, 400);

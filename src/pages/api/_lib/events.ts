@@ -1,4 +1,5 @@
 // Lógica compartida de escritura de eventos (contrato C1).
+import { MAX_FUNCTIONS } from "../../../lib/functionPattern.mjs";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { computeEventRange, formatLocation, slugify, notifySlack } from "./server-utils";
 import { listOrgVenues, isVenueAllowed, insertOrgVenue } from "../../../lib/orgVenues";
@@ -157,6 +158,12 @@ export function isValidDateInput(d: any) {
     return d && DATE_RE.test(d.date || "") && TIME_RE.test(d.startTime || "") && (!d.endTime || TIME_RE.test(d.endTime));
 }
 
+/** Tope de funciones por evento (el mismo de "Repetir" en el formulario y de update_event_functions). */
+export function assertFunctionCount(locations: Array<{ dates?: unknown[] }>) {
+    const total = (locations || []).reduce((n, loc) => n + (Array.isArray(loc?.dates) ? loc.dates.length : 0), 0);
+    if (total > MAX_FUNCTIONS) throw new EventInputError(`Máximo ${MAX_FUNCTIONS} funciones por evento (enviaste ${total}).`);
+}
+
 /**
  * R1: resuelve la función de una entrada. `dateIdMap` traduce ids del formulario (temporales o reales)
  * a ids reales de event_dates de ESTE evento. Cualquier valor desconocido => null (todas las funciones).
@@ -249,6 +256,7 @@ export async function createEventGraph(
         if (!loc.isNewVenue && !loc.venueId) throw new EventInputError("Selecciona un lugar para cada ubicación");
         if (loc.isNewVenue && !String(loc.newVenueName || "").trim()) throw new EventInputError("El nuevo lugar debe tener nombre");
     }
+    assertFunctionCount(locations);
     // Lugares existentes: solo los de la organización o los que ya usan sus eventos
     const { venues: allowedVenues, hasOrgColumn } = await listOrgVenues(supabaseAdmin, actor.orgId);
     if (locations.some((loc) => !loc.isNewVenue && !isVenueAllowed(loc.venueId, allowedVenues))) {
