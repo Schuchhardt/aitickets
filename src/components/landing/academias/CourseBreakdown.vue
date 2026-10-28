@@ -3,8 +3,7 @@
 // muestra, barras por curso (cada curso con su link con seguimiento: las métricas por canal del evento) y dos mini
 // cards. AC8: con movimiento, las barras crecen de scaleX(0) a su valor (900 ms, stagger 90 ms) cuando `active` pasa a
 // true; sin movimiento quedan en su valor. La lista de asistentes es el CSV de órdenes del evento (nombre, correo y
-// el link que trajo cada compra); separarla por función todavía no existe: va con "Pronto".
-import SoonBadge from '../../ui/SoonBadge.vue'
+// el link que trajo cada compra), también de una sola función (/api/events/orders-csv?event_date_id=).
 import { courseScales } from './academiasLanding.js'
 
 const props = defineProps({
@@ -54,7 +53,7 @@ const scales = courseScales(props.dashboard.courses)
         <p class="cb-label">Lista de asistentes</p>
         <p class="cb-action">Descargar <span aria-hidden="true">↓</span></p>
         <p class="cb-note">Con nombre, correo y curso</p>
-        <p class="cb-note cb-soon">Por función <SoonBadge dark /></p>
+        <p class="cb-note" data-testid="academy-by-function">También de una sola función</p>
       </div>
     </div>
   </div>
@@ -165,13 +164,6 @@ const scales = courseScales(props.dashboard.courses)
   font-size: 12px;
   line-height: 16px;
   color: var(--ac-on-ink-2);
-}
-.cb-soon {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  margin-top: 6px;
 }
 @media (min-width: 768px) {
   .cb {

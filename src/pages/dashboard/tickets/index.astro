@@ -5,6 +5,7 @@ import { EVENT_MANAGER_ROLES } from "../../../lib/supabaseServer";
 import { requireDashboardSession } from "../_lib/guard";
 import { getStaffEventIds } from "../../../../netlify/lib/event-staff.mjs";
 import { fetchAll } from "../../../lib/producer-api/tools/common";
+import { formatFunctionLabel } from "../../../../netlify/lib/dates.mjs";
 import {
     Ticket,
     Calendar,
@@ -48,7 +49,13 @@ const { data: currentEvents } = await onlyStaffEvents(supabaseAdmin
       price,
       total_quantity,
       status,
-      is_gift
+      is_gift,
+      event_date_id
+    ),
+    event_dates (
+      id,
+      date,
+      start_time
     )
   `,
     )
@@ -75,7 +82,13 @@ const { data: pastEvents } = await onlyStaffEvents(supabaseAdmin
       price,
       total_quantity,
       status,
-      is_gift
+      is_gift,
+      event_date_id
+    ),
+    event_dates (
+      id,
+      date,
+      start_time
     )
   `,
     )
@@ -94,6 +107,9 @@ type AttendeeRow = {
     purchaseDate: string;
     status: string | null;
     validated: boolean;
+    /** Función del tipo de entrada (event_date_id); null = válida para cualquier función. */
+    functionId: number | null;
+    functionLabel: string | null;
 };
 type TicketStats = {
     /** Entradas vendidas: vigentes, de órdenes pagadas (o gratis sin orden), sin cortesías. */
@@ -110,7 +126,15 @@ type TicketStats = {
  * Entradas de un evento con su listado. Paginado (fetchAll): antes las órdenes pagadas se cortaban en 1000 y las
  * entradas de órdenes posteriores dejaban de contarse.
  */
+/** Funciones del evento en orden, con su etiqueta (solo importan si hay más de una). */
+function eventFunctionList(event: any): { id: number; label: string }[] {
+    return [...(event.event_dates || [])]
+        .sort((a: any, b: any) => `${a.date} ${a.start_time || ""}`.localeCompare(`${b.date} ${b.start_time || ""}`))
+        .map((d: any) => ({ id: Number(d.id), label: formatFunctionLabel(d, { withPlace: false }) }));
+}
+
 async function loadEventTickets(event: any): Promise<{ stats: TicketStats; attendees: AttendeeRow[] }> {
+    const functionLabels = new Map(eventFunctionList(event).map((f) => [f.id, f.label]));
     const [eventAttendeesRows, paidOrders] = await Promise.all([
         fetchAll<any>(() => supabaseAdmin
             .from("event_attendees")
@@ -126,7 +150,8 @@ async function loadEventTickets(event: any): Promise<{ stats: TicketStats; atten
       event_tickets (
         id,
         ticket_name,
-        price
+        price,
+        event_date_id
       ),
       attendees (
         id,
@@ -181,6 +206,13 @@ async function loadEventTickets(event: any): Promise<{ stats: TicketStats; atten
             purchaseDate: a.created_at,
             status: a.status,
             validated: !!a.validated_at,
+            functionId: a.event_tickets?.event_date_id == null ? null : Number(a.event_tickets.event_date_id),
+            functionLabel:
+                functionLabels.size > 1
+                    ? a.event_tickets?.event_date_id == null
+                        ? "Todas las funciones"
+                        : functionLabels.get(Number(a.event_tickets.event_date_id)) || null
+                    : null,
         })),
     };
 }
@@ -503,8 +535,21 @@ function formatDate(dateString: string | null): string {
                                                         {attendees.length})
                                                     </h4>
                                                     <div class="flex items-center gap-2 w-full sm:w-auto">
+                                                    {eventFunctionList(event).length > 1 && (
+                                                        <select
+                                                            class="function-filter py-2 px-2 text-sm border border-gray-200 rounded-lg bg-white max-w-[12rem]"
+                                                            data-event-id={event.id}
+                                                            aria-label="Filtrar por función"
+                                                        >
+                                                            <option value="">Todas las funciones</option>
+                                                            {eventFunctionList(event).map((f) => (
+                                                                <option value={f.id}>{f.label}</option>
+                                                            ))}
+                                                        </select>
+                                                    )}
                                                     <a
                                                         href={`/api/events/orders-csv?event_id=${event.id}`}
+                                                        data-csv-event-id={event.id}
                                                         title="Descarga las órdenes pagadas del evento (CSV compatible con Excel)"
                                                         class="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition whitespace-nowrap"
                                                     >
@@ -557,7 +602,7 @@ function formatDate(dateString: string | null): string {
                                                                         (
                                                                             attendee,
                                                                         ) => (
-                                                                            <tr class="hover:bg-gray-50 transition attendee-row">
+                                                                            <tr class="hover:bg-gray-50 transition attendee-row" data-function={attendee.functionId ?? "all"}>
                                                                                 <td class="px-4 py-3">
                                                                                     <div>
                                                                                         <p class="font-medium text-gray-900 attendee-name">
@@ -586,6 +631,9 @@ function formatDate(dateString: string | null): string {
                                                                                             }
                                                                                         </span>
                                                                                     </span>
+                                                                                    {attendee.functionLabel && (
+                                                                                        <span class="block text-xs text-gray-500 mt-0.5 attendee-function">{attendee.functionLabel}</span>
+                                                                                    )}
                                                                                 </td>
                                                                                 <td class="px-4 py-3">
                                                                                     <span
@@ -862,8 +910,21 @@ function formatDate(dateString: string | null): string {
                                                         {attendees.length})
                                                     </h4>
                                                     <div class="flex items-center gap-2 w-full sm:w-auto">
+                                                    {eventFunctionList(event).length > 1 && (
+                                                        <select
+                                                            class="function-filter py-2 px-2 text-sm border border-gray-200 rounded-lg bg-white max-w-[12rem]"
+                                                            data-event-id={event.id}
+                                                            aria-label="Filtrar por función"
+                                                        >
+                                                            <option value="">Todas las funciones</option>
+                                                            {eventFunctionList(event).map((f) => (
+                                                                <option value={f.id}>{f.label}</option>
+                                                            ))}
+                                                        </select>
+                                                    )}
                                                     <a
                                                         href={`/api/events/orders-csv?event_id=${event.id}`}
+                                                        data-csv-event-id={event.id}
                                                         title="Descarga las órdenes pagadas del evento (CSV compatible con Excel)"
                                                         class="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition whitespace-nowrap"
                                                     >
@@ -916,7 +977,7 @@ function formatDate(dateString: string | null): string {
                                                                         (
                                                                             attendee,
                                                                         ) => (
-                                                                            <tr class="hover:bg-gray-50 transition attendee-row">
+                                                                            <tr class="hover:bg-gray-50 transition attendee-row" data-function={attendee.functionId ?? "all"}>
                                                                                 <td class="px-4 py-3">
                                                                                     <div>
                                                                                         <p class="font-medium text-gray-900 attendee-name">
@@ -945,6 +1006,9 @@ function formatDate(dateString: string | null): string {
                                                                                             }
                                                                                         </span>
                                                                                     </span>
+                                                                                    {attendee.functionLabel && (
+                                                                                        <span class="block text-xs text-gray-500 mt-0.5 attendee-function">{attendee.functionLabel}</span>
+                                                                                    )}
                                                                                 </td>
                                                                                 <td class="px-4 py-3">
                                                                                     <span
@@ -1054,43 +1118,32 @@ function formatDate(dateString: string | null): string {
         });
     });
 
-    // Search functionality
-    document.querySelectorAll(".search-input").forEach((input) => {
-        input.addEventListener("input", (e) => {
-            const target = e.target as HTMLInputElement;
-            const searchTerm = target.value.toLowerCase();
-            const eventId = target.getAttribute("data-event-id");
-            const tbody = document.querySelector(
-                `.attendees-tbody[data-event-id="${eventId}"]`,
-            );
-
-            if (tbody) {
-                tbody.querySelectorAll(".attendee-row").forEach((row) => {
-                    const name =
-                        row
-                            .querySelector(".attendee-name")
-                            ?.textContent?.toLowerCase() || "";
-                    const email =
-                        row
-                            .querySelector(".attendee-email")
-                            ?.textContent?.toLowerCase() || "";
-                    const ticket =
-                        row
-                            .querySelector(".attendee-ticket")
-                            ?.textContent?.toLowerCase() || "";
-
-                    if (
-                        name.includes(searchTerm) ||
-                        email.includes(searchTerm) ||
-                        ticket.includes(searchTerm)
-                    ) {
-                        (row as HTMLElement).style.display = "";
-                    } else {
-                        (row as HTMLElement).style.display = "none";
-                    }
-                });
-            }
+    // Búsqueda y filtro por función (las entradas válidas para cualquier función aparecen en todas). El CSV
+    // descarga solo la función elegida (/api/events/orders-csv?event_date_id=).
+    function applyFilters(eventId: string | null) {
+        if (!eventId) return;
+        const search = document.querySelector<HTMLInputElement>(`.search-input[data-event-id="${eventId}"]`);
+        const fnSelect = document.querySelector<HTMLSelectElement>(`.function-filter[data-event-id="${eventId}"]`);
+        const searchTerm = (search?.value || "").toLowerCase();
+        const fn = fnSelect?.value || "";
+        const tbody = document.querySelector(`.attendees-tbody[data-event-id="${eventId}"]`);
+        tbody?.querySelectorAll<HTMLElement>(".attendee-row").forEach((row) => {
+            const text = [".attendee-name", ".attendee-email", ".attendee-ticket"]
+                .map((sel) => row.querySelector(sel)?.textContent?.toLowerCase() || "")
+                .join(" ");
+            const rowFn = row.dataset.function || "all";
+            const matches = text.includes(searchTerm) && (!fn || rowFn === fn || rowFn === "all");
+            row.style.display = matches ? "" : "none";
         });
+        const csv = document.querySelector<HTMLAnchorElement>(`[data-csv-event-id="${eventId}"]`);
+        if (csv) csv.href = `/api/events/orders-csv?event_id=${eventId}${fn ? `&event_date_id=${fn}` : ""}`;
+    }
+
+    document.querySelectorAll(".search-input").forEach((input) => {
+        input.addEventListener("input", () => applyFilters(input.getAttribute("data-event-id")));
+    });
+    document.querySelectorAll(".function-filter").forEach((select) => {
+        select.addEventListener("change", () => applyFilters(select.getAttribute("data-event-id")));
     });
 </script>
 

@@ -40,8 +40,9 @@ test("el comparador arranca en Antes y pasa solo a Con AI Tickets una vez", asyn
   await expect(compare).toHaveAttribute("data-mode", "after", { timeout: 6000 });
   await expect(page.getByTestId("academy-compare-after")).toHaveAttribute("aria-checked", "true");
   await expect(page.getByTestId("academy-compare-list")).toContainText("Un link en el grupo, y listo");
-  // La lista de asistentes por función todavía no existe
-  await expect(page.locator("#ac-compare-body").getByTestId("soon-badge")).toHaveText("Pronto");
+  // La lista de asistentes por función ya existe: sin "Pronto"
+  await expect(page.locator("#ac-compare-body").getByTestId("soon-badge")).toHaveCount(0);
+  await expect(page.getByTestId("academy-by-function")).toHaveText("También de una sola función");
 });
 
 test("si la persona elige antes, el comparador no cambia solo", async ({ page }) => {

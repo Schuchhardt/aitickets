@@ -8,9 +8,11 @@ import {
     channelConversion,
     dailySeries,
     eventCapacity,
+    loadEventFunctions,
     loadEventVisits,
     loadOrderCheckins,
     loadPaidOrders,
+    salesByFunction,
     summarizeSales,
     summarizeTraffic,
 } from "../../eventAnalytics";
@@ -30,11 +32,12 @@ export async function eventPerformance(ctx: ToolContext, eventId: number, days: 
     const event = await loadOwnedEvent<any>(ctx, eventId, "id, name, slug, status, start_date, end_date");
     const now = new Date();
 
-    const [orders, { visits, truncated, refTracked }, { count: refunded }, capacity] = await Promise.all([
+    const [orders, { visits, truncated, refTracked }, { count: refunded }, capacity, { functions, ticketFunction }] = await Promise.all([
         loadPaidOrders(ctx.supabase, event.id),
         loadEventVisits(ctx.supabase, event.id),
         ctx.supabase.from("event_orders").select("id", { count: "exact", head: true }).eq("event_id", event.id).eq("status", "refunded"),
         eventCapacity(ctx.supabase, event),
+        loadEventFunctions(ctx.supabase, event.id),
     ]);
 
     // Ventas: sin cortesías ni transferencias (src/lib/orderKinds.ts). Las entradas transferidas siguen contando
@@ -97,6 +100,8 @@ export async function eventPerformance(ctx: ToolContext, eventId: number, days: 
         },
         ticket_types: capacity.ticketTypes,
         sales_by_ticket_type: s.byType.slice(0, 30),
+        // Solo con más de una función: órdenes, entradas e ingresos de cada una (una orden con dos funciones cuenta en ambas)
+        ...(functions.length > 1 ? { sales_by_function: salesByFunction(sales, functions, ticketFunction) } : {}),
         sales_channels: s.channels.slice(0, 10),
         channel_conversion: channelConversion(visits, sales, { refTracked, top: 10, checkins }),
         sales_by_payment_provider: s.providers,
@@ -110,7 +115,7 @@ const getEventPerformance: ToolDef = {
     title: "Rendimiento del evento",
     description:
         "¿Cómo le va al evento? Ventas, ingresos, capacidad vendida, ritmo de venta (últimos 7 días vs anteriores y proyección), " +
-        "visitas, conversión, fuentes de tráfico, ubicación de visitantes, horas pico, canales de venta (ref/UTM) con su conversión y cuántas de sus entradas ya ingresaron (checked_in), " +
+        "ventas por función (si tiene varias), visitas, conversión, fuentes de tráfico, ubicación de visitantes, horas pico, canales de venta (ref/UTM) con su conversión y cuántas de sus entradas ya ingresaron (checked_in), " +
             "medios de pago, códigos usados y serie diaria. " +
         "Ideal para diagnosticar y recomendar acciones (subir precio, crear descuento, reforzar un canal).",
     scope: "read",
