@@ -10,14 +10,14 @@ import {
 import { isCourtesyOrder, isTransferOrder, orderSoldQty } from "../../orderKinds";
 import { createPreviewLink, listPreviewLinks, revokePreviewLink, PreviewLinkError, PREVIEW_DEFAULT_HOURS } from "../../eventPreview";
 import { createEventGraph, setEventStatus, syncEventCategory, refreshEventDenorm, EventInputError, type EventGraphInput } from "../../../pages/api/_lib/events";
-import { loadSecretLocation, saveSecretLocation, MAX_REVEAL_HOURS, SECRET_LOCATION_MAX } from "../../../../netlify/lib/secret-location.mjs";
+import { loadSecretLocation, saveSecretLocation, MAX_REVEAL_HOURS, SECRET_LOCATION_MAX, DEFAULT_REVEAL_HOURS } from "../../../../netlify/lib/secret-location.mjs";
 import { listOrgVenues } from "../../orgVenues";
 import { sanitizeRichText } from "../../sanitize";
 import { changeEventSlug, EventSlugError, SLUG_MAX, SLUG_MIN } from "../../eventSlug";
 import { EVENT_PAGE_BACKGROUNDS, EVENT_PAGE_LAYOUTS, isDefaultPageSettings, normalizePageSettings, type EventPageSettings } from "../../eventPageSettings";
 import { normalizeEventVideo } from "../../eventVideo";
 import { notifySlack, dedupeLocation } from "../../../pages/api/_lib/server-utils";
-import { normalizeCheckoutFields, isDefaultCheckoutFields, ATTENDEE_NAME_MODES, QUESTION_TYPES, MAX_QUESTIONS, MAX_OPTIONS, MAX_LABEL } from "../../checkoutFields.mjs";
+import { normalizeCheckoutFields, isDefaultCheckoutFields, ATTENDEE_NAME_MODES, HOLDER_MODES, QUESTION_SCOPES, QUESTION_TYPES, MAX_QUESTIONS, MAX_OPTIONS, MAX_LABEL } from "../../checkoutFields.mjs";
 import { loadPeoplePerTicket } from "../../../../netlify/lib/tickets.mjs";
 
 const EVENT_LIST_COLUMNS = "id, name, slug, status, accessibility, start_date, end_date, location, image_url, created_at";
@@ -146,7 +146,8 @@ const getEvent: ToolDef = {
     description:
         "Detalle completo de un evento: estado (publicado o borrador), descripción, funciones (fechas/horas), lugares, tipos de entrada " +
         "con precio, capacidad, vendidas, disponibles y personas por entrada (people_per_ticket > 1 = mesa para N, un QR por persona), " +
-        "checkout_fields (qué pide el checkout además del nombre y correo: asistentes por entrada, datos de empresa y preguntas al inscribirse) " +
+        "checkout_fields (qué pide el checkout además del nombre y correo: asistentes por entrada, quién completa los datos de cada persona, " +
+        "datos de empresa y preguntas al inscribirse, cada una por compra o por persona) " +
         "y links privados de vista previa. Si is_published es false, el link público " +
         "NO funciona todavía: comparte un link de vista previa (create_preview_link).",
     scope: "read",
@@ -385,14 +386,19 @@ const updateEvent: ToolDef = {
         "slug cambia el link público (/eventos/<slug>); cambiar el nombre NO cambia el slug. Si el evento está publicado o ya tiene registrados " +
         "(órdenes pagadas, entradas o invitados), el link anterior queda redirigiendo (301) al nuevo, así no se rompen los links ya " +
         "compartidos ni los QR; en un borrador sin registrados, el link anterior se libera. " +
-        "private_address: dirección que solo ven quienes compran (la página pública, el mapa y los listados muestran el lugar y la comuna, " +
-        "sin la calle); va en la orden, la entrada, el correo y el recordatorio. private_address_reveal_hours la revela N horas antes de la " +
-        "función (se manda por correo a esa hora); null = apenas compran. private_address null o \"\" la quita. " +
+        "private_address: dirección que solo ven quienes compran (la página pública, el mapa y los listados dicen \"Lugar secreto\" y la comuna, " +
+        "sin el nombre del lugar ni la calle); va en la orden, la entrada, el correo y el recordatorio desde que se revela. " +
+        "private_address_reveal_hours: 0 = el día de la función (a las 9:00; es lo que se usa si no lo indicas al poner una dirección nueva), " +
+        "N = N horas antes, null = apenas compran; se manda por correo a esa hora. private_address null o \"\" la quita. " +
         "Fechas y horarios de las funciones se cambian con update_event_functions (avisa a los asistentes); el lugar, desde el panel o " +
         "update_venue. Para entradas usa las herramientas de ticket_type. Para un video de portada (en vez de la imagen) usa set_event_video. " +
         "checkout_fields cambia lo que pide el checkout además del nombre y correo de quien compra: attendee_names (nombre y correo de cada " +
-        "asistente en compras de varias entradas; cada QR llega a su correo), company (RUT y razón social opcionales; el comprobante NO es " +
-        "boleta ni factura) y questions (preguntas al inscribirse; reemplaza la lista completa). Solo cambia las claves enviadas.",
+        "asistente en compras de varias entradas; cada QR llega a su correo), holders (quién completa los datos de cada persona en compras de " +
+        "varias entradas: buyer = quien compra en el checkout; invite = quien compra solo escribe el correo de cada invitado y cada uno " +
+        "completa su nombre y sus respuestas desde el correo de su entrada; el QR sirve igual mientras tanto y list_attendees muestra " +
+        "data_pending), company (RUT y razón social opcionales; el comprobante NO es boleta ni factura) y questions (preguntas al " +
+        "inscribirse, cada una per order = una vez por compra o per attendee = una vez por persona; reemplaza la lista completa). " +
+        "Solo cambia las claves enviadas.",
     scope: "write",
     audit: (args, result) => ({ summary: `Editó ${((result as any).updated || []).join(", ") || "el evento"}`, target: `event:${args.event_id}` }),
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
@@ -427,10 +433,10 @@ const updateEvent: ToolDef = {
             },
             private_address_reveal_hours: {
                 type: "integer",
-                minimum: 1,
+                minimum: 0,
                 maximum: MAX_REVEAL_HOURS,
                 nullable: true,
-                description: "Horas antes de la función en que se revela private_address (se manda por correo a esa hora). null = apenas compran.",
+                description: "Cuándo se revela private_address (se manda por correo a esa hora): 0 = el día de la función, N = N horas antes, null = apenas compran.",
             },
             page_background: {
                 type: "string",
@@ -447,11 +453,19 @@ const updateEvent: ToolDef = {
                         enum: ATTENDEE_NAME_MODES,
                         description: "off = no se piden; optional = se piden y se pueden dejar en blanco; required = nombre obligatorio de cada asistente.",
                     },
+                    holders: {
+                        type: "string",
+                        enum: HOLDER_MODES,
+                        description:
+                            "Quién completa los datos de cada persona (nombre y preguntas per attendee) cuando se compra más de una entrada: " +
+                            "buyer = quien compra, en el checkout; invite = cada invitado desde su correo (quien compra solo escribe su correo). " +
+                            "Quien compra siempre completa los suyos al comprar.",
+                    },
                     company: { type: "boolean", description: "Ofrecer RUT y razón social de la empresa (opcionales, solo compras pagadas)." },
                     questions: {
                         type: "array",
                         maxItems: MAX_QUESTIONS,
-                        description: "Preguntas al inscribirse (una vez por compra, también en eventos gratis). Reemplaza la lista completa; [] = sin preguntas.",
+                        description: "Preguntas al inscribirse (también en eventos gratis). Reemplaza la lista completa; [] = sin preguntas.",
                         items: {
                             type: "object",
                             required: ["label", "type"],
@@ -462,6 +476,12 @@ const updateEvent: ToolDef = {
                                 type: { type: "string", enum: QUESTION_TYPES, description: "text = texto corto; choice = elegir una opción; yes_no = sí o no." },
                                 options: { type: "array", maxItems: MAX_OPTIONS, items: { type: "string", maxLength: 60 }, description: "Solo choice: 2 o más opciones." },
                                 required: { type: "boolean", default: false },
+                                per: {
+                                    type: "string",
+                                    enum: QUESTION_SCOPES,
+                                    default: "order",
+                                    description: "order = una respuesta por compra; attendee = una por persona (cada QR), p. ej. talla o restricción alimentaria.",
+                                },
                             },
                         },
                     },
@@ -542,11 +562,13 @@ const updateEvent: ToolDef = {
             const current = await loadSecretLocation(ctx.supabase, Number(event.id));
             const address = args.private_address !== undefined ? args.private_address : current.address;
             if (!address && args.private_address === undefined) throw new ToolError("invalid_input", "El evento no tiene dirección privada: envía private_address.");
+            // Una dirección nueva sin indicar cuándo se revela: el día del evento
+            const revealHours = args.private_address_reveal_hours !== undefined ? args.private_address_reveal_hours : current.address ? undefined : DEFAULT_REVEAL_HOURS;
             const { revealSaved } = await saveSecretLocation(ctx.supabase, Number(event.id), {
                 address: args.private_address,
-                revealHours: address ? (args.private_address_reveal_hours !== undefined ? args.private_address_reveal_hours : undefined) : null,
+                revealHours: address ? revealHours : null,
             });
-            if (!revealSaved) warnings.push("Revelar la dirección horas antes estará disponible después del próximo deploy: por ahora la ven apenas compran.");
+            if (!revealSaved) warnings.push("Elegir cuándo se revela la dirección estará disponible después del próximo deploy: por ahora la ven apenas compran.");
             await refreshEventDenorm(Number(event.id));
             secret = await loadSecretLocation(ctx.supabase, Number(event.id));
         }

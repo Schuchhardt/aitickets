@@ -22,6 +22,9 @@ export const PLATFORM_RULES: Record<SocialPlatform, { name: string; maxChars: nu
 
 export const platformName = (p: string) => (isSocialPlatform(p) ? PLATFORM_RULES[p].name : p);
 
+/** Plantillas de reel (9:16) en Canva: AI Tickets no genera video, el productor lo arma ahí y lo sube como video del evento. */
+export const CANVA_REEL_URL = "https://www.canva.com/create/instagram-reels/";
+
 /** Lo que impide publicar un post en esas redes (texto e imágenes), o null si está bien. */
 export function postMediaProblem(platforms: string[], imageCount: number, contentLength: number): string | null {
     for (const p of platforms) {

@@ -22,6 +22,7 @@ import { resolveCoverMeta, eventThemeFrom } from "./eventCoverMeta";
 import { normalizePageSettings, stripDemoSuffix } from "./eventPageSettings";
 import { computeFeeSplit } from "../../netlify/lib/fees.mjs";
 import { normalizeReviewSettings } from "../../netlify/lib/reviews.mjs";
+import { SECRET_PLACE_NAME } from "../../netlify/lib/secret-location.mjs";
 import { maxPerPurchase, loadTicketChain, waitingOnPrevious, loadPeoplePerTicket } from "../../netlify/lib/tickets.mjs";
 import { normalizeCheckoutFields } from "./checkoutFields.mjs";
 import { clientIpFrom } from "./sites";
@@ -507,9 +508,10 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
   const permit = trust.is_massive === true ? { status: trust.permit_status === "approved" ? "approved" : "pending" } : null;
 
   const hasSecretLocation = raw.hasSecretLocation;
-  // Dirección que solo ven quienes compran: el recinto público queda sin calle ni coordenadas (nombre y comuna)
+  // Dirección que solo ven quienes compran: el recinto público queda como "Lugar secreto" y su comuna, sin nombre (un
+  // lugar conocido delata la dirección), calle ni coordenadas
   const publicVenue = (venue: ReturnType<typeof buildVenue>) =>
-    venue && hasSecretLocation ? { ...venue, address: null, postal_code: null, latitude: null, longitude: null } : venue;
+    venue && hasSecretLocation ? { ...venue, name: SECRET_PLACE_NAME, address: null, postal_code: null, latitude: null, longitude: null } : venue;
 
   // Entradas (C2): a la venta = available, no regalo, dentro de la ventana (NULL = abierta)
   const allTickets: any[] = raw.tickets;
@@ -595,11 +597,9 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
   const primaryVenue = dates.find((d) => d.venue)?.venue || null;
   const eventTimezone = primaryVenue?.timezone || DEFAULT_EVENT_TIMEZONE;
 
-  // Con dirección privada, nunca events.location (puede venir de antes, con la calle): nombre y comuna del recinto
+  // Con dirección privada, nunca events.location (puede venir de antes, con la calle): "Lugar secreto" y la comuna
   const location = hasSecretLocation
-    ? primaryVenue
-      ? [primaryVenue.name, primaryVenue.city].filter(Boolean).join(", ")
-      : ""
+    ? [SECRET_PLACE_NAME, primaryVenue?.city].filter(Boolean).join(", ")
     : event.location || (primaryVenue ? [primaryVenue.name, primaryVenue.address, primaryVenue.city].filter(Boolean).join(", ") : "");
 
   // Tickets asignados a una función que ya no existe (o ya pasó y fue borrada) => tratarlos como "cualquier función"

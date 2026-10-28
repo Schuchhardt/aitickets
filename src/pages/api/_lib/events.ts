@@ -11,7 +11,7 @@ import { refreshEventRisk } from "../../../lib/eventRisk";
 import { chainError } from "../../../../netlify/lib/tickets.mjs";
 import { normalizeCheckoutFields, isDefaultCheckoutFields, normalizePeoplePerTicket } from "../../../lib/checkoutFields.mjs";
 import { normalizeEntryUntil } from "../../../lib/entryDeadline.mjs";
-import { hasSecretLocation, saveSecretLocation } from "../../../../netlify/lib/secret-location.mjs";
+import { hasSecretLocation, saveSecretLocation, SECRET_PLACE_NAME } from "../../../../netlify/lib/secret-location.mjs";
 
 /** Guarda la categoría del evento vía category_tags(name) + event_tags (reemplaza las anteriores). */
 export async function syncEventCategory(eventId: number, category: string | null | undefined) {
@@ -44,7 +44,7 @@ export async function syncEventCategory(eventId: number, category: string | null
 /**
  * Recalcula los campos denormalizados en `events` (start_date, end_date, location) a partir de
  * event_dates + event_locations/venues. Devuelve los valores calculados. Con dirección privada
- * (secret_location), location queda sin la calle: la leen los listados y sitios públicos.
+ * (secret_location), location queda como "Lugar secreto, comuna": la leen los listados y sitios públicos.
  */
 export async function refreshEventDenorm(eventId: number) {
     const supabase = getSupabaseAdmin();
@@ -66,7 +66,7 @@ export async function refreshEventDenorm(eventId: number) {
 
     const firstVenue: any = (locations || [])[0]?.venues;
     const venue = Array.isArray(firstVenue) ? firstVenue[0] : firstVenue;
-    const location = formatLocation(venue ? { name: venue.name, address: secret ? null : venue.address_line1, city: venue.city } : null);
+    const location = formatLocation(venue ? { name: secret ? SECRET_PLACE_NAME : venue.name, address: secret ? null : venue.address_line1, city: venue.city } : null);
 
     const { error } = await supabase
         .from("events")

@@ -7,6 +7,7 @@
 // { video, image_url } (con kind cover, si el evento no tenía imagen, el póster pasa a ser su imagen).
 import { onMounted, ref } from 'vue'
 import { Film, Trash2 } from 'lucide-vue-next'
+import { CANVA_REEL_URL } from '../../lib/socialPlatforms'
 
 const props = defineProps({
   eventId: { type: Number, required: true },
@@ -205,6 +206,11 @@ onMounted(load)
       <div class="min-w-0">
         <p class="font-semibold text-sm flex items-center gap-1.5"><Film size="16" /> {{ title || (kind === 'cover' ? 'Video de portada' : 'Video de la galería') }}</p>
         <p v-if="hint" class="text-xs text-gray-500 mt-0.5">{{ hint }}</p>
+        <p class="text-xs text-gray-500 mt-0.5">
+          ¿No tienes video? Arma uno vertical en
+          <a :href="CANVA_REEL_URL" target="_blank" rel="noopener" class="underline" data-track="Hacer video en Canva">Canva</a>
+          con el afiche (tiene plantillas gratis de reel), descárgalo en MP4 y súbelo aquí. También sirve para el reel de la difusión automática.
+        </p>
       </div>
       <div v-if="video && available" class="flex gap-2">
         <button type="button" :disabled="!!busy" @click="input?.click()"

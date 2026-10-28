@@ -53,12 +53,21 @@ describe('update_event: checkout_fields', () => {
     expect(r.result.updated).toContain('checkout_fields')
     expect(db.tables.events[0].checkout_fields).toEqual({
       attendee_names: 'required',
+      holders: 'buyer',
       company: false,
-      questions: [{ id: 'q1', label: 'Talla', type: 'choice', required: true, options: ['S', 'M'] }],
+      questions: [{ id: 'q1', label: 'Talla', type: 'choice', required: true, per: 'order', options: ['S', 'M'] }],
     })
     const again = await runTool(tool('update_event'), { event_id: 10, checkout_fields: { company: true } }, ctx())
     expect(again.ok).toBe(true)
     expect(db.tables.events[0].checkout_fields).toMatchObject({ attendee_names: 'required', company: true, questions: [{ label: 'Talla' }] })
+  })
+
+  it('acepta quién completa los datos (holders) y preguntas por persona (per)', async () => {
+    const r = await runTool(tool('update_event'), { event_id: 10, checkout_fields: { holders: 'invite', questions: [{ label: 'Talla', type: 'text', per: 'attendee', required: true }, { label: 'Factura', type: 'text' }] } }, ctx())
+    expect(r.ok).toBe(true)
+    expect(db.tables.events[0].checkout_fields).toMatchObject({ holders: 'invite', questions: [{ label: 'Talla', per: 'attendee', required: true }, { label: 'Factura', per: 'order' }] })
+    const bad = await runTool(tool('update_event'), { event_id: 10, checkout_fields: { holders: 'nadie' } }, ctx())
+    expect(bad.ok).toBe(false)
   })
 
   it('una pregunta de opciones sin 2 opciones se rechaza sin guardar', async () => {
@@ -105,5 +114,40 @@ describe('list_attendees y list_orders', () => {
     const r = await runTool(tool('list_orders'), { event_id: 10 }, ctx())
     expect(r.ok).toBe(true)
     expect(r.result.orders[0]).toMatchObject({ company: { name: 'Acme SpA', rut: '77.893.286-5' }, answers: [{ question: '¿Alergias?', answer: 'Maní' }] })
+  })
+})
+
+describe('respuestas por persona y datos pendientes', () => {
+  const FIELDS = { attendee_names: 'required', holders: 'invite', questions: [{ id: 'talla', label: 'Talla', type: 'text', required: true, per: 'attendee' }] }
+
+  it('list_attendees: attendee_answers de cada persona, data_pending del invitado que no completó y filtro data_pending', async () => {
+    db.tables.events[0].checkout_fields = FIELDS
+    db.tables.event_attendees[0].registration_answers = [{ id: 'talla', question: 'Talla', answer: 'M' }]
+    db.tables.event_attendees[1].holder_name = null
+    const r = await runTool(tool('list_attendees'), { event_id: 10 }, ctx())
+    expect(r.ok).toBe(true)
+    const [bea, ana] = r.result.attendees
+    expect(bea.attendee_answers).toEqual([{ question: 'Talla', answer: 'M' }])
+    expect(bea.data_pending).toBeUndefined()
+    expect(ana.data_pending).toEqual(['Nombre', 'Talla'])
+    const pending = await runTool(tool('list_attendees'), { event_id: 10, data_pending: true }, ctx())
+    expect(pending.result.attendees.map((a) => a.ticket_id)).toEqual([T2])
+    const done = await runTool(tool('list_attendees'), { event_id: 10, data_pending: false }, ctx())
+    expect(done.result.attendees.map((a) => a.ticket_id)).toEqual([T1])
+  })
+
+  it('get_order: cada entrada trae sus respuestas y lo que le falta', async () => {
+    const { postsaleTools } = await import('../../src/lib/producer-api/tools/postsale.ts')
+    db.tables.events[0].checkout_fields = FIELDS
+    db.tables.event_attendees[1].registration_answers = [{ id: 'talla', question: 'Talla', answer: 'L' }]
+    db.tables.event_attendees[1].holder_name = null
+    db.tables.aitickets_refunds = []
+    db.tables.aitickets_email_log = []
+    const r = await runTool(postsaleTools.find((t) => t.name === 'get_order'), { order_id: O1 }, ctx())
+    expect(r.ok).toBe(true)
+    const tickets = r.result.orders[0].tickets
+    expect(tickets[1]).toMatchObject({ attendee_answers: [{ question: 'Talla', answer: 'L' }], data_pending: ['Nombre'] })
+    // La entrada de quien compra no pide nombre; le falta su talla
+    expect(tickets[0].data_pending).toEqual(['Talla'])
   })
 })

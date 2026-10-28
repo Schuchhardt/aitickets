@@ -44,6 +44,7 @@ import { longDateLabel, renderPiece, type BaseImageOptions, type PieceData } fro
 import { normalizeCoverSettings } from "./eventCover";
 import { normalizeEventVideo } from "./eventVideo";
 import { tiktokSettings, tiktokTitle } from "./socialPlatforms";
+import { SECRET_PLACE_NAME } from "../../netlify/lib/secret-location.mjs";
 import { zernioRequest, ZernioError } from "../../netlify/lib/zernio-ads.mjs";
 import { sendEmail } from "../../netlify/lib/mailer.mjs";
 import { escapeHtml } from "../../netlify/lib/supabase.mjs";
@@ -92,7 +93,7 @@ export class SeriesError extends Error {
 // ---------------------------------------------------------------------------
 
 export const SERIES_EVENT_SELECT =
-    "id, name, title, slug, status, organization_id, description, start_date, end_date, image_url, cover_video, gallery_video, cover_settings, cancelled_at, archived_at, location, " +
+    "id, name, title, slug, status, organization_id, description, start_date, end_date, image_url, cover_video, gallery_video, cover_settings, cancelled_at, archived_at, location, secret_location, " +
     "event_dates(date, start_time, end_time), event_locations(venues(name, city))";
 
 export async function loadSeriesEvent(supabase: any, eventId: number): Promise<any | null> {
@@ -268,7 +269,9 @@ export async function ticketState(supabase: any, event: { id: number; status?: s
 
 /** Fecha, hora y lugar de la función hacia la que cuenta la serie. */
 export function eventLabels(event: any, anchor: Date) {
-    const venue = event.event_locations?.[0]?.venues?.name || (event.location ? String(event.location).split(",")[0].trim() : null);
+    // Dirección que solo ven quienes compran: las piezas dicen "Lugar secreto" (el nombre del recinto la delata)
+    const secret = typeof event.secret_location === "string" && event.secret_location.trim() !== "";
+    const venue = secret ? SECRET_PLACE_NAME : event.event_locations?.[0]?.venues?.name || (event.location ? String(event.location).split(",")[0].trim() : null);
     const hhmm = new Intl.DateTimeFormat("es-CL", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(anchor);
     return { name: String(event.title || event.name || "Evento"), dateLabel: longDateLabel(localDay(anchor)), startTime: hhmm, venue: venue || null };
 }

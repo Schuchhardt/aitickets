@@ -4,7 +4,9 @@
 // Cada intento (también los reenvíos con force) queda en aitickets_email_log con el id de Resend o el error;
 // el webhook de Resend (/api/webhooks/resend) completa la entrega, el rebote o la queja.
 // Asistentes por QR (event_attendees.holder_email, migración 202610300100): quien compra recibe todas las entradas
-// y, en el primer envío, cada asistente con correo distinto recibe la suya (renderHolderTicketEmail).
+// y, en el primer envío, cada asistente con correo distinto recibe la suya (renderHolderTicketEmail). Si el evento le pide
+// datos que no tiene (nombre o preguntas por persona, src/lib/checkoutFields.mjs), su correo le pide completarlos en
+// /ticket/<id>.
 // Mesa para N (unit_id, migración 202610300110): el comprobante cuenta mesas, no QR.
 import { getSupabaseAdmin } from './supabase.mjs'
 import { sendEmail, SITE_URL, formatRecipient, isValidEmail } from './mailer.mjs'
@@ -15,6 +17,7 @@ import { orderDiscount } from './discounts.mjs'
 import { greetingName } from './buyer-name.mjs'
 import { logEmailAttempt } from './email-log.mjs'
 import { orderKind } from './order-kind.mjs'
+import { missingAttendeeData } from '../../src/lib/checkoutFields.mjs'
 import {
   EVENT_DATE_COLUMNS,
   zonedDateTimeToUtc,
@@ -182,7 +185,7 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
       .or('status.is.null,status.neq.cancelled')
     let attendeeRows = null
     let attendeesError = null
-    for (const extra of [' holder_name, holder_email, unit_id, seat_number,', ' holder_name, holder_email,', '']) {
+    for (const extra of [' holder_name, holder_email, unit_id, seat_number, registration_answers,', ' holder_name, holder_email, unit_id, seat_number,', ' holder_name, holder_email,', '']) {
       ;({ data: attendeeRows, error: attendeesError } = await selectAttendees(extra))
       if (!attendeesError || !['42703', 'PGRST204'].includes(String(attendeesError.code || ''))) break
     }
@@ -383,6 +386,12 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
       const buyerEmail = String(buyer.email).toLowerCase()
       const own = attendeeRows.filter(r => r.holder_email && isValidEmail(r.holder_email) && String(r.holder_email).toLowerCase() !== buyerEmail)
       const buyerName = `${buyer.first_name || ''} ${buyer.last_name || ''}`.trim()
+      // Qué pide el evento de cada persona (sin la columna o sin configuración: nada que completar)
+      let checkoutFields = null
+      if (own.length) {
+        const { data: cfg, error: cfgError } = await supabase.from('events').select('checkout_fields').eq('id', event.id).maybeSingle()
+        if (!cfgError) checkoutFields = cfg?.checkout_fields ?? null
+      }
       for (const row of own) {
         try {
           const fnId = row.event_tickets?.event_date_id
@@ -400,6 +409,7 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
             secretLocation: event.secret_location || '',
             qrCid: 'qr-entrada',
             ticketUrl,
+            toComplete: missingAttendeeData(checkoutFields, row, { buyerEmail }),
           })
           const sentHolder = await sendEmail({
             to: formatRecipient(row.holder_name || '', row.holder_email),

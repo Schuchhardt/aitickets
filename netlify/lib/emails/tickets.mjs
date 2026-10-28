@@ -255,16 +255,19 @@ export async function renderTicketsEmail(data = {}) {
 /**
  * Entrada de un asistente de una compra de varias (event_attendees.holder_email): su QR, cuándo y dónde, y el link a
  * su entrada (/ticket/<id>). Sin montos: quien compró recibe el comprobante.
+ * toComplete: lo que el evento le pide y aún no tiene ('Nombre' o el texto de cada pregunta por persona). Si viene, el
+ * correo le pide completarlo en su entrada (el QR sirve igual).
  * @param {{ holderName?: string, buyerName?: string, organizerName?: string, eventName?: string, ticketName?: string,
  *   functionLabel?: string, dateLines?: Array<{ date: string, time?: string, place?: string }>, secretLocation?: string,
- *   qrCid: string, ticketUrl: string }} data
+ *   qrCid: string, ticketUrl: string, toComplete?: string[] }} data
  */
 export async function renderHolderTicketEmail(data = {}) {
   const holderName = str(data.holderName).trim() || 'asistente'
   const eventName = str(data.eventName).trim() || 'Tu evento'
   const buyerName = str(data.buyerName).trim()
   const dateLines = Array.isArray(data.dateLines) ? data.dateLines : []
-  const subject = `🎟️ Tu entrada para ${eventName}`
+  const toComplete = (Array.isArray(data.toComplete) ? data.toComplete : []).map((x) => str(x).trim()).filter(Boolean)
+  const subject = toComplete.length ? `🎟️ Tu entrada para ${eventName}: completa tus datos` : `🎟️ Tu entrada para ${eventName}`
   const element = h(
     EmailLayout,
     {
@@ -275,8 +278,16 @@ export async function renderHolderTicketEmail(data = {}) {
     h(Title, null, `¡Hola ${holderName}! Esta es tu entrada`),
     h(Subtitle, null, eventName),
     buyerName ? h(Paragraph, { align: 'center', muted: true }, `${buyerName} compró las entradas y te anotó como asistente.`) : null,
+    toComplete.length
+      ? h(
+          Panel,
+          { label: 'Completa tus datos', tone: 'warn' },
+          h(Paragraph, { style: { margin: '0 0 8px' } }, `La productora pide estos datos de cada asistente: ${toComplete.join(', ')}.`),
+          h(Paragraph, { small: true, style: { margin: 0 } }, 'Complétalos en tu entrada, con el botón de abajo. Tu QR sirve igual mientras tanto.')
+        )
+      : null,
     h(QrTickets, { qrTickets: [{ cid: data.qrCid, index: 1, total: 1, label: str(data.ticketName) || 'Entrada', functionLabel: str(data.functionLabel) }], moreCount: 0 }),
-    h(PrimaryButton, { href: data.ticketUrl, hint: 'Muestra el QR en la puerta. Es solo para ti: cada entrada se valida una vez.' }, 'Ver mi entrada (QR)'),
+    h(PrimaryButton, { href: data.ticketUrl, hint: 'Muestra el QR en la puerta. Es solo para ti: cada entrada se valida una vez.' }, toComplete.length ? 'Completar mis datos y ver mi entrada' : 'Ver mi entrada (QR)'),
     h(Panel, { label: 'Cuándo y dónde' }, h(DateRows, { dateLines })),
     data.secretLocation
       ? h(Panel, { label: 'Dirección exclusiva para asistentes', tone: 'warn' }, h(Paragraph, { style: { margin: 0 } }, str(data.secretLocation)))
