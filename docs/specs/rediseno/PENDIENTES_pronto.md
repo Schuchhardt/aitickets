@@ -32,7 +32,7 @@ Estado al 27-10-2026, rama `rediseno/aitickets`.
 | 2 | Segmentar anuncios por intereses o profesión | Stand-up, música, clubs, fiestas, seminarios | P2 | M |
 | 3 | ~~Aviso automático a la lista de espera y verla en el panel~~ **Hecho** | Música, fiestas, talleres, seminarios | P1 | M |
 | 4 | ~~Abrir sola la siguiente tanda cuando se agota la anterior~~ **Hecho** | Música, fiestas | P1 | M |
-| 5 | Que cada promotor o RRPP vea sus números | Clubs, fiestas | P1 | M |
+| 5 | ~~Que cada promotor o RRPP vea sus números~~ **Hecho** | Clubs, fiestas | P1 | M |
 | 6 | Check-ins por canal ("cuántos de cada lista entraron") | Clubs | P2 | S |
 | 7 | Aforo en vivo en el panel | Clubs, fiestas, seminarios | P2 | S |
 | 8 | Validar la hora de ingreso de la lista | Clubs | P3 | S |
@@ -43,7 +43,7 @@ Estado al 27-10-2026, rama `rediseno/aitickets`.
 | 13 | Ocupación de cada función en una vista | Teatro | P2 | S |
 | 14 | Borderó por función | Teatro | P2 | M |
 | 15 | Preguntas al inscribirse | Talleres | P2 | M |
-| 16 | Validar la misma entrada en varias sesiones o días | Talleres, seminarios | P1 | M |
+| 16 | ~~Validar la misma entrada en varias sesiones o días~~ **Hecho** | Talleres, seminarios | P1 | M |
 | 17 | Agenda con expositores y salas | Seminarios | P3 | L |
 | 18 | RUT y razón social de la empresa al comprar | Seminarios | P2 | M |
 | 19 | Nombre de cada asistente en una compra de varias entradas | Seminarios | P2 | M |
@@ -180,6 +180,19 @@ Con Preventa 1 (cupo 100) y Preventa 2 encadenada, la compra número 100 de la p
 intervención. Dos compras simultáneas no sobrevenden la primera.
 
 ## 5. Que cada promotor o RRPP vea sus números
+
+**Hecho (rama `feat/links-promotores`).** Link privado por promotor, sin cuenta y revocable: tabla
+`aitickets_promoter_links` (migración `202610290300_promoter_links.sql`; solo el sha256 del token, como los links de
+puerta) y página `/promotor/<token>` (`src/lib/promoterLinks.ts`).
+- El promotor ve solo las órdenes pagadas con su `ref` (sin mayúsculas/minúsculas; sin cortesías ni transferencias):
+  entradas, monto y compras por evento, desglose por función y su link `?ref=` para copiar en cada evento a la venta.
+  Nunca nombres, correos ni teléfonos. Se calcula en cada visita ("Actualizar").
+- Alcance: todos los eventos de la productora (un RRPP de todas las noches) o un evento. Muestra los eventos con ventas
+  suyas y los publicados que no terminaron hace más de 2 días.
+- Se crea desde el panel del evento (módulo "Promotores y RRPP" en Difusión, sugerido para noche y música;
+  `PromoterLinksManager.vue`, `/api/events/promoter-links`) o el asistente de IA (`create_promoter_link`,
+  `list_promoter_links`, `revoke_promoter_link`). Un miembro con acceso solo a algunos eventos crea links de esos eventos.
+- Landings de clubs y fiestas y la FAQ de ventas por promotor sin "Pronto".
 
 **Dónde se promete**
 - `clubs/ClubList.astro` ("Cada RRPP ve sus números en su celular", `data-testid="club-rrpp-soon"`)
@@ -372,6 +385,26 @@ Cada inscripción guarda nombre y correo de quien compra.
 - Verlas en la lista de asistentes y en el CSV.
 
 ## 16. Validar la misma entrada en varias sesiones o días
+
+**Hecho (rama `feat/checkin-por-funcion`).** Tabla `aitickets_attendee_checkins` (migración
+`202610290200_attendee_checkins.sql`): una fila por entrada y función, con `UNIQUE (event_attendee_id, event_date_id)`.
+- Una entrada "para todas las funciones" de un evento con más de una función entra una vez en cada función
+  (`checkInSession` en `netlify/lib/checkin.mjs`). La función se deduce de la hora del escaneo en hora de Chile
+  (`pickSession` en `src/lib/sessionCheckin.mjs`): la de hoy; con dos el mismo día, la que ya empezó o empieza dentro
+  de 2 horas; si hoy no hay, la más cercana. Una validación offline se registra en el día en que se escaneó.
+- El segundo escaneo del mismo día responde 409 `already_validated` con "Ya ingresó hoy.". En el primer ingreso la
+  entrada queda `validated` (validated_at = primer ingreso), así "asistió" significa lo mismo en estadísticas,
+  reseñas y mensajes.
+- Lo usan `/api/confirm-ticket`, `/api/door/<token>/confirm` y `check_in_attendee` (este último responde
+  `sessions_attended` de `sessions_total`). `validate-ticket` y las 5 fuentes de la lista del escáner devuelven el
+  estado de la función de hoy (`session_checkins` + `sessionView`), también sin conexión.
+- El escáner (`ValidateQR.vue`) muestra "Ingreso 2 de 3" al validar y "Pase de N funciones · fue a X" en la lista.
+  `get_checkin_stats` agrega `multi_pass_check_ins_by_function`.
+- Backfill: las multifunción ya validadas quedan registradas en la función del día en que se validaron.
+- Si la tabla aún no existe, todo vuelve a la regla de un solo ingreso.
+- Landings: talleres (pasar lista en cada sesión) y seminarios (ingreso cada día con el mismo pase) sin "Pronto".
+
+Pendiente: la lista de asistentes de `/dashboard/tickets` sigue mostrando solo validado sí/no.
 
 **Dónde se promete**
 - `talleres/WorkshopDay.astro` ("Pasar lista en cada sesión")

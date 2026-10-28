@@ -13,6 +13,7 @@ import { fetchPublic, isPublicIp, SafeFetchError } from "../../safe-fetch";
 import { EVENT_VIDEO_MAX_BYTES } from "../../eventVideo";
 import { clearEventVideo, EventVideoUnavailableError, loadEventVideoState, saveEventVideo } from "../../eventVideoStore";
 import { readMp4Meta, sniffVideoType } from "../../videoProbe";
+import { createPromoterLink, listPromoterLinks, revokePromoterLink, promoterRef, PROMOTER_REF_RE } from "../../promoterLinks";
 import { storeVideoBuffer, VideoStorageError } from "../../videoStorage";
 
 const PLATFORMS = ["instagram", "facebook"] as const;
@@ -566,4 +567,94 @@ const publishPost: ToolDef = {
     },
 };
 
-export const marketingTools: ToolDef[] = [getMarketingKit, createTrackingLink, uploadImage, setEventVideo, generateImage, createSocialPost, listSocialPosts, deleteSocialPost, publishPost];
+// ---------------------------------------------------------------------------
+// Links de promotor / RRPP: ven sus propias ventas en el celular, sin cuenta (src/lib/promoterLinks.ts)
+// ---------------------------------------------------------------------------
+
+const createPromoterLinkTool: ToolDef = {
+    name: "create_promoter_link",
+    title: "Crear link de promotor",
+    description:
+        "Crea un link privado para un promotor o RRPP: lo abre en el celular, sin cuenta, y ve SOLO sus ventas (las compras pagadas que " +
+        "llegaron con su ?ref=): entradas y monto por evento y función, y su link para compartir cada evento a la venta. No ve datos de " +
+        "compradores. Sin event_id cubre todos los eventos de la productora (un RRPP de todas las noches). La URL privada se entrega solo " +
+        "esta vez; revócala con revoke_promoter_link. ref = su código de seguimiento (por defecto, el nombre en minúsculas y con guiones).",
+    scope: "write",
+    permission: "events.write",
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    inputSchema: {
+        type: "object",
+        required: ["name"],
+        additionalProperties: false,
+        properties: {
+            name: { type: "string", minLength: 1, maxLength: 80, description: "Nombre del promotor (lo ve en su página)." },
+            ref: { type: "string", maxLength: 64, pattern: "^[A-Za-z0-9_.-]+$", description: "Código de seguimiento (?ref=). Omitir = a partir del nombre." },
+            event_id: { ...eventIdSchema, description: "Solo este evento. Omitir = todos los eventos de la productora." },
+        },
+    },
+    audit: (args, result) => ({ summary: `Link de promotor creado (${args.name})`, target: String((result.link as any)?.id || "") }),
+    async handler(args, ctx) {
+        if (args.event_id != null) await loadOwnedEvent(ctx, args.event_id, "id");
+        else if (ctx.actor.eventIds) {
+            throw new ToolError("forbidden", "Tu acceso está limitado a ciertos eventos: indica event_id para crear el link de uno de ellos.");
+        }
+        const ref = promoterRef(args.ref || args.name);
+        if (!PROMOTER_REF_RE.test(ref)) throw new ToolError("invalid_input", "El nombre o ref no sirve como código: usa letras o números.");
+        const created = await createPromoterLink(ctx.supabase, {
+            orgId: ctx.actor.orgId,
+            eventId: args.event_id ?? null,
+            name: args.name,
+            ref,
+            userId: ctx.actor.userId,
+            origin: ctx.origin,
+        });
+        return {
+            promoter_url: created.url,
+            link: created.link,
+            share_example: `${ctx.origin}/eventos/<slug>?ref=${ref}`,
+            note:
+                "Envíale promoter_url al promotor: ahí ve sus ventas y copia su link de cada evento (con ?ref=). Las ventas que ya entraron con " +
+                "ese ref también aparecen. Quien tenga promoter_url ve esos números: compártelo solo con el promotor.",
+        };
+    },
+};
+
+const listPromoterLinksTool: ToolDef = {
+    name: "list_promoter_links",
+    title: "Listar links de promotor",
+    description:
+        "Links de promotor de la productora (o los que cubren un evento) con su nombre, ref, alcance, estado y cuántas veces los abrieron. " +
+        "No incluye la URL privada (solo se entrega al crearla). Las ventas de cada ref están en get_event_performance → sales_channels.",
+    scope: "read",
+    permission: "events.read",
+    annotations: { readOnlyHint: true },
+    inputSchema: { type: "object", additionalProperties: false, properties: { event_id: eventIdSchema } },
+    async handler(args, ctx) {
+        if (args.event_id != null) await loadOwnedEvent(ctx, args.event_id, "id");
+        return { links: await listPromoterLinks(ctx.supabase, ctx.actor.orgId, { eventId: args.event_id ?? null, eventIds: ctx.actor.eventIds }) };
+    },
+};
+
+const revokePromoterLinkTool: ToolDef = {
+    name: "revoke_promoter_link",
+    title: "Revocar link de promotor",
+    description: "Desactiva un link de promotor (link_id de list_promoter_links o create_promoter_link). Deja de funcionar de inmediato; las ventas con su ref se siguen contando.",
+    scope: "write",
+    permission: "events.write",
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+    inputSchema: {
+        type: "object",
+        required: ["link_id"],
+        additionalProperties: false,
+        properties: { link_id: { type: "string", pattern: "^[0-9a-fA-F-]{36}$", description: "ID del link (uuid)." } },
+    },
+    audit: (args) => ({ summary: "Link de promotor revocado", target: args.link_id }),
+    async handler(args, ctx) {
+        const link = await revokePromoterLink(ctx.supabase, args.link_id, ctx.actor.orgId, ctx.actor.eventIds);
+        if (!link) throw new ToolError("not_found", "Link de promotor no encontrado en tu organización.");
+        return { link_id: link.id, name: link.name, status: "revoked" };
+    },
+};
+
+export const marketingTools: ToolDef[] = [getMarketingKit, createTrackingLink, uploadImage, setEventVideo, generateImage, createSocialPost, listSocialPosts, deleteSocialPost, publishPost,
+    createPromoterLinkTool, listPromoterLinksTool, revokePromoterLinkTool];

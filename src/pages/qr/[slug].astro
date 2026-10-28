@@ -5,6 +5,7 @@ import { getSupabaseAdmin, createEphemeralAuthClient } from "../../lib/auth-help
 import { getSessionContext, setSessionCookies, clearSessionCookies } from "../../lib/supabaseServer";
 import { resolveEventSlugRedirect, slugRedirectResponse } from "../../lib/eventSlug";
 import { canAccessEventByStaff } from "../../../netlify/lib/event-staff.mjs";
+import { attachSessionCheckins } from "../../../netlify/lib/checkin.mjs";
 import AppFooter from "../../components/AppFooter.vue";
 import Layout from '../../layouts/Layout.astro';
 import ValidateQR from "../../components/ValidateQR.vue";
@@ -92,7 +93,9 @@ const { data: eventDates } = await supabase
   .order("date", { ascending: true })
   .order("start_time", { ascending: true });
 
-const eventWithAttendees = { ...event, dates: eventDates || [], attendees: event_attendees };
+// Entradas multifunción: a qué funciones ya entró cada una
+const attendeesWithSessions = await attachSessionCheckins(supabase, event.id, event_attendees, eventDates || []);
+const eventWithAttendees = { ...event, dates: eventDates || [], attendees: attendeesWithSessions };
 ---
 
 <Layout title={`Validar entradas: ${event.name} | AI Tickets`} noindex>

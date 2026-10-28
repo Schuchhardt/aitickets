@@ -4,10 +4,12 @@
 // status NULL (entradas antiguas) se trata como 'active'.
 // 409 incluye `code`: 'already_validated' (ya validada) | 'invalid_status' (anulada u otro estado).
 // R1: la respuesta incluye function_mismatch/function_label si la entrada es de otra función (solo aviso).
+// Una entrada multifunción (pase de varios días) entra una vez en cada función: 409 already_validated con
+// "Ya ingresó hoy." y, si entra, sessions_attended / sessions_total.
 import { getSupabaseAdmin, getOwnedEvent } from '../../lib/supabase.mjs'
 import { canAccessEventByStaff } from '../../lib/event-staff.mjs'
 import { getSessionContextWithRefresh, jsonWithCookies, CHECKIN_ROLES } from '../../lib/session.mjs'
-import { getFunctionCheck } from '../../lib/checkin.mjs'
+import { getFunctionCheck, checkInSession } from '../../lib/checkin.mjs'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -55,14 +57,18 @@ export default async function handler(req) {
     if (ticketError) throw new Error(ticketError.message)
     if (!ticket) return respond({ message: 'La entrada no pertenece a este evento' }, 404)
 
-    if (ticket.status === 'validated') {
-      return respond({ message: 'Entrada ya validada', code: 'already_validated', validated_at: ticket.validated_at }, 409)
-    }
-    if (ticket.status != null && ticket.status !== 'active') {
+    if (ticket.status != null && ticket.status !== 'active' && ticket.status !== 'validated') {
       return respond({ message: `Entrada no válida (estado: ${ticket.status})`, code: 'invalid_status', status: ticket.status }, 409)
     }
 
     const validatedAt = resolveValidatedAt(body?.validated_at)
+    const session = await checkInSession(supabase, eventId, ticket, validatedAt)
+    if (session?.ok) return respond({ message: 'Entrada validada exitosamente', ...session }, 200)
+    if (session) return respond(session, 409)
+
+    if (ticket.status === 'validated') {
+      return respond({ message: 'Entrada ya validada', code: 'already_validated', validated_at: ticket.validated_at }, 409)
+    }
     // PostgREST 12.2 falla (42703) si un UPDATE con filtro or()/and() pide la fila de vuelta
     // (return=representation): se usa count exacto y, si hace falta, una lectura aparte.
     const { count: updatedCount, error: updateError } = await supabase

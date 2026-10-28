@@ -5,12 +5,12 @@
 // (discounts.mjs, /api/discount-codes) con usos, compras, descuento y ventas en el panel (DiscountCodesManager.vue);
 // links con seguimiento y métricas por canal (TrackingLinkBuilder.vue, eventAnalytics.ts; la frase de la misma visita es
 // la de PRODUCER_FAQ); CSV de órdenes con "Código de descuento" y "Canal" (ordersExport.ts); "Invitar a alguien" en la
-// página de la orden (src/pages/order/[id].astro, ref=invite). Que cada promotor vea sus números no existe: "Pronto".
+// página de la orden (src/pages/order/[id].astro, ref=invite). Cada promotor ve sus números con su link privado
+// (/promotor/<token>, src/lib/promoterLinks.ts).
 import PromoSheet from "./PromoSheet.vue";
 import DisposablePhoto from "./DisposablePhoto.astro";
 import StickerHeading from "./StickerHeading.astro";
 import Wristband from "./Wristband.astro";
-import SoonBadge from "../../ui/SoonBadge.vue";
 import { PARTY_NAME, PARTY_PHOTOS, PHOTO_ALT } from "./fiestasLanding.js";
 import { DIRECT_CHANNEL } from "../../../lib/eventAnalytics";
 
@@ -26,6 +26,10 @@ const items = [
   {
     title: "Y su link, por si no usan el código.",
     text: "Cada link suma visitas, entradas e ingresos en las métricas de la fiesta. La venta se asocia al link cuando la persona compra en la misma visita en que llegó con él.",
+  },
+  {
+    title: "Cada promotor ve sus números.",
+    text: "Le mandas su link privado: en su celular, sin cuenta, ve cuántas entradas vendió en cada fiesta y copia su link. No ve datos de quienes compraron.",
   },
   { title: "Liquidas con un CSV.", text: "Exportas las órdenes con su código y su canal, y calculas lo de cada promotor." },
   {
@@ -79,7 +83,6 @@ const items = [
             ))
           }
         </ol>
-        <p class="fi-soon-chip fpr-soon" data-lp-step>Cada promotor ve sus números en su celular <SoonBadge dark={false} /></p>
       </div>
     </div>
 
@@ -125,9 +128,6 @@ const items = [
   }
   .fpr-sheet {
     min-width: 0;
-  }
-  .fpr-soon {
-    margin-top: 22px;
   }
   @media (min-width: 1024px) {
     .fpr-head {
