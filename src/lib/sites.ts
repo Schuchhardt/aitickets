@@ -16,13 +16,19 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { getSupabaseAdmin } from "./auth-helpers";
 import { DEMO_EVENT_SLUGS, getDemoFunctionDate } from "./demoEvent.mjs";
 import { getZonedParts, zonedDateTimeToDate } from "../utils/dateHelpers.js";
+import { SITE_TEMPLATES, isSafeHttpUrl, resolveThemeFor, type SiteTemplate } from "./siteTemplates";
+
+export {
+  SITE_FONTS,
+  SITE_TEMPLATES,
+  TEMPLATE_DEFAULTS,
+  isSafeHttpUrl,
+  type SiteTemplate,
+} from "./siteTemplates";
 
 // ---------------------------------------------------------------------------
 // Tipos
 // ---------------------------------------------------------------------------
-export type SiteTemplate = "clasico" | "nocturno" | "minimal" | "festival";
-export const SITE_TEMPLATES: SiteTemplate[] = ["clasico", "nocturno", "minimal", "festival"];
-
 export type DomainStatus = "none" | "pending_provider" | "pending_dns" | "pending_ssl" | "active" | "failed" | "removing";
 
 export interface SiteTheme {
@@ -572,42 +578,14 @@ export function purchaseUrlFor(site: Pick<SiteRecord, "slug">, eventSlug: string
 // ---------------------------------------------------------------------------
 // Props públicas (tema saneado, sin correos)
 // ---------------------------------------------------------------------------
-const HEX_RE = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
-export const SITE_FONTS = ["Unbounded", "Prompt", "Inter", "Montserrat", "Playfair Display", "Space Grotesk", "Bebas Neue"];
-
-export function isSafeHttpUrl(url: unknown): url is string {
-  if (typeof url !== "string" || !url) return false;
-  try {
-    const u = new URL(url);
-    return u.protocol === "https:" || u.protocol === "http:";
-  } catch {
-    return false;
-  }
-}
-
-export const TEMPLATE_DEFAULTS: Record<SiteTemplate, Required<Pick<SiteTheme, "primary" | "accent" | "background" | "text" | "font">> & { dark: boolean }> = {
-  clasico: { primary: "#111827", accent: "#a3e635", background: "#ffffff", text: "#111827", font: "Unbounded", dark: false },
-  nocturno: { primary: "#a78bfa", accent: "#f472b6", background: "#0b0b12", text: "#f5f5f5", font: "Space Grotesk", dark: true },
-  minimal: { primary: "#111111", accent: "#111111", background: "#fafafa", text: "#171717", font: "Inter", dark: false },
-  festival: { primary: "#f97316", accent: "#facc15", background: "#fff7ed", text: "#1c1917", font: "Bebas Neue", dark: false },
-};
-
 /** Tema final (valores del productor validados + defaults de la plantilla). */
 export function resolveTheme(site: Pick<SiteRecord, "template" | "theme">, templateOverride?: SiteTemplate): SiteTheme & { dark: boolean } {
-  const template = templateOverride || site.template;
-  const defaults = TEMPLATE_DEFAULTS[template] || TEMPLATE_DEFAULTS.clasico;
-  const t = site.theme || {};
-  const color = (v: unknown, fallback: string) => (typeof v === "string" && HEX_RE.test(v.trim()) ? v.trim() : fallback);
-  return {
-    primary: color(t.primary, defaults.primary),
-    accent: color(t.accent, defaults.accent),
-    background: color(t.background, defaults.background),
-    text: color(t.text, defaults.text),
-    font: typeof t.font === "string" && SITE_FONTS.includes(t.font) ? t.font : defaults.font,
-    logo_url: isSafeHttpUrl(t.logo_url) ? t.logo_url : undefined,
-    hero_image_url: isSafeHttpUrl(t.hero_image_url) ? t.hero_image_url : undefined,
-    dark: typeof t.dark === "boolean" ? t.dark : defaults.dark,
-  };
+  // Al probar otra plantilla (?plantilla=) se ven sus colores y tipografía; del sitio solo se conservan logo y portada
+  if (templateOverride && templateOverride !== site.template) {
+    const { logo_url, hero_image_url } = site.theme || {};
+    return resolveThemeFor(templateOverride, { logo_url, hero_image_url });
+  }
+  return resolveThemeFor(site.template, site.theme);
 }
 
 function cleanSocials(site: SiteRecord): SiteSocials {

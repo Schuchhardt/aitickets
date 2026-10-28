@@ -9,7 +9,7 @@ export const prerender = false;
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const ALLOWED_TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif" };
-const KINDS = new Set(["logo", "hero", "banner", "og"]);
+const KINDS = new Set(["logo", "hero", "banner", "og", "gallery"]);
 
 // Firma de bytes: el Content-Type lo decide el cliente, así que se verifica el contenido real
 function sniffType(bytes: Uint8Array): string | null {

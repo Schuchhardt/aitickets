@@ -21,6 +21,8 @@ export interface LoadedSite {
   onTenantHost: boolean;
   /** Plantilla a renderizar (la del sitio o ?plantilla= para demo / dueño). */
   template: SiteTemplate;
+  /** Quien ve la página es el dueño del sitio (habilita la vista previa en vivo del editor, ?editor=1). */
+  owner: boolean;
 }
 
 async function isOwner(Astro: AstroGlobal, site: SiteRecord): Promise<boolean> {
@@ -90,5 +92,6 @@ export async function loadSiteForPage(Astro: AstroGlobal): Promise<LoadedSite | 
     base: siteBasePath(site, onTenantHost ? effectiveHost : null),
     onTenantHost,
     template,
+    owner: ownerChecked === true,
   };
 }

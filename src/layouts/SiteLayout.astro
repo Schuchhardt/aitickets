@@ -8,6 +8,7 @@
 import ToastContainer from "../components/ui/ToastContainer.vue";
 import ChunkReload from "../components/ChunkReload.astro";
 import type { SiteTheme } from "../lib/sites";
+import { GOOGLE_FONT_QUERIES, fontStack } from "../lib/siteTemplates";
 import "../styles/global.css";
 
 interface Props {
@@ -20,23 +21,16 @@ interface Props {
 
 const { theme, preview = false, favicon } = Astro.props;
 
-const FONT_QUERIES: Record<string, string> = {
-  Inter: "Inter:wght@400;500;600;700",
-  Montserrat: "Montserrat:wght@400;500;600;700",
-  "Playfair Display": "Playfair+Display:wght@400;600;700",
-  "Space Grotesk": "Space+Grotesk:wght@400;500;600;700",
-  "Bebas Neue": "Bebas+Neue",
-};
 const font = theme.font || "Unbounded";
-// Unbounded y Prompt ya vienen en global.css (@fontsource)
-const fontHref = FONT_QUERIES[font] ? `https://fonts.googleapis.com/css2?family=${FONT_QUERIES[font]}&display=swap` : null;
+// Unbounded y Prompt vienen en global.css y las de las plantillas de nicho en site-niches.css (@fontsource)
+const fontHref = GOOGLE_FONT_QUERIES[font] ? `https://fonts.googleapis.com/css2?family=${GOOGLE_FONT_QUERIES[font]}&display=swap` : null;
 
 const cssVars = [
   `--site-primary:${theme.primary}`,
   `--site-accent:${theme.accent}`,
   `--site-bg:${theme.background}`,
   `--site-text:${theme.text}`,
-  `--site-font:'${font}', 'Prompt', system-ui, sans-serif`,
+  `--site-font:${fontStack(font)}`,
 ].join(";");
 ---
 <!doctype html>
