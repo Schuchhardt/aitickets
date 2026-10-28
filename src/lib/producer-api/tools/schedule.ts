@@ -4,13 +4,17 @@
 // events.start_date/end_date (refreshEventDenorm) y, si el evento está publicado, avisa a los asistentes con
 // la misma descripción del cambio (describeScheduleChange) vía send-event-notification-background.
 // Pide confirmación solo cuando el cambio afecta a asistentes (evento publicado con entradas vigentes).
+// "repeat" crea las funciones de un patrón (jueves a domingo hasta tal fecha, src/lib/functionPattern.mjs) y
+// copy_tickets_from_function_id copia las entradas de una función a cada función nueva (cada una con su cupo).
 import { ToolError, type ToolDef, type ToolContext, type ConfirmationSummary } from "../registry";
 import { eventIdSchema, loadOwnedEvent, DATE_PATTERN, TIME_PATTERN, descriptionDateWarning, eventDateFields, DATES_NOTE, eventUrls, TZ } from "./common";
 import { refreshEventDenorm } from "../../../pages/api/_lib/events";
 import { loadSchedule, describeScheduleChange, type Schedule } from "../../../pages/api/_lib/eventSchedule";
 import { callInternalFunction, santiagoToDate } from "../../../pages/api/_lib/server-utils";
+import { MAX_FUNCTIONS, WEEKDAYS, patternError, repeatDates } from "../../functionPattern.mjs";
+import { loadTicketChain } from "../../../../netlify/lib/tickets.mjs";
 
-const MAX_FUNCTIONS = 60;
+const todayInChile = () => new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(new Date());
 
 type ScheduleDate = Schedule["dates"][number];
 
@@ -44,9 +48,15 @@ async function liveAttendees(ctx: ToolContext, filter: { eventId: number; ticket
  */
 async function planScheduleChange(args: any, ctx: ToolContext) {
     const changes: any[] = args.changes || [];
-    const additions: any[] = args.add || [];
+    const additions: any[] = [...(args.add || [])];
     const removals: number[] = (args.remove || []).map(Number);
-    if (!changes.length && !additions.length && !removals.length) throw new ToolError("invalid_input", "No enviaste cambios (changes, add o remove).");
+    const repeat = args.repeat || null;
+    if (args.copy_tickets_from_function_id != null && !additions.length && !repeat) {
+        throw new ToolError("invalid_input", "copy_tickets_from_function_id copia entradas a funciones nuevas: úsalo junto con add o repeat.");
+    }
+    if (!changes.length && !additions.length && !removals.length && !repeat) {
+        throw new ToolError("invalid_input", "No enviaste cambios (changes, add, repeat o remove).");
+    }
 
     const event = await loadOwnedEvent<any>(ctx, args.event_id, "id, name, slug, status, description, start_date, end_date");
     const before = await loadSchedule(Number(event.id), ctx.supabase);
@@ -99,6 +109,27 @@ async function planScheduleChange(args: any, ctx: ToolContext) {
     // Las nuevas funciones van al mismo lugar que las existentes (cambiar de lugar se hace desde el panel)
     const locationId = before.dates[0]?.event_location_id ?? before.locations[0]?.id ?? null;
     if (additions.length && !locationId) throw new ToolError("conflict", "El evento no tiene un lugar asociado: agrégalo desde el panel antes de sumar funciones.");
+    // Patrón: se omiten las fechas que ya tienen función a esa hora y las que ya pasaron
+    let repeatSkipped = 0;
+    if (repeat) {
+        const pattern = { weekdays: repeat.weekdays, from: repeat.from || todayInChile(), until: repeat.until };
+        const reason = patternError(pattern);
+        if (reason) throw new ToolError("invalid_input", `repeat: ${reason}`);
+        const taken = new Set([...remaining, ...additions].map((d: any) => `${d.date}|${String(d.start_time).slice(0, 5)}`));
+        const now = Date.now();
+        for (const date of repeatDates(pattern)) {
+            const starts = santiagoToDate(date, repeat.start_time);
+            if (taken.has(`${date}|${repeat.start_time}`) || (starts && starts.getTime() <= now)) {
+                repeatSkipped += 1;
+                continue;
+            }
+            additions.push({ date, start_time: repeat.start_time, end_time: repeat.end_time || null });
+        }
+        if (additions.length === 0 && !changes.length && !removals.length) {
+            throw new ToolError("invalid_input", "El patrón no agrega funciones: todas sus fechas ya existen o ya pasaron.");
+        }
+    }
+
     const added: ScheduleDate[] = additions.map((a, i) => ({
         id: -(i + 1),
         date: a.date,
@@ -109,7 +140,35 @@ async function planScheduleChange(args: any, ctx: ToolContext) {
     const result = [...remaining, ...added];
 
     if (!result.length) throw new ToolError("invalid_input", "El evento debe quedar con al menos una función. Para suspenderlo usa cancel_event.");
-    if (result.length > MAX_FUNCTIONS) throw new ToolError("invalid_input", `Máximo ${MAX_FUNCTIONS} funciones por evento.`);
+    if (result.length > MAX_FUNCTIONS) {
+        throw new ToolError(
+            "invalid_input",
+            `Quedarían ${result.length} funciones y el máximo es ${MAX_FUNCTIONS} por evento. No se creó nada: acorta el período o elige menos días.`,
+        );
+    }
+
+    // Entradas a copiar en cada función nueva (cada una con su propio cupo). Las cortesías no se copian.
+    let ticketTemplate: any[] = [];
+    if (args.copy_tickets_from_function_id != null) {
+        const sourceId = Number(args.copy_tickets_from_function_id);
+        if (!byId.has(sourceId)) throw new ToolError("not_found", `La función ${sourceId} no pertenece al evento ${event.id}. Usa get_event para ver sus funciones.`);
+        if (removals.includes(sourceId)) throw new ToolError("invalid_input", `No puedes copiar las entradas de la función ${sourceId} y eliminarla a la vez.`);
+        const { data, error } = await ctx.supabase
+            .from("event_tickets")
+            .select("id, ticket_name, price, max_quantity, status, init_date, end_date, total_quantity")
+            .eq("event_id", event.id)
+            .eq("event_date_id", sourceId)
+            .not("is_gift", "is", true)
+            .order("id", { ascending: true });
+        if (error) throw error;
+        ticketTemplate = (data || []).filter((t: any) => t.status !== "unavailable");
+        if (!ticketTemplate.length) {
+            throw new ToolError(
+                "invalid_input",
+                `La función ${sourceId} no tiene entradas propias para copiar (las de "todas las funciones" no se copian). Crea primero sus entradas con create_ticket_type y function_id.`,
+            );
+        }
+    }
     const seen = new Set<string>();
     for (const d of result) {
         const key = `${d.date}|${d.start_time}`;
@@ -130,7 +189,45 @@ async function planScheduleChange(args: any, ctx: ToolContext) {
     const affectsAttendees = !!change && event.status === "published" && attendees > 0;
     const notify = affectsAttendees && args.notify_attendees !== false;
     const updates = remaining.filter((d) => touched.has(Number(d.id)));
-    return { event, before, change, attendees, affectsAttendees, notify, updates, added, removals };
+    return { event, before, change, attendees, affectsAttendees, notify, updates, added, removals, repeatSkipped, ticketTemplate };
+}
+
+/** Copia las entradas modelo a cada función nueva, con las tandas encadenadas dentro de la misma función. */
+async function copyTicketsToFunctions(ctx: ToolContext, eventId: number, template: any[], dateIds: number[]): Promise<number> {
+    const chain: Map<number, number> = await loadTicketChain(ctx.supabase, eventId);
+    let copied = 0;
+    for (const dateId of dateIds) {
+        const { data, error } = await ctx.supabase
+            .from("event_tickets")
+            .insert(
+                template.map((t) => ({
+                    event_id: eventId,
+                    event_date_id: dateId,
+                    ticket_name: t.ticket_name,
+                    price: t.price,
+                    max_quantity: t.max_quantity,
+                    is_gift: false,
+                    status: t.status,
+                    init_date: t.init_date,
+                    end_date: t.end_date,
+                    total_quantity: t.total_quantity,
+                })),
+            )
+            .select("id");
+        if (error) throw error;
+        // Mismo orden de inserción: la copia i corresponde a template[i]
+        const copyOf = new Map(template.map((t, i) => [Number(t.id), Number(data?.[i]?.id)]));
+        copied += data?.length || 0;
+        for (const t of template) {
+            const prev = chain.get(Number(t.id));
+            const id = copyOf.get(Number(t.id));
+            const prevCopy = prev != null ? copyOf.get(Number(prev)) : undefined;
+            if (!id || !prevCopy) continue;
+            const { error: chainErr } = await ctx.supabase.from("event_tickets").update({ opens_after_ticket_id: prevCopy }).eq("id", id).eq("event_id", eventId);
+            if (chainErr) console.warn("update_event_functions: no se pudo copiar la tanda anterior:", chainErr.message);
+        }
+    }
+    return copied;
 }
 
 const label = (d: { date: string; start_time: string; end_time: string | null }) => `${d.date} ${d.start_time}${d.end_time ? `–${d.end_time}` : ""}`;
@@ -143,6 +240,8 @@ const updateEventFunctions: ToolDef = {
         "Las fechas del evento (start_date/end_date) se recalculan solas a partir de las funciones. Fechas en hora de Chile. " +
         "Usa get_event para ver functions[].id; si el evento tiene una sola función, function_id es opcional. " +
         "Las funciones nuevas usan el mismo lugar del evento (cambiar de lugar se hace en el panel). " +
+        'Para muchas funciones usa repeat (p. ej. "jueves a domingo, 20:00, hasta el 30 de noviembre") y, si cada función debe tener ' +
+        "su propio cupo, copy_tickets_from_function_id para copiarles las entradas de una función existente. " +
         "Si el evento está publicado y tiene entradas vigentes, el servidor devuelve primero un resumen (confirmation_required) y, al " +
         "confirmar, avisa por correo a los asistentes con el cambio (notify_attendees=false para no avisar). En borradores o eventos sin " +
         "asistentes se aplica directo. Después revisa los warnings: la descripción o los recordatorios programados pueden mencionar la fecha anterior.",
@@ -177,6 +276,35 @@ const updateEventFunctions: ToolDef = {
                 description: "Funciones nuevas (mismo lugar del evento).",
                 items: { type: "object", required: ["date", "start_time"], additionalProperties: false, properties: functionInput },
             },
+            repeat: {
+                type: "object",
+                required: ["weekdays", "until", "start_time"],
+                additionalProperties: false,
+                description:
+                    'Crea de una vez las funciones de un patrón, p. ej. "jueves a domingo, 20:00, hasta el 30 de noviembre". ' +
+                    "Se omiten las fechas que ya tienen función a esa hora y las que ya pasaron. Si el evento quedaría con más de " +
+                    `${MAX_FUNCTIONS} funciones no se crea nada y responde el total: acórtalo y vuelve a intentar.`,
+                properties: {
+                    weekdays: {
+                        type: "array",
+                        minItems: 1,
+                        maxItems: 7,
+                        items: { type: "string", enum: WEEKDAYS.map((d) => d.key) },
+                        description: "Días de la semana (sin tildes).",
+                    },
+                    from: { type: "string", pattern: DATE_PATTERN, description: "Primer día del período, YYYY-MM-DD. Por defecto, hoy." },
+                    until: { type: "string", pattern: DATE_PATTERN, description: "Último día del período (incluido), YYYY-MM-DD." },
+                    start_time: functionInput.start_time,
+                    end_time: functionInput.end_time,
+                },
+            },
+            copy_tickets_from_function_id: {
+                type: "integer",
+                minimum: 1,
+                description:
+                    "Copia los tipos de entrada propios de esta función (precio, cupo, ventana de venta y tandas encadenadas) a cada función " +
+                    "nueva de add/repeat, para que cada función tenga su propio cupo. No copia cortesías ni entradas de \"todas las funciones\".",
+            },
             remove: {
                 type: "array",
                 maxItems: MAX_FUNCTIONS,
@@ -201,6 +329,7 @@ const updateEventFunctions: ToolDef = {
                 event_id: Number(plan.event.id),
                 updated: plan.updates.map((d) => ({ function_id: Number(d.id), from: label(plan.before.dates.find((b) => Number(b.id) === Number(d.id))!), to: label(d) })),
                 added: plan.added.map(label),
+                ...(plan.ticketTemplate.length ? { tickets_to_copy: plan.ticketTemplate.map((t: any) => t.ticket_name), tickets_per_new_function: plan.ticketTemplate.length } : {}),
                 removed: plan.removals,
                 attendees: plan.attendees,
                 notify_attendees: plan.notify,
@@ -223,12 +352,16 @@ const updateEventFunctions: ToolDef = {
                 .eq("event_id", eventId);
             if (error) throw error;
         }
+        let newDates: Array<{ id: number }> = [];
         if (plan.added.length) {
-            const { error } = await ctx.supabase
+            const { data, error } = await ctx.supabase
                 .from("event_dates")
-                .insert(plan.added.map((d) => ({ event_id: eventId, event_location_id: d.event_location_id, date: d.date, start_time: d.start_time, end_time: d.end_time })));
+                .insert(plan.added.map((d) => ({ event_id: eventId, event_location_id: d.event_location_id, date: d.date, start_time: d.start_time, end_time: d.end_time })))
+                .select("id");
             if (error) throw error;
+            newDates = data || [];
         }
+        const ticketsCopied = plan.ticketTemplate.length ? await copyTicketsToFunctions(ctx, eventId, plan.ticketTemplate, newDates.map((d) => Number(d.id))) : 0;
         if (plan.removals.length) {
             // event_tickets.event_date_id tiene ON DELETE SET NULL: sus entradas pasan a "todas las funciones"
             const { error } = await ctx.supabase.from("event_dates").delete().eq("event_id", eventId).in("id", plan.removals);
@@ -281,6 +414,7 @@ const updateEventFunctions: ToolDef = {
         const summaryParts = [
             ...plan.updates.map((d) => `#${d.id} → ${label(d)}`),
             ...(plan.added.length ? [`+${plan.added.length} nueva(s)`] : []),
+            ...(ticketsCopied ? [`${ticketsCopied} entrada(s) copiada(s)`] : []),
             ...(plan.removals.length ? [`-${plan.removals.length} eliminada(s)`] : []),
         ];
         return {
@@ -289,6 +423,8 @@ const updateEventFunctions: ToolDef = {
             ...eventDateFields(range),
             dates_note: DATES_NOTE,
             functions,
+            ...(args.repeat ? { repeat_added: plan.added.length, repeat_skipped: plan.repeatSkipped } : {}),
+            ...(plan.ticketTemplate.length ? { tickets_copied: ticketsCopied } : {}),
             change_detected: !!plan.change,
             attendees_affected: plan.affectsAttendees ? plan.attendees : 0,
             attendees_notification_queued: notificationQueued,

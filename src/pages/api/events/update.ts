@@ -3,7 +3,7 @@ import { getSupabaseAdmin, getFriendlyErrorMessage } from "../../../lib/auth-hel
 import { getSessionContext, getOwnedEvent, hasRole, EVENT_MANAGER_ROLES, jsonResponse } from "../../../lib/supabaseServer";
 import { callInternalFunction, notifySlack, siteUrl } from "../_lib/server-utils";
 import { IDENTITY_REQUIRED_MESSAGE, eventRequiresIdentity, identityApproved, loadOrgIdentity, ticketsRequireIdentity } from "../../../lib/producerIdentity";
-import { syncEventCategory, refreshEventDenorm, normalizeTicket, isClientTempId, isValidDateInput, resolveTicketDateId, setEventStatus, EventInputError, saveCoverSettings, savePageSettings } from "../_lib/events";
+import { syncEventCategory, refreshEventDenorm, normalizeTicket, isClientTempId, isValidDateInput, resolveTicketDateId, setEventStatus, EventInputError, saveCoverSettings, savePageSettings, validateFormTicketChain, saveFormTicketChain, assertFunctionCount } from "../_lib/events";
 import { sanitizeRichText } from "../../../lib/sanitize";
 import { listOrgVenues, isVenueAllowed, insertOrgVenue } from "../../../lib/orgVenues";
 import { loadSchedule, describeScheduleChange } from "../_lib/eventSchedule";
@@ -94,6 +94,13 @@ export const POST: APIRoute = async (context) => {
         const normalizedTickets = tickets.map((t: any) => ({ raw: t, data: normalizeTicket(t) }));
         if (normalizedTickets.some((t: any) => !t.data)) {
             return jsonResponse({ message: "Revisa las entradas: nombre, precio y cantidad deben ser válidos" }, 400);
+        }
+        try {
+            assertFunctionCount(locations);
+            validateFormTicketChain(tickets);
+        } catch (err) {
+            if (err instanceof EventInputError) return jsonResponse({ message: err.message }, 400);
+            throw err;
         }
         // Evento publicado: pasar a más de 10 cupos pagados exige identidad verificada (igual que al publicar).
         // Los eventos que ya superaban el umbral antes de esta regla se pueden seguir editando.
@@ -250,11 +257,14 @@ export const POST: APIRoute = async (context) => {
             .eq("event_id", event.id);
         const existingTicketIds = new Set((existingTickets || []).map((t: any) => String(t.id)));
         const keptTicketIds = new Set<string>();
+        // id del formulario (real o temporal) -> id en la base, para encadenar tandas nuevas
+        const ticketIdMap = new Map<string, number>();
 
         for (const { raw, data } of normalizedTickets) {
             const eventDateId = resolveTicketDateId(raw.eventDateId, dateIdMap);
             if (!isClientTempId(raw.id) && existingTicketIds.has(String(raw.id))) {
                 keptTicketIds.add(String(raw.id));
+                ticketIdMap.set(String(raw.id), Number(raw.id));
                 const { error } = await supabaseAdmin
                     .from("event_tickets")
                     .update({
@@ -270,17 +280,24 @@ export const POST: APIRoute = async (context) => {
                     .eq("event_id", event.id);
                 if (error) throw error;
             } else {
-                const { error } = await supabaseAdmin.from("event_tickets").insert({
-                    ...data,
-                    event_date_id: eventDateId,
-                    event_id: event.id,
-                    max_quantity: 10,
-                    is_gift: false,
-                    status: "available",
-                });
+                const { data: inserted, error } = await supabaseAdmin
+                    .from("event_tickets")
+                    .insert({
+                        ...data,
+                        event_date_id: eventDateId,
+                        event_id: event.id,
+                        max_quantity: 10,
+                        is_gift: false,
+                        status: "available",
+                    })
+                    .select("id")
+                    .single();
                 if (error) throw error;
+                ticketIdMap.set(String(raw.id), Number(inserted.id));
             }
         }
+
+        await saveFormTicketChain(event.id, tickets, (formId) => ticketIdMap.get(String(formId)));
 
         // Entradas eliminadas en el formulario: se borran si no tienen ventas; si tienen, se retiran de la venta
         for (const ticketId of existingTicketIds) {

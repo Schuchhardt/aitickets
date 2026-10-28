@@ -20,7 +20,7 @@ import { isEventEnded } from "../components/event/eventView.js";
 import { resolveCoverMeta, eventThemeFrom } from "./eventCoverMeta";
 import { normalizePageSettings, stripDemoSuffix } from "./eventPageSettings";
 import { computeFeeSplit } from "../../netlify/lib/fees.mjs";
-import { maxPerPurchase } from "../../netlify/lib/tickets.mjs";
+import { maxPerPurchase, loadTicketChain, waitingOnPrevious } from "../../netlify/lib/tickets.mjs";
 import { clientIpFrom } from "./sites";
 
 // Columnas públicas del evento. NUNCA incluir secret_location (C4).
@@ -252,7 +252,12 @@ interface EventPageRows {
   gallery: GalleryImage[];
   /** Respuesta de aitickets_ticket_availability (loadAvailability cae al conteo anterior si trae error). */
   availability: { data: any; error: any };
+  /** Tandas encadenadas: ticketId -> tanda anterior (event_tickets.opens_after_ticket_id, migración 202610290100). */
+  ticketChain: Map<number, number>;
 }
+
+const chainFromTickets = (tickets: any[]) =>
+  new Map<number, number>(tickets.filter((t) => t.opens_after_ticket_id != null).map((t) => [Number(t.id), Number(t.opens_after_ticket_id)]));
 
 const isMissingFunction = (error: any) => error?.code === "PGRST202" || error?.code === "42883";
 
@@ -285,6 +290,8 @@ async function loadEventPageRows(
       hasSecretLocation: data.has_secret_location === true,
       gallery: data.gallery || [],
       availability: { data: data.availability || [], error: null },
+      // La función trae opens_after_ticket_id desde 202610290100; antes no hay tandas encadenadas
+      ticketChain: chainFromTickets(data.tickets || []),
     };
   }
   if (!isMissingFunction(error)) console.error("Error en aitickets_public_event_page (se usan las consultas por separado):", error);
@@ -345,7 +352,7 @@ async function loadEventPageRowsByQueries(
   if (opts.organizationId !== undefined && Number(event.organization_id) !== Number(opts.organizationId)) return null;
 
   // Datos relacionados (en paralelo)
-  const [categoriesRes, ticketsRes, faqsRes, datesRes, orgRes, secretRes, gallery, availability] = await Promise.all([
+  const [categoriesRes, ticketsRes, faqsRes, datesRes, orgRes, secretRes, gallery, availability, ticketChain] = await Promise.all([
     supabase.from("event_tags").select("category_tags(name)").eq("event_id", event.id),
     supabase
       .from("event_tickets")
@@ -375,6 +382,8 @@ async function loadEventPageRowsByQueries(
     loadEventGallery(Number(event.id)),
     // Vendidas/pendientes (loadAvailability): no depende de las entradas, va en el mismo viaje
     supabase.rpc("aitickets_ticket_availability", { p_event_id: event.id }),
+    // Tandas encadenadas: cuál espera a cuál (vacío sin la migración 202610290100)
+    loadTicketChain(supabase, event.id),
   ]);
 
   if (categoriesRes.error) console.error("Error al obtener las categorías:", categoriesRes.error);
@@ -393,6 +402,7 @@ async function loadEventPageRowsByQueries(
     hasSecretLocation: (secretRes.count ?? 0) > 0,
     gallery,
     availability,
+    ticketChain,
   };
 }
 
@@ -484,16 +494,20 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
 
   const { sold, pending } = await loadAvailability(supabase, event.id, windowTickets, now, Promise.resolve(raw.availability));
 
-  const ticketsWithStock = windowTickets.map((t: any) => {
-    const unlimited = t.total_quantity === null || t.total_quantity === undefined;
-    const remaining = unlimited
-      ? null
-      : Math.max(0, Number(t.total_quantity) - (sold.get(String(t.id)) || 0) - (pending.get(String(t.id)) || 0));
-    return toPublicTicket(t, { remaining, feeAbsorbed });
-  });
+  const remainingOf = (t: any) => Number(t.total_quantity) - (sold.get(String(t.id)) || 0) - (pending.get(String(t.id)) || 0);
+  // Tandas que esperan a que se agote la anterior: no se venden todavía (van atenuadas en el checkout)
+  const waiting: Map<number, any> = waitingOnPrevious(allTickets, raw.ticketChain, remainingOf, now);
+  const ticketsWithStock = windowTickets
+    .filter((t: any) => !waiting.has(Number(t.id)))
+    .map((t: any) => {
+      const unlimited = t.total_quantity === null || t.total_quantity === undefined;
+      const remaining = unlimited ? null : Math.max(0, remainingOf(t));
+      return toPublicTicket(t, { remaining, feeAbsorbed });
+    });
 
   const onSaleTickets = ticketsWithStock.filter((t) => t.remaining === null || t.remaining > 0);
   const upcomingSaleDates = allTickets
+    .filter((t: any) => !waiting.has(Number(t.id)))
     .filter((t: any) => t.init_date && new Date(t.init_date) > now && (!t.end_date || new Date(t.end_date) >= now))
     .map((t: any) => t.init_date)
     .sort();
@@ -577,6 +591,7 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
       .filter((t) => t.remaining !== null && t.remaining <= 0)
       .map((t) => ({ id: t.id, ticket_name: t.ticket_name, price: t.price, final_price: t.final_price, event_date_id: t.event_date_id, reason: "sold_out", sales_start: null })),
     ...allTickets
+      .filter((t: any) => !waiting.has(Number(t.id)))
       .filter((t: any) => t.init_date && new Date(t.init_date) > now && (!t.end_date || new Date(t.end_date) >= now))
       .map((t: any) => ({
         id: t.id,
@@ -586,6 +601,19 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
         event_date_id: t.event_date_id ?? null,
         reason: "upcoming",
         sales_start: t.init_date,
+      })),
+    // "Se abre al agotarse <anterior>" (solo si no cerró su propia ventana)
+    ...allTickets
+      .filter((t: any) => waiting.has(Number(t.id)) && (!t.end_date || new Date(t.end_date) >= now))
+      .map((t: any) => ({
+        id: t.id,
+        ticket_name: t.ticket_name,
+        price: Number(t.price) || 0,
+        final_price: computeFeeSplit(Number(t.price) || 0, { absorbed: feeAbsorbed }).total,
+        event_date_id: t.event_date_id ?? null,
+        reason: "upcoming",
+        sales_start: null,
+        opens_after: waiting.get(Number(t.id)).ticket_name,
       })),
   ].filter((t) => liveFunction(t.event_date_id));
 

@@ -328,7 +328,7 @@ export function builderNotes({ format, paid, enrolled, seats }) {
     if (format === 'weekly') {
       notes.push({ id: 'own-seats', text: 'Cada fecha con sus propios cupos: tu gente elige la suya.' })
       notes.push({ id: 'duplicate', text: '¿El próximo mes? Duplicas el taller y agregas las fechas nuevas.' })
-      notes.push({ id: 'repeat', text: 'Repetir "todos los sábados" en un paso', soon: true })
+      notes.push({ id: 'repeat', text: 'Repetir "todos los sábados" en un paso, con los cupos copiados a cada fecha.' })
     }
   }
   if (enrolled >= seats) {

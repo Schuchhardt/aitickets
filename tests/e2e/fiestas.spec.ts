@@ -71,7 +71,9 @@ test("la escalera se detiene en '¿Abrimos la 2?' y al adelantar sigue", async (
   await expect(pause).toBeVisible({ timeout: 5000 });
   await expect(pause).toContainText("Preventa 1: agotada en 4 días.");
   await expect(pause).toContainText("¿Abrimos la 2?");
-  await expect(pause.getByTestId("soon-badge")).toHaveCount(1);
+  // La etapa encadenada ya se abre sola: la pausa no promete nada "Pronto"
+  await expect(pause.getByTestId("soon-badge")).toHaveCount(0);
+  await expect(pause).toContainText("se abre sola cuando se agota");
   await expect(stairs.getByTestId("party-stairs-advance")).toBeFocused();
   await stairs.getByTestId("party-stairs-advance").click();
   await expect(stairs.getByTestId("party-stairs-pause")).toContainText("Preventa 2: agotada", { timeout: 5000 });

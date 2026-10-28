@@ -5,7 +5,7 @@ import { PERMISSION_LABELS, ROLE_LABELS, ROLE_PERMISSIONS } from "../permissions
 import {
     eventIdSchema, loadOwnedEvent, eventPublicUrl, eventDashboardUrl, eventUrls, ticketAvailability, presentTicket, TICKET_SELECT,
     DATE_PATTERN, TIME_PATTERN, fetchAll, DRAFT_URL_NOTE, scopeToEvents, eventDateFields, DATES_NOTE, descriptionDateWarning,
-    rejectCourtesyName, clp, localDateTime,
+    rejectCourtesyName, clp, localDateTime, ticketChainInfo,
 } from "./common";
 import { isCourtesyOrder, isTransferOrder, orderSoldQty } from "../../orderKinds";
 import { createPreviewLink, listPreviewLinks, revokePreviewLink, PreviewLinkError, PREVIEW_DEFAULT_HOURS } from "../../eventPreview";
@@ -175,6 +175,7 @@ async function eventDetail(ctx: ToolContext, eventId: number) {
         ctx.supabase.from("event_tags").select("category_tags ( name )").eq("event_id", event.id),
     ]);
     const availability = await ticketAvailability(ctx, event.id, (tickets || []).map((t: any) => Number(t.id)));
+    const chainOf = await ticketChainInfo(ctx, Number(event.id), tickets || [], availability);
     const previewLinks = await listPreviewLinks(Number(event.id), ctx.actor.orgId, ctx.supabase).catch(() => []);
     const pageSettings = await loadPageSettings(ctx, Number(event.id));
     const videos = await loadEventVideos(ctx, Number(event.id));
@@ -213,7 +214,7 @@ async function eventDetail(ctx: ToolContext, eventId: number) {
         dashboard_url: eventDashboardUrl(ctx, Number(event.id)),
         preview_links: previewLinks.filter((l) => l.status === "active").map(({ event_id, ...l }) => l),
         functions,
-        ticket_types: (tickets || []).map((t: any) => presentTicket(t, availability.get(Number(t.id)), event)),
+        ticket_types: (tickets || []).map((t: any) => presentTicket(t, availability.get(Number(t.id)), event, chainOf(t.id))),
         courtesy_note:
             "El tipo con is_system = true (Cortesía) lo crea AI Tickets con cada evento: no se vende y sirve para emitir cortesías (issue_complimentary_tickets).",
         ...(warnings.length ? { warnings } : {}),

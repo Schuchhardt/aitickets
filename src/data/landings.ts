@@ -239,7 +239,7 @@ export const LANDINGS: Landing[] = [
         // propias de fiestas; las de dinero, plazos, redes y anuncios vienen de PRODUCER_FAQ y ORGANIZADORES_FAQ).
         // Verificado:
         //   etapas → un tipo de entrada con ventana de venta (isTicketOnSale), hoy programada desde tools/tickets.ts;
-        //            la siguiente no abre sola cuando se agota la anterior (Pronto en la página)
+        //            la siguiente se abre sola al agotarse la anterior (opens_after_ticket_id, netlify/lib/tickets.mjs)
         //   "Ver QR" por entrada → src/pages/ticket/[id].astro; máximo por compra → DEFAULT_MAX_PER_PURCHASE
         //   dirección exacta → mensaje programado (send_attendee_message / schedule_reminder en tools/messaging.ts);
         //                      un lugar sin dirección exacta suma riesgo (event-risk.mjs) y puede dejar una reserva
@@ -249,7 +249,7 @@ export const LANDINGS: Landing[] = [
         faq: [
             {
                 q: "¿Cómo armo una preventa por etapas?",
-                a: "Cada etapa es un tipo de entrada con su precio, su cupo y su fecha y hora de apertura y cierre. Hoy las fechas se programan desde tu asistente de IA conectado o escribiéndonos por WhatsApp. Mientras una etapa está a la venta, tu público ve las siguientes con su fecha de apertura. Si una etapa se agota antes de tiempo, adelantas la siguiente por el mismo camino: todavía no abre sola.",
+                a: "Cada etapa es un tipo de entrada con su precio, su cupo y su fecha y hora de apertura y cierre. Hoy las fechas se programan desde tu asistente de IA conectado o escribiéndonos por WhatsApp. Mientras una etapa está a la venta, tu público ve las siguientes con su fecha de apertura. Si quieres que la siguiente se abra sola cuando se agota la anterior, la encadenas al crear o editar el evento (\"Se abre al agotarse…\").",
             },
             {
                 q: "¿Puedo tener entrada alumno y entrada general?",

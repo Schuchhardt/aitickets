@@ -3,6 +3,7 @@
 // (fechas): el productor (o la API) agrega las nuevas.
 import { slugify } from "../pages/api/_lib/server-utils";
 import { sanitizeRichText } from "./sanitize";
+import { loadTicketChain } from "../../netlify/lib/tickets.mjs";
 
 export const DUPLICATE_SOURCE_COLUMNS = "id, name, description, image_url, accessibility, secret_location, capacity";
 
@@ -42,7 +43,7 @@ export async function duplicateEventAsDraft(
             supabase.from("event_locations").select("venue_id, name, display_name, entrance_instructions, access_notes").eq("event_id", source.id),
             supabase
                 .from("event_tickets")
-                .select("ticket_name, price, max_quantity, is_gift, status, total_quantity")
+                .select("id, ticket_name, price, max_quantity, is_gift, status, total_quantity")
                 .eq("event_id", source.id)
                 .or("status.is.null,status.neq.unavailable")
                 // El tipo "Cortesía" (is_gift) lo crea la base de datos con cada evento: copiarlo lo duplicaría
@@ -63,10 +64,19 @@ export async function duplicateEventAsDraft(
         if (tickets?.length) {
             // Ventana de venta sin copiar (NULL = a la venta mientras esté publicado).
             // Las funciones no se copian => todas las entradas quedan para "todas las funciones" (R1).
-            const { error } = await supabase.from("event_tickets").insert(
-                tickets.map((t: any) => ({ ...t, status: "available", init_date: null, end_date: null, event_date_id: null, event_id: newEventId })),
-            );
+            const { data: inserted, error } = await supabase
+                .from("event_tickets")
+                .insert(tickets.map(({ id: _id, ...t }: any) => ({ ...t, status: "available", init_date: null, end_date: null, event_date_id: null, event_id: newEventId })))
+                .select("id");
             if (error) throw error;
+            // Tandas encadenadas: misma cadena con los ids nuevos (sin la migración 202610290100 no hay nada que copiar)
+            const chain: Map<number, number> = await loadTicketChain(supabase, source.id);
+            const newIdOf = new Map(tickets.map((t: any, i: number) => [Number(t.id), Number((inserted as any[])?.[i]?.id)]));
+            for (const [oldId, oldPrev] of chain) {
+                const id = newIdOf.get(oldId);
+                const prev = newIdOf.get(oldPrev);
+                if (id && prev) await supabase.from("event_tickets").update({ opens_after_ticket_id: prev }).eq("id", id).eq("event_id", newEventId);
+            }
         }
         if (tags?.length) {
             await supabase.from("event_tags").insert(tags.map((t: any) => ({ tag_id: t.tag_id, event_id: newEventId })));

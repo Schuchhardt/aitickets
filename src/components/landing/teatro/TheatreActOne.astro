@@ -2,8 +2,8 @@
 // 3 · Acto I · Antes del estreno (SPEC_landing_teatro §4.3, ancla #obra), en tres escenas:
 // 1. La temporada en una tarde: varias funciones (hasta MAX_EVENT_FUNCTIONS, schedule.ts), aforo y precio por función
 //    con tipos de entrada amarrados a una función (EditEventForm.vue paso 3) y el selector "Así lo ve tu público"
-//    (FunctionPicker, precios con priceQuote). Lo que no existe (repetir funciones en un paso, copiar las entradas a
-//    cada función) va con "Pronto". No hay butacas numeradas: se dice, sin "Pronto" (§0.6).
+//    (FunctionPicker, precios con priceQuote), "Repetir en varios días" y "Copiar a cada función" en el editor de
+//    funciones (FunctionRepeat.vue, TicketCopyToFunctions.vue). No hay butacas numeradas: se dice, sin "Pronto" (§0.6).
 // 2. Prensa e invitados (#prensa): cortesías (CourtesyTicketsForm.vue: no cuentan como venta y pueden superar el
 //    cupo), lista de invitados (hoy solo desde el asistente de IA, tools/guests.ts) y vista previa privada con link que
 //    vence (eventPreview.ts). Foto del ensayo en arco de proscenio con el pase de prensa colgado.
@@ -13,7 +13,6 @@ import FunctionPicker from "./FunctionPicker.vue";
 import PressPass from "./PressPass.astro";
 import LinkSales from "./LinkSales.astro";
 import ProsceniumPhoto from "./ProsceniumPhoto.astro";
-import SoonBadge from "../../ui/SoonBadge.vue";
 import { THEATRE_PHOTOS } from "./teatroLanding.js";
 import { MAX_EVENT_FUNCTIONS } from "../../../data/producerFaq";
 
@@ -23,8 +22,8 @@ const chips = [
   { label: "Entradas de estudiante y adulto mayor" },
   { label: "Jueves popular" },
   { label: "Si cambias un horario, avisamos a quienes compraron" },
-  { label: "Repetir funciones de jueves a domingo", soon: true },
-  { label: "Copiar las entradas a cada función", soon: true },
+  { label: "Repetir funciones de jueves a domingo" },
+  { label: "Copiar las entradas a cada función" },
 ];
 
 const pressItems = [
@@ -72,7 +71,6 @@ const pressItems = [
             chips.map((c) => (
               <li class="te-chip">
                 {c.label}
-                {c.soon && <SoonBadge dark />}
               </li>
             ))
           }

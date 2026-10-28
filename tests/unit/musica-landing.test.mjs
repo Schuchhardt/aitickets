@@ -25,6 +25,7 @@ import { DEFAULT_CADENCE } from '../../src/lib/socialSeriesCadence'
 import { MUSICA_FAQ } from '../../src/data/musicaFaq'
 import { getLanding } from '../../src/data/landings'
 import { MAX_EVENT_FUNCTIONS, PRODUCER_FAQ } from '../../src/data/producerFaq'
+import { MAX_FUNCTIONS } from '../../src/lib/functionPattern.mjs'
 import { PAYOUT_RELEASE_HOURS, PAYOUT_SCHEDULE_TEXT } from '../../netlify/lib/legal.mjs'
 import { LARGE_CAPACITY } from '../../netlify/lib/event-risk.mjs'
 import { RESERVE_HOLD_DAYS } from '../../src/lib/producer-api/ledger'
@@ -114,7 +115,8 @@ describe('curva de un concierto (§4.3)', () => {
 describe('tope de fechas (§0.3)', () => {
   it('MAX_EVENT_FUNCTIONS es el MAX_FUNCTIONS de schedule.ts y el cartel lo usa como {maxFunctions}', () => {
     const schedule = readFileSync(new URL('../../src/lib/producer-api/tools/schedule.ts', import.meta.url), 'utf8')
-    expect(schedule).toContain(`const MAX_FUNCTIONS = ${MAX_EVENT_FUNCTIONS};`)
+    expect(schedule).toMatch(/import \{ MAX_FUNCTIONS[^}]*\} from "..\/..\/functionPattern.mjs"/)
+    expect(MAX_EVENT_FUNCTIONS).toBe(MAX_FUNCTIONS)
     const texts = AUDIENCES.flatMap((a) => a.lines.map((l) => l.text))
     expect(texts.some((t) => t.includes('{maxFunctions}'))).toBe(true)
     expect(texts.join(' ')).not.toMatch(/\b60\b/)
