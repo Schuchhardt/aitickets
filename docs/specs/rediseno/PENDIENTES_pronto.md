@@ -40,7 +40,7 @@ Estado al 27-10-2026, rama `rediseno/aitickets`.
 | 10 | Dirección que solo ven quienes compran | Fiestas | P2 | S |
 | 11 | ~~Repetir funciones con un patrón y copiar entradas a cada función~~ **Hecho** | Teatro, talleres | P1 | M |
 | 12 | Mostrar reseñas mientras quedan fechas | Teatro, talleres | P2 | S |
-| 13 | Ocupación de cada función en una vista | Teatro | P2 | S |
+| 13 | ~~Ocupación de cada función en una vista~~ **Hecho** | Teatro | P2 | S |
 | 14 | Borderó por función | Teatro | P2 | M |
 | 15 | Preguntas al inscribirse | Talleres | P2 | M |
 | 16 | ~~Validar la misma entrada en varias sesiones o días~~ **Hecho** | Talleres, seminarios | P1 | M |
@@ -365,6 +365,15 @@ Las reseñas se muestran solo cuando el evento terminó (`EventDetail.vue`, `sho
 Una obra con funciones pasadas reseñadas y funciones futuras a la venta muestra las reseñas y el botón de compra.
 
 ## 13. Ocupación de cada función en una vista
+
+**Hecho (rama `feat/ocupacion-por-funcion`).** Sin migración. `functionOccupancy` (`src/lib/eventAnalytics.ts`): por
+función, vendidas, cortesías, emitidas (sin anuladas), ingresadas, cupo (suma de sus tipos de entrada; sin límite si
+alguno lo es) y % = emitidas ÷ cupo. Las entradas de tipos sin función (pase completo, tipo "Cortesía") van en su propia
+fila.
+- Panel del evento: módulo "Ocupación por función" en Entradas y ventas, con más de una función (`function-occupancy`
+  en `eventModules.ts`).
+- Asistente de IA: `get_event_performance` trae `occupancy_by_function`.
+- Landing de teatro: sin "Pronto" en la ocupación por función.
 
 **Dónde se promete**
 `teatro/TheatreSeason.astro` ("Ocupación de cada función en una vista").

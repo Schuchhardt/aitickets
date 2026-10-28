@@ -8,7 +8,7 @@
 //   Instagram → DEFAULT_KEYWORD (socialSeriesCadence.ts): con funciones cada semana la próxima siempre está a menos de
 //               daily_from_days días, así que la historia sale diaria toda la temporada (socialSeries.ts)
 //   invitar a la próxima obra → INVITE_AUDIENCES (reviews.mjs); duplicar → eventDuplicate.ts (no copia funciones)
-//   ocupación por función en una vista → no existe ("Pronto"; hoy, emitidas / cupo por tipo de entrada)
+//   ocupación por función en una vista → módulo "Ocupación por función" del panel (functionOccupancy, eventAnalytics.ts)
 // La isla hidrata antes de verse (rootMargin) para volver al paso 0 fuera de pantalla. Sin JS, debajo de la cartelera
 // (que queda en el paso 4) va la lista con los cinco momentos dentro de un <noscript>: con JS no ocupa espacio, así
 // que hidratar no mueve el contenido de abajo (CLS, §7).
@@ -53,7 +53,7 @@ const items = [
   [
     { icon: "soldout", title: "Agotada, sin que nadie te escriba.", text: "La función aparece agotada y tu público elige otra." },
     { icon: "schedule", title: "Cambio de horario, todos avisados.", text: "Si mueves una función, avisamos por correo a quienes compraron." },
-    { icon: "grid", title: "Ocupación de cada función en una vista", text: "Hoy ves emitidas y cupo de cada tipo de entrada.", soon: true },
+    { icon: "grid", title: "Cada función en una vista.", text: "En tu panel, una fila por función con vendidas, cortesías, cupo y cuánto se ha llenado." },
   ],
   [
     {

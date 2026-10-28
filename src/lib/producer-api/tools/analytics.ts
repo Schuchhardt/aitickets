@@ -8,6 +8,7 @@ import {
     channelConversion,
     dailySeries,
     eventCapacity,
+    functionOccupancy,
     loadEventFunctions,
     loadEventVisits,
     loadOrderCheckins,
@@ -101,7 +102,13 @@ export async function eventPerformance(ctx: ToolContext, eventId: number, days: 
         ticket_types: capacity.ticketTypes,
         sales_by_ticket_type: s.byType.slice(0, 30),
         // Solo con más de una función: órdenes, entradas e ingresos de cada una (una orden con dos funciones cuenta en ambas)
-        ...(functions.length > 1 ? { sales_by_function: salesByFunction(sales, functions, ticketFunction) } : {}),
+        ...(functions.length > 1
+            ? {
+                  sales_by_function: salesByFunction(sales, functions, ticketFunction),
+                  // Vendidas, cortesías, emitidas, ingresadas, cupo y % de cada función
+                  occupancy_by_function: await functionOccupancy(ctx.supabase, event.id),
+              }
+            : {}),
         sales_channels: s.channels.slice(0, 10),
         channel_conversion: channelConversion(visits, sales, { refTracked, top: 10, checkins }),
         sales_by_payment_provider: s.providers,
@@ -115,7 +122,7 @@ const getEventPerformance: ToolDef = {
     title: "Rendimiento del evento",
     description:
         "¿Cómo le va al evento? Ventas, ingresos, capacidad vendida, ritmo de venta (últimos 7 días vs anteriores y proyección), " +
-        "ventas por función (si tiene varias), visitas, conversión, fuentes de tráfico, ubicación de visitantes, horas pico, canales de venta (ref/UTM) con su conversión y cuántas de sus entradas ya ingresaron (checked_in), " +
+        "ventas y ocupación por función (si tiene varias), visitas, conversión, fuentes de tráfico, ubicación de visitantes, horas pico, canales de venta (ref/UTM) con su conversión y cuántas de sus entradas ya ingresaron (checked_in), " +
             "medios de pago, códigos usados y serie diaria. " +
         "Ideal para diagnosticar y recomendar acciones (subir precio, crear descuento, reforzar un canal).",
     scope: "read",
