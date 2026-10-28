@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { QrcodeStream } from 'vue-qrcode-reader'
 import { useClientStorage } from '../composables/useClientStorage'
 import { sessionView, addLocalSessionCheckin } from '../lib/sessionCheckin.mjs'
+import { entryDeadlineCheck, lateEntryMessage } from '../lib/entryDeadline.mjs'
 
 const props = defineProps({
   event: {
@@ -99,6 +100,15 @@ const alreadyMessage = (attendee) => {
   const fn = currentDates().find(d => String(d.id) === String(attendee.session_date_id))
   return fn && String(fn.date).slice(0, 10) === todayInSantiago() ? 'Ya ingresó hoy con este pase.' : `Ya ingresó a la función ${sessionLabel(attendee)}.`
 }
+// ==== Hora límite de ingreso (la lista "hasta las 01:00", src/lib/entryDeadline.mjs) ====
+/** { late, entry_until } con la hora límite del tipo de entrada (null si no tiene); también sin conexión. */
+const localLateCheck = (attendee) =>
+  entryDeadlineCheck({
+    entryUntil: attendee?.event_tickets?.entry_until,
+    eventDateId: attendee?.event_tickets?.event_date_id ?? attendee?.event_date_id ?? null,
+    dates: currentDates()
+  })
+
 /** " · Ingreso 2 de 3" para una multifunción. */
 const sessionProgress = (attended, total) => (total > 1 && attended ? ` · Ingreso ${attended} de ${total}` : '')
 
@@ -235,7 +245,7 @@ const onCameraError = (error) => {
 }
 
 
-const toTicketData = (ticket, fnCheck) => ({
+const toTicketData = (ticket, fnCheck, lateCheck = null) => ({
   id: ticket.id,
   event_id: ticket.event_id,
   status: ticket.status,
@@ -245,7 +255,10 @@ const toTicketData = (ticket, fnCheck) => ({
   ticket_name: ticket.event_tickets?.ticket_name || '',
   qr_code: ticket.qr_code,
   function_mismatch: Boolean(fnCheck?.function_mismatch),
-  function_label: fnCheck?.function_label || null
+  function_label: fnCheck?.function_label || null,
+  // Fuera de horario: la puerta decide si deja entrar igual (force)
+  late_entry: Boolean(lateCheck?.late),
+  entry_until: lateCheck?.entry_until || null
 })
 
 /** Busca en el servidor un QR que no está en la lista local (entrada vendida después de la última carga). */
@@ -273,12 +286,16 @@ const lookupTicketOnServer = async (qrCode) => {
       last_name: (ticket.full_name || '').split(' ').slice(1).join(' '),
       email: ticket.email || ''
     },
-    event_tickets: { ticket_name: ticket.ticket_name || '', event_date_id: ticket.event_date_id ?? null },
+    event_tickets: { ticket_name: ticket.ticket_name || '', event_date_id: ticket.event_date_id ?? null, ...(ticket.entry_until ? { entry_until: ticket.entry_until } : {}) },
     ...(ticket.sessions_total ? { sessions_attended: ticket.sessions_attended, sessions_total: ticket.sessions_total } : {})
   }
   const others = (localEvent.value?.attendees || []).filter(a => a.id !== attendee.id)
   setLocalEvent({ ...localEvent.value, attendees: [...others, attendee] })
-  return { attendee, fnCheck: { function_mismatch: ticket.function_mismatch, function_label: ticket.function_label } }
+  return {
+    attendee,
+    fnCheck: { function_mismatch: ticket.function_mismatch, function_label: ticket.function_label },
+    lateCheck: ticket.entry_until ? { late: Boolean(ticket.late_entry), entry_until: ticket.entry_until } : null
+  }
 }
 
 /** sha256 hex (modo puerta: la lista descargada trae qr_hash en vez del QR en claro). */
@@ -307,12 +324,14 @@ const onDetect = async ([result]) => {
   try {
     let ticket = await findLocalTicket(scannedCode.value)
     let fnCheck = ticket ? localFunctionCheck(ticket) : null
+    let lateCheck = ticket ? localLateCheck(ticket) : null
 
     if (!ticket && isOnline.value) {
       const found = await lookupTicketOnServer(scannedCode.value)
       if (found) {
         ticket = found.attendee
         fnCheck = found.fnCheck
+        lateCheck = found.lateCheck
       }
     }
 
@@ -337,7 +356,8 @@ const onDetect = async ([result]) => {
     }
 
     // Mostrar datos del ticket para confirmar
-    ticketData.value = toTicketData(ticket, fnCheck)
+    ticketData.value = toTicketData(ticket, fnCheck, lateCheck)
+    if (ticketData.value.late_entry && errorSound) errorSound.play()
     cameraVisible.value = false
   } catch (err) {
     if (errorSound) errorSound.play()
@@ -375,26 +395,30 @@ const isAlreadyValidated = (data) => data?.code === 'already_validated' || (!dat
 /**
  * Valida una entrada. Online: confirma en el servidor (/api/confirm-ticket con event_id).
  * Offline o si el servidor no responde: la valida localmente y la deja pendiente de sincronizar.
- * Devuelve { ok, message, offline?, function_mismatch?, function_label? }.
+ * Devuelve { ok, message, offline?, function_mismatch?, function_label?, late? }. `force` deja entrar igual una
+ * entrada fuera de horario; sin él, el servidor responde 409 late_entry (late: true) y la puerta decide.
  */
-const validateTicket = async (ticketId) => {
+const validateTicket = async (ticketId, { force = false } = {}) => {
   if (isOnline.value) {
     try {
       const res = await fetch(api.confirm, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ticket_id: ticketId, event_id: props.event.id })
+        body: JSON.stringify({ ticket_id: ticketId, event_id: props.event.id, ...(force ? { force: true } : {}) })
       })
       let data = {}
       try { data = await res.json() } catch (e) { /* sin cuerpo */ }
       if (res.ok) {
         markLocalValidated(ticketId, data.validated_at)
-        return { ok: true, function_mismatch: data.function_mismatch, function_label: data.function_label, sessions_attended: data.sessions_attended, sessions_total: data.sessions_total }
+        return { ok: true, function_mismatch: data.function_mismatch, function_label: data.function_label, sessions_attended: data.sessions_attended, sessions_total: data.sessions_total, late_entry: data.late_entry }
       }
       if (res.status === 401) {
         return { ok: false, message: sessionExpiredMessage }
       }
       if (res.status >= 400 && res.status < 500) {
+        if (res.status === 409 && data?.code === 'late_entry') {
+          return { ok: false, late: true, entry_until: data.entry_until || null, message: data.message || lateEntryMessage(data.entry_until) }
+        }
         if (res.status === 409) {
           if (isAlreadyValidated(data)) markLocalValidated(ticketId, data.validated_at)
           else if (data?.status) setLocalStatus(ticketId, data.status)
@@ -409,23 +433,32 @@ const validateTicket = async (ticketId) => {
   markLocalValidated(ticketId)
   queuePendingValidation(ticketId)
   const local = (localEvent.value?.attendees || []).find(a => a.id === ticketId)
-  return { ok: true, offline: true, sessions_attended: local?.sessions_attended, sessions_total: local?.sessions_total }
+  return { ok: true, offline: true, sessions_attended: local?.sessions_attended, sessions_total: local?.sessions_total, late_entry: force }
 }
 
-// Confirmar validación del QR escaneado
-const confirmValidation = async () => {
+/** " · Entró fuera de horario" cuando la puerta dejó entrar igual. */
+const lateNote = (result) => (result.late_entry ? ' · Entró fuera de horario' : '')
+
+// Confirmar validación del QR escaneado. force = "Dejar entrar igual" una entrada fuera de horario.
+const confirmValidation = async (force = false) => {
   if (!ticketData.value) return
 
   try {
     loading.value = true
-    const result = await validateTicket(ticketData.value.id)
+    const result = await validateTicket(ticketData.value.id, { force: force === true })
 
+    if (result.late) {
+      // El servidor dice que llegó fuera de horario (la lista local no lo sabía): la puerta decide
+      if (errorSound) errorSound.play()
+      ticketData.value = { ...ticketData.value, late_entry: true, entry_until: result.entry_until }
+      return
+    }
     if (result.ok) {
       if (successSound) successSound.play()
       const fnWarning = ticketData.value.function_mismatch && ticketData.value.function_label
         ? ` · Ojo: entrada para ${ticketData.value.function_label}`
         : ''
-      resultMessage.value = `✅ Entrada validada con éxito para ${ticketData.value.full_name}${sessionProgress(result.sessions_attended, result.sessions_total)}${result.offline ? ' (pendiente de sincronizar)' : ''}${fnWarning}`
+      resultMessage.value = `✅ Entrada validada con éxito para ${ticketData.value.full_name}${sessionProgress(result.sessions_attended, result.sessions_total)}${lateNote(result)}${result.offline ? ' (pendiente de sincronizar)' : ''}${fnWarning}`
     } else {
       if (errorSound) errorSound.play()
       resultMessage.value = `❌ ${result.message}`
@@ -464,7 +497,8 @@ const syncWithServer = async () => {
         const res = await fetch(api.confirm, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ticket_id: validation.ticket_id, event_id: props.event.id, validated_at: validation.validated_at })
+          // force: la puerta ya dejó entrar a esta persona sin conexión (aunque fuera fuera de horario)
+          body: JSON.stringify({ ticket_id: validation.ticket_id, event_id: props.event.id, validated_at: validation.validated_at, force: true })
         })
         let data = {}
         try { data = await res.json() } catch (e) { /* sin cuerpo */ }
@@ -547,12 +581,25 @@ const manualValidation = async (attendee) => {
 
   const fnCheck = localFunctionCheck(attendee)
   if (fnCheck.function_mismatch && !confirm(`Esta entrada es para otra función (${fnCheck.function_label}). ¿Validarla de todas formas?`)) return
+  const lateCheck = localLateCheck(attendee)
+  let force = false
+  if (lateCheck?.late) {
+    if (!confirm(`${lateEntryMessage(lateCheck.entry_until)} ¿Dejar entrar igual?`)) return
+    force = true
+  }
 
   const name = `${attendee.attendees?.first_name || ''} ${attendee.attendees?.last_name || ''}`.trim()
-  const result = await validateTicket(attendee.id)
+  let result = await validateTicket(attendee.id, { force })
+  if (result.late) {
+    if (!confirm(`${result.message} ¿Dejar entrar igual?`)) {
+      resultMessage.value = `⚠️ ${result.message} No entró.`
+      return
+    }
+    result = await validateTicket(attendee.id, { force: true })
+  }
   if (result.ok) {
     if (successSound) successSound.play()
-    resultMessage.value = `✅ Entrada validada manualmente para ${name}${sessionProgress(result.sessions_attended, result.sessions_total)}${result.offline ? ' (pendiente de sincronizar)' : ''}`
+    resultMessage.value = `✅ Entrada validada manualmente para ${name}${sessionProgress(result.sessions_attended, result.sessions_total)}${lateNote(result)}${result.offline ? ' (pendiente de sincronizar)' : ''}`
   } else {
     if (errorSound) errorSound.play()
     resultMessage.value = `❌ ${result.message}`
@@ -677,9 +724,22 @@ const resendTickets = async (attendee) => {
         ⚠️ Esta entrada es para otra función<span v-if="ticketData.function_label">: <strong>{{ ticketData.function_label }}</strong></span>. Puedes validarla de todas formas si corresponde.
       </div>
 
+      <div v-if="ticketData.late_entry" class="mt-3 p-2 bg-amber-100 border border-amber-400 rounded text-xs sm:text-sm text-amber-900" role="alert" data-testid="late-entry-warning">
+        ⚠️ <strong>Fuera de horario</strong>: la entrada valía hasta las {{ ticketData.entry_until }}. Tú decides si entra.
+      </div>
+
       <div class="flex flex-col sm:flex-row gap-2 mt-4">
         <button
-          @click="confirmValidation"
+          v-if="ticketData.late_entry"
+          @click="confirmValidation(true)"
+          class="flex-1 bg-amber-500 text-white px-4 py-2.5 rounded hover:bg-amber-600 font-medium text-sm sm:text-base"
+          data-testid="late-entry-force"
+        >
+          Dejar entrar igual
+        </button>
+        <button
+          v-else
+          @click="confirmValidation()"
           class="flex-1 bg-green-600 text-white px-4 py-2.5 rounded hover:bg-green-700 font-medium text-sm sm:text-base"
         >
           ✓ Validar Entrada
@@ -688,7 +748,7 @@ const resendTickets = async (attendee) => {
           @click="cancelValidation"
           class="flex-1 bg-gray-500 text-white px-4 py-2.5 rounded hover:bg-gray-600 font-medium text-sm sm:text-base"
         >
-          ✗ Cancelar
+          {{ ticketData.late_entry ? '✗ No entra' : '✗ Cancelar' }}
         </button>
       </div>
     </div>

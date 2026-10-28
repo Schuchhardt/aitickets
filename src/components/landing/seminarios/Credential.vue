@@ -4,7 +4,8 @@
 // contenedor) con su clip metálico, la banda del tipo con su trama (sólida turquesa, sólida grafito, rayas o contorno:
 // nunca solo color), el nombre en Archivo Expanded, la organización, el día y un QR decorativo (SVG precalculado,
 // aria-hidden) o la foto autorizada del testimonio. Sello "ejemplo" abajo a la izquierda.
-// Es un recurso gráfico, no una función del producto: imprimir credenciales con nombre es "Pronto" (§0.7).
+// Es un recurso gráfico de la landing: la credencial que el productor imprime desde el panel es la de credentialsPdf
+// (src/lib/attendeePdf.mjs), en A4 con 4 por hoja, nombre, tipo de entrada y el QR de la entrada.
 // Es .vue (y no .astro como dice la spec) para que la misma credencial sirva en las secciones Astro sin hidratar y
 // dentro de la mesa de acreditación (AccreditationDesk), donde cambia con cada caso.
 // swing: el contenedor lleva data-se-swing y seminariosLanding.client.js lo balancea (C4) al entrar en pantalla.

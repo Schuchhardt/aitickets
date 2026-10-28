@@ -50,7 +50,7 @@ export const SEMINARIOS_FAQ: FaqItem[] = [
     own("¿Dónde va el programa con los expositores?"),
     {
         q: "¿Una empresa puede comprar para todo su equipo?",
-        a: `Sí. Son hasta ${DEFAULT_MAX_PER_PURCHASE} entradas por compra si no lo cambias (se sube hasta ${MAX_PER_ORDER_AI} desde tu asistente de IA o escribiéndonos por WhatsApp). Quien compra recibe cada entrada con su link "Ver QR" y se la reenvía a cada persona. Si quieres el nombre de cada asistente en la acreditación, tu equipo pone cada entrada a nombre de su titular desde tu asistente de IA: le llega un QR nuevo y el anterior deja de servir.`,
+        a: `Sí. Son hasta ${DEFAULT_MAX_PER_PURCHASE} entradas por compra si no lo cambias (se sube hasta ${MAX_PER_ORDER_AI} desde tu asistente de IA o escribiéndonos por WhatsApp). Si activas "Nombre de cada asistente" en tu evento, la empresa escribe al comprar el nombre y el correo de cada persona y a cada una le llega su QR. Si no, quien compra recibe cada entrada con su link "Ver QR" y se la reenvía; para cambiar el titular después, tu equipo lo hace desde tu asistente de IA: le llega un QR nuevo y el anterior deja de servir.`,
     },
     own("¿Pueden pedirme factura?"),
     own("¿Puedo tener precio de socio o de convenio?"),

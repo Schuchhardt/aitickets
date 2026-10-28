@@ -5,6 +5,8 @@
 // Las entradas están como filas de event_tickets en la BD (max_quantity null = el productor no configuró un
 // máximo por compra); la página las pasa por toPublicTicket (src/lib/eventPage.ts), igual que la página real.
 
+import { agendaGroups } from "../../../src/lib/eventAgenda.mjs";
+
 export const FIXTURE_ROUTE = "/__e2e/eventos";
 
 export const TICKETS = {
@@ -17,6 +19,18 @@ export const TICKETS = {
   free: { id: 9105, ticket_name: "Entrada liberada", price: 0, max_quantity: null, total_quantity: null },
   // Quedan 8 cupos: "Gratis · Quedan 8 cupos"
   freeFew: { id: 9106, ticket_name: "Entrada liberada", price: 0, max_quantity: null, total_quantity: 8 },
+  // Mesa para 4 (people_per_ticket): un QR por persona, precio y cupo por mesa
+  table: { id: 9107, ticket_name: "Mesa VIP", price: 120000, max_quantity: null, total_quantity: 10, people: 4 },
+};
+
+/** Datos extra del checkout (events.checkout_fields) para tests/e2e/checkout-extras.spec.ts */
+const SEMINAR_FIELDS = {
+  attendee_names: "required",
+  company: true,
+  questions: [
+    { id: "nivel", label: "Nivel", type: "choice", options: ["Básico", "Avanzado"], required: true },
+    { id: "auto", label: "¿Vienes en auto?", type: "yes_no", required: false },
+  ],
 };
 
 /** Lugares para los eventos con varias funciones (el de una función es "Teatro de Prueba", en fixtureEvent). */
@@ -74,6 +88,21 @@ const RUN_ANY_FUNCTION = {
   tickets: [TICKETS.general],
 };
 
+/**
+ * Congreso de 2 días con pase completo y agenda (tests/e2e/event-agenda.spec.ts): fn = índice de la función del
+ * bloque; sin fn, vale para todos los días.
+ */
+const CONGRESS = {
+  functions: [{ days: 30, venue: VENUE_PROVIDENCIA }, { days: 31, venue: VENUE_PROVIDENCIA }],
+  tickets: [TICKETS.general],
+  agenda: [
+    { start: "08:30", end: "09:00", title: "Acreditación y café", room: "Hall" },
+    { fn: 0, start: "09:30", end: "10:30", title: "Charla inaugural", speakers: "Ana Pérez (Empresa Ejemplo)", room: "Sala 1" },
+    { fn: 0, start: "09:00", end: "09:30", title: "Bienvenida" },
+    { fn: 1, start: "10:00", end: "11:30", title: "Panel: IA en la empresa", speakers: "Juan Soto, Marta Díaz", room: "Sala 2" },
+  ],
+};
+
 /** layout: diseño elegido por el productor (sin imagen el diseño siempre es compacto). */
 export const SCENARIOS = {
   "poster-una-entrada": { layout: "poster", tickets: [TICKETS.general] },
@@ -83,6 +112,14 @@ export const SCENARIOS = {
   "maximo-configurado": { layout: "poster", tickets: [TICKETS.generalMax3] },
   // Evento que ya terminó (hace 2 días), con reseñas y fotos de asistentes (tests/e2e/event-reviews.spec.ts)
   "terminado-con-resenas": { layout: "poster", tickets: [], ended: true, reviews: true },
+  // Obra en cartelera: una función pasada con reseñas y dos a la venta (review_settings.show_while_on_sale)
+  "cartelera-con-resenas": {
+    layout: "poster",
+    functions: [{ days: -3 }, { days: 10 }, { days: 12 }],
+    tickets: [{ ...TICKETS.general, fn: 1 }, { ...TICKETS.general, id: 9106, fn: 2 }],
+    reviews: true,
+    reviewsDuringRun: true,
+  },
   // Videos del evento (tests/e2e/event-video.spec.ts): de portada en cada diseño (compacto se muestra como póster)
   // y opcional en la galería
   "con-video-portada": { layout: "poster", tickets: [TICKETS.general], coverVideo: true },
@@ -103,6 +140,11 @@ export const SCENARIOS = {
   agotado: { layout: "poster", tickets: [], unavailable: [{ ...TICKETS.general, reason: "sold_out" }], saleState: "sold_out" },
   "terminado-sin-resenas": { layout: "poster", tickets: [], ended: true },
   "venta-cerrada": { layout: "poster", tickets: [], saleState: "closed" },
+  // Agenda por día (tests/e2e/event-agenda.spec.ts)
+  "congreso-con-agenda": { layout: "poster", ...CONGRESS },
+  // Datos extra al comprar (tests/e2e/checkout-extras.spec.ts): asistentes, empresa y preguntas; y una mesa para 4
+  "datos-al-comprar": { layout: "poster", tickets: [TICKETS.general], checkoutFields: SEMINAR_FIELDS },
+  "mesa-para-cuatro": { layout: "poster", tickets: [TICKETS.table], checkoutFields: { attendee_names: "optional" } },
   // Vista previa privada de un borrador (status draft + is_preview, como /eventos/vista-previa/…)
   "vista-previa": { layout: "poster", tickets: [TICKETS.general], preview: true },
 };
@@ -203,9 +245,15 @@ export function fixtureEvent(name, { toPublicTicket, now = new Date() }) {
     cover_video: scenario.coverVideo ? FIXTURE_VIDEO : null,
     gallery_video: scenario.galleryVideo ? FIXTURE_VIDEO : null,
     dates,
-    tickets: scenario.tickets.map((t) =>
-      toPublicTicket({ ...t, init_date: null, end_date: null, event_date_id: functionId(t) }, { remaining: t.total_quantity ?? null, feeAbsorbed: false }),
+    agenda: agendaGroups(
+      (scenario.agenda || []).map((b, i) => ({ id: i + 1, function_id: functionId(b), start: b.start, end: b.end ?? null, title: b.title, speakers: b.speakers ?? null, room: b.room ?? null, position: i })),
+      dates,
     ),
+    tickets: scenario.tickets.map((t) => ({
+      ...toPublicTicket({ ...t, init_date: null, end_date: null, event_date_id: functionId(t) }, { remaining: t.total_quantity ?? null, feeAbsorbed: false }),
+      people_per_ticket: t.people || 1,
+    })),
+    checkout_fields: scenario.checkoutFields || null,
     unavailable_tickets: (scenario.unavailable || []).map((t) => ({
       id: t.id,
       ticket_name: t.ticket_name,
@@ -217,6 +265,7 @@ export function fixtureEvent(name, { toPublicTicket, now = new Date() }) {
     theme: image ? { tint: "75 60% 94%", poster_width: 1200, poster_height: 630 } : null,
     sale_state: scenario.saleState || (scenario.tickets.length ? "on_sale" : "closed"),
     reviews: scenario.reviews ? FIXTURE_REVIEWS : null,
+    reviews_during_run: scenario.reviewsDuringRun === true,
     sale_starts_at: scenario.saleStartsInDays ? new Date(now.getTime() + scenario.saleStartsInDays * 24 * 3600 * 1000).toISOString() : null,
     has_secret_location: false,
     organization: { name: "Productora de Prueba", website: null, instagram: null },

@@ -1,7 +1,7 @@
 ---
 // Ticket de mesa de ejemplo (SPEC_landing_clubs §4.7, C14): card vertical con borde que brilla. "MESA VIP" en Doto 40,
 // la noche, lo que incluye (sin marcas ni "botella de…": §0.10), el precio con SERVICE_FEE_NOTE (fees.mjs), la barra de
-// mesas vendidas (crece al revelarse) y "1 QR por mesa" (una unidad = un QR, buildAttendeeRows).
+// mesas vendidas (crece al revelarse) y "6 QR, uno por invitado" (mesa para 6: people_per_ticket, buildAttendeeRows).
 import { CLUB_TICKETS, LIVE_NIGHT, NIGHT_NAME, nightState, NIGHT_PEAK_STEP } from "./clubsLanding.js";
 import { formatCLP } from "../producerLanding.js";
 import { SERVICE_FEE_NOTE } from "../../../../netlify/lib/fees.mjs";
@@ -37,7 +37,7 @@ const { tablesSold, tablesTotal } = nightState(NIGHT_PEAK_STEP);
         height="7"
         rx="1"></rect><path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h4v-3"></path></svg
     >
-    1 QR por mesa
+    6 QR, uno por invitado
   </p>
 </article>
 

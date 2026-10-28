@@ -1,8 +1,11 @@
 <script setup>
+// Crear un post manual (Promocionar → Nuevo post) para Instagram, Facebook, TikTok y LinkedIn: evento, texto e imágenes,
+// redes y programación. Las reglas de cada red (imagen obligatoria, largo del texto) vienen de src/lib/socialPlatforms.ts.
 import { prepareImageForUpload } from '../../../lib/clientImage'
+import { SOCIAL_PLATFORMS, PLATFORM_RULES, postMediaProblem } from '../../../lib/socialPlatforms'
 import { ref, computed, watch } from 'vue'
 import {
-  ArrowLeft, ArrowRight, Check, Image, Instagram, Facebook,
+  ArrowLeft, ArrowRight, Check, Image, Instagram, Facebook, Linkedin, Music2,
   Sparkles, Upload, X, Loader2, Calendar, Clock, Send, Eye, Wand2
 } from 'lucide-vue-next'
 
@@ -40,10 +43,10 @@ const connectedPlatforms = computed(() => {
   return platformIds
 })
 
-const platformOptions = [
-  { id: 'instagram', name: 'Instagram', icon: Instagram, maxChars: 2200 },
-  { id: 'facebook', name: 'Facebook', icon: Facebook, maxChars: 63206 },
-]
+const PLATFORM_ICONS = { instagram: Instagram, facebook: Facebook, tiktok: Music2, linkedin: Linkedin }
+const platformOptions = SOCIAL_PLATFORMS.map((id) => ({ id, name: PLATFORM_RULES[id].name, icon: PLATFORM_ICONS[id], maxChars: PLATFORM_RULES[id].maxChars }))
+// Lo que falta para publicar en las redes elegidas (Instagram y TikTok piden imagen; LinkedIn, hasta 3.000 caracteres)
+const mediaProblem = computed(() => postMediaProblem(selectedPlatforms.value, imageUrls.value.length, postContent.value.length))
 
 const availablePlatforms = computed(() =>
   platformOptions.filter(p => connectedPlatforms.value.includes(p.id))
@@ -59,7 +62,7 @@ const charLimit = computed(() => {
 
 // Step validation
 const isStep1Valid = computed(() => !!selectedEventId.value)
-const isStep2Valid = computed(() => postContent.value.trim().length >= 10 && selectedPlatforms.value.length > 0)
+const isStep2Valid = computed(() => postContent.value.trim().length >= 10 && selectedPlatforms.value.length > 0 && !mediaProblem.value)
 const isStep3Valid = computed(() => true) // Preview is always valid
 const isCurrentStepValid = computed(() => {
   switch (currentStep.value) {
@@ -428,6 +431,7 @@ const selectedTone = ref('')
               <Check v-if="selectedPlatforms.includes(platform.id)" :size="16" class="text-green-600" />
             </button>
           </div>
+          <p v-if="mediaProblem" class="mt-3 text-sm text-amber-700" data-testid="post-media-problem">{{ mediaProblem }}</p>
         </div>
 
         <!-- Schedule -->
@@ -483,9 +487,8 @@ const selectedTone = ref('')
           <!-- Post meta -->
           <div class="px-4 pb-4 flex flex-wrap items-center gap-3 text-xs text-gray-400">
             <span v-for="p in selectedPlatforms" :key="p" class="flex items-center gap-1 capitalize">
-              <Instagram v-if="p === 'instagram'" :size="12" />
-              <Facebook v-if="p === 'facebook'" :size="12" />
-              {{ p }}
+              <component :is="PLATFORM_ICONS[p]" v-if="PLATFORM_ICONS[p]" :size="12" />
+              {{ PLATFORM_RULES[p]?.name || p }}
             </span>
             <span v-if="isScheduled && scheduledFor" class="flex items-center gap-1">
               <Clock :size="12" />

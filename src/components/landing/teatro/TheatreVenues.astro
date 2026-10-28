@@ -2,11 +2,11 @@
 // 8 · Para salas (SPEC_landing_teatro §4.8, ancla #salas): la web gratis con la cartelera (sites.ts, /web-gratis),
 // cada compañía programada como una obra con sus funciones, acceso de Solo lectura limitado a su obra (ROLE_LABELS;
 // limitar a un evento hoy solo desde el asistente de IA, assign_event_staff) y CSV de órdenes por obra
-// (/api/events/orders-csv). El borderó por función para liquidar con la sala no existe: "Pronto".
+// (/api/events/orders-csv). Borderó por función para liquidar con la sala: src/lib/functionSettlement.ts, imprimible
+// en /dashboard/events/<id>/bordero (PDF desde el navegador) y en planilla (/api/events/function-settlement).
 // Analítica: te_cta_click { position: salas } y te_web_click (TheatreTracking, data-cta="web").
 import ActEyebrow from "./ActEyebrow.astro";
 import VenueBill from "./VenueBill.astro";
-import SoonBadge from "../../ui/SoonBadge.vue";
 ---
 
 <section id="salas" class="te-section te-on-sala-2 vn" aria-labelledby="te-venues-title" data-te-section="salas">
@@ -49,9 +49,9 @@ import SoonBadge from "../../ui/SoonBadge.vue";
           <li class="vn-item" data-lp-step>
             <span class="te-bullet" aria-hidden="true"></span>
             <p>
-              <strong class="vn-item-title">Para liquidar con cada compañía.</strong> Descargas las órdenes de cada obra en
-              CSV, con fecha, entradas y montos.
-              <span class="vn-soon">Borderó por función <SoonBadge dark /></span>
+              <strong class="vn-item-title">Para liquidar con cada compañía.</strong> Un borderó por función con las entradas
+              por tipo y precio, cortesías, bruto, cargos y neto, para imprimir, guardar en PDF o descargar en planilla.
+              También las órdenes de cada obra en CSV.
             </p>
           </li>
         </ul>
@@ -98,14 +98,6 @@ import SoonBadge from "../../ui/SoonBadge.vue";
     display: block;
     font-weight: 600;
     color: var(--te-text-1);
-  }
-  .vn-soon {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: 6px;
-    color: var(--te-text-1);
-    font-weight: 500;
   }
   .vn-cta {
     margin-top: 28px;

@@ -2,10 +2,11 @@
 // Body: { qr_code, event_id }. Requiere sesión con rol de check-in y evento de la organización del usuario.
 // status NULL (entradas antiguas) se devuelve como 'active'. R1: incluye function_mismatch/function_label.
 // Entrada multifunción: status/validated_at son los de la función de hoy (+ sessions_attended / sessions_total).
+// Con hora límite de ingreso (event_tickets.entry_until): entry_until y late_entry (fuera de horario ahora).
 import { getSupabaseAdmin, getOwnedEvent } from '../../lib/supabase.mjs'
 import { canAccessEventByStaff } from '../../lib/event-staff.mjs'
 import { getSessionContextWithRefresh, jsonWithCookies, CHECKIN_ROLES } from '../../lib/session.mjs'
-import { getFunctionCheck, ticketSessionState } from '../../lib/checkin.mjs'
+import { getFunctionCheck, ticketSessionState, entryDeadlineState } from '../../lib/checkin.mjs'
 
 export default async function handler(req) {
   const { ctx, setCookies } = await getSessionContextWithRefresh(req)
@@ -39,6 +40,7 @@ export default async function handler(req) {
       .select(`
         id,
         event_id,
+        event_ticket_id,
         qr_code,
         status,
         validated_at,
@@ -55,6 +57,8 @@ export default async function handler(req) {
       return respond({ message: 'No se encontró una entrada con ese código QR.' }, 404)
     }
 
+    // Asistente de este QR si se escribió al comprar (migración 202610300100; sin ella, quien compró)
+    const { data: holder } = await supabase.from('event_attendees').select('holder_name, holder_email, seat_number').eq('id', data.id).maybeSingle()
     const fnCheck = await getFunctionCheck(supabase, eventId, data.event_tickets?.event_date_id ?? null)
     const ticket = {
       id: data.id,
@@ -65,13 +69,15 @@ export default async function handler(req) {
       event_date_id: data.event_tickets?.event_date_id ?? null,
       status: data.status ?? 'active',
       validated_at: data.validated_at,
-      full_name: `${data.attendees?.first_name || ''} ${data.attendees?.last_name || ''}`.trim(),
-      email: data.attendees?.email || null,
-      ticket_name: data.event_tickets?.ticket_name || null,
+      full_name: holder?.holder_name || `${data.attendees?.first_name || ''} ${data.attendees?.last_name || ''}`.trim(),
+      email: holder?.holder_email || data.attendees?.email || null,
+      ticket_name: data.event_tickets?.ticket_name ? `${data.event_tickets.ticket_name}${holder?.seat_number ? ` · invitado ${holder.seat_number}` : ''}` : null,
       price: data.event_tickets?.price ?? null,
       ...fnCheck,
       ...(await ticketSessionState(supabase, eventId, data)),
     }
+    const deadline = await entryDeadlineState(supabase, eventId, data)
+    if (deadline) Object.assign(ticket, { entry_until: deadline.entry_until, late_entry: Boolean(deadline.late) })
 
     return respond({ ticket }, 200)
   } catch (err) {

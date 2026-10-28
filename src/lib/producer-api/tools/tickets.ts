@@ -2,9 +2,12 @@
 import { ToolError, type ToolDef } from "../registry";
 import { eventIdSchema, loadOwnedEvent, ticketAvailability, presentTicket, TICKET_SELECT, isoOrNull, rejectCourtesyName, clp, ticketChainInfo } from "./common";
 import { chainError, loadTicketChain } from "../../../../netlify/lib/tickets.mjs";
+import { loadEntryDeadlines } from "../../../../netlify/lib/checkin.mjs";
+import { normalizeEntryUntil } from "../../entryDeadline.mjs";
 import { normalizeTicket } from "../../../pages/api/_lib/events";
 import { isTransferOrder } from "../../orderKinds";
 import { IDENTITY_REQUIRED_MESSAGE, identityApproved, loadCapacityTickets, loadOrgIdentity, ticketsRequireIdentity } from "../../producerIdentity";
+import { formatRut, MAX_PEOPLE_PER_TICKET } from "../../checkoutFields.mjs";
 
 /**
  * Evento publicado que con este cambio pasa a vender más de 10 cupos pagados: exige identidad verificada (igual que al publicar).
@@ -34,7 +37,7 @@ async function loadTicket(ctx: any, eventId: number, ticketId: number, { allowSy
 
 const FIELD_LABELS: Record<string, string> = {
     ticket_name: "Nombre", price: "Precio", total_quantity: "Capacidad", max_quantity: "Máximo por compra", status: "Venta", init_date: "Inicio de venta", end_date: "Fin de venta",
-    opens_after_ticket_id: "Se abre tras",
+    opens_after_ticket_id: "Se abre tras", people_per_ticket: "Personas por entrada", entry_until: "Ingreso hasta",
 };
 const fmtField = (field: string, v: unknown) =>
     v == null ? "—" : field === "price" ? clp(Number(v)).replace(" CLP", "") : field === "status" ? (v === "available" ? "activa" : "pausada") : String(v);
@@ -61,6 +64,21 @@ const opensAfterSchema = {
         "La anterior necesita cupo o fecha de cierre. null = quitar el encadenamiento.",
 };
 
+// Mesa para N (event_tickets.people_per_ticket, migración 202610300110)
+const peoplePerTicketSchema = {
+    type: "integer" as const,
+    minimum: 1,
+    maximum: MAX_PEOPLE_PER_TICKET,
+    description:
+        "Personas por entrada (mesa para N): cada unidad vendida emite un QR por persona, que se validan uno por uno. Precio, capacidad y " +
+        "máximo por compra siguen siendo por mesa. 1 = entrada normal. Un cambio aplica solo a compras nuevas.",
+};
+
+async function assertPeopleColumn(ctx: any) {
+    const { error } = await ctx.supabase.from("event_tickets").select("people_per_ticket").limit(1);
+    if (error) throw new ToolError("unavailable", "Las mesas para varias personas estarán disponibles después del próximo deploy.");
+}
+
 async function assertChainable(ctx: any, eventId: number, ticketId: number | null, prevId: number | null) {
     const { error: columnError } = await ctx.supabase.from("event_tickets").select("opens_after_ticket_id").limit(1);
     if (columnError) throw new ToolError("unavailable", "Las tandas que se abren solas estarán disponibles después del próximo deploy.");
@@ -71,6 +89,25 @@ async function assertChainable(ctx: any, eventId: number, ticketId: number | nul
     const reason = chainError(tickets || [], chain, ticketId ?? 0, prevId);
     if (reason) throw new ToolError("invalid_input", reason);
     return chain;
+}
+
+// Hora límite de ingreso (event_tickets.entry_until, migración 202610300300)
+const entryUntilSchema = {
+    type: "string" as const,
+    pattern: "^([01]\\d|2[0-3]):[0-5]\\d$",
+    nullable: true,
+    description:
+        "Hora límite de ingreso \"HH:MM\" (hora de Chile, p. ej. la lista hasta las 01:00). Si es anterior al inicio de la función, es de la " +
+        "madrugada siguiente. Pasada esa hora el escáner marca la entrada \"fuera de horario\" y la puerta decide. null = entra a cualquier hora.",
+};
+
+/** Guarda la hora límite (columna aparte: sin la migración avisa en vez de fallar el resto del cambio). */
+async function saveEntryUntil(ctx: any, eventId: number, ticketId: number, value: string | null) {
+    const { error } = await ctx.supabase.from("event_tickets").update({ entry_until: normalizeEntryUntil(value) }).eq("id", ticketId).eq("event_id", eventId);
+    if (error) {
+        if (["42703", "PGRST204"].includes(String(error.code || ""))) throw new ToolError("unavailable", "La hora límite de ingreso estará disponible después del próximo deploy.");
+        throw error;
+    }
 }
 
 async function presentWithChain(ctx: any, event: any, row: any, availability?: Map<number, { sold: number; pending: number }>) {
@@ -84,7 +121,8 @@ const createTicketType: ToolDef = {
     name: "create_ticket_type",
     title: "Crear tipo de entrada",
     description: "Agrega un tipo de entrada a un evento (ej: Preventa 2, VIP). Precio en CLP. No uses el nombre \"Cortesía\": ese tipo ya lo crea el sistema. " +
-        "Para que una tanda se abra sola al agotarse la anterior, pasa opens_after_ticket_type_id.",
+        "Para que una tanda se abra sola al agotarse la anterior, pasa opens_after_ticket_type_id. Para una mesa o pack para varias personas " +
+        "(un QR por persona), pasa people_per_ticket. Para una lista con hora de ingreso (\"lista hasta las 01:00\"), pasa entry_until.",
     scope: "write",
     audit: (args, result) => ({ summary: `Nuevo tipo ${args.name}: ${clp(args.price).replace(" CLP", "")}`, target: `ticket_type:${(result as any).ticket_type?.id ?? ""}` }),
     annotations: { readOnlyHint: false, destructiveHint: false },
@@ -102,10 +140,14 @@ const createTicketType: ToolDef = {
             function_id: { type: "integer", minimum: 1, nullable: true, description: "Solo para esa función (get_event → functions). Omitir = todas." },
             max_per_order: { type: "integer", minimum: 1, maximum: 50, default: 10 },
             opens_after_ticket_type_id: opensAfterSchema,
+            people_per_ticket: peoplePerTicketSchema,
+            entry_until: entryUntilSchema,
         },
     },
     async handler(args, ctx) {
         rejectCourtesyName(args.name);
+        const people = args.people_per_ticket && args.people_per_ticket > 1 ? Math.min(args.people_per_ticket, MAX_PEOPLE_PER_TICKET) : null;
+        if (people) await assertPeopleColumn(ctx);
         const event = await loadOwnedEvent<any>(ctx, args.event_id, "id, status");
         const normalized = normalizeTicket({ name: args.name, price: args.price, quantity: args.quantity ?? null, initDate: args.sales_start, endDate: args.sales_end });
         if (!normalized) throw new ToolError("invalid_input", "Revisa nombre, precio y cantidad.");
@@ -124,11 +166,15 @@ const createTicketType: ToolDef = {
                 is_gift: false,
                 status: "available",
                 ...(prevId != null ? { opens_after_ticket_id: prevId } : {}),
+                ...(people ? { people_per_ticket: people } : {}),
             })
             .select(TICKET_SELECT)
             .single();
         if (error) throw error;
-        return { event_id: Number(event.id), ticket_type: prevId != null ? await presentWithChain(ctx, event, data) : presentTicket(data, undefined, event) };
+        const entryUntil = normalizeEntryUntil(args.entry_until);
+        if (entryUntil) await saveEntryUntil(ctx, Number(event.id), Number(data.id), entryUntil);
+        const ticketType = prevId != null || entryUntil ? await presentWithChain(ctx, event, data) : presentTicket(data, undefined, event);
+        return { event_id: Number(event.id), ticket_type: people ? { ...ticketType, people_per_ticket: people } : ticketType };
     },
 };
 
@@ -136,8 +182,9 @@ const updateTicketType: ToolDef = {
     name: "update_ticket_type",
     title: "Editar tipo de entrada",
     description:
-        "Cambia nombre, precio, capacidad, ventana de venta, pausa/reanuda la venta (on_sale) o encadena la tanda a la anterior " +
-        "(opens_after_ticket_type_id: se abre sola cuando esa se agota) de un tipo de entrada. " +
+        "Cambia nombre, precio, capacidad, ventana de venta, pausa/reanuda la venta (on_sale), encadena la tanda a la anterior " +
+        "(opens_after_ticket_type_id: se abre sola cuando esa se agota), las personas por entrada (people_per_ticket: mesa para N) " +
+        "o la hora límite de ingreso (entry_until) de un tipo de entrada. " +
         "La capacidad no puede quedar bajo lo ya vendido. Un cambio de precio aplica solo a compras nuevas.",
     scope: "write",
     audit: (args, result) => {
@@ -164,11 +211,26 @@ const updateTicketType: ToolDef = {
             on_sale: { type: "boolean", description: "false = retirar de la venta (pausar); true = volver a vender." },
             max_per_order: { type: "integer", minimum: 1, maximum: 50 },
             opens_after_ticket_type_id: opensAfterSchema,
+            people_per_ticket: peoplePerTicketSchema,
+            entry_until: entryUntilSchema,
         },
     },
     async handler(args, ctx) {
         const event = await loadOwnedEvent<any>(ctx, args.event_id, "id, status");
         const ticket = await loadTicket(ctx, event.id, args.ticket_type_id);
+        if (args.people_per_ticket !== undefined) {
+            await assertPeopleColumn(ctx);
+            const { data: current } = await ctx.supabase.from("event_tickets").select("people_per_ticket").eq("id", ticket.id).maybeSingle();
+            (ticket as any).people_per_ticket = Number(current?.people_per_ticket) || 1;
+        }
+        // La hora límite va aparte (columna nueva): sin migración el resto del cambio no se pierde
+        let entryChange: { field: string; from: string | null; to: string | null } | null = null;
+        if (args.entry_until !== undefined) {
+            const before = (await loadEntryDeadlines(ctx.supabase, Number(event.id))).get(Number(ticket.id)) ?? null;
+            const to = normalizeEntryUntil(args.entry_until);
+            await saveEntryUntil(ctx, Number(event.id), Number(ticket.id), to);
+            if (before !== to) entryChange = { field: "entry_until", from: before, to };
+        }
         const patch: Record<string, unknown> = {};
         if (args.name !== undefined) {
             rejectCourtesyName(args.name);
@@ -198,7 +260,11 @@ const updateTicketType: ToolDef = {
             (ticket as any).opens_after_ticket_id = chain.get(Number(ticket.id)) ?? null;
             patch.opens_after_ticket_id = args.opens_after_ticket_type_id;
         }
-        if (!Object.keys(patch).length) throw new ToolError("invalid_input", "No enviaste cambios.");
+        if (args.people_per_ticket !== undefined) patch.people_per_ticket = Math.min(Math.max(1, args.people_per_ticket), MAX_PEOPLE_PER_TICKET);
+        if (!Object.keys(patch).length) {
+            if (args.entry_until === undefined) throw new ToolError("invalid_input", "No enviaste cambios.");
+            return { event_id: Number(event.id), ticket_type: await presentWithChain(ctx, event, ticket), changes: entryChange ? [entryChange] : [] };
+        }
         if (patch.price !== undefined || patch.total_quantity !== undefined) {
             const change: { id: number; price?: number; total_quantity?: number | null } = { id: Number(ticket.id) };
             if (patch.price !== undefined) change.price = patch.price as number;
@@ -216,7 +282,13 @@ const updateTicketType: ToolDef = {
         const changes = Object.keys(patch)
             .filter((k) => String((ticket as any)[k] ?? "") !== String(patch[k] ?? ""))
             .map((k) => ({ field: k, from: (ticket as any)[k] ?? null, to: patch[k] ?? null }));
-        return { event_id: Number(event.id), ticket_type: await presentWithChain(ctx, event, data), changes };
+        if (entryChange) changes.push(entryChange);
+        const presented = await presentWithChain(ctx, event, data);
+        return {
+            event_id: Number(event.id),
+            ticket_type: patch.people_per_ticket !== undefined ? { ...presented, people_per_ticket: patch.people_per_ticket } : presented,
+            changes,
+        };
     },
 };
 
@@ -262,7 +334,8 @@ const listOrders: ToolDef = {
     name: "list_orders",
     title: "Listar órdenes",
     description:
-        "Órdenes de un evento con datos del comprador (nombre, email, teléfono), entradas, monto, descuento y canal de origen. " +
+        "Órdenes de un evento con datos del comprador (nombre, email, teléfono), entradas, monto, descuento, canal de origen, datos de empresa " +
+        "(company: razón social y RUT, si los dio; no es boleta ni factura) y respuestas a las preguntas del evento (answers). " +
         "Contiene datos personales: úsalos solo para gestionar el evento.",
     scope: "attendees",
     annotations: { readOnlyHint: true },
@@ -280,15 +353,21 @@ const listOrders: ToolDef = {
     },
     async handler(args, ctx) {
         const event = await loadOwnedEvent<any>(ctx, args.event_id, "id, name");
-        let query = ctx.supabase
-            .from("event_orders")
-            .select("id, created_at, status, amount, ticket_qty, ticket_fee, service_fee_tax, discount_code, discount_amount, ticket_details, buyer_first_name, buyer_last_name, buyer_email, buyer_phone, ref, utm_source, utm_medium, utm_campaign, payment_provider", { count: "exact" })
-            .eq("event_id", event.id)
-            .order("created_at", { ascending: false })
-            .range(args.offset, args.offset + args.limit - 1);
-        if (args.status !== "all") query = query.eq("status", args.status);
-        if (args.search) query = query.ilike("buyer_email", `%${args.search.replace(/[%_\\]/g, (c: string) => `\\${c}`)}%`);
-        const { data, error, count } = await query;
+        const ORDER_COLUMNS = "id, created_at, status, amount, ticket_qty, ticket_fee, service_fee_tax, discount_code, discount_amount, ticket_details, buyer_first_name, buyer_last_name, buyer_email, buyer_phone, ref, utm_source, utm_medium, utm_campaign, payment_provider";
+        const runQuery = (cols: string) => {
+            let query = ctx.supabase
+                .from("event_orders")
+                .select(cols, { count: "exact" })
+                .eq("event_id", event.id)
+                .order("created_at", { ascending: false })
+                .range(args.offset, args.offset + args.limit - 1);
+            if (args.status !== "all") query = query.eq("status", args.status);
+            if (args.search) query = query.ilike("buyer_email", `%${args.search.replace(/[%_\\]/g, (c: string) => `\\${c}`)}%`);
+            return query;
+        };
+        // Datos de empresa y respuestas: columnas opcionales (migración 202610300100)
+        let { data, error, count } = await runQuery(`${ORDER_COLUMNS}, registration_answers, company_rut, company_name`);
+        if (error && ["42703", "PGRST204"].includes(String(error.code || ""))) ({ data, error, count } = await runQuery(ORDER_COLUMNS));
         if (error) throw error;
         const rows = (data || []).slice(0, args.limit);
         return {
@@ -307,6 +386,7 @@ const listOrders: ToolDef = {
                           name: l.name || l.ticket_name,
                           quantity: l.quantity,
                           price: l.price,
+                          ...(Number(l.people) > 1 ? { people_per_ticket: Number(l.people) } : {}),
                           ...(Number(l.transferred_out) ? { transferred_out: Number(l.transferred_out) } : {}),
                           ...(l.complimentary ? { complimentary: true } : {}),
                       }))
@@ -317,6 +397,10 @@ const listOrders: ToolDef = {
                 discount_clp: Number(o.discount_amount) || 0,
                 payment: o.payment_provider || null,
                 channel: o.ref ? `ref:${o.ref}` : [o.utm_source, o.utm_medium, o.utm_campaign].filter(Boolean).join(" / ") || "directo",
+                ...(o.company_rut ? { company: { name: o.company_name || null, rut: formatRut(o.company_rut) } } : {}),
+                ...(Array.isArray(o.registration_answers) && o.registration_answers.length
+                    ? { answers: o.registration_answers.map((a: any) => ({ question: a.question, answer: a.answer })) }
+                    : {}),
             })),
         };
     },

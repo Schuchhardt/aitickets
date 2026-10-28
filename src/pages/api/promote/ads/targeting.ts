@@ -1,9 +1,10 @@
-// Buscador de ciudades de Chile para segmentar un anuncio (ids de Meta vía Zernio). GET ?connectionId=&q=
+// Buscador para segmentar un anuncio (ids de Meta vía Zernio). GET ?connectionId=&q=&dimension=
+//   dimension geo (por defecto): ciudades de Chile · interest: intereses · workPosition: cargos (profesión)
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin } from "../../../../lib/auth-helpers";
 import { getSessionContext, hasRole, EVENT_MANAGER_ROLES, jsonResponse } from "../../../../lib/supabaseServer";
 import { adsJsonError } from "../../../../lib/ads";
-import { adsEnabled, friendlyAdsError, searchAdCities } from "../../../../../netlify/lib/zernio-ads.mjs";
+import { AUDIENCE_DIMENSIONS, adsEnabled, friendlyAdsError, searchAdAudience, searchAdCities } from "../../../../../netlify/lib/zernio-ads.mjs";
 
 export const GET: APIRoute = async (context) => {
     const session = await getSessionContext(context);
@@ -13,6 +14,8 @@ export const GET: APIRoute = async (context) => {
 
     const q = (context.url.searchParams.get("q") || "").trim();
     const connectionId = Number(context.url.searchParams.get("connectionId"));
+    const dimension = context.url.searchParams.get("dimension") || "geo";
+    if (dimension !== "geo" && !Object.hasOwn(AUDIENCE_DIMENSIONS, dimension)) return adsJsonError("Búsqueda no válida", 400);
     if (q.length < 2 || q.length > 80 || !Number.isSafeInteger(connectionId)) return jsonResponse({ results: [] });
 
     const { data: connection } = await getSupabaseAdmin()
@@ -24,7 +27,8 @@ export const GET: APIRoute = async (context) => {
         .maybeSingle();
     if (!connection?.zernio_account_id || connection.status !== "active") return adsJsonError("Cuenta publicitaria no encontrada", 404);
     try {
-        return jsonResponse({ results: await searchAdCities(connection.zernio_account_id, q) });
+        const results = dimension === "geo" ? await searchAdCities(connection.zernio_account_id, q) : await searchAdAudience(connection.zernio_account_id, q, dimension);
+        return jsonResponse({ results });
     } catch (err: any) {
         console.error("[ads/targeting]", err?.status || "", err?.message);
         return adsJsonError(friendlyAdsError(err), 502);

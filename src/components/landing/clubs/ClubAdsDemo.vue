@@ -2,11 +2,10 @@
 // Card de anuncios de "Tu noche en historias" (SPEC_landing_clubs §4.3, card 2): piel de luz negra sobre la misma lógica
 // de las demos de stand-up y música (useAdsDemo: presupuesto × días, estado activo y foco). Los anuncios existen (Meta
 // vía Zernio, netlify/lib/zernio-ads.mjs): presupuesto diario, días, ciudad con radio y edad (AD_LIMITS llega por props:
-// días, radio de ciudad más chico y edad mínima por defecto); Meta cobra el gasto directo. Segmentar por gustos ("Música
-// electrónica") no existe: chip deshabilitado con "Pronto". Es una demostración: no crea nada ni muestra alcances o
+// días, radio de ciudad más chico y edad mínima por defecto) e intereses de Meta (hasta 3; "Música electrónica" es el
+// ejemplo); Meta cobra el gasto directo. Es una demostración: no crea nada ni muestra alcances o
 // resultados estimados, y la pieza de ejemplo no muestra alcohol (§0.10).
 // Mobile: un solo slider (presupuesto) y los días fijos en 3. Analítica: cl_ads_demo { budget, days }.
-import SoonBadge from '../../ui/SoonBadge.vue'
 import { trackEvent } from '../../../composables/useGoogleAnalytics.js'
 import { useAdsDemo } from '../../../composables/useAdsDemo.js'
 import { formatCLP } from '../producerLanding.js'
@@ -33,7 +32,7 @@ const demoMaxDays = Math.min(CLUB_ADS_DEMO.daysMax, props.maxDays)
     <p class="cl-meta ad-badge">Quedan 3 mesas · Faltan 2 días</p>
     <h3 class="ad-title">¿Viernes flojo? Impúlsalo con anuncios.</h3>
     <p class="ad-text">
-      Lanza un anuncio en Instagram y Facebook desde tu panel, para tu ciudad y para mayores de {{ props.minAge }}. Tú
+      Lanza un anuncio en Instagram y Facebook desde tu panel, para tu ciudad, mayores de {{ props.minAge }} y por gustos. Tú
       defines cuánto invertir por día y por cuántos días, y lo pausas cuando quieras. Meta cobra el gasto directo en tu
       cuenta publicitaria y ves cuántas entradas vendió cada anuncio.
     </p>
@@ -61,7 +60,7 @@ const demoMaxDays = Math.min(CLUB_ADS_DEMO.daysMax, props.maxDays)
         <ul class="ad-chips" aria-label="Público">
           <li class="ad-chip">Santiago · {{ props.radiusKm }} km</li>
           <li class="ad-chip">{{ props.minAge }}–{{ CLUB_ADS_DEMO.ageMax }} años</li>
-          <li class="ad-chip is-disabled" aria-disabled="true">Música electrónica <SoonBadge dark /></li>
+          <li class="ad-chip">Música electrónica</li>
         </ul>
         <button ref="launchButton" type="button" class="cl-btn cl-btn-lime ad-cta" data-testid="club-ads-launch" @click="setLaunched(true)">
           <span class="ad-wide">Impulsar · <span class="cl-tabular">{{ formatCLP(total) }}</span> en total</span>
@@ -144,9 +143,6 @@ const demoMaxDays = Math.min(CLUB_ADS_DEMO.daysMax, props.maxDays)
   border-radius: 10px;
   background: var(--cl-noche-3);
   font-size: 12px;
-}
-.ad-chip.is-disabled {
-  color: var(--cl-text-3);
 }
 .ad-cta {
   min-height: 48px;

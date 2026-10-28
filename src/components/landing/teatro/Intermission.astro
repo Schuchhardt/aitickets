@@ -2,7 +2,8 @@
 // 5 · Entreacto · Tu obra no descansa (SPEC_landing_teatro §4.5, fondo terciopelo, ancla #difusion): la difusión en
 // tres columnas, todas verificadas en el código:
 // 1. Instagram automático (socialSeries.ts): historias que cuentan hacia la próxima función y se reprograman a la
-//    siguiente cuando una pasa; DM con el link a quien responde DEFAULT_KEYWORD. Facebook, TikTok y reels: "Pronto".
+//    siguiente cuando una pasa; DM con el link a quien responde DEFAULT_KEYWORD. La misma serie en la página de Facebook
+//    y en TikTok si se conectan, y el teaser vertical (3 a 60 s, columna 2) sale como reel unos días antes.
 // 2. Video de portada de la página (eventVideo.ts): se reproduce solo y sin sonido. El mockup no reproduce nada.
 // 3. Asistente de la página del evento (EventAssistant.vue) y preguntas frecuentes generadas con IA (/api/events/ai).
 // Cierra con los anuncios en Instagram y Facebook (zernio-ads.mjs, ORGANIZADORES_FAQ) sin demo: la demo de anuncios es
@@ -10,10 +11,9 @@
 import ActEyebrow from "./ActEyebrow.astro";
 import CurtainStory from "./CurtainStory.astro";
 import ProsceniumPhoto from "./ProsceniumPhoto.astro";
-import SoonBadge from "../../ui/SoonBadge.vue";
 import { THEATRE_PHOTOS } from "./teatroLanding.js";
 
-const channels = [{ label: "Instagram", on: true }, { label: "Facebook" }, { label: "TikTok" }, { label: "Reels" }];
+const channels = [{ label: "Instagram" }, { label: "Facebook" }, { label: "TikTok" }, { label: "Reel con tu teaser" }];
 ---
 
 <section id="difusion" class="te-section te-on-velvet im" aria-labelledby="te-intermission-title" data-te-section="difusion">
@@ -26,7 +26,7 @@ const channels = [{ label: "Instagram", on: true }, { label: "Facebook" }, { lab
         Mientras ensayas, <span class="te-gold im-line">tu obra sigue en cartelera.</span>
       </h2>
       <p class="te-lead im-lead" data-lp-step>
-        Conectas tu Instagram una vez y apruebas la serie con una vista previa de cada pieza. Con el afiche y los datos de
+        Conectas tu Instagram (y si quieres tu Facebook y tu TikTok) una vez y apruebas la serie con una vista previa de cada pieza. Con el afiche y los datos de
         tu obra armamos historias que cuentan hacia la próxima función, y cuando una pasa, siguen con la siguiente. Si se
         agota, cambias una fecha o cancelas, la serie se ajusta o se detiene sola.
       </p>
@@ -35,15 +35,14 @@ const channels = [{ label: "Instagram", on: true }, { label: "Facebook" }, { lab
     <div class="im-cols" data-lp-reveal>
       <article class="im-col" data-lp-step data-testid="theatre-series">
         <p class="te-meta im-kicker">Difusión</p>
-        <h3 class="te-h3 im-h3">Tu Instagram, en piloto automático.</h3>
+        <h3 class="te-h3 im-h3">Tus redes, en piloto automático.</h3>
         <div class="im-mock"><CurtainStory /></div>
         <ul class="im-chips" aria-label="Redes de la serie automática">
           {
             channels.map((c) => (
-              <li class:list={["te-chip", "im-chip", { "is-on": c.on }]}>
-                {c.on && <span class="im-on" aria-hidden="true" />}
+              <li class="te-chip im-chip is-on">
+                <span class="im-on" aria-hidden="true" />
                 {c.label}
-                {!c.on && <SoonBadge dark />}
               </li>
             ))
           }

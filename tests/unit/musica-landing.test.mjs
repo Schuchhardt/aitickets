@@ -152,8 +152,8 @@ describe('MUSICA_FAQ (§4.11)', () => {
     expect(bands?.a).toBe(PRODUCER_FAQ.find((f) => f.q === '¿Puedo saber cuántas entradas vende cada promotor?')?.a)
   })
 
-  it('no promete el aviso automático a la lista de espera y el aforo grande sale de event-risk.mjs', () => {
-    expect(MUSICA_FAQ.find((f) => f.q === '¿Qué pasa cuando se agota?')?.a).toMatch(/todavía no está disponible/)
+  it('el aviso a la lista de espera ya existe y el aforo grande sale de event-risk.mjs', () => {
+    expect(MUSICA_FAQ.find((f) => f.q === '¿Qué pasa cuando se agota?')?.a).toContain('correo automático')
     const big = MUSICA_FAQ.find((f) => f.q === '¿Sirve para un concierto grande?')
     expect(big?.a).toContain(LARGE_CAPACITY.toLocaleString('es-CL'))
     // Lo que retiene fondos es la reserva por riesgo, no los documentos (ledger.ts)

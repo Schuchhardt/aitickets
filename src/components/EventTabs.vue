@@ -143,9 +143,9 @@ const hasMultipleVenues = computed(() => {
           class="text-blue-500 cursor-pointer">Ver ubicación</a>
       </p>
       <p v-if="event.has_secret_location" class="text-amber-600 text-sm mt-2 italic">
-        La ubicación exacta será mostrada en la entrada el día del evento.
+        La dirección exacta la reciben solo quienes compran, en su entrada y por correo.
       </p>
-      <iframe v-if="googleMapsApiKey && mapQuery" class="w-full h-64 mt-4 rounded-lg shadow-md"
+      <iframe v-if="googleMapsApiKey && mapQuery && !event.has_secret_location" class="w-full h-64 mt-4 rounded-lg shadow-md"
         :src="'https://www.google.com/maps/embed/v1/place?key=' + googleMapsApiKey + '&q=' + encodeURIComponent(mapQuery)"
         :title="'Mapa de ' + mapQuery"
         loading="lazy"

@@ -85,9 +85,12 @@ export const MK_WEEK = Object.freeze([
 ])
 export const MK_TODAY = 2
 export const MK_SHOW = 4
+/** Días antes de la función en que sale el reel: REEL_DAYS de socialSeriesCadence.ts (no se importa: arrastra código de servidor). */
+export const MK_REEL_DAYS = 3
 
 /**
- * Días de la semana de ejemplo con sus publicaciones. on = { story, post }; times = { daily, eventDay } (HH:MM).
+ * Días de la semana de ejemplo con sus publicaciones. on = { story, post, reel? }; times = { daily, eventDay } (HH:MM).
+ * El reel (con el video del evento) sale una vez, MK_REEL_DAYS antes de la primera función.
  * showDays: índices de MK_WEEK con función (por defecto solo el viernes). Con varias funciones la serie se replanifica
  * hacia la siguiente cuando pasa una (socialSeries.ts, "siguiente función"): cada día con función tiene su historia de
  * la mañana, el día entre dos funciones sigue la historia diaria y los posts de feed terminan antes de la primera.
@@ -102,6 +105,7 @@ export function marketingWeek(on, times, showDays = [MK_SHOW]) {
     const state = i < MK_TODAY ? 'past' : i === MK_TODAY ? 'today' : 'future'
     if (on.story && i <= lastShow) slots.push({ kind: 'story', label: 'Historia', time: isShow ? times.eventDay : times.daily, state })
     if (on.post && i < firstShow) slots.push({ kind: 'post', label: 'Post', time: times.daily, state })
+    if (on.reel && i === Math.max(0, firstShow - MK_REEL_DAYS)) slots.push({ kind: 'reel', label: 'Reel', time: times.daily, state })
     return { ...day, isToday: i === MK_TODAY, isShow, slots }
   })
 }

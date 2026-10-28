@@ -3,8 +3,9 @@
 // 22:00 a 05:00 en pasos de 15 min. Cada posición sale de nightState (clubsLanding.js): letrero LED de la puerta, aforo
 // (Doto 96 px y 30 LED), llegadas cada 15 min de las últimas 3 h y ingresados / emitidos por tipo de entrada, como
 // get_checkin_stats ("Aforo en vivo", tools/access.ts); a la derecha, la respuesta del asistente de IA con los mismos
-// datos (aiAnswer). El mismo aforo se ve en el panel (pestaña Puerta, LiveCapacityPanel.vue). Lo que no existe va con
-// "Pronto": validar la hora de ingreso de la lista. El cobro de la noche: término + PAYOUT_RELEASE_HOURS
+// datos (aiAnswer). El mismo aforo se ve en el panel (pestaña Puerta, LiveCapacityPanel.vue). La lista tiene hora
+// límite de ingreso (LIST_ENTRY_UNTIL: event_tickets.entry_until, el escáner marca "fuera de horario" pasada esa hora
+// y la puerta decide). El cobro de la noche: término + PAYOUT_RELEASE_HOURS
 // (LIVE_PAYOUT), con "*" de términos.
 // C11: al entrar en pantalla la noche corre sola una vez de 22:00 a 01:30 en 4 s y se detiene; después manda la
 // persona ("↻ Repetir"). Con "reducir movimiento" (o sin JS: SSR) queda quieta en 01:30, sin corrida ni botón.
@@ -12,7 +13,6 @@
 // aria-valuetext "01:30, 455 personas adentro". Mobile: el crossfader va pegado arriba (sticky, top 64 px).
 // Analítica: cl_night_scrub { hour } al soltar (una vez por hora entera, con pausa), cl_night_replay.
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import SoonBadge from '../../ui/SoonBadge.vue'
 import Crossfader from './Crossfader.vue'
 import { trackEvent } from '../../../composables/useGoogleAnalytics.js'
 import { useDelayedAnnouncement } from '../../../composables/usePriceCalculator.js'
@@ -21,6 +21,7 @@ import {
   ARRIVALS_MAX,
   CLUB_TICKETS,
   LIST_CLOSES_AT,
+  LIST_ENTRY_UNTIL,
   LIVE_PAYOUT,
   NIGHT_CAPACITY,
   NIGHT_PEAK_STEP,
@@ -151,7 +152,7 @@ onBeforeUnmount(() => {
               </p>
               <span class="nl-type-bar" aria-hidden="true"><span :style="{ transform: `scaleX(${row.issued ? row.inside / row.issued : 0})` }"></span></span>
               <p v-if="row.kind === 'lista' && state.listClosed" class="nl-type-note">
-                Inscripción cerrada {{ LIST_CLOSES_AT }} · Validar la hora de ingreso de la lista <SoonBadge dark />
+                Inscripción cerrada {{ LIST_CLOSES_AT }} · Ingreso hasta las {{ LIST_ENTRY_UNTIL }}: después, la puerta ve «fuera de horario»
               </p>
             </li>
           </ul>

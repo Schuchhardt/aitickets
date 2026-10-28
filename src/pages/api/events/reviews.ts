@@ -1,7 +1,8 @@
 // Reseñas de un evento desde el panel (EventReviewsManager.vue).
 // GET  ?eventId=  → { settings, summary, reviews, photos, stats, ended, upcoming_events, invitations }
 //      reviews incluye email y comentario privado (solo la productora los ve).
-// POST { eventId, action: "settings", enabled?, reward: { value, valid_days } | null, moderate_photos? } → { settings }
+// POST { eventId, action: "settings", enabled?, reward: { value, valid_days } | null, moderate_photos?, show_while_on_sale? }
+//      → { settings }
 // POST { eventId, action: "review_status", id, public_status: "visible" | "hidden" } → { ok }
 //      (ocultar un comentario NO cambia el promedio: todas las calificaciones cuentan)
 // POST { eventId, action: "photo_status", id, status: "visible" | "hidden" } → { ok }
@@ -154,6 +155,7 @@ export const POST: APIRoute = async (context) => {
         enabled: typeof body.enabled === "boolean" ? body.enabled : prev.enabled,
         reward: body.reward === undefined ? prev.reward : body.reward,
         moderate_photos: typeof body.moderate_photos === "boolean" ? body.moderate_photos : prev.moderate_photos,
+        show_while_on_sale: typeof body.show_while_on_sale === "boolean" ? body.show_while_on_sale : prev.show_while_on_sale,
       });
       if (body.reward && !next.reward) return jsonResponse({ message: `El premio debe ser entre ${REWARD_LIMITS.minValue}% y ${REWARD_LIMITS.maxValue}%.` }, 400);
       const { error } = await supabase.from("events").update({ review_settings: next }).eq("id", eventId).eq("organization_id", orgId);

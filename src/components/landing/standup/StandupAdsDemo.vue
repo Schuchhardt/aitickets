@@ -1,10 +1,10 @@
 <script setup>
 // Card de anuncios de la landing de stand-up (SPEC_landing_standup §4.4 y S13). Los anuncios existen (Meta vía Zernio,
 // netlify/lib/zernio-ads.mjs): presupuesto diario, días, ciudad con radio y rango de edad; Meta cobra el gasto directo
-// en la cuenta publicitaria de la productora. Segmentar por intereses ("Comedia y stand-up") no existe: va con "Pronto".
+// en la cuenta publicitaria de la productora. También por intereses de Meta (hasta 3, buscador del armado del anuncio):
+// el chip "Comedia y stand-up" es un ejemplo de interés.
 // Es una demostración: no se crea nada y no se muestran alcances ni resultados estimados. Al impulsar se mide
 // su_ads_demo { budget, days }. En mobile: un solo slider (presupuesto) y "Impulsar N días · total".
-import SoonBadge from '../../ui/SoonBadge.vue'
 import { trackEvent } from '../../../composables/useGoogleAnalytics.js'
 import { useAdsDemo } from '../../../composables/useAdsDemo.js'
 import { formatCLP } from '../producerLanding.js'
@@ -22,7 +22,7 @@ const { budget, days, launched, total, daysLabel, launchButton, pauseButton, set
       <p class="sad-badge">QUEDAN 23 ENTRADAS · FALTAN 3 DÍAS</p>
       <h3 class="sad-title">¿Necesitas un empujón? <span class="sad-serif">Impulsa con anuncios.</span></h3>
       <p class="sad-text">
-        Lanza una campaña en Instagram y Facebook desde tu panel, para tu ciudad y la edad de tu público. Tú decides
+        Lanza una campaña en Instagram y Facebook desde tu panel, para tu ciudad, la edad y los intereses de tu público. Tú decides
         cuánto invertir y la pausas cuando quieras. Meta cobra el gasto directo en tu cuenta publicitaria.
       </p>
     </div>
@@ -40,7 +40,7 @@ const { budget, days, launched, total, daysLabel, launchButton, pauseButton, set
         <ul class="sad-chips sad-wide" aria-label="Público">
           <li>Santiago + 25 km</li>
           <li>20–45 años</li>
-          <li>Comedia y stand-up <SoonBadge /></li>
+          <li>Comedia y stand-up</li>
         </ul>
         <button ref="launchButton" type="button" class="sad-cta" data-testid="standup-ads-launch" @click="setLaunched(true)">
           <span class="sad-wide">Impulsar · <span class="ev-tabular">{{ formatCLP(total) }}</span> en total</span>

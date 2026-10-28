@@ -1,10 +1,13 @@
-// POST /api/door/<token>/validate { qr_code } — busca una entrada por QR en el evento del link.
+// POST /api/door/<token>/validate { qr_code } — busca una entrada por QR en el evento del link. Con hora límite de
+// ingreso trae entry_until y late_entry (fuera de horario ahora).
 import type { APIRoute } from "astro";
 import { authorizeDoor, doorJson, readDoorBody } from "../_door";
 import { findEventTicket } from "../../../../lib/checkinAccess";
-import { getFunctionCheck, ticketSessionState } from "../../../../../netlify/lib/checkin.mjs";
+import { getFunctionCheck, ticketSessionState, entryDeadlineState } from "../../../../../netlify/lib/checkin.mjs";
 
 export const prerender = false;
+
+const lateView = (state: any) => (state ? { entry_until: state.entry_until, late_entry: Boolean(state.late) } : {});
 
 export const POST: APIRoute = async ({ params, request }) => {
     const auth = await authorizeDoor(request, params.token);
@@ -29,6 +32,7 @@ export const POST: APIRoute = async ({ params, request }) => {
                 ticket_name: row.event_tickets?.ticket_name || null,
                 ...fn,
                 ...(await ticketSessionState(auth.supabase, auth.event.id, row)),
+                ...lateView(await entryDeadlineState(auth.supabase, auth.event.id, row)),
             },
         });
     } catch (err: any) {

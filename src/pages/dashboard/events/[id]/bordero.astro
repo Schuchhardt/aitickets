@@ -1,0 +1,176 @@
+---
+// Borderó por función (src/lib/functionSettlement.ts): el documento para liquidar con la sala. ?funcion=<event_date_id>
+// (por defecto la primera) o ?funcion=all para las entradas válidas para cualquier función. Se imprime o guarda como
+// PDF desde el navegador (el CSS de impresión deja solo el documento) y se descarga como planilla
+// (/api/events/function-settlement). Se llega desde "Ocupación por función" del panel y "Ventas por función" de la
+// analítica.
+import DashboardLayout from "../../../../layouts/DashboardLayout.astro";
+import { getSupabaseAdmin } from "../../../../lib/auth-helpers";
+import { EVENT_MANAGER_ROLES } from "../../../../lib/supabaseServer";
+import { requireDashboardSession } from "../../_lib/guard";
+import { canAccessEventByStaff } from "../../../../../netlify/lib/event-staff.mjs";
+import { loadEventFunctions } from "../../../../lib/eventAnalytics";
+import { functionSettlement, settlementClp as clp } from "../../../../lib/functionSettlement";
+
+const { id } = Astro.params;
+const guard = await requireDashboardSession(Astro, EVENT_MANAGER_ROLES);
+if (!guard.ok) return guard.response;
+const { dbUser } = guard.session;
+if (!(await canAccessEventByStaff(getSupabaseAdmin(), dbUser.id, id))) return Astro.redirect("/dashboard/events");
+const supabaseAdmin = getSupabaseAdmin();
+
+const { data: event } = await supabaseAdmin.from("events").select("id, name").eq("id", id).eq("organization_id", dbUser.organization_id).maybeSingle();
+if (!event) return Astro.redirect("/dashboard/events");
+
+const { functions } = await loadEventFunctions(supabaseAdmin, Number(event.id));
+const param = Astro.url.searchParams.get("funcion");
+const selected = param === "all" ? null : functions.find((f) => String(f.id) === param)?.id ?? functions[0]?.id ?? null;
+const settlement = await functionSettlement(supabaseAdmin, { id: Number(event.id), name: event.name }, selected);
+const t = settlement.totals;
+const csvHref = `/api/events/function-settlement?event_id=${event.id}&event_date_id=${selected ?? "all"}`;
+const issuedAt = new Date(settlement.generated_at).toLocaleString("es-CL", { timeZone: "America/Santiago", dateStyle: "long", timeStyle: "short" });
+const n = (v: number) => Number(v || 0).toLocaleString("es-CL");
+---
+
+<DashboardLayout title={`Borderó · ${event.name}`}>
+    <div class="no-print mb-6">
+        <div class="flex items-center gap-2 sm:gap-3 mb-2 min-w-0 text-sm sm:text-base">
+            <a href="/dashboard/events" class="text-gray-500 hover:text-black transition">Eventos</a>
+            <span class="text-gray-300">/</span>
+            <a href={`/dashboard/events/${event.id}`} class="text-gray-500 hover:text-black transition truncate min-w-0 max-w-[200px]">{event.name}</a>
+            <span class="text-gray-300">/</span>
+            <span class="text-gray-900 font-medium">Borderó</span>
+        </div>
+        <h1 class="text-2xl md:text-3xl font-bold font-[Unbounded]">Borderó por función</h1>
+        <p class="text-sm sm:text-base text-gray-500 mt-1">Lo vendido en una función, para liquidar con la sala. Imprímelo, guárdalo como PDF o descarga la planilla.</p>
+        <div class="mt-4 flex flex-wrap items-center gap-2">
+            <label class="text-sm text-gray-600" for="bordero-function">Función</label>
+            <select id="bordero-function" class="px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm" data-testid="bordero-function">
+                {functions.map((f) => <option value={String(f.id)} selected={f.id === selected}>{f.label}</option>)}
+                <option value="all" selected={selected === null}>Válidas para cualquier función</option>
+            </select>
+            <button type="button" class="px-4 py-2 bg-black text-white rounded-lg text-sm font-medium hover:bg-gray-900" data-print>Imprimir o guardar PDF</button>
+            <a href={csvHref} class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:border-black" data-testid="bordero-csv">Descargar planilla (CSV)</a>
+        </div>
+    </div>
+
+    <article id="bordero" class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 sm:p-8 max-w-3xl" data-testid="bordero">
+        <header class="border-b border-gray-200 pb-4 mb-4">
+            <p class="text-xs uppercase tracking-wider text-gray-500">Borderó</p>
+            <h2 class="text-xl font-bold mt-1">{event.name}</h2>
+            <p class="text-sm text-gray-700 mt-1">{settlement.function ? settlement.function.label : "Entradas válidas para cualquier función"}</p>
+            {settlement.function?.venue && <p class="text-sm text-gray-500">{settlement.function.venue}</p>}
+            <p class="text-xs text-gray-400 mt-2">Emitido el {issuedAt} · AI Tickets</p>
+        </header>
+
+        <h3 class="font-semibold text-sm mb-2">Entradas vendidas</h3>
+        <table class="w-full text-sm mb-6">
+            <thead class="text-gray-500 border-b border-gray-200">
+                <tr>
+                    <th class="py-1.5 text-left font-medium">Tipo de entrada</th>
+                    <th class="py-1.5 text-right font-medium">Precio</th>
+                    <th class="py-1.5 text-right font-medium">Vendidas</th>
+                    <th class="py-1.5 text-right font-medium">Bruto</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {settlement.tickets.length === 0 && (
+                    <tr><td colspan="4" class="py-2 text-gray-500">Sin entradas vendidas en esta función.</td></tr>
+                )}
+                {settlement.tickets.map((r) => (
+                    <tr data-testid="bordero-ticket-row">
+                        <td class="py-1.5">{r.ticket_type}</td>
+                        <td class="py-1.5 text-right tabular-nums">{clp(r.unit_price_clp)}</td>
+                        <td class="py-1.5 text-right tabular-nums">{n(r.tickets)}</td>
+                        <td class="py-1.5 text-right tabular-nums">{clp(r.gross_clp)}</td>
+                    </tr>
+                ))}
+            </tbody>
+            <tfoot class="border-t border-gray-300 font-semibold">
+                <tr>
+                    <td class="py-1.5">Total</td>
+                    <td></td>
+                    <td class="py-1.5 text-right tabular-nums">{n(t.tickets_sold)}</td>
+                    <td class="py-1.5 text-right tabular-nums">{clp(t.gross_clp)}</td>
+                </tr>
+            </tfoot>
+        </table>
+
+        <h3 class="font-semibold text-sm mb-2">Cortesías</h3>
+        {settlement.courtesies.length === 0 ? (
+            <p class="text-sm text-gray-500 mb-6">Sin cortesías.</p>
+        ) : (
+            <table class="w-full text-sm mb-6">
+                <tbody class="divide-y divide-gray-100">
+                    {settlement.courtesies.map((c) => (
+                        <tr>
+                            <td class="py-1.5">{c.ticket_type}</td>
+                            <td class="py-1.5 text-right tabular-nums">{n(c.tickets)}</td>
+                        </tr>
+                    ))}
+                </tbody>
+                <tfoot class="border-t border-gray-300 font-semibold">
+                    <tr><td class="py-1.5">Total cortesías</td><td class="py-1.5 text-right tabular-nums">{n(t.courtesy_tickets)}</td></tr>
+                </tfoot>
+            </table>
+        )}
+
+        <h3 class="font-semibold text-sm mb-2">Liquidación</h3>
+        <table class="w-full text-sm" data-testid="bordero-totals">
+            <tbody class="divide-y divide-gray-100">
+                <tr><td class="py-1.5">Bruto (valor de lista)</td><td class="py-1.5 text-right tabular-nums">{clp(t.gross_clp)}</td></tr>
+                <tr><td class="py-1.5">Descuentos</td><td class="py-1.5 text-right tabular-nums">−{clp(t.discounts_clp)}</td></tr>
+                <tr><td class="py-1.5">Cargo por servicio + IVA absorbido por el productor</td><td class="py-1.5 text-right tabular-nums">−{clp(t.service_fee_absorbed_clp)}</td></tr>
+                {settlement.rounding_clp !== 0 && <tr><td class="py-1.5">Ajuste por redondeo</td><td class="py-1.5 text-right tabular-nums">{clp(settlement.rounding_clp)}</td></tr>}
+            </tbody>
+            <tfoot class="border-t-2 border-gray-900 font-bold">
+                <tr><td class="py-2">Neto al productor</td><td class="py-2 text-right tabular-nums" data-testid="bordero-net">{clp(t.net_to_producer_clp)}</td></tr>
+            </tfoot>
+        </table>
+        <dl class="mt-4 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600">
+            <dt>Total pagado por el público</dt><dd class="text-right tabular-nums">{clp(t.buyer_paid_clp)}</dd>
+            <dt>Cargo por servicio + IVA pagado por los compradores</dt><dd class="text-right tabular-nums">{clp(t.service_fee_paid_by_buyers_clp)}</dd>
+            <dt>Órdenes</dt><dd class="text-right tabular-nums">{n(t.orders)}</dd>
+        </dl>
+        {settlement.discount_codes.length > 0 && (
+            <p class="mt-3 text-xs text-gray-600">Códigos de descuento: {settlement.discount_codes.map((c) => `${c.code} (${c.orders} · ${clp(c.discount_clp)})`).join(", ")}</p>
+        )}
+        <p class="mt-4 text-xs text-gray-400">
+            Órdenes pagadas, sin reembolsadas ni transferencias. Una compra con entradas de varias funciones se reparte según el
+            valor de cada entrada. El cargo por servicio que pagan los compradores es de AI Tickets y no forma parte del neto.
+        </p>
+    </article>
+</DashboardLayout>
+
+<script>
+    document.querySelector("[data-print]")?.addEventListener("click", () => window.print());
+    document.getElementById("bordero-function")?.addEventListener("change", (e) => {
+        const url = new URL(window.location.href);
+        url.searchParams.set("funcion", (e.target as HTMLSelectElement).value);
+        window.location.href = url.toString();
+    });
+</script>
+
+<style is:global>
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        #bordero,
+        #bordero * {
+            visibility: visible;
+        }
+        #bordero {
+            position: absolute;
+            inset: 0 auto auto 0;
+            width: 100%;
+            max-width: none;
+            border: 0;
+            box-shadow: none;
+            padding: 0;
+        }
+        .no-print {
+            display: none !important;
+        }
+    }
+</style>

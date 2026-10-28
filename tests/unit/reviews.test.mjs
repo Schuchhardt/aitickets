@@ -27,8 +27,8 @@ import { readReviewHash, formatRating, reviewsCountLabel } from '../../src/compo
 
 describe('normalizeReviewSettings', () => {
   it('por defecto: correo activado, sin premio, fotos sin moderación', () => {
-    expect(normalizeReviewSettings(null)).toEqual({ enabled: true, reward: null, moderate_photos: false })
-    expect(normalizeReviewSettings('basura')).toEqual({ enabled: true, reward: null, moderate_photos: false })
+    expect(normalizeReviewSettings(null)).toEqual({ enabled: true, reward: null, moderate_photos: false, show_while_on_sale: false })
+    expect(normalizeReviewSettings('basura')).toEqual({ enabled: true, reward: null, moderate_photos: false, show_while_on_sale: false })
   })
   it('acota el premio a los límites y completa los días', () => {
     expect(normalizeReviewSettings({ reward: { value: 80 } }).reward).toEqual({ value: REWARD_LIMITS.maxValue, valid_days: REWARD_LIMITS.defaultDays })

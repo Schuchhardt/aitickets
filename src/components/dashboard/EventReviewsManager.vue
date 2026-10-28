@@ -2,7 +2,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { Star, Lock, Eye, EyeOff, Trash2, Download, Send, Gift, ChevronDown } from 'lucide-vue-next'
 
-// Reseñas del evento (panel): resumen, configuración (correo de 24 h, premio por calificar, moderación de fotos),
+// Reseñas del evento (panel): resumen, configuración (correo de 24 h, premio por calificar, moderación de fotos,
+// mostrarlas en la página mientras quedan funciones),
 // comentarios públicos y privados, fotos de los asistentes e invitación masiva al próximo evento.
 // API: /api/events/reviews (lectura y moderación) y /api/events/invitations (invitaciones).
 
@@ -37,6 +38,7 @@ const load = async () => {
       rewardValue: json.settings.reward?.value ?? json.reward_limits.defaultValue,
       rewardDays: json.settings.reward?.valid_days ?? json.reward_limits.defaultDays,
       moderate: json.settings.moderate_photos,
+      whileOnSale: json.settings.show_while_on_sale === true,
     }
     if (!invite.value.target && json.upcoming_events?.length) invite.value.target = String(json.upcoming_events[0].id)
   } catch (e) {
@@ -57,7 +59,7 @@ const fmtAvg = (v) => (v == null ? '—' : Number(v).toLocaleString('es-CL', { m
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleString('es-CL', { timeZone: 'America/Santiago', dateStyle: 'medium', timeStyle: 'short' }) : '')
 
 // ---- Configuración ----
-const form = ref({ enabled: true, rewardOn: false, rewardValue: 10, rewardDays: 60, moderate: false })
+const form = ref({ enabled: true, rewardOn: false, rewardValue: 10, rewardDays: 60, moderate: false, whileOnSale: false })
 const showSettings = ref(false)
 const savingSettings = ref(false)
 const settingsMsg = ref('')
@@ -69,6 +71,7 @@ const settingsSummary = computed(() => {
     s.enabled ? 'correo a las 24 h' : 'sin correo',
     s.reward ? `premio ${s.reward.value}% por ${s.reward.valid_days} días` : 'sin premio',
     s.moderate_photos ? 'fotos con revisión' : 'fotos al tiro',
+    s.show_while_on_sale ? 'en la página mientras quedan funciones' : 'en la página al terminar',
   ].join(' · ')
 })
 const saveSettings = async () => {
@@ -81,6 +84,7 @@ const saveSettings = async () => {
       action: 'settings',
       enabled: f.enabled,
       moderate_photos: f.moderate,
+      show_while_on_sale: f.whileOnSale,
       reward: f.rewardOn ? { value: Number(f.rewardValue), valid_days: Number(f.rewardDays) } : null,
     })
     data.value = { ...data.value, settings: res.settings }
@@ -283,6 +287,10 @@ const sendInvite = async () => {
             <input v-model="form.moderate" type="checkbox" class="mt-1" />
             <span><strong>Revisar las fotos antes de publicarlas.</strong> Si no, se publican al tiro y puedes ocultarlas después.</span>
           </label>
+          <label class="flex items-start gap-3 text-sm">
+            <input v-model="form.whileOnSale" type="checkbox" class="mt-1" data-testid="reviews-while-on-sale" />
+            <span><strong>Mostrar las reseñas mientras quedan funciones.</strong> La página muestra las de las funciones pasadas junto al botón de compra. Si no, aparecen cuando termina el evento.</span>
+          </label>
           <div class="flex items-center gap-3">
             <button type="submit" :disabled="savingSettings" class="px-4 py-2 bg-black text-white rounded-lg font-medium hover:bg-gray-900 disabled:opacity-60">
               {{ savingSettings ? 'Guardando…' : 'Guardar configuración' }}
@@ -306,7 +314,7 @@ const sendInvite = async () => {
           </button>
         </div>
         <p v-if="!data.reviews.length" class="text-sm text-gray-500 py-4">
-          {{ data.ended ? 'Aún no hay reseñas. Llegan a partir de 24 h después de que termina cada función.' : 'Las reseñas llegarán cuando termine el evento.' }}
+          {{ data.ended ? 'Aún no hay reseñas. Llegan a partir de 24 h después de que termina cada función.' : 'Aún no hay reseñas. El correo para calificar sale 24 h después de cada función.' }}
         </p>
         <p v-else-if="!reviews.length" class="text-sm text-gray-500 py-4">No hay reseñas con ese filtro.</p>
         <ul v-else class="divide-y divide-gray-100" data-track-mask>

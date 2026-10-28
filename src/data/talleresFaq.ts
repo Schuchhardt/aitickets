@@ -9,8 +9,9 @@
 //   cupo que se libera → postsale.ts anula las entradas reembolsadas (status cancelled) y eventPage.ts no las cuenta
 //   máximo por compra → DEFAULT_MAX_PER_PURCHASE (Reservation/pricing.js); cambiarlo → tools/tickets.ts (max_per_order)
 //   fin de venta → event_tickets.end_date (tools/tickets.ts, hoy solo desde el asistente de IA)
-//   pago → solo Webpay (CheckoutSheet.vue); inscripción con los datos de quien compra (sin preguntas por persona)
-//   reseñas en la página → EventDetail.vue (showReviews: cuando el evento terminó)
+//   pago → solo Webpay (CheckoutSheet.vue); preguntas al inscribirse y nombre de cada asistente → events.checkout_fields
+//               (CheckoutExtras.vue; respuestas una vez por compra)
+//   reseñas en la página → EventDetail.vue (showReviews: al terminar o, con review_settings.show_while_on_sale, con fechas)
 //   invitar al próximo taller → invitations.ts y filterInviteRecipients de reviews.mjs (INVITE_AUDIENCES)
 import { PRODUCER_FAQ, type FaqItem } from "./producerFaq";
 import { ORGANIZADORES_FAQ } from "./organizadoresFaq";
@@ -69,13 +70,13 @@ export const TALLERES_FAQ: FaqItem[] = [
     },
     {
         q: "¿Sirve para talleres de niños?",
-        a: "Sí. Se inscribe el papá, la mamá o quien esté a cargo, con su correo, y recibe la entrada. Hoy la inscripción guarda los datos de quien compra, no los de cada niño o niña.",
+        a: "Sí. Se inscribe el papá, la mamá o quien esté a cargo, con su correo, y recibe la entrada. Si activas el nombre de cada asistente, escribe el de cada niño o niña, y con las preguntas al inscribirse le pides lo que necesites (edad, alergias, quién lo retira).",
     },
     pick(ORGANIZADORES_FAQ, "¿Cómo funciona la publicación automática en redes?"),
     reword(
         pick(ORGANIZADORES_FAQ, "¿Cómo funcionan las reseñas?"),
         "¿Cómo funcionan las reseñas?",
-        "En la página del taller se muestran cuando termina su última fecha.",
+        "Si lo activas, la página del taller las muestra mientras sigue con fechas, junto al botón para inscribirse.",
     ),
     {
         q: "¿Puedo invitar a quienes vinieron a mi próximo taller?",

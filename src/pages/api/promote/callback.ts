@@ -2,6 +2,7 @@ import type { APIRoute } from "astro";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { getSessionContext, hasRole, EVENT_MANAGER_ROLES } from "../../../lib/supabaseServer";
 import { verifyOAuthState } from "../../../lib/crypto";
+import { isSocialPlatform } from "../../../lib/socialPlatforms";
 
 const ZERNIO_BASE = "https://zernio.com/api/v1";
 const STATE_MAX_AGE_MS = 15 * 60 * 1000;
@@ -83,7 +84,7 @@ export const GET: APIRoute = async (context) => {
         if (!platform || !accountId || !profileId) {
             return redirect(`/dashboard/promote?error=missing_params`);
         }
-        if (!["instagram", "facebook"].includes(platform) || (state.platform && state.platform !== platform)) {
+        if (!isSocialPlatform(platform) || (state.platform && state.platform !== platform)) {
             return redirect(`/dashboard/promote?error=invalid_platform`);
         }
 

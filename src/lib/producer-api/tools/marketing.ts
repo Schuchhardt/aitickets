@@ -15,8 +15,8 @@ import { clearEventVideo, EventVideoUnavailableError, loadEventVideoState, saveE
 import { readMp4Meta, sniffVideoType } from "../../videoProbe";
 import { createPromoterLink, listPromoterLinks, revokePromoterLink, promoterRef, PROMOTER_REF_RE } from "../../promoterLinks";
 import { storeVideoBuffer, VideoStorageError } from "../../videoStorage";
+import { SOCIAL_PLATFORMS, platformName, postMediaProblem } from "../../socialPlatforms";
 
-const PLATFORMS = ["instagram", "facebook"] as const;
 const IMAGE_GENERATIONS_PER_DAY = 20;
 const VIDEO_UPLOADS_PER_HOUR = 20;
 // La función responde de forma síncrona: la descarga tiene que caber holgada en su tiempo máximo
@@ -379,8 +379,9 @@ const createSocialPost: ToolDef = {
     name: "create_social_post",
     title: "Crear post para redes",
     description:
-        "Guarda un post para Instagram/Facebook como borrador (o programado si envías scheduled_for). NO lo publica: " +
-        "para eso usa publish_social_post tras la aprobación del productor. Instagram exige al menos una imagen.",
+        "Guarda un post para Instagram, Facebook, TikTok o LinkedIn como borrador (o programado si envías scheduled_for). NO lo publica: " +
+        "para eso usa publish_social_post tras la aprobación del productor. Instagram y TikTok (foto) exigen al menos una imagen; " +
+        "LinkedIn admite hasta 3.000 caracteres (publica en la página de empresa o el perfil que se eligió al conectar).",
     scope: "write",
     audit: (args, result) => ({
         summary: `Post ${(result as any).post?.status === "scheduled" ? "programado" : "en borrador"} para ${[...new Set(args.platforms)].join(", ")}`,
@@ -395,7 +396,7 @@ const createSocialPost: ToolDef = {
             event_id: eventIdSchema,
             content: { type: "string", minLength: 1, maxLength: 2200, description: "Texto del post (Instagram admite hasta 2.200 caracteres)." },
             image_urls: { type: "array", maxItems: 10, items: { type: "string", maxLength: 2000, pattern: "^https://" }, description: "URLs de upload_image/generate_image." },
-            platforms: { type: "array", minItems: 1, maxItems: 2, items: { type: "string", enum: PLATFORMS } },
+            platforms: { type: "array", minItems: 1, maxItems: SOCIAL_PLATFORMS.length, items: { type: "string", enum: SOCIAL_PLATFORMS } },
             scheduled_for: { type: "string", format: "date-time", description: "ISO 8601 futuro. Se programa al publicar con publish_social_post." },
         },
     },
@@ -403,7 +404,8 @@ const createSocialPost: ToolDef = {
         const event = await loadOwnedEvent<any>(ctx, args.event_id, "id");
         const platforms = [...new Set<string>(args.platforms)];
         const images: string[] = args.image_urls || [];
-        if (platforms.includes("instagram") && !images.length) throw new ToolError("invalid_input", "Instagram requiere al menos una imagen (image_urls).");
+        const problem = postMediaProblem(platforms, images.length, String(args.content).length);
+        if (problem) throw new ToolError("invalid_input", `${problem}${/imagen/.test(problem) ? " (image_urls)" : ""}`);
         const storageBase = serverEnv("SUPABASE_URL")?.replace(/\/+$/, "");
         if (storageBase && images.some((u) => !u.startsWith(`${storageBase}/storage/v1/object/public/`))) {
             throw new ToolError("invalid_input", "Las imágenes deben estar alojadas en AI Tickets: súbelas antes con upload_image.");
@@ -461,7 +463,7 @@ const listSocialPosts: ToolDef = {
     },
 };
 
-/** Lo que impide publicar un post: sin cuentas conectadas, evento en borrador/cancelado o Instagram sin imagen. */
+/** Lo que impide publicar un post: sin cuentas conectadas, evento en borrador/cancelado, o texto o imágenes que alguna red no acepta. */
 async function checkPublishable(ctx: ToolContext, post: any) {
     const platforms: string[] = Array.isArray(post.platforms) ? post.platforms : [];
     const event = await loadOwnedEvent<any>(ctx, Number(post.event_id), "id, name, slug, status, cancelled_at");
@@ -482,9 +484,8 @@ async function checkPublishable(ctx: ToolContext, post: any) {
                 `Conéctalas en ${ctx.origin}/dashboard/promote o publica el texto a mano.`,
         );
     }
-    if (accounts.some((a: any) => a.platform === "instagram") && !(post.image_urls || []).length) {
-        throw new ToolError("invalid_input", "Instagram requiere al menos una imagen: agrégala al post.");
-    }
+    const problem = postMediaProblem(accounts.map((a: any) => a.platform), (post.image_urls || []).length, String(post.content || "").length);
+    if (problem) throw new ToolError("invalid_input", `${problem} Corrige el post antes de publicarlo.`);
     return { accounts, platforms, event };
 }
 
@@ -528,7 +529,7 @@ const publishPost: ToolDef = {
         // Se valida aquí (antes de pedir confirmación) todo lo que haría fallar la publicación
         const { accounts, platforms, event } = await checkPublishable(ctx, post);
         const text = String(post.content || "");
-        const where = accounts.map((a: any) => `${a.platform} (${a.account_name || "cuenta conectada"})`).join(", ");
+        const where = accounts.map((a: any) => `${platformName(a.platform)} (${a.account_name || "cuenta conectada"})`).join(", ");
         const missing = platforms.filter((p: string) => !accounts.some((a: any) => a.platform === p));
         return {
             message:
@@ -554,7 +555,7 @@ const publishPost: ToolDef = {
         properties: { post_id: { type: "integer", minimum: 1 } },
     },
     async handler(args, ctx) {
-        const { data: post } = await ctx.supabase.from("social_posts").select("id, event_id, status, platforms, image_urls").eq("id", args.post_id).eq("organization_id", ctx.actor.orgId).maybeSingle();
+        const { data: post } = await ctx.supabase.from("social_posts").select("id, event_id, status, content, platforms, image_urls").eq("id", args.post_id).eq("organization_id", ctx.actor.orgId).maybeSingle();
         if (!post) throw new ToolError("not_found", "Post no encontrado en tu organización.");
         if (post.status === "published") throw new ToolError("conflict", "Este post ya fue publicado.");
         await checkPublishable(ctx, post);

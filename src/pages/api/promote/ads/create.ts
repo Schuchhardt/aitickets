@@ -122,7 +122,7 @@ export const POST: APIRoute = async (context) => {
                 headline: value.type === "boost" ? null : value.headline,
                 image_urls: value.type === "boost" ? post?.image_urls || [] : [value.imageUrl],
                 call_to_action: value.callToAction,
-                target_audience: { geo: value.geo, ageMin: value.ageMin, ageMax: value.ageMax },
+                target_audience: { geo: value.geo, ageMin: value.ageMin, ageMax: value.ageMax, interests: value.interests, workPositions: value.workPositions },
                 created_by: userId,
             })
             .select("id, organization_id, created_at")

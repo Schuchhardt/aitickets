@@ -11,7 +11,10 @@ import { normalizePageSettings } from "../../../../lib/eventPageSettings";
 import { isDemoEventSlug } from "../../../../lib/demoEvent.mjs";
 import { normalizeReviewSettings } from "../../../../../netlify/lib/reviews.mjs";
 import { siteUrl as siteUrlFromEnv } from "../../../api/_lib/server-utils";
-import { loadTicketChain } from "../../../../../netlify/lib/tickets.mjs";
+import { loadTicketChain, loadPeoplePerTicket } from "../../../../../netlify/lib/tickets.mjs";
+import { normalizeCheckoutFields } from "../../../../lib/checkoutFields.mjs";
+import { loadEntryDeadlines } from "../../../../../netlify/lib/checkin.mjs";
+import { loadSecretLocation } from "../../../../../netlify/lib/secret-location.mjs";
 
 const { id } = Astro.params;
 const guard = await requireDashboardSession(Astro, EVENT_MANAGER_ROLES);
@@ -70,6 +73,16 @@ if (error || !event) {
 
 // Tandas encadenadas (vacío si la migración 202610290100 aún no está aplicada)
 const ticketChain = await loadTicketChain(supabaseAdmin, event.id);
+// Mesas para N y qué pedir al comprar (vacíos si las migraciones 202610300100/110 aún no están aplicadas)
+const [peoplePerTicket, checkoutFieldsRes] = await Promise.all([
+    loadPeoplePerTicket(supabaseAdmin, event.id),
+    supabaseAdmin.from("events").select("checkout_fields").eq("id", event.id).maybeSingle(),
+]);
+const checkoutFields = normalizeCheckoutFields(checkoutFieldsRes.error ? null : (checkoutFieldsRes.data as any)?.checkout_fields);
+// Hora límite de ingreso por entrada (vacío si la migración 202610300300 aún no está aplicada)
+const entryDeadlines = await loadEntryDeadlines(supabaseAdmin, event.id);
+// Dirección que solo ven quienes compran (secret_location) y cuándo se revela
+const secretLocation = await loadSecretLocation(supabaseAdmin, event.id).catch(() => ({ address: null, revealHours: null }));
 // Solo cuenta si la anterior sigue en el formulario (las retiradas de la venta no se muestran)
 const visibleTicketIds = new Set((event.event_tickets || []).filter((t: any) => t.status !== "unavailable").map((t: any) => Number(t.id)));
 
@@ -86,6 +99,9 @@ const initialFormState = {
         pageSettings: normalizePageSettings(event.page_settings),
         category: (event as any).event_tags?.[0]?.category_tags?.name || "",
         isPrivate: event.accessibility === "private",
+        checkoutFields,
+        secretLocation: secretLocation.address || "",
+        secretLocationRevealHours: secretLocation.revealHours ?? "",
     },
     // Toggle al final del formulario: correo "¿Cómo estuvo?" 24 h después de cada función
     reviews: { enabled: normalizeReviewSettings(event.review_settings).enabled },
@@ -116,7 +132,9 @@ const initialFormState = {
             description: "",
             // R1: "" = todas las funciones
             eventDateId: t.event_date_id ?? "",
+            peoplePerTicket: peoplePerTicket.get(Number(t.id)) || 1,
             opensAfterId: visibleTicketIds.has(Number(ticketChain.get(Number(t.id)))) ? ticketChain.get(Number(t.id)) : "",
+            entryUntil: entryDeadlines.get(Number(t.id)) || "",
         })) || [],
 };
 

@@ -6,6 +6,7 @@ import {
 } from "../../checkinAccess";
 import { formatFunctionLabel } from "../../../../netlify/lib/dates.mjs";
 import { checkinsByChannel, loadOrderCheckins, loadPaidOrders, summarizeSales } from "../../eventAnalytics";
+import { loadPeoplePerTicket } from "../../../../netlify/lib/tickets.mjs";
 
 const timeFmt = new Intl.DateTimeFormat("es-CL", { timeZone: TZ, hour: "2-digit", minute: "2-digit", day: "2-digit", month: "short" });
 const formatLocal = (iso: string | null | undefined) => (iso ? timeFmt.format(new Date(iso)) : null);
@@ -34,7 +35,9 @@ const listAttendees: ToolDef = {
     title: "Listar asistentes",
     description:
         "Entradas emitidas de un evento con su titular (nombre, email), tipo de entrada, función, estado (active = sin ingresar, validated = ya entró, " +
-        "cancelled = anulada), hora de ingreso y si es cortesía. Filtra por checked_in, tipo, función o búsqueda por nombre/email. " +
+        "cancelled = anulada), hora de ingreso y si es cortesía. El titular es el asistente que se escribió al comprar (compras de varias entradas) " +
+        "o, si no, quien compró; buyer aparece cuando son personas distintas. seat = lugar en una mesa para N. answers = respuestas a las preguntas " +
+        "del evento (de la orden). Filtra por checked_in, tipo, función o búsqueda por nombre/email. " +
         "Contiene datos personales: úsalos solo para gestionar el evento.",
     scope: "attendees",
     permission: "attendees.read",
@@ -57,13 +60,26 @@ const listAttendees: ToolDef = {
     async handler(args, ctx) {
         const event = await loadOwnedEvent<any>(ctx, args.event_id, "id, name");
         const { ticketById, dateById } = await loadEventStructure(ctx, event.id);
-        const rows = await fetchAll<any>(() =>
-            ctx.supabase
-                .from("event_attendees")
-                .select("id, created_at, status, validated_at, is_complimentary, event_order_id, event_ticket_id, attendees ( first_name, last_name, email )")
-                .eq("event_id", event.id)
-                .order("created_at", { ascending: true }),
-        );
+        // Asistente de cada QR y lugar en la mesa: columnas opcionales (migraciones 202610300100 y 202610300110)
+        const loadRows = (extra: string) =>
+            fetchAll<any>(() =>
+                ctx.supabase
+                    .from("event_attendees")
+                    .select(`id, created_at, status, validated_at, is_complimentary, event_order_id, event_ticket_id,${extra} attendees ( first_name, last_name, email )`)
+                    .eq("event_id", event.id)
+                    .order("created_at", { ascending: true }),
+            );
+        let rows: any[] = [];
+        for (const extra of [" holder_name, holder_email, seat_number,", ""]) {
+            try {
+                rows = await loadRows(extra);
+                break;
+            } catch (err: any) {
+                if (!extra || !["42703", "PGRST204"].includes(String(err?.code || ""))) throw err;
+            }
+        }
+        const buyerOf = (r: any) => ({ name: `${r.attendees?.first_name || ""} ${r.attendees?.last_name || ""}`.trim() || null, email: r.attendees?.email || null });
+        const holderOf = (r: any) => (r.holder_name || r.holder_email ? { name: r.holder_name || null, email: r.holder_email || null } : buyerOf(r));
         const query = (args.search || "").toLowerCase();
         const filtered = rows.filter((r) => {
             const status = r.status ?? "active";
@@ -73,12 +89,19 @@ const listAttendees: ToolDef = {
             if (args.ticket_type_id && Number(r.event_ticket_id) !== args.ticket_type_id) return false;
             if (args.function_id && Number(ticketById.get(Number(r.event_ticket_id))?.event_date_id) !== args.function_id) return false;
             if (query) {
-                const name = `${r.attendees?.first_name || ""} ${r.attendees?.last_name || ""}`.toLowerCase();
-                if (!name.includes(query) && !String(r.attendees?.email || "").toLowerCase().includes(query)) return false;
+                const haystack = [buyerOf(r).name, buyerOf(r).email, r.holder_name, r.holder_email].filter(Boolean).join(" ").toLowerCase();
+                if (!haystack.includes(query)) return false;
             }
             return true;
         });
         const page = filtered.slice(args.offset, args.offset + args.limit);
+        // Respuestas a las preguntas del evento, por orden (sin la migración no hay)
+        const orderIds = [...new Set(page.map((r) => r.event_order_id).filter(Boolean))];
+        const answersByOrder = new Map<string, any[]>();
+        if (orderIds.length) {
+            const { data: orders, error } = await ctx.supabase.from("event_orders").select("id, registration_answers").in("id", orderIds);
+            if (!error) for (const o of orders || []) if (Array.isArray(o.registration_answers)) answersByOrder.set(o.id, o.registration_answers);
+        }
         return {
             event_id: Number(event.id),
             total: filtered.length,
@@ -88,7 +111,10 @@ const listAttendees: ToolDef = {
                 const ticket = ticketById.get(Number(r.event_ticket_id));
                 return {
                     ticket_id: r.id,
-                    holder: { name: `${r.attendees?.first_name || ""} ${r.attendees?.last_name || ""}`.trim() || null, email: r.attendees?.email || null },
+                    holder: holderOf(r),
+                    ...(r.holder_name || r.holder_email ? { buyer: buyerOf(r) } : {}),
+                    ...(r.seat_number ? { seat: Number(r.seat_number) } : {}),
+                    ...(answersByOrder.has(r.event_order_id) ? { answers: answersByOrder.get(r.event_order_id)!.map((a: any) => ({ question: a.question, answer: a.answer })) } : {}),
                     ticket_type: { id: Number(r.event_ticket_id) || null, name: ticket?.ticket_name || null },
                     function: functionInfo(dateById, ticket?.event_date_id),
                     status: isCancelled(r) ? "cancelled" : r.status ?? "active",
@@ -110,7 +136,9 @@ const checkInAttendee: ToolDef = {
         "Marca el ingreso de una entrada (check-in manual, p. ej. si falla el escáner) por ticket_id (de list_attendees) o por el código QR. " +
         "Una entrada solo puede ingresar una vez: si ya entró, responde conflicto con la hora de ingreso. Avisa si la entrada es de otra función. " +
         "Excepción: una entrada válida para todas las funciones de un evento con varias (pase de varios días, taller de varias sesiones) " +
-        "ingresa una vez en cada función (la de hoy, o la más cercana); responde sessions_attended de sessions_total.",
+        "ingresa una vez en cada función (la de hoy, o la más cercana); responde sessions_attended de sessions_total. " +
+        "Si el tipo de entrada tiene hora límite de ingreso (entry_until, p. ej. la lista hasta las 01:00) y ya pasó, responde conflicto " +
+        "\"fuera de horario\" sin marcar el ingreso; con force: true entra igual.",
     scope: "attendees",
     permission: "checkin",
     annotations: { readOnlyHint: false, destructiveHint: false },
@@ -122,6 +150,10 @@ const checkInAttendee: ToolDef = {
             event_id: eventIdSchema,
             ticket_id: { type: "string", pattern: "^[0-9a-fA-F-]{36}$", description: "ID de la entrada (list_attendees → ticket_id)." },
             qr_code: { type: "string", minLength: 4, maxLength: 200, description: "Contenido del código QR de la entrada." },
+            force: {
+                type: "boolean",
+                description: "Dejar entrar igual una entrada fuera de horario (pasada la hora límite de su tipo). Solo si la puerta lo decide.",
+            },
         },
     },
     audit: (_args, result) => ({ summary: "Ingreso manual de una entrada", target: String(result.ticket_id || "") }),
@@ -129,7 +161,7 @@ const checkInAttendee: ToolDef = {
         if (!args.ticket_id === !args.qr_code) throw new ToolError("invalid_input", "Envía ticket_id o qr_code (uno de los dos).");
         if (args.ticket_id && !UUID_RE.test(args.ticket_id)) throw new ToolError("invalid_input", "ticket_id inválido.");
         const event = await loadOwnedEvent<any>(ctx, args.event_id, "id");
-        const result = await checkInTicket(ctx.supabase, Number(event.id), { ticketId: args.ticket_id, qrCode: args.qr_code });
+        const result = await checkInTicket(ctx.supabase, Number(event.id), { ticketId: args.ticket_id, qrCode: args.qr_code }, undefined, { force: args.force === true });
         if (!result.ok) {
             if (result.code === "not_found") throw new ToolError("not_found", result.message);
             if (result.code === "already_validated") {
@@ -137,6 +169,7 @@ const checkInAttendee: ToolDef = {
                 if (result.function_label) throw new ToolError("conflict", `${result.message.replace(/\.$/, "")}${when}: el pase entra una vez por función.`);
                 throw new ToolError("conflict", `Esta entrada ya ingresó${when}. No se puede usar dos veces.`);
             }
+            if (result.code === "late_entry") throw new ToolError("conflict", `${result.message} No se marcó el ingreso: si la puerta decide dejarla entrar, repite con force: true.`);
             throw new ToolError("conflict", `${result.message} No puede ingresar.`);
         }
         const t = result.ticket;
@@ -149,6 +182,7 @@ const checkInAttendee: ToolDef = {
             ticket_type: t.event_tickets?.ticket_name || null,
             complimentary: Boolean(t.is_complimentary),
             ...(result.sessions_total ? { function: result.function_label, sessions_attended: result.sessions_attended, sessions_total: result.sessions_total } : {}),
+            ...(result.late_entry ? { late_entry: true, entry_until: result.entry_until } : {}),
             ...(result.function_mismatch
                 ? { warning: `Ojo: la entrada es para otra función (${result.function_label}). Se marcó el ingreso igual; revisa si corresponde.` }
                 : {}),
@@ -178,7 +212,12 @@ const getCheckinStats: ToolDef = {
         );
         const valid = rows.filter((r) => !isCancelled(r));
         const checkedIn = valid.filter(isCheckedIn);
-        const ticketCapacity = tickets.reduce((s: number | null, t: any) => (s == null || t.total_quantity == null ? null : s + Number(t.total_quantity)), 0 as number | null);
+        // Aforo en personas: una mesa para N (people_per_ticket) aporta N por mesa, igual que sus QR
+        const people = await loadPeoplePerTicket(ctx.supabase, event.id);
+        const ticketCapacity = tickets.reduce(
+            (s: number | null, t: any) => (s == null || t.total_quantity == null ? null : s + Number(t.total_quantity) * (people.get(Number(t.id)) || 1)),
+            0 as number | null,
+        );
         const capacity = Number(event.capacity) > 0 ? Number(event.capacity) : tickets.length && ticketCapacity ? ticketCapacity : null;
         const pct = (n: number, d: number | null) => (d ? Math.round((n / d) * 1000) / 10 : null);
 

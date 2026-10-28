@@ -21,10 +21,10 @@ const session = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-async function openScenario(page: Page, hash = "") {
+async function openScenario(page: Page, hash = "", scenario = SCENARIO) {
   await page.route(/google-analytics\.com|googletagmanager\.com/, (route) => route.abort());
   await page.route("**/api/events/visit", (route) => route.fulfill({ status: 204 }));
-  const response = await page.goto(`${FIXTURE_ROUTE}/${SCENARIO}${hash}`);
+  const response = await page.goto(`${FIXTURE_ROUTE}/${scenario}${hash}`);
   expect(response?.status(), "el servidor debe levantarse con E2E_FIXTURES=1 (playwright.config.ts)").toBe(200);
   await page.addStyleTag({ content: "astro-dev-toolbar{display:none!important}" });
   await waitForIsland(page, '[data-testid="event-reviews"]');
@@ -42,6 +42,20 @@ test("evento terminado: resumen, comentarios y galería de asistentes", async ({
   // Abre el visor de fotos con el pie "Foto de <nombre>"
   await reviews.getByTestId("attendee-gallery").getByRole("button").first().click();
   await expect(page.getByRole("dialog")).toContainText("Foto de Ana R.");
+});
+
+test("obra en cartelera: reseñas de las funciones pasadas junto al botón de compra", async ({ page }) => {
+  await openScenario(page, "", "cartelera-con-resenas");
+  const card = page.getByTestId("event-action-card");
+  await expect(card).not.toHaveAttribute("data-state", "ended");
+  await expect(card.getByTestId("buy-button")).toBeVisible();
+  const reviews = page.getByTestId("event-reviews");
+  await expect(reviews.getByTestId("reviews-summary")).toContainText("4,5");
+  await expect(reviews.getByTestId("reviews-list").locator("li")).toHaveCount(2);
+  await expect(page.locator(".badges")).toContainText("★ 4,5");
+  // En mobile la tarjeta de compra no tapa las reseñas: ambas caben en el ancho de la pantalla
+  const width = page.viewportSize()?.width || 0;
+  for (const box of [await card.boundingBox(), await reviews.boundingBox()]) expect(box && box.x + box.width).toBeLessThanOrEqual(width + 1);
 });
 
 test("validar con la entrada, calificar y recibir el código de premio", async ({ page }) => {

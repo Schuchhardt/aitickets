@@ -1,12 +1,12 @@
 <script setup>
 // Asistente para crear un anuncio en Meta (Facebook e Instagram) vía Zernio: POST /api/promote/ads/create.
 // Pasos: 1) evento, tipo (anuncio nuevo o promocionar un post publicado) y cuenta publicitaria; 2) texto e imagen o el
-// post; 3) público (todo Chile o una ciudad con radio, edad); 4) presupuesto diario y días, con el gasto máximo
+// post; 3) público (todo Chile o una ciudad con radio, edad y, opcional, hasta 3 intereses y 3 cargos de Meta); 4) presupuesto diario y días, con el gasto máximo
 // confirmado explícitamente. El servidor vuelve a validar todo (netlify/lib/zernio-ads.mjs validateAdInput).
 import { ref, computed, watch } from 'vue'
 import {
   ArrowLeft, ArrowRight, Check, Sparkles, Loader2, AlertCircle, MapPin, Users,
-  Image as ImageIcon, Upload, Megaphone, CheckCircle, Search,
+  Image as ImageIcon, Upload, Megaphone, CheckCircle, Search, Heart, Briefcase, X,
 } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -50,6 +50,8 @@ const form = ref({
   radiusKm: 25,
   ageMin: 18,
   ageMax: 65,
+  interests: [],
+  workPositions: [],
   dailyBudget: null,
   days: 5,
   launch: 'now',
@@ -173,10 +175,47 @@ const searchCity = async () => {
 }
 const pickCity = (c) => { form.value.city = c; cityResults.value = [] }
 
+// ---- Intereses y cargos (opcional: sin ninguno, Meta busca dentro de la edad y el lugar) ----
+const AUDIENCE = {
+  interest: { field: 'interests', max: limits.maxInterests || 3, empty: 'No encontramos ese interés. Prueba con otra palabra (ej: "Música electrónica").' },
+  workPosition: { field: 'workPositions', max: limits.maxWorkPositions || 3, empty: 'No encontramos ese cargo. Prueba con otro nombre (ej: "Gerente de recursos humanos").' },
+}
+const audienceSearch = ref({ interest: '', workPosition: '' })
+const audienceResults = ref({ interest: [], workPosition: [] })
+const searchingAudience = ref('')
+const searchAudience = async (dimension) => {
+  const q = audienceSearch.value[dimension].trim()
+  if (!connection.value || q.length < 2) return
+  searchingAudience.value = dimension
+  error.value = ''
+  try {
+    const qs = new URLSearchParams({ connectionId: String(connection.value.id), q, dimension })
+    const res = await fetch(`/api/promote/ads/targeting?${qs}`)
+    const data = await res.json().catch(() => ({}))
+    if (res.ok) {
+      const chosen = form.value[AUDIENCE[dimension].field].map((x) => x.id)
+      audienceResults.value[dimension] = (data.results || []).filter((r) => !chosen.includes(r.id))
+      if (!audienceResults.value[dimension].length) error.value = AUDIENCE[dimension].empty
+    } else error.value = data.message || 'No se pudo buscar'
+  } catch { error.value = 'No se pudo buscar' } finally { searchingAudience.value = '' }
+}
+const pickAudience = (dimension, item) => {
+  const list = form.value[AUDIENCE[dimension].field]
+  if (list.length < AUDIENCE[dimension].max && !list.some((x) => x.id === item.id)) list.push({ id: item.id, name: item.name })
+  audienceResults.value[dimension] = []
+  audienceSearch.value[dimension] = ''
+}
+const dropAudience = (dimension, id) => {
+  const field = AUDIENCE[dimension].field
+  form.value[field] = form.value[field].filter((x) => x.id !== id)
+}
+const peopleLabel = (n) => (n >= 1e6 ? `${Math.round(n / 1e5) / 10} M personas` : n >= 1e3 ? `${Math.round(n / 1e3)} mil personas` : `${n} personas`)
+
 const audienceLabel = computed(() => {
   const f = form.value
   const geo = f.geoType === 'city' && f.city ? `${f.city.name} y ${f.radiusKm} km a la redonda` : 'Todo Chile'
-  return `${geo} · ${f.ageMin} a ${f.ageMax}${f.ageMax === 65 ? '+' : ''} años`
+  const extra = [...f.interests, ...f.workPositions].map((x) => x.name)
+  return `${geo} · ${f.ageMin} a ${f.ageMax}${f.ageMax === 65 ? '+' : ''} años${extra.length ? ` · ${extra.join(', ')}` : ''}`
 })
 
 // ---- Enviar ----
@@ -201,6 +240,8 @@ const submit = async () => {
         geo: f.geoType === 'city' && f.city ? { type: 'city', key: f.city.key, name: f.city.name, radiusKm: f.radiusKm } : { type: 'country' },
         ageMin: f.ageMin,
         ageMax: f.ageMax,
+        interests: f.interests,
+        workPositions: f.workPositions,
         dailyBudget: f.dailyBudget,
         days: f.days,
         launch: f.launch,
@@ -406,6 +447,36 @@ const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('es-CL', { week
             <span class="text-gray-500">años</span>
           </div>
           <p class="text-xs text-gray-500 mt-2">Meta busca a las personas con más probabilidad de hacer clic dentro de este público.</p>
+        </div>
+        <div v-for="(cfg, dim) in AUDIENCE" :key="dim" :data-testid="`ad-audience-${dim}`">
+          <h2 class="text-lg font-semibold mb-1 flex items-center gap-2">
+            <Heart v-if="dim === 'interest'" :size="18" /><Briefcase v-else :size="18" />
+            {{ dim === 'interest' ? 'Intereses' : 'Cargo o profesión' }} <span class="text-sm font-normal text-gray-500">(opcional)</span>
+          </h2>
+          <p class="text-xs text-gray-500 mb-3">
+            {{ dim === 'interest'
+              ? `Hasta ${cfg.max}: Meta muestra el anuncio a quien tenga al menos uno (ej: "Stand-up comedy", "Reggaetón").`
+              : `Hasta ${cfg.max}, según el cargo que la gente puso en Facebook (ej: "Gerente de recursos humanos"). Muchos no lo informan: úsalo para charlas y seminarios.` }}
+          </p>
+          <div v-if="form[cfg.field].length" class="flex flex-wrap gap-2 mb-3">
+            <span v-for="x in form[cfg.field]" :key="x.id" class="inline-flex items-center gap-1 pl-3 pr-1.5 py-1 rounded-full bg-gray-100 text-sm">
+              {{ x.name }}
+              <button type="button" class="p-0.5 rounded-full hover:bg-gray-200" :aria-label="`Quitar ${x.name}`" @click="dropAudience(dim, x.id)"><X :size="14" /></button>
+            </span>
+          </div>
+          <form v-if="form[cfg.field].length < cfg.max" class="flex gap-2" @submit.prevent="searchAudience(dim)">
+            <input v-model="audienceSearch[dim]" class="flex-1 border border-gray-300 rounded-lg px-3 py-2" :placeholder="dim === 'interest' ? 'Ej: Música electrónica' : 'Ej: Recursos humanos'" />
+            <button type="submit" :disabled="searchingAudience === dim" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-black text-white text-sm disabled:opacity-50">
+              <Loader2 v-if="searchingAudience === dim" :size="16" class="animate-spin" /><Search v-else :size="16" /> Buscar
+            </button>
+          </form>
+          <div v-if="audienceResults[dim].length" class="grid gap-1 mt-2">
+            <button v-for="r in audienceResults[dim]" :key="r.id" type="button" @click="pickAudience(dim, r)" class="text-left text-sm px-3 py-2 rounded-lg hover:bg-gray-50 border border-gray-100">
+              <strong>{{ r.name }}</strong>
+              <span v-if="r.path?.length > 1" class="text-gray-500"> · {{ r.path.slice(0, -1).join(' › ') }}</span>
+              <span v-if="r.audienceSize" class="text-gray-400"> · {{ peopleLabel(r.audienceSize) }}</span>
+            </button>
+          </div>
         </div>
       </section>
 

@@ -112,6 +112,6 @@ describe('pestañas', () => {
   })
   it('cada pestaña trae también las herramientas que no vienen para el tipo de evento (para Más herramientas)', () => {
     const page = panelTabs(resolveModules(ctx({ profile: 'funciones' }))).find((t) => t.id === 'pagina')
-    expect(page.modules.map((m) => [m.id, m.enabled])).toEqual([['cover', true], ['faq', true], ['gallery', true], ['documents', false]])
+    expect(page.modules.map((m) => [m.id, m.enabled])).toEqual([['cover', true], ['agenda', false], ['faq', true], ['gallery', true], ['documents', false]])
   })
 })

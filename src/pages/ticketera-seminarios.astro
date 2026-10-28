@@ -13,9 +13,10 @@
 // lógica de los anuncios (useAdsDemo) y del muro (useWallDemo) y los rótulos de la página del evento (cardState,
 // cardLabel, cardFunctionChips, formatSaleStart). Montos y plazos: fees.mjs, legal.mjs, ledger.ts y producerFaq.ts. Los
 // textos de las historias salen de pieceText (socialSeriesRender.ts, módulo de servidor) llamado aquí al construir y
-// pasados por props. Lo que no existe en el producto (agenda con expositores, ingreso diario con el mismo pase, datos de
-// cada asistente y de facturación al comprar, credenciales impresas, certificados, LinkedIn desde el panel,
-// Facebook/TikTok/reels, segmentar por profesión) va con "Pronto".
+// pasados por props. Todo lo que se muestra existe en el producto, sin "Pronto": la agenda con expositores, el ingreso
+// diario con el mismo pase, las credenciales, los certificados, el nombre de cada asistente y el RUT y la razón social al
+// comprar (events.checkout_fields), LinkedIn desde el panel, la serie en Facebook y TikTok, el reel y segmentar anuncios
+// por cargo o intereses.
 // La jornada de ejemplo empieza el jueves que cae al menos 35 días después del build (la página es prerender: no hay
 // desfase de hidratación).
 // Fase 4 (contenido real) queda fuera del código: fotos reales con autorización (§8; la del hall muestra una pistola

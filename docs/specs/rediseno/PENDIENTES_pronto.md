@@ -4,7 +4,8 @@ Inventario de todas las etiquetas **Pronto** (`src/components/ui/SoonBadge.vue`)
 Cada una es una promesa pública. Este documento dice, por cada una, dónde aparece, qué existe hoy en el código, qué
 falta construir y qué hay que tocar en las landings cuando esté lista.
 
-Estado al 27-10-2026, rama `rediseno/aitickets`.
+Estado al 28-10-2026: todos los ítems están hechos (el último lote, en la rama `feat/pronto-resto`). Ya no queda
+ningún "Pronto" en las landings.
 
 ## Cómo usar este documento
 
@@ -28,28 +29,28 @@ Estado al 27-10-2026, rama `rediseno/aitickets`.
 
 | # | Capacidad | Nichos que la prometen | Prioridad | Esfuerzo |
 |---|---|---|---|---|
-| 1 | Publicación automática en Facebook, TikTok y Reels | Todos (organizadores, stand-up, teatro, música, clubs, fiestas, talleres, seminarios) | P2 | L |
-| 2 | Segmentar anuncios por intereses o profesión | Stand-up, música, clubs, fiestas, seminarios | P2 | M |
+| 1 | ~~Publicación automática en Facebook, TikTok y Reels~~ **Hecho** | Todos (organizadores, stand-up, teatro, música, clubs, fiestas, talleres, seminarios) | P2 | L |
+| 2 | ~~Segmentar anuncios por intereses o profesión~~ **Hecho** | Stand-up, música, clubs, fiestas, seminarios | P2 | M |
 | 3 | ~~Aviso automático a la lista de espera y verla en el panel~~ **Hecho** | Música, fiestas, talleres, seminarios | P1 | M |
 | 4 | ~~Abrir sola la siguiente tanda cuando se agota la anterior~~ **Hecho** | Música, fiestas | P1 | M |
 | 5 | ~~Que cada promotor o RRPP vea sus números~~ **Hecho** | Clubs, fiestas | P1 | M |
 | 6 | ~~Check-ins por canal ("cuántos de cada lista entraron")~~ **Hecho** | Clubs | P2 | S |
 | 7 | ~~Aforo en vivo en el panel~~ **Hecho** | Clubs, fiestas, seminarios | P2 | S |
-| 8 | Validar la hora de ingreso de la lista | Clubs | P3 | S |
-| 9 | Una entrada para cada invitado de la mesa | Clubs | P2 | M |
-| 10 | Dirección que solo ven quienes compran | Fiestas | P2 | S |
+| 8 | ~~Validar la hora de ingreso de la lista~~ **Hecho** | Clubs | P3 | S |
+| 9 | ~~Una entrada para cada invitado de la mesa~~ **Hecho** | Clubs | P2 | M |
+| 10 | ~~Dirección que solo ven quienes compran~~ **Hecho** | Fiestas | P2 | S |
 | 11 | ~~Repetir funciones con un patrón y copiar entradas a cada función~~ **Hecho** | Teatro, talleres | P1 | M |
-| 12 | Mostrar reseñas mientras quedan fechas | Teatro, talleres | P2 | S |
+| 12 | ~~Mostrar reseñas mientras quedan fechas~~ **Hecho** | Teatro, talleres | P2 | S |
 | 13 | ~~Ocupación de cada función en una vista~~ **Hecho** | Teatro | P2 | S |
-| 14 | Borderó por función | Teatro | P2 | M |
-| 15 | Preguntas al inscribirse | Talleres | P2 | M |
+| 14 | ~~Borderó por función~~ **Hecho** | Teatro | P2 | M |
+| 15 | ~~Preguntas al inscribirse~~ **Hecho** | Talleres | P2 | M |
 | 16 | ~~Validar la misma entrada en varias sesiones o días~~ **Hecho** | Talleres, seminarios | P1 | M |
-| 17 | Agenda con expositores y salas | Seminarios | P3 | L |
-| 18 | RUT y razón social de la empresa al comprar | Seminarios | P2 | M |
-| 19 | Nombre de cada asistente en una compra de varias entradas | Seminarios | P2 | M |
-| 20 | Certificados de asistencia | Seminarios | P3 | M |
-| 21 | Imprimir credenciales con nombre | Seminarios | P3 | M |
-| 22 | Publicar en LinkedIn desde el panel | Seminarios | P3 | M |
+| 17 | ~~Agenda con expositores y salas~~ **Hecho** | Seminarios | P3 | L |
+| 18 | ~~RUT y razón social de la empresa al comprar~~ **Hecho** | Seminarios | P2 | M |
+| 19 | ~~Nombre de cada asistente en una compra de varias entradas~~ **Hecho** | Seminarios | P2 | M |
+| 20 | ~~Certificados de asistencia~~ **Hecho** | Seminarios | P3 | M |
+| 21 | ~~Imprimir credenciales con nombre~~ **Hecho** | Seminarios | P3 | M |
+| 22 | ~~Publicar en LinkedIn desde el panel~~ **Hecho** | Seminarios | P3 | M |
 | 23 | ~~Lista de asistentes y ventas separadas por función~~ **Hecho** | Academias | P2 | S |
 
 Recomendación de orden: 3, 4, 11 y 16 primero, porque son las que más se repiten y las que un productor nota en su
@@ -58,6 +59,21 @@ primera semana. Después 5, 6, 7 y 23, que salen casi de los mismos datos de che
 ---
 
 ## 1. Publicación automática en Facebook, TikTok y Reels
+
+**Hecho (rama `feat/pronto-resto`).** Migración `202610300400_social_series_networks.sql`: `networks` (estado por red) y `reel_enabled` en la
+serie; `platform` y `video_url` en los slots, con `kind` 'reel'.
+- Facebook (página) publica las mismas historias y posts, con el link en el texto (`fb-serie`) y DM por Messenger al
+  comentar la palabra (`fb-post-dm`).
+- TikTok publica una foto vertical por día la última semana, con el link en la descripción (`tiktok-serie`). Zernio
+  exige `tiktokSettings` y permite 15 photo posts al día por cuenta.
+- Cada red tiene sus propias piezas: si una falla o se desconecta, se omiten sus pendientes y se avisa; las demás siguen.
+  Al reconectarla, se retoma desde ese día.
+- Se activa por evento en "Difusión automática" (`SocialSeriesCard.vue`) o con `prepare_social_series`
+  (`facebook_enabled`, `tiktok_enabled`, `reel_enabled`).
+- El reel usa el video vertical del evento (3 a 60 s) y sale cerca de D-3 en cada red activa.
+- Sin las columnas, la serie queda solo en Instagram.
+- **AI Tickets no genera video desde el afiche**: Zernio no lo hace y las funciones no tienen codificador. Las landings
+  dicen "Reel con tu video" en vez de "Reels".
 
 **Dónde se promete**
 - `src/components/landing/organizadores/MarketingSection.astro` ("Reel antes de la función", "Facebook y TikTok")
@@ -90,6 +106,15 @@ red falla, se ve el error y no bloquea a las demás.
 Quitar los chips Facebook, TikTok y Reels y la fila "Reel antes de la función" de los 9 archivos. Dejar solo Instagram.
 
 ## 2. Segmentar anuncios por intereses o profesión
+
+**Hecho (rama `feat/pronto-resto`).** Sin migración.
+- `searchAdAudience` (`zernio-ads.mjs`) busca intereses y cargos de Meta vía Zernio (`/ads/targeting/search`, dimensiones
+  `interest` y `workPosition`).
+- El armado del anuncio deja elegir hasta 3 intereses y hasta 3 cargos (`CreateAdCampaign.vue`,
+  `/api/promote/ads/targeting?dimension=`).
+- Se guardan en `ad_campaigns.target_audience` y se mandan en `adTargeting` (create y boost).
+- Los cargos solo llegan a quien informó su cargo en Facebook, y el armado lo dice.
+- Demos de stand-up, música, clubs, fiestas y seminarios sin "Pronto".
 
 **Dónde se promete**
 Chips deshabilitados en las demos de anuncios:
@@ -266,6 +291,18 @@ Con la puerta escaneando, el panel muestra el número subiendo sin recargar, con
 
 ## 8. Validar la hora de ingreso de la lista
 
+**Hecho (rama `feat/pronto-resto`).** `event_tickets.entry_until` (migración `202610300300_ticket_entry_until.sql`): hora límite de
+ingreso en hora de Chile, relativa a la función.
+- Si es antes del inicio, cuenta como la madrugada siguiente. La regla está en `src/lib/entryDeadline.mjs`, y la usan el
+  servidor y el escáner sin conexión.
+- Pasada la hora, `/api/confirm-ticket`, `/api/door/<token>/confirm` y `check_in_attendee` responden 409 `late_entry` sin
+  marcar el ingreso, salvo con `force: true`.
+- `ValidateQR.vue` lo muestra en ámbar con "Dejar entrar igual".
+- Se configura con "Ingreso hasta" en los formularios de entradas y con `entry_until` en `create_ticket_type` /
+  `update_ticket_type`.
+- Sin la columna, se entra a cualquier hora, como antes. Landing de discotecas sin "Pronto".
+- Pendiente: la lista de asistentes no marca quién entró tarde.
+
 **Dónde se promete**
 - `clubs/ClubDoor.astro` ("Rechazar la lista después de su hora")
 - `clubs/NightLive.vue` ("Validar la hora de ingreso de la lista")
@@ -283,6 +320,20 @@ Una entrada de lista "hasta 01:00" escaneada a las 01:05 se marca en ámbar como
 
 ## 9. Una entrada para cada invitado de la mesa
 
+**Hecho (rama `feat/pronto-resto`).** `event_tickets.people_per_ticket` (migración `202610300110_table_tickets.sql`).
+- Una "Mesa VIP · 6 personas" emite 6 QR por mesa vendida (`buildAttendeeRows`, mismo `unit_id`, `seat_number` 1..6). Se
+  validan uno por uno.
+- Cupo, precio y máximo por compra son por mesa:
+  - `aitickets_reserve_order` no cambia (mismo bloqueo).
+  - `aitickets_ticket_availability` cuenta una mesa mientras tenga algún QR vigente.
+  - `findOversell` cuenta igual.
+- La ocupación por función y `get_checkin_stats` cuentan el cupo en personas (mesas × N).
+- En la orden, cada QR tiene "Compartir" (su `/ticket/<id>`) y dice "invitado 2 de 6". Con "Nombre de cada asistente" se
+  pide un nombre por invitado.
+- Se configura en crear/editar evento ("Personas por entrada") y con `create_ticket_type` / `update_ticket_type`
+  (`people_per_ticket`). Landing de clubs sin "Pronto".
+- Pendiente: una cortesía de mesa emite un solo QR.
+
 **Dónde se promete**
 `clubs/ClubTables.astro` ("Una entrada para cada invitado de la mesa").
 
@@ -299,6 +350,20 @@ cada una con su QR.
 Comprar "Mesa VIP · 6 personas" deja 6 QR distintos en la orden, que se pueden compartir y se validan uno por uno.
 
 ## 10. Dirección que solo ven quienes compran
+
+**Hecho (rama `feat/pronto-resto`).** La dirección privada (`events.secret_location`) se carga en los formularios del evento y con
+`update_event` (`private_address`).
+- `secret_location_reveal_hours` (migración `202610300310_secret_location_reveal.sql`) la revela N horas antes de la
+  primera función de la entrada.
+- Lo público muestra el lugar y la comuna, sin calle ni coordenadas: página, JSON-LD, meta, `events.location` de los
+  listados y sitios, chat del comprador, invitaciones y copy de redes.
+- La orden, la entrada, el correo y el recordatorio la muestran desde que se revela; antes dicen cuándo llega.
+- `send-secret-location` (cada 15 min) la manda por correo una vez por persona. Lógica en
+  `netlify/lib/secret-location.mjs`.
+- Ojo:
+  - El nombre del lugar sigue siendo público.
+  - Los eventos antiguos conservan la calle en `events.location` hasta que se vuelven a guardar.
+- Landing de fiestas sin "Pronto".
 
 **Dónde se promete**
 `fiestas/PartyPage.astro` ("Dirección que solo ven quienes compran").
@@ -350,6 +415,14 @@ También se puede duplicar el evento.
 
 ## 12. Mostrar reseñas mientras quedan fechas
 
+**Hecho (rama `feat/pronto-resto`).** Sin migración: `review_settings.show_while_on_sale`.
+- Con la opción activa, desde que pasa la primera función la página muestra las reseñas de las funciones pasadas junto al
+  botón de compra, y la nota en las insignias, si ya hay alguna.
+- Se activa en la configuración de reseñas del panel y con `update_review_settings`. El módulo aparece en cartelera con
+  varias funciones.
+- El correo "¿Cómo estuvo?" ya salía 24 h después de cada función.
+- Landings de teatro y talleres sin "Pronto".
+
 **Dónde se promete**
 - `teatro/TheatreSeason.astro` ("Mostrar las reseñas en la página mientras la obra sigue en cartelera")
 - `talleres/WorkshopAfter.astro` ("…mientras el taller sigue con fechas")
@@ -387,6 +460,20 @@ y 23.
 
 ## 14. Borderó por función
 
+**Hecho (rama `feat/pronto-resto`).** Sin migración. `src/lib/functionSettlement.ts` arma el borderó de una función:
+- entradas por tipo y precio y cortesías;
+- bruto y descuentos;
+- cargo por servicio, el que pagaron los compradores y el absorbido;
+- neto al productor.
+
+Las compras de varias funciones se reparten con `orderForFunction`, que ahora también reparte el cargo y su IVA.
+- Se imprime o guarda en PDF en `/dashboard/events/<id>/bordero` y se descarga en planilla
+  (`/api/events/function-settlement`).
+- Se enlaza desde "Ocupación por función" y "Ventas por función".
+- En el asistente de IA: `get_function_settlement`.
+- Solo órdenes pagadas, sin reembolsadas ni transferencias.
+- Pendiente: validar el formato con una sala real. Los reembolsos parciales no se descuentan.
+
 **Dónde se promete**
 `teatro/TheatreVenues.astro` ("Borderó por función").
 
@@ -399,6 +486,17 @@ CSV de órdenes (`src/pages/api/events/orders-csv.ts`).
 - Definir el formato con una sala real antes de construirlo.
 
 ## 15. Preguntas al inscribirse
+
+**Hecho (rama `feat/pronto-resto`).** Hasta 8 preguntas por evento (texto corto, elegir una opción, sí o no; obligatorias u opcionales)
+en `events.checkout_fields.questions` (migración `202610300100_checkout_fields.sql`, reglas en
+`src/lib/checkoutFields.mjs`).
+- Se editan en crear/editar evento ("Qué pedir al comprar", `CheckoutFieldsEditor.vue`) y con `update_event`.
+- Se piden una vez por compra en el checkout y en el registro gratis (`CheckoutExtras.vue`).
+- El servidor las valida y las guarda en `event_orders.registration_answers`.
+- Se ven en `/dashboard/tickets`, en el CSV de órdenes (una columna por pregunta), en `list_attendees`, `get_order` y
+  `list_orders`, y en la orden.
+- Landing de talleres sin "Pronto".
+- Pendiente: respuestas por asistente (hoy, por compra).
 
 **Dónde se promete**
 `talleres/BeforeWorkshop.astro` (ítem con `soon: true`).
@@ -454,6 +552,15 @@ Un pase de 3 días entra una vez cada día. El segundo escaneo del mismo día di
 
 ## 17. Agenda con expositores y salas
 
+**Hecho (rama `feat/pronto-resto`).** Tabla `aitickets_event_agenda` (migración `202610300200_event_agenda.sql`).
+- Cada bloque tiene inicio y término, título, expositores (texto), sala y función (`event_date_id`; NULL = todos los
+  días).
+- Lógica en `src/lib/eventAgenda.mjs`.
+- Se edita en el panel (módulo "Agenda" en Página, `EventAgendaManager.vue`) o con `get_event_agenda` /
+  `update_event_agenda`.
+- La página del evento la muestra por día, solo si hay bloques. El chat de la página la usa.
+- Pendiente: expositores con foto y JSON-LD `subEvent`.
+
 **Dónde se promete**
 `seminarios/ProgramBuilder.vue` ("Agenda con expositores y salas").
 
@@ -464,6 +571,15 @@ Un pase de 3 días entra una vez cada día. El segundo escaneo del mismo día di
 - Es lo más grande de seminarios. Validar demanda antes de construirlo.
 
 ## 18. RUT y razón social de la empresa al comprar
+
+**Hecho (rama `feat/pronto-resto`).** Ajuste por evento `checkout_fields.company`.
+- En compras pagadas, el checkout ofrece "¿Compras para una empresa?" con RUT (con dígito verificador, `isValidRut`) y
+  razón social, opcionales.
+- Al lado dice que salen en el comprobante de compra, que no es boleta ni factura.
+- Se guardan en `event_orders.company_rut` / `company_name` y salen en el comprobante, en el CSV de órdenes, en
+  `get_order` / `list_orders` y en las credenciales.
+- Landing de seminarios sin "Pronto".
+- **Pendiente: revisarlo con abogado y contador** antes de promoverlo, por la expectativa de factura.
 
 **Dónde se promete**
 `seminarios/SeminarCompanies.astro` ("RUT y razón social de la empresa al comprar").
@@ -479,6 +595,17 @@ El comprobante es `LEGAL.receiptLabel`, que no es boleta ni factura.
 
 ## 19. Nombre de cada asistente en una compra de varias entradas
 
+**Hecho (rama `feat/pronto-resto`).** Ajuste por evento "Nombre de cada asistente" (no pedir / opcional / obligatorio) en
+`events.checkout_fields`.
+- En compras con más de un QR, el checkout y el registro gratis piden nombre y correo por entrada. La primera vacía es
+  quien compra.
+- Se guarda en `event_orders.attendee_holders`; al emitir, cada QR toma el suyo (`event_attendees.holder_name` /
+  `holder_email`).
+- Quien compra recibe todas. Cada asistente con correo propio recibe la suya en el primer envío
+  (`renderHolderTicketEmail`).
+- Se ve en `/dashboard/tickets`, el CSV, `list_attendees`, `get_order`, el escáner y la orden.
+- Pendiente: editar el asistente después de comprar (hoy, `transfer_ticket`).
+
 **Dónde se promete**
 `seminarios/TeamOrder.vue` ("Que la empresa escriba el nombre de cada asistente al comprar").
 
@@ -488,6 +615,17 @@ El comprobante es `LEGAL.receiptLabel`, que no es boleta ni factura.
 - Es la base de los ítems 20 y 21, y comparte trabajo con el ítem 9.
 
 ## 20. Certificados de asistencia
+
+**Hecho (rama `feat/pronto-resto`).** `src/lib/certificates.ts`, PDF con jsPDF en `src/lib/attendeePdf.mjs`.
+- Solo para entradas `validated`, con el nombre del titular o de quien compró.
+- Incluye las fechas y horas de las funciones a las que fue, o las que fije el productor.
+- En un pase de varias funciones se puede exigir un mínimo de funciones con ingreso.
+- Panel: módulo "Certificados de asistencia" en Asistentes y después (`CertificatesCard.vue`), con todos en un PDF y el
+  link de cada uno.
+- El envío por correo (`send_attendance_certificates`, con confirmación) se activa recién con el evento terminado:
+  - Cada persona recibe un link firmado sin vencimiento (`/certificado/<token>`).
+  - Queda registro en `aitickets_certificate_sends` (migración `202610300210`), y un segundo envío llega solo a quienes
+    faltan.
 
 **Dónde se promete**
 `seminarios/SeminarAfter.astro` (ítem con `soon: true`).
@@ -502,6 +640,13 @@ La lista de quienes ingresaron (`list_attendees`).
 
 ## 21. Imprimir credenciales con nombre
 
+**Hecho (rama `feat/pronto-resto`).** Panel, pestaña Puerta: módulo "Credenciales con nombre" (`CredentialsPrintCard.vue`,
+`/api/events/credentials`, `src/lib/credentials.ts`).
+- PDF A4 con 4 credenciales por hoja, en orden alfabético, una por entrada vigente.
+- Cada una lleva nombre del titular, empresa (si la orden la tiene), tipo de entrada, función y el QR de la entrada.
+- Se filtra por función.
+- Pendiente: logo y tamaños configurables.
+
 **Dónde se promete**
 - `seminarios/SeminarAccreditation.astro` ("Imprimir credenciales con nombre")
 - `seminarios/Credential.vue` (comentario)
@@ -511,6 +656,14 @@ La lista de quienes ingresaron (`list_attendees`).
 - Depende del ítem 19.
 
 ## 22. Publicar en LinkedIn desde el panel
+
+**Hecho (rama `feat/pronto-resto`).** Sin migración (`social_accounts.platform` no tiene restricción).
+- Promocionar conecta LinkedIn (perfil o página de empresa, se elige en el flujo de Zernio) y TikTok.
+- Los posts del panel y de la IA (`create_social_post`, `publish_social_post`) salen en Instagram, Facebook, TikTok y
+  LinkedIn.
+- Reglas por red en `src/lib/socialPlatforms.ts`: LinkedIn acepta solo texto o hasta 20 imágenes, con 3.000 caracteres
+  como máximo.
+- Landing de seminarios sin "Pronto".
 
 **Dónde se promete**
 `seminarios/SeminarDiffusion.astro` ("Publicar en LinkedIn desde tu panel").

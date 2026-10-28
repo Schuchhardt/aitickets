@@ -62,10 +62,12 @@ test("los switches de marketing quitan sus publicaciones y el contador se actual
   await expect(live).toHaveText("4 publicaciones esta semana");
   await week.getByTestId("standup-marketing-toggle-post").click();
   await expect(live).toHaveText("0 publicaciones esta semana");
-  // El reel no existe en el producto: switch deshabilitado con "Pronto"
-  const reel = week.getByRole("switch", { name: /Reel antes de la función/ });
-  await expect(reel).toBeDisabled();
-  await expect(reel.getByTestId("soon-badge")).toHaveText("Pronto");
+  // El reel (con el video del evento) parte apagado y suma una publicación
+  const reel = week.getByTestId("standup-marketing-toggle-reel");
+  await expect(reel).toHaveAttribute("aria-checked", "false");
+  await reel.click();
+  await expect(live).toHaveText("1 publicaciones esta semana");
+  await expect(week.getByTestId("soon-badge")).toHaveCount(0);
 });
 
 test("el calendario marca las dos funciones de la semana (desktop)", async ({ page, isMobile }) => {
@@ -73,14 +75,17 @@ test("el calendario marca las dos funciones de la semana (desktop)", async ({ pa
   await open(page);
   const week = await showIsland(page, "standup-marketing-week");
   await expect(week.getByText("FUNCIÓN 21:00")).toHaveCount(2);
-  // Facebook y TikTok no se pueden conectar todavía
-  await expect(week.getByRole("list", { name: "Redes" }).getByTestId("soon-badge")).toHaveCount(2);
+  // Instagram, Facebook y TikTok conectados, sin "Pronto"
+  await expect(week.getByRole("list", { name: "Redes" })).toContainText("TikTok · conectado");
+  await expect(week.getByRole("list", { name: "Redes" }).getByTestId("soon-badge")).toHaveCount(0);
 });
 
 test("la demo de anuncios pasa a campaña activa y se pausa", async ({ page }) => {
   await open(page);
   const ads = await showIsland(page, "standup-ads-demo");
-  await expect(ads.getByText("Comedia y stand-up").getByTestId("soon-badge")).toHaveText("Pronto");
+  // Segmentar por intereses existe: el chip es un ejemplo, sin "Pronto"
+  await expect(ads.getByText("Comedia y stand-up")).toHaveCount(1);
+  await expect(ads.getByTestId("soon-badge")).toHaveCount(0);
   await ads.getByTestId("standup-ads-launch").click();
   await expect(ads.getByRole("status")).toContainText("Campaña activa · 3 días");
   const pause = ads.getByRole("button", { name: "Pausar" });

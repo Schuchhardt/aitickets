@@ -5,7 +5,7 @@ import { getSupabaseAdmin, createEphemeralAuthClient } from "../../lib/auth-help
 import { getSessionContext, setSessionCookies, clearSessionCookies } from "../../lib/supabaseServer";
 import { resolveEventSlugRedirect, slugRedirectResponse } from "../../lib/eventSlug";
 import { canAccessEventByStaff } from "../../../netlify/lib/event-staff.mjs";
-import { attachSessionCheckins } from "../../../netlify/lib/checkin.mjs";
+import { attachSessionCheckins, attachEntryDeadlines } from "../../../netlify/lib/checkin.mjs";
 import AppFooter from "../../components/AppFooter.vue";
 import Layout from '../../layouts/Layout.astro';
 import ValidateQR from "../../components/ValidateQR.vue";
@@ -66,6 +66,7 @@ for (let from = 0; ; from += PAGE_SIZE) {
     .select(`
       id,
       event_id,
+      event_ticket_id,
       event_order_id,
       qr_code,
       status,
@@ -94,7 +95,7 @@ const { data: eventDates } = await supabase
   .order("start_time", { ascending: true });
 
 // Entradas multifunción: a qué funciones ya entró cada una
-const attendeesWithSessions = await attachSessionCheckins(supabase, event.id, event_attendees, eventDates || []);
+const attendeesWithSessions = await attachEntryDeadlines(supabase, event.id, await attachSessionCheckins(supabase, event.id, event_attendees, eventDates || []));
 const eventWithAttendees = { ...event, dates: eventDates || [], attendees: attendeesWithSessions };
 ---
 

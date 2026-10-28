@@ -187,18 +187,18 @@ export const LANDINGS: Landing[] = [
         // src/components/landing/clubs y las preguntas en src/data/clubsFaq.ts, que toma de aquí estas seis (las propias
         // de clubs; las de dinero, plazos, redes y anuncios vienen de PRODUCER_FAQ y ORGANIZADORES_FAQ). Verificado:
         //   lista con hora de cierre → ventana de venta por entrada (isTicketOnSale), hoy desde tools/tickets.ts
-        //   mesas → un QR por unidad (buildAttendeeRows); cortesías → CourtesyTicketsForm.vue
+        //   mesas → un QR por invitado con "Personas por entrada" (people_per_ticket, buildAttendeeRows); cortesías → CourtesyTicketsForm.vue
         //   transferir una entrada → transfer_ticket (tools/postsale.ts); lista de invitados → tools/guests.ts
         //   sin preguntas en el checkout (edad, RUT) ni venta en la puerta (POS)
         sections: [],
         faq: [
             {
                 q: "¿Cómo armo la lista free?",
-                a: "Creas un tipo de entrada de $0 llamado, por ejemplo, \"Lista free\", con su cupo. Cada persona se inscribe con su nombre y correo y le llega su QR. Si quieres que la inscripción se cierre a una hora, hoy se programa desde tu asistente de IA conectado o escribiéndonos por WhatsApp. En la puerta, tu equipo ve que es una entrada de lista al escanearla.",
+                a: "Creas un tipo de entrada de $0 llamado, por ejemplo, \"Lista free\", con su cupo. Cada persona se inscribe con su nombre y correo y le llega su QR. Si quieres que la inscripción se cierre a una hora, hoy se programa desde tu asistente de IA conectado o escribiéndonos por WhatsApp. En la puerta, tu equipo ve que es una entrada de lista al escanearla. Si la lista vale hasta cierta hora, le pones «Ingreso hasta» (por ejemplo 01:00) y después de esa hora el escáner la marca fuera de horario: tu equipo decide si entra igual.",
             },
             {
                 q: "¿Cómo vendo mesas?",
-                a: "Cada mesa es un tipo de entrada con su precio, su cupo y la descripción de lo que incluye. Quien la compra recibe un QR para la mesa. Si quieres que cada invitado tenga su propia entrada, envíaselas como cortesías. No hay plano para elegir mesa.",
+                a: "Cada mesa es un tipo de entrada con su precio, su cupo y la descripción de lo que incluye. Si le pones cuántas personas entran con ella (por ejemplo, 6), cada mesa vendida deja 6 QR en la orden: quien compra le pasa el suyo a cada invitado y la puerta los valida uno por uno. El cupo y el precio son por mesa. No hay plano para elegir mesa.",
             },
             {
                 q: "¿Puedo pedir que sean mayores de 18?",
@@ -261,7 +261,7 @@ export const LANDINGS: Landing[] = [
             },
             {
                 q: "¿Puedo avisar la dirección a última hora?",
-                a: "Sí. Publica la comuna o un punto de referencia y, el mismo día, programa un correo a todos los que compraron con la dirección exacta desde tu asistente de IA. Ten en cuenta que un evento sin dirección exacta puede quedar con una parte de lo vendido en reserva (ver términos).",
+                a: "Sí. En el evento activas «Dirección solo para quienes compran»: la página muestra la comuna y la dirección exacta va en la entrada y en el correo de cada comprador. Si eliges revelarla unas horas antes, a esa hora se la mandamos por correo a todos los que compraron. Ten en cuenta que un evento sin dirección exacta puede quedar con una parte de lo vendido en reserva (ver términos).",
                 terms: true,
             },
             {
@@ -301,12 +301,14 @@ export const LANDINGS: Landing[] = [
         // Verificado:
         //   varios días → hasta MAX_EVENT_FUNCTIONS funciones (schedule.ts); cada entrada para una función o para todas
         //                 (event_date_id NULL); el pase completo se valida una vez (confirm-ticket): ingreso diario "Pronto"
-        //   programa → descripción con títulos y listas (sanitize.ts) y el asistente de la página (EventAssistant.vue);
-        //              agenda con expositores y salas "Pronto"
+        //   programa → agenda por día con hora, expositores y sala (aitickets_event_agenda, eventAgenda.mjs; panel y
+        //              update_event_agenda), que también usa el asistente de la página (EventAssistant.vue)
         //   documentos → terms.astro §3 (boleta del cargo; el precio de la entrada lo documenta el productor), pendiente de
-        //                validar con abogado y contador; RUT y razón social al comprar "Pronto"
+        //                validar con abogado y contador; RUT y razón social al comprar → events.checkout_fields.company
+        //                (en el comprobante, que no es boleta ni factura, y en el CSV)
         //   convenios → códigos de descuento por evento o de la organización (discounts.mjs); sin entradas ocultas
-        //   certificados de asistencia → "Pronto"; hoy, la lista de quienes ingresaron (list_attendees)
+        //   certificados de asistencia → PDF de quienes ingresaron, con mínimo de días en un pase (certificates.ts;
+        //              panel, get_attendance_certificates y send_attendance_certificates)
         //   sin transmisión online ni pago con orden de compra o transferencia
         sections: [],
         faq: [
@@ -317,11 +319,11 @@ export const LANDINGS: Landing[] = [
             },
             {
                 q: "¿Dónde va el programa con los expositores?",
-                a: "En la descripción del evento, con un título por día y una lista por bloque. El asistente de tu página lo usa para responder preguntas como \"¿a qué hora es el panel?\". Una sección propia de agenda, con expositores y salas, todavía no existe.",
+                a: "En la agenda del evento: cargas cada bloque con su hora, expositores y sala, en el día que va, desde tu panel o tu asistente de IA. La página la muestra por día, y el asistente de tu página la usa para responder preguntas como \"¿a qué hora es el panel?\".",
             },
             {
                 q: "¿Pueden pedirme factura?",
-                a: "El cargo por servicio lo documenta AI Tickets con boleta electrónica. El valor de la entrada lo documentas tú, como organizador: si una empresa necesita factura, se la emites con los datos de su compra. Desde tu panel exportas las órdenes a CSV con comprador, correo, entradas, montos y medio de pago.",
+                a: "El cargo por servicio lo documenta AI Tickets con boleta electrónica. El valor de la entrada lo documentas tú, como organizador: si una empresa necesita factura, se la emites con los datos de su compra. Si lo activas en tu evento, quien compra puede dejar el RUT y la razón social de su empresa: salen en su comprobante de compra (que no es boleta ni factura) y en el CSV de órdenes, junto al comprador, correo, entradas, montos y medio de pago.",
                 terms: true,
             },
             {
@@ -338,7 +340,7 @@ export const LANDINGS: Landing[] = [
             },
             {
                 q: "¿Entregan certificado de asistencia?",
-                a: "Todavía no: está en camino. Hoy tu asistente de IA te da la lista de quienes ingresaron, con su hora, para que emitas los certificados.",
+                a: "Sí. Desde tu panel descargas en un PDF el certificado de cada persona que ingresó, con su nombre, el evento, las fechas y las horas. Cuando termina el evento, se los envías por correo con un clic: a cada una le llega el link para descargar el suyo. En un pase de varios días puedes pedir un mínimo de días con ingreso.",
             },
             {
                 q: "¿Puedo hacer un evento solo para mi empresa o mis socios?",
@@ -376,7 +378,7 @@ export const LANDINGS: Landing[] = [
         faq: [
             {
                 q: "¿Puedo pedir datos adicionales al inscribirse?",
-                a: "Cada inscripción guarda el nombre y el email de la persona. Puedes exportar las órdenes a CSV para tu registro.",
+                a: "Sí. Al crear o editar el taller agregas preguntas (texto corto, elegir una opción o sí o no), obligatorias u opcionales, y se responden al inscribirse. Las respuestas salen en tu lista de asistentes y en el CSV de órdenes. Si hay varios cupos en una compra, también puedes pedir el nombre y el correo de cada persona.",
             },
             {
                 q: "¿Puedo escribirle a los inscritos?",

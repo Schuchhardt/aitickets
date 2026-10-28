@@ -1,10 +1,10 @@
-// Herramientas de admin: difusión automática en Instagram (docs/specs/historias-automaticas.md). Las acciones sobre
+// Herramientas de admin: difusión automática en Instagram, Facebook y TikTok (docs/specs/historias-automaticas.md). Las acciones sobre
 // una serie (preparar, aprobar, pausar…) son las del productor vía org_*_social_series; aquí, la vista de toda la
 // plataforma y la configuración global de cadencia (bandas y horas).
 import { fetchAll, localDateTime } from "../../producer-api/tools/common";
 import type { JsonSchema } from "../../producer-api/registry";
 import { DEFAULT_CADENCE, normalizeCadence, type CadenceConfig } from "../../socialSeriesCadence";
-import { attributedSales, loadCadenceConfig, saveCadenceConfig, SERIES_TABLE, SLOTS_TABLE } from "../../socialSeries";
+import { attributedSales, loadCadenceConfig, networkStates, saveCadenceConfig, SERIES_TABLE, SLOTS_TABLE } from "../../socialSeries";
 import type { AdminToolDef } from "../registry";
 import { organizationIdSchema } from "./organizations";
 import { orgNames } from "./analytics";
@@ -15,8 +15,9 @@ const listSocialSeries: AdminToolDef = {
     name: "list_social_series",
     title: "Difusiones automáticas (toda la plataforma)",
     description:
-        "Series de historias automáticas en Instagram de todos los productores (o una organización): estado, evento, hora de publicación, piezas " +
-        "publicadas, pendientes y fallidas (con el último error), avisos, DMs enviados y ventas atribuidas al DM. Por defecto las vivas " +
+        "Series de historias automáticas de todos los productores (o una organización): estado, evento, hora de publicación, redes (Instagram " +
+        "y, si se activaron, Facebook y TikTok con su estado), piezas publicadas, pendientes y fallidas por red (con el último error), avisos, " +
+        "DMs enviados y ventas atribuidas. Por defecto las vivas " +
         "(borrador, activas y pausadas). Para el detalle de una usa org_get_social_series.",
     readOnly: true,
     inputSchema: {
@@ -43,7 +44,7 @@ const listSocialSeries: AdminToolDef = {
         const names = await orgNames(supabase, top.map((s: any) => Number(s.organization_id)));
         const out = [];
         for (const s of top) {
-            const slots = await fetchAll<any>(() => supabase.from(SLOTS_TABLE).select("status, error, publish_at, kind").eq("series_id", s.id).order("publish_at", { ascending: true })).catch(() => []);
+            const slots = await fetchAll<any>(() => supabase.from(SLOTS_TABLE).select("*").eq("series_id", s.id).order("publish_at", { ascending: true })).catch(() => []);
             const count = (st: string) => slots.filter((x: any) => x.status === st).length;
             const lastFailed = [...slots].reverse().find((x: any) => x.status === "failed");
             const next = slots.find((x: any) => ["planned", "rendering", "queued"].includes(x.status));
@@ -57,6 +58,8 @@ const listSocialSeries: AdminToolDef = {
                 approved_local: localDateTime(s.approved_at),
                 publish_time: s.cadence_config?.publish_time || null,
                 pieces: { published: count("published"), pending: count("planned") + count("rendering") + count("queued"), failed: count("failed"), skipped: count("skipped") },
+                networks: networkStates(s),
+                failed_by_platform: slots.filter((x: any) => x.status === "failed").reduce((acc: Record<string, number>, x: any) => ({ ...acc, [x.platform || "instagram"]: (acc[x.platform || "instagram"] || 0) + 1 }), {}),
                 next_local: next ? localDateTime(next.publish_at) : null,
                 last_error: lastFailed?.error || null,
                 pause_reason: s.pause_reason || null,

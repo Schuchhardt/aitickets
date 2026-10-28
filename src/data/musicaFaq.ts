@@ -44,7 +44,7 @@ export const MUSICA_FAQ: FaqItem[] = [
     },
     {
         q: "¿Qué pasa cuando se agota?",
-        a: "La entrada aparece agotada y tu público puede dejar su correo en la página del evento para enterarse. El aviso automático cuando vuelva a haber entradas todavía no está disponible.",
+        a: "La entrada aparece agotada y tu público puede dejar su correo en la página del evento para enterarse. Cuando vuelve a haber entradas (se libera un cupo o se abre la siguiente tanda), les llega un correo automático con el link, una sola vez.",
     },
     pick(ORGANIZADORES_FAQ, "¿Cómo funciona la publicación automática en redes?"),
     pick(ORGANIZADORES_FAQ, "¿Tengo que pagar anuncios?"),

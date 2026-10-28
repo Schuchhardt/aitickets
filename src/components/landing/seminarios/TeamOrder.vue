@@ -4,12 +4,12 @@
 // (src/pages/ticket/[id].astro; aquí no navega) y, en las tres primeras, a quién se la reenvió quien compró.
 // "Poner cada entrada a nombre de su titular": la fila 2 se despliega con el titular nuevo y el aviso real del cambio
 // (transfer_ticket de tools/postsale.ts: QR nuevo a su correo y el anterior deja de servir), que hoy hace tu equipo desde
-// el asistente de IA. Que la empresa escriba el nombre de cada asistente al comprar no existe: "Pronto".
+// el asistente de IA. Si el evento pide el nombre de cada asistente (events.checkout_fields.attendee_names), la empresa
+// los escribe al comprar y a cada uno le llega su QR (CheckoutExtras.vue, tickets-email.mjs): va como nota, sin "Pronto".
 // Mobile: filas 1–3 y "Ver las 8". C9: las filas entran con stagger de 50 ms; la fila se despliega con clip-path +
 // translateY y el QR viejo se tacha con un filete que crece (scaleX). Con "reducir movimiento", sin animaciones.
 // Analítica: se_team_assign (al activar el titular).
 import { computed, ref } from 'vue'
-import SoonBadge from '../../ui/SoonBadge.vue'
 import { trackEvent } from '../../../composables/useGoogleAnalytics.js'
 import { formatCLP } from '../producerLanding.js'
 import { MAX_PER_ORDER_AI, TEAM_ORDER, teamOrderTotal } from './seminariosLanding.js'
@@ -71,7 +71,10 @@ function onAssign(e) {
       <input type="checkbox" :checked="assigned" data-testid="seminar-team-assign" @change="onAssign" />
       Poner cada entrada a nombre de su titular
     </label>
-    <p class="se-soon-chip">Que la empresa escriba el nombre de cada asistente al comprar <SoonBadge /></p>
+    <p class="se-note to-names" data-testid="seminar-team-names">
+      ¿Quieres los nombres desde el principio? Activa "Nombre de cada asistente" en tu evento: la empresa escribe el nombre y
+      el correo de cada persona al comprar y a cada una le llega su QR.
+    </p>
     <p class="se-note to-note">
       Hasta {{ props.maxPerPurchase }} entradas por compra si no lo cambias; se sube hasta {{ MAX_PER_ORDER_AI }} desde tu asistente de IA.
     </p>
@@ -182,6 +185,7 @@ function onAssign(e) {
 .to-toggle {
   margin-top: 12px;
 }
+.to-names,
 .to-note {
   margin-top: 10px;
 }

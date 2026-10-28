@@ -173,26 +173,74 @@ export function generateQrCode() {
 }
 
 /**
- * Filas de event_attendees: una por unidad comprada.
- * @param {{eventId:number, attendeeId:number, orderId:string, lines:Array<{id:number, quantity:number}>, isComplimentary?:boolean}} p
+ * Filas de event_attendees: una por QR. Una entrada normal emite un QR por unidad; una mesa para N
+ * (event_tickets.people_per_ticket, migración 202610300110) emite N, con el mismo unit_id y seat_number 1..N.
+ * holders (event_orders.attendee_holders, migración 202610300100): [{ ticket_id, name, email }] en orden de emisión;
+ * se asignan en orden a los QR de ese tipo de entrada. Las columnas nuevas solo van si hay algo que guardar, así una
+ * compra normal se inserta igual en una base sin migrar.
+ * @param {{eventId:number, attendeeId:number, orderId:string, lines:Array<{id:number, quantity:number}>, isComplimentary?:boolean,
+ *          peopleOf?:(ticketId:number)=>number, holders?:Array<{ticket_id:number, name?:string|null, email?:string|null}>|null}} p
  */
-export function buildAttendeeRows({ eventId, attendeeId, orderId, lines, isComplimentary = false }) {
+export function buildAttendeeRows({ eventId, attendeeId, orderId, lines, isComplimentary = false, peopleOf = () => 1, holders = null }) {
   const rows = []
+  // Asistentes por tipo de entrada, en orden
+  const queue = new Map()
+  for (const h of Array.isArray(holders) ? holders : []) {
+    const id = Number(h?.ticket_id)
+    if (!queue.has(id)) queue.set(id, [])
+    queue.get(id).push(h)
+  }
   for (const line of lines) {
     const qty = Number(line.quantity) || 0
+    const people = Math.max(1, Math.min(30, Math.floor(Number(peopleOf(Number(line.id))) || 1)))
     for (let i = 0; i < qty; i++) {
-      rows.push({
-        event_id: eventId,
-        event_ticket_id: Number(line.id),
-        attendee_id: attendeeId,
-        qr_code: generateQrCode(),
-        is_complimentary: isComplimentary,
-        status: 'active',
-        event_order_id: orderId,
-      })
+      const unitId = people > 1 ? crypto.randomUUID() : null
+      for (let seat = 1; seat <= people; seat++) {
+        const holder = queue.get(Number(line.id))?.shift()
+        rows.push({
+          event_id: eventId,
+          event_ticket_id: Number(line.id),
+          attendee_id: attendeeId,
+          qr_code: generateQrCode(),
+          is_complimentary: isComplimentary,
+          status: 'active',
+          event_order_id: orderId,
+          ...(unitId ? { unit_id: unitId, seat_number: seat } : {}),
+          ...(holder?.name ? { holder_name: String(holder.name) } : {}),
+          ...(holder?.email ? { holder_email: String(holder.email) } : {}),
+        })
+      }
     }
   }
   return rows
+}
+
+const MISSING_COLUMN = ['42703', 'PGRST204']
+const NEW_ATTENDEE_COLUMNS = ['unit_id', 'seat_number', 'holder_name', 'holder_email']
+
+/**
+ * Personas por entrada de un evento (mesa para N): Map<ticketId, N> solo con las de más de 1.
+ * Vacío si la columna aún no existe (deploy preview sin migrar).
+ */
+export async function loadPeoplePerTicket(supabase, eventId) {
+  const { data, error } = await supabase
+    .from('event_tickets')
+    .select('id, people_per_ticket')
+    .eq('event_id', Number(eventId))
+    .gt('people_per_ticket', 1)
+  if (error) {
+    if (!MISSING_COLUMN.includes(String(error.code || ''))) console.warn('loadPeoplePerTicket:', error.message)
+    return new Map()
+  }
+  return new Map((data || []).map((t) => [Number(t.id), Number(t.people_per_ticket) || 1]))
+}
+
+/** Asistentes guardados en la orden (null si no hay o la columna aún no existe). */
+async function loadOrderHolders(supabase, order) {
+  if (order.attendee_holders !== undefined) return Array.isArray(order.attendee_holders) ? order.attendee_holders : null
+  const { data, error } = await supabase.from('event_orders').select('attendee_holders').eq('id', order.id).maybeSingle()
+  if (error) return null
+  return Array.isArray(data?.attendee_holders) ? data.attendee_holders : null
 }
 
 /**
@@ -224,8 +272,21 @@ export async function ensureOrderAttendees(supabase, order) {
     throw new Error('La orden contiene tipos de entrada que no pertenecen al evento')
   }
 
-  const rows = buildAttendeeRows({ eventId: order.event_id, attendeeId: order.attendee_id, orderId: order.id, lines })
-  const { error: insertError } = await supabase.from('event_attendees').insert(rows)
+  const [people, holders] = await Promise.all([loadPeoplePerTicket(supabase, order.event_id), loadOrderHolders(supabase, order)])
+  const rows = buildAttendeeRows({
+    eventId: order.event_id,
+    attendeeId: order.attendee_id,
+    orderId: order.id,
+    lines,
+    peopleOf: (id) => people.get(id) || 1,
+    holders,
+  })
+  let { error: insertError } = await supabase.from('event_attendees').insert(rows)
+  if (insertError && MISSING_COLUMN.includes(String(insertError.code || ''))) {
+    // Base sin las columnas de asistentes o mesas: se emiten igual, a nombre de quien compró
+    const plain = rows.map(r => Object.fromEntries(Object.entries(r).filter(([k]) => !NEW_ATTENDEE_COLUMNS.includes(k))))
+    ;({ error: insertError } = await supabase.from('event_attendees').insert(plain))
+  }
   if (insertError) throw new Error(`Error insertando entradas: ${insertError.message}`)
   return { created: rows.length, existing: 0 }
 }

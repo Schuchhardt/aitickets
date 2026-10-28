@@ -38,8 +38,11 @@ describe('STANDUP_FAQ', () => {
     expect(STANDUP_FAQ.find((f) => f.q === '¿Cuándo recibo el dinero de mis ventas?')?.a).toContain(PAYOUT_SCHEDULE_TEXT)
   })
 
-  it('no promete redes que todavía no existen como si funcionaran', () => {
+  it('la publicación automática dice lo que hace en Facebook, TikTok y el reel', () => {
     const social = STANDUP_FAQ.find((f) => f.q === '¿Cómo funciona la publicación automática en redes?')
-    expect(social?.a).toMatch(/Facebook, TikTok y reels todavía no/)
+    expect(social?.a).toMatch(/página de Facebook o tu TikTok/)
+    // El reel usa el video del evento: AI Tickets no lo genera
+    expect(social?.a).toMatch(/video vertical corto/)
+    expect(social?.a).not.toMatch(/todavía no/)
   })
 })

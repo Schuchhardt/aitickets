@@ -37,6 +37,11 @@ export type PieceData = {
     remaining: number | null;
     /** Variación visual respecto de la pieza anterior. */
     styleIndex: number;
+    /**
+     * Facebook y TikTok no tienen respuesta a historias por DM: la pieza muestra dónde comprar ("aitickets.cl/eventos/…")
+     * en vez de "Responde PALABRA". Sin esto, el llamado de Instagram.
+     */
+    linkLabel?: string | null;
 };
 
 export type PieceText = { kicker: string | null; bigLines: string[]; message: string[]; scarcity: string | null; cta: string | null };
@@ -80,7 +85,7 @@ export function pieceText(raw: PieceData): PieceText {
     const when = [d.dateLabel, d.startTime ? `${d.startTime} h` : null].filter(Boolean).join(" · ");
     const where = d.venue || null;
     const reply = d.kind === "story" ? "Responde" : "Comenta";
-    const cta = `${reply} ${d.keyword} y te mandamos el link`;
+    const cta = d.linkLabel ? `Entradas en ${d.linkLabel}` : `${reply} ${d.keyword} y te mandamos el link`;
     const scarcity = d.remaining != null && d.remaining > 0 ? `Quedan ${d.remaining.toLocaleString("es-CL")} ${d.remaining === 1 ? "entrada" : "entradas"}` : null;
     if (d.variant === "sold_out") {
         return { kicker: d.eventName, bigLines: ["Agotado"], message: ["Entradas agotadas.", "¡Gracias por llenar la sala!"], scarcity: null, cta: null };
@@ -92,7 +97,7 @@ export function pieceText(raw: PieceData): PieceText {
                 bigLines: ["Hoy"],
                 message: [d.startTime ? `${d.startTime} h${where ? ` · ${where}` : ""}` : where || ""].filter(Boolean),
                 scarcity,
-                cta: `Entradas en puerta o por DM: ${reply.toLowerCase()} ${d.keyword}`,
+                cta: d.linkLabel ? `Entradas en ${d.linkLabel} o en puerta` : `Entradas en puerta o por DM: ${reply.toLowerCase()} ${d.keyword}`,
             };
         case "tomorrow":
             return { kicker: d.eventName, bigLines: ["Mañana"], message: ["Última noche para comprar", [when, where].filter(Boolean).join(" · ")], scarcity, cta };

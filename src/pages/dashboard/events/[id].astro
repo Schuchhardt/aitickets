@@ -15,6 +15,9 @@ import PromoterLinksManager from "../../../components/dashboard/PromoterLinksMan
 import SocialSeriesCard from "../../../components/dashboard/SocialSeriesCard.vue";
 import EventWaitlistManager from "../../../components/dashboard/EventWaitlistManager.vue";
 import LiveCapacityPanel from "../../../components/dashboard/LiveCapacityPanel.vue";
+import EventAgendaManager from "../../../components/dashboard/EventAgendaManager.vue";
+import CredentialsPrintCard from "../../../components/dashboard/CredentialsPrintCard.vue";
+import CertificatesCard from "../../../components/dashboard/CertificatesCard.vue";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { EVENT_MANAGER_ROLES, ORG_ADMIN_ROLES, hasRole } from "../../../lib/supabaseServer";
 import { adsEnabled } from "../../../../netlify/lib/zernio-ads.mjs";
@@ -23,6 +26,7 @@ import { requireDashboardSession } from "../_lib/guard";
 import { identityApproved, loadOrgIdentity, ticketsRequireIdentity, IDENTITY_FREE_PAID_CAPACITY } from "../../../lib/producerIdentity";
 import { canAccessEventByStaff } from "../../../../netlify/lib/event-staff.mjs";
 import { functionOccupancy, getEventSummary } from "../../../lib/eventAnalytics";
+import { formatFunctionLabel } from "../../../../netlify/lib/dates.mjs";
 import { PROFILE_LABELS, eventProfile, eventPhase, normalizeAddedModules, resolveModules, panelTabs, defaultTab } from "../../../lib/eventModules";
 import {
     Calendar,
@@ -62,7 +66,7 @@ const loadEvent = (coverColumn: string) => supabaseAdmin
       is_gift,
       status
     ),
-    event_dates ( id ),
+    event_dates ( id, date, start_time ),
     event_tags ( category_tags ( name ) ),
     event_locations (
       id,
@@ -97,6 +101,11 @@ const fmtPct = (v: number | null) => (v == null ? "—" : `${v.toLocaleString("e
 const ticketSalesMap = summary.issued_by_ticket_type_id;
 // Ocupación por función (solo con más de una función; módulo function-occupancy)
 const occupancyRows = (event.event_dates?.length || 0) > 1 ? await functionOccupancy(supabaseAdmin, Number(event.id)) : [];
+
+// Funciones en orden, con su rótulo (filtro de credenciales)
+const functionOptions = [...(event.event_dates || [])]
+    .sort((a: any, b: any) => `${a.date}|${a.start_time}`.localeCompare(`${b.date}|${b.start_time}`))
+    .map((d: any) => ({ id: Number(d.id), label: formatFunctionLabel(d, { withPlace: false }) }));
 
 const publicLink = `/eventos/${event.slug}`;
 const siteUrl = (siteUrlFromEnv() || Astro.url.origin).replace(/\/+$/, "");
@@ -342,6 +351,7 @@ const canCreateAds = adsEnabled() && hasRole(dbUser, ORG_ADMIN_ROLES);
                                             <th class="px-4 py-2 text-right font-medium whitespace-nowrap">Cortesías</th>
                                             <th class="px-4 py-2 text-right font-medium whitespace-nowrap">Cupo</th>
                                             <th class="px-4 py-2 text-left font-medium whitespace-nowrap min-w-[8rem]">Ocupación</th>
+                                            <th class="px-4 py-2 text-right font-medium"><span class="sr-only">Borderó</span></th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-gray-100">
@@ -363,13 +373,16 @@ const canCreateAds = adsEnabled() && hasRole(dbUser, ORG_ADMIN_ROLES);
                                                         </div>
                                                     )}
                                                 </td>
+                                                <td class="px-4 py-2 text-right whitespace-nowrap">
+                                                    <a href={`/dashboard/events/${event.id}/bordero?funcion=${r.event_date_id ?? "all"}`} class="text-black font-medium hover:underline" data-testid="function-bordero-link">Borderó</a>
+                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
                             </div>
                             <p class="px-4 sm:px-6 py-3 text-xs text-gray-500 border-t border-gray-100">
-                                Ocupación = entradas emitidas (vendidas y cortesías, sin anuladas) ÷ cupo de los tipos de entrada de esa función. Las entradas válidas para cualquier función van en su propia fila.
+                                Ocupación = entradas emitidas (vendidas y cortesías, sin anuladas) ÷ cupo de los tipos de entrada de esa función. Las entradas válidas para cualquier función van en su propia fila. El borderó de cada función sirve para liquidar con la sala.
                             </p>
                         </section>
                     )}
@@ -454,10 +467,16 @@ const canCreateAds = adsEnabled() && hasRole(dbUser, ORG_ADMIN_ROLES);
                     {m.id === "live-capacity" && (
                         <LiveCapacityPanel client:visible eventId={Number(event.id)} checkinUrl={`/dashboard/events/${event.id}/checkin`} />
                     )}
+                    {/* Credenciales con nombre para imprimir (PDF, filtrable por función) */}
+                    {m.id === "credentials" && <CredentialsPrintCard client:visible eventId={Number(event.id)} options={functionOptions} />}
+                    {/* Agenda con expositores y salas (sección "Agenda" de la página del evento) */}
+                    {m.id === "agenda" && <EventAgendaManager client:visible eventId={Number(event.id)} />}
                     {m.id === "faq" && <EventFAQManager client:visible eventId={Number(event.id)} />}
                     {m.id === "documents" && <EventDocumentsManager client:visible eventId={Number(event.id)} />}
                     {/* Mensajes de asistentes y muro (reacciones) */}
                     {m.id === "community" && <EventCommunityManager client:visible eventId={Number(event.id)} eventName={event.name} />}
+                    {/* Certificados de asistencia de quienes ingresaron: PDF y envío por correo */}
+                    {m.id === "certificates" && <CertificatesCard client:visible eventId={Number(event.id)} />}
                     {/* Reseñas, fotos de asistentes e invitación al próximo evento */}
                     {m.id === "reviews" && <EventReviewsManager client:visible eventId={Number(event.id)} publicUrl={publicLink} />}
                     {/* Galería (al final de la página pública del evento) */}

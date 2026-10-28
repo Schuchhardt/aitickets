@@ -8,12 +8,15 @@
 // - CTA a /order/<order_id> de cada asistente cuando existe (vía recipientVariables de sendEmail).
 // - Saludo con el nombre que escribió en la orden (el attendee se reutiliza por email y puede tener un nombre
 //   antiguo); si la orden no lo tiene, el del attendee. greetingName respeta nombres compuestos ("María José").
+// - Dirección que solo ven quienes compran (netlify/lib/secret-location.mjs): va como "Lugar" si ya se reveló para esa
+//   función; si se revela más tarde, el lugar va sin la calle y el correo dice cuándo llega (send-secret-location).
 import { getSupabaseAdmin, escapeHtml, fetchAllRows } from '../../lib/supabase.mjs'
 import { sendEmail, SITE_URL, formatRecipient, isValidEmail } from '../../lib/mailer.mjs'
 import { renderReminderEmail } from '../../lib/emails/index.mjs'
 import { LEGAL } from '../../lib/legal.mjs'
 import { greetingName, holderName } from '../../lib/buyer-name.mjs'
 import { EVENT_DATE_COLUMNS, todayInTimeZone, addDays, formatDateOnlyLong, formatTimeShort, formatEventLocation } from '../../lib/dates.mjs'
+import { loadSecretLocation, functionStart, isRevealed, revealAt, pendingRevealText, publicPlace } from '../../lib/secret-location.mjs'
 
 const REMINDER_TYPE = 'reminder_24h'
 const DEDUPE_WINDOW_HOURS = 20
@@ -76,6 +79,7 @@ export default async function handler() {
         .eq('type', REMINDER_TYPE)
         .gte('created_at', since)
       const alreadyReminded = new Set((alreadyLogged || []).map(r => r.attendee_id))
+      const secret = await loadSecretLocation(supabase, eventId).catch(() => ({ address: null, revealHours: null }))
 
       let eventAttendees
       try {
@@ -117,12 +121,17 @@ export default async function handler() {
         }
         if (!recipients.length) continue
 
-        const venue = formatEventLocation(ed.event_locations) || event.location || 'Revisa los detalles del evento'
+        const start = functionStart(ed)
+        const secretShown = Boolean(secret.address) && isRevealed({ revealHours: secret.revealHours, start })
+        const venue = secretShown
+          ? secret.address
+          : (secret.address ? publicPlace(ed.event_locations) : formatEventLocation(ed.event_locations)) || event.location || 'Revisa los detalles del evento'
         const { subject, html, text } = await renderReminderEmail({
           eventName: event.name,
           eventDate: formatDateOnlyLong(ed.date),
           startTime: formatTimeShort(ed.start_time),
           venue,
+          venueNote: secret.address && !secretShown ? pendingRevealText(secret.revealHours, revealAt(start, secret.revealHours)) : '',
         })
 
         const sent = []

@@ -2,10 +2,10 @@
 // Card de anuncios de "Difusión" (SPEC_landing_seminarios §4.5): piel sobria sobre la misma lógica de las demos de
 // stand-up, música, clubs y fiestas (useAdsDemo: presupuesto × días, estado activo y foco). Los anuncios existen (Meta vía
 // Zernio, netlify/lib/zernio-ads.mjs): presupuesto diario, días, ciudad con radio y edad desde AD_LIMITS.defaultAgeMin
-// (AD_LIMITS llega por props); Meta cobra el gasto directo. Segmentar por profesión o intereses ("Recursos humanos") no
-// existe: chip deshabilitado con "Pronto". Es una demostración: no crea nada ni muestra alcances o resultados estimados.
+// (AD_LIMITS llega por props), intereses y cargos de Meta (hasta 3 de cada uno; el chip de cargo es el ejemplo: Meta
+// segmenta por el cargo que la gente informa en Facebook, así que llega a parte de ese público). Meta cobra el gasto
+// directo. Es una demostración: no crea nada ni muestra alcances o resultados estimados.
 // Mobile: un solo slider (presupuesto) y los días fijos en 3. Analítica: se_ads_demo { budget, days }.
-import SoonBadge from '../../ui/SoonBadge.vue'
 import { trackEvent } from '../../../composables/useGoogleAnalytics.js'
 import { useAdsDemo } from '../../../composables/useAdsDemo.js'
 import { formatCLP } from '../producerLanding.js'
@@ -32,7 +32,8 @@ const demoMaxDays = Math.min(SEMINAR_ADS_DEMO.daysMax, props.maxDays)
     <p class="se-meta sad-badge">Quedan 38 · Faltan 9 días</p>
     <h3 class="se-h3 sad-title">¿Faltan inscritos? Impúlsalo.</h3>
     <p class="sad-text">
-      Lanza un anuncio en Instagram y Facebook desde tu panel, para tu ciudad y desde los {{ props.minAge }} años. Defines
+      Lanza un anuncio en Instagram y Facebook desde tu panel, para tu ciudad, desde los {{ props.minAge }} años y por cargo o
+      intereses. Defines
       cuánto invertir por día y por cuántos días, y lo pausas cuando quieras. Meta cobra el gasto directo en tu cuenta
       publicitaria y ves cuántas entradas vendió cada anuncio.
     </p>
@@ -60,7 +61,7 @@ const demoMaxDays = Math.min(SEMINAR_ADS_DEMO.daysMax, props.maxDays)
         <ul class="sad-chips" aria-label="Público">
           <li class="sad-chip">Santiago · {{ props.radiusKm }} km</li>
           <li class="sad-chip">{{ props.minAge }}–{{ SEMINAR_ADS_DEMO.ageMax }} años</li>
-          <li class="sad-chip is-disabled" aria-disabled="true">Recursos humanos <SoonBadge /></li>
+          <li class="sad-chip">Cargo: recursos humanos</li>
         </ul>
         <button ref="launchButton" type="button" class="se-btn se-btn-solid sad-cta" data-testid="seminar-ads-launch" @click="setLaunched(true)">
           <span>Impulsar · <span class="se-tabular">{{ formatCLP(total) }}</span> en total</span>
@@ -136,10 +137,6 @@ const demoMaxDays = Math.min(SEMINAR_ADS_DEMO.daysMax, props.maxDays)
   background: #ffffff;
   font-size: 12px;
   font-weight: 600;
-}
-.sad-chip.is-disabled {
-  border-style: dashed;
-  color: var(--se-text-3);
 }
 .sad-cta {
   font-size: 15px;

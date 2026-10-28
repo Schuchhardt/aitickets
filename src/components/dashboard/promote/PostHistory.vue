@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import { 
   Send, Clock, AlertCircle, CheckCircle, XCircle, FileText,
-  Instagram, Facebook, Image, ListFilter, Eye
+  Instagram, Facebook, Linkedin, Music2, Image, ListFilter, Eye
 } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -36,6 +36,8 @@ const statusConfig = {
 const platformIcons = {
   instagram: Instagram,
   facebook: Facebook,
+  tiktok: Music2,
+  linkedin: Linkedin,
 }
 
 const getEventName = (post) => {

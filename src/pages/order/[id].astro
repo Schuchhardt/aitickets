@@ -6,16 +6,20 @@
 // El lenguaje depende del tipo de orden (netlify/lib/order-kind.mjs): un evento gratis es una confirmación de
 // asistencia (sin "compra", total ni comprobante); solo una compra muestra el detalle de pago y el n.º de orden.
 // Con entradas vigentes: muro de asistentes, mensaje a la productora y "guardar en este dispositivo" (Mis entradas).
+// Con más de una entrada, cada una tiene "Compartir" (su página /ticket/<id>) y muestra a su asistente si se escribió
+// al comprar (event_attendees.holder_name) o su lugar en la mesa ("invitado 2 de 6", seat_number). El detalle de la
+// compra muestra los datos de empresa (no es boleta ni factura) y las respuestas a las preguntas del evento.
 import { getSupabaseAdmin } from "../../lib/auth-helpers";
 import { LEGAL } from "../../lib/legal";
 import { cdnImage } from "../../lib/imageCdn.js";
 import { getBuyerSession } from "../../lib/buyerSession";
-import { loadAttendeeEvent, functionsForTickets, upcomingFirst, calendarUrl, mapsUrl } from "../../lib/attendeePage";
+import { loadAttendeeEvent, functionsForTickets, upcomingFirst, calendarUrl, mapsUrl, secretLocationFor } from "../../lib/attendeePage";
 import { FEE_INCLUDED_NOTE, SERVICE_FEE_TAX_LABEL, orderBuyerBreakdown, serviceFeeLabelFor } from "../../../netlify/lib/fees.mjs";
 import { orderDiscount, discountLineLabel } from "../../../netlify/lib/discounts.mjs";
 import { orderKind, orderCopy, isPaidKind } from "../../../netlify/lib/order-kind.mjs";
 import { loadFeed } from "../../../netlify/lib/attendee-community.mjs";
 import { maskEmail } from "../../../netlify/lib/reviews.mjs";
+import { formatRut, COMPANY_RECEIPT_NOTE } from "../../lib/checkoutFields.mjs";
 import Layout from "../../layouts/Layout.astro";
 import AppHeader from "../../components/AppHeader.vue";
 import AppFooter from "../../components/AppFooter.vue";
@@ -43,6 +47,8 @@ let buyer: { first_name: string; last_name: string; email: string } | null = nul
 let errorMessage: string | null = null;
 let pendingMessage: string | null = null;
 let secretLocation = "";
+// Dirección privada que se revela horas antes: cuándo le llega
+let secretPending = "";
 let feed: any = null;
 
 if (!id || !UUID_RE.test(id)) {
@@ -51,7 +57,8 @@ if (!id || !UUID_RE.test(id)) {
   try {
     const ORDER_COLS = "id, created_at, status, event_id, attendee_id, amount, ticket_fee, total_payment, ticket_qty, ticket_details, payment_provider, buyer_first_name, buyer_last_name, buyer_email";
     // Columnas opcionales, de la más completa a la mínima: descuento (202609300200) e IVA del cargo (202609290100)
-    for (const cols of [`${ORDER_COLS}, service_fee_tax, discount_amount, discount_code, fee_absorbed`, `${ORDER_COLS}, service_fee_tax, discount_amount, discount_code`, `${ORDER_COLS}, service_fee_tax`, ORDER_COLS]) {
+    // y datos extra del checkout (202610300100)
+    for (const cols of [`${ORDER_COLS}, service_fee_tax, discount_amount, discount_code, fee_absorbed, company_rut, company_name, registration_answers`, `${ORDER_COLS}, service_fee_tax, discount_amount, discount_code, fee_absorbed`, `${ORDER_COLS}, service_fee_tax, discount_amount, discount_code`, `${ORDER_COLS}, service_fee_tax`, ORDER_COLS]) {
       const { data, error: orderError } = await supabase.from("event_orders").select(cols).eq("id", id).maybeSingle();
       orderInfo = data;
       if (!orderError || !["42703", "PGRST204"].includes(String(orderError.code || ""))) break;
@@ -71,10 +78,15 @@ if (!id || !UUID_RE.test(id)) {
         buyer = attendee || null;
       }
 
-      const { data: ticketsData, error: ticketsError } = await supabase
-        .from("event_attendees")
-        .select("id, qr_code, status, validated_at, event_tickets ( ticket_name, price, event_date_id )")
-        .eq("event_order_id", id);
+      // Asistente de cada QR y lugar en la mesa (columnas opcionales: base sin migrar)
+      const selectTickets = (extra: string) =>
+        supabase.from("event_attendees").select(`id, qr_code, status, validated_at,${extra} event_tickets ( ticket_name, price, event_date_id )`).eq("event_order_id", id);
+      let ticketsData: any[] | null = null;
+      let ticketsError: any = null;
+      for (const extra of [" holder_name, unit_id, seat_number,", " holder_name,", ""]) {
+        ({ data: ticketsData, error: ticketsError } = await selectTickets(extra));
+        if (!ticketsError || !["42703", "PGRST204"].includes(String(ticketsError.code || ""))) break;
+      }
 
       if (ticketsError) {
         console.error("Error al obtener tickets:", ticketsError.message);
@@ -83,12 +95,16 @@ if (!id || !UUID_RE.test(id)) {
         const holderName = `${buyer?.first_name || ""} ${buyer?.last_name || ""}`.trim();
         // Vigentes primero (las anuladas al final)
         const rows = (ticketsData || []).slice().sort((a: any, b: any) => Number(a.status === "cancelled") - Number(b.status === "cancelled"));
+        // Personas por mesa: los QR que comparten unit_id
+        const seatsOf = new Map<string, number>();
+        for (const t of rows) if (t.unit_id) seatsOf.set(t.unit_id, (seatsOf.get(t.unit_id) || 0) + 1);
         tickets = rows.map((t: any) => {
           const fn = functionsForTickets(event, [t.event_tickets?.event_date_id])[0];
+          const seat = t.unit_id && t.seat_number ? ` · invitado ${t.seat_number} de ${seatsOf.get(t.unit_id) || t.seat_number}` : "";
           return {
             id: t.id,
-            ticket_name: t.event_tickets?.ticket_name || "Entrada General",
-            attendee_name: holderName,
+            ticket_name: `${t.event_tickets?.ticket_name || "Entrada General"}${seat}`,
+            attendee_name: t.holder_name || holderName,
             // Entrada anulada (p. ej. orden reembolsada): no se muestra el QR
             qr_code: t.status === "cancelled" ? null : t.qr_code || null,
             status: t.status,
@@ -101,8 +117,9 @@ if (!id || !UUID_RE.test(id)) {
       // Dirección secreta: solo para órdenes pagadas con al menos una entrada vigente
       const hasLiveTicket = (ticketsData || []).some((t: any) => t.status !== "cancelled");
       if (orderInfo.status === "paid" && hasLiveTicket) {
-        const { data: secretRow } = await supabase.from("events").select("secret_location").eq("id", event.id).maybeSingle();
-        if (secretRow?.secret_location) secretLocation = String(secretRow.secret_location);
+        const secret = await secretLocationFor(supabase, event, (ticketsData || []).filter((t: any) => t.status !== "cancelled").map((t: any) => t.event_tickets?.event_date_id ?? null));
+        secretLocation = secret.address;
+        secretPending = secret.pending;
         // Muro de asistentes (sin la migración aplicada, simplemente no aparece)
         if (buyer?.email) {
           try {
@@ -173,6 +190,9 @@ const statusBadge = isPaid
     : ["processing", "pending"].includes(orderInfo?.status)
       ? { text: orderInfo?.status === "processing" ? "Pago recibido" : "Pago en proceso", tone: "bg-amber-100 text-amber-800" }
       : { text: "Sin entradas", tone: "bg-gray-200 text-gray-700" };
+// Datos de empresa y respuestas a las preguntas del evento (si se dieron al comprar)
+const company = orderInfo?.company_rut && orderInfo?.company_name ? { rut: formatRut(orderInfo.company_rut), name: String(orderInfo.company_name) } : null;
+const registrationAnswers: Array<{ question: string; answer: string }> = Array.isArray(orderInfo?.registration_answers) ? orderInfo.registration_answers : [];
 const pageTitle = event?.name ? `${kind === "rsvp" ? "Tu asistencia" : copy.ticketsTitle}: ${event.name} | AI Tickets` : "Tu entrada | AI Tickets";
 ---
 
@@ -222,6 +242,7 @@ const pageTitle = event?.name ? `${kind === "rsvp" ? "Tu asistencia" : copy.tick
                     <dd class="text-gray-800">
                       {place}
                       {secretLocation && <span class="block text-xs text-amber-700">Dirección exclusiva para asistentes: no la compartas.</span>}
+                      {secretPending && <span class="block text-xs text-amber-700" data-testid="secret-location-pending">{secretPending}</span>}
                     </dd>
                   </div>
                 )}
@@ -258,6 +279,7 @@ const pageTitle = event?.name ? `${kind === "rsvp" ? "Tu asistencia" : copy.tick
                   total={tickets.length}
                   functionLabel={ticket.functionLabel || (functions.length === 1 ? functions[0].label : "")}
                   place={secretLocation || (functions.length === 1 ? functions[0].place : "")}
+                  shareUrl={tickets.length > 1 ? `${Astro.url.origin}/ticket/${ticket.id}` : undefined}
                   client:only="vue"
                 />
                 </div>
@@ -293,7 +315,19 @@ const pageTitle = event?.name ? `${kind === "rsvp" ? "Tu asistencia" : copy.tick
                   <div class="flex justify-between gap-4"><dt>{paidKind ? "Comprador" : "A nombre de"}</dt><dd class="text-right text-gray-900 break-all">{`${buyer.first_name || ""} ${buyer.last_name || ""}`.trim() || buyer.email}</dd></div>
                 )}
                 {createdLabel && <div class="flex justify-between gap-4"><dt>{copy.dateLabel}</dt><dd class="text-right text-gray-900">{createdLabel}</dd></div>}
+                {company && (
+                  <div class="flex justify-between gap-4" data-testid="order-company"><dt>Empresa</dt><dd class="text-right text-gray-900 break-words">{company.name}<span class="block text-xs text-gray-500">RUT {company.rut}</span></dd></div>
+                )}
               </dl>
+              {company && <p class="-mt-3 text-xs text-gray-500">{COMPANY_RECEIPT_NOTE}</p>}
+
+              {registrationAnswers.length > 0 && (
+                <dl class="space-y-1.5 border-t border-gray-100 pt-4 text-gray-600" data-testid="order-answers">
+                  {registrationAnswers.map((a) => (
+                    <div><dt class="text-xs text-gray-500">{a.question}</dt><dd class="text-gray-900 break-words">{a.answer}</dd></div>
+                  ))}
+                </dl>
+              )}
 
               {paidKind && breakdown && (
                 <dl class="space-y-1 border-t border-gray-100 pt-4 text-gray-600" data-testid="order-fee-breakdown">

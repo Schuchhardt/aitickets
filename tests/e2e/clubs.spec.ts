@@ -97,18 +97,22 @@ test("la noche en vivo se mueve con el crossfader y el teclado", async ({ page }
 
 test("lo que no existe va con Pronto y sin testimonio real no hay cita", async ({ page }) => {
   await open(page);
-  // Facebook, TikTok y reels en la serie; gustos en los anuncios
-  await expect(page.getByTestId("club-series").getByTestId("soon-badge")).toHaveCount(3);
-  await expect(page.getByTestId("club-ads-demo").getByTestId("soon-badge")).toHaveCount(1);
+  // Facebook, TikTok y el reel en la serie, y los gustos en los anuncios, ya existen
+  await expect(page.getByTestId("club-series").getByTestId("soon-badge")).toHaveCount(0);
+  await expect(page.getByTestId("club-ads-demo").getByTestId("soon-badge")).toHaveCount(0);
   // El acceso del RRPP a sus números y cuántos de cada lista entraron ya existen
   await expect(page.locator("#lista").getByTestId("soon-badge")).toHaveCount(0);
   await expect(page.locator("#lista")).toContainText("en su celular ve cuántas entradas vendió");
   await expect(page.getByTestId("club-rrpp-soon")).toContainText("Cuántos de cada lista entraron, en las métricas de tu noche");
-  // Validar la hora de ingreso de la lista (estado de 01:30); el aforo en vivo en el panel ya existe
-  await expect(page.getByTestId("club-night").getByTestId("soon-badge")).toHaveCount(1);
+  // La hora de ingreso de la lista y el aforo en vivo en el panel ya existen
+  await expect(page.getByTestId("club-night").getByTestId("soon-badge")).toHaveCount(0);
   await expect(page.getByTestId("club-night")).toContainText("Aforo en vivo en tu panel");
-  await expect(page.locator("#puerta").getByTestId("soon-badge")).toHaveCount(1);
-  await expect(page.locator("#mesas").getByTestId("soon-badge")).toHaveCount(1);
+  await expect(page.getByTestId("club-night")).toContainText("Ingreso hasta las 03:00");
+  await expect(page.locator("#puerta").getByTestId("soon-badge")).toHaveCount(0);
+  await expect(page.locator("#puerta")).toContainText("La lista vale hasta su hora.");
+  // Un QR para cada invitado de la mesa ya existe (people_per_ticket)
+  await expect(page.locator("#mesas").getByTestId("soon-badge")).toHaveCount(0);
+  await expect(page.getByTestId("club-table-guests")).toContainText("6 QR en la orden");
   await expect(page.locator("[data-cl-testimonial]")).toHaveCount(0);
 });
 

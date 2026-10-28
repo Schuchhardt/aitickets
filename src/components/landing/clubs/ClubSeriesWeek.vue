@@ -2,11 +2,11 @@
 // Card "La serie de la semana" (SPEC_landing_clubs §4.3, card 1): los 7 días hasta el viernes con la cadencia real
 // (DEFAULT_CADENCE de socialSeriesCadence.ts, llega por props; weekSeries usa la misma regla que planSlots). Con una
 // noche semanal se está en la banda diaria: historia todos los días, post hasta D-feed_posts_to_days y la historia del
-// día a las event_day_time. Cada pieza es una cápsula LED (historia = fluor, post = blanco). Solo Instagram existe:
-// Facebook, TikTok y reels van con "Pronto". C9: las cápsulas aparecen con pop (stagger 50 ms) al hidratarse (client:visible).
+// día a las event_day_time. Cada pieza es una cápsula LED (historia = fluor, post = blanco). La serie sale en Instagram
+// y, si se conectan, en Facebook y TikTok; el reel usa el video vertical de la noche. C9: las cápsulas aparecen con pop
+// (stagger 50 ms) al hidratarse (client:visible).
 // Mobile: la tira de 7 días tiene scroll horizontal.
 import { onMounted, ref } from 'vue'
-import SoonBadge from '../../ui/SoonBadge.vue'
 import { weekSeries } from './clubsLanding.js'
 
 const props = defineProps({
@@ -30,10 +30,7 @@ onMounted(() => {
       <p class="cl-example">ejemplo</p>
     </div>
     <ul class="sw-chips" aria-label="Redes">
-      <li class="sw-chip is-on"><span class="sw-chip-dot" aria-hidden="true"></span>Instagram</li>
-      <li class="sw-chip is-soon">Facebook <SoonBadge dark /></li>
-      <li class="sw-chip is-soon">TikTok <SoonBadge dark /></li>
-      <li class="sw-chip is-soon">Reels <SoonBadge dark /></li>
+      <li v-for="net in ['Instagram', 'Facebook', 'TikTok', 'Reel con tu video']" :key="net" class="sw-chip is-on"><span class="sw-chip-dot" aria-hidden="true"></span>{{ net }}</li>
     </ul>
     <ol class="sw-days" aria-label="Piezas programadas por día">
       <li v-for="(d, i) in days" :key="d.day" class="sw-day" :class="{ 'is-night': d.day === 0 }">

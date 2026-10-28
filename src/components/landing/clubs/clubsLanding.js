@@ -55,7 +55,7 @@ export const NIGHT_EVENT_URL = 'aitickets.cl/eventos/viernes-ultravioleta'
 /**
  * Tipos de entrada de la noche de ejemplo: cada uno es un tipo de entrada con precio (la lista es de $0) y cupo
  * (EditEventForm.vue). Las cortesías no se venden: se envían desde el panel (CourtesyTicketsForm.vue) y no cuentan como
- * venta. capacity = cupo del tipo de entrada; en mesas, una unidad es una mesa y un QR (buildAttendeeRows).
+ * venta. capacity = cupo del tipo de entrada; en mesas, el cupo cuenta mesas (una mesa para N emite N QR, buildAttendeeRows).
  */
 export const CLUB_TICKETS = Object.freeze({
   lista: { name: 'Lista free', short: 'Lista', price: 0, capacity: 200 },
@@ -212,8 +212,8 @@ export const NIGHT_ARRIVALS = Object.freeze([
 
 /**
  * Fotogramas de la noche (§4.5): ingresados y emitidas por tipo de entrada en seis momentos. Entre fotogramas se
- * interpola (nightState). Al final: emitidas 200 + 300 + 9 + 30 = 539 (las mesas son un QR por mesa: el escáner cuenta 9
- * y no 54 personas) e ingresaron 178 + 283 + 9 + 28 = 498. Las sumas las cuadra tests/unit/clubs-landing.test.mjs.
+ * interpola (nightState). Al final: emitidas 200 + 300 + 9 + 30 = 539 (la fila de mesas cuenta mesas, igual que el cupo;
+ * con "Personas por entrada" cada mesa trae 6 QR, pero el resumen del ejemplo no los desglosa) e ingresaron 178 + 283 + 9 + 28 = 498. Las sumas las cuadra tests/unit/clubs-landing.test.mjs.
  * sign: mensaje del letrero de la puerta ({cover} = precio del cover, {pct} = aforo del momento).
  */
 export const NIGHT_FRAMES = Object.freeze([
@@ -234,6 +234,11 @@ export const NIGHT_FRAMES = Object.freeze([
 export const NIGHT_PEAK_STEP = 14
 /** Hora en que se cierra la inscripción a la lista (la del fotograma que la cierra) */
 export const LIST_CLOSES_AT = clock(toMinutes(NIGHT_START) + NIGHT_FRAMES.find((f) => f.listClosed).step * 15)
+/**
+ * Hora límite de ingreso de la lista (event_tickets.entry_until): desde el fotograma de las 03:00 los ingresados de la
+ * lista ya no suben. Pasada esa hora el escáner la marca "fuera de horario" (src/lib/entryDeadline.mjs).
+ */
+export const LIST_ENTRY_UNTIL = clock(toMinutes(NIGHT_START) + 20 * 15)
 
 const sum = (byKind) => TICKET_KINDS.reduce((s, k) => s + byKind[k], 0)
 

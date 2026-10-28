@@ -4,7 +4,8 @@
 // offline con sincronización, un QR entra una vez ("Este ticket ya fue validado"), muestra nombre y tipo de entrada,
 // contador de validadas sobre el total, búsqueda por nombre y reenvío al correo (/api/orders/resend); rol Puerta
 // (permissions.ts) o link de escáner que vence solo (/puerta/<token>, hoy desde el asistente de IA: tools/access.ts).
-// "Pronto": rechazar la lista después de su hora (hoy solo se cierra la inscripción). El aviso de "entrada de otra
+// Hora límite de la lista: event_tickets.entry_until ("Ingreso hasta" en el formulario de entradas); pasada esa hora el
+// escáner la marca "fuera de horario" en ámbar y la puerta decide ("Dejar entrar igual"). El aviso de "entrada de otra
 // noche" no se promete (Preguntas abiertas 8: getFunctionCheck compara la fecha y no la ventana de la función).
 // El escaneo cuenta para el pago (ledger.ts, CHECKIN_RELEASE_THRESHOLD: check-ins de la función o acreditar que se
 // realizó), con "*" de términos.
@@ -13,14 +14,17 @@ import CapsulePhoto from "./CapsulePhoto.astro";
 import LedHeading from "./LedHeading.astro";
 import NightHour from "./NightHour.astro";
 import UvStamp from "./UvStamp.astro";
-import SoonBadge from "../../ui/SoonBadge.vue";
 import { CLUB_PHOTOS, LIVE_NIGHT } from "./clubsLanding.js";
 import { TERMS_NOTE } from "../../../data/producerFaq";
 
 const items = [
   { title: "Escaneas con el celular, aunque no haya señal.", text: "La lista se descarga antes y se sincroniza cuando vuelve la conexión." },
   { title: "Un QR entra una sola vez.", text: "Si alguien comparte el pantallazo de su entrada, el segundo que la muestra no entra." },
-  { title: "La puerta ve qué entrada es.", text: "Lista, cover, mesa o cortesía, con el nombre de quien la compró.", soon: "Rechazar la lista después de su hora" },
+  { title: "La puerta ve qué entrada es.", text: "Lista, cover, mesa o cortesía, con el nombre de quien la compró." },
+  {
+    title: "La lista vale hasta su hora.",
+    text: "Le pones «ingreso hasta las 01:00» y, pasada esa hora, el escáner la marca fuera de horario. Tu equipo decide si entra igual.",
+  },
   { title: "Ves cuántos han entrado.", text: "El escáner cuenta las entradas validadas sobre el total, en vivo." },
   {
     title: "Tu equipo de puerta no necesita tu cuenta.",
@@ -59,11 +63,6 @@ const items = [
               <div>
                 <h3 class="cl-item-title">{item.title}</h3>
                 <p class="cl-item-text">{item.text}</p>
-                {item.soon && (
-                  <p class="cdo-soon">
-                    {item.soon} <SoonBadge dark />
-                  </p>
-                )}
               </div>
             </li>
           ))
@@ -127,15 +126,6 @@ const items = [
   }
   .cdo-items {
     margin-top: 32px;
-  }
-  .cdo-soon {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px 8px;
-    margin-top: 6px;
-    font-size: 13px;
-    color: var(--cl-text-3);
   }
   .cdo-note {
     max-width: 620px;

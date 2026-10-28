@@ -13,6 +13,7 @@
 import { fetchAll, localDay, ticketAvailability, presentTicket, TICKET_SELECT, isCourtesyName, TZ } from "./producer-api/tools/common";
 import { isCourtesyOrder, isTransferOrder, lineSoldQty, orderLines, orderSoldQty } from "./orderKinds";
 import { formatFunctionLabel } from "../../netlify/lib/dates.mjs";
+import { loadPeoplePerTicket } from "../../netlify/lib/tickets.mjs";
 
 export const MAX_VISITS = 50000;
 /** Tope de días de la serie diaria del panel. */
@@ -233,7 +234,8 @@ export function lineFunctionKey(line: any, ticketFunction?: Map<number, number |
 
 /**
  * La parte de una orden que es de una función: solo sus líneas de esa función, con su parte del monto (el monto de la
- * orden, ya con descuentos, se reparte según el valor de cada línea). null si la orden no tiene entradas de esa función.
+ * orden, ya con descuentos, se reparte según el valor de cada línea; igual el cargo por servicio y su IVA si la orden
+ * los trae, para el borderó). null si la orden no tiene entradas de esa función.
  */
 export function orderForFunction(o: any, key: string, ticketFunction?: Map<number, number | null>): any | null {
     const lines = orderLines(o);
@@ -249,6 +251,8 @@ export function orderForFunction(o: any, key: string, ticketFunction?: Map<numbe
         ticket_qty: own.reduce((n: number, l: any) => n + (Number(l?.quantity) || 0), 0),
         amount: Math.round((Number(o.amount) || 0) * share),
         discount_amount: Math.round((Number(o.discount_amount) || 0) * share),
+        ...(o.ticket_fee != null ? { ticket_fee: Math.round((Number(o.ticket_fee) || 0) * share) } : {}),
+        ...(o.service_fee_tax != null ? { service_fee_tax: Math.round((Number(o.service_fee_tax) || 0) * share) } : {}),
     };
 }
 
@@ -281,15 +285,16 @@ export type FunctionOccupancy = {
  * Ocupación de cada función (panel y get_event_performance): por función, entradas vendidas, cortesías, emitidas
  * (vigentes, sin anuladas), ingresadas, cupo y % (emitidas ÷ cupo). La función de una entrada es la de su tipo de
  * entrada; las de tipos sin función (pase completo, cortesías del tipo "Cortesía") van en una fila aparte, que no se
- * suma al cupo de cada función.
+ * suma al cupo de cada función. Una mesa para N (people_per_ticket) emite N QR: su cupo se cuenta en personas (mesas × N).
  */
 export async function functionOccupancy(supabase: any, eventId: number): Promise<FunctionOccupancy[]> {
-    const [{ functions }, { data: tickets }, attendees] = await Promise.all([
+    const [{ functions }, { data: tickets }, attendees, people] = await Promise.all([
         loadEventFunctions(supabase, eventId),
         supabase.from("event_tickets").select("id, ticket_name, event_date_id, total_quantity, is_gift").eq("event_id", eventId),
         fetchAll<any>(() =>
             supabase.from("event_attendees").select("id, event_ticket_id, status, is_complimentary").eq("event_id", eventId).order("id", { ascending: true }),
         ),
+        loadPeoplePerTicket(supabase, eventId) as Promise<Map<number, number>>,
     ]);
     const keyOf = (dateId: unknown) => (dateId == null ? ALL_FUNCTIONS : String(dateId));
     const rows = new Map<string, FunctionOccupancy & { unlimited: boolean; capacitySum: number; types: number }>();
@@ -311,7 +316,7 @@ export async function functionOccupancy(supabase: any, eventId: number): Promise
         const r = row(keyOf(t.event_date_id));
         r.types += 1;
         if (t.total_quantity == null) r.unlimited = true;
-        else r.capacitySum += Number(t.total_quantity) || 0;
+        else r.capacitySum += (Number(t.total_quantity) || 0) * (people.get(Number(t.id)) || 1);
     }
     for (const a of attendees) {
         if (a.status === "cancelled") continue;

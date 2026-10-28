@@ -12,7 +12,9 @@
 //   * Presupuesto DIARIO en unidades enteras de la moneda de la cuenta publicitaria (CLP 5000 = $5.000; Zernio convierte
 //     a lo que pide Meta), entre el mínimo de la cuenta y un tope de cordura; de 1 a 30 días y nunca más allá del
 //     evento. Gasto máximo = diario × días, y la productora lo confirma explícitamente antes de crear.
-//   * Público: Chile entero o una ciudad con radio (Meta exige ~17 km mínimo), edad 18 a 65 por defecto.
+//   * Público: Chile entero o una ciudad con radio (Meta exige ~17 km mínimo), edad 18 a 65 por defecto y, si la
+//     productora quiere, hasta 3 intereses y hasta 3 cargos (ids de Meta del buscador de Zernio, dimensiones
+//     interest y workPosition: https://docs.zernio.com/ad-targeting/search-ad-targeting).
 //   * Se publica al tiro o queda pausado (solo el anuncio: reanudarlo lo deja corriendo).
 //   * Cada creación lleva Idempotency-Key: un doble clic o un reintento nunca crea dos anuncios.
 import { SITE_URL } from './mailer.mjs'
@@ -41,6 +43,9 @@ export const AD_LIMITS = Object.freeze({
   cityRadiiKm: [17, 25, 40, 80],
   /** Cuánto antes puede programarse el inicio. */
   maxStartDaysAhead: 60,
+  /** Intereses y cargos por anuncio (cada lista). Meta los combina con O dentro de la lista. */
+  maxInterests: 3,
+  maxWorkPositions: 3,
 })
 
 /** Botones que el panel ofrece (subconjunto de los callToAction de Meta que Zernio acepta en create y boost). */
@@ -230,6 +235,25 @@ export async function searchAdCities(adsAccountId, q) {
     .map((r) => ({ key: String(r.id), name: String(r.name), path: Array.isArray(r.path) ? r.path.map(String).slice(0, 4) : [] }))
 }
 
+/** Qué busca el buscador de público: intereses (gustos) o cargos (profesión). Dimensiones de Zernio, solo Meta. */
+export const AUDIENCE_DIMENSIONS = Object.freeze({ interest: 'interests', workPosition: 'workPositions' })
+
+/** Intereses o cargos de Meta para segmentar (ids opacos de Meta, con su tamaño de público si Meta lo informa). */
+export async function searchAdAudience(adsAccountId, q, dimension = 'interest') {
+  if (!Object.hasOwn(AUDIENCE_DIMENSIONS, dimension)) throw new ZernioError(400, { error: 'Dimensión no soportada', code: 'invalid_dimension' })
+  const data = await zernioRequest('/ads/targeting/search', {
+    query: { accountId: adsAccountId, q: String(q).slice(0, 80), dimension, locale: 'es_LA', limit: 8 },
+  })
+  return (Array.isArray(data?.results) ? data.results : [])
+    .filter((r) => r?.id && r?.name)
+    .map((r) => ({
+      id: String(r.id),
+      name: String(r.name).slice(0, 120),
+      path: Array.isArray(r.path) ? r.path.map(String).slice(0, 4) : [],
+      audienceSize: Number.isFinite(Number(r.audienceSize)) && r.audienceSize !== null ? Number(r.audienceSize) : null,
+    }))
+}
+
 // ---------------------------------------------------------------------------
 // Validación y armado del anuncio
 // ---------------------------------------------------------------------------
@@ -301,8 +325,11 @@ export function validateAdInput(raw, { connection, event, post = null, now = new
     else geo = { type: 'city', key, radiusKm: radius, label: `${cleanText(raw.geo.name, 80) || 'Ciudad'} + ${radius} km` }
   }
 
+  const interests = audienceList(raw?.interests, AD_LIMITS.maxInterests, 'intereses', errors)
+  const workPositions = audienceList(raw?.workPositions, AD_LIMITS.maxWorkPositions, 'cargos', errors)
+
   const callToAction = Object.hasOwn(AD_CALLS_TO_ACTION, raw?.callToAction) ? raw.callToAction : 'BUY_TICKETS'
-  const value = { type, currency, dailyBudget: daily, days, totalBudget, startDate: start, endDate: end, ageMin, ageMax, geo, callToAction, launch: raw?.launch === 'paused' ? 'paused' : 'now' }
+  const value = { type, currency, dailyBudget: daily, days, totalBudget, startDate: start, endDate: end, ageMin, ageMax, geo, interests, workPositions, callToAction, launch: raw?.launch === 'paused' ? 'paused' : 'now' }
 
   if (type === 'standalone') {
     value.headline = cleanText(raw?.headline, AD_LIMITS.headlineMax)
@@ -318,12 +345,38 @@ export function validateAdInput(raw, { connection, event, post = null, now = new
   return errors.length ? { ok: false, errors } : { ok: true, value }
 }
 
-/** Segmentación (TargetingSpec de Zernio, igual en create y boost). */
+/** Intereses o cargos elegidos en el buscador: [{ id, name }] sin repetidos, como mucho `max`. */
+function audienceList(raw, max, label, errors) {
+  if (raw == null) return []
+  if (!Array.isArray(raw)) {
+    errors.push(`Los ${label} no son válidos.`)
+    return []
+  }
+  const out = []
+  for (const item of raw) {
+    const id = String(item?.id ?? '').trim()
+    if (!/^\d{1,25}$/.test(id)) {
+      errors.push(`Elige los ${label} desde el buscador.`)
+      return []
+    }
+    if (!out.some((x) => x.id === id)) out.push({ id, name: cleanText(item?.name, 120) || id })
+  }
+  if (out.length > max) errors.push(`Elige como mucho ${max} ${label}.`)
+  return out.slice(0, max)
+}
+
+/** Segmentación (TargetingSpec de Zernio, igual en create y boost). Intereses y cargos solo si se eligieron. */
 export function adTargeting(value) {
   const geo = value.geo?.type === 'city'
     ? { cities: [{ key: value.geo.key, radius: value.geo.radiusKm, distance_unit: 'kilometer' }] }
     : { countries: ['CL'] }
-  return { ...geo, ageMin: value.ageMin, ageMax: value.ageMax }
+  return {
+    ...geo,
+    ageMin: value.ageMin,
+    ageMax: value.ageMax,
+    ...(value.interests?.length ? { interests: value.interests.map(({ id, name }) => ({ id, name })) } : {}),
+    ...(value.workPositions?.length ? { workPositions: value.workPositions.map(({ id, name }) => ({ id, name })) } : {}),
+  }
 }
 
 /** Nombre del anuncio en Meta (máx. 255): se reconoce en el Ads Manager de la productora. */

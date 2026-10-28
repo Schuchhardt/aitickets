@@ -9,13 +9,14 @@
 //   razón social, RUT y "Productor verificado" → EventTrust.vue
 //   documentos → terms.astro §3: AI Tickets emite boleta electrónica por el cargo; el precio de la entrada lo documenta
 //               el productor (pendiente de validar con abogado y contador: Preguntas abiertas 6). Cada compra trae un
-//               LEGAL.receiptLabel, que no es boleta ni factura. RUT y razón social al comprar: "Pronto"
+//               LEGAL.receiptLabel, que no es boleta ni factura. RUT y razón social al comprar → events.checkout_fields
+//               .company (CheckoutExtras.vue, validación del dígito verificador en checkoutFields.mjs): salen en ese
+//               comprobante y en el CSV de órdenes, con la aclaración de que no es boleta ni factura
 //   CSV de órdenes → ordersExport.ts
 import { BadgeCheck, Building, Building2, IdCard, Receipt, Sheet, TicketPercent } from "lucide-vue-next";
 import SeminarHeading from "./SeminarHeading.astro";
 import TeamOrder from "./TeamOrder.vue";
 import WayfindingSign from "./WayfindingSign.astro";
-import SoonBadge from "../../ui/SoonBadge.vue";
 import { AGREEMENT, agreementTotals } from "./seminariosLanding.js";
 import { formatCLP } from "../producerLanding.js";
 import { DEFAULT_MAX_PER_PURCHASE } from "../../Reservation/pricing.js";
@@ -91,7 +92,10 @@ const agreement = agreementTotals();
               El cargo por servicio lo documenta AI Tickets con boleta electrónica. El valor de la entrada lo documentas tú,
               como organizador: si una empresa te pide factura, se la emites con los datos de su compra.
             </p>
-            <p class="se-item-extra"><span class="se-soon-chip">RUT y razón social de la empresa al comprar <SoonBadge dark={false} /></span></p>
+            <p class="se-item-extra" data-testid="seminar-company-fields">
+              Si lo activas, quien compra deja el RUT y la razón social de su empresa: salen en su comprobante de compra y en
+              tu CSV. Ese comprobante no es boleta ni factura.
+            </p>
           </div>
         </li>
         <li class="se-item" data-lp-step>

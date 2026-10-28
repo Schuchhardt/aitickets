@@ -1,4 +1,5 @@
-// Herramientas: difusión automática en Instagram (historias y posts hasta el día del evento, link por DM). La lógica
+// Herramientas: difusión automática en Instagram (historias y posts hasta el día del evento, link por DM) y, si el
+// productor las activa para el evento, Facebook y TikTok con la misma cadencia, más un reel con el video del evento. La lógica
 // vive en src/lib/socialSeries.ts; estas herramientas las usan el MCP/REST de productores, la tarjeta "Difusión
 // automática" del panel (/api/events/social-series) y el admin (org_*). Spec: docs/specs/historias-automaticas.md.
 //
@@ -8,7 +9,7 @@ import { ToolError, type ToolContext, type ToolDef } from "../registry";
 import { eventDashboardUrl, eventIdSchema, eventPublicUrl, loadOwnedEvent, localDateTime } from "./common";
 import { serverEnv } from "../../../pages/api/_lib/server-utils";
 import * as S from "../../socialSeries";
-import { normalizeCadence } from "../../socialSeriesCadence";
+import { EXTRA_NETWORKS, expandNetworkSlots, normalizeCadence, type SeriesPlatform } from "../../socialSeriesCadence";
 import { pieceText } from "../../socialSeriesRender";
 import { ZernioError, friendlyAdsError } from "../../../../netlify/lib/zernio-ads.mjs";
 
@@ -36,16 +37,22 @@ const STATUS_LABELS: Record<string, string> = {
 };
 const SERIES_STATUS_LABELS: Record<string, string> = { draft: "Sin activar (borrador)", active: "Activa", paused: "Pausada", completed: "Terminada", cancelled: "Cancelada" };
 
+const KIND_LABELS: Record<string, string> = { story: "Historia", feed_post: "Post de feed", reel: "Reel" };
+const kindLabel = (kind: string, platform = "instagram") => (platform === "tiktok" && kind === "feed_post" ? "Post de foto" : platform === "tiktok" && kind === "reel" ? "Video" : KIND_LABELS[kind] || kind);
+
 const stageLabel = (kind: string, variant: string, days: number) => {
     const t = pieceText({ kind: kind === "feed_post" ? "feed_post" : "story", variant: variant === "sold_out" ? "sold_out" : "countdown", daysToEvent: days, eventName: "", dateLabel: "", startTime: null, venue: null, keyword: "", remaining: null, styleIndex: 0 });
     return t.bigLines.join(" ");
 };
 
 function presentSlot(s: any) {
+    const platform = s.platform || "instagram";
     return {
         id: Number(s.id),
+        platform,
+        platform_label: S.NETWORK_NAMES[platform] || platform,
         kind: s.kind,
-        kind_label: s.kind === "feed_post" ? "Post de feed" : "Historia",
+        kind_label: kindLabel(s.kind, platform),
         variant: s.variant,
         days_to_event: s.days_to_event,
         stage: stageLabel(s.kind, s.variant, s.days_to_event),
@@ -54,6 +61,7 @@ function presentSlot(s: any) {
         status: s.status,
         status_label: STATUS_LABELS[s.status] || s.status,
         image_url: s.image_url || null,
+        video_url: s.video_url || null,
         caption: s.caption || null,
         post_url: s.platform_post_url || null,
         error: s.error || null,
@@ -71,6 +79,8 @@ function presentSeries(series: any) {
         dm_message: series.dm_message || null,
         feed_posts_enabled: series.feed_posts_enabled,
         sold_out_story_enabled: series.sold_out_story_enabled,
+        reel_enabled: series.reel_enabled !== false,
+        networks: S.networkStates(series),
         base_image_url: series.base_image_url || null,
         publish_time: series.cadence_config?.publish_time || null,
         publish_time_source: series.cadence_config?.publish_time_source || null,
@@ -92,7 +102,14 @@ export async function seriesView(ctx: ToolContext, eventId: number, { refreshSta
     if (!event) throw new ToolError("not_found", "Evento no encontrado.");
     const live = await S.loadLiveSeries(supabase, eventId);
     const series = live || (await S.loadLatestSeries(supabase, eventId));
-    const [ig, blockers] = await Promise.all([S.instagramAccount(supabase, ctx.actor.orgId), S.activationBlockers(supabase, event, ctx.actor.orgId)]);
+    const [ig, fb, tt, blockers] = await Promise.all([
+        S.instagramAccount(supabase, ctx.actor.orgId),
+        S.socialAccount(supabase, ctx.actor.orgId, "facebook"),
+        S.socialAccount(supabase, ctx.actor.orgId, "tiktok"),
+        S.activationBlockers(supabase, event, ctx.actor.orgId, new Date(), live?.status === "draft" ? live : null),
+    ]);
+    const reelVideo = S.reelVideoFor(event);
+    const states = S.networkStates(live || series);
     const config = series && series.status !== "draft" ? normalizeCadence(series.cadence_config) : await S.loadCadenceConfig(supabase);
     const draftLike = !series || series.status === "draft" || series.status === "cancelled" || series.status === "completed";
 
@@ -100,6 +117,10 @@ export async function seriesView(ctx: ToolContext, eventId: number, { refreshSta
     if (draftLike && event.status === "published") {
         const p = await S.buildPlan(supabase, event, { feedPosts: live?.feed_posts_enabled ?? true, config });
         const labels = p.anchorStart ? S.eventLabels(event, p.anchorStart) : null;
+        // Piezas por red si se aprueba ahora: Facebook y TikTok solo si están activadas y conectadas
+        const platforms: SeriesPlatform[] = ["instagram", ...(states.facebook.enabled && fb ? ["facebook" as const] : []), ...(states.tiktok.enabled && tt ? ["tiktok" as const] : [])];
+        const expanded = expandNetworkSlots(p.slots, { platforms, reel: Boolean(reelVideo) && (live?.reel_enabled ?? true), config });
+        const per = (platform: string) => expanded.filter((x) => x.platform === platform && x.kind !== "reel").length;
         plan = {
             anchor_starts_at: p.anchorStart?.toISOString() || null,
             anchor_local: localDateTime(p.anchorStart),
@@ -110,6 +131,9 @@ export async function seriesView(ctx: ToolContext, eventId: number, { refreshSta
                     : `hora por defecto (menos de ${config.peak_min_visits} visitas para calcular la hora pico)`,
             stories: p.slots.filter((s) => s.kind === "story").length,
             feed_posts: p.slots.filter((s) => s.kind === "feed_post").length,
+            facebook_posts: per("facebook"),
+            tiktok_posts: per("tiktok"),
+            reels: expanded.filter((x) => x.kind === "reel").map((x) => ({ platform: x.platform, publish_local: localDateTime(x.publish_at) })),
             first_local: localDateTime(p.slots[0]?.publish_at),
             last_local: localDateTime(p.slots[p.slots.length - 1]?.publish_at),
             slots: p.slots.map((s) => ({
@@ -140,6 +164,20 @@ export async function seriesView(ctx: ToolContext, eventId: number, { refreshSta
         event: { id: Number(event.id), name: event.name, status: event.status, public_url: eventPublicUrl(ctx, event.slug) },
         enabled: S.socialSeriesEnabled(),
         instagram: ig ? { connected: true, account: ig.name } : { connected: false, connect_url: `${ctx.origin}/dashboard/promote` },
+        networks: Object.fromEntries(
+            EXTRA_NETWORKS.map((n) => {
+                const acc = n === "facebook" ? fb : tt;
+                return [n, { connected: Boolean(acc), account: acc?.name || null, enabled: states[n].enabled, status: states[n].status, error: states[n].error }];
+            }),
+        ),
+        reel: {
+            available: Boolean(reelVideo),
+            enabled: (live || series)?.reel_enabled !== false,
+            video_url: reelVideo?.url || null,
+            note: reelVideo
+                ? `Reel con el video del evento (${reelVideo.duration} s), unos días antes de la función.`
+                : "Para el reel, sube un video vertical de 3 a 60 segundos como video de portada o de galería del evento.",
+        },
         can_activate: blockers.length === 0 && (!live || live.status === "draft"),
         blockers,
         series: series ? presentSeries(series) : null,
@@ -163,7 +201,14 @@ export async function seriesView(ctx: ToolContext, eventId: number, { refreshSta
             url: baseImage,
             source: live?.base_image_url ? "elegida para la serie" : event.image_url ? "portada del evento" : event.cover_video?.poster_url ? "fotograma del video de portada" : null,
         },
-        tracking: { story_dm_ref: S.DM_REFS.story, post_dm_ref: S.DM_REFS.post, note: "Las ventas por DM aparecen como canales ig-story-dm e ig-post-dm en la analítica del evento." },
+        tracking: {
+            story_dm_ref: S.DM_REFS.story,
+            post_dm_ref: S.DM_REFS.post,
+            facebook_dm_ref: S.DM_REFS.facebook_post,
+            facebook_link_ref: S.LINK_REFS.facebook,
+            tiktok_link_ref: S.LINK_REFS.tiktok,
+            note: "Las ventas aparecen como canales ig-story-dm, ig-post-dm, fb-post-dm, fb-serie y tiktok-serie en la analítica del evento.",
+        },
         dashboard_url: eventDashboardUrl(ctx, Number(event.id)),
     };
 }
@@ -176,7 +221,7 @@ const getSocialSeries: ToolDef = {
     name: "get_social_series",
     title: "Ver difusión automática (historias)",
     description:
-        "Estado de las historias y posts automáticos de un evento en Instagram: si se puede activar (y qué falta), el calendario propuesto " +
+        "Estado de las historias y posts automáticos de un evento (Instagram y, si están activadas, Facebook y TikTok): si se puede activar (y qué falta), el calendario propuesto " +
         "(borrador) o las piezas programadas y publicadas con su estado, la próxima publicación, DMs enviados y clics, y ventas atribuidas a " +
         "los DM (ref ig-story-dm / ig-post-dm). Responde \"¿cómo va mi difusión?\".",
     scope: "read",
@@ -194,7 +239,9 @@ const prepareSocialSeries: ToolDef = {
     description:
         "Deja preparada (en borrador, sin publicar nada) la serie de historias automáticas de un evento: cadencia automática (cada 3 días, diaria la " +
         "última semana y el día del evento), posts de feed la última semana (feed_posts_enabled), palabra clave del DM (ENTRADAS por defecto), " +
-        "mensaje del DM ({link} = link con seguimiento) y foto base (por defecto la portada). Devuelve el calendario para que el productor lo " +
+        "mensaje del DM ({link} = link con seguimiento), foto base (por defecto la portada), si publica también en la página de Facebook " +
+        "(facebook_enabled) y en TikTok (tiktok_enabled; foto vertical cada día de la última semana), y el reel con el video vertical del " +
+        "evento (reel_enabled; 3 a 60 s). Devuelve el calendario para que el productor lo " +
         "revise; se activa con approve_social_series. Se puede llamar varias veces para ajustar el borrador.",
     scope: "write",
     audit: (args) => ({ summary: "Preparó la difusión automática (borrador)", target: `event:${args.event_id}` }),
@@ -211,6 +258,9 @@ const prepareSocialSeries: ToolDef = {
             extra_keywords: { type: "array", maxItems: 5, items: { type: "string", pattern: KEYWORD_PATTERN }, description: "Variantes que también activan el DM (por defecto entrada y link)." },
             dm_message: { type: "string", maxLength: 600, description: "Texto del DM. {link} se reemplaza por el link con seguimiento (si no está, va al final). Vacío = mensaje por defecto." },
             base_image_url: { type: "string", maxLength: 2000, pattern: "^(https://.*)?$", description: "Foto base (de upload_image). Vacío = la portada del evento." },
+            facebook_enabled: { type: "boolean", description: "Publicar también las historias y posts en la página de Facebook conectada (por defecto no)." },
+            tiktok_enabled: { type: "boolean", description: "Publicar también en TikTok: un post de foto vertical cada día de la última semana (por defecto no)." },
+            reel_enabled: { type: "boolean", description: "Si el evento tiene un video vertical de 3 a 60 s, publicarlo como reel unos días antes (por defecto sí)." },
         },
     },
     async handler(args, ctx) {
@@ -229,10 +279,13 @@ const prepareSocialSeries: ToolDef = {
                 extra_keywords: args.extra_keywords,
                 dm_message: args.dm_message === undefined ? undefined : args.dm_message || null,
                 base_image_url: args.base_image_url === undefined ? undefined : args.base_image_url || null,
+                facebook_enabled: args.facebook_enabled,
+                tiktok_enabled: args.tiktok_enabled,
+                reel_enabled: args.reel_enabled,
             });
             return {
                 ...(await seriesView(ctx, args.event_id, { refreshStats: false })),
-                next_steps: "Muestra el calendario al productor. Si lo aprueba, llama approve_social_series (pide confirmación: publica en su Instagram).",
+                next_steps: "Muestra el calendario al productor. Si lo aprueba, llama approve_social_series (pide confirmación: publica en sus redes).",
             };
         });
     },
@@ -244,7 +297,7 @@ const approveSocialSeries: ToolDef = {
     title: "Aprobar y programar difusión automática",
     description:
         "Aprueba la serie (aprobación única): desde aquí AI Tickets publica sola las historias (y los posts de feed) en el Instagram de la " +
-        "organización hasta el día del evento y responde por DM con el link a quien responda o comente la palabra clave. Acción pública: el " +
+        "organización (y en Facebook y TikTok si se activaron) hasta el día del evento y responde por DM con el link a quien responda o comente la palabra clave. Acción pública: el " +
         "servidor devuelve primero el resumen y solo activa al repetir la llamada con confirmation_token.",
     scope: "publish",
     async confirm(args, ctx) {
@@ -255,11 +308,17 @@ const approveSocialSeries: ToolDef = {
             const plan = view.plan;
             if (!plan?.slots?.length) throw new ToolError("invalid_input", "No quedan horarios para publicar antes del evento.");
             const series = view.series;
+            const extra = [
+                plan.facebook_posts ? `Facebook (${view.networks.facebook.account || "página conectada"}): ${plan.facebook_posts} pieza(s)` : null,
+                plan.tiktok_posts ? `TikTok (${view.networks.tiktok.account || "cuenta conectada"}): ${plan.tiktok_posts} post(s) de foto` : null,
+                plan.reels.length ? `reel con el video del evento el ${plan.reels[0].publish_local?.replace("T", " ")} en ${plan.reels.map((r: any) => S.NETWORK_NAMES[r.platform]).join(", ")}` : null,
+            ].filter(Boolean);
             return {
                 message:
                     `Activar la difusión automática de "${view.event.name}" en Instagram (${view.instagram.connected ? (view.instagram as any).account || "cuenta conectada" : "sin cuenta"}): ` +
                     `${plan.stories} historia(s)${plan.feed_posts ? ` y ${plan.feed_posts} post(s) de feed` : ""} entre el ${plan.first_local?.replace("T", " ")} y el ${plan.last_local?.replace("T", " ")} ` +
-                    `(hora de Chile), con DM automático a quien responda o comente ${series?.keyword || S.DEFAULT_KEYWORD}. Se publican solas, sin otra aprobación.`,
+                    `(hora de Chile), con DM automático a quien responda o comente ${series?.keyword || S.DEFAULT_KEYWORD}.` +
+                    `${extra.length ? ` Además: ${extra.join("; ")}.` : ""} Se publican solas, sin otra aprobación.`,
                 details: {
                     event_id: view.event.id,
                     publish_time: plan.publish_time,
@@ -270,11 +329,12 @@ const approveSocialSeries: ToolDef = {
                 warnings: [
                     !view.base_image.url ? "El evento no tiene portada ni foto base: las piezas usarán un fondo liso. Sube una foto para que se vean mejor." : null,
                     "Instagram no permite stickers de link por API: el link va por DM a quien responda la historia.",
+                    plan.tiktok_posts ? "En TikTok se publica como contenido de tu marca, público y con comentarios activos; el link va en la descripción (TikTok no lo hace clickeable)." : null,
                 ].filter(Boolean) as string[],
             };
         });
     },
-    audit: (args) => ({ summary: "Aprobó la difusión automática en Instagram", target: `event:${args.event_id}` }),
+    audit: (args) => ({ summary: "Aprobó la difusión automática en redes", target: `event:${args.event_id}` }),
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     inputSchema: { type: "object", required: ["event_id"], additionalProperties: false, properties: { event_id: eventIdSchema } },
     async handler(args, ctx) {
@@ -318,7 +378,7 @@ const resumeSocialSeries: ToolDef = {
     async confirm(args, ctx) {
         const series = await liveSeriesOf(ctx, args.event_id);
         if (series.status !== "paused") throw new ToolError("conflict", "La difusión no está pausada.");
-        return { message: `Reanudar la difusión automática del evento ${args.event_id}: se recalculan las publicaciones desde hoy y vuelven a salir solas en Instagram.` };
+        return { message: `Reanudar la difusión automática del evento ${args.event_id}: se recalculan las publicaciones desde hoy y vuelven a salir solas en tus redes.` };
     },
     audit: (args) => ({ summary: "Reanudó la difusión automática", target: `event:${args.event_id}` }),
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
@@ -335,7 +395,7 @@ const resumeSocialSeries: ToolDef = {
 const cancelSocialSeries: ToolDef = {
     name: "cancel_social_series",
     title: "Cancelar difusión automática",
-    description: "Cancela la difusión: borra lo programado en Instagram y desactiva el DM automático. Lo ya publicado no se borra. Pide confirmación.",
+    description: "Cancela la difusión: borra lo programado en Instagram, Facebook y TikTok y desactiva el DM automático. Lo ya publicado no se borra. Pide confirmación.",
     scope: "publish",
     async confirm(args, ctx) {
         const series = await liveSeriesOf(ctx, args.event_id);

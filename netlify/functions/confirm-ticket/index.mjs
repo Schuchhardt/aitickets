@@ -1,15 +1,17 @@
 // POST /api/confirm-ticket (contrato C7) — marca una entrada como validada (check-in).
-// Body: { ticket_id, event_id, validated_at? } (validated_at opcional para sincronizaciones offline).
+// Body: { ticket_id, event_id, validated_at?, force? } (validated_at opcional para sincronizaciones offline).
 // Requiere sesión de productor con rol admin/producer/editor/validator y que el evento sea de su organización.
 // status NULL (entradas antiguas) se trata como 'active'.
 // 409 incluye `code`: 'already_validated' (ya validada) | 'invalid_status' (anulada u otro estado).
 // R1: la respuesta incluye function_mismatch/function_label si la entrada es de otra función (solo aviso).
 // Una entrada multifunción (pase de varios días) entra una vez en cada función: 409 already_validated con
 // "Ya ingresó hoy." y, si entra, sessions_attended / sessions_total.
+// Hora límite de ingreso (event_tickets.entry_until): pasada, 409 late_entry ("fuera de horario") salvo
+// force: true (la puerta decide dejar entrar igual); la respuesta forzada trae late_entry: true.
 import { getSupabaseAdmin, getOwnedEvent } from '../../lib/supabase.mjs'
 import { canAccessEventByStaff } from '../../lib/event-staff.mjs'
 import { getSessionContextWithRefresh, jsonWithCookies, CHECKIN_ROLES } from '../../lib/session.mjs'
-import { getFunctionCheck, checkInSession } from '../../lib/checkin.mjs'
+import { getFunctionCheck, checkInSession, lateEntryGate } from '../../lib/checkin.mjs'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -50,7 +52,7 @@ export default async function handler(req) {
     const supabase = getSupabaseAdmin()
     const { data: ticket, error: ticketError } = await supabase
       .from('event_attendees')
-      .select('id, status, validated_at, event_tickets ( event_date_id )')
+      .select('id, status, validated_at, event_ticket_id, event_tickets ( event_date_id )')
       .eq('id', ticketId)
       .eq('event_id', eventId)
       .maybeSingle()
@@ -62,8 +64,11 @@ export default async function handler(req) {
     }
 
     const validatedAt = resolveValidatedAt(body?.validated_at)
+    const late = await lateEntryGate(supabase, eventId, ticket, validatedAt, body?.force === true)
+    if (late && !late.forced) return respond(late, 409)
+    const lateFields = late ? { late_entry: true, entry_until: late.entry_until } : {}
     const session = await checkInSession(supabase, eventId, ticket, validatedAt)
-    if (session?.ok) return respond({ message: 'Entrada validada exitosamente', ...session }, 200)
+    if (session?.ok) return respond({ message: 'Entrada validada exitosamente', ...session, ...lateFields }, 200)
     if (session) return respond(session, 409)
 
     if (ticket.status === 'validated') {
@@ -93,7 +98,7 @@ export default async function handler(req) {
     }
 
     const fnCheck = await getFunctionCheck(supabase, eventId, ticket.event_tickets?.event_date_id ?? null)
-    return respond({ message: 'Entrada validada exitosamente', validated_at: validatedAt, ...fnCheck }, 200)
+    return respond({ message: 'Entrada validada exitosamente', validated_at: validatedAt, ...fnCheck, ...lateFields }, 200)
   } catch (err) {
     console.error('Error en confirm-ticket:', err?.message)
     return respond({ message: 'Error interno del servidor' }, 500)

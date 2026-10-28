@@ -3,10 +3,13 @@
 // Máquina de estados: idle → submitting → success | already | error ; full → waitlist_ok.
 // confirmed: ya confirmó en este navegador (orden gratis guardada; card v2, §4.4b).
 // El servidor (/api/purchase-ticket) crea la orden de $0 y envía la entrada con QR igual que antes.
+// Si el evento lo pide (events.checkout_fields), CheckoutExtras agrega las preguntas al inscribirse y, con
+// acompañantes, el nombre y correo de cada uno (cada QR llega a su asistente).
 import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from "vue";
 import AutoHeight from "./AutoHeight.vue";
 import SuccessCheck from "./SuccessCheck.vue";
 import QuantityStepper from "./QuantityStepper.vue";
+import CheckoutExtras from "./CheckoutExtras.vue";
 import { suggestEmail } from "./emailSuggest.js";
 import { fireConfetti } from "./confetti.js";
 import { firstNameOf, ticketMax, formatFunctionShort, formatWaitingDate, upcomingFunctions } from "./eventView.js";
@@ -56,6 +59,8 @@ const nameInput = ref(null);
 const emailInput = ref(null);
 const successTitle = ref(null);
 const captchaEl = ref(null);
+const extrasRef = ref(null);
+const extraLines = computed(() => (selectedTicket.value ? [{ id: selectedTicket.value.id, quantity: quantity.value, name: selectedTicket.value.ticket_name }] : []));
 const captcha = useTurnstile(captchaEl, { disabled: () => Boolean(props.event?.is_demo) });
 
 // Tipos de entrada gratis a la venta (chips solo si hay más de uno)
@@ -155,6 +160,12 @@ async function submit() {
     return;
   }
   if (!selectedTicket.value) return;
+  const extrasError = await extrasRef.value?.validate();
+  if (extrasError) {
+    shake.value++;
+    liveMessage.value = extrasError;
+    return;
+  }
 
   status.value = "submitting";
   serverMessage.value = "";
@@ -176,6 +187,7 @@ async function submit() {
     tickets: [{ id: selectedTicket.value.id, quantity: quantity.value }],
     cfToken,
     termsAccepted: true,
+    ...(extrasRef.value?.payload() || {}),
   });
 
   if (res.ok && res.data?.orderId) {
@@ -449,6 +461,8 @@ watch(status, (s) => s !== "idle" && stopNudge());
             <QuantityStepper v-model="quantity" :min="1" :max="maxGuests" item-label="un asistente" :disabled="busy" />
           </div>
         </div>
+
+        <CheckoutExtras ref="extrasRef" :event="event" :lines="extraLines" :paid="false" :buyer-name="name" :buyer-email="email" :disabled="busy" />
 
         <div class="ev-collapse" :class="{ 'is-open': status === 'error' }">
           <div>
