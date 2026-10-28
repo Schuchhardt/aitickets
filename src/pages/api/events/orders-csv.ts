@@ -2,13 +2,18 @@ import type { APIRoute } from "astro";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { getSessionContext, getOwnedEvent, hasRole, EVENT_MANAGER_ROLES, jsonResponse } from "../../../lib/supabaseServer";
 import { csvCell, slugify } from "../_lib/server-utils";
+import { ALL_FUNCTIONS, lineFunctionKey, loadEventFunctions } from "../../../lib/eventAnalytics";
 
 const BASE_COLUMNS = "id, created_at, status, amount, ticket_fee, payment_fee, total_payment, ticket_qty, ticket_details, attendees ( first_name, last_name, email, phone )";
 
 const PROVIDER_LABELS: Record<string, string> = { flow: "Webpay (Flow)", free: "Gratis", courtesy: "Cortesía", demo: "Demo" };
 const providerLabel = (p: string | null | undefined) => (p ? PROVIDER_LABELS[p] || p : "");
 
-/** Exporta las órdenes pagadas de un evento de la organización como CSV (separador ;). */
+/**
+ * Exporta las órdenes pagadas de un evento de la organización como CSV (separador ;). Con varias funciones agrega la
+ * columna "Función"; `event_date_id` deja solo las órdenes con entradas de esa función (o válidas para cualquiera) y
+ * "Entradas de la función" cuenta solo esas. Los montos son los de la orden completa.
+ */
 export const GET: APIRoute = async (context) => {
     const session = await getSessionContext(context);
     if (!session) return jsonResponse({ error: "Unauthorized" }, 401);
@@ -24,6 +29,14 @@ export const GET: APIRoute = async (context) => {
     if (!event) return jsonResponse({ message: "Evento no encontrado o no autorizado" }, 404);
 
     const supabase = getSupabaseAdmin();
+    const { functions, ticketFunction } = await loadEventFunctions(supabase, event.id);
+    const labelOf = new Map(functions.map((f) => [String(f.id), f.label]));
+    const fnParam = context.url.searchParams.get("event_date_id");
+    const onlyFunction = fnParam ? functions.find((f) => String(f.id) === fnParam) : null;
+    if (fnParam && !onlyFunction) return jsonResponse({ message: "La función no es de este evento" }, 400);
+    const withFunctions = functions.length > 1;
+    const fnKey = (d: any) => lineFunctionKey(d, ticketFunction);
+    const fnLabel = (key: string) => (key === ALL_FUNCTIONS ? "Todas las funciones" : labelOf.get(key) || "Función");
     // Columnas opcionales según las migraciones aplicadas: proveedor/moneda (202609270100), atribución (ref/utm)
     // e IVA del cargo por servicio (service_fee_tax, 202609290100; sin ella la columna del CSV va en 0).
     // Descuento (discount_code/discount_amount, 202609300200; sin ellas las columnas van vacías/0).
@@ -57,15 +70,20 @@ export const GET: APIRoute = async (context) => {
         return jsonResponse({ message: "No se pudieron obtener las órdenes" }, 500);
     }
 
+    const inFunction = (d: any) => !onlyFunction || [String(onlyFunction.id), ALL_FUNCTIONS].includes(fnKey(d));
+    const selected = (orders || []).filter((o: any) => !onlyFunction || (Array.isArray(o.ticket_details) ? o.ticket_details : []).some(inFunction));
+
     const header = [
         "Orden", "Fecha (Chile)", "Nombre", "Apellido", "Email", "Teléfono", "Entradas", "Cantidad",
+        ...(withFunctions ? ["Función"] : []),
+        ...(onlyFunction ? ["Entradas de la función"] : []),
         "Código de descuento", "Descuento",
         "Monto entradas (a pagar al productor)", "Cargo por servicio neto (comprador)", "IVA cargo por servicio", "Total pagado", "Comisión pasarela", "Cortesía",
         ...(withProvider ? ["Medio de pago", "Moneda"] : []),
         ...(withAttribution ? ["Ref", "UTM source", "UTM medium", "UTM campaign"] : []),
     ];
 
-    const rows = (orders || []).map((o: any) => {
+    const rows = selected.map((o: any) => {
         const attendee = Array.isArray(o.attendees) ? o.attendees[0] : o.attendees;
         const details = Array.isArray(o.ticket_details) ? o.ticket_details : [];
         const detailText = details.map((d: any) => `${d.quantity || 0} x ${d.name || d.ticket_name || "Entrada"}`).join(" | ");
@@ -79,6 +97,8 @@ export const GET: APIRoute = async (context) => {
             attendee?.phone,
             detailText,
             o.ticket_qty ?? details.reduce((s: number, d: any) => s + (Number(d.quantity) || 0), 0),
+            ...(withFunctions ? [[...new Set<string>(details.map(fnKey))].map(fnLabel).join(" | ")] : []),
+            ...(onlyFunction ? [details.filter(inFunction).reduce((s: number, d: any) => s + (Number(d.quantity) || 0), 0)] : []),
             Number(o.discount_amount) > 0 ? o.discount_code || "" : "",
             Number(o.discount_amount) || 0,
             Number(o.amount) || 0,
@@ -94,7 +114,7 @@ export const GET: APIRoute = async (context) => {
 
     // BOM para que Excel abra bien los acentos
     const csv = "﻿" + [header.map(csvCell).join(";"), ...rows].join("\r\n");
-    const filename = `ordenes-${slugify(event.slug || event.name || String(event.id))}.csv`;
+    const filename = `ordenes-${slugify(event.slug || event.name || String(event.id))}${onlyFunction ? `-${slugify(onlyFunction.label)}` : ""}.csv`;
 
     return new Response(csv, {
         status: 200,

@@ -50,7 +50,7 @@ Estado al 27-10-2026, rama `rediseno/aitickets`.
 | 20 | Certificados de asistencia | Seminarios | P3 | M |
 | 21 | Imprimir credenciales con nombre | Seminarios | P3 | M |
 | 22 | Publicar en LinkedIn desde el panel | Seminarios | P3 | M |
-| 23 | Lista de asistentes y ventas separadas por función | Academias | P2 | S |
+| 23 | ~~Lista de asistentes y ventas separadas por función~~ **Hecho** | Academias | P2 | S |
 
 Recomendación de orden: 3, 4, 11 y 16 primero, porque son las que más se repiten y las que un productor nota en su
 primera semana. Después 5, 6, 7 y 23, que salen casi de los mismos datos de check-in y ventas por link.
@@ -461,6 +461,18 @@ La lista de quienes ingresaron (`list_attendees`).
 - Comparte diseño con el ítem 1.
 
 ## 23. Lista de asistentes y ventas separadas por función
+
+**Hecho (rama `feat/ventas-por-funcion`).** Sin migración. Helpers en `src/lib/eventAnalytics.ts`:
+`lineFunctionKey` (la función de cada línea; en órdenes antiguas, la de su tipo de entrada), `orderForFunction` (la
+parte de una orden que es de una función, con su parte del monto ya con descuento) y `salesByFunction`.
+- Analítica del evento: tabla "Ventas por función" (con varias funciones) y selector de función en "Ventas por canal"
+  (`?funcion=`). Las visitas y la conversión siguen siendo del evento completo.
+- Lista de asistentes (`/dashboard/tickets`): cada entrada muestra su función y hay un filtro por función (las válidas
+  para cualquier función aparecen en todas). El "Exportar CSV" descarga la función elegida.
+- CSV de órdenes: columna "Función" con varias funciones, y `event_date_id` deja solo las órdenes de esa función (y las
+  válidas para todas) con la columna "Entradas de la función". Los montos son los de la orden completa.
+- Asistente de IA: `get_event_performance` trae `sales_by_function`; `list_attendees` ya filtraba por `function_id`.
+- Landing de academias: "Por función" sin "Pronto".
 
 **Dónde se promete**
 `academias/CourseBreakdown.vue` (nota "Por función").

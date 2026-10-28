@@ -32,7 +32,11 @@ if (error || !event) {
 // Toda la analítica sale de src/lib/eventAnalytics.ts (la misma que usan get_event_performance y el resumen del
 // evento): paginada, en hora de Chile y con las definiciones canónicas (ventas sin cortesías ni transferencias;
 // conversión = órdenes ÷ visitantes únicos; ocupación = emitidas ÷ capacidad).
-const analytics = await getEventAnalytics(supabaseAdmin, { id: Number(event.id), status: event.status });
+// ?funcion=<event_date_id>: ventas por canal solo de esa función
+const functionParam = Number(Astro.url.searchParams.get("funcion"));
+const analytics = await getEventAnalytics(supabaseAdmin, { id: Number(event.id), status: event.status }, {
+    eventDateId: Number.isSafeInteger(functionParam) && functionParam > 0 ? functionParam : null,
+});
 const { kpis } = analytics;
 const fmtPct = (v: number | null) => (v == null ? "—" : `${v.toLocaleString("es-CL")}%`);
 
@@ -53,6 +57,10 @@ const ticketValues = analytics.ticket_types.map((t) => t.tickets);
 const geoData = analytics.locations.map(({ location, visits, percentage }) => ({ location, visits, percentage }));
 
 const channelRows = analytics.channels.map((c) => ({ ...c, channel: c.channel.startsWith("ref:") ? `ref: ${c.channel.slice(4)}` : c.channel }));
+const channelLabel = (channel: string) => (channel.startsWith("ref:") ? `ref: ${channel.slice(4)}` : channel);
+const selectedFunction = analytics.selected_function;
+const functionChannelRows = (analytics.function_channels || []).map((c) => ({ ...c, channel: channelLabel(c.channel) }));
+const functionsBreakdown = analytics.sales_by_function;
 const providerRows = analytics.providers;
 const refundedOrders = analytics.refunded_orders;
 
@@ -218,12 +226,97 @@ const peakDatasets = JSON.stringify([
         />
     </div>
 
+    {functionsBreakdown.length > 0 && (
+        <div class="bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-sm mt-6" data-testid="sales-by-function">
+            <h3 class="font-bold text-lg mb-4">Ventas por función</h3>
+            <div class="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-gray-500 border-b border-gray-100">
+                            <th class="py-2 pr-4 font-medium">Función</th>
+                            <th class="py-2 pr-4 font-medium text-right whitespace-nowrap">Órdenes</th>
+                            <th class="py-2 pr-4 font-medium text-right whitespace-nowrap">Entradas</th>
+                            <th class="py-2 pr-4 font-medium text-right whitespace-nowrap">Ingresos</th>
+                            <th class="py-2 font-medium text-right whitespace-nowrap"><span class="sr-only">Detalle</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {functionsBreakdown.map((row) => (
+                            <tr class="border-b border-gray-50">
+                                <td class="py-2 pr-4 text-gray-900">{row.label}</td>
+                                <td class="py-2 pr-4 text-right whitespace-nowrap">{row.orders}</td>
+                                <td class="py-2 pr-4 text-right whitespace-nowrap">{row.tickets}</td>
+                                <td class="py-2 pr-4 text-right whitespace-nowrap">${row.revenue_clp.toLocaleString("es-CL")}</td>
+                                <td class="py-2 text-right whitespace-nowrap">
+                                    {row.event_date_id != null && (
+                                        <a href={`?funcion=${row.event_date_id}#canales`} class="text-blue-600 hover:underline">Por canal</a>
+                                    )}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-xs text-gray-400 mt-3">
+                Una compra con entradas de dos funciones cuenta en ambas, con la parte del monto de cada una. Sin cortesías ni transferencias.
+            </p>
+        </div>
+    )}
+
     <!-- Ventas y conversión por canal (UTM / ref) -->
     <div class="bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-sm mt-6">
         <div class="flex flex-wrap items-baseline justify-between gap-2 mb-4">
-            <h3 class="font-bold text-lg">Ventas por canal</h3>
-            <a href={`/dashboard/events/${event.id}#trackingBuilder`} class="text-sm text-blue-600 hover:underline">Crear link con seguimiento</a>
+            <h3 class="font-bold text-lg" id="canales">Ventas por canal{selectedFunction && <span class="font-normal text-gray-500"> · {selectedFunction.label}</span>}</h3>
+            <div class="flex flex-wrap items-center gap-3">
+                {analytics.functions.length > 1 && (
+                    <form method="get" action="#canales" class="flex items-center gap-2 text-sm">
+                        <label for="funcion" class="text-gray-500">Función</label>
+                        <select id="funcion" name="funcion" data-testid="channel-function" class="border border-gray-200 rounded-lg px-2 py-1 bg-white" onchange="this.form.submit()">
+                            <option value="">Todas</option>
+                            {analytics.functions.map((f) => (
+                                <option value={f.id} selected={selectedFunction?.id === f.id}>{f.label}</option>
+                            ))}
+                        </select>
+                        <noscript><button type="submit" class="underline">Ver</button></noscript>
+                    </form>
+                )}
+                <a href={`/dashboard/events/${event.id}#trackingBuilder`} class="text-sm text-blue-600 hover:underline">Crear link con seguimiento</a>
+            </div>
         </div>
+        {selectedFunction && (
+            <div class="mb-6" data-testid="function-channels">
+                {functionChannelRows.length === 0 ? (
+                    <p class="text-sm text-gray-500">Aún no hay ventas para esta función.</p>
+                ) : (
+                    <div class="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="text-left text-gray-500 border-b border-gray-100">
+                                    <th class="py-2 pr-4 font-medium">Canal</th>
+                                    <th class="py-2 pr-4 font-medium text-right whitespace-nowrap">Órdenes</th>
+                                    <th class="py-2 pr-4 font-medium text-right whitespace-nowrap">Entradas</th>
+                                    <th class="py-2 font-medium text-right whitespace-nowrap">Ingresos</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {functionChannelRows.map((row) => (
+                                    <tr class="border-b border-gray-50">
+                                        <td class="py-2 pr-4 text-gray-900 break-all min-w-[8rem]">{row.channel}</td>
+                                        <td class="py-2 pr-4 text-right whitespace-nowrap">{row.orders}</td>
+                                        <td class="py-2 pr-4 text-right whitespace-nowrap">{row.tickets}</td>
+                                        <td class="py-2 text-right whitespace-nowrap">${row.revenue_clp.toLocaleString("es-CL")}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+                <p class="text-xs text-gray-400 mt-2">
+                    Solo las entradas de esta función. Las visitas y la conversión son del evento completo (abajo): no se sabe a qué función iba quien visitó.
+                    <a href="?#canales" class="text-blue-600 hover:underline">Ver todas las funciones</a>
+                </p>
+            </div>
+        )}
         {channelRows.length === 0 ? (
             <p class="text-sm text-gray-500">Aún no hay visitas ni ventas. Comparte links con <code>utm_source</code> o <code>ref</code> para saber qué canal vende más.</p>
         ) : (

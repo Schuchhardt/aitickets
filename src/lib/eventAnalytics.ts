@@ -12,6 +12,7 @@
 // Todo se lee paginado (fetchAll): PostgREST corta en 1000 filas sin avisar.
 import { fetchAll, localDay, ticketAvailability, presentTicket, TICKET_SELECT, isCourtesyName, TZ } from "./producer-api/tools/common";
 import { isCourtesyOrder, isTransferOrder, lineSoldQty, orderLines, orderSoldQty } from "./orderKinds";
+import { formatFunctionLabel } from "../../netlify/lib/dates.mjs";
 
 export const MAX_VISITS = 50000;
 /** Tope de días de la serie diaria del panel. */
@@ -180,6 +181,77 @@ export function summarizeSales(orders: any[]) {
 }
 
 // ---------------------------------------------------------------------------
+// Por función
+// ---------------------------------------------------------------------------
+
+/** Clave de las líneas válidas para cualquier función (pase completo o tipo de entrada sin función). */
+export const ALL_FUNCTIONS = "all";
+
+/**
+ * Función de una línea de orden: su event_date_id, o el de su tipo de entrada (`ticketFunction`, id → event_date_id)
+ * en órdenes antiguas que no lo guardaban. ALL_FUNCTIONS si vale para cualquier función.
+ */
+export function lineFunctionKey(line: any, ticketFunction?: Map<number, number | null>): string {
+    const id = line?.event_date_id ?? (line?.id != null ? ticketFunction?.get(Number(line.id)) : null);
+    return id == null ? ALL_FUNCTIONS : String(id);
+}
+
+/**
+ * La parte de una orden que es de una función: solo sus líneas de esa función, con su parte del monto (el monto de la
+ * orden, ya con descuentos, se reparte según el valor de cada línea). null si la orden no tiene entradas de esa función.
+ */
+export function orderForFunction(o: any, key: string, ticketFunction?: Map<number, number | null>): any | null {
+    const lines = orderLines(o);
+    const own = lines.filter((l: any) => lineFunctionKey(l, ticketFunction) === key);
+    if (!own.length) return null;
+    if (own.length === lines.length) return o;
+    const value = (ls: any[]) => ls.reduce((n: number, l: any) => n + (Number(l?.total) || (Number(l?.price) || 0) * lineSoldQty(l)), 0);
+    const total = value(lines);
+    const share = total > 0 ? value(own) / total : own.length / lines.length;
+    return {
+        ...o,
+        ticket_details: own,
+        ticket_qty: own.reduce((n: number, l: any) => n + (Number(l?.quantity) || 0), 0),
+        amount: Math.round((Number(o.amount) || 0) * share),
+        discount_amount: Math.round((Number(o.discount_amount) || 0) * share),
+    };
+}
+
+/** Funciones del evento (event_dates) con su etiqueta, y el mapa tipo de entrada → función para órdenes antiguas. */
+export async function loadEventFunctions(supabase: any, eventId: number) {
+    const [{ data: dates }, { data: tickets }] = await Promise.all([
+        supabase.from("event_dates").select("id, date, start_time").eq("event_id", eventId).order("date", { ascending: true }),
+        supabase.from("event_tickets").select("id, event_date_id").eq("event_id", eventId),
+    ]);
+    const functions = ((dates || []) as any[])
+        .sort((a, b) => `${a.date} ${a.start_time || ""}`.localeCompare(`${b.date} ${b.start_time || ""}`))
+        .map((d) => ({ id: Number(d.id), label: formatFunctionLabel(d, { withPlace: false }) as string }));
+    const ticketFunction = new Map<number, number | null>(((tickets || []) as any[]).map((t) => [Number(t.id), t.event_date_id == null ? null : Number(t.event_date_id)]));
+    return { functions, ticketFunction };
+}
+
+/**
+ * Ventas por función (sin cortesías ni transferencias): órdenes, entradas e ingresos de cada función, y aparte las
+ * entradas válidas para cualquier función. Una orden con entradas de dos funciones cuenta en ambas.
+ */
+export function salesByFunction(sales: any[], functions: { id: number; label: string }[], ticketFunction?: Map<number, number | null>) {
+    const keys = [...functions.map((f) => String(f.id)), ALL_FUNCTIONS];
+    return keys
+        .map((key) => {
+            const scoped = sales.map((o) => orderForFunction(o, key, ticketFunction)).filter(Boolean);
+            const f = functions.find((x) => String(x.id) === key);
+            return {
+                event_date_id: f ? f.id : null,
+                label: f ? f.label : "Válidas para cualquier función",
+                orders: scoped.length,
+                tickets: scoped.reduce((n: number, o: any) => n + orderSoldQty(o), 0),
+                revenue_clp: scoped.reduce((n: number, o: any) => n + (Number(o.amount) || 0), 0),
+            };
+        })
+        .filter((r) => r.event_date_id != null || r.orders > 0);
+}
+
+// ---------------------------------------------------------------------------
 // Tráfico
 // ---------------------------------------------------------------------------
 
@@ -321,15 +393,21 @@ export async function issuedByTicketType(supabase: any, eventId: number) {
 // Vistas del panel
 // ---------------------------------------------------------------------------
 
-/** Página de analítica de un evento (/dashboard/events/:id/analytics). El evento ya debe estar autorizado. */
-export async function getEventAnalytics(supabase: any, event: { id: number; status?: string | null }) {
-    const [{ visits, truncated: visitsTruncated, refTracked }, orders, capacity, ticketTypes, { count: refunded }] = await Promise.all([
+/**
+ * Página de analítica de un evento (/dashboard/events/:id/analytics). El evento ya debe estar autorizado.
+ * `eventDateId`: además, las ventas por canal de esa función (function_channels; sin visitas: no se sabe a qué función
+ * iba quien visitó).
+ */
+export async function getEventAnalytics(supabase: any, event: { id: number; status?: string | null }, { eventDateId = null }: { eventDateId?: number | null } = {}) {
+    const [{ visits, truncated: visitsTruncated, refTracked }, orders, capacity, ticketTypes, { count: refunded }, { functions, ticketFunction }] = await Promise.all([
         loadEventVisits(supabase, event.id),
         loadPaidOrders(supabase, event.id),
         eventCapacity(supabase, event),
         issuedByTicketType(supabase, event.id),
         supabase.from("event_orders").select("id", { count: "exact", head: true }).eq("event_id", event.id).eq("status", "refunded"),
+        loadEventFunctions(supabase, event.id),
     ]);
+    const selectedFunction = eventDateId != null ? functions.find((f) => f.id === Number(eventDateId)) || null : null;
     const sales = summarizeSales(orders);
     const traffic = summarizeTraffic(visits);
     const { days, truncated: seriesTruncated } = activityDays(visits, sales.sales);
@@ -357,6 +435,12 @@ export async function getEventAnalytics(supabase: any, event: { id: number; stat
         refunded_orders: refunded || 0,
         visits_truncated: visitsTruncated,
         ref_tracked: refTracked,
+        functions,
+        sales_by_function: functions.length > 1 ? salesByFunction(sales.sales, functions, ticketFunction) : [],
+        selected_function: selectedFunction,
+        function_channels: selectedFunction
+            ? summarizeSales(sales.sales.map((o: any) => orderForFunction(o, String(selectedFunction.id), ticketFunction)).filter(Boolean)).channels
+            : null,
     };
 }
 
