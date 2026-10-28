@@ -1,6 +1,6 @@
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
-import { getSessionContext, hasRole, jsonResponse } from "../../../lib/supabaseServer";
+import { getSessionContext, getOwnedEvent, hasRole, jsonResponse } from "../../../lib/supabaseServer";
 import { sendTicketsEmail } from "../_lib/server-utils";
 
 // Reenviar entradas: cualquier miembro del equipo del evento (incluidos validadores en la puerta)
@@ -29,6 +29,9 @@ export const POST: APIRoute = async (context) => {
             .maybeSingle();
 
         if (!order) return jsonResponse({ message: "Orden no encontrada" }, 404);
+        // Acceso por evento (aitickets_event_staff): quien solo tiene asignados algunos eventos no reenvía los de otros
+        const ownedEvent = await getOwnedEvent(Number((order as any).events?.id), dbUser.organization_id, "id", dbUser.id);
+        if (!ownedEvent) return jsonResponse({ message: "Orden no encontrada" }, 404);
         if (order.status === "refunded") return jsonResponse({ message: "La orden fue reembolsada: sus entradas están anuladas" }, 400);
         if (order.status !== "paid") return jsonResponse({ message: "Solo se pueden reenviar órdenes pagadas" }, 400);
 
