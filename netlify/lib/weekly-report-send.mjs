@@ -264,7 +264,7 @@ function presentSuggestions(m, aiEntry, { adsInApp = false } = {}) {
   return mergeSuggestions(aiEntry?.suggestions, m, { adsInApp }).map((s) => {
     const out = { type: s.type, channel: s.channel, title: s.title, body: s.body, action: null, trackingUrl: '', trackingLabel: '' }
     const channelName = NETWORK_LABEL[s.channel] || 'ese canal'
-    if (s.type === 'content') out.action = { href: `${SITE_URL}/dashboard/promote/create?event=${m.event_id}`, label: 'Crear el post con IA' }
+    if (s.type === 'content') out.action = { href: `${SITE_URL}/dashboard/promote/create?event=${m.event_id}`, label: 'Crear la publicación con IA' }
     if (s.type === 'offer') out.action = { href: `${SITE_URL}/dashboard/descuentos`, label: 'Crear un código de descuento' }
     if (s.type === 'ads' && adsInApp) {
       // El anuncio se crea (o se ajusta) en el panel y su link ya mide las ventas: no hace falta copiar un link

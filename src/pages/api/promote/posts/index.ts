@@ -37,7 +37,7 @@ export const GET: APIRoute = async (context) => {
 
         if (error) {
             console.error("Fetch posts error:", error);
-            return new Response(JSON.stringify({ message: "Error al obtener posts" }), { status: 500 });
+            return new Response(JSON.stringify({ message: "Error al obtener las publicaciones" }), { status: 500 });
         }
 
         return new Response(JSON.stringify({ posts: posts || [] }), {

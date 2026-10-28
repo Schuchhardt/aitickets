@@ -91,7 +91,7 @@ const getMarketingKit: ToolDef = {
     title: "Kit de marketing del evento",
     description:
         "Todo lo necesario para que TÚ (el asistente) escribas piezas de marketing del evento: ficha del evento, link público, imagen, " +
-        "redes de la organización, redes conectadas para publicar y guía de estilo. Úsala antes de redactar posts, emails o anuncios.",
+        "redes de la organización, redes conectadas para publicar y guía de estilo. Úsala antes de redactar publicaciones, emails o anuncios.",
     scope: "read",
     annotations: { readOnlyHint: true },
     inputSchema: { type: "object", required: ["event_id"], additionalProperties: false, properties: { event_id: eventIdSchema } },
@@ -107,7 +107,7 @@ const getMarketingKit: ToolDef = {
         return {
             event_id: Number(event.id),
             status: event.status,
-            ...(published ? {} : { draft_warning: `${DRAFT_URL_NOTE} No publiques posts ni compartas el link hasta publicar el evento.` }),
+            ...(published ? {} : { draft_warning: `${DRAFT_URL_NOTE} No hagas publicaciones ni compartas el link hasta publicar el evento.` }),
             brief: buildEventContext(event),
             brief_note: "Texto plano. Solo incluye las entradas que el público puede comprar (sin la de cortesía ni las pausadas o ya cerradas).",
             ...eventUrls(ctx, event),
@@ -377,14 +377,14 @@ const presentPost = (p: any) => ({
 
 const createSocialPost: ToolDef = {
     name: "create_social_post",
-    title: "Crear post para redes",
+    title: "Crear publicación para redes",
     description:
-        "Guarda un post para Instagram, Facebook, TikTok o LinkedIn como borrador (o programado si envías scheduled_for). NO lo publica: " +
+        "Guarda una publicación para Instagram, Facebook, TikTok o LinkedIn como borrador (o programado si envías scheduled_for). NO lo publica: " +
         "para eso usa publish_social_post tras la aprobación del productor. Instagram y TikTok (foto) exigen al menos una imagen; " +
         "LinkedIn admite hasta 3.000 caracteres (publica en la página de empresa o el perfil que se eligió al conectar).",
     scope: "write",
     audit: (args, result) => ({
-        summary: `Post ${(result as any).post?.status === "scheduled" ? "programado" : "en borrador"} para ${[...new Set(args.platforms)].join(", ")}`,
+        summary: `Publicación ${(result as any).post?.status === "scheduled" ? "programada" : "en borrador"} para ${[...new Set(args.platforms)].join(", ")}`,
         target: `social_post:${(result as any).post?.id ?? ""}`,
     }),
     annotations: { readOnlyHint: false, destructiveHint: false },
@@ -394,7 +394,7 @@ const createSocialPost: ToolDef = {
         additionalProperties: false,
         properties: {
             event_id: eventIdSchema,
-            content: { type: "string", minLength: 1, maxLength: 2200, description: "Texto del post (Instagram admite hasta 2.200 caracteres)." },
+            content: { type: "string", minLength: 1, maxLength: 2200, description: "Texto de la publicación (Instagram admite hasta 2.200 caracteres)." },
             image_urls: { type: "array", maxItems: 10, items: { type: "string", maxLength: 2000, pattern: "^https://" }, description: "URLs de upload_image/generate_image." },
             platforms: { type: "array", minItems: 1, maxItems: SOCIAL_PLATFORMS.length, items: { type: "string", enum: SOCIAL_PLATFORMS } },
             scheduled_for: { type: "string", format: "date-time", description: "ISO 8601 futuro. Se programa al publicar con publish_social_post." },
@@ -433,15 +433,15 @@ const createSocialPost: ToolDef = {
         return {
             post: presentPost(data),
             review_url: `${ctx.origin}/dashboard/promote`,
-            next_steps: "Muestra el post al productor y, si lo aprueba, llama publish_social_post.",
+            next_steps: "Muestra la publicación al productor y, si la aprueba, llama publish_social_post.",
         };
     },
 };
 
 const listSocialPosts: ToolDef = {
     name: "list_social_posts",
-    title: "Listar posts",
-    description: "Posts de redes sociales de la organización (borradores, programados, publicados y fallidos).",
+    title: "Listar publicaciones",
+    description: "Publicaciones en redes sociales de la organización (borradores, programadas, publicadas y fallidas).",
     scope: "read",
     annotations: { readOnlyHint: true },
     inputSchema: {
@@ -463,13 +463,13 @@ const listSocialPosts: ToolDef = {
     },
 };
 
-/** Lo que impide publicar un post: sin cuentas conectadas, evento en borrador/cancelado, o texto o imágenes que alguna red no acepta. */
+/** Lo que impide hacer una publicación: sin cuentas conectadas, evento en borrador/cancelado, o texto o imágenes que alguna red no acepta. */
 async function checkPublishable(ctx: ToolContext, post: any) {
     const platforms: string[] = Array.isArray(post.platforms) ? post.platforms : [];
     const event = await loadOwnedEvent<any>(ctx, Number(post.event_id), "id, name, slug, status, cancelled_at");
-    if (event.cancelled_at) throw new ToolError("conflict", "El evento está cancelado: no publiques posts de él.");
+    if (event.cancelled_at) throw new ToolError("conflict", "El evento está cancelado: no hagas publicaciones de él.");
     if (event.status !== "published") {
-        throw new ToolError("conflict", `"${event.name}" está en BORRADOR: su link da 404. Publica el evento (set_event_status) antes de publicar posts.`);
+        throw new ToolError("conflict", `"${event.name}" está en BORRADOR: su link da 404. Publica el evento (set_event_status) antes de hacer publicaciones.`);
     }
     const { data: accounts } = await ctx.supabase
         .from("social_accounts")
@@ -485,24 +485,24 @@ async function checkPublishable(ctx: ToolContext, post: any) {
         );
     }
     const problem = postMediaProblem(accounts.map((a: any) => a.platform), (post.image_urls || []).length, String(post.content || "").length);
-    if (problem) throw new ToolError("invalid_input", `${problem} Corrige el post antes de publicarlo.`);
+    if (problem) throw new ToolError("invalid_input", `${problem} Corrige la publicación antes de publicarla.`);
     return { accounts, platforms, event };
 }
 
 const deleteSocialPost: ToolDef = {
     name: "delete_social_post",
-    title: "Eliminar post",
-    description: "Elimina un post en borrador (o fallido) que no se publicó. Los publicados o programados no se eliminan desde aquí.",
+    title: "Eliminar publicación",
+    description: "Elimina una publicación en borrador (o fallida) que no salió. Las publicadas o programadas no se eliminan desde aquí.",
     scope: "write",
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
     inputSchema: { type: "object", required: ["post_id"], additionalProperties: false, properties: { post_id: { type: "integer", minimum: 1 } } },
-    audit: (args) => ({ summary: "Eliminó un post en borrador", target: `social_post:${args.post_id}` }),
+    audit: (args) => ({ summary: "Eliminó una publicación en borrador", target: `social_post:${args.post_id}` }),
     async handler(args, ctx) {
         const { data: post } = await ctx.supabase.from("social_posts").select("id, event_id, status").eq("id", args.post_id).eq("organization_id", ctx.actor.orgId).maybeSingle();
-        if (!post) throw new ToolError("not_found", "Post no encontrado en tu organización (ver list_social_posts).");
+        if (!post) throw new ToolError("not_found", "Publicación no encontrada en tu organización (ver list_social_posts).");
         await loadOwnedEvent(ctx, Number(post.event_id), "id");
         if (!["draft", "failed"].includes(post.status)) {
-            throw new ToolError("conflict", `El post está ${post.status === "published" ? "publicado" : "programado"}: solo se eliminan borradores o fallidos.`);
+            throw new ToolError("conflict", `La publicación está ${post.status === "published" ? "publicada" : "programada"}: solo se eliminan borradores o fallidas.`);
         }
         const { error } = await ctx.supabase.from("social_posts").delete().eq("id", post.id).eq("organization_id", ctx.actor.orgId).in("status", ["draft", "failed"]);
         if (error) throw error;
@@ -512,9 +512,9 @@ const deleteSocialPost: ToolDef = {
 
 const publishPost: ToolDef = {
     name: "publish_social_post",
-    title: "Publicar post en redes",
+    title: "Publicar en redes",
     description:
-        "Publica AHORA (o programa, si el post tiene scheduled_for) un post en las cuentas conectadas de la organización. " +
+        "Publica AHORA (o programa, si la publicación tiene scheduled_for) una publicación en las cuentas conectadas de la organización. " +
         "Acción pública e irreversible: el servidor devuelve primero un resumen y solo publica al repetir la llamada con confirmation_token.",
     scope: "publish",
     async confirm(args, ctx) {
@@ -524,8 +524,8 @@ const publishPost: ToolDef = {
             .eq("id", args.post_id)
             .eq("organization_id", ctx.actor.orgId)
             .maybeSingle();
-        if (!post) throw new ToolError("not_found", "Post no encontrado en tu organización.");
-        if (post.status === "published") throw new ToolError("conflict", "Este post ya fue publicado.");
+        if (!post) throw new ToolError("not_found", "Publicación no encontrada en tu organización.");
+        if (post.status === "published") throw new ToolError("conflict", "Esta publicación ya salió.");
         // Se valida aquí (antes de pedir confirmación) todo lo que haría fallar la publicación
         const { accounts, platforms, event } = await checkPublishable(ctx, post);
         const text = String(post.content || "");
@@ -533,7 +533,7 @@ const publishPost: ToolDef = {
         const missing = platforms.filter((p: string) => !accounts.some((a: any) => a.platform === p));
         return {
             message:
-                `${post.scheduled_for ? `Programar para ${localDateTime(post.scheduled_for)?.replace("T", " ")} (hora de Chile)` : "Publicar AHORA"} el post ${post.id} ` +
+                `${post.scheduled_for ? `Programar para ${localDateTime(post.scheduled_for)?.replace("T", " ")} (hora de Chile)` : "Publicar AHORA"} la publicación ${post.id} ` +
                 `de "${event.name}" en ${where}. Es público y no se puede deshacer desde AI Tickets.`,
             details: {
                 post_id: Number(post.id),
@@ -543,10 +543,10 @@ const publishPost: ToolDef = {
                 image_urls: post.image_urls || [],
                 event_url: eventPublicUrl(ctx, event.slug),
             },
-            warnings: missing.length ? [`No hay cuenta conectada de ${missing.join(", ")}: el post solo saldrá en ${accounts.map((a: any) => a.platform).join(", ")}.`] : undefined,
+            warnings: missing.length ? [`No hay cuenta conectada de ${missing.join(", ")}: la publicación solo saldrá en ${accounts.map((a: any) => a.platform).join(", ")}.`] : undefined,
         };
     },
-    audit: (args, result) => ({ summary: (result as any).status === "scheduled" ? "Programó un post en redes" : "Publicó un post en redes", target: `social_post:${args.post_id}` }),
+    audit: (args, result) => ({ summary: (result as any).status === "scheduled" ? "Programó una publicación en redes" : "Publicó en redes", target: `social_post:${args.post_id}` }),
     annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
     inputSchema: {
         type: "object",
@@ -556,8 +556,8 @@ const publishPost: ToolDef = {
     },
     async handler(args, ctx) {
         const { data: post } = await ctx.supabase.from("social_posts").select("id, event_id, status, content, platforms, image_urls").eq("id", args.post_id).eq("organization_id", ctx.actor.orgId).maybeSingle();
-        if (!post) throw new ToolError("not_found", "Post no encontrado en tu organización.");
-        if (post.status === "published") throw new ToolError("conflict", "Este post ya fue publicado.");
+        if (!post) throw new ToolError("not_found", "Publicación no encontrada en tu organización.");
+        if (post.status === "published") throw new ToolError("conflict", "Esta publicación ya salió.");
         await checkPublishable(ctx, post);
         const result = await publishSocialPost(ctx.actor.orgId, post.id);
         if (!result.ok) {

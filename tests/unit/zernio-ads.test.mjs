@@ -103,7 +103,7 @@ describe('validación del anuncio', () => {
     const ok = validateAdInput(base({ type: 'boost' }), { connection, event, post: { status: 'published', zernio_post_id: 'zp_1' }, now: NOW })
     expect(ok.ok).toBe(true)
     const draft = validateAdInput(base({ type: 'boost' }), { connection, event, post: { status: 'draft', zernio_post_id: null }, now: NOW })
-    expect(draft.errors[0]).toMatch(/posts ya publicados/)
+    expect(draft.errors[0]).toMatch(/publicaciones hechas desde AI Tickets/)
   })
 })
 

@@ -61,7 +61,7 @@ onMounted(() => {
 })
 
 // "Promociona un evento": cada evento a la venta con su difusión automática y anuncios, y los atajos a la pestaña
-// Difusión del evento (/dashboard/events/:id#difusion), a crear post y a crear anuncio (?event=<id>)
+// Difusión del evento (/dashboard/events/:id#difusion), a crear publicación y a crear anuncio (?event=<id>)
 const SERIES_LABEL = { active: 'Historias activas', paused: 'Historias en pausa', draft: 'Historias por aprobar' }
 const SERIES_CLASS = { active: 'bg-green-50 text-green-700', paused: 'bg-amber-50 text-amber-700', draft: 'bg-amber-50 text-amber-700' }
 const fmtEventDate = (iso) => (iso ? new Date(iso).toLocaleString('es-CL', { timeZone: 'America/Santiago', dateStyle: 'medium', timeStyle: 'short' }) : 'Fecha por definir')
@@ -124,7 +124,7 @@ const handleDisconnect = async (accountId) => {
           class="inline-flex items-center justify-center gap-2 bg-black text-white px-5 py-2.5 rounded-lg hover:bg-gray-800 transition font-medium"
         >
           <Plus :size="20" />
-          Crear Post
+          Crear publicación
         </a>
       </div>
     </div>
@@ -134,7 +134,7 @@ const handleDisconnect = async (accountId) => {
       <h2 class="font-bold text-lg mb-1">Promociona un evento</h2>
       <p class="text-sm text-gray-500 mb-4">
         Cada evento tiene su pestaña <strong>Difusión</strong> con el link para compartir, links por canal o promotor e
-        difusión automática en Instagram, Facebook y TikTok. Desde aquí también puedes publicar un post (también en LinkedIn) o
+        difusión automática en Instagram, Facebook y TikTok. Desde aquí también puedes hacer una publicación (también en LinkedIn) o
         crear un anuncio pagado.
       </p>
       <div v-if="events.length" class="bg-white rounded-xl border border-gray-200 shadow-sm divide-y divide-gray-100">
@@ -173,7 +173,7 @@ const handleDisconnect = async (accountId) => {
               :href="`/dashboard/promote/create?event=${e.id}`"
               class="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium hover:bg-gray-50 transition"
             >
-              <Send :size="16" /> Post
+              <Send :size="16" /> Publicación
             </a>
             <a
               v-if="adsEnabled && canManageAds"
@@ -207,7 +207,7 @@ const handleDisconnect = async (accountId) => {
         class="shrink-0 px-4 py-2 rounded-md text-sm font-medium transition-colors"
         :class="activeTab === 'posts' ? 'bg-white text-black shadow-sm' : 'text-gray-500 hover:text-gray-700'"
       >
-        Historial de posts<span v-if="stats.totalPosts" class="text-gray-400"> · {{ stats.totalPosts }}</span>
+        Historial de publicaciones<span v-if="stats.totalPosts" class="text-gray-400"> · {{ stats.totalPosts }}</span>
       </button>
       <button
         v-if="adsEnabled"

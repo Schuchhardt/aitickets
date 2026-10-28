@@ -201,7 +201,7 @@ export async function publishSocialPost(organizationId: number, postId: number |
         .eq("id", postId)
         .eq("organization_id", organizationId)
         .single();
-    if (postError || !post) return { ok: false, httpStatus: 404, message: "Post no encontrado" };
+    if (postError || !post) return { ok: false, httpStatus: 404, message: "Publicación no encontrada" };
 
     const { data: accounts } = await supabaseAdmin
         .from("social_accounts")

@@ -65,7 +65,7 @@ export const POST: APIRoute = async (context) => {
                 .eq("id", Number(body?.socialPostId))
                 .eq("organization_id", orgId)
                 .maybeSingle();
-            if (!data || Number(data.event_id) !== eventId) return adsJsonError("Post no encontrado", 404);
+            if (!data || Number(data.event_id) !== eventId) return adsJsonError("Publicación no encontrada", 404);
             post = data;
             // El boost corre desde la cuenta donde se publicó (Facebook primero: Instagram necesita su página vinculada)
             const platform = (post.platforms || []).includes("facebook") ? "facebook" : "instagram";
@@ -78,7 +78,7 @@ export const POST: APIRoute = async (context) => {
                 .limit(1)
                 .maybeSingle();
             boostAccountId = account?.zernio_account_id || null;
-            if (!boostAccountId) return adsJsonError("La cuenta donde se publicó ese post ya no está conectada.", 400);
+            if (!boostAccountId) return adsJsonError("La cuenta donde se hizo esa publicación ya no está conectada.", 400);
         }
 
         const check = validateAdInput(body, { connection, event, post, now });

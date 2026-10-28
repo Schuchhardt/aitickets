@@ -39,12 +39,12 @@ onMounted(() => {
           <span class="lp-sr-only">Historia a las</span> {{ d.time }}
         </span>
         <span v-if="d.post" class="sw-slot sw-post" :style="{ '--i': i * 2 + 1 }">
-          <span class="lp-sr-only">y</span> post
+          <span class="lp-sr-only">y</span> publicación
         </span>
       </li>
     </ol>
     <p class="sw-legend">
-      <strong>{{ stories }} historias · {{ posts }} posts esta semana</strong>
+      <strong>{{ stories }} historias · {{ posts }} publicaciones esta semana</strong>
       · hora: la de más visitas de tu evento, o {{ props.cadence.default_time }}
     </p>
   </div>
