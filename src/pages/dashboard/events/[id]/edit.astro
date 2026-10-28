@@ -13,6 +13,8 @@ import { normalizeReviewSettings } from "../../../../../netlify/lib/reviews.mjs"
 import { siteUrl as siteUrlFromEnv } from "../../../api/_lib/server-utils";
 import { loadTicketChain, loadPeoplePerTicket } from "../../../../../netlify/lib/tickets.mjs";
 import { normalizeCheckoutFields } from "../../../../lib/checkoutFields.mjs";
+import { loadEntryDeadlines } from "../../../../../netlify/lib/checkin.mjs";
+import { loadSecretLocation } from "../../../../../netlify/lib/secret-location.mjs";
 
 const { id } = Astro.params;
 const guard = await requireDashboardSession(Astro, EVENT_MANAGER_ROLES);
@@ -77,6 +79,10 @@ const [peoplePerTicket, checkoutFieldsRes] = await Promise.all([
     supabaseAdmin.from("events").select("checkout_fields").eq("id", event.id).maybeSingle(),
 ]);
 const checkoutFields = normalizeCheckoutFields(checkoutFieldsRes.error ? null : (checkoutFieldsRes.data as any)?.checkout_fields);
+// Hora límite de ingreso por entrada (vacío si la migración 202610300300 aún no está aplicada)
+const entryDeadlines = await loadEntryDeadlines(supabaseAdmin, event.id);
+// Dirección que solo ven quienes compran (secret_location) y cuándo se revela
+const secretLocation = await loadSecretLocation(supabaseAdmin, event.id).catch(() => ({ address: null, revealHours: null }));
 // Solo cuenta si la anterior sigue en el formulario (las retiradas de la venta no se muestran)
 const visibleTicketIds = new Set((event.event_tickets || []).filter((t: any) => t.status !== "unavailable").map((t: any) => Number(t.id)));
 
@@ -94,6 +100,8 @@ const initialFormState = {
         category: (event as any).event_tags?.[0]?.category_tags?.name || "",
         isPrivate: event.accessibility === "private",
         checkoutFields,
+        secretLocation: secretLocation.address || "",
+        secretLocationRevealHours: secretLocation.revealHours ?? "",
     },
     // Toggle al final del formulario: correo "¿Cómo estuvo?" 24 h después de cada función
     reviews: { enabled: normalizeReviewSettings(event.review_settings).enabled },
@@ -126,6 +134,7 @@ const initialFormState = {
             eventDateId: t.event_date_id ?? "",
             peoplePerTicket: peoplePerTicket.get(Number(t.id)) || 1,
             opensAfterId: visibleTicketIds.has(Number(ticketChain.get(Number(t.id)))) ? ticketChain.get(Number(t.id)) : "",
+            entryUntil: entryDeadlines.get(Number(t.id)) || "",
         })) || [],
 };
 

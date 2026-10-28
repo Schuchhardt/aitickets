@@ -182,7 +182,8 @@ export const EVENT_MODULES: EventModule[] = [
         title: "Reseñas",
         description: "Calificaciones, fotos de asistentes e invitación al próximo evento.",
         tab: "despues",
-        when: (ctx) => ctx.phase === "after" && ctx.hasAttendees,
+        // Con varias funciones, también en cartelera: las reseñas llegan después de cada función
+        when: (ctx) => ctx.hasAttendees && (ctx.phase === "after" || (ctx.phase === "during" && ctx.functionCount > 1)),
     },
 ];
 

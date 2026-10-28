@@ -194,7 +194,7 @@ export const LANDINGS: Landing[] = [
         faq: [
             {
                 q: "¿Cómo armo la lista free?",
-                a: "Creas un tipo de entrada de $0 llamado, por ejemplo, \"Lista free\", con su cupo. Cada persona se inscribe con su nombre y correo y le llega su QR. Si quieres que la inscripción se cierre a una hora, hoy se programa desde tu asistente de IA conectado o escribiéndonos por WhatsApp. En la puerta, tu equipo ve que es una entrada de lista al escanearla.",
+                a: "Creas un tipo de entrada de $0 llamado, por ejemplo, \"Lista free\", con su cupo. Cada persona se inscribe con su nombre y correo y le llega su QR. Si quieres que la inscripción se cierre a una hora, hoy se programa desde tu asistente de IA conectado o escribiéndonos por WhatsApp. En la puerta, tu equipo ve que es una entrada de lista al escanearla. Si la lista vale hasta cierta hora, le pones «Ingreso hasta» (por ejemplo 01:00) y después de esa hora el escáner la marca fuera de horario: tu equipo decide si entra igual.",
             },
             {
                 q: "¿Cómo vendo mesas?",
@@ -261,7 +261,7 @@ export const LANDINGS: Landing[] = [
             },
             {
                 q: "¿Puedo avisar la dirección a última hora?",
-                a: "Sí. Publica la comuna o un punto de referencia y, el mismo día, programa un correo a todos los que compraron con la dirección exacta desde tu asistente de IA. Ten en cuenta que un evento sin dirección exacta puede quedar con una parte de lo vendido en reserva (ver términos).",
+                a: "Sí. En el evento activas «Dirección solo para quienes compran»: la página muestra la comuna y la dirección exacta va en la entrada y en el correo de cada comprador. Si eliges revelarla unas horas antes, a esa hora se la mandamos por correo a todos los que compraron. Ten en cuenta que un evento sin dirección exacta puede quedar con una parte de lo vendido en reserva (ver términos).",
                 terms: true,
             },
             {

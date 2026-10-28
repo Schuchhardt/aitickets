@@ -81,7 +81,7 @@ describe('/api/events/update: toggle de reseñas', () => {
   it('desactiva el correo de reseñas sin perder el premio ni la moderación', async () => {
     seed({ review_settings: { enabled: true, reward: { value: 15, valid_days: 30 }, moderate_photos: true } })
     expect((await save({}, { reviewsEnabled: false })).status).toBe(200)
-    expect(db.tables.events[0].review_settings).toEqual({ enabled: false, reward: { value: 15, valid_days: 30 }, moderate_photos: true })
+    expect(db.tables.events[0].review_settings).toEqual({ enabled: false, reward: { value: 15, valid_days: 30 }, moderate_photos: true, show_while_on_sale: false })
   })
 
   it('sin cambios (activado por defecto) no escribe review_settings', async () => {

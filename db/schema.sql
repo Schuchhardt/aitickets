@@ -136,6 +136,8 @@ CREATE TABLE public.events (
   secret_location text,
   -- 202610300100: datos extra del checkout (asistentes, empresa, preguntas)
   checkout_fields jsonb,
+  -- 202610300310: horas antes de la función en que se revela secret_location (NULL = apenas compran)
+  secret_location_reveal_hours integer CHECK (secret_location_reveal_hours IS NULL OR secret_location_reveal_hours BETWEEN 1 AND 168),
   CONSTRAINT events_pkey PRIMARY KEY (id),
   CONSTRAINT events_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id)
 );
@@ -161,6 +163,8 @@ CREATE TABLE public.event_tickets (
   -- 202610300110: mesa para N (un QR por persona; cupo y precio por unidad)
   people_per_ticket smallint NOT NULL DEFAULT 1,
   CONSTRAINT event_tickets_people_per_ticket_range CHECK (people_per_ticket BETWEEN 1 AND 30),
+  -- 202610300300: hora límite de ingreso (la lista "hasta las 01:00"; antes del inicio = madrugada siguiente)
+  entry_until time,
   CONSTRAINT event_tickets_pkey PRIMARY KEY (id),
   CONSTRAINT event_tickets_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.events(id)
 );

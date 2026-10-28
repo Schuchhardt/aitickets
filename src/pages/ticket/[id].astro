@@ -5,7 +5,7 @@
 // Titular: el asistente que se escribió al comprar (event_attendees.holder_name) o, si no, quien compró.
 import { getSupabaseAdmin } from "../../lib/auth-helpers";
 import { cdnImage } from "../../lib/imageCdn.js";
-import { loadAttendeeEvent, functionsForTickets, upcomingFirst, calendarUrl, mapsUrl } from "../../lib/attendeePage";
+import { loadAttendeeEvent, functionsForTickets, upcomingFirst, calendarUrl, mapsUrl, secretLocationFor } from "../../lib/attendeePage";
 import { orderKind, orderCopy } from "../../../netlify/lib/order-kind.mjs";
 import { loadFeed } from "../../../netlify/lib/attendee-community.mjs";
 import Layout from "../../layouts/Layout.astro";
@@ -64,8 +64,8 @@ if (!id || !UUID_RE.test(id)) {
     const liveTicket = ticketData.status == null || ticketData.status === "active" || ticketData.status === "validated";
     const paidOrder = !ticketData.event_order_id || order?.status === "paid";
     if (event && liveTicket && paidOrder) {
-      const { data: secretRow } = await supabase.from("events").select("secret_location").eq("id", event.id).maybeSingle();
-      if (secretRow?.secret_location) secretLocation = String(secretRow.secret_location);
+      // Dirección privada: desde que se revela (si se revela horas antes, la página de la orden dice cuándo)
+      secretLocation = (await secretLocationFor(supabase, event, [functionId])).address;
       try {
         feed = await loadFeed(supabase, event.id);
       } catch (err: any) {

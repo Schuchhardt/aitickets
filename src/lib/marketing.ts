@@ -37,9 +37,11 @@ const isPublicTicket = (t: any, now: Date) =>
  * pesos chilenos ("$10.000"), horas "21:00 a 02:00" y solo las entradas que el público puede comprar.
  */
 export function buildEventContext(event: any, now = new Date()): string {
+    // Dirección que solo ven quienes compran (secret_location): el copy público va sin la calle
+    const secret = typeof event.secret_location === "string" && event.secret_location.trim() !== "";
     const venues = event.event_locations?.map((loc: any) => {
         if (!loc.venues) return "Ubicación por definir";
-        const parts = [loc.venues.name, loc.venues.address_line1, loc.venues.city].map((p: unknown) => String(p || "").trim()).filter(Boolean);
+        const parts = [loc.venues.name, secret ? null : loc.venues.address_line1, loc.venues.city].map((p: unknown) => String(p || "").trim()).filter(Boolean);
         return dedupeLocation(parts.join(", ")) || "Ubicación por definir";
     }).join("; ") || "Sin ubicación";
 
@@ -55,7 +57,7 @@ export function buildEventContext(event: any, now = new Date()): string {
 Evento: ${event.title || event.name}
 Descripción: ${htmlToPlainText(event.description) || "Sin descripción"}
 Fecha(s): ${dates} (hora de Chile)
-Lugar: ${venues}
+Lugar: ${venues}${secret ? " (la dirección exacta solo la reciben quienes compran: no la inventes ni la pidas)" : ""}
 Entradas: ${tickets}
     `.trim();
 }

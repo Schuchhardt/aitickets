@@ -11,7 +11,7 @@
 //   fin de venta → event_tickets.end_date (tools/tickets.ts, hoy solo desde el asistente de IA)
 //   pago → solo Webpay (CheckoutSheet.vue); preguntas al inscribirse y nombre de cada asistente → events.checkout_fields
 //               (CheckoutExtras.vue; respuestas una vez por compra)
-//   reseñas en la página → EventDetail.vue (showReviews: cuando el evento terminó)
+//   reseñas en la página → EventDetail.vue (showReviews: al terminar o, con review_settings.show_while_on_sale, con fechas)
 //   invitar al próximo taller → invitations.ts y filterInviteRecipients de reviews.mjs (INVITE_AUDIENCES)
 import { PRODUCER_FAQ, type FaqItem } from "./producerFaq";
 import { ORGANIZADORES_FAQ } from "./organizadoresFaq";
@@ -76,7 +76,7 @@ export const TALLERES_FAQ: FaqItem[] = [
     reword(
         pick(ORGANIZADORES_FAQ, "¿Cómo funcionan las reseñas?"),
         "¿Cómo funcionan las reseñas?",
-        "En la página del taller se muestran cuando termina su última fecha.",
+        "Si lo activas, la página del taller las muestra mientras sigue con fechas, junto al botón para inscribirse.",
     ),
     {
         q: "¿Puedo invitar a quienes vinieron a mi próximo taller?",

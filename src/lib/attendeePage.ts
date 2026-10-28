@@ -1,9 +1,11 @@
 // Datos del evento para las páginas del asistente (/order/<id> y /ticket/<id>): funciones con su lugar, dirección,
 // FAQ, productora y links de calendario/mapa. La dirección secreta NO se carga aquí: cada página decide si la
-// muestra (solo con una entrada vigente de una orden pagada).
+// muestra (solo con una entrada vigente de una orden pagada) con secretLocationFor. Mientras el evento tenga dirección
+// privada, el lugar de cada función va sin la calle (nombre y comuna).
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { descriptionToHtml } from "./sanitize";
 import { formatFunctionDate, formatLocalTimeFromString, formatLocalDate, formatLocalTime, zonedDateTimeToDate } from "../utils/dateHelpers.js";
+import { firstRelevantStart, hasSecretLocation, isRevealed, loadSecretLocation, pendingRevealText, publicPlace, revealAt } from "../../netlify/lib/secret-location.mjs";
 
 export type AttendeeFunction = { id: number | null; date: string; start_time: string | null; end_time: string | null; place: string; label: string; startIso: string | null; endIso: string | null };
 
@@ -22,7 +24,7 @@ export function formatPlace(loc: any): string {
 
 const capitalize = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 
-function toFunction(d: any, fallbackPlace: string): AttendeeFunction {
+function toFunction(d: any, fallbackPlace: string, secret = false): AttendeeFunction {
   const start = formatLocalTimeFromString(d.start_time);
   const startDate = d.start_time ? zonedDateTimeToDate(String(d.date).slice(0, 10), d.start_time) : null;
   let endDate = d.end_time ? zonedDateTimeToDate(String(d.date).slice(0, 10), d.end_time) : null;
@@ -32,7 +34,7 @@ function toFunction(d: any, fallbackPlace: string): AttendeeFunction {
     date: String(d.date).slice(0, 10),
     start_time: d.start_time || null,
     end_time: d.end_time || null,
-    place: formatPlace(d.event_locations) || fallbackPlace,
+    place: (secret ? publicPlace(d.event_locations) : formatPlace(d.event_locations)) || fallbackPlace,
     label: capitalize(`${formatFunctionDate(d, { weekday: "long", day: "numeric", month: "long" })}${start ? ` · ${start} hrs` : ""}`),
     startIso: startDate ? startDate.toISOString() : null,
     endIso: endDate ? endDate.toISOString() : null,
@@ -43,15 +45,16 @@ function toFunction(d: any, fallbackPlace: string): AttendeeFunction {
 export async function loadAttendeeEvent(supabase: SupabaseClient, eventId: number | string) {
   const { data: event } = await supabase.from("events").select(EVENT_COLUMNS).eq("id", eventId).maybeSingle();
   if (!event) return null;
-  const [{ data: dates }, { data: faqs }, { data: org }] = await Promise.all([
+  const [{ data: dates }, { data: faqs }, { data: org }, secret] = await Promise.all([
     supabase.from("event_dates").select(DATE_COLUMNS).eq("event_id", event.id).order("date", { ascending: true }).order("start_time", { ascending: true }),
     supabase.from("event_faqs").select("question, answer").eq("event_id", event.id),
     event.organization_id
       ? supabase.from("organizations").select("public_name").eq("id", event.organization_id).maybeSingle()
       : Promise.resolve({ data: null }),
+    hasSecretLocation(supabase, event.id),
   ]);
   const fallbackPlace = event.location || "";
-  let functions: AttendeeFunction[] = (dates || []).map((d: any) => toFunction(d, fallbackPlace));
+  let functions: AttendeeFunction[] = (dates || []).map((d: any) => toFunction(d, fallbackPlace, secret));
   if (!functions.length && event.start_date) {
     // Eventos antiguos sin funciones: start_date/end_date en hora de Chile
     functions = [
@@ -77,6 +80,23 @@ export async function loadAttendeeEvent(supabase: SupabaseClient, eventId: numbe
 }
 
 export type AttendeeEvent = NonNullable<Awaited<ReturnType<typeof loadAttendeeEvent>>>;
+
+/**
+ * Dirección privada para quien tiene una entrada vigente de una orden pagada (el llamador lo verifica). `address` si
+ * ya se reveló; si no, `pending` con cuándo le llega. Ambos vacíos si el evento no tiene dirección privada.
+ */
+export async function secretLocationFor(
+    supabase: SupabaseClient,
+    event: { id: number | string; functions: AttendeeFunction[] },
+    functionIds: Array<number | null>,
+    now = new Date(),
+): Promise<{ address: string; pending: string }> {
+  const secret = await loadSecretLocation(supabase, Number(event.id));
+  if (!secret.address) return { address: "", pending: "" };
+  const start = firstRelevantStart(event.functions.filter((f) => f.date), functionIds);
+  if (isRevealed({ revealHours: secret.revealHours, start, now })) return { address: secret.address, pending: "" };
+  return { address: "", pending: pendingRevealText(secret.revealHours, revealAt(start, secret.revealHours)) };
+}
 
 /** Funciones de las entradas: las de su función específica (R1) o, si alguna sirve para todas, las del evento. */
 export function functionsForTickets(event: AttendeeEvent, functionIds: Array<number | string | null | undefined>): AttendeeFunction[] {

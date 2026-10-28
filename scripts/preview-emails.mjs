@@ -76,6 +76,7 @@ export const SAMPLES = {
     contactUrl: `${SITE}/order/8f2c1e4a-1234-4c1a-9e1f-0a1b2c3d4e5f#mensaje`,
   }),
   'reminder': () => emails.renderReminderEmail({ eventName: 'Festival de Jazz de Valparaíso', eventDate: 'sábado 12 de octubre de 2026', startTime: '20:00', venue: 'Teatro Municipal, Valparaíso' }),
+  'secret-location': () => emails.renderSecretLocationEmail({ eventName: 'Fiesta Bajo Tierra', eventDate: 'sábado 5 de diciembre de 2026', startTime: '22:00', address: 'Pasaje Los Aromos 77, Ñuñoa' }),
   'event-notification': () => emails.renderEventNotificationEmail({ eventName: 'Festival de Jazz de Valparaíso', changeType: 'date_change', changeDescription: 'La función del sábado se mueve al domingo 13 a las 19:00.\nTus entradas siguen siendo válidas.', eventUrl: `${SITE}/eventos/festival-jazz` }),
   'event-cancellation': () => emails.renderEventNotificationEmail({ eventName: 'Festival de Jazz de Valparaíso', changeType: 'cancellation', changeDescription: 'El evento se cancela por razones de fuerza mayor. El organizador te reembolsará el valor de la entrada.', eventUrl: `${SITE}/eventos/festival-jazz` }),
   'producer-message': () => emails.renderProducerMessageEmail({ eventName: 'Festival de Jazz de Valparaíso', organizerName: 'Jazz Prod', subject: 'Cambio de hora', message: 'La puerta abre a las 20:00 (una hora antes).\nTrae tu QR listo.' }),

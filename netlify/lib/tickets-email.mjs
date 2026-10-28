@@ -27,6 +27,7 @@ import {
   formatFunctionLabel,
 } from './dates.mjs'
 import QRCode from 'qrcode'
+import { loadSecretLocation, firstRelevantStart, isRevealed, revealAt, pendingRevealText, publicPlace } from './secret-location.mjs'
 
 // Máximo de QR como imagen dentro del correo (el resto se abre con el link de la orden)
 const MAX_INLINE_QR = 20
@@ -238,11 +239,19 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
       ? allDates.filter(d => specificIds.has(Number(d.id)))
       : (upcoming.length ? upcoming : allDates).slice(0, 5)
 
+    // Dirección que solo ven quienes compran: si se revela horas antes, el correo dice cuándo llega y el lugar va
+    // sin la calle (netlify/lib/secret-location.mjs)
+    const secret = await loadSecretLocation(supabase, event.id).catch(() => ({ address: event.secret_location || null, revealHours: null }))
+    const secretStart = firstRelevantStart(allDates, attendeeRows.map(r => r.event_tickets?.event_date_id ?? null))
+    const secretShown = Boolean(secret.address) && isRevealed({ revealHours: secret.revealHours, start: secretStart })
+    const secretPending = secret.address && !secretShown ? pendingRevealText(secret.revealHours, revealAt(secretStart, secret.revealHours)) : ''
+    const placeOf = (loc) => (secret.address ? publicPlace(loc) : formatEventLocation(loc))
+
     const dateLines = shownDates.length
       ? shownDates.map(d => ({
           date: formatDateOnlyLong(d.date),
           time: formatTimeShort(d.start_time),
-          place: formatEventLocation(d.event_locations) || event.location || '',
+          place: placeOf(d.event_locations) || event.location || '',
         }))
       : (event.start_date ? [{ date: formatInstantLong(event.start_date, false), time: formatInstantTime(event.start_date), place: event.location || '' }] : [])
 
@@ -254,13 +263,13 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
       start = zonedDateTimeToUtc(first.date, first.start_time)
       end = first.end_time ? zonedDateTimeToUtc(first.date, first.end_time) : null
       if (end && end <= start) end = new Date(end.getTime() + 24 * 60 * 60 * 1000) // termina después de medianoche
-      calendarLocation = formatEventLocation(first.event_locations) || calendarLocation
+      calendarLocation = placeOf(first.event_locations) || calendarLocation
     } else if (event.start_date) {
       start = new Date(event.start_date)
       end = event.end_date ? new Date(event.end_date) : null
     }
     if (start && !end) end = new Date(start.getTime() + 3 * 60 * 60 * 1000)
-    if (event.secret_location) calendarLocation = event.secret_location
+    if (secretShown) calendarLocation = secret.address
 
     const orderUrl = `${SITE_URL}/order/${order.id}`
     // Gratis (confirmación de asistencia), cortesía, transferida o compra: cambia el lenguaje y si va comprobante
@@ -320,7 +329,8 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
       customerName: greetingName(buyer.first_name, buyer.last_name, 'asistente'),
       eventName: event.name || 'Tu evento',
       dateLines,
-      secretLocation: event.secret_location || '',
+      secretLocation: secretShown ? secret.address : '',
+      secretLocationPending: secretPending,
       ticketLines,
       subtotal,
       discountCode,

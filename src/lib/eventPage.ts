@@ -21,6 +21,7 @@ import { isEventEnded } from "../components/event/eventView.js";
 import { resolveCoverMeta, eventThemeFrom } from "./eventCoverMeta";
 import { normalizePageSettings, stripDemoSuffix } from "./eventPageSettings";
 import { computeFeeSplit } from "../../netlify/lib/fees.mjs";
+import { normalizeReviewSettings } from "../../netlify/lib/reviews.mjs";
 import { maxPerPurchase, loadTicketChain, waitingOnPrevious, loadPeoplePerTicket } from "../../netlify/lib/tickets.mjs";
 import { normalizeCheckoutFields } from "./checkoutFields.mjs";
 import { clientIpFrom } from "./sites";
@@ -194,6 +195,13 @@ async function loadAvailability(
 }
 
 const pickOne = (v: any) => (Array.isArray(v) ? v[0] : v) || null;
+
+/** review_settings.show_while_on_sale del evento (false si la columna aún no existe). */
+async function showsReviewsWhileOnSale(supabase: ReturnType<typeof getSupabaseAdmin>, eventId: number): Promise<boolean> {
+  const { data, error } = await supabase.from("events").select("review_settings").eq("id", eventId).maybeSingle();
+  if (error) return false;
+  return normalizeReviewSettings((data as any)?.review_settings).show_while_on_sale;
+}
 
 const buildVenue = (loc: any) => {
   if (!loc) return null;
@@ -499,6 +507,9 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
   const permit = trust.is_massive === true ? { status: trust.permit_status === "approved" ? "approved" : "pending" } : null;
 
   const hasSecretLocation = raw.hasSecretLocation;
+  // Dirección que solo ven quienes compran: el recinto público queda sin calle ni coordenadas (nombre y comuna)
+  const publicVenue = (venue: ReturnType<typeof buildVenue>) =>
+    venue && hasSecretLocation ? { ...venue, address: null, postal_code: null, latitude: null, longitude: null } : venue;
 
   // Entradas (C2): a la venta = available, no regalo, dentro de la ventana (NULL = abierta)
   const allTickets: any[] = raw.tickets;
@@ -537,7 +548,7 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
   let dates: any[] = raw.dates
     .map((d: any) => (isDemo ? { ...d, date: getDemoFunctionDate(d.date, now, event.slug) } : d))
     .map((d: any) => {
-      const venue = buildVenue(pickOne(d.event_locations));
+      const venue = publicVenue(buildVenue(pickOne(d.event_locations)));
       const tz = venue?.timezone || DEFAULT_EVENT_TIMEZONE;
       const start = zonedDateTimeToDate(d.date, d.start_time, tz);
       let end = d.end_time ? zonedDateTimeToDate(d.date, d.end_time, tz) : null;
@@ -584,8 +595,12 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
   const primaryVenue = dates.find((d) => d.venue)?.venue || null;
   const eventTimezone = primaryVenue?.timezone || DEFAULT_EVENT_TIMEZONE;
 
-  const location =
-    event.location || (primaryVenue ? [primaryVenue.name, primaryVenue.address, primaryVenue.city].filter(Boolean).join(", ") : "");
+  // Con dirección privada, nunca events.location (puede venir de antes, con la calle): nombre y comuna del recinto
+  const location = hasSecretLocation
+    ? primaryVenue
+      ? [primaryVenue.name, primaryVenue.city].filter(Boolean).join(", ")
+      : ""
+    : event.location || (primaryVenue ? [primaryVenue.name, primaryVenue.address, primaryVenue.city].filter(Boolean).join(", ") : "");
 
   // Tickets asignados a una función que ya no existe (o ya pasó y fue borrada) => tratarlos como "cualquier función"
   // y ocultar las entradas de una función que ya terminó.
@@ -632,8 +647,11 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
       })),
   ].filter((t) => liveFunction(t.event_date_id));
 
-  // Reseñas y fotos de los asistentes: solo cuando el evento ya terminó (src/lib/eventReviews.ts)
+  // Reseñas y fotos de los asistentes: cuando el evento ya terminó (src/lib/eventReviews.ts) o, si la productora lo
+  // activó (review_settings.show_while_on_sale), desde que pasa la primera función aunque queden otras a la venta
   const ended = !isDemo && !isPreview && isEventEnded({ dates, end_date: endDate, is_demo: isDemo }, now);
+  const pastFunction = !ended && !isDemo && !isPreview && dates.some((d) => d.end_iso && new Date(d.end_iso) < now);
+  const reviewsDuringRun = pastFunction ? await showsReviewsWhileOnSale(supabase, Number(event.id)) : false;
 
   // Póster: proporción real y tinte de la página (events.cover_meta, src/lib/eventCoverMeta.ts)
   const [coverMeta, reviews, agendaBlocks, checkoutConfig] = await Promise.all([
@@ -643,7 +661,7 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
         return typeof ctx?.waitUntil === "function" ? (p: Promise<unknown>) => ctx.waitUntil(p) : undefined;
       })(),
     }),
-    ended ? loadPublicReviews(Number(event.id)).catch(() => null) : Promise.resolve(null),
+    ended || reviewsDuringRun ? loadPublicReviews(Number(event.id)).catch(() => null) : Promise.resolve(null),
     // Agenda con expositores y salas (aitickets_event_agenda; vacía sin la tabla)
     loadAgenda(supabase, Number(event.id)).catch(() => []),
     loadCheckoutConfig(supabase, Number(event.id)),
@@ -667,6 +685,8 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
     gallery_video: normalizeEventVideo(rawGalleryVideo),
     // Evento terminado: { summary, reviews, comments_total, photos } (null si no terminó o sin tablas)
     reviews,
+    // Quedan funciones y la productora muestra las reseñas de las pasadas (solo si ya hay alguna)
+    reviews_during_run: reviewsDuringRun && Number(reviews?.summary?.count) > 0,
     dates,
     // Agenda por día: [{ key, function_id, title, blocks: [{ start, end, title, speakers, room }] }] ([] = sin sección)
     agenda: agendaGroups(agendaBlocks, dates),

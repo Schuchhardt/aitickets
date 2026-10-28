@@ -161,7 +161,7 @@ const FOOTER_REASON = {
  *   kind?: 'rsvp' | 'courtesy' | 'transfer' | 'purchase',
  *   customerName?: string, eventName?: string, organizerName?: string,
  *   dateLines?: Array<{ date: string, time?: string, place?: string }>,
- *   secretLocation?: string,
+ *   secretLocation?: string, secretLocationPending?: string,
  *   ticketLines?: Array<{ name: string, quantity: number, unitPrice: number, url?: string }>,
  *   subtotal?: number, discountCode?: string, discountAmount?: number, fee?: number, feeNet?: number, feeIva?: number, feeIncluded?: boolean, total?: number,
  *   orderId: string, orderDate?: string, orderUrl: string, contactUrl?: string, calendarUrl?: string | null,
@@ -227,7 +227,9 @@ export async function renderTicketsEmail(data = {}) {
           { label: 'Dirección exclusiva para asistentes', tone: 'warn' },
           h(Paragraph, { style: { margin: 0 } }, str(data.secretLocation))
         )
-      : null,
+      : data.secretLocationPending
+        ? h(Panel, { label: 'Dirección exclusiva para asistentes', tone: 'warn' }, h(Paragraph, { style: { margin: 0 } }, str(data.secretLocationPending)))
+        : null,
     paid
       ? h(
           Panel,

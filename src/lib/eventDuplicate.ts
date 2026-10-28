@@ -4,6 +4,7 @@
 import { slugify } from "../pages/api/_lib/server-utils";
 import { sanitizeRichText } from "./sanitize";
 import { loadTicketChain } from "../../netlify/lib/tickets.mjs";
+import { loadEntryDeadlines } from "../../netlify/lib/checkin.mjs";
 
 export const DUPLICATE_SOURCE_COLUMNS = "id, name, description, image_url, accessibility, secret_location, capacity";
 
@@ -76,6 +77,12 @@ export async function duplicateEventAsDraft(
                 const id = newIdOf.get(oldId);
                 const prev = newIdOf.get(oldPrev);
                 if (id && prev) await supabase.from("event_tickets").update({ opens_after_ticket_id: prev }).eq("id", id).eq("event_id", newEventId);
+            }
+            // Hora límite de ingreso (vacío sin la migración 202610300300)
+            const deadlines: Map<number, string> = await loadEntryDeadlines(supabase, source.id);
+            for (const [oldId, until] of deadlines) {
+                const id = newIdOf.get(oldId);
+                if (id) await supabase.from("event_tickets").update({ entry_until: until }).eq("id", id).eq("event_id", newEventId);
             }
         }
         if (tags?.length) {

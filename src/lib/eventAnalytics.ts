@@ -234,7 +234,8 @@ export function lineFunctionKey(line: any, ticketFunction?: Map<number, number |
 
 /**
  * La parte de una orden que es de una función: solo sus líneas de esa función, con su parte del monto (el monto de la
- * orden, ya con descuentos, se reparte según el valor de cada línea). null si la orden no tiene entradas de esa función.
+ * orden, ya con descuentos, se reparte según el valor de cada línea; igual el cargo por servicio y su IVA si la orden
+ * los trae, para el borderó). null si la orden no tiene entradas de esa función.
  */
 export function orderForFunction(o: any, key: string, ticketFunction?: Map<number, number | null>): any | null {
     const lines = orderLines(o);
@@ -250,6 +251,8 @@ export function orderForFunction(o: any, key: string, ticketFunction?: Map<numbe
         ticket_qty: own.reduce((n: number, l: any) => n + (Number(l?.quantity) || 0), 0),
         amount: Math.round((Number(o.amount) || 0) * share),
         discount_amount: Math.round((Number(o.discount_amount) || 0) * share),
+        ...(o.ticket_fee != null ? { ticket_fee: Math.round((Number(o.ticket_fee) || 0) * share) } : {}),
+        ...(o.service_fee_tax != null ? { service_fee_tax: Math.round((Number(o.service_fee_tax) || 0) * share) } : {}),
     };
 }
 

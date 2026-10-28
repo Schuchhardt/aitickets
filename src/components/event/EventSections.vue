@@ -209,7 +209,8 @@ function toggleFaq(i) {
       <h2 id="ubicacion-title" class="section-title">{{ event.has_secret_location ? "Ubicación aproximada" : "Ubicación" }}</h2>
       <p v-if="venue?.name || event.location" class="loc-name">{{ venue?.name || event.location }}</p>
       <p v-if="venue?.address" class="loc-address">{{ [venue.address, venue.city].filter(Boolean).join(", ") }}</p>
-      <p v-if="event.has_secret_location" class="loc-note">La ubicación exacta aparece en tu entrada.</p>
+      <p v-if="event.has_secret_location && venue?.city && venue.city !== venue.name" class="loc-address">{{ venue.city }}</p>
+      <p v-if="event.has_secret_location" class="loc-note">La dirección exacta la reciben solo quienes compran, en su entrada y por correo.</p>
       <a
         v-if="staticMapUrl && !mapFailed"
         :href="directions"

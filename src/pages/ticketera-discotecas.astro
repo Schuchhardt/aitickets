@@ -11,10 +11,11 @@
 // (4 KB) y Vite lo inlinea en el CSS de la página, así que ya llega con la hoja.
 // Reutiliza la fórmula de precios (priceQuote → fees.mjs), el FAQ, la barra CTA mobile, el movimiento (LandingMotion), la
 // lógica de la demo de anuncios (useAdsDemo) y la serie de redes (seriesMarks de música). Montos y plazos: fees.mjs,
-// legal.mjs y producerFaq.ts; cadencia de redes: DEFAULT_CADENCE; lo que no existe en el producto (validar la hora de
-// ingreso de la lista) va con "Pronto". Ya existen y van sin "Pronto": el acceso del RRPP a sus números, cuántos de cada
-// lista entraron, el aforo en vivo en el panel, un QR por invitado de la mesa (event_tickets.people_per_ticket), la serie
-// en Facebook y TikTok, el reel con el video del evento y segmentar anuncios por intereses (socialSeries.ts, zernio-ads.mjs).
+// legal.mjs y producerFaq.ts; cadencia de redes: DEFAULT_CADENCE. Todo lo que se muestra existe en el producto, sin
+// "Pronto": el acceso del RRPP a sus números, cuántos de cada lista entraron, el aforo en vivo en el panel, la hora límite
+// de ingreso de la lista (event_tickets.entry_until), un QR por invitado de la mesa (event_tickets.people_per_ticket), la
+// serie en Facebook y TikTok, el reel con el video del evento y segmentar anuncios por intereses (socialSeries.ts,
+// zernio-ads.mjs).
 // Fase 4 (contenido real) queda fuera del código: fotos reales con autorización (§8), testimonio (CLUB_TESTIMONIAL, hoy
 // null: la sección no se muestra), evento de ejemplo de club y revisión de los nombres de ejemplo.
 export const prerender = true;

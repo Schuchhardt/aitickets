@@ -9,7 +9,8 @@ import {
 } from "./common";
 import { isCourtesyOrder, isTransferOrder, orderSoldQty } from "../../orderKinds";
 import { createPreviewLink, listPreviewLinks, revokePreviewLink, PreviewLinkError, PREVIEW_DEFAULT_HOURS } from "../../eventPreview";
-import { createEventGraph, setEventStatus, syncEventCategory, EventInputError, type EventGraphInput } from "../../../pages/api/_lib/events";
+import { createEventGraph, setEventStatus, syncEventCategory, refreshEventDenorm, EventInputError, type EventGraphInput } from "../../../pages/api/_lib/events";
+import { loadSecretLocation, saveSecretLocation, MAX_REVEAL_HOURS, SECRET_LOCATION_MAX } from "../../../../netlify/lib/secret-location.mjs";
 import { listOrgVenues } from "../../orgVenues";
 import { sanitizeRichText } from "../../sanitize";
 import { changeEventSlug, EventSlugError, SLUG_MAX, SLUG_MIN } from "../../eventSlug";
@@ -190,6 +191,7 @@ async function eventDetail(ctx: ToolContext, eventId: number) {
     const pageSettings = await loadPageSettings(ctx, Number(event.id));
     const videos = await loadEventVideos(ctx, Number(event.id));
     const [checkoutFields, people] = await Promise.all([loadCheckoutFields(ctx, Number(event.id)), loadPeoplePerTicket(ctx.supabase, Number(event.id))]);
+    const secret = await loadSecretLocation(ctx.supabase, Number(event.id)).catch(() => ({ address: null, revealHours: null }));
     const venueOf = new Map<string, any>();
     for (const l of locations || []) {
         const v = Array.isArray((l as any).venues) ? (l as any).venues[0] : (l as any).venues;
@@ -219,6 +221,9 @@ async function eventDetail(ctx: ToolContext, eventId: number) {
         page_layout: pageSettings.layout,
         show_organizer: pageSettings.show_organizer,
         page_background: pageSettings.background,
+        // Dirección que solo ven quienes compran (la página muestra el lugar y la comuna, sin la calle)
+        private_address: secret.address,
+        private_address_reveal_hours: secret.revealHours,
         ...eventDateFields(event),
         dates_note: DATES_NOTE,
         ...eventUrls(ctx, event),
@@ -380,6 +385,9 @@ const updateEvent: ToolDef = {
         "slug cambia el link público (/eventos/<slug>); cambiar el nombre NO cambia el slug. Si el evento está publicado o ya tiene registrados " +
         "(órdenes pagadas, entradas o invitados), el link anterior queda redirigiendo (301) al nuevo, así no se rompen los links ya " +
         "compartidos ni los QR; en un borrador sin registrados, el link anterior se libera. " +
+        "private_address: dirección que solo ven quienes compran (la página pública, el mapa y los listados muestran el lugar y la comuna, " +
+        "sin la calle); va en la orden, la entrada, el correo y el recordatorio. private_address_reveal_hours la revela N horas antes de la " +
+        "función (se manda por correo a esa hora); null = apenas compran. private_address null o \"\" la quita. " +
         "Fechas y horarios de las funciones se cambian con update_event_functions (avisa a los asistentes); el lugar, desde el panel o " +
         "update_venue. Para entradas usa las herramientas de ticket_type. Para un video de portada (en vez de la imagen) usa set_event_video. " +
         "checkout_fields cambia lo que pide el checkout además del nombre y correo de quien compra: attendee_names (nombre y correo de cada " +
@@ -411,6 +419,19 @@ const updateEvent: ToolDef = {
                 description: `Diseño de la página pública: ${PAGE_LAYOUT_HELP} Sin imagen, la página usa siempre el compacto.`,
             },
             show_organizer: { type: "boolean", description: "Mostrar \"Organiza <productora>\" bajo el título de la página pública." },
+            private_address: {
+                type: "string",
+                maxLength: SECRET_LOCATION_MAX,
+                nullable: true,
+                description: "Dirección exacta que solo ven quienes compran (fiesta en casa, tocata). null o \"\" = sin dirección privada.",
+            },
+            private_address_reveal_hours: {
+                type: "integer",
+                minimum: 1,
+                maximum: MAX_REVEAL_HOURS,
+                nullable: true,
+                description: "Horas antes de la función en que se revela private_address (se manda por correo a esa hora). null = apenas compran.",
+            },
             page_background: {
                 type: "string",
                 enum: EVENT_PAGE_BACKGROUNDS.map((b) => b.value),
@@ -459,8 +480,9 @@ const updateEvent: ToolDef = {
         if (args.image_url !== undefined) patch.image_url = args.image_url;
         if (args.is_private !== undefined) patch.accessibility = args.is_private ? "private" : "public";
         const pageChange = args.page_layout !== undefined || args.show_organizer !== undefined || args.page_background !== undefined;
+        const secretChange = args.private_address !== undefined || args.private_address_reveal_hours !== undefined;
         const checkoutChange = args.checkout_fields !== undefined && Object.keys(args.checkout_fields || {}).length > 0;
-        if (!Object.keys(patch).length && args.category === undefined && args.slug === undefined && !pageChange && !checkoutChange) throw new ToolError("invalid_input", "No enviaste cambios.");
+        if (!Object.keys(patch).length && args.category === undefined && args.slug === undefined && !pageChange && !checkoutChange && !secretChange) throw new ToolError("invalid_input", "No enviaste cambios.");
         // Datos extra del checkout: se valida antes de guardar nada (una pregunta de opciones necesita 2 o más)
         let checkoutFields: ReturnType<typeof normalizeCheckoutFields> | null = null;
         if (checkoutChange) {
@@ -514,9 +536,23 @@ const updateEvent: ToolDef = {
             if (error) throw error;
         }
         let warnings: string[] = [];
+        // Dirección privada: después se recalcula events.location (los listados quedan sin la calle)
+        let secret: { address: string | null; revealHours: number | null } | null = null;
+        if (secretChange) {
+            const current = await loadSecretLocation(ctx.supabase, Number(event.id));
+            const address = args.private_address !== undefined ? args.private_address : current.address;
+            if (!address && args.private_address === undefined) throw new ToolError("invalid_input", "El evento no tiene dirección privada: envía private_address.");
+            const { revealSaved } = await saveSecretLocation(ctx.supabase, Number(event.id), {
+                address: args.private_address,
+                revealHours: address ? (args.private_address_reveal_hours !== undefined ? args.private_address_reveal_hours : undefined) : null,
+            });
+            if (!revealSaved) warnings.push("Revelar la dirección horas antes estará disponible después del próximo deploy: por ahora la ven apenas compran.");
+            await refreshEventDenorm(Number(event.id));
+            secret = await loadSecretLocation(ctx.supabase, Number(event.id));
+        }
         if (args.description !== undefined) {
             const { data: dates } = await ctx.supabase.from("event_dates").select("date").eq("event_id", event.id);
-            warnings = [descriptionDateWarning(patch.description as string, (dates || []).map((d: any) => String(d.date).slice(0, 10)))].filter(Boolean) as string[];
+            warnings.push(...([descriptionDateWarning(patch.description as string, (dates || []).map((d: any) => String(d.date).slice(0, 10)))].filter(Boolean) as string[]));
         }
         return {
             event_id: Number(event.id),
@@ -528,8 +564,11 @@ const updateEvent: ToolDef = {
                 ...(args.show_organizer !== undefined ? ["show_organizer"] : []),
                 ...(args.page_background !== undefined ? ["page_background"] : []),
                 ...(checkoutFields ? ["checkout_fields"] : []),
+                ...(args.private_address !== undefined ? ["private_address"] : []),
+                ...(args.private_address_reveal_hours !== undefined ? ["private_address_reveal_hours"] : []),
             ],
             ...(checkoutFields ? { checkout_fields: checkoutFields } : {}),
+            ...(secret ? { private_address: secret.address, private_address_reveal_hours: secret.revealHours } : {}),
             ...(pageSettings ? { page_layout: pageSettings.layout, show_organizer: pageSettings.show_organizer, page_background: pageSettings.background } : {}),
             ...eventUrls(ctx, event),
             ...(slugChange ? { slug_change: slugChangeSummary(ctx, slugChange) } : {}),

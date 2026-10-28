@@ -4,7 +4,7 @@
 import { getSupabaseAdmin, getOwnedEvent, fetchAllRows } from '../../lib/supabase.mjs'
 import { canAccessEventByStaff } from '../../lib/event-staff.mjs'
 import { getSessionContextWithRefresh, jsonWithCookies, CHECKIN_ROLES } from '../../lib/session.mjs'
-import { attachSessionCheckins } from '../../lib/checkin.mjs'
+import { attachSessionCheckins, attachEntryDeadlines } from '../../lib/checkin.mjs'
 
 export default async function handler(req) {
   const { ctx, setCookies } = await getSessionContextWithRefresh(req)
@@ -31,6 +31,7 @@ export default async function handler(req) {
         .select(`
           id,
           event_id,
+          event_ticket_id,
           qr_code,
           status,
           validated_at,
@@ -55,6 +56,8 @@ export default async function handler(req) {
 
     // Entradas multifunción: a qué funciones ya entró cada una (el escáner muestra el estado de la función de hoy)
     attendees = await attachSessionCheckins(supabase, eventId, attendees, dates || [])
+    // Hora límite de ingreso por tipo de entrada (fuera de horario también sin conexión)
+    attendees = await attachEntryDeadlines(supabase, eventId, attendees)
     return respond({ attendees, dates: dates || [] }, 200)
   } catch (err) {
     console.error('Error en get-event-attendees:', err?.message)

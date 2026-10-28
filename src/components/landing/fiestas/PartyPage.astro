@@ -5,12 +5,12 @@
 // ven solo quienes tienen entrada) y seis ítems. Verificado: el flyer en su proporción y el tinte (eventCoverMeta.ts,
 // eventTint.js), video de portada hasta EVENT_VIDEO_MAX_BYTES (eventVideo.ts), galería con GALLERY_MAX_IMAGES fotos y un
 // video (eventGallery.ts), "Ver QR" por entrada (src/pages/ticket/[id].astro), DEFAULT_MAX_PER_PURCHASE y el asistente
-// de la página. La dirección que solo ven quienes compran no se puede cargar todavía (secret_location sin panel ni API):
-// "Pronto"; hoy, la comuna y un correo programado desde el asistente de IA (tools/messaging.ts).
+// de la página. Dirección que solo ven quienes compran: events.secret_location desde el formulario del evento o
+// update_event (private_address); la página muestra el lugar y la comuna sin la calle ni el mapa, y la dirección va en la
+// orden, la entrada y el correo, o se revela N horas antes (secret_location_reveal_hours, netlify/lib/secret-location.mjs).
 import PartyWall from "./PartyWall.vue";
 import StickerHeading from "./StickerHeading.astro";
 import Wristband from "./Wristband.astro";
-import SoonBadge from "../../ui/SoonBadge.vue";
 import { Camera, Film, Images, MessageCircle, QrCode, Smartphone } from "lucide-vue-next";
 import { PARTY_NAME, PARTY_PHOTOS } from "./fiestasLanding.js";
 import { DEFAULT_MAX_PER_PURCHASE } from "../../Reservation/pricing.js";
@@ -103,10 +103,9 @@ const items = [
 
     <div class="fpg-address" data-lp-step>
       <p class="fpg-address-text">
-        <strong>¿Fiesta en lugar secreto?</strong> Publica la comuna y avísales la dirección exacta el mismo día con un correo
-        programado a todos los que compraron (desde tu asistente de IA).
+        <strong>¿Fiesta en lugar secreto?</strong> La página muestra la comuna. La dirección exacta solo la ven quienes
+        compran: en su entrada y en el correo, o se la mandamos unas horas antes si prefieres revelarla a última hora.
       </p>
-      <p class="fi-soon-chip">Dirección que solo ven quienes compran <SoonBadge dark={false} /></p>
     </div>
   </div>
 </section>

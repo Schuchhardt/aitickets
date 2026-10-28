@@ -101,7 +101,8 @@ test("el fader se mueve con el teclado y cambia la cartelera y el panel", async 
   await page.keyboard.press("ArrowRight");
   await expect(season.getByTestId("theatre-season-title")).toHaveText("Semana 2");
   await expect(fader).toHaveAttribute("aria-valuetext", "Semana 2");
-  await expect(season.getByTestId("soon-badge")).toHaveCount(1);
+  // Las reseñas en la página durante la temporada ya existen
+  await expect(season.getByTestId("soon-badge")).toHaveCount(0);
 });
 
 test("con 'reducir movimiento' el escáner queda fijo en el aviso de otra función, con el botón", async ({ page }) => {
@@ -119,13 +120,13 @@ test("con 'reducir movimiento' el escáner queda fijo en el aviso de otra funci�
 
 test("lo que no existe va con Pronto y sin testimonio real no hay crítica", async ({ page }) => {
   await open(page);
-  // Repetir funciones y copiar entradas ya existen (Acto I, sin Pronto); Facebook, TikTok y el reel con el teaser también
-  // (entreacto, sin Pronto); borderó (salas) no
+  // Repetir funciones, copiar entradas, el borderó por función, Facebook, TikTok y el reel con el teaser ya existen
   await expect(page.locator("#obra").getByTestId("soon-badge")).toHaveCount(0);
   await expect(page.locator("#obra")).toContainText("Repetir funciones de jueves a domingo");
   await expect(page.getByTestId("theatre-series").getByTestId("soon-badge")).toHaveCount(0);
   await expect(page.getByTestId("theatre-series")).toContainText("Reel con tu teaser");
-  await expect(page.locator("#salas").getByTestId("soon-badge")).toHaveCount(1);
+  await expect(page.locator("#salas").getByTestId("soon-badge")).toHaveCount(0);
+  await expect(page.locator("#salas")).toContainText("Un borderó por función");
   await expect(page.locator("[data-te-testimonial]")).toHaveCount(0);
   // Las butacas numeradas no son "Pronto": se dice que no hay
   await expect(page.locator("#obra")).toContainText("No hay butacas numeradas");

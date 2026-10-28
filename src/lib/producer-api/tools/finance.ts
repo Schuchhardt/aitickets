@@ -11,6 +11,7 @@ import { computeFeeSplit, SERVICE_FEE_RATE, IVA_RATE, SERVICE_FEE_PERCENT_LABEL,
 import { computeDiscountAmount } from "../../../../netlify/lib/discounts.mjs";
 import { notifySlack } from "../../../pages/api/_lib/server-utils";
 import { isTransferOrder } from "../../orderKinds";
+import { functionSettlement, SettlementError } from "../../functionSettlement";
 import { identityApproved, loadOrgIdentity, recomputeHolderMatch } from "../../producerIdentity";
 
 export const BANK_CHANGE_HOLD_HOURS = 72;
@@ -992,8 +993,56 @@ const getSettlementReport: ToolDef = {
     },
 };
 
+// ---------------------------------------------------------------------------
+// Borderó por función (para liquidar con la sala)
+// ---------------------------------------------------------------------------
+
+const getFunctionSettlement: ToolDef = {
+    name: "get_function_settlement",
+    title: "Borderó por función",
+    description:
+        "Borderó de una función para liquidar con la sala: entradas vendidas por tipo y precio, cortesías, bruto, descuentos, cargo por servicio " +
+        "(el que pagaron los compradores y el absorbido por el productor) y neto al productor. Una compra con entradas de varias funciones se " +
+        "reparte según el valor de cada entrada. function_id de get_event → functions; omitirlo = las entradas válidas para cualquier función. " +
+        "Incluye el link al borderó imprimible del panel (PDF desde el navegador) y a la planilla CSV.",
+    scope: "finance",
+    permission: "finance.read",
+    annotations: { readOnlyHint: true },
+    inputSchema: {
+        type: "object",
+        required: ["event_id"],
+        additionalProperties: false,
+        properties: {
+            event_id: eventIdSchema,
+            function_id: { type: "integer", minimum: 1, description: "Función (get_event → functions). Omitir = entradas válidas para cualquier función." },
+        },
+    },
+    async handler(args, ctx) {
+        const event = await loadOwnedEvent<any>(ctx, args.event_id, "id, name");
+        try {
+            const s = await functionSettlement(ctx.supabase, { id: Number(event.id), name: event.name }, args.function_id ?? null);
+            const fn = args.function_id ?? "all";
+            return {
+                currency: "CLP",
+                ...s,
+                definitions: {
+                    gross_clp: "Valor de lista de las entradas vendidas (precio × cantidad).",
+                    service_fee_paid_by_buyers_clp: "Cargo por servicio + IVA que pagaron los compradores (de AI Tickets, no del productor).",
+                    service_fee_absorbed_clp: "Cargo + IVA descontado al productor en las órdenes con el cargo absorbido.",
+                    net_to_producer_clp: "gross_clp − discounts_clp − service_fee_absorbed_clp (± redondeo al repartir órdenes de varias funciones).",
+                },
+                printable_url: `${ctx.origin}/dashboard/events/${event.id}/bordero?funcion=${fn}`,
+                csv_url: `${ctx.origin}/api/events/function-settlement?event_id=${event.id}&event_date_id=${fn}`,
+            };
+        } catch (err) {
+            if (err instanceof SettlementError) throw new ToolError("not_found", err.message);
+            throw err;
+        }
+    },
+};
+
 export const financeTools: ToolDef[] = [
     getPayoutAccount, createPayoutAccountLink, getVerificationStatus, removePayoutAccount,
     getFeeSchedule, quoteFees, setFeeAbsorption,
-    getBalance, listBalanceTransactions, requestPayout, listPayouts, getPayout, cancelPayout, getSettlementReport,
+    getBalance, listBalanceTransactions, requestPayout, listPayouts, getPayout, cancelPayout, getSettlementReport, getFunctionSettlement,
 ];

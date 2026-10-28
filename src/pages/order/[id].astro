@@ -13,7 +13,7 @@ import { getSupabaseAdmin } from "../../lib/auth-helpers";
 import { LEGAL } from "../../lib/legal";
 import { cdnImage } from "../../lib/imageCdn.js";
 import { getBuyerSession } from "../../lib/buyerSession";
-import { loadAttendeeEvent, functionsForTickets, upcomingFirst, calendarUrl, mapsUrl } from "../../lib/attendeePage";
+import { loadAttendeeEvent, functionsForTickets, upcomingFirst, calendarUrl, mapsUrl, secretLocationFor } from "../../lib/attendeePage";
 import { FEE_INCLUDED_NOTE, SERVICE_FEE_TAX_LABEL, orderBuyerBreakdown, serviceFeeLabelFor } from "../../../netlify/lib/fees.mjs";
 import { orderDiscount, discountLineLabel } from "../../../netlify/lib/discounts.mjs";
 import { orderKind, orderCopy, isPaidKind } from "../../../netlify/lib/order-kind.mjs";
@@ -47,6 +47,8 @@ let buyer: { first_name: string; last_name: string; email: string } | null = nul
 let errorMessage: string | null = null;
 let pendingMessage: string | null = null;
 let secretLocation = "";
+// Dirección privada que se revela horas antes: cuándo le llega
+let secretPending = "";
 let feed: any = null;
 
 if (!id || !UUID_RE.test(id)) {
@@ -115,8 +117,9 @@ if (!id || !UUID_RE.test(id)) {
       // Dirección secreta: solo para órdenes pagadas con al menos una entrada vigente
       const hasLiveTicket = (ticketsData || []).some((t: any) => t.status !== "cancelled");
       if (orderInfo.status === "paid" && hasLiveTicket) {
-        const { data: secretRow } = await supabase.from("events").select("secret_location").eq("id", event.id).maybeSingle();
-        if (secretRow?.secret_location) secretLocation = String(secretRow.secret_location);
+        const secret = await secretLocationFor(supabase, event, (ticketsData || []).filter((t: any) => t.status !== "cancelled").map((t: any) => t.event_tickets?.event_date_id ?? null));
+        secretLocation = secret.address;
+        secretPending = secret.pending;
         // Muro de asistentes (sin la migración aplicada, simplemente no aparece)
         if (buyer?.email) {
           try {
@@ -239,6 +242,7 @@ const pageTitle = event?.name ? `${kind === "rsvp" ? "Tu asistencia" : copy.tick
                     <dd class="text-gray-800">
                       {place}
                       {secretLocation && <span class="block text-xs text-amber-700">Dirección exclusiva para asistentes: no la compartas.</span>}
+                      {secretPending && <span class="block text-xs text-amber-700" data-testid="secret-location-pending">{secretPending}</span>}
                     </dd>
                   </div>
                 )}

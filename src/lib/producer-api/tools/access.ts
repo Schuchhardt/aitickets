@@ -136,7 +136,9 @@ const checkInAttendee: ToolDef = {
         "Marca el ingreso de una entrada (check-in manual, p. ej. si falla el escáner) por ticket_id (de list_attendees) o por el código QR. " +
         "Una entrada solo puede ingresar una vez: si ya entró, responde conflicto con la hora de ingreso. Avisa si la entrada es de otra función. " +
         "Excepción: una entrada válida para todas las funciones de un evento con varias (pase de varios días, taller de varias sesiones) " +
-        "ingresa una vez en cada función (la de hoy, o la más cercana); responde sessions_attended de sessions_total.",
+        "ingresa una vez en cada función (la de hoy, o la más cercana); responde sessions_attended de sessions_total. " +
+        "Si el tipo de entrada tiene hora límite de ingreso (entry_until, p. ej. la lista hasta las 01:00) y ya pasó, responde conflicto " +
+        "\"fuera de horario\" sin marcar el ingreso; con force: true entra igual.",
     scope: "attendees",
     permission: "checkin",
     annotations: { readOnlyHint: false, destructiveHint: false },
@@ -148,6 +150,10 @@ const checkInAttendee: ToolDef = {
             event_id: eventIdSchema,
             ticket_id: { type: "string", pattern: "^[0-9a-fA-F-]{36}$", description: "ID de la entrada (list_attendees → ticket_id)." },
             qr_code: { type: "string", minLength: 4, maxLength: 200, description: "Contenido del código QR de la entrada." },
+            force: {
+                type: "boolean",
+                description: "Dejar entrar igual una entrada fuera de horario (pasada la hora límite de su tipo). Solo si la puerta lo decide.",
+            },
         },
     },
     audit: (_args, result) => ({ summary: "Ingreso manual de una entrada", target: String(result.ticket_id || "") }),
@@ -155,7 +161,7 @@ const checkInAttendee: ToolDef = {
         if (!args.ticket_id === !args.qr_code) throw new ToolError("invalid_input", "Envía ticket_id o qr_code (uno de los dos).");
         if (args.ticket_id && !UUID_RE.test(args.ticket_id)) throw new ToolError("invalid_input", "ticket_id inválido.");
         const event = await loadOwnedEvent<any>(ctx, args.event_id, "id");
-        const result = await checkInTicket(ctx.supabase, Number(event.id), { ticketId: args.ticket_id, qrCode: args.qr_code });
+        const result = await checkInTicket(ctx.supabase, Number(event.id), { ticketId: args.ticket_id, qrCode: args.qr_code }, undefined, { force: args.force === true });
         if (!result.ok) {
             if (result.code === "not_found") throw new ToolError("not_found", result.message);
             if (result.code === "already_validated") {
@@ -163,6 +169,7 @@ const checkInAttendee: ToolDef = {
                 if (result.function_label) throw new ToolError("conflict", `${result.message.replace(/\.$/, "")}${when}: el pase entra una vez por función.`);
                 throw new ToolError("conflict", `Esta entrada ya ingresó${when}. No se puede usar dos veces.`);
             }
+            if (result.code === "late_entry") throw new ToolError("conflict", `${result.message} No se marcó el ingreso: si la puerta decide dejarla entrar, repite con force: true.`);
             throw new ToolError("conflict", `${result.message} No puede ingresar.`);
         }
         const t = result.ticket;
@@ -175,6 +182,7 @@ const checkInAttendee: ToolDef = {
             ticket_type: t.event_tickets?.ticket_name || null,
             complimentary: Boolean(t.is_complimentary),
             ...(result.sessions_total ? { function: result.function_label, sessions_attended: result.sessions_attended, sessions_total: result.sessions_total } : {}),
+            ...(result.late_entry ? { late_entry: true, entry_until: result.entry_until } : {}),
             ...(result.function_mismatch
                 ? { warning: `Ojo: la entrada es para otra función (${result.function_label}). Se marcó el ingreso igual; revisa si corresponde.` }
                 : {}),

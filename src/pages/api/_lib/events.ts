@@ -10,6 +10,8 @@ import { identityPublishBlocker } from "../../../lib/producerIdentity";
 import { refreshEventRisk } from "../../../lib/eventRisk";
 import { chainError } from "../../../../netlify/lib/tickets.mjs";
 import { normalizeCheckoutFields, isDefaultCheckoutFields, normalizePeoplePerTicket } from "../../../lib/checkoutFields.mjs";
+import { normalizeEntryUntil } from "../../../lib/entryDeadline.mjs";
+import { hasSecretLocation, saveSecretLocation } from "../../../../netlify/lib/secret-location.mjs";
 
 /** Guarda la categoría del evento vía category_tags(name) + event_tags (reemplaza las anteriores). */
 export async function syncEventCategory(eventId: number, category: string | null | undefined) {
@@ -41,17 +43,19 @@ export async function syncEventCategory(eventId: number, category: string | null
 
 /**
  * Recalcula los campos denormalizados en `events` (start_date, end_date, location) a partir de
- * event_dates + event_locations/venues. Devuelve los valores calculados.
+ * event_dates + event_locations/venues. Devuelve los valores calculados. Con dirección privada
+ * (secret_location), location queda sin la calle: la leen los listados y sitios públicos.
  */
 export async function refreshEventDenorm(eventId: number) {
     const supabase = getSupabaseAdmin();
-    const [{ data: dates }, { data: locations }] = await Promise.all([
+    const [{ data: dates }, { data: locations }, secret] = await Promise.all([
         supabase.from("event_dates").select("date, start_time, end_time, event_location_id").eq("event_id", eventId),
         supabase
             .from("event_locations")
             .select("id, created_at, venues ( name, address_line1, city )")
             .eq("event_id", eventId)
             .order("created_at", { ascending: true }),
+        hasSecretLocation(supabase, eventId),
     ]);
 
     const range = computeEventRange((dates || []).map((d: any) => ({
@@ -62,7 +66,7 @@ export async function refreshEventDenorm(eventId: number) {
 
     const firstVenue: any = (locations || [])[0]?.venues;
     const venue = Array.isArray(firstVenue) ? firstVenue[0] : firstVenue;
-    const location = formatLocation(venue ? { name: venue.name, address: venue.address_line1, city: venue.city } : null);
+    const location = formatLocation(venue ? { name: venue.name, address: secret ? null : venue.address_line1, city: venue.city } : null);
 
     const { error } = await supabase
         .from("events")
@@ -88,6 +92,8 @@ export type TicketInput = {
     opensAfterId?: number | string | null;
     /** Personas por entrada (mesa para N, migración 202610300110). 1/omitido = entrada normal. */
     peoplePerTicket?: number | string | null;
+    /** Hora límite de ingreso ("01:00", hora de Chile, relativa a la función). ""/null = entra a cualquier hora. */
+    entryUntil?: string | null;
 };
 
 /** Normaliza un ticket del formulario. Devuelve null si es inválido. */
@@ -169,6 +175,28 @@ export async function saveFormTicketPeople(eventId: number, tickets: TicketInput
                 if (people > 1) throw new EventInputError("Las mesas para varias personas estarán disponibles después del próximo deploy.");
                 return;
             }
+            throw error;
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Hora límite de ingreso desde el formulario (event_tickets.entry_until, migración 202610300300)
+// ---------------------------------------------------------------------------------------------------------
+
+/**
+ * Guarda la hora límite de ingreso de cada entrada que la trae (formularios anteriores no mandan entryUntil). Sin la
+ * columna aún (deploy preview) no hace nada. Una hora inválida se guarda como "sin hora límite".
+ */
+export async function saveFormEntryDeadlines(eventId: number, tickets: TicketInput[], idOf: (formId: unknown) => number | undefined) {
+    const supabaseAdmin = getSupabaseAdmin();
+    for (const t of tickets) {
+        if (t?.entryUntil === undefined) continue;
+        const id = idOf(t.id);
+        if (!id) continue;
+        const { error } = await supabaseAdmin.from("event_tickets").update({ entry_until: normalizeEntryUntil(t.entryUntil) }).eq("id", id).eq("event_id", eventId);
+        if (error) {
+            if (["42703", "PGRST204"].includes(String(error.code || ""))) return;
             throw error;
         }
     }
@@ -260,6 +288,10 @@ export type EventGraphInput = {
         coverSettings?: unknown;
         /** Datos extra del checkout (src/lib/checkoutFields.mjs). */
         checkoutFields?: unknown;
+        /** Dirección que solo ven quienes compran (events.secret_location). ""/null = sin dirección privada. */
+        secretLocation?: string | null;
+        /** Horas antes de la función en que se revela (null = apenas compran). */
+        secretLocationRevealHours?: number | string | null;
     };
     locations: Array<{
         venueId?: string | null;
@@ -330,6 +362,10 @@ export async function createEventGraph(
     }
     const eventId = eventData.id as number;
     state.eventId = eventId;
+    // Dirección privada antes de refreshEventDenorm (la ubicación pública queda sin la calle)
+    if (general.secretLocation) {
+        await saveSecretLocation(supabaseAdmin, eventId, { address: general.secretLocation, revealHours: general.secretLocationRevealHours ?? null });
+    }
     if (general.coverSettings) await saveCoverSettings(eventId, actor.orgId, general.coverSettings);
     if (general.checkoutFields) await saveCheckoutFields(eventId, actor.orgId, general.checkoutFields);
 
@@ -385,11 +421,10 @@ export async function createEventGraph(
         )
         .select("id");
     if (ticketsError) throw ticketsError;
-    // Tandas encadenadas: el insert devuelve las filas en el mismo orden del formulario
+    // Tandas encadenadas y hora límite de ingreso: el insert devuelve las filas en el mismo orden del formulario
     const ticketIdMap = new Map(tickets.map((t, i) => [String(t.id), Number((insertedTickets as any[])?.[i]?.id)]));
-    if (tickets.some(hasOpensAfter)) {
-        await saveFormTicketChain(eventId, tickets, (formId) => ticketIdMap.get(String(formId)) || undefined);
-    }
+    if (tickets.some(hasOpensAfter)) await saveFormTicketChain(eventId, tickets, (formId) => ticketIdMap.get(String(formId)) || undefined);
+    if (tickets.some((t) => normalizeEntryUntil(t?.entryUntil))) await saveFormEntryDeadlines(eventId, tickets, (formId) => ticketIdMap.get(String(formId)) || undefined);
     // Mesas para N (solo las que piden más de una persona: el resto queda con el valor por defecto)
     const tables = tickets.filter((t) => normalizePeoplePerTicket(t?.peoplePerTicket) > 1);
     if (tables.length) await saveFormTicketPeople(eventId, tables, (formId) => ticketIdMap.get(String(formId)) || undefined);

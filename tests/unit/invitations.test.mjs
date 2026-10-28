@@ -155,7 +155,7 @@ describe('herramientas de la API de productores', () => {
   it('update_review_settings y list_event_reviews', async () => {
     const updated = await runTool(tool('update_review_settings'), { event_id: 10, reward_percent: 20, moderate_photos: true }, ctx())
     expect(updated.ok).toBe(true)
-    expect(updated.result.settings).toEqual({ enabled: true, reward: { value: 20, valid_days: 60 }, moderate_photos: true })
+    expect(updated.result.settings).toEqual({ enabled: true, reward: { value: 20, valid_days: 60 }, moderate_photos: true, show_while_on_sale: false })
     const removed = await runTool(tool('update_review_settings'), { event_id: 10, reward_percent: 0 }, ctx())
     expect(removed.result.settings.reward).toBeNull()
     db.tables.aitickets_event_review_photos = [{ id: 'p1', event_id: 10, status: 'pending' }]

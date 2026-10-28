@@ -108,7 +108,8 @@ const updateReviewSettings: ToolDef = {
   description:
     "Configura las reseñas de un evento: si se envía el correo \"¿Cómo estuvo?\" 24 h después de cada función, el premio por calificar " +
     `(un código de descuento de un solo uso, ${REWARD_LIMITS.minValue}-${REWARD_LIMITS.maxValue}%, para cualquier evento de la organización; reward_percent=0 lo quita) ` +
-    "y si las fotos de los asistentes esperan revisión antes de publicarse.",
+    "si las fotos de los asistentes esperan revisión antes de publicarse y si la página muestra las reseñas de las funciones pasadas " +
+    "mientras quedan funciones a la venta (show_while_on_sale: una obra en cartelera, un taller con fechas; sin esto, solo cuando el evento terminó).",
   scope: "write",
   permission: "events.write",
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
@@ -122,6 +123,10 @@ const updateReviewSettings: ToolDef = {
       reward_percent: { type: "integer", minimum: 0, maximum: REWARD_LIMITS.maxValue, description: `Descuento del premio (${REWARD_LIMITS.minValue}-${REWARD_LIMITS.maxValue}). 0 = sin premio.` },
       reward_valid_days: { type: "integer", minimum: REWARD_LIMITS.minDays, maximum: REWARD_LIMITS.maxDays, description: `Días de vigencia del código (por defecto ${REWARD_LIMITS.defaultDays}).` },
       moderate_photos: { type: "boolean", description: "true = las fotos esperan tu aprobación antes de verse en la página." },
+      show_while_on_sale: {
+        type: "boolean",
+        description: "true = la página muestra las reseñas de las funciones pasadas junto al botón de compra mientras quedan funciones. false = solo cuando el evento terminó.",
+      },
     },
   },
   audit: (args) => ({ summary: "Configuración de reseñas actualizada", target: `event:${args.event_id}` }),
@@ -148,6 +153,7 @@ const updateReviewSettings: ToolDef = {
       enabled: args.send_request_email ?? prev.enabled,
       reward,
       moderate_photos: args.moderate_photos ?? prev.moderate_photos,
+      show_while_on_sale: args.show_while_on_sale ?? prev.show_while_on_sale,
     });
     const { error: upError } = await ctx.supabase.from("events").update({ review_settings: next }).eq("id", event.id).eq("organization_id", ctx.actor.orgId);
     if (upError) throw upError;
