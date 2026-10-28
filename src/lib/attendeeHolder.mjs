@@ -34,6 +34,8 @@ export function ticketHolder(row) {
   const buyer = holderName(one(row?.attendees), order)
   const buyerName = clean(`${buyer.first_name || ''} ${buyer.last_name || ''}`)
   const buyerEmail = clean(order?.buyer_email || one(row?.attendees)?.email).toLowerCase()
+  // Invitado con correo propio que aún no completó su nombre: su correo, no el nombre de quien compró
+  if (!name && email && email !== buyerEmail) return { name: email, email }
   return { name: name || buyerName, email: email || buyerEmail }
 }
 

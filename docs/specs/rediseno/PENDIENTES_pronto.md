@@ -499,7 +499,16 @@ en `events.checkout_fields.questions` (migración `202610300100_checkout_fields.
 - Se ven en `/dashboard/tickets`, en el CSV de órdenes (una columna por pregunta), en `list_attendees`, `get_order` y
   `list_orders`, y en la orden.
 - Landing de talleres sin "Pronto".
-- Pendiente: respuestas por asistente (hoy, por compra).
+- Cada pregunta es "Una por compra" o "Una por persona" (`questions[].per`). Las por persona se responden una vez por QR y
+  quedan en `event_attendees.registration_answers` (migración `202610310100_attendee_answers.sql`).
+- "¿Quién completa los datos de cada persona?" (`checkout_fields.holders`, solo si se compra más de una entrada):
+  - Quien compra: llena todo en el checkout.
+  - Cada invitado desde su correo: quien compra pone solo los correos y llena lo suyo. A cada invitado le llega su
+    entrada con "Completa tus datos" y los llena en `/ticket/<id>` (`POST /api/tickets/holder`). La llave es el id de
+    la entrada, con límite por IP y por entrada, y se puede hasta que termina el evento.
+  - Faltar datos no invalida el QR.
+  - El productor ve "Datos pendientes" en `/dashboard/tickets`, el CSV, `list_attendees` (filtro `data_pending`) y
+    `get_order`.
 
 **Dónde se promete**
 `talleres/BeforeWorkshop.astro` (ítem con `soon: true`).
