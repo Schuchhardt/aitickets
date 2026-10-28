@@ -113,8 +113,9 @@ test("lo que no existe va con Pronto y sin testimonio real no hay cita", async (
   await expect(page.locator("#difusion").getByTestId("soon-badge")).toHaveCount(4);
   // Dirección que solo ven quienes compran
   await expect(page.locator("#pagina").getByTestId("soon-badge")).toHaveCount(1);
-  // Vista de aforo en el panel
-  await expect(page.locator("#puerta").getByTestId("soon-badge")).toHaveCount(1);
+  // El aforo en vivo en el panel ya existe
+  await expect(page.locator("#puerta").getByTestId("soon-badge")).toHaveCount(0);
+  await expect(page.locator("#puerta")).toContainText("En tu panel ves el aforo en vivo");
   await expect(page.locator("[data-fi-testimonial]")).toHaveCount(0);
 });
 
