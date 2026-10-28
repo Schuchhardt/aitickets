@@ -2,6 +2,8 @@
 import { ToolError, type ToolDef } from "../registry";
 import { eventIdSchema, loadOwnedEvent, ticketAvailability, presentTicket, TICKET_SELECT, isoOrNull, rejectCourtesyName, clp, ticketChainInfo } from "./common";
 import { chainError, loadTicketChain } from "../../../../netlify/lib/tickets.mjs";
+import { loadEntryDeadlines } from "../../../../netlify/lib/checkin.mjs";
+import { normalizeEntryUntil } from "../../entryDeadline.mjs";
 import { normalizeTicket } from "../../../pages/api/_lib/events";
 import { isTransferOrder } from "../../orderKinds";
 import { IDENTITY_REQUIRED_MESSAGE, identityApproved, loadCapacityTickets, loadOrgIdentity, ticketsRequireIdentity } from "../../producerIdentity";
@@ -34,7 +36,7 @@ async function loadTicket(ctx: any, eventId: number, ticketId: number, { allowSy
 
 const FIELD_LABELS: Record<string, string> = {
     ticket_name: "Nombre", price: "Precio", total_quantity: "Capacidad", max_quantity: "Máximo por compra", status: "Venta", init_date: "Inicio de venta", end_date: "Fin de venta",
-    opens_after_ticket_id: "Se abre tras",
+    opens_after_ticket_id: "Se abre tras", entry_until: "Ingreso hasta",
 };
 const fmtField = (field: string, v: unknown) =>
     v == null ? "—" : field === "price" ? clp(Number(v)).replace(" CLP", "") : field === "status" ? (v === "available" ? "activa" : "pausada") : String(v);
@@ -73,6 +75,25 @@ async function assertChainable(ctx: any, eventId: number, ticketId: number | nul
     return chain;
 }
 
+// Hora límite de ingreso (event_tickets.entry_until, migración 202610300300)
+const entryUntilSchema = {
+    type: "string" as const,
+    pattern: "^([01]\\d|2[0-3]):[0-5]\\d$",
+    nullable: true,
+    description:
+        "Hora límite de ingreso \"HH:MM\" (hora de Chile, p. ej. la lista hasta las 01:00). Si es anterior al inicio de la función, es de la " +
+        "madrugada siguiente. Pasada esa hora el escáner marca la entrada \"fuera de horario\" y la puerta decide. null = entra a cualquier hora.",
+};
+
+/** Guarda la hora límite (columna aparte: sin la migración avisa en vez de fallar el resto del cambio). */
+async function saveEntryUntil(ctx: any, eventId: number, ticketId: number, value: string | null) {
+    const { error } = await ctx.supabase.from("event_tickets").update({ entry_until: normalizeEntryUntil(value) }).eq("id", ticketId).eq("event_id", eventId);
+    if (error) {
+        if (["42703", "PGRST204"].includes(String(error.code || ""))) throw new ToolError("unavailable", "La hora límite de ingreso estará disponible después del próximo deploy.");
+        throw error;
+    }
+}
+
 async function presentWithChain(ctx: any, event: any, row: any, availability?: Map<number, { sold: number; pending: number }>) {
     const { data: tickets } = await ctx.supabase.from("event_tickets").select(TICKET_SELECT).eq("event_id", event.id);
     const avail = availability || (await ticketAvailability(ctx, event.id, (tickets || []).map((t: any) => Number(t.id))));
@@ -84,7 +105,8 @@ const createTicketType: ToolDef = {
     name: "create_ticket_type",
     title: "Crear tipo de entrada",
     description: "Agrega un tipo de entrada a un evento (ej: Preventa 2, VIP). Precio en CLP. No uses el nombre \"Cortesía\": ese tipo ya lo crea el sistema. " +
-        "Para que una tanda se abra sola al agotarse la anterior, pasa opens_after_ticket_type_id.",
+        "Para que una tanda se abra sola al agotarse la anterior, pasa opens_after_ticket_type_id. Para una lista con hora de ingreso " +
+        "(\"lista hasta las 01:00\"), pasa entry_until.",
     scope: "write",
     audit: (args, result) => ({ summary: `Nuevo tipo ${args.name}: ${clp(args.price).replace(" CLP", "")}`, target: `ticket_type:${(result as any).ticket_type?.id ?? ""}` }),
     annotations: { readOnlyHint: false, destructiveHint: false },
@@ -102,6 +124,7 @@ const createTicketType: ToolDef = {
             function_id: { type: "integer", minimum: 1, nullable: true, description: "Solo para esa función (get_event → functions). Omitir = todas." },
             max_per_order: { type: "integer", minimum: 1, maximum: 50, default: 10 },
             opens_after_ticket_type_id: opensAfterSchema,
+            entry_until: entryUntilSchema,
         },
     },
     async handler(args, ctx) {
@@ -128,7 +151,12 @@ const createTicketType: ToolDef = {
             .select(TICKET_SELECT)
             .single();
         if (error) throw error;
-        return { event_id: Number(event.id), ticket_type: prevId != null ? await presentWithChain(ctx, event, data) : presentTicket(data, undefined, event) };
+        const entryUntil = normalizeEntryUntil(args.entry_until);
+        if (entryUntil) await saveEntryUntil(ctx, Number(event.id), Number(data.id), entryUntil);
+        return {
+            event_id: Number(event.id),
+            ticket_type: prevId != null || entryUntil ? await presentWithChain(ctx, event, data) : presentTicket(data, undefined, event),
+        };
     },
 };
 
@@ -137,7 +165,7 @@ const updateTicketType: ToolDef = {
     title: "Editar tipo de entrada",
     description:
         "Cambia nombre, precio, capacidad, ventana de venta, pausa/reanuda la venta (on_sale) o encadena la tanda a la anterior " +
-        "(opens_after_ticket_type_id: se abre sola cuando esa se agota) de un tipo de entrada. " +
+        "(opens_after_ticket_type_id: se abre sola cuando esa se agota) o fija la hora límite de ingreso (entry_until) de un tipo de entrada. " +
         "La capacidad no puede quedar bajo lo ya vendido. Un cambio de precio aplica solo a compras nuevas.",
     scope: "write",
     audit: (args, result) => {
@@ -164,11 +192,20 @@ const updateTicketType: ToolDef = {
             on_sale: { type: "boolean", description: "false = retirar de la venta (pausar); true = volver a vender." },
             max_per_order: { type: "integer", minimum: 1, maximum: 50 },
             opens_after_ticket_type_id: opensAfterSchema,
+            entry_until: entryUntilSchema,
         },
     },
     async handler(args, ctx) {
         const event = await loadOwnedEvent<any>(ctx, args.event_id, "id, status");
         const ticket = await loadTicket(ctx, event.id, args.ticket_type_id);
+        // La hora límite va aparte (columna nueva): sin migración el resto del cambio no se pierde
+        let entryChange: { field: string; from: string | null; to: string | null } | null = null;
+        if (args.entry_until !== undefined) {
+            const before = (await loadEntryDeadlines(ctx.supabase, Number(event.id))).get(Number(ticket.id)) ?? null;
+            const to = normalizeEntryUntil(args.entry_until);
+            await saveEntryUntil(ctx, Number(event.id), Number(ticket.id), to);
+            if (before !== to) entryChange = { field: "entry_until", from: before, to };
+        }
         const patch: Record<string, unknown> = {};
         if (args.name !== undefined) {
             rejectCourtesyName(args.name);
@@ -198,7 +235,10 @@ const updateTicketType: ToolDef = {
             (ticket as any).opens_after_ticket_id = chain.get(Number(ticket.id)) ?? null;
             patch.opens_after_ticket_id = args.opens_after_ticket_type_id;
         }
-        if (!Object.keys(patch).length) throw new ToolError("invalid_input", "No enviaste cambios.");
+        if (!Object.keys(patch).length) {
+            if (args.entry_until === undefined) throw new ToolError("invalid_input", "No enviaste cambios.");
+            return { event_id: Number(event.id), ticket_type: await presentWithChain(ctx, event, ticket), changes: entryChange ? [entryChange] : [] };
+        }
         if (patch.price !== undefined || patch.total_quantity !== undefined) {
             const change: { id: number; price?: number; total_quantity?: number | null } = { id: Number(ticket.id) };
             if (patch.price !== undefined) change.price = patch.price as number;
@@ -216,6 +256,7 @@ const updateTicketType: ToolDef = {
         const changes = Object.keys(patch)
             .filter((k) => String((ticket as any)[k] ?? "") !== String(patch[k] ?? ""))
             .map((k) => ({ field: k, from: (ticket as any)[k] ?? null, to: patch[k] ?? null }));
+        if (entryChange) changes.push(entryChange);
         return { event_id: Number(event.id), ticket_type: await presentWithChain(ctx, event, data), changes };
     },
 };

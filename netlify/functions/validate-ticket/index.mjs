@@ -2,10 +2,11 @@
 // Body: { qr_code, event_id }. Requiere sesión con rol de check-in y evento de la organización del usuario.
 // status NULL (entradas antiguas) se devuelve como 'active'. R1: incluye function_mismatch/function_label.
 // Entrada multifunción: status/validated_at son los de la función de hoy (+ sessions_attended / sessions_total).
+// Con hora límite de ingreso (event_tickets.entry_until): entry_until y late_entry (fuera de horario ahora).
 import { getSupabaseAdmin, getOwnedEvent } from '../../lib/supabase.mjs'
 import { canAccessEventByStaff } from '../../lib/event-staff.mjs'
 import { getSessionContextWithRefresh, jsonWithCookies, CHECKIN_ROLES } from '../../lib/session.mjs'
-import { getFunctionCheck, ticketSessionState } from '../../lib/checkin.mjs'
+import { getFunctionCheck, ticketSessionState, entryDeadlineState } from '../../lib/checkin.mjs'
 
 export default async function handler(req) {
   const { ctx, setCookies } = await getSessionContextWithRefresh(req)
@@ -39,6 +40,7 @@ export default async function handler(req) {
       .select(`
         id,
         event_id,
+        event_ticket_id,
         qr_code,
         status,
         validated_at,
@@ -72,6 +74,8 @@ export default async function handler(req) {
       ...fnCheck,
       ...(await ticketSessionState(supabase, eventId, data)),
     }
+    const deadline = await entryDeadlineState(supabase, eventId, data)
+    if (deadline) Object.assign(ticket, { entry_until: deadline.entry_until, late_entry: Boolean(deadline.late) })
 
     return respond({ ticket }, 200)
   } catch (err) {

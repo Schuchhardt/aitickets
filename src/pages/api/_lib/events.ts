@@ -9,6 +9,7 @@ import { isDefaultPageSettings, normalizePageSettings } from "../../../lib/event
 import { identityPublishBlocker } from "../../../lib/producerIdentity";
 import { refreshEventRisk } from "../../../lib/eventRisk";
 import { chainError } from "../../../../netlify/lib/tickets.mjs";
+import { normalizeEntryUntil } from "../../../lib/entryDeadline.mjs";
 
 /** Guarda la categoría del evento vía category_tags(name) + event_tags (reemplaza las anteriores). */
 export async function syncEventCategory(eventId: number, category: string | null | undefined) {
@@ -85,6 +86,8 @@ export type TicketInput = {
     maxPerOrder?: number | null;
     /** Tanda anterior: id (real o temporal) de otra entrada del formulario. ""/null = se vende desde ya. */
     opensAfterId?: number | string | null;
+    /** Hora límite de ingreso ("01:00", hora de Chile, relativa a la función). ""/null = entra a cualquier hora. */
+    entryUntil?: string | null;
 };
 
 /** Normaliza un ticket del formulario. Devuelve null si es inválido. */
@@ -142,6 +145,28 @@ export async function saveFormTicketChain(eventId: number, tickets: TicketInput[
         if (!id) continue;
         const prev = hasOpensAfter(t) ? idOf(t.opensAfterId) ?? null : null;
         const { error } = await supabaseAdmin.from("event_tickets").update({ opens_after_ticket_id: prev }).eq("id", id).eq("event_id", eventId);
+        if (error) {
+            if (["42703", "PGRST204"].includes(String(error.code || ""))) return;
+            throw error;
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Hora límite de ingreso desde el formulario (event_tickets.entry_until, migración 202610300300)
+// ---------------------------------------------------------------------------------------------------------
+
+/**
+ * Guarda la hora límite de ingreso de cada entrada que la trae (formularios anteriores no mandan entryUntil). Sin la
+ * columna aún (deploy preview) no hace nada. Una hora inválida se guarda como "sin hora límite".
+ */
+export async function saveFormEntryDeadlines(eventId: number, tickets: TicketInput[], idOf: (formId: unknown) => number | undefined) {
+    const supabaseAdmin = getSupabaseAdmin();
+    for (const t of tickets) {
+        if (t?.entryUntil === undefined) continue;
+        const id = idOf(t.id);
+        if (!id) continue;
+        const { error } = await supabaseAdmin.from("event_tickets").update({ entry_until: normalizeEntryUntil(t.entryUntil) }).eq("id", id).eq("event_id", eventId);
         if (error) {
             if (["42703", "PGRST204"].includes(String(error.code || ""))) return;
             throw error;
@@ -345,11 +370,10 @@ export async function createEventGraph(
         )
         .select("id");
     if (ticketsError) throw ticketsError;
-    // Tandas encadenadas: el insert devuelve las filas en el mismo orden del formulario
-    if (tickets.some(hasOpensAfter)) {
-        const ticketIdMap = new Map(tickets.map((t, i) => [String(t.id), Number((insertedTickets as any[])?.[i]?.id)]));
-        await saveFormTicketChain(eventId, tickets, (formId) => ticketIdMap.get(String(formId)) || undefined);
-    }
+    // Tandas encadenadas y hora límite de ingreso: el insert devuelve las filas en el mismo orden del formulario
+    const ticketIdMap = new Map(tickets.map((t, i) => [String(t.id), Number((insertedTickets as any[])?.[i]?.id)]));
+    if (tickets.some(hasOpensAfter)) await saveFormTicketChain(eventId, tickets, (formId) => ticketIdMap.get(String(formId)) || undefined);
+    if (tickets.some((t) => normalizeEntryUntil(t?.entryUntil))) await saveFormEntryDeadlines(eventId, tickets, (formId) => ticketIdMap.get(String(formId)) || undefined);
 
     // 4. Categoría + campos denormalizados (start_date, end_date, location)
     await syncEventCategory(eventId, general.category);

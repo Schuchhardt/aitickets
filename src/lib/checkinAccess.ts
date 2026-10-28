@@ -2,7 +2,7 @@
 // (/puerta/<token>, links en aitickets_checkin_links: solo se guarda el sha256 del token).
 // La service role se salta RLS: todo filtra por evento (ya verificado) u organización.
 import { createHash, randomBytes } from "node:crypto";
-import { checkInSession, getFunctionCheck } from "../../netlify/lib/checkin.mjs";
+import { checkInSession, getFunctionCheck, lateEntryGate } from "../../netlify/lib/checkin.mjs";
 import { zonedDateTimeToUtc } from "../../netlify/lib/dates.mjs";
 
 export const DOOR_PATH = "/puerta";
@@ -165,11 +165,24 @@ export type CheckInResult =
           /** Entradas multifunción: a cuántas funciones lleva entrando y cuántas tiene el evento. */
           sessions_attended?: number;
           sessions_total?: number;
+          /** Entró pasada la hora límite de su tipo de entrada (la puerta forzó el ingreso). */
+          late_entry?: boolean;
+          entry_until?: string;
           ticket: any;
       }
-    | { ok: false; code: "not_found" | "already_validated" | "invalid_status"; message: string; validated_at?: string | null; status?: string | null; function_label?: string | null };
+    | {
+          ok: false;
+          code: "not_found" | "already_validated" | "invalid_status" | "late_entry";
+          message: string;
+          validated_at?: string | null;
+          status?: string | null;
+          function_label?: string | null;
+          /** late_entry: hora límite ("01:00") e instante en que venció. */
+          entry_until?: string;
+          deadline_at?: string;
+      };
 
-const TICKET_SELECT = "id, event_id, qr_code, status, validated_at, event_order_id, is_complimentary, attendees ( first_name, last_name, email ), event_tickets ( ticket_name, event_date_id )";
+const TICKET_SELECT = "id, event_id, event_ticket_id, qr_code, status, validated_at, event_order_id, is_complimentary, attendees ( first_name, last_name, email ), event_tickets ( ticket_name, event_date_id )";
 
 /** Busca una entrada del evento por id (uuid) o QR. */
 export async function findEventTicket(supabase: any, eventId: number, ref: { ticketId?: string | null; qrCode?: string | null }) {
@@ -189,13 +202,15 @@ export async function findEventTicket(supabase: any, eventId: number, ref: { tic
  * Marca el ingreso de una entrada (misma regla que /api/confirm-ticket): solo si su estado es activo
  * (NULL en entradas antiguas = activa). El UPDATE va condicionado al estado, así que dos dispositivos no
  * pueden validar la misma entrada dos veces. Una entrada multifunción entra una vez en cada función
- * (checkInSession, netlify/lib/checkin.mjs).
+ * (checkInSession, netlify/lib/checkin.mjs). Pasada la hora límite de su tipo de entrada responde late_entry,
+ * salvo `force` (la puerta decide dejar entrar igual).
  */
 export async function checkInTicket(
     supabase: any,
     eventId: number,
     ref: { ticketId?: string | null; qrCode?: string | null },
     validatedAtInput?: unknown,
+    { force = false }: { force?: boolean } = {},
 ): Promise<CheckInResult> {
     const ticket = await findEventTicket(supabase, eventId, ref);
     if (!ticket) return { ok: false, code: "not_found", message: "No existe una entrada con ese código en este evento." };
@@ -206,9 +221,13 @@ export async function checkInTicket(
     if (ticket.status != null && ticket.status !== "active" && ticket.status !== "validated") return reject(ticket);
 
     const validatedAt = resolveValidatedAt(validatedAtInput);
+    // Hora límite de ingreso (la lista "hasta las 01:00")
+    const late: any = await lateEntryGate(supabase, eventId, ticket, validatedAt, force);
+    if (late && !late.forced) return late as CheckInResult;
+    const lateFields = late ? { late_entry: true, entry_until: late.entry_until as string } : {};
     // Entrada multifunción (pase de varios días): una vez por función, no una vez en total.
     const session: any = await checkInSession(supabase, eventId, ticket, validatedAt);
-    if (session?.ok) return { ...session, ok: true, ticket_id: ticket.id, ticket };
+    if (session?.ok) return { ...session, ...lateFields, ok: true, ticket_id: ticket.id, ticket };
     if (session) return session as CheckInResult;
     if (ticket.status === "validated") return reject(ticket);
     const patch = { status: "validated", validated_at: validatedAt };
@@ -227,7 +246,7 @@ export async function checkInTicket(
         return reject(current || {});
     }
     const fn = await getFunctionCheck(supabase, eventId, ticket.event_tickets?.event_date_id ?? null);
-    return { ok: true, ticket_id: ticket.id, validated_at: validatedAt, function_mismatch: Boolean(fn.function_mismatch), function_label: fn.function_label ?? null, ticket };
+    return { ok: true, ticket_id: ticket.id, validated_at: validatedAt, function_mismatch: Boolean(fn.function_mismatch), function_label: fn.function_label ?? null, ...lateFields, ticket };
 }
 
 /**
@@ -244,9 +263,13 @@ export function presentDoorTicket(row: any) {
         validated_at: row.validated_at ?? null,
         is_complimentary: Boolean(row.is_complimentary),
         attendees: { first_name: row.attendees?.first_name || "", last_name: row.attendees?.last_name || "" },
-        event_tickets: { ticket_name: row.event_tickets?.ticket_name || "", event_date_id: row.event_tickets?.event_date_id ?? null },
+        event_tickets: {
+            ticket_name: row.event_tickets?.ticket_name || "",
+            event_date_id: row.event_tickets?.event_date_id ?? null,
+            ...(row.event_tickets?.entry_until ? { entry_until: row.event_tickets.entry_until } : {}),
+        },
         ...(Array.isArray(row.session_checkins) ? { session_checkins: row.session_checkins } : {}),
     };
 }
 
-export const DOOR_TICKET_SELECT = "id, event_id, qr_code, status, validated_at, is_complimentary, attendees ( first_name, last_name ), event_tickets ( ticket_name, event_date_id )";
+export const DOOR_TICKET_SELECT = "id, event_id, event_ticket_id, qr_code, status, validated_at, is_complimentary, attendees ( first_name, last_name ), event_tickets ( ticket_name, event_date_id )";

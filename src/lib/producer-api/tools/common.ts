@@ -2,6 +2,7 @@
 // La service role se salta RLS: TODA consulta filtra por ctx.actor.orgId (o por un evento ya verificado).
 import { ToolError, type JsonSchema, type ToolContext } from "../registry";
 import { getSoldCountsLegacy, isTicketOnSale, loadTicketChain, waitingOnPrevious } from "../../../../netlify/lib/tickets.mjs";
+import { loadEntryDeadlines } from "../../../../netlify/lib/checkin.mjs";
 
 export const TZ = "America/Santiago";
 
@@ -110,19 +111,25 @@ export async function ticketAvailability(ctx: ToolContext, eventId: number, tick
  * es del sistema, nunca se vende y solo sirve para emitir cortesías (issue_complimentary_tickets).
  * on_sale_now exige además que el evento esté publicado (si se pasa `event`).
  */
-/** Tandas encadenadas de un evento para presentTicket: a cuál espera cada una y si hoy sigue esperando. */
+/**
+ * Tandas encadenadas de un evento para presentTicket: a cuál espera cada una y si hoy sigue esperando. También la hora
+ * límite de ingreso de cada tipo (entry_until; vacío sin la migración 202610300300).
+ */
 export async function ticketChainInfo(ctx: ToolContext, eventId: number, tickets: any[], availability: Map<number, { sold: number; pending: number }>) {
-    const chain: Map<number, number> = await loadTicketChain(ctx.supabase, eventId);
+    const [chain, deadlines]: [Map<number, number>, Map<number, string>] = await Promise.all([
+        loadTicketChain(ctx.supabase, eventId),
+        loadEntryDeadlines(ctx.supabase, eventId),
+    ]);
     const remainingOf = (t: any) => Number(t.total_quantity) - (availability.get(Number(t.id))?.sold || 0) - (availability.get(Number(t.id))?.pending || 0);
     const waiting: Map<number, any> = waitingOnPrevious(tickets, chain, remainingOf);
-    return (id: number) => ({ opensAfter: chain.get(Number(id)) ?? null, waiting: waiting.has(Number(id)) });
+    return (id: number) => ({ opensAfter: chain.get(Number(id)) ?? null, waiting: waiting.has(Number(id)), entryUntil: deadlines.get(Number(id)) ?? null });
 }
 
 export function presentTicket(
     t: any,
     availability?: { sold: number; pending: number },
     event?: { status?: string | null },
-    chain?: { opensAfter?: number | null; waiting?: boolean },
+    chain?: { opensAfter?: number | null; waiting?: boolean; entryUntil?: string | null },
 ) {
     const sold = availability?.sold ?? 0;
     const pending = availability?.pending ?? 0;
@@ -147,6 +154,8 @@ export function presentTicket(
         // Tanda encadenada: se abre sola cuando se agota la anterior
         opens_after_ticket_type_id: chain?.opensAfter ?? null,
         waiting_on_previous: chain?.waiting === true,
+        // Hora límite de ingreso ("01:00", hora de Chile; antes del inicio de la función = madrugada siguiente)
+        entry_until: chain?.entryUntil ?? null,
     };
 }
 

@@ -194,7 +194,7 @@ export const LANDINGS: Landing[] = [
         faq: [
             {
                 q: "¿Cómo armo la lista free?",
-                a: "Creas un tipo de entrada de $0 llamado, por ejemplo, \"Lista free\", con su cupo. Cada persona se inscribe con su nombre y correo y le llega su QR. Si quieres que la inscripción se cierre a una hora, hoy se programa desde tu asistente de IA conectado o escribiéndonos por WhatsApp. En la puerta, tu equipo ve que es una entrada de lista al escanearla.",
+                a: "Creas un tipo de entrada de $0 llamado, por ejemplo, \"Lista free\", con su cupo. Cada persona se inscribe con su nombre y correo y le llega su QR. Si quieres que la inscripción se cierre a una hora, hoy se programa desde tu asistente de IA conectado o escribiéndonos por WhatsApp. En la puerta, tu equipo ve que es una entrada de lista al escanearla. Si la lista vale hasta cierta hora, le pones «Ingreso hasta» (por ejemplo 01:00) y después de esa hora el escáner la marca fuera de horario: tu equipo decide si entra igual.",
             },
             {
                 q: "¿Cómo vendo mesas?",

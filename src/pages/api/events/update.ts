@@ -3,7 +3,7 @@ import { getSupabaseAdmin, getFriendlyErrorMessage } from "../../../lib/auth-hel
 import { getSessionContext, getOwnedEvent, hasRole, EVENT_MANAGER_ROLES, jsonResponse } from "../../../lib/supabaseServer";
 import { callInternalFunction, notifySlack, siteUrl } from "../_lib/server-utils";
 import { IDENTITY_REQUIRED_MESSAGE, eventRequiresIdentity, identityApproved, loadOrgIdentity, ticketsRequireIdentity } from "../../../lib/producerIdentity";
-import { syncEventCategory, refreshEventDenorm, normalizeTicket, isClientTempId, isValidDateInput, resolveTicketDateId, setEventStatus, EventInputError, saveCoverSettings, savePageSettings, validateFormTicketChain, saveFormTicketChain, assertFunctionCount } from "../_lib/events";
+import { syncEventCategory, refreshEventDenorm, normalizeTicket, isClientTempId, isValidDateInput, resolveTicketDateId, setEventStatus, EventInputError, saveCoverSettings, savePageSettings, validateFormTicketChain, saveFormTicketChain, saveFormEntryDeadlines, assertFunctionCount } from "../_lib/events";
 import { sanitizeRichText } from "../../../lib/sanitize";
 import { listOrgVenues, isVenueAllowed, insertOrgVenue } from "../../../lib/orgVenues";
 import { loadSchedule, describeScheduleChange } from "../_lib/eventSchedule";
@@ -298,6 +298,7 @@ export const POST: APIRoute = async (context) => {
         }
 
         await saveFormTicketChain(event.id, tickets, (formId) => ticketIdMap.get(String(formId)));
+        await saveFormEntryDeadlines(event.id, tickets, (formId) => ticketIdMap.get(String(formId)));
 
         // Entradas eliminadas en el formulario: se borran si no tienen ventas; si tienen, se retiran de la venta
         for (const ticketId of existingTicketIds) {

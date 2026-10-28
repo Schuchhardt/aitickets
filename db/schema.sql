@@ -156,6 +156,8 @@ CREATE TABLE public.event_tickets (
   event_date_id bigint,
   -- 202610290100: tanda anterior (se abre sola cuando esa se agota)
   opens_after_ticket_id bigint REFERENCES public.event_tickets(id) ON DELETE SET NULL,
+  -- 202610300300: hora límite de ingreso (la lista "hasta las 01:00"; antes del inicio = madrugada siguiente)
+  entry_until time,
   CONSTRAINT event_tickets_pkey PRIMARY KEY (id),
   CONSTRAINT event_tickets_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.events(id)
 );

@@ -126,7 +126,7 @@ const copyTicketsToFunctions = () =>
 
 // Logic Step 3 (Tickets)
 const addTicket = () => {
-  form.value.tickets.push({ id: newTempId(), name: '', price: 0, quantity: 100, description: '', eventDateId: '', opensAfterId: '' })
+  form.value.tickets.push({ id: newTempId(), name: '', price: 0, quantity: 100, description: '', eventDateId: '', opensAfterId: '', entryUntil: '' })
 }
 
 const removeTicket = (index) => {
@@ -547,6 +547,11 @@ if (form.value.tickets.length === 0) addTicket()
                   </select>
                   <p v-if="ticket.opensAfterId" class="mt-1 text-xs text-gray-500">En la página aparece como «Se abre al agotarse…» y se pone a la venta sola cuando se venden todas las de la anterior.</p>
                </div>
+               <div class="col-span-2 sm:col-span-1">
+                  <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Ingreso hasta <span class="normal-case font-normal">(opcional)</span></label>
+                  <input v-model="ticket.entryUntil" type="time" class="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black outline-none bg-white" data-testid="ticket-entry-until" />
+                  <p v-if="ticket.entryUntil" class="mt-1 text-xs text-gray-500">Pasada esa hora la puerta ve «fuera de horario» y decide si entra. Una hora antes del inicio cuenta como la madrugada siguiente.</p>
+               </div>
              </div>
            </div>
 
@@ -580,6 +585,7 @@ if (form.value.tickets.length === 0) addTicket()
                      {{ t.name }}: {{ t.quantity ?? 'Sin límite' }} x ${{ t.price }}
                      <span v-if="functionOptions.length > 1" class="text-gray-500"> · {{ functionLabelFor(t.eventDateId) }}</span>
                      <span v-if="chainSummary(form.tickets, t)" class="text-gray-500"> · {{ chainSummary(form.tickets, t) }}</span>
+                     <span v-if="t.entryUntil" class="text-gray-500"> · Ingreso hasta {{ t.entryUntil }}</span>
                    </li>
                  </ul>
                </div>

@@ -234,6 +234,11 @@ export const NIGHT_FRAMES = Object.freeze([
 export const NIGHT_PEAK_STEP = 14
 /** Hora en que se cierra la inscripción a la lista (la del fotograma que la cierra) */
 export const LIST_CLOSES_AT = clock(toMinutes(NIGHT_START) + NIGHT_FRAMES.find((f) => f.listClosed).step * 15)
+/**
+ * Hora límite de ingreso de la lista (event_tickets.entry_until): desde el fotograma de las 03:00 los ingresados de la
+ * lista ya no suben. Pasada esa hora el escáner la marca "fuera de horario" (src/lib/entryDeadline.mjs).
+ */
+export const LIST_ENTRY_UNTIL = clock(toMinutes(NIGHT_START) + 20 * 15)
 
 const sum = (byKind) => TICKET_KINDS.reduce((s, k) => s + byKind[k], 0)
 
