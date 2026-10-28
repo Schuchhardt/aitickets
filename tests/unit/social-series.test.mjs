@@ -279,7 +279,7 @@ describe('preparar y aprobar', () => {
 
     const first = await call('approve_social_series', { event_id: 2296 })
     expect(first.status).toBe('confirmation_required')
-    expect(first.summary).toMatch(/10 historia\(s\) y 7 publicación\(es\) en el feed/)
+    expect(first.summary).toMatch(/10 historia\(s\) y 7 post\(s\) de feed/)
     expect(series().status).toBe('draft')
 
     const approved = await call('approve_social_series', { event_id: 2296, confirmation_token: first.confirmation_token })

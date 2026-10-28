@@ -37,8 +37,8 @@ const STATUS_LABELS: Record<string, string> = {
 };
 const SERIES_STATUS_LABELS: Record<string, string> = { draft: "Sin activar (borrador)", active: "Activa", paused: "Pausada", completed: "Terminada", cancelled: "Cancelada" };
 
-const KIND_LABELS: Record<string, string> = { story: "Historia", feed_post: "Publicación en el feed", reel: "Reel" };
-const kindLabel = (kind: string, platform = "instagram") => (platform === "tiktok" && kind === "feed_post" ? "Publicación con foto" : platform === "tiktok" && kind === "reel" ? "Video" : KIND_LABELS[kind] || kind);
+const KIND_LABELS: Record<string, string> = { story: "Historia", feed_post: "Post de feed", reel: "Reel" };
+const kindLabel = (kind: string, platform = "instagram") => (platform === "tiktok" && kind === "feed_post" ? "Post de foto" : platform === "tiktok" && kind === "reel" ? "Video" : KIND_LABELS[kind] || kind);
 
 const stageLabel = (kind: string, variant: string, days: number) => {
     const t = pieceText({ kind: kind === "feed_post" ? "feed_post" : "story", variant: variant === "sold_out" ? "sold_out" : "countdown", daysToEvent: days, eventName: "", dateLabel: "", startTime: null, venue: null, keyword: "", remaining: null, styleIndex: 0 });
@@ -138,7 +138,7 @@ export async function seriesView(ctx: ToolContext, eventId: number, { refreshSta
             last_local: localDateTime(p.slots[p.slots.length - 1]?.publish_at),
             slots: p.slots.map((s) => ({
                 kind: s.kind,
-                kind_label: s.kind === "feed_post" ? "Publicación en el feed" : "Historia",
+                kind_label: s.kind === "feed_post" ? "Post de feed" : "Historia",
                 days_to_event: s.days_to_event,
                 stage: stageLabel(s.kind, "countdown", s.days_to_event),
                 publish_at: s.publish_at,
@@ -221,7 +221,7 @@ const getSocialSeries: ToolDef = {
     name: "get_social_series",
     title: "Ver difusión automática (historias)",
     description:
-        "Estado de las historias y publicaciones automáticas de un evento (Instagram y, si están activadas, Facebook y TikTok): si se puede activar (y qué falta), el calendario propuesto " +
+        "Estado de las historias y posts automáticos de un evento (Instagram y, si están activadas, Facebook y TikTok): si se puede activar (y qué falta), el calendario propuesto " +
         "(borrador) o las piezas programadas y publicadas con su estado, la próxima publicación, DMs enviados y clics, y ventas atribuidas a " +
         "los DM (ref ig-story-dm / ig-post-dm). Responde \"¿cómo va mi difusión?\".",
     scope: "read",
@@ -238,7 +238,7 @@ const prepareSocialSeries: ToolDef = {
     title: "Preparar difusión automática (borrador)",
     description:
         "Deja preparada (en borrador, sin publicar nada) la serie de historias automáticas de un evento: cadencia automática (cada 3 días, diaria la " +
-        "última semana y el día del evento), publicaciones en el feed la última semana (feed_posts_enabled), palabra clave del DM (ENTRADAS por defecto), " +
+        "última semana y el día del evento), posts de feed la última semana (feed_posts_enabled), palabra clave del DM (ENTRADAS por defecto), " +
         "mensaje del DM ({link} = link con seguimiento), foto base (por defecto la portada), si publica también en la página de Facebook " +
         "(facebook_enabled) y en TikTok (tiktok_enabled; foto vertical cada día de la última semana), y el reel con el video vertical del " +
         "evento (reel_enabled; 3 a 60 s). Devuelve el calendario para que el productor lo " +
@@ -252,14 +252,14 @@ const prepareSocialSeries: ToolDef = {
         additionalProperties: false,
         properties: {
             event_id: eventIdSchema,
-            feed_posts_enabled: { type: "boolean", description: "Una publicación diaria en el feed la última semana (por defecto sí)." },
+            feed_posts_enabled: { type: "boolean", description: "Un post de feed diario la última semana (por defecto sí)." },
             sold_out_story_enabled: { type: "boolean", description: "Si se agota, publicar una historia \"Entradas agotadas, gracias\" (por defecto no)." },
             keyword: { type: "string", pattern: KEYWORD_PATTERN, description: "Palabra que la gente responde o comenta para recibir el link (por defecto ENTRADAS)." },
             extra_keywords: { type: "array", maxItems: 5, items: { type: "string", pattern: KEYWORD_PATTERN }, description: "Variantes que también activan el DM (por defecto entrada y link)." },
             dm_message: { type: "string", maxLength: 600, description: "Texto del DM. {link} se reemplaza por el link con seguimiento (si no está, va al final). Vacío = mensaje por defecto." },
             base_image_url: { type: "string", maxLength: 2000, pattern: "^(https://.*)?$", description: "Foto base (de upload_image). Vacío = la portada del evento." },
-            facebook_enabled: { type: "boolean", description: "Publicar también las historias y publicaciones en la página de Facebook conectada (por defecto no)." },
-            tiktok_enabled: { type: "boolean", description: "Publicar también en TikTok: una publicación con foto vertical cada día de la última semana (por defecto no)." },
+            facebook_enabled: { type: "boolean", description: "Publicar también las historias y posts en la página de Facebook conectada (por defecto no)." },
+            tiktok_enabled: { type: "boolean", description: "Publicar también en TikTok: un post de foto vertical cada día de la última semana (por defecto no)." },
             reel_enabled: { type: "boolean", description: "Si el evento tiene un video vertical de 3 a 60 s, publicarlo como reel unos días antes (por defecto sí)." },
         },
     },
@@ -296,7 +296,7 @@ const approveSocialSeries: ToolDef = {
     name: "approve_social_series",
     title: "Aprobar y programar difusión automática",
     description:
-        "Aprueba la serie (aprobación única): desde aquí AI Tickets publica sola las historias (y las publicaciones en el feed) en el Instagram de la " +
+        "Aprueba la serie (aprobación única): desde aquí AI Tickets publica sola las historias (y los posts de feed) en el Instagram de la " +
         "organización (y en Facebook y TikTok si se activaron) hasta el día del evento y responde por DM con el link a quien responda o comente la palabra clave. Acción pública: el " +
         "servidor devuelve primero el resumen y solo activa al repetir la llamada con confirmation_token.",
     scope: "publish",
@@ -310,13 +310,13 @@ const approveSocialSeries: ToolDef = {
             const series = view.series;
             const extra = [
                 plan.facebook_posts ? `Facebook (${view.networks.facebook.account || "página conectada"}): ${plan.facebook_posts} pieza(s)` : null,
-                plan.tiktok_posts ? `TikTok (${view.networks.tiktok.account || "cuenta conectada"}): ${plan.tiktok_posts} publicación(es) con foto` : null,
+                plan.tiktok_posts ? `TikTok (${view.networks.tiktok.account || "cuenta conectada"}): ${plan.tiktok_posts} post(s) de foto` : null,
                 plan.reels.length ? `reel con el video del evento el ${plan.reels[0].publish_local?.replace("T", " ")} en ${plan.reels.map((r: any) => S.NETWORK_NAMES[r.platform]).join(", ")}` : null,
             ].filter(Boolean);
             return {
                 message:
                     `Activar la difusión automática de "${view.event.name}" en Instagram (${view.instagram.connected ? (view.instagram as any).account || "cuenta conectada" : "sin cuenta"}): ` +
-                    `${plan.stories} historia(s)${plan.feed_posts ? ` y ${plan.feed_posts} publicación(es) en el feed` : ""} entre el ${plan.first_local?.replace("T", " ")} y el ${plan.last_local?.replace("T", " ")} ` +
+                    `${plan.stories} historia(s)${plan.feed_posts ? ` y ${plan.feed_posts} post(s) de feed` : ""} entre el ${plan.first_local?.replace("T", " ")} y el ${plan.last_local?.replace("T", " ")} ` +
                     `(hora de Chile), con DM automático a quien responda o comente ${series?.keyword || S.DEFAULT_KEYWORD}.` +
                     `${extra.length ? ` Además: ${extra.join("; ")}.` : ""} Se publican solas, sin otra aprobación.`,
                 details: {

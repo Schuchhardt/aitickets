@@ -4,7 +4,7 @@ import { Instagram, Facebook, Music2, Clapperboard, CalendarClock, Pause, Play, 
 import { CANVA_REEL_URL } from '../../lib/socialPlatforms'
 
 // Difusión automática (docs/specs/historias-automaticas.md): el productor aprueba una vez y AI Tickets publica
-// historias (y publicaciones la última semana) en Instagram hasta el día del evento, con el link por DM a quien responda la
+// historias (y posts la última semana) en Instagram hasta el día del evento, con el link por DM a quien responda la
 // palabra clave. Por evento puede sumar la página de Facebook y TikTok (misma cadencia; cada red con su estado, una que
 // falla no frena a las otras) y un reel con el video vertical del evento. Habla con /api/events/social-series
 // (herramientas *_social_series de la API de productores).
@@ -22,8 +22,8 @@ const configuring = ref(false)
 const previewVersion = ref(Date.now())
 const form = ref({ feed_posts_enabled: true, sold_out_story_enabled: false, keyword: 'ENTRADAS', dm_message: '', base_image_url: '', facebook_enabled: false, tiktok_enabled: false, reel_enabled: true })
 const NETWORKS = [
-  { id: 'facebook', name: 'Facebook', icon: Facebook, what: 'Las mismas historias y publicaciones en tu página' },
-  { id: 'tiktok', name: 'TikTok', icon: Music2, what: 'Una publicación con foto vertical cada día de la última semana' },
+  { id: 'facebook', name: 'Facebook', icon: Facebook, what: 'Las mismas historias y posts en tu página' },
+  { id: 'tiktok', name: 'TikTok', icon: Music2, what: 'Un post de foto vertical cada día de la última semana' },
 ]
 const PLATFORM_ICON = { instagram: Instagram, facebook: Facebook, tiktok: Music2 }
 
@@ -276,7 +276,7 @@ const done = computed(() => (view.value?.slots || []).filter((s) => ['published'
 
           <div v-else-if="!configuring" class="space-y-3">
             <p v-if="plan" class="text-sm text-gray-700">
-              Se publicarían <strong>{{ plan.stories }} historias</strong><template v-if="plan.feed_posts"> y <strong>{{ plan.feed_posts }} publicaciones</strong></template>
+              Se publicarían <strong>{{ plan.stories }} historias</strong><template v-if="plan.feed_posts"> y <strong>{{ plan.feed_posts }} posts</strong></template>
               en <strong>{{ view.instagram.account || 'tu Instagram' }}</strong>, cada vez más seguido a medida que se acerca el evento, a las {{ plan.publish_time }}.
               Puedes sumar Facebook y TikTok.
             </p>
@@ -300,7 +300,7 @@ const done = computed(() => (view.value?.slots || []).filter((s) => ['published'
                 <input v-model="form.keyword" maxlength="30" class="w-full bg-gray-50 border border-gray-200 text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-black uppercase" />
               </label>
               <div class="flex flex-col justify-end gap-2 text-sm text-gray-700">
-                <label class="flex items-center gap-2 cursor-pointer"><input v-model="form.feed_posts_enabled" type="checkbox" /> Publicaciones en el feed la última semana</label>
+                <label class="flex items-center gap-2 cursor-pointer"><input v-model="form.feed_posts_enabled" type="checkbox" /> Posts de feed la última semana</label>
                 <label class="flex items-center gap-2 cursor-pointer"><input v-model="form.sold_out_story_enabled" type="checkbox" /> Historia "agotado" si se agota</label>
               </div>
             </div>
@@ -360,7 +360,7 @@ const done = computed(() => (view.value?.slots || []).filter((s) => ['published'
 
             <div v-if="plan" class="space-y-2">
               <p class="text-sm text-gray-700">
-                <strong>{{ plan.stories }} historias</strong><template v-if="plan.feed_posts"> y <strong>{{ plan.feed_posts }} publicaciones</strong></template>
+                <strong>{{ plan.stories }} historias</strong><template v-if="plan.feed_posts"> y <strong>{{ plan.feed_posts }} posts</strong></template>
                 a las {{ plan.publish_time }} <span class="text-gray-500">({{ plan.publish_time_source }})</span><template v-if="extraSummary">; además {{ extraSummary }}</template>.
                 La cuenta de entradas se actualiza al publicar.
               </p>

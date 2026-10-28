@@ -24,7 +24,7 @@ const nets = ['Instagram', 'Facebook', 'TikTok', 'Reel con tu video']
     <div class="st-scroll">
       <ol class="st-days" aria-label="Publicaciones de los últimos 14 días antes del show">
         <li v-for="(m, i) in marks" :key="m.day" class="st-day" :style="{ '--i': i }">
-          <span class="lp-sr-only">{{ m.label }}: {{ [m.story && 'historia', m.post && 'publicación'].filter(Boolean).join(' y ') || 'nada' }}</span>
+          <span class="lp-sr-only">{{ m.label }}: {{ [m.story && 'historia', m.post && 'post'].filter(Boolean).join(' y ') || 'nada' }}</span>
           <span class="st-bars" aria-hidden="true">
             <span v-if="m.story" class="st-bar st-story"></span>
             <span v-if="m.post" class="st-bar st-post"></span>
@@ -35,7 +35,7 @@ const nets = ['Instagram', 'Facebook', 'TikTok', 'Reel con tu video']
     </div>
     <p class="mu-mono st-legend">
       <span class="st-key st-key-story" aria-hidden="true"></span>{{ counts.stories }} historias ·
-      <span class="st-key st-key-post" aria-hidden="true"></span>{{ counts.posts }} publicaciones · hora: la de más visitas de tu
+      <span class="st-key st-key-post" aria-hidden="true"></span>{{ counts.posts }} posts · hora: la de más visitas de tu
       evento, o {{ props.cadence.default_time }}. El día del show, a las {{ props.cadence.event_day_time }}.
     </p>
     <ul class="st-nets" aria-label="Redes">

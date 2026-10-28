@@ -106,7 +106,7 @@ function AdsTable({ ads }) {
           h(
             'tr',
             { key: `ad-${i}` },
-            h('td', { style: cell }, `${a.ad_type === 'boost' ? 'Publicación' : 'Anuncio'} #${a.id}`, AD_STATUS_LABELS[a.status] ? h('span', { style: { color: COLORS.muted } }, ` · ${AD_STATUS_LABELS[a.status]}`) : null),
+            h('td', { style: cell }, `${a.ad_type === 'boost' ? 'Post' : 'Anuncio'} #${a.id}`, AD_STATUS_LABELS[a.status] ? h('span', { style: { color: COLORS.muted } }, ` · ${AD_STATUS_LABELS[a.status]}`) : null),
             h('td', { style: { ...cell, ...num } }, adMoney(a.spend, a.currency)),
             h('td', { style: { ...cell, ...num } }, a.tickets ? `${a.tickets.toLocaleString('es-CL')} (${clp(a.revenue_clp)})` : '0'),
             h('td', { style: { ...cell, ...num } }, a.cost_per_ticket != null ? adMoney(a.cost_per_ticket, a.currency) : '—')

@@ -245,7 +245,7 @@ describe('preparar y aprobar con Facebook y TikTok', () => {
 
     const first = await call('approve_social_series', { event_id: 2296 })
     expect(first.summary).toMatch(/Facebook \(Escuela Dire\): 17 pieza/)
-    expect(first.summary).toMatch(/TikTok \(@escueladire\): 7 publicación/)
+    expect(first.summary).toMatch(/TikTok \(@escueladire\): 7 post/)
     expect(first.summary).toMatch(/reel con el video del evento/)
     await call('approve_social_series', { event_id: 2296, confirmation_token: first.confirmation_token })
 

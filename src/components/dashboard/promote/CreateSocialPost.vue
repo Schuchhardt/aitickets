@@ -1,5 +1,5 @@
 <script setup>
-// Crear una publicación manual (Promocionar → Nueva publicación) para Instagram, Facebook, TikTok y LinkedIn: evento, texto e imágenes,
+// Crear un post manual (Promocionar → Nuevo post) para Instagram, Facebook, TikTok y LinkedIn: evento, texto e imágenes,
 // redes y programación. Las reglas de cada red (imagen obligatoria, largo del texto) vienen de src/lib/socialPlatforms.ts.
 import { prepareImageForUpload } from '../../../lib/clientImage'
 import { SOCIAL_PLATFORMS, PLATFORM_RULES, postMediaProblem } from '../../../lib/socialPlatforms'
@@ -92,7 +92,7 @@ const handleFileUpload = async (e) => {
   if (!file) return
   
   if (imageUrls.value.length >= 4) {
-    alert('Máximo 4 imágenes por publicación')
+    alert('Máximo 4 imágenes por post')
     return
   }
 
@@ -145,7 +145,7 @@ const generateText = async (tone = '') => {
 const generateImage = async () => {
   if (!selectedEventId.value) return
   if (imageUrls.value.length >= 4) {
-    alert('Máximo 4 imágenes por publicación')
+    alert('Máximo 4 imágenes por post')
     return
   }
   isGeneratingImage.value = true
@@ -187,7 +187,7 @@ const handleSubmitAndPublish = async () => {
 
     const createData = await createRes.json()
     if (!createRes.ok) {
-      alert(createData.message || 'Error al crear la publicación')
+      alert(createData.message || 'Error al crear post')
       return
     }
 
@@ -203,11 +203,11 @@ const handleSubmitAndPublish = async () => {
     if (publishRes.ok) {
       window.location.href = '/dashboard/promote?published=true'
     } else {
-      alert(publishData.message || 'Error al publicar. La publicación quedó guardada como borrador.')
+      alert(publishData.message || 'Error al publicar. El post fue guardado como borrador.')
       window.location.href = '/dashboard/promote'
     }
   } catch (err) {
-    alert('Error al publicar')
+    alert('Error al publicar el post')
   } finally {
     isSubmitting.value = false
     isPublishing.value = false
@@ -260,7 +260,7 @@ const selectedTone = ref('')
         <ArrowLeft :size="20" class="text-gray-600" />
       </a>
       <div class="min-w-0">
-        <h1 class="text-2xl md:text-3xl font-bold font-[Unbounded]">Crear publicación</h1>
+        <h1 class="text-2xl md:text-3xl font-bold font-[Unbounded]">Crear Post</h1>
         <p class="text-gray-600">Publica contenido en tus redes sociales conectadas.</p>
       </div>
     </div>
@@ -324,7 +324,7 @@ const selectedTone = ref('')
       <div v-if="currentStep === 2" class="space-y-6">
         <!-- Content Editor -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 md:p-6">
-          <h2 class="text-xl font-bold mb-1">Escribe tu publicación</h2>
+          <h2 class="text-xl font-bold mb-1">Compone tu Post</h2>
           <p class="text-gray-500 text-sm mb-6">Escribe el contenido o genera con IA.</p>
 
           <!-- AI Text Generation -->
@@ -452,14 +452,14 @@ const selectedTone = ref('')
               :min="new Date().toISOString().slice(0, 16)"
             />
           </div>
-          <p v-if="!isScheduled" class="text-sm text-gray-400">Se publicará inmediatamente.</p>
+          <p v-if="!isScheduled" class="text-sm text-gray-400">El post se publicará inmediatamente.</p>
         </div>
       </div>
 
       <!-- Step 3: Preview -->
       <div v-if="currentStep === 3" class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 md:p-6">
         <h2 class="text-xl font-bold mb-1">Vista Previa</h2>
-        <p class="text-gray-500 text-sm mb-6">Así se verá tu publicación en redes sociales.</p>
+        <p class="text-gray-500 text-sm mb-6">Así se verá tu post en redes sociales.</p>
 
         <!-- Mock social post -->
         <div class="max-w-md mx-auto border border-gray-200 rounded-xl overflow-hidden">
@@ -507,9 +507,9 @@ const selectedTone = ref('')
 
       <!-- Step 4: Publish -->
       <div v-if="currentStep === 4" class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 md:p-6 text-center">
-        <h2 class="text-xl font-bold mb-1">{{ isScheduled ? 'Programar publicación' : 'Publicar ahora' }}</h2>
+        <h2 class="text-xl font-bold mb-1">{{ isScheduled ? 'Programar Post' : 'Publicar Post' }}</h2>
         <p class="text-gray-500 text-sm mb-6 md:mb-8">
-          {{ isScheduled ? 'Tu publicación saldrá en la fecha programada.' : 'Tu publicación saldrá ahora en las plataformas seleccionadas.' }}
+          {{ isScheduled ? 'Tu post se publicará en la fecha programada.' : 'Tu post se publicará ahora en las plataformas seleccionadas.' }}
         </p>
 
         <!-- Summary -->

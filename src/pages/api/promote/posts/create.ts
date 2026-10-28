@@ -63,10 +63,10 @@ export const POST: APIRoute = async (context) => {
 
         if (error) {
             console.error("Create post error:", error);
-            return new Response(JSON.stringify({ message: "Error al crear la publicación" }), { status: 500 });
+            return new Response(JSON.stringify({ message: "Error al crear el post" }), { status: 500 });
         }
 
-        return new Response(JSON.stringify({ message: "Publicación creada", id: post.id }), {
+        return new Response(JSON.stringify({ message: "Post creado exitosamente", id: post.id }), {
             status: 200,
             headers: { "Content-Type": "application/json" },
         });

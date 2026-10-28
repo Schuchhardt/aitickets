@@ -75,7 +75,7 @@ const PROMPTS: McpPrompt[] = [
             { name: "objetivo", description: "Ej: vender la preventa, último aviso, lanzar line-up.", required: false },
         ],
         render: (a: Record<string, string>) =>
-            `Crea una campaña de 3 publicaciones para "${a.evento}"${a.objetivo ? ` con el objetivo: ${a.objetivo}` : ""}. ` +
+            `Crea una campaña de 3 posts para "${a.evento}"${a.objetivo ? ` con el objetivo: ${a.objetivo}` : ""}. ` +
             "Usa get_marketing_kit, propone copies distintos (anuncio, prueba social/urgencia, último llamado), genera o sube imágenes, " +
             "créalos como borradores con create_social_post usando links con create_tracking_link, y muéstramelos antes de publicar nada.",
     },

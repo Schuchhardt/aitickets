@@ -90,14 +90,14 @@ export const EVENT_MODULES: EventModule[] = [
     {
         id: "social-series",
         title: "Difusión automática en Instagram",
-        description: "Historias y publicaciones hasta el día del evento.",
+        description: "Historias y posts hasta el día del evento.",
         tab: "difusion",
         when: (ctx) => ctx.status === "published" && ctx.phase !== "after",
     },
     {
         id: "promote",
-        title: "Publicaciones y anuncios",
-        description: "Publica en tus redes o crea un anuncio pagado para este evento.",
+        title: "Posts y anuncios",
+        description: "Publica un post en tus redes o crea un anuncio pagado para este evento.",
         tab: "difusion",
         when: (ctx) => ctx.status === "published" && ctx.phase !== "after",
     },

@@ -16,7 +16,7 @@ export const POST: APIRoute = async (context) => {
         const { postId } = body;
 
         if (!postId) {
-            return new Response(JSON.stringify({ message: "ID de publicación requerido" }), { status: 400 });
+            return new Response(JSON.stringify({ message: "ID de post requerido" }), { status: 400 });
         }
 
         const dbUser = session.dbUser;
@@ -30,7 +30,7 @@ export const POST: APIRoute = async (context) => {
         }
 
         return new Response(JSON.stringify({
-            message: result.status === "scheduled" ? "Publicación programada" : "Publicación hecha",
+            message: result.status === "scheduled" ? "Post programado exitosamente" : "Post publicado exitosamente",
             zernio_post_id: result.zernioPostId,
         }), {
             status: 200,

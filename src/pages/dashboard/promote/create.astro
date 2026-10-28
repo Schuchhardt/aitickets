@@ -34,7 +34,7 @@ const { data: socialAccounts } = await supabaseAdmin
 const preSelectedEventId = Astro.url.searchParams.get("event") || "";
 ---
 
-<DashboardLayout title="Crear publicación">
+<DashboardLayout title="Crear Post">
   <CreateSocialPost
     client:only="vue"
     eventsJson={JSON.stringify(events || [])}

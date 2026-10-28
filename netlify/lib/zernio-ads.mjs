@@ -339,7 +339,7 @@ export function validateAdInput(raw, { connection, event, post = null, now = new
     if (!value.body) errors.push('Escribe el texto del anuncio.')
     if (!isHttpsUrl(value.imageUrl)) errors.push('El anuncio necesita una imagen.')
   } else if (!post?.zernio_post_id || post.status !== 'published') {
-    errors.push('Solo se pueden promocionar publicaciones hechas desde AI Tickets.')
+    errors.push('Solo se pueden promocionar posts ya publicados desde AI Tickets.')
   }
 
   return errors.length ? { ok: false, errors } : { ok: true, value }

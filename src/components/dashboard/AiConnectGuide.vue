@@ -67,7 +67,7 @@ const examplePrompts = [
   'Crea un evento "Fiesta de Primavera" el sábado 15 de noviembre a las 22:00 en mi lugar de siempre, con entradas General a $8.000 y VIP a $15.000.',
   'Crea un código PREVENTA20 de 20% de descuento válido hasta el viernes.',
   'Genera una portada para mi evento usando esta imagen de referencia: https://…',
-  'Arma una campaña de 3 publicaciones para Instagram y déjalas en borrador.',
+  'Arma una campaña de 3 posts para Instagram y déjalos en borrador.',
   'Muéstrame la vista previa de mi evento en borrador.',
 ]
 
