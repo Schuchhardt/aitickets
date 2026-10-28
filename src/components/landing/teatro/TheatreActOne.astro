@@ -13,7 +13,6 @@ import FunctionPicker from "./FunctionPicker.vue";
 import PressPass from "./PressPass.astro";
 import LinkSales from "./LinkSales.astro";
 import ProsceniumPhoto from "./ProsceniumPhoto.astro";
-import SoonBadge from "../../ui/SoonBadge.vue";
 import { THEATRE_PHOTOS } from "./teatroLanding.js";
 import { MAX_EVENT_FUNCTIONS } from "../../../data/producerFaq";
 
@@ -72,7 +71,6 @@ const pressItems = [
             chips.map((c) => (
               <li class="te-chip">
                 {c.label}
-                {c.soon && <SoonBadge dark />}
               </li>
             ))
           }
