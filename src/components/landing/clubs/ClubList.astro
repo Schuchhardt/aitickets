@@ -5,7 +5,8 @@
 // canal, cierre de la inscripción a una hora (ventana de venta por entrada, isTicketOnSale; hoy desde el asistente de IA,
 // tools/tickets.ts), lista de invitados (tools/guests.ts, solo desde el asistente: AI Tickets no envía WhatsApp, deja
 // los links listos) y cortesías con su QR (CourtesyTicketsForm.vue).
-// "Pronto": acceso propio de cada RRPP a sus números y cuántos de cada lista entraron (check-ins por canal). La comisión
+// Cuántos de cada lista entraron: columna "Entraron" de Ventas por canal en la analítica y by_channel de
+// get_checkin_stats (eventAnalytics.ts, loadOrderCheckins). "Pronto": acceso propio de cada RRPP a sus números. La comisión
 // automática por RRPP no existe y no se muestra (Preguntas abiertas 5).
 // Mobile: los ítems arriba y el ranking como cards debajo.
 import LedHeading from "./LedHeading.astro";
@@ -66,7 +67,7 @@ const items = [
         <RrppBoard client:visible directLabel={DIRECT_CHANNEL} />
         <ul class="cll-soon" data-testid="club-rrpp-soon">
           <li>Cada RRPP ve sus números en su celular <SoonBadge dark /></li>
-          <li>Cuántos de cada lista entraron <SoonBadge dark /></li>
+          <li>Cuántos de cada lista entraron, en las métricas de tu noche</li>
         </ul>
         <p class="cll-links">
           <a href="/guias/como-medir-ventas-por-promotor" class="cl-link">Guía: cómo medir ventas por promotor →</a>

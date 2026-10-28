@@ -121,6 +121,41 @@ export async function eventVisitCounts(supabase: any, eventId: number): Promise<
     return { visits: rows.length, unique_visitors: new Set(rows.map((v) => v.ip_hash)).size, truncated: rows.length >= MAX_VISITS };
 }
 
+export type OrderCheckins = { tickets: number; checked_in: number };
+
+/**
+ * Entradas vigentes e ingresadas (status validated) por orden de venta, para "entraron" por canal / link de RRPP.
+ * Una entrada transferida a otro titular queda en la orden de la transferencia: se cuenta en la venta original
+ * (transferred_from_order, siguiendo la cadena), que es la que trajo el link. `orders` = loadPaidOrders.
+ */
+export async function loadOrderCheckins(supabase: any, eventId: number, orders: any[]): Promise<Map<string, OrderCheckins>> {
+    const rows = await fetchAll<{ event_order_id: string | null; status: string | null }>(() =>
+        supabase.from("event_attendees").select("id, event_order_id, status").eq("event_id", eventId).order("id", { ascending: true }),
+    );
+    const origin = new Map<string, string>();
+    for (const o of orders) {
+        if (isTransferOrder(o)) origin.set(String(o.id), String(orderLines(o)[0]?.transferred_from_order));
+    }
+    const root = (id: string) => {
+        const seen = new Set<string>();
+        while (origin.has(id) && !seen.has(id)) {
+            seen.add(id);
+            id = origin.get(id)!;
+        }
+        return id;
+    };
+    const out = new Map<string, OrderCheckins>();
+    for (const a of rows) {
+        if (!a.event_order_id || (a.status != null && a.status !== "active" && a.status !== "validated")) continue;
+        const id = root(String(a.event_order_id));
+        const row = out.get(id) || { tickets: 0, checked_in: 0 };
+        row.tickets += 1;
+        if (a.status === "validated") row.checked_in += 1;
+        out.set(id, row);
+    }
+    return out;
+}
+
 // ---------------------------------------------------------------------------
 // Ventas
 // ---------------------------------------------------------------------------
@@ -214,13 +249,18 @@ export function summarizeTraffic(visits: VisitRow[], { geoTop = 10, sourcesTop =
 /**
  * Ventas y conversión por canal de seguimiento. Las visitas se atribuyen por los parámetros del link con que
  * llegaron (ref / utm_*); las órdenes, por la atribución que guardó el checkout. Si ref aún no se registra en las
- * visitas (refTracked = false), los canales ref:* no tienen visitas conocidas (null).
+ * visitas (refTracked = false), los canales ref:* no tienen visitas conocidas (null). Con `checkins`
+ * (loadOrderCheckins) cada canal trae también cuántas de sus entradas ya ingresaron (checked_in).
  */
-export function channelConversion(visits: VisitRow[], sales: any[], { refTracked = true, top = 20 } = {}) {
-    const rows = new Map<string, { channel: string; visits: number; visitors: Set<string>; orders: number; tickets: number; revenue_clp: number }>();
+export function channelConversion(
+    visits: VisitRow[],
+    sales: any[],
+    { refTracked = true, top = 20, checkins = null }: { refTracked?: boolean; top?: number; checkins?: Map<string, OrderCheckins> | null } = {},
+) {
+    const rows = new Map<string, { channel: string; visits: number; visitors: Set<string>; orders: number; tickets: number; revenue_clp: number; checked_in: number }>();
     const get = (channel: string) => {
         let r = rows.get(channel);
-        if (!r) rows.set(channel, (r = { channel, visits: 0, visitors: new Set(), orders: 0, tickets: 0, revenue_clp: 0 }));
+        if (!r) rows.set(channel, (r = { channel, visits: 0, visitors: new Set(), orders: 0, tickets: 0, revenue_clp: 0, checked_in: 0 }));
         return r;
     };
     for (const v of visits) {
@@ -233,6 +273,7 @@ export function channelConversion(visits: VisitRow[], sales: any[], { refTracked
         r.orders += 1;
         r.tickets += orderSoldQty(o);
         r.revenue_clp += Number(o.amount) || 0;
+        r.checked_in += checkins?.get(String(o.id))?.checked_in || 0;
     }
     return [...rows.values()]
         .map((r) => {
@@ -247,10 +288,32 @@ export function channelConversion(visits: VisitRow[], sales: any[], { refTracked
                 revenue_clp: r.revenue_clp,
                 // Más órdenes que visitantes (p. ej. visitas anteriores a que se registrara ref): no es una conversión real
                 conversion_pct: unknownVisits || !unique || r.orders > unique ? null : pct(r.orders, unique),
+                // Entradas de esas ventas que ya ingresaron a la puerta ("entraron"); null si no se cargaron los check-ins
+                checked_in: checkins ? r.checked_in : null,
             };
         })
         .sort((a, b) => b.revenue_clp - a.revenue_clp || b.orders - a.orders || (b.visits || 0) - (a.visits || 0))
         .slice(0, top);
+}
+
+/**
+ * Ingresos a la puerta por canal / link (get_checkin_stats): de las entradas vigentes de cada canal (ventas e
+ * inscripciones; sin cortesías ni transferencias, que cuentan en su venta original), cuántas ya entraron.
+ */
+export function checkinsByChannel(sales: any[], checkins: Map<string, OrderCheckins>) {
+    const rows = new Map<string, { channel: string; tickets: number; checked_in: number }>();
+    for (const o of sales) {
+        const c = checkins.get(String(o.id));
+        if (!c) continue;
+        const channel = trackingChannel(o);
+        const r = rows.get(channel) || { channel, tickets: 0, checked_in: 0 };
+        r.tickets += c.tickets;
+        r.checked_in += c.checked_in;
+        rows.set(channel, r);
+    }
+    return [...rows.values()]
+        .map((r) => ({ ...r, pending: r.tickets - r.checked_in, checked_in_pct: pct(r.checked_in, r.tickets) }))
+        .sort((a, b) => b.checked_in - a.checked_in || b.tickets - a.tickets);
 }
 
 /** Serie diaria (hora de Chile) de visitas, entradas vendidas e ingresos sobre los días dados. */
@@ -333,6 +396,7 @@ export async function getEventAnalytics(supabase: any, event: { id: number; stat
     const sales = summarizeSales(orders);
     const traffic = summarizeTraffic(visits);
     const { days, truncated: seriesTruncated } = activityDays(visits, sales.sales);
+    const checkins = await loadOrderCheckins(supabase, event.id, orders);
     return {
         kpis: {
             visits: traffic.visits,
@@ -351,7 +415,7 @@ export async function getEventAnalytics(supabase: any, event: { id: number; stat
         peak_hours: traffic.peakHours,
         sources: traffic.sources,
         locations: traffic.locations,
-        channels: channelConversion(visits, sales.sales, { refTracked }),
+        channels: channelConversion(visits, sales.sales, { refTracked, checkins }),
         providers: sales.providers,
         ticket_types: ticketTypes,
         refunded_orders: refunded || 0,

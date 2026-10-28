@@ -9,6 +9,7 @@ import {
     dailySeries,
     eventCapacity,
     loadEventVisits,
+    loadOrderCheckins,
     loadPaidOrders,
     summarizeSales,
     summarizeTraffic,
@@ -41,6 +42,7 @@ export async function eventPerformance(ctx: ToolContext, eventId: number, days: 
     const s = summarizeSales(orders);
     const { sales, paidOrders, ticketsSold, courtesyTickets, revenue, discountTotal } = s;
     const traffic = summarizeTraffic(visits);
+    const checkins = await loadOrderCheckins(ctx.supabase, event.id, orders);
 
     // Ritmo: últimos 7 días vs 7 anteriores
     const since = (d: number) => now.getTime() - d * 86400000;
@@ -96,7 +98,7 @@ export async function eventPerformance(ctx: ToolContext, eventId: number, days: 
         ticket_types: capacity.ticketTypes,
         sales_by_ticket_type: s.byType.slice(0, 30),
         sales_channels: s.channels.slice(0, 10),
-        channel_conversion: channelConversion(visits, sales, { refTracked, top: 10 }),
+        channel_conversion: channelConversion(visits, sales, { refTracked, top: 10, checkins }),
         sales_by_payment_provider: s.providers,
         discount_codes_used: s.codes.slice(0, 20),
         daily: dailySeries(lastDays(days, now), visits, sales),
@@ -108,7 +110,7 @@ const getEventPerformance: ToolDef = {
     title: "Rendimiento del evento",
     description:
         "¿Cómo le va al evento? Ventas, ingresos, capacidad vendida, ritmo de venta (últimos 7 días vs anteriores y proyección), " +
-        "visitas, conversión, fuentes de tráfico, ubicación de visitantes, horas pico, canales de venta (ref/UTM) con su conversión, " +
+        "visitas, conversión, fuentes de tráfico, ubicación de visitantes, horas pico, canales de venta (ref/UTM) con su conversión y cuántas de sus entradas ya ingresaron (checked_in), " +
             "medios de pago, códigos usados y serie diaria. " +
         "Ideal para diagnosticar y recomendar acciones (subir precio, crear descuento, reforzar un canal).",
     scope: "read",

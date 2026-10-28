@@ -100,8 +100,9 @@ test("lo que no existe va con Pronto y sin testimonio real no hay cita", async (
   // Facebook, TikTok y reels en la serie; gustos en los anuncios
   await expect(page.getByTestId("club-series").getByTestId("soon-badge")).toHaveCount(3);
   await expect(page.getByTestId("club-ads-demo").getByTestId("soon-badge")).toHaveCount(1);
-  // "Entraron" en el ranking, acceso del RRPP y check-ins por lista
-  await expect(page.locator("#lista").getByTestId("soon-badge")).toHaveCount(3);
+  // Acceso del RRPP a sus números (cuántos de cada lista entraron ya existe)
+  await expect(page.locator("#lista").getByTestId("soon-badge")).toHaveCount(1);
+  await expect(page.getByTestId("club-rrpp-soon")).toContainText("Cuántos de cada lista entraron, en las métricas de tu noche");
   // Validar la hora de ingreso de la lista y la vista de aforo en el panel (estado de 01:30)
   await expect(page.getByTestId("club-night").getByTestId("soon-badge")).toHaveCount(2);
   await expect(page.locator("#puerta").getByTestId("soon-badge")).toHaveCount(1);
