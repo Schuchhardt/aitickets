@@ -12,6 +12,7 @@ import { renderWaitlistOpenEmail } from './emails/index.mjs'
 import { LEGAL } from './legal.mjs'
 import { formatDateOnlyLong, formatTimeShort } from './dates.mjs'
 import { isDemoEventSlug } from '../../src/lib/demoEvent.mjs'
+import { loadTicketChain, waitingOnPrevious } from './tickets.mjs'
 
 export const WAITLIST_TABLE = 'aitickets_event_waitlist'
 export const WAITLIST_KIND_LABELS = Object.freeze({ sale_opens: 'Venta por abrir', sold_out: 'Agotado', full: 'Cupos llenos' })
@@ -24,12 +25,14 @@ const isMissingTable = (error) => ['42P01', 'PGRST205'].includes(String(error?.c
 
 /**
  * Entradas que se pueden comprar ahora, con su función. `availability`: filas de aitickets_ticket_availability
- * ({ ticket_id, sold, pending }).
+ * ({ ticket_id, sold, pending }). `chain`: Map<ticketId, anteriorId> de las tandas encadenadas (loadTicketChain).
  */
-export function buyableTickets(tickets, availability, now = new Date()) {
+export function buyableTickets(tickets, availability, now = new Date(), chain = new Map()) {
   const used = new Map((availability || []).map((r) => [String(r.ticket_id), (Number(r.sold) || 0) + (Number(r.pending) || 0)]))
+  // Tandas que esperan a que se agote la anterior (netlify/lib/tickets.mjs)
+  const waiting = waitingOnPrevious(tickets, chain, (t) => Number(t.total_quantity) - (used.get(String(t.id)) || 0), now)
   return (tickets || []).filter((t) => {
-    if (t.status !== 'available' || t.is_gift) return false
+    if (t.status !== 'available' || t.is_gift || waiting.has(Number(t.id))) return false
     if (t.init_date && new Date(t.init_date) > now) return false
     if (t.end_date && new Date(t.end_date) < now) return false
     if (t.total_quantity === null || t.total_quantity === undefined) return true
@@ -121,17 +124,18 @@ export async function notifyWaitlist(supabase, { now = new Date(), sendEmail = d
       if (!event || event.status !== 'published' || event.cancelled_at || isDemoEventSlug(event.slug)) continue
       if (event.end_date && new Date(event.end_date) < now) continue
 
-      const [{ data: tickets, error: tError }, { data: availability, error: aError }] = await Promise.all([
+      const [{ data: tickets, error: tError }, { data: availability, error: aError }, chain] = await Promise.all([
         supabase
           .from('event_tickets')
           .select('id, status, is_gift, total_quantity, init_date, end_date, event_date_id')
           .eq('event_id', eventId),
         supabase.rpc('aitickets_ticket_availability', { p_event_id: eventId }),
+        loadTicketChain(supabase, eventId),
       ])
       if (tError) throw tError
       // Sin el conteo de stock no se puede saber si hay cupo: mejor no avisar que avisar de más
       if (aError) throw aError
-      const buyable = buyableTickets(tickets, availability, now)
+      const buyable = buyableTickets(tickets, availability, now, chain)
       if (!buyable.length) continue
 
       const byEmail = new Map()

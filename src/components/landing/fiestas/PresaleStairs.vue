@@ -5,8 +5,9 @@
 // CALC_PRICE.inputMax, cupo ±25 de 25 a 500, y su apertura fija: D-26, D-19, D-12 y D-5, cada una un lunes a las 20:00).
 // La simulación es playPresale (fiestasLanding.js, pura y con test): una etapa a la venta a la vez y, si una se agota
 // antes de que abra la siguiente, la página se detiene y pregunta "¿Abrimos la 2?". Adelantar = la siguiente abre ese
-// día con lo que queda de la demanda; esperar = sin entradas a la venta hasta el lunes. Que abra sola no existe: "Pronto"
-// (§0.7); hoy se adelanta desde el asistente de IA o por WhatsApp (tools/tickets.ts: sales_start).
+// día con lo que queda de la demanda; esperar = sin entradas a la venta hasta el lunes. Para no tener que decidir, la etapa
+// se encadena a la anterior y se abre sola al agotarse (opens_after_ticket_id, netlify/lib/tickets.mjs); adelantar una
+// etapa con fecha sigue siendo desde el asistente de IA o por WhatsApp (tools/tickets.ts: sales_start).
 // "Tú recibes" = Σ priceQuote(precio, 'buyer', vendidas).total (fees.mjs). Al final, si se agota la General, la historia
 // "Agotado" de la serie (pieceText variante sold_out, por props).
 // Movimiento (F7, F8): barras de llenado por día (260 ms), la pulsera agotada se corta y sale una ráfaga de confeti. Con
@@ -15,7 +16,6 @@
 // Analítica: fi_stairs_play, fi_stairs_count {n}, fi_stairs_edit {stage, field} (con pausa, sin el valor),
 // fi_stairs_choice {stage, choice}, fi_stairs_end {sold, total}.
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import SoonBadge from '../../ui/SoonBadge.vue'
 import BuyerPreview from './BuyerPreview.vue'
 import { CALC_PRICE, formatCLP, parseAmount, priceQuote } from '../producerLanding.js'
 import { useDelayedAnnouncement } from '../../../composables/usePriceCalculator.js'
@@ -344,8 +344,10 @@ const bandText = (s) => `${s.name} · ${formatCLP(s.price)} · ${s.capacity}`
               </button>
               <button type="button" class="fi-btn fi-btn-line" data-testid="party-stairs-wait" @click="choose('wait')">{{ copy.wait }}</button>
             </div>
-            <p class="ps-pause-note">Hoy la adelantas desde tu asistente de IA o escribiéndonos por WhatsApp.</p>
-            <p class="fi-soon-chip ps-soon">Que abra sola cuando se agota la anterior <SoonBadge /></p>
+            <p class="ps-pause-note">
+              Para no tener que elegir, encadena cada etapa a la anterior al crear el evento: se abre sola cuando se agota.
+              Adelantar una con fecha lo haces desde tu asistente de IA o escribiéndonos por WhatsApp.
+            </p>
           </div>
 
           <!-- Final: la historia "Agotado" de la serie, o cuánto se vendió -->
@@ -610,7 +612,7 @@ const bandText = (s) => `${s.name} · ${formatCLP(s.price)} · ${s.capacity}`
 }
 .ps-pause,
 .ps-end {
-  /* Sticker crema dentro de la sección cobalto: los tokens puente vuelven a los de crema (badge "Pronto") */
+  /* Sticker crema dentro de la sección cobalto: los tokens puente vuelven a los de crema */
   --surface-2: #fff;
   --text-1: var(--fi-tinta);
   --text-2: var(--fi-text-2);
@@ -653,9 +655,6 @@ const bandText = (s) => `${s.name} · ${formatCLP(s.price)} · ${s.capacity}`
   font-size: 13px;
   line-height: 18px;
   color: var(--fi-text-2);
-}
-.ps-soon {
-  margin-top: 8px;
 }
 .ps-end {
   text-align: center;

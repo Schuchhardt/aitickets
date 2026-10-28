@@ -7,7 +7,7 @@
 // necesitan a una persona avisan a Slack (netlify/lib/assistant-llm.mjs).
 import { getSupabaseAdmin, json } from '../../lib/supabase.mjs'
 import { isValidEmail } from '../../lib/mailer.mjs'
-import { TICKET_COLUMNS, isTicketOnSale, maxPerPurchase, getSoldCounts } from '../../lib/tickets.mjs'
+import { TICKET_COLUMNS, isTicketOnSale, maxPerPurchase, getSoldCounts, ticketsWaitingOnPrevious } from '../../lib/tickets.mjs'
 import { IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL, computeBuyerTotal } from '../../lib/fees.mjs'
 import { isDemoEventSlug, getDemoFunctionDate } from '../../../src/lib/demoEvent.mjs'
 import { EVENT_DATE_COLUMNS, todayInTimeZone, formatDateOnlyLong, formatTimeShort, formatEventLocation } from '../../lib/dates.mjs'
@@ -96,7 +96,10 @@ async function loadEventContext(supabase, eventId) {
   ])
 
   const now = new Date()
-  const onSale = (tickets || []).filter(t => isTicketOnSale(t, now))
+  // Tandas encadenadas que esperan a la anterior no se ofrecen todavía
+  let waiting = new Map()
+  try { waiting = await ticketsWaitingOnPrevious(supabase, eventId, now) } catch { /* sin la regla no bloquea el chat */ }
+  const onSale = (tickets || []).filter(t => isTicketOnSale(t, now) && !waiting.has(Number(t.id)))
   const limitedIds = onSale.filter(t => t.total_quantity != null).map(t => Number(t.id))
   let sold = new Map()
   if (limitedIds.length) {
