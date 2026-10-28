@@ -95,11 +95,20 @@ describe('normalizeAddedModules', () => {
 })
 
 describe('pestañas', () => {
-  it('omite pestañas sin módulos y abre ventas antes y asistentes después', () => {
+  it('omite pestañas sin módulos y abre ventas antes, la puerta durante y asistentes después', () => {
     const tabs = panelTabs(resolveModules(ctx()))
-    expect(tabs.map((t) => t.id)).toEqual(['ventas', 'difusion', 'pagina', 'despues'])
+    expect(tabs.map((t) => t.id)).toEqual(['ventas', 'difusion', 'pagina', 'puerta', 'despues'])
     expect(defaultTab(ctx(), tabs)).toBe('ventas')
+    expect(defaultTab(ctx({ phase: 'during' }), tabs)).toBe('puerta')
     expect(defaultTab(ctx({ phase: 'after' }), tabs)).toBe('despues')
+  })
+  it('el aforo en vivo va en la puerta, siempre que haya entradas emitidas', () => {
+    expect(byId(resolveModules(ctx())))
+      .toHaveProperty('live-capacity', expect.objectContaining({ tab: 'puerta', enabled: true, core: true }))
+    const empty = resolveModules(ctx({ status: 'draft', hasAttendees: false }))
+    expect(byId(empty)['live-capacity']).toBeUndefined()
+    // Sin entradas no hay pestaña Puerta: durante el evento abre la primera que haya
+    expect(defaultTab(ctx({ phase: 'during', hasAttendees: false }), panelTabs(empty))).toBe('ventas')
   })
   it('cada pestaña trae también las herramientas que no vienen para el tipo de evento (para Más herramientas)', () => {
     const page = panelTabs(resolveModules(ctx({ profile: 'funciones' }))).find((t) => t.id === 'pagina')

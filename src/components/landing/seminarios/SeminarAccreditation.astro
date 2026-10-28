@@ -9,7 +9,7 @@
 //   otro día → getFunctionCheck (checkin.mjs) con la opción de validarla igual
 //   sin QR → búsqueda por nombre o correo, validación manual y reenvío (/api/orders/resend)
 //   una entrada se valida una sola vez (confirm-ticket): el pase completo se acredita el primer día ("Pronto" el ingreso
-//   diario); detalle por tipo desde el asistente de IA (get_checkin_stats); aforo en vivo en el panel: "Pronto"
+//   diario); aforo en vivo por tipo en el panel (pestaña Puerta, LiveCapacityPanel.vue) y en el asistente (get_checkin_stats)
 //   acreditar cuenta para el pago → ledger.ts (CHECKIN_RELEASE_THRESHOLD o acreditar que se realizó) y términos §8
 // La foto de referencia muestra una pistola lectora (AI Tickets escanea con la cámara del celular): es "solo staging"
 // (§8) y no hay staging, así que no se muestra (SHOW_DESK_PHOTO) y la columna 3 lleva los ítems (§4.7). Con una foto
@@ -41,8 +41,7 @@ const items = [
   { title: "El pase completo, una vez.", text: "Se acredita el primer día que la persona llega.", soon: "Ingreso cada día con el mismo pase" },
   {
     title: "¿Cuántos llegaron de cada tipo?",
-    text: "El contador del escáner te dice cuántos entraron; el detalle por tipo de entrada te lo da tu asistente de IA.",
-    soon: "Aforo en vivo en el panel",
+    text: "El contador del escáner te dice cuántos entraron, y en tu panel ves el aforo en vivo por tipo de entrada, sin recargar. También se lo puedes preguntar a tu asistente de IA.",
   },
 ];
 ---

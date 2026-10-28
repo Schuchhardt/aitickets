@@ -34,7 +34,7 @@ Estado al 27-10-2026, rama `rediseno/aitickets`.
 | 4 | ~~Abrir sola la siguiente tanda cuando se agota la anterior~~ **Hecho** | Música, fiestas | P1 | M |
 | 5 | Que cada promotor o RRPP vea sus números | Clubs, fiestas | P1 | M |
 | 6 | Check-ins por canal ("cuántos de cada lista entraron") | Clubs | P2 | S |
-| 7 | Aforo en vivo en el panel | Clubs, fiestas, seminarios | P2 | S |
+| 7 | ~~Aforo en vivo en el panel~~ **Hecho** | Clubs, fiestas, seminarios | P2 | S |
 | 8 | Validar la hora de ingreso de la lista | Clubs | P3 | S |
 | 9 | Una entrada para cada invitado de la mesa | Clubs | P2 | M |
 | 10 | Dirección que solo ven quienes compran | Fiestas | P2 | S |
@@ -216,6 +216,15 @@ Cruzar check-in con el link de la venta y mostrarlo en la vista de ventas por li
 En la tabla de links, cada RRPP tiene "vendidas" y "entraron".
 
 ## 7. Aforo en vivo en el panel
+
+**Hecho (rama `feat/aforo-en-vivo`).** Módulo "Aforo en vivo" en la pestaña Puerta del panel del evento
+(`LiveCapacityPanel.vue`, `live-capacity` en `eventModules.ts`, aparece cuando hay entradas emitidas). Durante el evento
+el panel abre en esa pestaña.
+- Datos: `/api/events/checkin-stats`, que es la herramienta `get_checkin_stats` con la sesión del usuario
+  (`producer-api/session.ts`): adentro sobre emitidas y sobre la capacidad, por tipo de entrada y función, y llegadas
+  cada 15 minutos. Permiso `checkin`, con el acceso por evento del equipo. Sin migración.
+- Se refresca cada 5 segundos (polling) mientras la tarjeta está a la vista y la pestaña del navegador activa.
+- Landings de clubs, fiestas y seminarios sin "Pronto" en el aforo del panel.
 
 **Dónde se promete**
 - `clubs/NightLive.vue` ("Vista de aforo en el panel")

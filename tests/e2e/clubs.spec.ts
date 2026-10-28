@@ -102,8 +102,9 @@ test("lo que no existe va con Pronto y sin testimonio real no hay cita", async (
   await expect(page.getByTestId("club-ads-demo").getByTestId("soon-badge")).toHaveCount(1);
   // "Entraron" en el ranking, acceso del RRPP y check-ins por lista
   await expect(page.locator("#lista").getByTestId("soon-badge")).toHaveCount(3);
-  // Validar la hora de ingreso de la lista y la vista de aforo en el panel (estado de 01:30)
-  await expect(page.getByTestId("club-night").getByTestId("soon-badge")).toHaveCount(2);
+  // Validar la hora de ingreso de la lista (estado de 01:30); el aforo en vivo en el panel ya existe
+  await expect(page.getByTestId("club-night").getByTestId("soon-badge")).toHaveCount(1);
+  await expect(page.getByTestId("club-night")).toContainText("Aforo en vivo en tu panel");
   await expect(page.locator("#puerta").getByTestId("soon-badge")).toHaveCount(1);
   await expect(page.locator("#mesas").getByTestId("soon-badge")).toHaveCount(1);
   await expect(page.locator("[data-cl-testimonial]")).toHaveCount(0);
