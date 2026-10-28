@@ -5,6 +5,7 @@ import {
     checkInTicket, createCheckinLink, defaultCheckinExpiry, listCheckinLinks, revokeCheckinLink, UUID_RE,
 } from "../../checkinAccess";
 import { formatFunctionLabel } from "../../../../netlify/lib/dates.mjs";
+import { checkinsByChannel, loadOrderCheckins, loadPaidOrders, summarizeSales } from "../../eventAnalytics";
 
 const timeFmt = new Intl.DateTimeFormat("es-CL", { timeZone: TZ, hour: "2-digit", minute: "2-digit", day: "2-digit", month: "short" });
 const formatLocal = (iso: string | null | undefined) => (iso ? timeFmt.format(new Date(iso)) : null);
@@ -163,7 +164,8 @@ const getCheckinStats: ToolDef = {
     title: "Aforo en vivo",
     description:
         "Estado del acceso de un evento en vivo: entradas emitidas, ingresadas, pendientes, % de aforo (sobre la capacidad), desglose por tipo de " +
-        "entrada y por función, ingresos de los pases multifunción en cada función (multi_pass_check_ins_by_function) e ingresos cada 15 minutos en las últimas 3 horas.",
+        "entrada, por función, ingresos de los pases multifunción en cada función (multi_pass_check_ins_by_function), por canal o link de " +
+        "RRPP (by_channel: de las entradas que vendió o inscribió cada link, cuántas entraron) e ingresos cada 15 minutos en las últimas 3 horas.",
     scope: "attendees",
     permission: "checkin",
     annotations: { readOnlyHint: true },
@@ -215,6 +217,8 @@ const getCheckinStats: ToolDef = {
             const t = r.validated_at ? new Date(r.validated_at).getTime() : NaN;
             if (Number.isFinite(t) && t >= start && t < end) arrivals[Math.floor((t - start) / bucketMs)].count += 1;
         }
+        const orders = await loadPaidOrders(ctx.supabase, event.id);
+        const byChannel = checkinsByChannel(summarizeSales(orders).sales, await loadOrderCheckins(ctx.supabase, event.id, orders));
         const lastArrival = checkedIn.reduce((m: string | null, r: any) => (r.validated_at && (!m || r.validated_at > m) ? r.validated_at : m), null);
 
         return {
@@ -241,6 +245,8 @@ const getCheckinStats: ToolDef = {
                   }
                 : {}),
             arrivals_last_3h: arrivals.map((a) => ({ ...a, from_local: formatLocal(a.from) })),
+            // "Cuántos de cada lista entraron": ref:<rrpp>, utm o "Directo / sin seguimiento" (sin cortesías)
+            by_channel: byChannel.slice(0, 30),
         };
     },
 };

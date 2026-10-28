@@ -33,7 +33,7 @@ Estado al 27-10-2026, rama `rediseno/aitickets`.
 | 3 | ~~Aviso automático a la lista de espera y verla en el panel~~ **Hecho** | Música, fiestas, talleres, seminarios | P1 | M |
 | 4 | ~~Abrir sola la siguiente tanda cuando se agota la anterior~~ **Hecho** | Música, fiestas | P1 | M |
 | 5 | ~~Que cada promotor o RRPP vea sus números~~ **Hecho** | Clubs, fiestas | P1 | M |
-| 6 | Check-ins por canal ("cuántos de cada lista entraron") | Clubs | P2 | S |
+| 6 | ~~Check-ins por canal ("cuántos de cada lista entraron")~~ **Hecho** | Clubs | P2 | S |
 | 7 | Aforo en vivo en el panel | Clubs, fiestas, seminarios | P2 | S |
 | 8 | Validar la hora de ingreso de la lista | Clubs | P3 | S |
 | 9 | Una entrada para cada invitado de la mesa | Clubs | P2 | M |
@@ -213,6 +213,15 @@ El promotor abre su link en el celular y ve cuántas entradas vendió en cada ev
 correos de los compradores.
 
 ## 6. Check-ins por canal ("cuántos de cada lista entraron")
+
+**Hecho (rama `feat/checkins-por-canal`).** `loadOrderCheckins` (`src/lib/eventAnalytics.ts`) cuenta por orden las
+entradas vigentes y las validadas (`event_attendees.event_order_id`); una entrada transferida cuenta en su venta
+original (`transferred_from_order`, siguiendo la cadena). Sin cortesías, igual que las ventas. Sin migración.
+- Analítica del evento: "Ventas por canal" suma la columna "Entraron" (`channelConversion`, `checked_in`).
+- Asistente de IA: `get_checkin_stats` trae `by_channel` (entradas, entraron, pendientes y % por link o UTM) y
+  `get_event_performance` trae `checked_in` en `channel_conversion`.
+- Landing de clubs: "Cuántos de cada lista entraron" sin "Pronto". El ranking de ejemplo es de las 20:00 (antes de
+  abrir), así que pierde la columna "Entraron" en vez de mostrar números inventados.
 
 **Dónde se promete**
 - `clubs/ClubList.astro` ("Cuántos de cada lista entraron")
