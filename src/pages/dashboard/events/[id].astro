@@ -14,6 +14,7 @@ import TrackingLinkBuilder from "../../../components/dashboard/TrackingLinkBuild
 import PromoterLinksManager from "../../../components/dashboard/PromoterLinksManager.vue";
 import SocialSeriesCard from "../../../components/dashboard/SocialSeriesCard.vue";
 import EventWaitlistManager from "../../../components/dashboard/EventWaitlistManager.vue";
+import LiveCapacityPanel from "../../../components/dashboard/LiveCapacityPanel.vue";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { EVENT_MANAGER_ROLES, ORG_ADMIN_ROLES, hasRole } from "../../../lib/supabaseServer";
 import { adsEnabled } from "../../../../netlify/lib/zernio-ads.mjs";
@@ -400,6 +401,10 @@ const canCreateAds = adsEnabled() && hasRole(dbUser, ORG_ADMIN_ROLES);
                             imageUrl={event.image_url || ""}
                             coverSettings={event.cover_settings || null}
                         />
+                    )}
+                    {/* Aforo en vivo: ingresados por tipo de entrada y función, se refresca sola (get_checkin_stats) */}
+                    {m.id === "live-capacity" && (
+                        <LiveCapacityPanel client:visible eventId={Number(event.id)} checkinUrl={`/dashboard/events/${event.id}/checkin`} />
                     )}
                     {m.id === "faq" && <EventFAQManager client:visible eventId={Number(event.id)} />}
                     {m.id === "documents" && <EventDocumentsManager client:visible eventId={Number(event.id)} />}

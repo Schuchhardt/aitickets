@@ -115,6 +115,15 @@ export const EVENT_MODULES: EventModule[] = [
         tab: "difusion",
         when: (ctx) => ctx.status !== "published",
     },
+    // Con entradas emitidas: se refresca sola mientras está a la vista (LiveCapacityPanel.vue)
+    {
+        id: "live-capacity",
+        title: "Aforo en vivo",
+        description: "Ingresados sobre el total, por tipo de entrada y función.",
+        tab: "puerta",
+        core: true,
+        when: (ctx) => ctx.hasAttendees,
+    },
     { id: "cover", title: "Portada", description: "Imagen de la página, ajuste por dispositivo y generación con IA.", tab: "pagina", core: true },
     { id: "faq", title: "Preguntas frecuentes", description: "Respuestas que se muestran en la página del evento.", tab: "pagina" },
     { id: "gallery", title: "Galería", description: "Fotos y video al final de la página del evento.", tab: "pagina" },
@@ -198,8 +207,9 @@ export function panelTabs(modules: ResolvedModule[]): { id: EventTab; label: str
     return TABS.map((t) => ({ ...t, modules: modules.filter((m) => m.tab === t.id) })).filter((t) => t.modules.length > 0);
 }
 
-/** Pestaña que se abre por defecto: después del evento importan los asistentes; antes, las ventas. */
+/** Pestaña que se abre por defecto: antes del evento, las ventas; durante, la puerta (aforo en vivo); después, los
+ *  asistentes. */
 export function defaultTab(ctx: EventModuleContext, tabs: { id: EventTab }[]): EventTab | undefined {
-    const preferred: EventTab = ctx.phase === "after" ? "despues" : "ventas";
+    const preferred: EventTab = ctx.phase === "after" ? "despues" : ctx.phase === "during" ? "puerta" : "ventas";
     return tabs.find((t) => t.id === preferred)?.id ?? tabs[0]?.id;
 }

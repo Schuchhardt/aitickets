@@ -124,9 +124,10 @@ test("lo que no existe va con Pronto y sin testimonio real no hay cita", async (
   await expect(page.locator("#difusion").getByTestId("soon-badge")).toHaveCount(5);
   // La lista de espera ya existe: sin "Pronto"
   await expect(page.locator("#pagina").getByTestId("soon-badge")).toHaveCount(0);
-  // Aforo en vivo y credenciales impresas (el ingreso diario ya existe)
-  await expect(page.locator("#acreditacion").getByTestId("soon-badge")).toHaveCount(2);
+  // Credenciales impresas (el ingreso diario y el aforo en vivo en el panel ya existen)
+  await expect(page.locator("#acreditacion").getByTestId("soon-badge")).toHaveCount(1);
   await expect(page.locator("#acreditacion")).toContainText("El pase completo, cada día.");
+  await expect(page.locator("#acreditacion")).toContainText("en tu panel ves el aforo en vivo");
   // Certificados de asistencia
   await expect(page.locator('[data-se-section="despues"]').getByTestId("soon-badge")).toHaveCount(1);
   await expect(page.locator("[data-se-testimonial]")).toHaveCount(0);

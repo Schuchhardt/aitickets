@@ -3,8 +3,8 @@
 // 22:00 a 05:00 en pasos de 15 min. Cada posición sale de nightState (clubsLanding.js): letrero LED de la puerta, aforo
 // (Doto 96 px y 30 LED), llegadas cada 15 min de las últimas 3 h y ingresados / emitidos por tipo de entrada, como
 // get_checkin_stats ("Aforo en vivo", tools/access.ts); a la derecha, la respuesta del asistente de IA con los mismos
-// datos (aiAnswer). Lo que no existe va con "Pronto": validar la hora de ingreso de la lista y la vista de aforo en el
-// panel (hoy: el contador del escáner y el asistente de IA). El cobro de la noche: término + PAYOUT_RELEASE_HOURS
+// datos (aiAnswer). El mismo aforo se ve en el panel (pestaña Puerta, LiveCapacityPanel.vue). Lo que no existe va con
+// "Pronto": validar la hora de ingreso de la lista. El cobro de la noche: término + PAYOUT_RELEASE_HOURS
 // (LIVE_PAYOUT), con "*" de términos.
 // C11: al entrar en pantalla la noche corre sola una vez de 22:00 a 01:30 en 4 s y se detiene; después manda la
 // persona ("↻ Repetir"). Con "reducir movimiento" (o sin JS: SSR) queda quieta en 01:30, sin corrida ni botón.
@@ -171,7 +171,7 @@ onBeforeUnmount(() => {
       <ul class="nl-chips" aria-label="De dónde sale cada dato">
         <li>Contador en el escáner</li>
         <li>Aforo por tipo y llegadas: tu asistente de IA</li>
-        <li>Vista de aforo en el panel <SoonBadge dark /></li>
+        <li>Aforo en vivo en tu panel</li>
       </ul>
     </div>
 
