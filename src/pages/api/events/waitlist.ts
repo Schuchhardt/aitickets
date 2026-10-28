@@ -1,6 +1,6 @@
 // POST /api/events/waitlist — PÚBLICO: deja un email en la lista de espera / avisos de un evento publicado
-// (cupos llenos, agotado o venta por abrir). Solo registra (aitickets_event_waitlist); las notificaciones
-// automáticas quedan fuera de alcance.
+// (cupos llenos, agotado o venta por abrir). Registra en aitickets_event_waitlist; el aviso lo manda
+// send-waitlist-notifications (netlify/lib/waitlist.mjs) y el productor ve la lista en su panel.
 // Request: { eventId, email, kind?: 'full'|'sold_out'|'sale_opens', functionId?, utm?: {source,medium,campaign} }
 // Respuesta: 200 { ok: true } (también si el email ya estaba anotado), 400 inválida, 404 evento, 429, 503.
 import type { APIRoute } from "astro";

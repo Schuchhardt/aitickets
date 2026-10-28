@@ -30,7 +30,7 @@ Estado al 27-10-2026, rama `rediseno/aitickets`.
 |---|---|---|---|---|
 | 1 | Publicación automática en Facebook, TikTok y Reels | Todos (organizadores, stand-up, teatro, música, clubs, fiestas, talleres, seminarios) | P2 | L |
 | 2 | Segmentar anuncios por intereses o profesión | Stand-up, música, clubs, fiestas, seminarios | P2 | M |
-| 3 | Aviso automático a la lista de espera y verla en el panel | Música, fiestas, talleres, seminarios | P1 | M |
+| 3 | ~~Aviso automático a la lista de espera y verla en el panel~~ **Hecho** | Música, fiestas, talleres, seminarios | P1 | M |
 | 4 | Abrir sola la siguiente tanda cuando se agota la anterior | Música, fiestas | P1 | M |
 | 5 | Que cada promotor o RRPP vea sus números | Clubs, fiestas | P1 | M |
 | 6 | Check-ins por canal ("cuántos de cada lista entraron") | Clubs | P2 | S |
@@ -113,6 +113,12 @@ usa `/ads/targeting/search` de Zernio con `dimension: 'geo'`.
 Un anuncio creado con 1 a 3 intereses llega a Meta con esa segmentación, y se ve en el Ads Manager de la productora.
 
 ## 3. Aviso automático a la lista de espera y verla en el panel
+
+**Hecho** (rama `feat/lista-de-espera`): `netlify/lib/waitlist.mjs` y la función programada
+`send-waitlist-notifications` (cada 15 min) avisan una vez por persona y evento cuando hay una entrada comprable para
+su evento o función; la tarjeta "Lista de espera" del panel (`EventWaitlistManager.vue`, `/api/events/waitlist-list`,
+con CSV) aparece cuando hay anotados. Se quitaron los "Pronto" de música, fiestas, talleres y seminarios. Sin enlace
+de baja: es un solo aviso que la persona pidió. Falta: verla desde el asistente de IA.
 
 **Dónde se promete**
 - `musica/MusicPresale.astro` ("Aviso automático")

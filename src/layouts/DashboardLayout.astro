@@ -117,18 +117,43 @@ const activityPage = await recordDashboardPageView(Astro, session).catch(() => n
           }
           {
             showIdentityNotice && (
-              <div role="status" class="mb-6 flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-gray-900">
+              <div id="identity-banner" role="status" class="mb-6 flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 pr-10 text-sm text-gray-900 relative">
+                <button
+                  type="button"
+                  id="identity-banner-close"
+                  aria-label="Cerrar"
+                  class="absolute top-2 right-2 p-1 text-gray-500 hover:text-gray-900"
+                >
+                  ✕
+                </button>
                 <div class="flex-1">
                   <p class="font-semibold">Verifica tu identidad para poder retirar lo recaudado</p>
-                  <p class="text-gray-700">
-                    Tus eventos siguen publicados y a la venta. Para transferirte el dinero necesitamos verificar tu identidad con Didit (toma un par de minutos)
-                    y que tu cuenta bancaria esté a tu nombre o al de tu empresa.
-                  </p>
+                  <p class="text-gray-700">Tus eventos siguen a la venta. Toma un par de minutos.</p>
                 </div>
                 <a href="/dashboard/settings#identidad" class="shrink-0 rounded-lg bg-gray-900 px-4 py-2 text-center font-semibold text-white hover:bg-gray-700">
                   Verificar identidad
                 </a>
               </div>
+            )
+          }
+          {
+            showIdentityNotice && (
+              // Cerrado, no vuelve en 7 días (en este navegador). Inline y justo después del aviso para que no parpadee.
+              <script is:inline>
+                (function () {
+                  var KEY = "aitickets:identity-banner-closed";
+                  var WEEK = 7 * 24 * 3600 * 1000;
+                  var banner = document.getElementById("identity-banner");
+                  try {
+                    if (Date.now() - Number(localStorage.getItem(KEY) || 0) < WEEK) banner && banner.remove();
+                  } catch (e) {}
+                  var close = document.getElementById("identity-banner-close");
+                  close && close.addEventListener("click", function () {
+                    try { localStorage.setItem(KEY, String(Date.now())); } catch (e) {}
+                    banner && banner.remove();
+                  });
+                })();
+              </script>
             )
           }
           <slot />

@@ -12,12 +12,16 @@ import EventReviewsManager from "../../../components/dashboard/EventReviewsManag
 import EventCommunityManager from "../../../components/dashboard/EventCommunityManager.vue";
 import TrackingLinkBuilder from "../../../components/dashboard/TrackingLinkBuilder.vue";
 import SocialSeriesCard from "../../../components/dashboard/SocialSeriesCard.vue";
+import EventWaitlistManager from "../../../components/dashboard/EventWaitlistManager.vue";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
-import { EVENT_MANAGER_ROLES } from "../../../lib/supabaseServer";
+import { EVENT_MANAGER_ROLES, ORG_ADMIN_ROLES, hasRole } from "../../../lib/supabaseServer";
+import { adsEnabled } from "../../../../netlify/lib/zernio-ads.mjs";
+import { WAITLIST_TABLE } from "../../../../netlify/lib/waitlist.mjs";
 import { requireDashboardSession } from "../_lib/guard";
 import { identityApproved, loadOrgIdentity, ticketsRequireIdentity, IDENTITY_FREE_PAID_CAPACITY } from "../../../lib/producerIdentity";
 import { canAccessEventByStaff } from "../../../../netlify/lib/event-staff.mjs";
 import { getEventSummary } from "../../../lib/eventAnalytics";
+import { PROFILE_LABELS, eventProfile, eventPhase, normalizeAddedModules, resolveModules, panelTabs, defaultTab } from "../../../lib/eventModules";
 import {
     Calendar,
     MapPin,
@@ -30,6 +34,8 @@ import {
     BarChart3,
     Pause,
     Rocket,
+    Send,
+    Target,
 } from "lucide-vue-next";
 
 const { id } = Astro.params;
@@ -55,6 +61,7 @@ const loadEvent = (coverColumn: string) => supabaseAdmin
       status
     ),
     event_dates ( id ),
+    event_tags ( category_tags ( name ) ),
     event_locations (
       id,
       venues (
@@ -67,9 +74,14 @@ const loadEvent = (coverColumn: string) => supabaseAdmin
     .eq("id", id)
     .eq("organization_id", dbUser.organization_id)
     .single();
-let { data: event, error }: { data: any; error: any } = await loadEvent(" cover_settings,");
-// Deploy previews: la migración de cover_settings puede no estar aplicada todavía
-if (error?.code === "42703") ({ data: event, error } = await loadEvent(""));
+// Deploy previews y local comparten la BD de producción: las columnas más nuevas pueden no existir todavía, así que
+// se van soltando de a una (de la más nueva a la más antigua) en vez de perderlas todas
+const optionalColumns = ["panel_modules", "cover_settings", "is_massive, requires_documents"];
+let { data: event, error }: { data: any; error: any } = await loadEvent(` ${optionalColumns.join(", ")},`);
+for (let i = 1; error?.code === "42703" && i <= optionalColumns.length; i++) {
+    const rest = optionalColumns.slice(i);
+    ({ data: event, error } = await loadEvent(rest.length ? ` ${rest.join(", ")},` : ""));
+}
 
 if (error || !event) {
     return Astro.redirect("/dashboard/events");
@@ -95,6 +107,26 @@ const publishBlockers = [
     activeTickets.length === 0 ? "Agrega al menos un tipo de entrada." : null,
     !identityOk ? `Verifica tu identidad en Configuración > Verificación de identidad: es obligatorio para vender más de ${IDENTITY_FREE_PAID_CAPACITY} entradas pagadas.` : null,
 ].filter(Boolean);
+
+// Lista de espera (sin la tabla, 0)
+const { count: waitlistCount } = await supabaseAdmin.from(WAITLIST_TABLE).select("id", { count: "exact", head: true }).eq("event_id", event.id);
+
+// Módulos del panel por perfil (categoría), condiciones del evento y los que el productor agregó: src/lib/eventModules.ts
+const categoryTag = event.event_tags?.[0]?.category_tags;
+const moduleCtx = {
+    profile: eventProfile(Array.isArray(categoryTag) ? categoryTag[0]?.name : categoryTag?.name),
+    status: event.status,
+    functionCount: event.event_dates?.length || 0,
+    ticketTypeCount: activeTickets.length,
+    phase: eventPhase(event.start_date, event.end_date),
+    waitlistCount: waitlistCount || 0,
+    hasAttendees: Object.values(ticketSalesMap).some((n) => Number(n) > 0),
+    isMassive: event.is_massive === true || event.requires_documents === true,
+};
+const modules = resolveModules(moduleCtx, normalizeAddedModules(event.panel_modules));
+const tabs = panelTabs(modules);
+const activeTab = defaultTab(moduleCtx, tabs);
+const canCreateAds = adsEnabled() && hasRole(dbUser, ORG_ADMIN_ROLES);
 ---
 
 <DashboardLayout title={event.name}>
@@ -241,137 +273,238 @@ const publishBlockers = [
         </div>
     </div>
 
-    <!-- Main Content Layout -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
-        <!-- Left Column: Details -->
-        <div class="lg:col-span-2 space-y-6 md:space-y-8 min-w-0">
-            <!-- Portada (vista Desktop / Mobile, ajuste y generación con IA) -->
-            <EventCoverManager
-                client:load
-                eventId={Number(event.id)}
-                eventName={event.name}
-                imageUrl={event.image_url || ""}
-                coverSettings={event.cover_settings || null}
-            />
-
-            <!-- Difusión automática: historias y posts en Instagram hasta el evento (docs/specs/historias-automaticas.md) -->
-            {event.status === "published" && <SocialSeriesCard client:visible eventId={Number(event.id)} eventName={event.name} />}
-
-            <!-- Tickets Section -->
-            <section
-                class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
-            >
-                <div
-                    class="p-4 sm:p-6 border-b border-gray-100 flex justify-between items-center gap-3"
+    <!-- Pestañas: cada módulo vive en una (src/lib/eventModules.ts); las vacías no se muestran -->
+    <div class="border-b border-gray-200 mb-6 -mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto scroll-mt-4" role="tablist" data-testid="event-tabs">
+        <div class="flex gap-1 min-w-max">
+            {tabs.map((t) => (
+                <button
+                    type="button"
+                    role="tab"
+                    data-tab={t.id}
+                    aria-selected={t.id === activeTab ? "true" : "false"}
+                    class="px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition border-transparent text-gray-500 hover:text-black aria-selected:border-black aria-selected:text-black"
                 >
-                    <h3 class="font-bold text-lg">Tipos de Entrada</h3>
-                    <a
-                        href={`/dashboard/events/${event.id}/edit`}
-                        class="text-sm text-black font-medium hover:underline"
-                        >Gestionar</a
-                    >
-                </div>
-                <div class="divide-y divide-gray-100">
-                    {
-                        event.event_tickets?.map((ticket: any) => (
-                            <div class="p-4 flex justify-between items-center gap-3 hover:bg-gray-50 transition">
-                                <div class="min-w-0">
-                                    <p class="font-bold text-gray-900 break-words">
-                                        {ticket.ticket_name}
-                                    </p>
-                                    <p class="text-sm text-gray-500">
-                                        ${Number(ticket.price).toLocaleString()}{" "}
-                                        • {ticketSalesMap[ticket.id] || 0} emitidas / {ticket.total_quantity ?? "sin límite"}
-                                    </p>
-                                </div>
-                                <div class="shrink-0">
-                                    <span class={`px-2 py-1 rounded text-xs font-medium ${ticket.status === "unavailable" ? "bg-red-50 text-red-600" : "bg-gray-100 text-gray-600"}`}>
-                                        {ticket.status === "unavailable" ? "Retirada" : "Activo"}
-                                    </span>
-                                </div>
-                            </div>
-                        ))
-                    }
-                    {
-                        (!event.event_tickets ||
-                            event.event_tickets.length === 0) && (
-                            <div class="p-8 text-center text-gray-500">
-                                No hay entradas configuradas.
-                            </div>
-                        )
-                    }
-                </div>
-            </section>
-
-            <!-- Cortesías -->
-            <CourtesyTicketsForm client:visible eventId={Number(event.id)} tickets={courtesyTickets} />
-
-            <!-- Códigos de descuento (del evento + los de toda la organización) -->
-            <DiscountCodesManager client:visible eventId={Number(event.id)} />
-
-            <!-- FAQ Section -->
-            <EventFAQManager client:load eventId={Number(event.id)} />
-
-            <!-- Galería (al final de la página pública del evento) -->
-            <EventGalleryManager client:visible eventId={Number(event.id)} publicUrl={publicLink} />
-
-            <!-- Mensajes de asistentes y muro (reacciones) -->
-            <EventCommunityManager client:visible eventId={Number(event.id)} eventName={event.name} />
-
-            <!-- Reseñas, fotos de asistentes e invitación al próximo evento -->
-            <EventReviewsManager client:visible eventId={Number(event.id)} publicUrl={publicLink} />
-        </div>
-
-        <!-- Right Column: Public Link & sharing -->
-        <div class="space-y-6 min-w-0">
-            <div
-                class="bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-sm"
-            >
-                <div class="flex items-center justify-between gap-3 mb-4">
-                    <h3 class="font-bold text-lg">Link Público</h3>
-                    <a
-                        href={`/dashboard/events/${event.id}/edit#link-publico`}
-                        class="text-sm text-black font-medium hover:underline"
-                        >Cambiar</a
-                    >
-                </div>
-                <p class="text-sm text-gray-500 mb-2">
-                    Comparte este enlace para vender entradas.
-                </p>
-
-                <div class="flex gap-2">
-                    <input
-                        type="text"
-                        readonly
-                        value={`${siteUrl}${publicLink}`}
-                        class="bg-gray-50 border border-gray-200 text-gray-600 text-sm rounded-lg px-3 py-2 w-full min-w-0 outline-none"
-                    />
-                    <button
-                        id="copyLinkBtn"
-                        type="button"
-                        data-link={`${siteUrl}${publicLink}`}
-                        title="Copiar link"
-                        class="shrink-0 p-2.5 sm:p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition text-gray-700"
-                    >
-                        <Share2 size={18} />
-                    </button>
-                </div>
-            </div>
-
-            <TrackingLinkBuilder
-                client:visible
-                baseUrl={`${siteUrl}${publicLink}`}
-                analyticsUrl={`/dashboard/events/${event.id}/analytics`}
-            />
-
-            <PreviewLinksManager client:visible eventId={Number(event.id)} status={event.status} />
-
-            <EventDocumentsManager client:visible eventId={Number(event.id)} />
+                    {t.label}
+                </button>
+            ))}
         </div>
     </div>
+
+    {tabs.map((t) => (
+        <div role="tabpanel" data-tab-panel={t.id} hidden={t.id !== activeTab} class="max-w-4xl space-y-6 md:space-y-8 mb-8">
+            {t.modules.map((m) => (
+                <div data-module={m.id} hidden={!m.enabled} class="rounded-xl transition-shadow">
+                    {m.id === "tickets" && (
+                        <section class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                            <div class="p-4 sm:p-6 border-b border-gray-100 flex justify-between items-center gap-3">
+                                <h3 class="font-bold text-lg">Tipos de Entrada</h3>
+                                <a href={`/dashboard/events/${event.id}/edit`} class="text-sm text-black font-medium hover:underline">Gestionar</a>
+                            </div>
+                            <div class="divide-y divide-gray-100">
+                                {event.event_tickets?.map((ticket: any) => (
+                                    <div class="p-4 flex justify-between items-center gap-3 hover:bg-gray-50 transition">
+                                        <div class="min-w-0">
+                                            <p class="font-bold text-gray-900 break-words">{ticket.ticket_name}</p>
+                                            <p class="text-sm text-gray-500">
+                                                ${Number(ticket.price).toLocaleString()}{" "}
+                                                • {ticketSalesMap[ticket.id] || 0} emitidas / {ticket.total_quantity ?? "sin límite"}
+                                            </p>
+                                        </div>
+                                        <div class="shrink-0">
+                                            <span class={`px-2 py-1 rounded text-xs font-medium ${ticket.status === "unavailable" ? "bg-red-50 text-red-600" : "bg-gray-100 text-gray-600"}`}>
+                                                {ticket.status === "unavailable" ? "Retirada" : "Activo"}
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))}
+                                {(!event.event_tickets || event.event_tickets.length === 0) && (
+                                    <div class="p-8 text-center text-gray-500">No hay entradas configuradas.</div>
+                                )}
+                            </div>
+                        </section>
+                    )}
+                    {m.id === "waitlist" && <EventWaitlistManager client:visible eventId={Number(event.id)} />}
+                    {m.id === "courtesy" && <CourtesyTicketsForm client:visible eventId={Number(event.id)} tickets={courtesyTickets} />}
+                    {/* Códigos de descuento (del evento + los de toda la organización) */}
+                    {m.id === "discounts" && <DiscountCodesManager client:visible eventId={Number(event.id)} />}
+                    {m.id === "public-link" && (
+                        <div class="bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-sm">
+                            <div class="flex items-center justify-between gap-3 mb-4">
+                                <h3 class="font-bold text-lg">Link Público</h3>
+                                <a href={`/dashboard/events/${event.id}/edit#link-publico`} class="text-sm text-black font-medium hover:underline">Cambiar</a>
+                            </div>
+                            <p class="text-sm text-gray-500 mb-2">Comparte este enlace para vender entradas.</p>
+                            <div class="flex gap-2">
+                                <input
+                                    type="text"
+                                    readonly
+                                    value={`${siteUrl}${publicLink}`}
+                                    class="bg-gray-50 border border-gray-200 text-gray-600 text-sm rounded-lg px-3 py-2 w-full min-w-0 outline-none"
+                                />
+                                <button
+                                    id="copyLinkBtn"
+                                    type="button"
+                                    data-link={`${siteUrl}${publicLink}`}
+                                    title="Copiar link"
+                                    class="shrink-0 p-2.5 sm:p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition text-gray-700"
+                                >
+                                    <Share2 size={18} />
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                    {/* Difusión automática: historias y posts en Instagram hasta el evento (docs/specs/historias-automaticas.md) */}
+                    {m.id === "social-series" && <SocialSeriesCard client:visible eventId={Number(event.id)} eventName={event.name} />}
+                    {/* Atajos a Promocionar con el evento elegido (?event=<id>) */}
+                    {m.id === "promote" && (
+                        <div class="bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-sm" data-testid="event-promote">
+                            <div class="flex items-center justify-between gap-3 mb-1">
+                                <h3 class="font-bold text-lg">Posts y anuncios</h3>
+                                <a href="/dashboard/promote" class="text-sm text-black font-medium hover:underline">Ver en Promocionar</a>
+                            </div>
+                            <p class="text-sm text-gray-500 mb-4">
+                                {canCreateAds
+                                    ? "Publica un post en tus redes conectadas o crea un anuncio pagado en Instagram y Facebook."
+                                    : "Publica un post en tus redes conectadas."}
+                            </p>
+                            <div class="flex flex-wrap gap-2">
+                                <a
+                                    href={`/dashboard/promote/create?event=${event.id}`}
+                                    class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-black text-white text-sm font-medium hover:bg-gray-900 transition"
+                                >
+                                    <Send size={16} /> Crear post
+                                </a>
+                                {canCreateAds && (
+                                    <a
+                                        href={`/dashboard/promote/ads/create?event=${event.id}`}
+                                        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium hover:bg-gray-50 transition"
+                                    >
+                                        <Target size={16} /> Crear anuncio
+                                    </a>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                    {m.id === "tracking-links" && (
+                        <TrackingLinkBuilder client:visible baseUrl={`${siteUrl}${publicLink}`} analyticsUrl={`/dashboard/events/${event.id}/analytics`} />
+                    )}
+                    {m.id === "preview-links" && <PreviewLinksManager client:visible eventId={Number(event.id)} status={event.status} />}
+                    {/* Portada (vista Desktop / Mobile, ajuste y generación con IA) */}
+                    {m.id === "cover" && (
+                        <EventCoverManager
+                            client:visible
+                            eventId={Number(event.id)}
+                            eventName={event.name}
+                            imageUrl={event.image_url || ""}
+                            coverSettings={event.cover_settings || null}
+                        />
+                    )}
+                    {m.id === "faq" && <EventFAQManager client:visible eventId={Number(event.id)} />}
+                    {m.id === "documents" && <EventDocumentsManager client:visible eventId={Number(event.id)} />}
+                    {/* Mensajes de asistentes y muro (reacciones) */}
+                    {m.id === "community" && <EventCommunityManager client:visible eventId={Number(event.id)} eventName={event.name} />}
+                    {/* Reseñas, fotos de asistentes e invitación al próximo evento */}
+                    {m.id === "reviews" && <EventReviewsManager client:visible eventId={Number(event.id)} publicUrl={publicLink} />}
+                    {/* Galería (al final de la página pública del evento) */}
+                    {m.id === "gallery" && <EventGalleryManager client:visible eventId={Number(event.id)} publicUrl={publicLink} />}
+                </div>
+            ))}
+
+            {/* Más herramientas de esta pestaña: las que no vienen para este tipo de evento; al agregar una aparece su tarjeta */}
+            <details data-more-tools={t.id} hidden={!t.modules.some((m) => !m.core && !m.enabled)} class="group rounded-xl border border-dashed border-gray-300 bg-white/60">
+                <summary class="flex items-center justify-between gap-3 p-4 cursor-pointer list-none">
+                    <span class="font-medium text-gray-700">Más herramientas</span>
+                    <span class="text-sm text-gray-500 group-open:hidden">Ver</span>
+                    <span class="text-sm text-gray-500 hidden group-open:inline">Cerrar</span>
+                </summary>
+                <p class="px-4 -mt-2 pb-2 text-xs text-gray-500">No vienen activas para este evento ({PROFILE_LABELS[moduleCtx.profile]}). Al agregar una, queda en esta pestaña.</p>
+                <ul class="divide-y divide-gray-100 border-t border-gray-100">
+                    {t.modules.filter((m) => !m.core).map((m) => (
+                        <li data-add-item={m.id} hidden={m.enabled} class="flex items-center justify-between gap-4 p-4">
+                            <div class="min-w-0">
+                                <p class="font-medium text-gray-900">{m.title}</p>
+                                <p class="text-sm text-gray-500">{m.description}</p>
+                            </div>
+                            <button
+                                type="button"
+                                data-add-module={m.id}
+                                class="shrink-0 px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-sm font-medium hover:bg-gray-50"
+                            >
+                                Agregar
+                            </button>
+                        </li>
+                    ))}
+                </ul>
+            </details>
+        </div>
+    ))}
+
+    <p id="modulesToast" hidden role="alert" class="fixed bottom-4 left-4 right-4 sm:left-auto sm:max-w-sm z-50 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 shadow-lg"></p>
 </DashboardLayout>
 
 <script>
+  // Pestañas: la elegida queda en el hash (#ventas, #difusion…) para volver a ella al recargar
+  const tabButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-tab]'));
+  const showTab = (id: string) => {
+    if (!tabButtons.some((b) => b.dataset.tab === id)) return false;
+    tabButtons.forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === id)));
+    document.querySelectorAll<HTMLElement>('[data-tab-panel]').forEach((p) => (p.hidden = p.dataset.tabPanel !== id));
+    return true;
+  };
+  tabButtons.forEach((b) =>
+    b.addEventListener('click', () => {
+      showTab(b.dataset.tab!);
+      history.replaceState(null, '', `#${b.dataset.tab}`);
+    }),
+  );
+  // Llegando con #pestaña (p. ej. desde Promocionar): el id no existe como ancla, así que se baja a las pestañas a mano
+  const openFromHash = () => {
+    if (location.hash && showTab(location.hash.slice(1))) {
+      requestAnimationFrame(() => document.querySelector('[role="tablist"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    }
+  };
+  openFromHash();
+  // Un link a #pestaña dentro de la misma página no recarga: solo cambia el hash
+  window.addEventListener('hashchange', openFromHash);
+
+  // Agregar una herramienta (events.panel_modules vía /api/events/modules): su tarjeta aparece al instante, se baja a
+  // ella para configurarla y se guarda en segundo plano (si falla, vuelve a "Más herramientas").
+  const panelEventId = Number(document.getElementById('toggleStatusBtn')?.dataset.eventId);
+  const toast = document.getElementById('modulesToast');
+  const showModule = (id: string, shown: boolean) => {
+    const slot = document.querySelector<HTMLElement>(`[data-module="${id}"]`);
+    if (slot) slot.hidden = !shown;
+    const item = document.querySelector<HTMLElement>(`[data-add-item="${id}"]`);
+    if (item) item.hidden = shown;
+    const more = item?.closest<HTMLDetailsElement>('[data-more-tools]');
+    if (more) more.hidden = !more.querySelector('[data-add-item]:not([hidden])');
+    return slot;
+  };
+  const addModule = async (id: string) => {
+    const slot = showModule(id, true);
+    if (slot) {
+      slot.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      slot.classList.add('ring-2', 'ring-black', 'ring-offset-4');
+      setTimeout(() => slot.classList.remove('ring-2', 'ring-black', 'ring-offset-4'), 1600);
+    }
+    try {
+      const res = await fetch('/api/events/modules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventId: panelEventId, moduleId: id }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'No se pudo guardar');
+    } catch (e: any) {
+      showModule(id, false);
+      if (toast) {
+        toast.textContent = e?.message || 'Error de conexión';
+        toast.hidden = false;
+        setTimeout(() => (toast.hidden = true), 5000);
+      }
+    }
+  };
+  document.querySelectorAll<HTMLButtonElement>('[data-add-module]').forEach((b) => b.addEventListener('click', () => addModule(b.dataset.addModule!)));
+
   const copyBtn = document.getElementById('copyLinkBtn');
   copyBtn?.addEventListener('click', async () => {
     try {

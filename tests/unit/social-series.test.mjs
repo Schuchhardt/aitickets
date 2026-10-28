@@ -24,7 +24,7 @@ vi.mock('../../netlify/lib/zernio-ads.mjs', async (orig) => {
 })
 
 const { planSlots, choosePublishTime, normalizeCadence, nextFunctionStart, DEFAULT_CADENCE, stageOf } = await import('../../src/lib/socialSeriesCadence.ts')
-const { pieceText, backgroundMode, renderPiece } = await import('../../src/lib/socialSeriesRender.ts')
+const { pieceText, backgroundMode, renderPiece, withoutEmoji } = await import('../../src/lib/socialSeriesRender.ts')
 const S = await import('../../src/lib/socialSeries.ts')
 const { runTool } = await import('../../src/lib/producer-api/registry.ts')
 const { getTool } = await import('../../src/lib/producer-api/tools/index.ts')
@@ -206,6 +206,14 @@ describe('motor de cadencia', () => {
 
 describe('textos de las piezas', () => {
   const base = { eventName: 'Concierto de Primavera', dateLabel: 'domingo 8 de noviembre', startTime: '12:00', venue: 'Escuela de Música del Dire', keyword: 'ENTRADAS', remaining: null, styleIndex: 0 }
+  it('sin emojis en la imagen (las fuentes no los tienen)', () => {
+    expect(withoutEmoji('Cumpleaños de Seba en Halloween 🎃')).toBe('Cumpleaños de Seba en Halloween')
+    expect(withoutEmoji('Fiesta 🇨🇱 👩🏽‍🎤 ❤️ final')).toBe('Fiesta final')
+    expect(withoutEmoji('Ñuñoa · 20:00 h')).toBe('Ñuñoa · 20:00 h')
+    const t = pieceText({ ...base, eventName: '🎃 Noche de brujas 🎃', venue: '🏠', kind: 'story', variant: 'countdown', daysToEvent: 13 })
+    expect(t.kicker).toBe('Noche de brujas')
+    expect(t.message).toEqual(['domingo 8 de noviembre · 12:00 h'])
+  })
   it('cambian por etapa y muestran escasez real solo la última semana', () => {
     expect(pieceText({ ...base, kind: 'story', variant: 'countdown', daysToEvent: 13, remaining: 20 })).toMatchObject({ bigLines: ['Faltan', '13', 'días'], scarcity: null, cta: 'Responde ENTRADAS y te mandamos el link' })
     expect(pieceText({ ...base, kind: 'story', variant: 'countdown', daysToEvent: 5, remaining: 42 })).toMatchObject({ scarcity: 'Quedan 42 entradas' })
@@ -307,6 +315,14 @@ describe('preparar y aprobar', () => {
     const v = await call('prepare_social_series', { event_id: 2296, dm_message: 'Hola! Compra acá {link} y nos vemos 🎶' })
     expect(v.dm_preview).toBe('Hola! Compra acá https://aitickets.cl/eventos/concierto-de-primavera-2296?ref=ig-story-dm y nos vemos 🎶')
     const bad = await runTool(getTool('prepare_social_series'), { event_id: 2296, base_image_url: 'https://evil.com/x.jpg' }, ctx())
+    expect(bad).toMatchObject({ ok: false, code: 'invalid_input' })
+  })
+
+  it('la foto base vacía (lo que manda el panel sin foto propia) vuelve a la portada del evento', async () => {
+    setNow(ACTIVATION)
+    const out = await runTool(getTool('prepare_social_series'), { event_id: 2296, base_image_url: '' }, ctx())
+    expect(out).toMatchObject({ ok: true })
+    const bad = await runTool(getTool('prepare_social_series'), { event_id: 2296, base_image_url: 'http://x/y.jpg' }, ctx())
     expect(bad).toMatchObject({ ok: false, code: 'invalid_input' })
   })
 })

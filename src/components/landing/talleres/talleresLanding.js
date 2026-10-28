@@ -335,7 +335,7 @@ export function builderNotes({ format, paid, enrolled, seats }) {
     // "Todas las semanas": solo se llena la primera fecha y la página la marca "Agotada" (el teléfono no muestra el aviso)
     if (format === 'weekly') notes.push({ id: 'full', text: 'Esa fecha se llenó: la página la marca Agotada y tu gente elige otra.' })
     else notes.push({ id: 'full', text: 'Se llenó: la página lo dice y anota a quien quiere cupo.' })
-    notes.push({ id: 'waitlist', text: 'Ver esa lista y avisarles cuando se libere un cupo', soon: true })
+    notes.push({ id: 'waitlist', text: 'Ves esa lista en tu panel y les avisamos solos cuando se libera un cupo.' })
   }
   return notes
 }

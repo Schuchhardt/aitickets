@@ -102,8 +102,8 @@ test("la plancha de promotores muestra los números del panel y el link de cada 
 
 test("lo que no existe va con Pronto y sin testimonio real no hay cita", async ({ page }) => {
   await open(page);
-  // Aviso automático a la lista (y "abrir sola" en la pausa, que se ve al jugar)
-  await expect(page.locator("#preventa").getByTestId("soon-badge")).toHaveCount(1);
+  // El aviso a la lista ya existe; "abrir sola" en la pausa se ve al jugar
+  await expect(page.locator("#preventa").getByTestId("soon-badge")).toHaveCount(0);
   // Acceso del promotor
   await expect(page.locator("#promotores").getByTestId("soon-badge")).toHaveCount(1);
   // Facebook, TikTok y reels en la serie; gustos en los anuncios

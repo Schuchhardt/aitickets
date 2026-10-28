@@ -1,6 +1,6 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { Instagram, CalendarClock, Pause, Play, X, RefreshCw, ImagePlus, MessageCircle, Check, AlertTriangle } from 'lucide-vue-next'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { Instagram, CalendarClock, Pause, Play, X, RefreshCw, ImagePlus, MessageCircle, Check, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-vue-next'
 
 // Difusión automática en Instagram (docs/specs/historias-automaticas.md): el productor aprueba una vez y AI Tickets
 // publica historias (y posts la última semana) hasta el día del evento, con el link por DM a quien responda la
@@ -83,6 +83,34 @@ const load = async () => {
   }
 }
 onMounted(load)
+
+// Vista previa ampliada: { items: [{ src, alt, kind, title, subtitle, caption }], index }. Flechas para recorrer el
+// calendario y Escape para cerrar.
+const zoom = ref(null)
+const zoomItem = computed(() => zoom.value?.items[zoom.value.index] || null)
+const openZoom = (items, index = 0) => (zoom.value = { items, index })
+const closeZoom = () => (zoom.value = null)
+const stepZoom = (d) => {
+  if (!zoom.value) return
+  const n = zoom.value.items.length
+  zoom.value.index = (zoom.value.index + d + n) % n
+}
+const slotZoomItem = (s, src = previewUrl(s)) => ({
+  src,
+  alt: `${s.kind_label} ${s.stage || ''}`.trim(),
+  kind: s.kind,
+  title: s.stage ? `${s.kind_label} · ${s.stage}` : s.kind_label,
+  subtitle: fmt(s.publish_local),
+  caption: s.caption_example || '',
+})
+const onZoomKey = (e) => {
+  if (!zoom.value) return
+  if (e.key === 'Escape') closeZoom()
+  else if (e.key === 'ArrowRight') stepZoom(1)
+  else if (e.key === 'ArrowLeft') stepZoom(-1)
+}
+onMounted(() => window.addEventListener('keydown', onZoomKey))
+onBeforeUnmount(() => window.removeEventListener('keydown', onZoomKey))
 
 /** Guarda el borrador con la configuración del formulario y refresca el calendario. */
 const savePreview = async () => {
@@ -269,13 +297,20 @@ const done = computed(() => (view.value?.slots || []).filter((s) => ['published'
               </p>
               <div class="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1" data-track-section="Calendario de la difusión">
                 <figure v-for="(s, i) in plan.slots" :key="`${s.kind}-${s.publish_at}`" class="shrink-0 w-28">
-                  <img
-                    :src="previewUrl(s)"
-                    :alt="`${s.kind_label} ${s.stage}`"
-                    loading="lazy"
-                    class="w-28 rounded-lg border border-gray-200 bg-gray-100"
-                    :class="s.kind === 'story' ? 'aspect-[9/16]' : 'aspect-[4/5]'"
-                  />
+                  <button
+                    type="button"
+                    class="block rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-black cursor-zoom-in"
+                    :aria-label="`Ampliar ${s.kind_label} ${s.stage}`"
+                    @click="openZoom(plan.slots.map((x) => slotZoomItem(x)), i)"
+                  >
+                    <img
+                      :src="previewUrl(s)"
+                      :alt="`${s.kind_label} ${s.stage}`"
+                      loading="lazy"
+                      class="w-28 rounded-lg border border-gray-200 bg-gray-100 hover:opacity-90 transition"
+                      :class="s.kind === 'story' ? 'aspect-[9/16]' : 'aspect-[4/5]'"
+                    />
+                  </button>
                   <figcaption class="mt-1 text-[11px] leading-tight text-gray-600">
                     <span class="font-semibold text-gray-800">{{ s.kind_label }}</span><br />{{ fmt(s.publish_local) }}
                     <details v-if="s.caption_example" class="mt-1">
@@ -328,7 +363,14 @@ const done = computed(() => (view.value?.slots || []).filter((s) => ['published'
           </p>
 
           <div v-if="view.next_slot && status === 'active'" class="flex items-center gap-3 p-3 rounded-lg border border-gray-200">
-            <img :src="view.next_slot.image_url || previewUrl(view.next_slot)" alt="Próxima publicación" class="w-14 rounded border border-gray-200" :class="view.next_slot.kind === 'story' ? 'aspect-[9/16]' : 'aspect-[4/5]'" />
+            <button
+              type="button"
+              class="shrink-0 rounded cursor-zoom-in focus:outline-none focus-visible:ring-2 focus-visible:ring-black"
+              aria-label="Ampliar la próxima publicación"
+              @click="openZoom([slotZoomItem(view.next_slot, view.next_slot.image_url || previewUrl(view.next_slot))])"
+            >
+              <img :src="view.next_slot.image_url || previewUrl(view.next_slot)" alt="Próxima publicación" class="w-14 rounded border border-gray-200 hover:opacity-90 transition" :class="view.next_slot.kind === 'story' ? 'aspect-[9/16]' : 'aspect-[4/5]'" />
+            </button>
             <div class="text-sm">
               <p class="font-semibold">Próxima: {{ view.next_slot.kind_label }} · {{ view.next_slot.stage }}</p>
               <p class="text-gray-500">{{ fmt(view.next_slot.publish_local) }} · {{ view.next_slot.status_label }}</p>
@@ -390,6 +432,54 @@ const done = computed(() => (view.value?.slots || []).filter((s) => ['published'
       </template>
 
       <p v-if="error" class="text-sm text-red-600" role="alert">{{ error }}</p>
+    </div>
+
+    <!-- Vista previa ampliada (fixed; sin Teleport para no complicar la hidratación de la isla) -->
+    <div
+      v-if="zoomItem"
+      class="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="zoomItem.title"
+      data-testid="social-series-zoom"
+      @click.self="closeZoom"
+    >
+      <button type="button" class="absolute top-3 right-3 p-2 rounded-full bg-white/10 text-white hover:bg-white/20" aria-label="Cerrar" @click="closeZoom">
+        <X :size="22" />
+      </button>
+      <button
+        v-if="zoom.items.length > 1"
+        type="button"
+        class="absolute left-2 sm:left-6 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/10 text-white hover:bg-white/20"
+        aria-label="Anterior"
+        @click="stepZoom(-1)"
+      >
+        <ChevronLeft :size="26" />
+      </button>
+      <figure class="flex flex-col items-center max-h-full" @click.self="closeZoom">
+        <img
+          :src="zoomItem.src"
+          :alt="zoomItem.alt"
+          class="rounded-xl shadow-2xl bg-gray-900 object-contain max-w-[min(90vw,420px)]"
+          :class="zoomItem.kind === 'story' ? 'max-h-[78vh] aspect-[9/16]' : 'max-h-[70vh] aspect-[4/5]'"
+        />
+        <figcaption class="mt-3 text-center text-white max-w-md">
+          <p class="font-semibold">{{ zoomItem.title }}</p>
+          <p class="text-sm text-white/70">
+            {{ zoomItem.subtitle }}<template v-if="zoom.items.length > 1"> · {{ zoom.index + 1 }} de {{ zoom.items.length }}</template>
+          </p>
+          <p v-if="zoomItem.caption" class="mt-2 text-sm text-white/80 whitespace-pre-line max-h-24 overflow-y-auto">{{ zoomItem.caption }}</p>
+        </figcaption>
+      </figure>
+      <button
+        v-if="zoom.items.length > 1"
+        type="button"
+        class="absolute right-2 sm:right-6 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/10 text-white hover:bg-white/20"
+        aria-label="Siguiente"
+        @click="stepZoom(1)"
+      >
+        <ChevronRight :size="26" />
+      </button>
     </div>
   </section>
 </template>

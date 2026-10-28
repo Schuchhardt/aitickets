@@ -210,7 +210,7 @@ const prepareSocialSeries: ToolDef = {
             keyword: { type: "string", pattern: KEYWORD_PATTERN, description: "Palabra que la gente responde o comenta para recibir el link (por defecto ENTRADAS)." },
             extra_keywords: { type: "array", maxItems: 5, items: { type: "string", pattern: KEYWORD_PATTERN }, description: "Variantes que también activan el DM (por defecto entrada y link)." },
             dm_message: { type: "string", maxLength: 600, description: "Texto del DM. {link} se reemplaza por el link con seguimiento (si no está, va al final). Vacío = mensaje por defecto." },
-            base_image_url: { type: "string", maxLength: 2000, pattern: "^https://", description: "Foto base (de upload_image). Vacío = la portada del evento." },
+            base_image_url: { type: "string", maxLength: 2000, pattern: "^(https://.*)?$", description: "Foto base (de upload_image). Vacío = la portada del evento." },
         },
     },
     async handler(args, ctx) {

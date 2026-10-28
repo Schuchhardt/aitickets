@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { 
   Megaphone, Plus, Instagram, Facebook, Send, Calendar, 
   TrendingUp, Clock, AlertCircle, CheckCircle, XCircle,
-  ExternalLink, Unplug, Target, DollarSign
+  ExternalLink, Unplug, Target, DollarSign, Share2, ArrowRight
 } from 'lucide-vue-next'
 import ConnectedAccounts from './ConnectedAccounts.vue'
 import PostHistory from './PostHistory.vue'
@@ -60,6 +60,12 @@ onMounted(() => {
   }
 })
 
+// "Promociona un evento": cada evento a la venta con su difusión automática y anuncios, y los atajos a la pestaña
+// Difusión del evento (/dashboard/events/:id#difusion), a crear post y a crear anuncio (?event=<id>)
+const SERIES_LABEL = { active: 'Historias activas', paused: 'Historias en pausa', draft: 'Historias por aprobar' }
+const SERIES_CLASS = { active: 'bg-green-50 text-green-700', paused: 'bg-amber-50 text-amber-700', draft: 'bg-amber-50 text-amber-700' }
+const fmtEventDate = (iso) => (iso ? new Date(iso).toLocaleString('es-CL', { timeZone: 'America/Santiago', dateStyle: 'medium', timeStyle: 'short' }) : 'Fecha por definir')
+
 const hasAccounts = computed(() => accounts.value.length > 0)
 
 const handleDisconnect = async (accountId) => {
@@ -101,7 +107,7 @@ const handleDisconnect = async (accountId) => {
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 md:mb-8">
       <div>
         <h1 class="text-2xl md:text-3xl font-bold font-[Unbounded] mb-2">Promocionar</h1>
-        <p class="text-gray-600">Publica en redes sociales y promociona tus eventos.</p>
+        <p class="text-gray-600">Comparte tus eventos, publica en redes y crea anuncios pagados.</p>
       </div>
 
       <div class="flex flex-wrap gap-2">
@@ -123,39 +129,68 @@ const handleDisconnect = async (accountId) => {
       </div>
     </div>
 
-    <!-- Stats Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 md:mb-8">
-      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-        <div class="flex items-center gap-3 mb-2">
-          <div class="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center">
-            <Send :size="20" class="text-purple-600" />
+    <!-- Promociona un evento -->
+    <section class="mb-8" data-testid="promote-events">
+      <h2 class="font-bold text-lg mb-1">Promociona un evento</h2>
+      <p class="text-sm text-gray-500 mb-4">
+        Cada evento tiene su pestaña <strong>Difusión</strong> con el link para compartir, links por canal o promotor e
+        historias automáticas en Instagram. Desde aquí también puedes publicar un post o crear un anuncio pagado.
+      </p>
+      <div v-if="events.length" class="bg-white rounded-xl border border-gray-200 shadow-sm divide-y divide-gray-100">
+        <div
+          v-for="e in events"
+          :key="e.id"
+          class="p-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4"
+        >
+          <div class="flex items-center gap-3 min-w-0 flex-1">
+            <img v-if="e.image_url" :src="e.image_url" alt="" class="w-12 h-12 rounded-lg object-cover shrink-0" loading="lazy" />
+            <div v-else class="w-12 h-12 rounded-lg bg-gray-100 shrink-0" />
+            <div class="min-w-0">
+              <p class="font-bold text-gray-900 truncate">{{ e.name }}</p>
+              <p class="text-xs text-gray-500">{{ fmtEventDate(e.start_date) }}</p>
+              <div class="flex flex-wrap gap-1.5 mt-1">
+                <span
+                  class="px-2 py-0.5 rounded text-xs font-medium"
+                  :class="SERIES_CLASS[e.series] || 'bg-gray-100 text-gray-500'"
+                >
+                  <Instagram :size="12" class="inline -mt-0.5" /> {{ SERIES_LABEL[e.series] || 'Sin historias automáticas' }}
+                </span>
+                <span v-if="e.activeAds" class="px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700">
+                  {{ e.activeAds }} {{ e.activeAds === 1 ? 'anuncio activo' : 'anuncios activos' }}
+                </span>
+              </div>
+            </div>
           </div>
-          <span class="text-sm text-gray-500">Posts Totales</span>
-        </div>
-        <p class="text-2xl font-bold">{{ stats.totalPosts }}</p>
-      </div>
-
-      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-        <div class="flex items-center gap-3 mb-2">
-          <div class="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
-            <CheckCircle :size="20" class="text-green-600" />
+          <div class="grid grid-cols-3 sm:flex gap-2 shrink-0">
+            <a
+              :href="`/dashboard/events/${e.id}#difusion`"
+              class="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-black text-white text-sm font-medium hover:bg-gray-800 transition"
+            >
+              <Share2 :size="16" /> Difusión
+            </a>
+            <a
+              :href="`/dashboard/promote/create?event=${e.id}`"
+              class="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium hover:bg-gray-50 transition"
+            >
+              <Send :size="16" /> Post
+            </a>
+            <a
+              v-if="adsEnabled && canManageAds"
+              :href="`/dashboard/promote/ads/create?event=${e.id}`"
+              class="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium hover:bg-gray-50 transition"
+            >
+              <Target :size="16" /> Anuncio
+            </a>
           </div>
-          <span class="text-sm text-gray-500">Publicados</span>
         </div>
-        <p class="text-2xl font-bold">{{ stats.publishedPosts }}</p>
       </div>
-
-      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-        <div class="flex items-center gap-3 mb-2">
-          <div class="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
-            <Clock :size="20" class="text-blue-600" />
-          </div>
-          <span class="text-sm text-gray-500">Programados</span>
-        </div>
-        <p class="text-2xl font-bold">{{ stats.scheduledPosts }}</p>
+      <div v-else class="bg-white rounded-xl border border-dashed border-gray-300 p-6 text-center">
+        <p class="text-gray-600 mb-3">No tienes eventos a la venta. Publica uno para empezar a promocionarlo.</p>
+        <a href="/dashboard/events" class="inline-flex items-center gap-1.5 text-sm font-medium text-black hover:underline">
+          Ir a mis eventos <ArrowRight :size="16" />
+        </a>
       </div>
-
-    </div>
+    </section>
 
     <!-- Tabs -->
     <div class="flex gap-1 mb-6 bg-gray-100 rounded-lg p-1 w-fit max-w-full overflow-x-auto whitespace-nowrap">
@@ -171,7 +206,7 @@ const handleDisconnect = async (accountId) => {
         class="shrink-0 px-4 py-2 rounded-md text-sm font-medium transition-colors"
         :class="activeTab === 'posts' ? 'bg-white text-black shadow-sm' : 'text-gray-500 hover:text-gray-700'"
       >
-        Historial de Posts
+        Historial de posts<span v-if="stats.totalPosts" class="text-gray-400"> · {{ stats.totalPosts }}</span>
       </button>
       <button
         v-if="adsEnabled"
