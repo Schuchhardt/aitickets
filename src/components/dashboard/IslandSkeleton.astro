@@ -1,0 +1,60 @@
+---
+// Skeleton para las islas client:only del panel mientras carga su JavaScript (antes no se veía nada):
+//   <SiteEditor client:only="vue" ...><IslandSkeleton slot="fallback" /></SiteEditor>
+// variant: "form" (tarjeta con campos), "card" (tarjeta corta) u "overview" (cifras + tarjetas).
+interface Props {
+  variant?: "form" | "card" | "overview";
+  fields?: number;
+}
+const { variant = "form", fields = 4 } = Astro.props;
+const card = "bg-white rounded-xl shadow-sm border border-gray-100";
+---
+
+<div role="status" aria-label="Cargando">
+  <span class="sr-only">Cargando…</span>
+  {
+    variant === "overview" ? (
+      <div aria-hidden="true">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <div>
+            <div class="ait-skeleton rounded-md h-8 md:h-9 w-56 mb-3" />
+            <div class="ait-skeleton rounded-md h-4 w-72 max-w-full" />
+          </div>
+          <div class="ait-skeleton h-11 w-44 rounded-lg" />
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 mb-8">
+          {[0, 1, 2].map(() => (
+            <div class:list={[card, "p-4 md:p-6"]}>
+              <div class="ait-skeleton rounded-md h-3 w-24 mb-3" />
+              <div class="ait-skeleton rounded-md h-8 w-28" />
+            </div>
+          ))}
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+          {[0, 1, 2].map(() => (
+            <div class:list={[card, "overflow-hidden"]}>
+              <div class="ait-skeleton h-40" />
+              <div class="p-4 space-y-2">
+                <div class="ait-skeleton rounded-md h-4 w-3/4" />
+                <div class="ait-skeleton rounded-md h-3 w-1/2" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    ) : (
+      <div class:list={[card, variant === "card" ? "p-4 md:p-6" : "p-4 md:p-8"]} aria-hidden="true">
+        <div class="ait-skeleton rounded-md h-6 w-48 mb-2" />
+        <div class="ait-skeleton rounded-md h-3.5 w-72 max-w-full mb-6" />
+        <div class:list={["grid gap-4 md:gap-6", variant === "form" && "md:grid-cols-2"]}>
+          {Array.from({ length: fields }).map(() => (
+            <div>
+              <div class="ait-skeleton rounded-md h-3 w-24 mb-2" />
+              <div class="ait-skeleton h-11 w-full rounded-lg" />
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+</div>

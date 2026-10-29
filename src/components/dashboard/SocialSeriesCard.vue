@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import SkeletonRows from './SkeletonRows.vue'
 import { Instagram, Facebook, Music2, Clapperboard, CalendarClock, Pause, Play, X, RefreshCw, ImagePlus, MessageCircle, Check, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-vue-next'
 import { CANVA_REEL_URL } from '../../lib/socialPlatforms'
 
@@ -253,7 +254,7 @@ const done = computed(() => (view.value?.slots || []).filter((s) => ['published'
     </div>
 
     <div class="p-4 sm:p-6 space-y-4">
-      <p v-if="loading" class="text-sm text-gray-500">Cargando…</p>
+      <SkeletonRows v-if="loading" variant="lines" :rows="4" />
 
       <template v-else-if="view">
         <div v-if="series?.notice" class="flex gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-900" role="status">

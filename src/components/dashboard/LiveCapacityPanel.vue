@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import SkeletonRows from './SkeletonRows.vue'
 import { Activity, ScanLine } from 'lucide-vue-next'
 
 // Aforo en vivo del evento (/api/events/checkin-stats = get_checkin_stats del asistente de IA): ingresados sobre
@@ -111,7 +112,7 @@ onBeforeUnmount(() => {
       </a>
     </div>
 
-    <p v-if="loading" class="text-sm text-gray-500">Cargando…</p>
+    <SkeletonRows v-if="loading" variant="lines" :rows="3" />
     <p v-else-if="!stats" class="text-sm text-red-600" role="alert">{{ error }}</p>
 
     <template v-else>

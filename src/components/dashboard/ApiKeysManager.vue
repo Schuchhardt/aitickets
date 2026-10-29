@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import SkeletonRows from './SkeletonRows.vue'
 import { KeyRound, Copy, Check, ChevronDown } from 'lucide-vue-next'
 import AiConnectGuide from './AiConnectGuide.vue'
 
@@ -219,7 +220,7 @@ const copy = async (text, tag) => {
         <h2 class="font-bold text-gray-900">Apps conectadas</h2>
         <p class="text-sm text-gray-500">Asistentes que autorizaste iniciando sesión (Claude, ChatGPT…).</p>
       </div>
-      <div v-if="loading" class="p-4 md:p-6 text-sm text-gray-500">Cargando...</div>
+      <div v-if="loading" class="px-4 md:px-6 py-2"><SkeletonRows :rows="2" label="Cargando apps conectadas" /></div>
       <div v-else-if="!connections.length" class="p-4 md:p-6 text-sm text-gray-500">Aún no conectas ninguna app.</div>
       <ul v-else class="divide-y divide-gray-50">
         <li v-for="c in connections" :key="c.id" class="p-4 md:px-6 flex flex-col sm:flex-row sm:items-center gap-2 justify-between">
@@ -303,7 +304,7 @@ const copy = async (text, tag) => {
         </div>
       </form>
 
-      <div v-if="loading" class="p-4 md:p-6 text-sm text-gray-500">Cargando llaves...</div>
+      <div v-if="loading" class="px-4 md:px-6 py-2"><SkeletonRows :rows="2" label="Cargando llaves" /></div>
       <div v-else-if="listError" class="p-4 md:p-6 text-sm text-red-600">{{ listError }}</div>
       <div v-else-if="!keys.length" class="p-4 md:p-6 text-sm text-gray-500">Aún no tienes llaves.</div>
       <div v-else class="overflow-x-auto">

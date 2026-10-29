@@ -156,6 +156,14 @@ describe('page_view en el layout', () => {
     expect(waitUntil).toHaveBeenCalledTimes(1)
   })
 
+  it('precarga (Sec-Purpose: prefetch;prerender): devuelve el id pero no registra la visita todavía', async () => {
+    const out = await recordDashboardPageView(astro('https://aitickets.cl/dashboard/events', { 'sec-purpose': 'prefetch;prerender' }), SESSION)
+    expect(out).toMatchObject({ deferred: true })
+    expect(out.id).toMatch(/^[0-9a-f-]{36}$/)
+    expect(db.tables.aitickets_producer_activity || []).toHaveLength(0)
+    expect(await recordDashboardPageView(astro('https://aitickets.cl/dashboard/events'), SESSION)).toMatchObject({ deferred: false })
+  })
+
   it('reconoce dispositivo y navegador', () => {
     expect(deviceFromUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36')).toEqual({ device: 'desktop', browser: 'Chrome', os: 'Windows' })
     expect(deviceFromUserAgent('Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/130.0 Mobile Safari/537.36')).toMatchObject({ device: 'mobile', os: 'Android' })
@@ -188,6 +196,28 @@ describe('POST /api/dashboard/journal', () => {
     expect((await post(null, JSON.stringify({ ...valid, junk: 'x'.repeat(70 * 1024) }))).status).toBe(413)
     expect((await post({ ...valid, events: [{ type: 'otro' }] })).status).toBe(204)
     expect(db.tables.aitickets_producer_activity).toHaveLength(0)
+  })
+
+  it('página precargada que se abrió (page_view: true): registra la visita con los datos de la sesión', async () => {
+    const res = await journal.POST({
+      url: new URL('https://aitickets.cl/api/dashboard/journal'),
+      request: new Request('https://aitickets.cl/api/dashboard/journal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36' },
+        body: JSON.stringify({ ...valid, path: '/dashboard/events/812', search: '?tab=entradas', events: [], page_view: true, referrer: 'https://aitickets.cl/dashboard/events', organization_id: 8 }),
+      }),
+    })
+    expect(res.status).toBe(204)
+    expect(db.tables.aitickets_producer_activity).toHaveLength(1)
+    expect(db.tables.aitickets_producer_activity[0]).toMatchObject({
+      organization_id: 7,
+      user_id: 1,
+      page_view_id: PV,
+      type: 'page_view',
+      path: '/dashboard/events/812',
+      event_id: 812,
+      data: { query: { tab: 'entradas' }, from: '/dashboard/events', role: 'producer', device: 'desktop', browser: 'Chrome' },
+    })
   })
 
   it('tabla inexistente (deploy sin migrar): 204 igual', async () => {

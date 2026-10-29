@@ -1,6 +1,6 @@
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin, getFriendlyErrorMessage } from "../../../lib/auth-helpers";
-import { getSessionContext, hasRole, ORG_ADMIN_ROLES } from "../../../lib/supabaseServer";
+import { forgetCachedSessionsOfUser, getSessionContext, hasRole, ORG_ADMIN_ROLES } from "../../../lib/supabaseServer";
 import { OWNER_ONLY_ROLES, countActiveOrgAdmins, isAiticketsAuthUser, json } from "./_team";
 
 export const POST: APIRoute = async (context) => {
@@ -61,6 +61,8 @@ export const POST: APIRoute = async (context) => {
             console.error("Database update error:", updateDbError);
             return json({ error: getFriendlyErrorMessage(updateDbError) }, 500);
         }
+
+        forgetCachedSessionsOfUser(targetUser.id);
 
         // Sus links de escáner de puerta (aitickets_checkin_links) dejan de funcionar al desactivarlo
         if (!active) {

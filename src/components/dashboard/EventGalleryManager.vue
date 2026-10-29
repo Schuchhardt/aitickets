@@ -4,6 +4,7 @@
 // pública (EventGallery.vue). API: /api/events/upload-image (kind=gallery) y /api/events/gallery.
 // Arriba de las fotos puede ir, opcional, un video (EventVideoUploader.vue, /api/events/video con slot gallery).
 import { computed, onMounted, ref } from 'vue'
+import SkeletonRows from './SkeletonRows.vue'
 import { Images, UploadCloud, Trash2, ChevronLeft, ChevronRight, Check } from 'lucide-vue-next'
 import { prepareImageForUpload, MAX_UPLOAD_BYTES, MAX_SOURCE_BYTES } from '../../lib/clientImage'
 import EventVideoUploader from './EventVideoUploader.vue'
@@ -198,7 +199,7 @@ onMounted(load)
 
     <div class="p-4 sm:p-6 space-y-4"
       @dragover.prevent="dragging = true" @dragleave.prevent="dragging = false" @drop.prevent="onDrop">
-      <p v-if="loading" class="text-sm text-gray-500">Cargando galería...</p>
+      <SkeletonRows v-if="loading" variant="media" :rows="4" label="Cargando galería" />
 
       <button v-else-if="!images.length" type="button" :disabled="!!busy" @click="fileInput?.click()"
         class="w-full border-2 border-dashed rounded-xl p-6 sm:p-10 flex flex-col items-center text-center transition disabled:opacity-60"

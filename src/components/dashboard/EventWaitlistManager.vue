@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import SkeletonRows from './SkeletonRows.vue'
 import { BellRing, Download } from 'lucide-vue-next'
 
 // Lista de espera del evento (/api/events/waitlist-list): quiénes se anotaron en la página (agotado, cupos llenos o
@@ -52,7 +53,7 @@ onMounted(async () => {
       </a>
     </div>
 
-    <p v-if="loading" class="p-4 sm:p-6 text-sm text-gray-500">Cargando…</p>
+    <div v-if="loading" class="px-4 sm:px-6 py-2"><SkeletonRows :rows="3" label="Cargando lista de espera" /></div>
     <p v-else-if="error" class="p-4 sm:p-6 text-sm text-red-600" role="alert">{{ error }}</p>
     <template v-else-if="data">
       <div class="grid grid-cols-3 divide-x divide-gray-100 border-b border-gray-100 text-center">

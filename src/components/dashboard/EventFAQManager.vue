@@ -3,6 +3,7 @@
 // pregunta se hace en un modal; las sugerencias con IA se revisan en la lista antes de agregarlas.
 // API: /api/events/faqs (se guarda al instante, no depende del botón "Guardar" del formulario).
 import { ref, computed, nextTick, onBeforeUnmount, onMounted, watch } from "vue";
+import SkeletonRows from "./SkeletonRows.vue";
 import { Sparkles, X } from "lucide-vue-next";
 
 const props = defineProps({
@@ -271,8 +272,8 @@ onMounted(fetchFaqs);
     </div>
 
     <!-- FAQ List -->
-    <div v-if="loading" class="p-6 sm:p-8 text-center text-gray-500">
-      Cargando...
+    <div v-if="loading" class="p-4 sm:p-6">
+      <SkeletonRows variant="lines" :rows="5" label="Cargando preguntas" />
     </div>
 
     <div v-else-if="faqs.length === 0" class="p-6 sm:p-8 text-center text-gray-500">

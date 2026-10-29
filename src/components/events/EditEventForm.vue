@@ -115,6 +115,8 @@ onMounted(() => {
   if (params.has('step') || params.has('saved')) {
     window.history.replaceState(null, '', window.location.pathname)
   }
+  // src/lib/dashboardNav.js no pone el skeleton de navegación si el navegador va a preguntar si salir
+  window.aitHasUnsavedChanges = () => isDirty.value && !leavingAfterSave
   window.addEventListener('beforeunload', (e) => {
     if (isDirty.value && !leavingAfterSave) {
       e.preventDefault()

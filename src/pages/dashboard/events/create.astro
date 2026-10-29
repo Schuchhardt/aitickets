@@ -5,6 +5,7 @@ import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { listOrgVenues, type OrgVenue } from "../../../lib/orgVenues";
 import { EVENT_MANAGER_ROLES } from "../../../lib/supabaseServer";
 import { requireDashboardSession } from "../_lib/guard";
+import IslandSkeleton from "../../../components/dashboard/IslandSkeleton.astro";
 
 const guard = await requireDashboardSession(Astro, EVENT_MANAGER_ROLES);
 if (!guard.ok) return guard.response;
@@ -28,6 +29,6 @@ try {
     </div>
 
     <!-- The Wizard Form -->
-    <CreateEventForm client:only="vue" initialVenues={venues} />
+    <CreateEventForm client:only="vue" initialVenues={venues}><IslandSkeleton slot="fallback" fields={6} /></CreateEventForm>
   </div>
 </DashboardLayout>

@@ -19,22 +19,23 @@ import {
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import logoLight from '../../images/logo.png'
 
-const props = defineProps(['userJson'])
+// Se renderiza en el servidor (DashboardLayout, client:load): nada de window/localStorage fuera de onMounted.
+// currentPath e initialCollapsed llegan del servidor para que el primer render ya sea el definitivo.
+const props = defineProps(['userJson', 'currentPath', 'initialCollapsed'])
 const user = ref(props.userJson ? JSON.parse(props.userJson) : null)
-const currentPath = ref(window.location.pathname)
+const currentPath = ref(props.currentPath || '/dashboard')
 
-// Escritorio: sidebar contraído (solo íconos), recordado entre páginas.
-// Mobile: cajón que se abre desde la barra superior del layout ([data-sidebar-open]).
-const COLLAPSE_KEY = 'dashboard_sidebar_collapsed'
-const readCollapsed = () => {
-  try { return localStorage.getItem(COLLAPSE_KEY) === '1' } catch { return false }
-}
-const isCollapsed = ref(readCollapsed())
+// Escritorio: sidebar contraído (solo íconos), recordado entre páginas en una cookie (el servidor la lee para
+// renderizarlo ya contraído). Mobile: cajón que se abre desde la barra superior del layout ([data-sidebar-open]).
+const COLLAPSE_COOKIE = 'dashboard_sidebar_collapsed'
+const LEGACY_COLLAPSE_KEY = 'dashboard_sidebar_collapsed'
+const isCollapsed = ref(!!props.initialCollapsed)
 const isMobileOpen = ref(false)
 
-watch(isCollapsed, (value) => {
-  try { localStorage.setItem(COLLAPSE_KEY, value ? '1' : '0') } catch { /* storage no disponible */ }
-})
+const saveCollapsed = (value) => {
+  document.cookie = `${COLLAPSE_COOKIE}=${value ? '1' : '0'}; path=/dashboard; max-age=31536000; samesite=lax`
+}
+watch(isCollapsed, saveCollapsed)
 
 const toggleCollapse = () => {
   isCollapsed.value = !isCollapsed.value
@@ -55,18 +56,33 @@ const onKeydown = (e) => {
   if (e.key === 'Escape') closeMobile()
 }
 // Al pasar a escritorio el cajón no aplica
-const desktopQuery = window.matchMedia('(min-width: 768px)')
+let desktopQuery = null
 const onBreakpointChange = (e) => { if (e.matches) closeMobile() }
+// src/lib/dashboardNav.js avisa al hacer clic en un enlace del panel: el ítem se marca al tiro, sin esperar la página
+const onNavigate = (e) => { if (e.detail?.path) currentPath.value = e.detail.path }
+// Volver atrás desde la caché del navegador (bfcache): el ítem activo vuelve a ser el de esta página
+const onPageShow = (e) => { if (e.persisted) currentPath.value = window.location.pathname }
 
 onMounted(() => {
+  // Antes se recordaba en localStorage: se pasa una vez a la cookie
+  if (!document.cookie.includes(`${COLLAPSE_COOKIE}=`)) {
+    try {
+      if (localStorage.getItem(LEGACY_COLLAPSE_KEY) === '1') isCollapsed.value = true
+    } catch { /* storage no disponible */ }
+  }
   document.addEventListener('click', onDocumentClick)
   document.addEventListener('keydown', onKeydown)
+  window.addEventListener('ait:navigate', onNavigate)
+  window.addEventListener('pageshow', onPageShow)
+  desktopQuery = window.matchMedia('(min-width: 768px)')
   desktopQuery.addEventListener('change', onBreakpointChange)
 })
 onUnmounted(() => {
   document.removeEventListener('click', onDocumentClick)
   document.removeEventListener('keydown', onKeydown)
-  desktopQuery.removeEventListener('change', onBreakpointChange)
+  window.removeEventListener('ait:navigate', onNavigate)
+  window.removeEventListener('pageshow', onPageShow)
+  desktopQuery?.removeEventListener('change', onBreakpointChange)
   document.body.style.overflow = ''
 })
 

@@ -8,6 +8,7 @@ import { loadAdConnections, loadAdsView } from "../../../lib/ads";
 import { adsEnabled } from "../../../../netlify/lib/zernio-ads.mjs";
 import { getStaffEventIds } from "../../../../netlify/lib/event-staff.mjs";
 import { SERIES_TABLE, LIVE_STATUSES } from "../../../lib/socialSeries";
+import IslandSkeleton from "../../../components/dashboard/IslandSkeleton.astro";
 
 const guard = await requireDashboardSession(Astro, EVENT_MANAGER_ROLES);
 if (!guard.ok) return guard.response;
@@ -105,5 +106,7 @@ const tab = rawTab === "ads" && !enabledAds ? "" : rawTab;
     initialTab={tab || ""}
     adsJson={JSON.stringify(ads)}
     canManageAds={hasRole(dbUser, ORG_ADMIN_ROLES)}
-  />
+  >
+    <IslandSkeleton slot="fallback" variant="overview" />
+  </PromoteOverview>
 </DashboardLayout>
