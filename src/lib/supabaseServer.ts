@@ -126,6 +126,10 @@ async function isOrgEmailVerified(orgId: number, authUser: User): Promise<boolea
  * organización no ha verificado su correo.
  */
 export const getSessionContext = async (context: CookieContext): Promise<SessionContext | null> => {
+    const accessToken = context.cookies.get("sb-access-token")?.value;
+    const cached = accessToken ? readCachedSession(accessToken) : null;
+    if (cached) return cached;
+
     const authUser = await getSessionUser(context);
     if (!authUser) return null;
 
@@ -137,7 +141,48 @@ export const getSessionContext = async (context: CookieContext): Promise<Session
 
     if (!dbUser || !dbUser.organization_id || dbUser.active === false) return null;
     if (!(await isOrgEmailVerified(Number(dbUser.organization_id), authUser))) return null;
-    return { authUser, dbUser: dbUser as DbUser };
+    const session = { authUser, dbUser: dbUser as DbUser };
+    if (accessToken) cacheSession(accessToken, session);
+    return session;
+}
+
+// Sesiones ya validadas en este proceso, por access token. Cada página del panel y cada llamada a /api pedía
+// a Supabase Auth el usuario (una ida y vuelta de red) y luego su fila en public.users: con esto, al navegar
+// entre secciones se valida una vez cada SESSION_CACHE_MS. Solo se guardan sesiones válidas; un cambio de rol
+// o una desactivación tarda como máximo eso en notarse. El token vence solo (1 h) y al refrescarlo cambia la llave.
+const SESSION_CACHE_MS = 30_000;
+const SESSION_CACHE_MAX = 500;
+const sessionCache = new Map<string, { session: SessionContext; expiresAt: number }>();
+
+function readCachedSession(accessToken: string): SessionContext | null {
+    const hit = sessionCache.get(accessToken);
+    if (!hit) return null;
+    if (hit.expiresAt <= Date.now()) {
+        sessionCache.delete(accessToken);
+        return null;
+    }
+    return hit.session;
+}
+
+function cacheSession(accessToken: string, session: SessionContext) {
+    if (sessionCache.size >= SESSION_CACHE_MAX) {
+        const oldest = sessionCache.keys().next().value;
+        if (oldest !== undefined) sessionCache.delete(oldest);
+    }
+    sessionCache.set(accessToken, { session, expiresAt: Date.now() + SESSION_CACHE_MS });
+}
+
+/** Olvida la sesión de este token (logout): que no siga valiendo desde la caché. */
+export function forgetCachedSession(accessToken: string | null | undefined) {
+    if (accessToken) sessionCache.delete(accessToken);
+}
+
+/** Olvida las sesiones de un usuario (cambió su nombre, rol o estado) para que la próxima página lo lea de nuevo. */
+export function forgetCachedSessionsOfUser(userId: number | string | null | undefined) {
+    if (userId == null) return;
+    for (const [token, entry] of sessionCache) {
+        if (Number(entry.session.dbUser.id) === Number(userId)) sessionCache.delete(token);
+    }
 }
 
 /** Roles que pueden administrar eventos (crear/editar/publicar). */

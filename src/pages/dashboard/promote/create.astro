@@ -4,6 +4,7 @@ import { EVENT_MANAGER_ROLES } from "../../../lib/supabaseServer";
 import { requireDashboardSession } from "../_lib/guard";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import CreateSocialPost from "../../../components/dashboard/promote/CreateSocialPost.vue";
+import IslandSkeleton from "../../../components/dashboard/IslandSkeleton.astro";
 
 const guard = await requireDashboardSession(Astro, EVENT_MANAGER_ROLES);
 if (!guard.ok) return guard.response;
@@ -40,5 +41,7 @@ const preSelectedEventId = Astro.url.searchParams.get("event") || "";
     eventsJson={JSON.stringify(events || [])}
     accountsJson={JSON.stringify(socialAccounts || [])}
     preSelectedEventId={preSelectedEventId}
-  />
+  >
+    <IslandSkeleton slot="fallback" fields={6} />
+  </CreateSocialPost>
 </DashboardLayout>

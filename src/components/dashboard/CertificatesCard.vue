@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import SkeletonRows from './SkeletonRows.vue'
 import { Award, Download, Send, Copy, Check } from 'lucide-vue-next'
 
 // Certificados de asistencia (/api/events/certificates → get_attendance_certificates / send_attendance_certificates,
@@ -109,7 +110,7 @@ const copy = async (c) => {
       </label>
     </div>
 
-    <p v-if="loading" class="text-sm text-gray-500">Cargando…</p>
+    <SkeletonRows v-if="loading" variant="lines" :rows="2" />
     <template v-else-if="summary">
       <p class="text-sm text-gray-700" data-testid="certificates-summary">
         <strong>{{ summary.eligible }}</strong> {{ summary.eligible === 1 ? 'certificado' : 'certificados' }} de {{ summary.checked_in }}

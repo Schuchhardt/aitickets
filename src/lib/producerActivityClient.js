@@ -150,11 +150,30 @@ export function startProducerActivity() {
   const route = document.body.dataset.aitRoute || "";
   if (!pv) return;
   started = true;
+  // Página precargada (src/lib/dashboardNav.js): no se mide nada hasta que el productor la abre de verdad
+  if (document.prerendering) {
+    document.addEventListener("prerenderingchange", () => track(pv, route), { once: true });
+  } else {
+    track(pv, route);
+  }
+}
 
+function track(pv, route) {
   const origFetch = window.fetch.bind(window);
   const queue = [];
   let sent = 0;
   let disabled = false;
+
+  // Precargada: el servidor no registró la visita al renderizarla (recordDashboardPageView con deferred); se
+  // registra ahora que la abrió
+  if (document.body.dataset.aitPvDeferred) {
+    const body = JSON.stringify({ v: 1, pv, route, path: location.pathname, search: location.search, sent_at: Date.now(), events: [], page_view: true, referrer: document.referrer || null });
+    origFetch(ACTIVITY_ENDPOINT, { method: "POST", headers: { "Content-Type": "application/json" }, body, keepalive: true, credentials: "same-origin" })
+      .then((res) => {
+        if ([401, 403, 404, 410].includes(res.status)) disabled = true;
+      })
+      .catch(() => {});
+  }
 
   const push = (type, fields = {}) => {
     if (disabled || (sent >= MAX_EVENTS_PER_PAGE && type !== "page_time")) return;
@@ -220,7 +239,8 @@ export function startProducerActivity() {
     if (firstSnapshot) {
       firstSnapshot = false;
       const nav = performance.getEntriesByType && performance.getEntriesByType("navigation")[0];
-      if (nav && nav.loadEventEnd > 0) data.load_ms = Math.round(nav.loadEventEnd);
+      // Precargada: lo que tardó desde que la abrió (activationStart), casi siempre 0
+      if (nav && nav.loadEventEnd > 0) data.load_ms = Math.max(0, Math.round(nav.loadEventEnd - (nav.activationStart || 0)));
       data.viewport = `${window.innerWidth}x${window.innerHeight}`;
     }
     push("page_time", { duration_ms: activeMs, data });

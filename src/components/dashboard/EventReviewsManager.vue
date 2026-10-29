@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import SkeletonRows from './SkeletonRows.vue'
 import { Star, Lock, Eye, EyeOff, Trash2, Download, Send, Gift, ChevronDown } from 'lucide-vue-next'
 
 // Reseñas del evento (panel): resumen, configuración (correo de 24 h, premio por calificar, moderación de fotos,
@@ -232,7 +233,7 @@ const sendInvite = async () => {
       </p>
     </div>
 
-    <div v-if="loading" class="p-6 text-sm text-gray-500">Cargando reseñas…</div>
+    <div v-if="loading" class="px-4 md:px-6 py-2"><SkeletonRows :rows="3" label="Cargando reseñas" /></div>
     <div v-else-if="loadError" class="p-6 text-sm text-red-600">{{ loadError }}</div>
     <div v-else-if="unavailable" class="p-4 md:p-6 text-sm text-amber-700 bg-amber-50">Las reseñas se están activando. Vuelve a intentarlo en unos minutos.</div>
 

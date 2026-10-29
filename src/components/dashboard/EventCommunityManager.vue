@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import SkeletonRows from './SkeletonRows.vue'
 import { MessageCircle, Eye, EyeOff, Mail, Check } from 'lucide-vue-next'
 
 // Mensajes de asistentes (escritos desde la página de su orden) y muro de asistentes (reacciones con emoji y
@@ -90,7 +91,7 @@ const togglePost = async (p) => {
       </p>
     </div>
 
-    <div v-if="loading" class="p-6 text-sm text-gray-500">Cargando…</div>
+    <div v-if="loading" class="px-4 md:px-6 py-2"><SkeletonRows :rows="4" label="Cargando comunidad" /></div>
     <div v-else-if="loadError" class="p-4 md:p-6 text-sm text-amber-700 bg-amber-50">{{ loadError }}</div>
 
     <template v-else-if="data">

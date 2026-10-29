@@ -10,6 +10,7 @@ import { loadAdConnections } from "../../../../lib/ads";
 import CreateAdCampaign from "../../../../components/dashboard/promote/CreateAdCampaign.vue";
 import { getStaffEventIds } from "../../../../../netlify/lib/event-staff.mjs";
 import { AD_CALLS_TO_ACTION, AD_LIMITS, adsEnabled } from "../../../../../netlify/lib/zernio-ads.mjs";
+import IslandSkeleton from "../../../../components/dashboard/IslandSkeleton.astro";
 
 const guard = await requireDashboardSession(Astro, ORG_ADMIN_ROLES);
 if (!guard.ok) return guard.response;
@@ -60,5 +61,7 @@ const limits = { cityRadiiKm: AD_LIMITS.cityRadiiKm, callsToAction: AD_CALLS_TO_
     preSelectedEventId={Astro.url.searchParams.get("event") || ""}
     preSelectedPostId={Astro.url.searchParams.get("post") || ""}
     limitsJson={JSON.stringify(limits)}
-  />
+  >
+    <IslandSkeleton slot="fallback" fields={6} />
+  </CreateAdCampaign>
 </DashboardLayout>

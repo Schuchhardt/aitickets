@@ -123,39 +123,64 @@ type PageViewAstro = {
     locals: any;
 };
 
+/** ¿La petición es una precarga (Speculation Rules / prefetch) y no una visita? Chrome manda Sec-Purpose: prefetch[;prerender]. */
+export const isSpeculativeRequest = (request: Request) => /prefetch/i.test(request.headers.get("sec-purpose") || request.headers.get("purpose") || "");
+
+/** Fila page_view de una página del panel. La organización y el usuario salen de la sesión. */
+export function buildPageViewRow(
+    session: SessionContext,
+    page: { id: string; path: string; route: string; search: string; referer: string | null; ownHost: string; userAgent: string | null },
+) {
+    const query = cleanQuery(page.search);
+    return {
+        organization_id: Number(session.dbUser.organization_id),
+        user_id: Number(session.dbUser.id),
+        page_view_id: page.id,
+        type: "page_view",
+        occurred_at: new Date().toISOString(),
+        path: page.path,
+        route: page.route,
+        event_id: eventIdFromPath(page.path, query),
+        data: {
+            ...(Object.keys(query).length ? { query } : {}),
+            from: referrerOf(page.referer, page.ownHost),
+            role: session.dbUser.role || null,
+            ...deviceFromUserAgent(page.userAgent),
+        },
+    };
+}
+
 /**
  * Registra la página del panel que se está renderizando (page_view) y devuelve su id y patrón de ruta para que el
  * rastreador del navegador les cuelgue sus hechos. null si la bitácora está apagada o no hay sesión.
+ * Si es una precarga (el productor pasó el mouse por un enlace, src/lib/dashboardNav.js) no se registra todavía:
+ * vuelve con deferred y el navegador lo registra al abrirla de verdad (page_view en el lote, sanitizeActivityBatch).
  */
-export async function recordDashboardPageView(Astro: PageViewAstro, session: SessionContext | null): Promise<{ id: string; route: string } | null> {
+export async function recordDashboardPageView(
+    Astro: PageViewAstro,
+    session: SessionContext | null,
+): Promise<{ id: string; route: string; deferred: boolean } | null> {
     if (!session || !producerActivityEnabled()) return null;
     const path = cleanDashboardPath(Astro.url.pathname);
     if (!path) return null;
     const route = (Astro.routePattern && ROUTE_RE.test(Astro.routePattern) ? Astro.routePattern : path).slice(0, 200);
-    const query = cleanQuery(Astro.url.search);
     const id = randomUUID();
-    const row = {
-        organization_id: Number(session.dbUser.organization_id),
-        user_id: Number(session.dbUser.id),
-        page_view_id: id,
-        type: "page_view",
-        occurred_at: new Date().toISOString(),
+    if (isSpeculativeRequest(Astro.request)) return { id, route, deferred: true };
+    const row = buildPageViewRow(session, {
+        id,
         path,
         route,
-        event_id: eventIdFromPath(path, query),
-        data: {
-            ...(Object.keys(query).length ? { query } : {}),
-            from: referrerOf(Astro.request.headers.get("referer"), Astro.url.host),
-            role: session.dbUser.role || null,
-            ...deviceFromUserAgent(Astro.request.headers.get("user-agent")),
-        },
-    };
+        search: Astro.url.search,
+        referer: Astro.request.headers.get("referer"),
+        ownHost: Astro.url.host,
+        userAgent: Astro.request.headers.get("user-agent"),
+    });
     const write = insertActivityRows(getSupabaseAdmin(), [row]);
     // waitUntil (Netlify) deja responder sin esperar a la BD; sin él se espera (insertActivityRows nunca lanza)
     const waitUntil = Astro.locals?.netlify?.context?.waitUntil;
     if (typeof waitUntil === "function") waitUntil(write);
     else await write;
-    return { id, route };
+    return { id, route, deferred: false };
 }
 
 // ---------------------------------------------------------------------------
@@ -221,7 +246,9 @@ function cleanData(type: string, raw: unknown): Record<string, unknown> {
     return out;
 }
 
-export type ActivityBatchResult = { ok: true; rows: Record<string, unknown>[] } | { ok: false; error: string };
+export type ActivityBatchResult =
+    | { ok: true; rows: Record<string, unknown>[]; pageView: { id: string; path: string; route: string; search: string; referrer: string | null } | null }
+    | { ok: false; error: string };
 
 /**
  * Valida y sanea un lote del navegador. Devuelve las filas listas para insertar SIN organization_id ni user_id
@@ -266,5 +293,11 @@ export function sanitizeActivityBatch(body: any, now = Date.now()): ActivityBatc
             data: cleanData(ev.type, ev.data),
         });
     }
-    return { ok: true, rows };
+    // Página que se precargó y el productor acaba de abrir: el servidor no registró su page_view al renderizarla
+    // (recordDashboardPageView con deferred); lo registra el endpoint con los datos de la sesión.
+    const pageView =
+        body.page_view === true
+            ? { id: pv, path, route, search: typeof body.search === "string" ? body.search : "", referrer: typeof body.referrer === "string" ? body.referrer.slice(0, 500) : null }
+            : null;
+    return { ok: true, rows, pageView };
 }

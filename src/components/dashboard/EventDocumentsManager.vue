@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import SkeletonRows from './SkeletonRows.vue'
 import { FileCheck, Upload } from 'lucide-vue-next'
 
 // Permisos y documentos del evento (/api/events/documents): autorización de la Delegación Presidencial (eventos
@@ -109,7 +110,7 @@ const toggleMassive = async (value) => {
       Sube la autorización del evento, el permiso del lugar y la póliza de responsabilidad civil. Los revisamos y la página del evento muestra el estado de la autorización.
     </p>
 
-    <p v-if="loading" class="text-sm text-gray-400">Cargando…</p>
+    <SkeletonRows v-if="loading" variant="lines" :rows="3" />
     <p v-else-if="unavailable" class="text-sm text-amber-700">Esta sección estará disponible en unos minutos.</p>
 
     <template v-else>

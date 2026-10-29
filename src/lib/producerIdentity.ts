@@ -112,6 +112,21 @@ export async function needsIdentityForPublishedEvents(supabase: any, orgId: numb
     return (data || []).length > 0;
 }
 
+// Aviso del layout del panel (DashboardLayout): se calcula a lo más una vez por minuto y organización en este
+// proceso, para no sumar dos consultas a cada cambio de sección. El aviso puede tardar eso en aparecer o irse.
+const IDENTITY_NOTICE_TTL_MS = 60_000;
+const identityNoticeCache = new Map<number, { value: boolean; expiresAt: number }>();
+
+/** needsIdentityForPublishedEvents con caché corta (solo para el aviso del panel; nunca para bloquear algo). */
+export async function needsIdentityNotice(supabase: any, orgId: number): Promise<boolean> {
+    const hit = identityNoticeCache.get(orgId);
+    if (hit && hit.expiresAt > Date.now()) return hit.value;
+    const value = await needsIdentityForPublishedEvents(supabase, orgId);
+    if (identityNoticeCache.size > 1000) identityNoticeCache.clear();
+    identityNoticeCache.set(orgId, { value, expiresAt: Date.now() + IDENTITY_NOTICE_TTL_MS });
+    return value;
+}
+
 /** Mensaje de bloqueo si el evento no se puede publicar por falta de identidad verificada; null si puede. */
 export async function identityPublishBlocker(supabase: any, orgId: number, eventId: number): Promise<string | null> {
     if (!(await eventRequiresIdentity(supabase, eventId))) return null;

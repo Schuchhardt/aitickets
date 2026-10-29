@@ -1,6 +1,6 @@
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin, getFriendlyErrorMessage } from "../../../lib/auth-helpers";
-import { getSessionContext, hasRole, ORG_ADMIN_ROLES } from "../../../lib/supabaseServer";
+import { forgetCachedSessionsOfUser, getSessionContext, hasRole, ORG_ADMIN_ROLES } from "../../../lib/supabaseServer";
 import { ASSIGNABLE_ROLES, EMAIL_RE, OWNER_ONLY_ROLES, countActiveOrgAdmins, isAiticketsAuthUser, json } from "./_team";
 
 export const POST: APIRoute = async (context) => {
@@ -114,6 +114,7 @@ export const POST: APIRoute = async (context) => {
             return json({ error: getFriendlyErrorMessage(updateDbError) }, 500);
         }
 
+        forgetCachedSessionsOfUser(targetUser.id);
         return json({ message: "Usuario actualizado exitosamente" });
     } catch (error) {
         console.error("Update team member error:", error);

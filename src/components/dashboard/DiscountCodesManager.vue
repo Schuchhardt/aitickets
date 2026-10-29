@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import SkeletonRows from './SkeletonRows.vue'
 import { Tag, Shuffle, ChevronDown } from 'lucide-vue-next'
 
 // Códigos de descuento (dashboard). Con eventId: códigos del evento + los de toda la organización;
@@ -233,7 +234,7 @@ const copy = async (code) => {
       <p v-if="message" class="text-sm" :class="isError ? 'text-red-600' : 'text-green-700'" role="status">{{ message }}</p>
     </form>
 
-    <div v-if="loading" class="p-4 md:p-6 text-sm text-gray-500">Cargando códigos...</div>
+    <div v-if="loading" class="px-4 md:px-6 py-2"><SkeletonRows :rows="3" label="Cargando códigos" /></div>
     <div v-else-if="listError" class="p-4 md:p-6 text-sm text-red-600">{{ listError }}</div>
     <div v-else-if="!codes.length && !unavailable" class="p-4 md:p-6 text-sm text-gray-500">Aún no tienes códigos de descuento.</div>
     <template v-else-if="codes.length">

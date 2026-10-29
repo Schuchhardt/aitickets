@@ -1,6 +1,6 @@
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin, getFriendlyErrorMessage } from "../../../lib/auth-helpers";
-import { getSessionContext } from "../../../lib/supabaseServer";
+import { forgetCachedSessionsOfUser, getSessionContext } from "../../../lib/supabaseServer";
 
 export const POST: APIRoute = async (context) => {
     const session = await getSessionContext(context);
@@ -37,6 +37,8 @@ export const POST: APIRoute = async (context) => {
                 headers: { "Content-Type": "application/json" },
             });
         }
+
+        forgetCachedSessionsOfUser(session.dbUser.id);
 
         // 2. Update Supabase Auth metadata (so sidebar update reflects immediately without DB fetch if used)
         // Solo si la cuenta de Auth la creó AI Tickets (Auth es compartido con otras apps)

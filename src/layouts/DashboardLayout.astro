@@ -1,5 +1,6 @@
 ---
 import DashboardSidebar from "../components/dashboard/DashboardSidebar.vue";
+import DashboardSkeletons from "../components/dashboard/DashboardSkeletons.astro";
 import ChunkReload from "../components/ChunkReload.astro";
 import logoLight from "../images/logo.png";
 import "../styles/global.css";
@@ -7,7 +8,7 @@ import { getSessionContext, type SessionContext } from "../lib/supabaseServer";
 import SetPasswordModal from "../components/auth/SetPasswordModal.vue";
 import { PW_RESET_COOKIE, verifyPwResetCookie } from "../lib/magic-link";
 import { getSupabaseAdmin } from "../lib/auth-helpers";
-import { needsIdentityForPublishedEvents } from "../lib/producerIdentity";
+import { needsIdentityNotice } from "../lib/producerIdentity";
 import { recordDashboardPageView } from "../lib/producerActivity";
 
 const { title = "Dashboard" } = Astro.props;
@@ -35,16 +36,21 @@ const canSetPassword =
 // Recién verificó su correo (verificar.astro redirige con ?bienvenida=1 ya con sesión iniciada)
 const showWelcome = !!session && Astro.url.searchParams.get("bienvenida") === "1";
 
-// Productores con eventos pagados ya publicados y sin identidad verificada: sus eventos siguen a la venta,
-// pero se les pide verificar (Términos para productores §2 bis) porque sin eso no pueden retirar.
-const showIdentityNotice =
-  !!session &&
-  !Astro.url.pathname.startsWith("/dashboard/settings") &&
-  (await needsIdentityForPublishedEvents(getSupabaseAdmin(), Number(session.dbUser.organization_id)).catch(() => false));
+// Las dos consultas del layout van en paralelo (cada cambio de sección pasa por aquí).
+const [showIdentityNotice, activityPage] = await Promise.all([
+  // Productores con eventos pagados ya publicados y sin identidad verificada: sus eventos siguen a la venta,
+  // pero se les pide verificar (Términos para productores §2 bis) porque sin eso no pueden retirar.
+  !!session && !Astro.url.pathname.startsWith("/dashboard/settings")
+    ? needsIdentityNotice(getSupabaseAdmin(), Number(session.dbUser.organization_id)).catch(() => false)
+    : false,
+  // Bitácora de uso del panel (MCP de admin: get_producer_activity): registra esta página y le pasa su id al
+  // rastreador del navegador (src/lib/producerActivityClient.js). Sin sesión o con la bitácora apagada no hay id.
+  recordDashboardPageView(Astro, session).catch(() => null),
+]);
 
-// Bitácora de uso del panel (MCP de admin: get_producer_activity): registra esta página y le pasa su id al
-// rastreador del navegador (src/lib/producerActivityClient.js). Sin sesión o con la bitácora apagada no hay id.
-const activityPage = await recordDashboardPageView(Astro, session).catch(() => null);
+// Sidebar renderizado en el servidor (antes client:only: aparecía tarde en cada página). El estado contraído
+// vive en una cookie para que el primer render ya sea el definitivo (DashboardSidebar.vue).
+const sidebarCollapsed = Astro.cookies.get("dashboard_sidebar_collapsed")?.value === "1";
 ---
 
 <!doctype html>
@@ -60,19 +66,85 @@ const activityPage = await recordDashboardPageView(Astro, session).catch(() => n
     <link rel="manifest" href="/site.webmanifest" />
     <meta name="generator" content={Astro.generator} />
     <title>{title} | Producer Dashboard</title>
-    <link
-      href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;700&family=Prompt:wght@300;400;500;600&display=swap"
-      rel="stylesheet"
-    />
+    <!-- Las fuentes (Unbounded y Prompt) vienen de @fontsource en global.css: sin hoja externa que bloquee el render -->
+    <style is:global>
+      /* Cambio de sección sin parpadeo (Chrome, Edge, Safari 18.2+): el menú lateral y la barra superior quedan
+         fijos y solo el contenido hace un fundido corto. */
+      @view-transition {
+        navigation: auto;
+      }
+      #dashboard-sidebar {
+        view-transition-name: dashboard-sidebar;
+      }
+      #dashboard-topbar {
+        view-transition-name: dashboard-topbar;
+      }
+      ::view-transition-old(root),
+      ::view-transition-new(root) {
+        animation-duration: 120ms;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        @view-transition {
+          navigation: none;
+        }
+      }
+
+      /* Navegación en curso (src/lib/dashboardNav.js): el skeleton reemplaza al contenido */
+      #dashboard-nav-skeleton,
+      .ait-nav-progress {
+        display: none;
+      }
+      .ait-navigating #dashboard-content {
+        display: none;
+      }
+      .ait-navigating #dashboard-nav-skeleton {
+        display: block;
+      }
+      /* Arriba del contenido (main es relative y vuelve al inicio al navegar) */
+      .ait-navigating .ait-nav-progress {
+        display: block;
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        overflow: hidden;
+        z-index: 30;
+      }
+      .ait-nav-progress::after {
+        content: "";
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 40%;
+        background: #84cc16;
+        animation: ait-progress 1s ease-in-out infinite;
+      }
+      @keyframes ait-progress {
+        from { transform: translateX(-100%); }
+        to { transform: translateX(250%); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .ait-nav-progress::after {
+          animation: none;
+        }
+      }
+    </style>
   </head>
-  <body class="bg-gray-50 min-h-screen font-[Prompt]" data-ait-pv={activityPage?.id} data-ait-route={activityPage?.route}>
+  <body
+    class="bg-gray-50 min-h-screen font-[Prompt]"
+    data-ait-pv={activityPage?.id}
+    data-ait-route={activityPage?.route}
+    data-ait-pv-deferred={activityPage?.deferred ? "1" : undefined}
+  >
     <script>
       import { startProducerActivity } from "../lib/producerActivityClient.js";
+      import { startDashboardNav } from "../lib/dashboardNav.js";
+      startDashboardNav();
       startProducerActivity();
     </script>
     <div class="flex flex-col md:flex-row h-dvh overflow-hidden">
       <!-- Barra superior (mobile): abre el menú lateral como cajón -->
-      <header class="md:hidden flex items-center gap-3 h-14 px-3 bg-white border-b border-gray-200 shrink-0 pt-[env(safe-area-inset-top)] box-content">
+      <header id="dashboard-topbar" class="md:hidden flex items-center gap-3 h-14 px-3 bg-white border-b border-gray-200 shrink-0 pt-[env(safe-area-inset-top)] box-content">
         <button
           type="button"
           data-sidebar-open
@@ -88,11 +160,19 @@ const activityPage = await recordDashboardPageView(Astro, session).catch(() => n
       </header>
 
       <!-- Sidebar -->
-      <DashboardSidebar client:only="vue" userJson={JSON.stringify(userData)} />
+      <DashboardSidebar
+        client:load
+        userJson={JSON.stringify(userData)}
+        currentPath={Astro.url.pathname}
+        initialCollapsed={sidebarCollapsed}
+      />
 
       <!-- Main Content -->
-      <main class="flex-1 min-w-0 overflow-y-auto overflow-x-hidden p-4 md:p-8 relative">
-        <div class="max-w-7xl mx-auto">
+      <main id="dashboard-main" class="flex-1 min-w-0 overflow-y-auto overflow-x-hidden p-4 md:p-8 relative">
+        <!-- Al hacer clic en un enlace del panel: barra de progreso + skeleton de la sección de destino (src/lib/dashboardNav.js) -->
+        <div class="ait-nav-progress" aria-hidden="true"></div>
+        <div id="dashboard-nav-skeleton" class="max-w-7xl mx-auto" role="status" aria-live="polite" aria-label="Cargando"></div>
+        <div id="dashboard-content" class="max-w-7xl mx-auto">
           {
             showWelcome && (
               <div
@@ -161,5 +241,6 @@ const activityPage = await recordDashboardPageView(Astro, session).catch(() => n
       </main>
     </div>
     {showSetPassword && <SetPasswordModal client:only="vue" canSet={canSetPassword} />}
+    <DashboardSkeletons />
   </body>
 </html>

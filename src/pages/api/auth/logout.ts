@@ -1,11 +1,12 @@
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
-import { clearSessionCookies, jsonResponse } from "../../../lib/supabaseServer";
+import { clearSessionCookies, forgetCachedSession, jsonResponse } from "../../../lib/supabaseServer";
 
 export const POST: APIRoute = async (context) => {
     try {
         // Revocar la sesión en Supabase (best-effort): invalida el refresh token aunque la cookie se haya copiado
         const accessToken = context.cookies.get("sb-access-token")?.value;
+        forgetCachedSession(accessToken);
         if (accessToken) {
             try {
                 const { error } = await getSupabaseAdmin().auth.admin.signOut(accessToken);

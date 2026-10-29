@@ -8,6 +8,7 @@ import SiteEditor from "../../../components/dashboard/site/SiteEditor.vue";
 import BannerManager from "../../../components/dashboard/site/BannerManager.vue";
 import ContactSettings from "../../../components/dashboard/site/ContactSettings.vue";
 import DomainConnect from "../../../components/dashboard/site/DomainConnect.vue";
+import IslandSkeleton from "../../../components/dashboard/IslandSkeleton.astro";
 import {
   EDITOR_FONTS,
   EDITOR_TEMPLATES,
@@ -66,18 +67,20 @@ const domainJson = view && org ? JSON.stringify({ domain: view.domain, provider:
 
     {view && org && (
       <>
-        <SiteEditor client:only="vue" initialJson={editorJson} />
+        <SiteEditor client:only="vue" initialJson={editorJson}><IslandSkeleton slot="fallback" fields={6} /></SiteEditor>
         <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
           <div class="space-y-6">
-            <BannerManager client:only="vue" initialJson={bannersJson} />
+            <BannerManager client:only="vue" initialJson={bannersJson}><IslandSkeleton slot="fallback" variant="card" fields={2} /></BannerManager>
             <ContactSettings
               client:only="vue"
               contactEmail={view.site.contact_email}
               contactFormEnabled={view.site.contact_form_enabled}
               orgEmail={org.orgEmail}
-            />
+            >
+              <IslandSkeleton slot="fallback" variant="card" fields={2} />
+            </ContactSettings>
           </div>
-          <DomainConnect client:only="vue" initialJson={domainJson} freeUrl={view.urls.free} />
+          <DomainConnect client:only="vue" initialJson={domainJson} freeUrl={view.urls.free}><IslandSkeleton slot="fallback" variant="card" fields={2} /></DomainConnect>
         </div>
       </>
     )}

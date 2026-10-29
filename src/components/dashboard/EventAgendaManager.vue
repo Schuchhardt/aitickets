@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import SkeletonRows from './SkeletonRows.vue'
 import { CalendarClock, Plus, Trash2 } from 'lucide-vue-next'
 
 // Agenda del evento (/api/events/agenda → get_event_agenda / update_event_agenda, src/lib/eventAgenda.mjs): bloques
@@ -93,7 +94,7 @@ const save = async () => {
     </p>
 
     <p v-if="unavailable" class="text-sm text-amber-700">La agenda estará disponible en unos minutos.</p>
-    <p v-else-if="loading" class="text-sm text-gray-500">Cargando…</p>
+    <SkeletonRows v-else-if="loading" variant="lines" :rows="4" label="Cargando agenda" />
 
     <template v-else>
       <p v-if="!blocks.length" class="text-sm text-gray-500 mb-3">Todavía no hay bloques. Sin bloques, la página no muestra la agenda.</p>

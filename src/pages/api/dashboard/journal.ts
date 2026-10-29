@@ -5,7 +5,7 @@
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { getSessionContext, jsonResponse } from "../../../lib/supabaseServer";
-import { MAX_ACTIVITY_BODY, insertActivityRows, producerActivityEnabled, sanitizeActivityBatch } from "../../../lib/producerActivity";
+import { MAX_ACTIVITY_BODY, buildPageViewRow, insertActivityRows, producerActivityEnabled, sanitizeActivityBatch } from "../../../lib/producerActivity";
 import { rateLimit } from "../../../../netlify/lib/rate-limit.mjs";
 
 export const prerender = false;
@@ -30,7 +30,7 @@ export const POST: APIRoute = async (context) => {
     }
     const batch = sanitizeActivityBatch(body);
     if (!batch.ok) return jsonResponse({ error: batch.error }, 400);
-    if (!batch.rows.length) return noContent();
+    if (!batch.rows.length && !batch.pageView) return noContent();
 
     const supabase = getSupabaseAdmin();
     const limit = await rateLimit("dashboard:journal", String(session.dbUser.id), { windowSeconds: 60, max: JOURNAL_BATCHES_PER_MINUTE, supabase });
@@ -38,9 +38,19 @@ export const POST: APIRoute = async (context) => {
 
     const organizationId = Number(session.dbUser.organization_id);
     const userId = Number(session.dbUser.id);
-    await insertActivityRows(
-        supabase,
-        batch.rows.map((row) => ({ ...row, organization_id: organizationId, user_id: userId })),
-    );
+    const pageViewRows = batch.pageView
+        ? [
+              buildPageViewRow(session, {
+                  ...batch.pageView,
+                  referer: batch.pageView.referrer,
+                  ownHost: context.url.host,
+                  userAgent: context.request.headers.get("user-agent"),
+              }),
+          ]
+        : [];
+    await insertActivityRows(supabase, [
+        ...pageViewRows,
+        ...batch.rows.map((row) => ({ ...row, organization_id: organizationId, user_id: userId })),
+    ]);
     return noContent();
 };

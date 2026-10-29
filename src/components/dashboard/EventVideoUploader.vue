@@ -6,6 +6,7 @@
 // progreso, y el navegador saca un cuadro del video como póster. Se guarda al instante. Emite "change" con
 // { video, image_url } (con kind cover, si el evento no tenía imagen, el póster pasa a ser su imagen).
 import { onMounted, ref } from 'vue'
+import SkeletonRows from './SkeletonRows.vue'
 import { Film, Trash2 } from 'lucide-vue-next'
 import { CANVA_REEL_URL } from '../../lib/socialPlatforms'
 
@@ -221,7 +222,7 @@ onMounted(load)
     </div>
     <input ref="input" type="file" accept="video/mp4,video/webm,video/quicktime" class="hidden" @change="onFile" />
 
-    <p v-if="loading" class="text-sm text-gray-500">Cargando video...</p>
+    <SkeletonRows v-if="loading" variant="lines" :rows="2" label="Cargando video" />
     <p v-else-if="!available" class="text-sm text-amber-700 bg-amber-50 rounded-lg p-3">Los videos se están activando. Vuelve a intentarlo en unos minutos.</p>
     <template v-else>
       <video v-if="video && busy !== 'upload'" :key="video.url" :src="video.url" :poster="video.poster_url || undefined"
