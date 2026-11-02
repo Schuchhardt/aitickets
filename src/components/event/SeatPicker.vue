@@ -4,7 +4,7 @@
 // validarlos al comprar (/api/purchase-ticket).
 import { ref, computed, watch, onMounted } from "vue";
 import SeatMapView from "../seats/SeatMapView.vue";
-import { seatIndex, assignSeatsToLines } from "../../lib/seatMap.mjs";
+import { seatLabel, assignSeatsToLines } from "../../lib/seatMap.mjs";
 
 const props = defineProps({
   event: { type: Object, required: true },
@@ -21,7 +21,6 @@ const map = computed(() => {
   const key = s?.map_of_date?.[String(props.functionId)];
   return key ? s.maps[key] : null;
 });
-const index = computed(() => (map.value ? seatIndex(map.value) : new Map()));
 const sectionsOf = (id) => (props.event.tickets || []).find((t) => String(t.id) === String(id))?.seat_sections || null;
 const ticketLines = computed(() => props.lines.filter((l) => l.quantity > 0).map((l) => ({ id: l.id, quantity: l.quantity, seat_sections: sectionsOf(l.id) })));
 const needed = computed(() => ticketLines.value.reduce((s, l) => s + Number(l.quantity || 0), 0));
@@ -75,11 +74,7 @@ function toggle({ key }) {
   emit("track", "checkout_seat_select", { count: next.length });
 }
 
-const labelOf = (key) => {
-  const s = index.value.get(key);
-  if (!s) return key;
-  return (map.value?.sections?.length || 0) > 1 ? `${s.sectionName} · Fila ${s.row} · Asiento ${s.n}` : `Fila ${s.row} · Asiento ${s.n}`;
-};
+const labelOf = (key) => (map.value ? seatLabel(map.value, key) : "") || key;
 const chosen = computed(() => [...props.modelValue].sort((a, b) => a.localeCompare(b, "es", { numeric: true })).map(labelOf));
 // Los asientos no calzan con las entradas (p. ej. dos de Platea con una entrada de Balcón)
 const mismatch = computed(() => {

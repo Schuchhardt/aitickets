@@ -14,6 +14,9 @@ import {
   normalizeSeatSections,
   MAX_SEATS,
   pickBestSeats,
+  sectionLayout,
+  sectionRows,
+  rowSize,
 } from '../../src/lib/seatMap.mjs'
 import { validateSeatSelection } from '../../netlify/lib/seats.mjs'
 import { buildAttendeeRows } from '../../netlify/lib/tickets.mjs'
@@ -208,5 +211,52 @@ describe('pickBestSeats (cortesías)', () => {
   it('respeta las secciones permitidas', () => {
     const two = seatMapFromTemplate('cine-preferencial')
     expect(pickBestSeats(two, [], 4, ['preferencial']).every((k) => k.startsWith('preferencial:'))).toBe(true)
+  })
+})
+
+describe('mesas (café o bar) y graderías en arco (circo)', () => {
+  it('mesas: cada mesa es una "fila" con sus sillas, etiqueta "Mesa N"', () => {
+    const map = seatMapFromTemplate('cafe-mesas')
+    expect(map.sections[0]).toMatchObject({ layout: 'tables', rows: 10, seatsPerRow: 4, columns: 5, aisles: [] })
+    expect(totalSeats(map)).toBe(40)
+    expect(seatLabel(map, 'mesas:C:2')).toBe('Mesa 3 · Asiento 2')
+    // La clave cumple el formato de aitickets_event_seats
+    expect(listSeats(map).every((s) => /^[a-z0-9-]{1,40}:[A-Z]{1,2}:[0-9]{1,3}$/.test(s.key))).toBe(true)
+    // Cortesías: 4 juntas = una mesa entera
+    const four = pickBestSeats(map, [], 4)
+    expect(new Set(four.map((k) => k.split(':')[1])).size).toBe(1)
+  })
+  it('mesas: sillas alrededor de cada mesa, sin salirse del dibujo', () => {
+    const l = sectionLayout(seatMapFromTemplate('cafe-mesas').sections[0])
+    expect(l.tables).toHaveLength(10)
+    expect(l.seats).toHaveLength(40)
+    for (const s of l.seats) {
+      expect(s.x).toBeGreaterThan(0)
+      expect(s.x).toBeLessThan(l.width)
+      expect(s.y).toBeGreaterThan(0)
+      expect(s.y).toBeLessThan(l.height)
+    }
+  })
+  it('arco: cada fila suma asientos, los bloques cortan con pasillos y queda una pista', () => {
+    const map = seatMapFromTemplate('circo')
+    const sec = map.sections[0]
+    expect(sec).toMatchObject({ layout: 'arc', rows: 7, seatsPerRow: 18, growth: 3, blocks: 3 })
+    expect(rowSize(sec, 0)).toBe(18)
+    expect(rowSize(sec, 6)).toBe(36)
+    expect(totalSeats(map)).toBe(18 * 7 + 3 * (0 + 1 + 2 + 3 + 4 + 5 + 6))
+    const firstRow = sectionRows(sec)[0]
+    expect(firstRow.seats.filter((s) => s.aisleAfter).map((s) => s.n)).toEqual([6, 12])
+    const l = sectionLayout(sec)
+    expect(l.ring).toBeTruthy()
+    // Ningún asiento cae dentro de la pista
+    for (const s of l.seats) expect(Math.hypot(s.x - l.ring.x, s.y - l.ring.y)).toBeGreaterThan(l.ring.r)
+  })
+  it('un hueco en una fila larga del arco se conserva; fuera de rango se descarta', () => {
+    const map = normalizeSeatMap({ sections: [{ id: 'g', name: 'G', layout: 'arc', rows: 3, seatsPerRow: 10, growth: 4, removed: ['C-18', 'A-18'] }] })
+    expect(map.sections[0].removed).toEqual(['C-18'])
+  })
+  it('el tope de asientos también vale con arcos que crecen', () => {
+    const map = normalizeSeatMap({ sections: [{ id: 'g', name: 'G', layout: 'arc', rows: 40, seatsPerRow: 60, growth: 6 }] })
+    expect(totalSeats(map)).toBeLessThanOrEqual(MAX_SEATS)
   })
 })
