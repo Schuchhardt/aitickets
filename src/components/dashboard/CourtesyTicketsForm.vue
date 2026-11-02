@@ -4,10 +4,17 @@ import { Gift } from 'lucide-vue-next'
 
 const props = defineProps({
   eventId: { type: Number, required: true },
-  tickets: { type: Array, required: true } // [{ id, ticket_name }]
+  // [{ id, ticket_name }]; id 'courtesy' = tipo Cortesía, que se crea al emitir la primera
+  tickets: { type: Array, required: true },
+  // Entradas numeradas: cada cortesía toma un asiento de la función elegida (se asignan juntos y centrados)
+  seated: { type: Boolean, default: false },
+  // [{ id, label }] (sin default: con `default: () => []` astro check deja de ver el componente)
+  functionOptions: { type: Array, required: false }
 })
 
-const ticketId = ref(props.tickets[0]?.id || '')
+const ticketId = ref(props.tickets[0]?.id || 'courtesy')
+const functionList = /** @type {Array<{ id: number, label: string }>} */ (props.functionOptions || [])
+const eventDateId = ref(functionList.length === 1 ? String(functionList[0].id) : '')
 const quantity = ref(1)
 const firstName = ref('')
 const lastName = ref('')
@@ -19,9 +26,14 @@ const isError = ref(false)
 const submit = async () => {
   message.value = ''
   isError.value = false
-  if (!ticketId.value || !firstName.value.trim() || !email.value.trim()) {
+  if (!firstName.value.trim() || !email.value.trim()) {
     isError.value = true
-    message.value = 'Completa tipo de entrada, nombre y email.'
+    message.value = 'Completa nombre y email.'
+    return
+  }
+  if (props.seated && !eventDateId.value) {
+    isError.value = true
+    message.value = 'Elige la función: las entradas son numeradas.'
     return
   }
   loading.value = true
@@ -31,7 +43,8 @@ const submit = async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         eventId: props.eventId,
-        ticketId: Number(ticketId.value),
+        ticketId: ticketId.value === 'courtesy' ? 'courtesy' : Number(ticketId.value),
+        ...(props.seated ? { eventDateId: Number(eventDateId.value) } : {}),
         quantity: Number(quantity.value),
         firstName: firstName.value,
         lastName: lastName.value,
@@ -62,16 +75,20 @@ const submit = async () => {
       <p class="text-sm text-gray-500 mt-1">Emite entradas gratis (invitados, prensa, staff). Se envían por email con su QR.</p>
     </div>
 
-    <div v-if="!tickets.length" class="p-4 sm:p-6 text-sm text-gray-500">
-      Primero agrega un tipo de entrada al evento.
-    </div>
-
-    <form v-else @submit.prevent="submit" class="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+    <form @submit.prevent="submit" class="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
       <div>
         <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Tipo de entrada</label>
         <select v-model="ticketId" class="w-full px-3 py-2 rounded-lg border border-gray-300 bg-white outline-none focus:ring-2 focus:ring-black">
           <option v-for="t in tickets" :key="t.id" :value="t.id">{{ t.ticket_name }}</option>
         </select>
+      </div>
+      <div v-if="seated" class="md:col-span-2">
+        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Función</label>
+        <select v-model="eventDateId" class="w-full px-3 py-2 rounded-lg border border-gray-300 bg-white outline-none focus:ring-2 focus:ring-black" data-testid="courtesy-function">
+          <option value="" disabled>Elige la función…</option>
+          <option v-for="f in functionList" :key="f.id" :value="String(f.id)">{{ f.label }}</option>
+        </select>
+        <p class="mt-1 text-xs text-gray-500">Entradas numeradas: cada cortesía toma un asiento libre, juntos y al centro. Te mostramos cuáles al emitir.</p>
       </div>
       <div>
         <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Cantidad</label>

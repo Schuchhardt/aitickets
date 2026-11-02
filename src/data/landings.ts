@@ -161,7 +161,7 @@ export const LANDINGS: Landing[] = [
         faq: [
             {
                 q: "¿Puedo vender entradas de distintas zonas o precios?",
-                a: "Sí, con tipos de entrada distintos, cada uno con su precio y su cupo. AI Tickets no tiene mapa de asientos numerados.",
+                a: "Sí, con tipos de entrada distintos, cada uno con su precio y su cupo. Si la sala tiene butacas, puedes vender entradas numeradas con mapa de asientos.",
             },
         ],
         demo: { url: "/eventos/evento-demo-concierto", label: "Ver un concierto de ejemplo" },

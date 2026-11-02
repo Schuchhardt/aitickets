@@ -3,7 +3,7 @@
 // 1. La temporada en una tarde: varias funciones (hasta MAX_EVENT_FUNCTIONS, schedule.ts), aforo y precio por función
 //    con tipos de entrada amarrados a una función (EditEventForm.vue paso 3) y el selector "Así lo ve tu público"
 //    (FunctionPicker, precios con priceQuote), "Repetir en varios días" y "Copiar a cada función" en el editor de
-//    funciones (FunctionRepeat.vue, TicketCopyToFunctions.vue). No hay butacas numeradas: se dice, sin "Pronto" (§0.6).
+//    funciones (FunctionRepeat.vue, TicketCopyToFunctions.vue). Butacas numeradas: mapa de asientos por sala (src/lib/seatMap.mjs).
 // 2. Prensa e invitados (#prensa): cortesías (CourtesyTicketsForm.vue: no cuentan como venta y pueden superar el
 //    cupo), lista de invitados (hoy solo desde el asistente de IA, tools/guests.ts) y vista previa privada con link que
 //    vence (eventPreview.ts). Foto del ensayo en arco de proscenio con el pase de prensa colgado.
@@ -79,7 +79,7 @@ const pressItems = [
       <div class="a1-mock" data-lp-reveal>
         <div data-lp-step><FunctionPicker client:visible /></div>
         <p class="a1-mock-note" data-lp-step>
-          No hay butacas numeradas: si separas platea y galería, cada una es un tipo de entrada con su cupo.
+          ¿Butacas numeradas? Arma el mapa de tu sala y cada espectador elige su asiento.
         </p>
       </div>
     </div>

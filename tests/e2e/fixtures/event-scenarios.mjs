@@ -6,6 +6,7 @@
 // máximo por compra); la página las pasa por toPublicTicket (src/lib/eventPage.ts), igual que la página real.
 
 import { agendaGroups } from "../../../src/lib/eventAgenda.mjs";
+import { seatMapFromTemplate, totalSeats } from "../../../src/lib/seatMap.mjs";
 
 export const FIXTURE_ROUTE = "/__e2e/eventos";
 
@@ -112,6 +113,25 @@ const CONGRESS = {
   ],
 };
 
+/**
+ * Cine con entradas numeradas (tests/e2e/seat-map.spec.ts): 2 funciones en la Sala 1 con la plantilla "Cine con zona
+ * preferencial". General vale en todo el mapa; Preferencial solo en su sección. La segunda función está llena.
+ */
+const VENUE_CINE = { name: "Cine de Prueba · Sala 1", address: "Av. Siempre Viva 100", city: "Santiago" };
+const CINEMA_MAP = seatMapFromTemplate("cine-preferencial");
+const CINEMA = {
+  functions: [{ days: 30, venue: VENUE_CINE }, { days: 31, venue: VENUE_CINE }],
+  tickets: [
+    { id: 9131, ticket_name: "General", price: 5000, max_quantity: null, total_quantity: null, seat_sections: null },
+    { id: 9132, ticket_name: "Preferencial", price: 7000, max_quantity: null, total_quantity: null, seat_sections: ["preferencial"] },
+  ],
+  seating: (dates) => ({
+    maps: { m1: CINEMA_MAP },
+    map_of_date: Object.fromEntries(dates.map((d) => [String(d.id), "m1"])),
+    seats_left: { [String(dates[0].id)]: totalSeats(CINEMA_MAP) - 2, [String(dates[1].id)]: 0 },
+  }),
+};
+
 /** layout: diseño elegido por el productor (sin imagen el diseño siempre es compacto). */
 export const SCENARIOS = {
   "poster-una-entrada": { layout: "poster", tickets: [TICKETS.general] },
@@ -159,6 +179,8 @@ export const SCENARIOS = {
   "invitar-por-correo": { layout: "poster", tickets: [TICKETS.general], checkoutFields: { ...PER_PERSON_FIELDS, attendee_names: "required", holders: "invite" } },
   // Vista previa privada de un borrador (status draft + is_preview, como /eventos/vista-previa/…)
   "vista-previa": { layout: "poster", tickets: [TICKETS.general], preview: true },
+  // Entradas numeradas: mapa de asientos de la sala
+  "cine-numerado": { layout: "poster", ...CINEMA },
 };
 
 /** Video como lo arma normalizeEventVideo (src/lib/eventVideo.ts), con el MP4 de public/videos. */
@@ -264,7 +286,9 @@ export function fixtureEvent(name, { toPublicTicket, now = new Date() }) {
     tickets: scenario.tickets.map((t) => ({
       ...toPublicTicket({ ...t, init_date: null, end_date: null, event_date_id: functionId(t) }, { remaining: t.total_quantity ?? null, feeAbsorbed: false }),
       people_per_ticket: t.people || 1,
+      ...(scenario.seating ? { seat_sections: t.seat_sections ?? null } : {}),
     })),
+    seating: scenario.seating ? scenario.seating(dates) : null,
     checkout_fields: scenario.checkoutFields || null,
     unavailable_tickets: (scenario.unavailable || []).map((t) => ({
       id: t.id,

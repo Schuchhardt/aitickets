@@ -46,8 +46,9 @@ if (!id || !UUID_RE.test(id)) {
 } else {
   const selectTicket = (extra: string) =>
     supabase.from("event_attendees").select(`id, event_id, attendee_id, qr_code, status, event_order_id,${extra} event_tickets ( ticket_name, event_date_id )`).eq("id", id).maybeSingle();
-  // holder_* / seat_number / registration_answers son opcionales (base sin migrar)
-  let { data: ticketData, error: ticketError }: { data: any; error: any } = await selectTicket(" holder_name, holder_email, seat_number, registration_answers,");
+  // holder_* / seat_number / registration_answers / seat_label son opcionales (base sin migrar)
+  let { data: ticketData, error: ticketError }: { data: any; error: any } = await selectTicket(" holder_name, holder_email, seat_number, registration_answers, seat_label,");
+  if (ticketError) ({ data: ticketData, error: ticketError } = await selectTicket(" holder_name, holder_email, seat_number, registration_answers,"));
   if (ticketError) ({ data: ticketData, error: ticketError } = await selectTicket(" holder_name, seat_number,"));
   if (ticketError) ({ data: ticketData } = await selectTicket(""));
 
@@ -111,7 +112,8 @@ if (!id || !UUID_RE.test(id)) {
 
     ticket = {
       id: ticketData.id,
-      ticket_name: `${ticketType?.ticket_name || "Entrada General"}${ticketData.seat_number ? ` · invitado ${ticketData.seat_number}` : ""}`,
+      // Asiento numerado (seat_label) o lugar en la mesa (seat_number)
+      ticket_name: `${ticketType?.ticket_name || "Entrada General"}${ticketData.seat_label ? ` · ${ticketData.seat_label}` : ticketData.seat_number ? ` · invitado ${ticketData.seat_number}` : ""}`,
       attendee_name: ticketData.holder_name || `${attendee?.first_name || ""} ${attendee?.last_name || ""}`.trim(),
       // Entrada anulada (p. ej. orden reembolsada): no se muestra el QR
       qr_code: ticketData.status === "cancelled" ? null : ticketData.qr_code || null,

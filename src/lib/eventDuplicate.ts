@@ -41,13 +41,13 @@ export async function duplicateEventAsDraft(
 
     try {
         const [{ data: locations }, { data: tickets }, { data: tags }, { data: faqs }] = await Promise.all([
-            supabase.from("event_locations").select("venue_id, name, display_name, entrance_instructions, access_notes").eq("event_id", source.id),
+            supabase.from("event_locations").select("id, venue_id, name, display_name, entrance_instructions, access_notes").eq("event_id", source.id),
             supabase
                 .from("event_tickets")
                 .select("id, ticket_name, price, max_quantity, is_gift, status, total_quantity")
                 .eq("event_id", source.id)
                 .or("status.is.null,status.neq.unavailable")
-                // El tipo "Cortesía" (is_gift) lo crea la base de datos con cada evento: copiarlo lo duplicaría
+                // El tipo "Cortesía" (is_gift) no se copia: se crea al emitir la primera cortesía (src/lib/courtesy.ts)
                 .not("is_gift", "is", true),
             supabase.from("event_tags").select("tag_id").eq("event_id", source.id),
             supabase.from("event_faqs").select("question, answer").eq("event_id", source.id),
@@ -57,10 +57,18 @@ export async function duplicateEventAsDraft(
         if (locations?.length) {
             const { data: inserted, error } = await supabase
                 .from("event_locations")
-                .insert(locations.map((l: any) => ({ ...l, event_id: newEventId })))
+                .insert(locations.map(({ id: _id, ...l }: any) => ({ ...l, event_id: newEventId })))
                 .select("id");
             if (error) throw error;
             locationIds = (inserted || []).map((l: any) => String(l.id));
+            // Entradas numeradas: el mapa de asientos de cada ubicación (sin la migración 202611020100 no hay nada)
+            const { data: maps, error: mapsError } = await supabase.from("event_locations").select("id, seat_map").eq("event_id", source.id).not("seat_map", "is", null);
+            if (!mapsError) {
+                for (const m of maps || []) {
+                    const i = locations.findIndex((l: any) => String(l.id) === String((m as any).id));
+                    if (i >= 0 && locationIds[i]) await supabase.from("event_locations").update({ seat_map: (m as any).seat_map }).eq("id", locationIds[i]).eq("event_id", newEventId);
+                }
+            }
         }
         if (tickets?.length) {
             // Ventana de venta sin copiar (NULL = a la venta mientras esté publicado).
@@ -77,6 +85,14 @@ export async function duplicateEventAsDraft(
                 const id = newIdOf.get(oldId);
                 const prev = newIdOf.get(oldPrev);
                 if (id && prev) await supabase.from("event_tickets").update({ opens_after_ticket_id: prev }).eq("id", id).eq("event_id", newEventId);
+            }
+            // Secciones del mapa de las entradas numeradas (vacío sin la migración 202611020100)
+            const { data: sections, error: sectionsError } = await supabase.from("event_tickets").select("id, seat_sections").eq("event_id", source.id).not("seat_sections", "is", null);
+            if (!sectionsError) {
+                for (const t of sections || []) {
+                    const id = newIdOf.get(Number((t as any).id));
+                    if (id) await supabase.from("event_tickets").update({ seat_sections: (t as any).seat_sections }).eq("id", id).eq("event_id", newEventId);
+                }
             }
             // Hora límite de ingreso (vacío sin la migración 202610300300)
             const deadlines: Map<number, string> = await loadEntryDeadlines(supabase, source.id);

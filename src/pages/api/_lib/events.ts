@@ -12,6 +12,8 @@ import { chainError } from "../../../../netlify/lib/tickets.mjs";
 import { normalizeCheckoutFields, isDefaultCheckoutFields, normalizePeoplePerTicket } from "../../../lib/checkoutFields.mjs";
 import { normalizeEntryUntil } from "../../../lib/entryDeadline.mjs";
 import { hasSecretLocation, saveSecretLocation, SECRET_PLACE_NAME } from "../../../../netlify/lib/secret-location.mjs";
+import { normalizeSeatMap, normalizeSeatSections, seatedTicketCapacity, missingSeats } from "../../../lib/seatMap.mjs";
+import { takenSeats } from "../../../../netlify/lib/seats.mjs";
 
 /** Guarda la categoría del evento vía category_tags(name) + event_tags (reemplaza las anteriores). */
 export async function syncEventCategory(eventId: number, category: string | null | undefined) {
@@ -94,6 +96,8 @@ export type TicketInput = {
     peoplePerTicket?: number | string | null;
     /** Hora límite de ingreso ("01:00", hora de Chile, relativa a la función). ""/null = entra a cualquier hora. */
     entryUntil?: string | null;
+    /** Entradas numeradas: secciones del mapa donde vale (null/[] = todas). */
+    seatSections?: string[] | null;
 };
 
 /** Normaliza un ticket del formulario. Devuelve null si es inválido. */
@@ -282,6 +286,8 @@ export type EventGraphInput = {
     general: {
         name?: string;
         description?: string;
+        /** Entradas numeradas (mapa de asientos por ubicación). */
+        seated?: boolean;
         imageUrl?: string | null;
         isPrivate?: boolean;
         category?: string | null;
@@ -300,6 +306,8 @@ export type EventGraphInput = {
         newVenueAddress?: string | null;
         newVenueCity?: string | null;
         dates: Array<{ id?: string | number; date: string; startTime: string; endTime?: string | null }>;
+        /** Entradas numeradas: mapa de asientos de esta ubicación (src/lib/seatMap.mjs). */
+        seatMap?: unknown;
     }>;
     tickets: TicketInput[];
 };
@@ -313,6 +321,8 @@ export async function createEventGraph(
     actor: { userId: number; orgId: number },
     input: EventGraphInput,
     state: { eventId: number | null } = { eventId: null },
+    // Borrador guardado solo desde el formulario (saveFormDraft): se completa ese evento en vez de crear otro
+    opts: { draftId?: number | null } = {},
 ): Promise<{ id: number; slug: string; name: string; ticketsPayload: any[] }> {
     const supabaseAdmin = getSupabaseAdmin();
     const { general, locations, tickets } = input || ({} as EventGraphInput);
@@ -336,31 +346,51 @@ export async function createEventGraph(
     const ticketsPayload = tickets.map(normalizeTicket);
     if (ticketsPayload.some((t) => !t)) throw new EventInputError("Revisa las entradas: nombre, precio y cantidad deben ser válidos");
     validateFormTicketChain(tickets);
+    const seatMaps = formSeatMaps(general, locations);
 
-    // 1. Crear evento (siempre como borrador; se publica aparte)
+    // 1. Crear evento (siempre como borrador; se publica aparte) o completar el borrador guardado solo
     const name = String(general.name).trim().slice(0, 200);
-    const slug = `${slugify(name) || "evento"}-${Date.now().toString().slice(-4)}`;
-
-    const { data: eventData, error: eventError } = await supabaseAdmin
-        .from("events")
-        .insert({
-            name,
-            title: name,
-            description: sanitizeRichText(general.description),
-            image_url: general.imageUrl || null,
-            slug,
-            status: "draft",
-            accessibility: general.isPrivate ? "private" : "public",
-            created_by: actor.userId,
-            organization_id: actor.orgId,
-        })
-        .select("id")
-        .single();
-    if (eventError) {
-        console.error("Event insert error:", eventError);
-        throw eventError;
+    let slug = `${slugify(name) || "evento"}-${Date.now().toString().slice(-4)}`;
+    let eventId: number;
+    if (opts.draftId) {
+        const draft = await loadAutosavedDraft(actor.orgId, opts.draftId);
+        slug = draftSlug(name, draft.slug);
+        const { error } = await supabaseAdmin
+            .from("events")
+            .update({
+                name,
+                title: name,
+                description: sanitizeRichText(general.description),
+                image_url: general.imageUrl || null,
+                slug,
+                accessibility: general.isPrivate ? "private" : "public",
+            })
+            .eq("id", draft.id)
+            .eq("organization_id", actor.orgId);
+        if (error) throw error;
+        eventId = draft.id;
+    } else {
+        const { data: eventData, error: eventError } = await supabaseAdmin
+            .from("events")
+            .insert({
+                name,
+                title: name,
+                description: sanitizeRichText(general.description),
+                image_url: general.imageUrl || null,
+                slug,
+                status: "draft",
+                accessibility: general.isPrivate ? "private" : "public",
+                created_by: actor.userId,
+                organization_id: actor.orgId,
+            })
+            .select("id")
+            .single();
+        if (eventError) {
+            console.error("Event insert error:", eventError);
+            throw eventError;
+        }
+        eventId = eventData.id as number;
     }
-    const eventId = eventData.id as number;
     state.eventId = eventId;
     // Dirección privada antes de refreshEventDenorm (la ubicación pública queda sin la calle)
     if (general.secretLocation) {
@@ -371,7 +401,8 @@ export async function createEventGraph(
 
     // 2. Ubicaciones y funciones (antes que las entradas, para mapear la función de cada entrada — R1)
     const dateIdMap = new Map<string, number>();
-    for (const loc of locations) {
+    const seatLocations: Array<{ locationId: string | null; venueId: string | null; map: any }> = [];
+    for (const [locIndex, loc] of locations.entries()) {
         let venueId = loc.venueId;
         if (loc.isNewVenue) {
             venueId = await insertOrgVenue(
@@ -388,6 +419,7 @@ export async function createEventGraph(
             .select("id")
             .single();
         if (locError) throw locError;
+        seatLocations.push({ locationId: String(locationData.id), venueId: venueId ? String(venueId) : null, map: seatMaps[locIndex] });
 
         for (const d of loc.dates) {
             const { data: dateRow, error: dateError } = await supabaseAdmin
@@ -428,6 +460,15 @@ export async function createEventGraph(
     // Mesas para N (solo las que piden más de una persona: el resto queda con el valor por defecto)
     const tables = tickets.filter((t) => normalizePeoplePerTicket(t?.peoplePerTicket) > 1);
     if (tables.length) await saveFormTicketPeople(eventId, tables, (formId) => ticketIdMap.get(String(formId)) || undefined);
+    // Entradas numeradas: mapa por ubicación, secciones y cupo de cada entrada
+    if (general.seated === true) {
+        await saveEventSeating(
+            eventId,
+            true,
+            seatLocations,
+            tickets.map((t) => ({ id: ticketIdMap.get(String(t.id))!, seatSections: t.seatSections })).filter((t) => t.id),
+        );
+    }
 
     // 4. Categoría + campos denormalizados (start_date, end_date, location)
     await syncEventCategory(eventId, general.category);
@@ -489,4 +530,207 @@ async function onEventPublished(supabaseAdmin: any, eventId: number): Promise<vo
     } catch (err: any) {
         console.error("riesgo del evento al publicar:", err?.message);
     }
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Entradas numeradas desde el formulario (mapa de asientos, migración 202611020100, src/lib/seatMap.mjs)
+//   general.seated: true = las entradas son numeradas; locations[].seatMap: mapa de cada ubicación;
+//   tickets[].seatSections: secciones donde vale cada entrada (null = todas).
+// ---------------------------------------------------------------------------------------------------------
+
+const MISSING_SEAT_SCHEMA = ["42703", "PGRST204", "42P01", "PGRST205"];
+
+/** Mapas del formulario normalizados (por índice de ubicación). Lanza EventInputError si falta alguno. */
+export function formSeatMaps(general: any, locations: any[]): Array<ReturnType<typeof normalizeSeatMap>> {
+    if (general?.seated !== true) return locations.map(() => null);
+    return locations.map((loc, i) => {
+        const map = normalizeSeatMap(loc?.seatMap);
+        if (!map) throw new EventInputError(`Arma el mapa de asientos de la ubicación ${i + 1} o desmarca "Entradas numeradas".`);
+        return map;
+    });
+}
+
+/**
+ * Antes de guardar un evento existente: un asiento vendido o reservado no puede desaparecer del mapa (ni el mapa
+ * entero). Revisa las ubicaciones que ya existen; las funciones nuevas no tienen asientos tomados.
+ */
+export async function assertSeatChangesKeepSold(eventId: number, locations: any[], maps: Array<any>): Promise<void> {
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data: dates, error } = await supabaseAdmin.from("event_dates").select("id, event_location_id").eq("event_id", eventId);
+    if (error) throw error;
+    const mapOfLocation = new Map(locations.map((loc, i) => [String(loc?.id), maps[i]]));
+    for (const d of dates || []) {
+        const locKey = String((d as any).event_location_id);
+        if (!mapOfLocation.has(locKey)) continue; // ubicación eliminada: sus funciones se borran
+        const keys = await takenSeats(supabaseAdmin, Number((d as any).id)).catch(() => []);
+        if (!keys.length) continue;
+        const map = mapOfLocation.get(locKey);
+        const lost = missingSeats(map, keys);
+        if (lost.length) {
+            const sample = lost.slice(0, 3).map((k: string) => k.split(":").slice(1).join("-")).join(", ");
+            throw new EventInputError(
+                map
+                    ? `No puedes quitar asientos que ya están vendidos o reservados (${sample}${lost.length > 3 ? "…" : ""}).`
+                    : "Ya hay asientos vendidos o reservados: no puedes desmarcar las entradas numeradas.",
+            );
+        }
+    }
+}
+
+/**
+ * Guarda el mapa de cada ubicación (y lo deja como el último de su sala), las secciones de cada entrada y su cupo
+ * (asientos de sus secciones en las funciones donde vale; una entrada numerada es para una persona). Sin entradas
+ * numeradas limpia los mapas. Sin la migración: avisa si se pidieron asientos, si no no hace nada.
+ */
+export async function saveEventSeating(
+    eventId: number,
+    seated: boolean,
+    locations: Array<{ locationId: string | null; venueId: string | null; map: any }>,
+    tickets: Array<{ id: number; seatSections?: unknown }>,
+): Promise<void> {
+    const supabaseAdmin = getSupabaseAdmin();
+    const missing = (error: any) => MISSING_SEAT_SCHEMA.includes(String(error?.code || ""));
+    const fail = (error: any) => {
+        if (missing(error)) {
+            if (seated) throw new EventInputError("Las entradas numeradas estarán disponibles después del próximo deploy.");
+            return true;
+        }
+        throw error;
+    };
+
+    for (const loc of locations) {
+        if (!loc.locationId) continue;
+        const { error } = await supabaseAdmin.from("event_locations").update({ seat_map: seated ? loc.map : null }).eq("id", loc.locationId).eq("event_id", eventId);
+        if (error && fail(error)) return;
+        if (seated && loc.venueId) {
+            const { error: venueError } = await supabaseAdmin.from("venues").update({ seat_map: loc.map }).eq("id", loc.venueId);
+            if (venueError) console.warn("No se pudo guardar el mapa en la sala:", venueError.message);
+        }
+    }
+
+    if (!seated) {
+        const ids = tickets.map((t) => t.id).filter(Boolean);
+        if (ids.length) {
+            const { error } = await supabaseAdmin.from("event_tickets").update({ seat_sections: null }).eq("event_id", eventId).in("id", ids);
+            if (error) fail(error);
+        }
+        return;
+    }
+
+    // Mapa de cada función según su ubicación
+    const { data: dates, error: datesError } = await supabaseAdmin.from("event_dates").select("id, event_location_id").eq("event_id", eventId);
+    if (datesError) throw datesError;
+    const mapOfLocation = new Map(locations.filter((l) => l.locationId).map((l) => [String(l.locationId), l.map]));
+    const mapsByDate = new Map<string, any>();
+    for (const d of dates || []) {
+        const map = mapOfLocation.get(String((d as any).event_location_id));
+        if (map) mapsByDate.set(String((d as any).id), map);
+    }
+    const allSections = { sections: locations.flatMap((l) => l.map?.sections || []) };
+
+    const { data: rows, error: rowsError } = await supabaseAdmin.from("event_tickets").select("id, event_date_id").eq("event_id", eventId).in("id", tickets.map((t) => t.id));
+    if (rowsError) throw rowsError;
+    const dateOf = new Map((rows || []).map((r: any) => [Number(r.id), r.event_date_id]));
+    for (const t of tickets) {
+        const seat_sections = normalizeSeatSections(t.seatSections, allSections);
+        const capacity = seatedTicketCapacity({ event_date_id: dateOf.get(Number(t.id)) ?? null, seat_sections }, mapsByDate);
+        if (!capacity) throw new EventInputError("Cada entrada numerada debe valer en al menos una sección con asientos.");
+        const { error } = await supabaseAdmin
+            .from("event_tickets")
+            .update({ seat_sections, total_quantity: capacity, people_per_ticket: 1 })
+            .eq("id", t.id)
+            .eq("event_id", eventId);
+        if (error && fail(error)) return;
+    }
+}
+
+/** Para el formulario de edición: mapa por ubicación y secciones por entrada (vacíos sin la migración). */
+export async function loadEventSeatingForForm(eventId: number): Promise<{ maps: Map<string, any>; sections: Map<number, string[] | null> }> {
+    const supabaseAdmin = getSupabaseAdmin();
+    const [locs, tickets] = await Promise.all([
+        supabaseAdmin.from("event_locations").select("id, seat_map").eq("event_id", eventId),
+        supabaseAdmin.from("event_tickets").select("id, seat_sections").eq("event_id", eventId),
+    ]);
+    const maps = new Map<string, any>();
+    for (const l of (locs.error ? [] : locs.data) || []) {
+        const map = normalizeSeatMap((l as any).seat_map);
+        if (map) maps.set(String((l as any).id), map);
+    }
+    const sections = new Map<number, string[] | null>();
+    for (const t of (tickets.error ? [] : tickets.data) || []) sections.set(Number((t as any).id), (t as any).seat_sections || null);
+    return { maps, sections };
+}
+
+
+// ---------------------------------------------------------------------------------------------------------
+// Borrador automático del formulario "Crear evento" (/api/events/draft)
+//   Apenas el primer paso tiene nombre y algo más (categoría, descripción o imagen), el evento se guarda como
+//   borrador y cada cambio del primer paso lo actualiza. "Crear evento" completa ese mismo borrador
+//   (createEventGraph con draftId): nunca quedan dos eventos.
+// ---------------------------------------------------------------------------------------------------------
+
+/** Lo mínimo del primer paso para guardar el borrador: nombre (más de 3 letras) y categoría, descripción o imagen. */
+export function draftIsSavable(general: any): boolean {
+    const name = typeof general?.name === "string" ? general.name.trim() : "";
+    if (name.length <= 3) return false;
+    const hasDescription = typeof general?.description === "string" && general.description.replace(/<[^>]*>/g, "").trim().length > 0;
+    return Boolean((typeof general?.category === "string" && general.category.trim()) || hasDescription || general?.imageUrl);
+}
+
+/** Slug del borrador según su nombre actual, con el mismo sufijo (un borrador no tiene link público que cuidar). */
+export function draftSlug(name: string, currentSlug: string | null | undefined): string {
+    const suffix = /-(\d{4})$/.exec(String(currentSlug || ""))?.[1] || Date.now().toString().slice(-4);
+    return `${slugify(name) || "evento"}-${suffix}`;
+}
+
+/**
+ * Borrador de la organización que el formulario de creación puede seguir completando: en borrador y todavía sin
+ * funciones ni entradas a la venta (el tipo Cortesía, si lo creó la base, no cuenta). Si ya se completó o se editó
+ * en otra pestaña, EventInputError.
+ */
+export async function loadAutosavedDraft(orgId: number, draftId: number): Promise<{ id: number; slug: string | null }> {
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data: event, error } = await supabaseAdmin.from("events").select("id, slug, status").eq("id", draftId).eq("organization_id", orgId).maybeSingle();
+    if (error) throw error;
+    if (!event) throw new EventInputError("No encontramos ese borrador.", 404);
+    const [{ count: locations }, { count: tickets }] = await Promise.all([
+        supabaseAdmin.from("event_locations").select("id", { count: "exact", head: true }).eq("event_id", draftId),
+        supabaseAdmin.from("event_tickets").select("id", { count: "exact", head: true }).eq("event_id", draftId).not("is_gift", "is", true),
+    ]);
+    if ((event as any).status !== "draft" || (locations || 0) > 0 || (tickets || 0) > 0) {
+        throw new EventInputError("Este borrador ya se completó o se editó en otra pestaña. Ábrelo desde Mis eventos.", 409);
+    }
+    return { id: Number((event as any).id), slug: (event as any).slug ?? null };
+}
+
+/** Crea o actualiza el borrador con los datos del primer paso. Devuelve su id. */
+export async function saveFormDraft(actor: { userId: number; orgId: number }, general: any, draftId?: number | null): Promise<{ id: number }> {
+    if (!draftIsSavable(general)) throw new EventInputError("Escribe el nombre y al menos la categoría, la descripción o la imagen.");
+    const supabaseAdmin = getSupabaseAdmin();
+    const name = String(general.name).trim().slice(0, 200);
+    const fields = {
+        name,
+        title: name,
+        description: sanitizeRichText(general.description || ""),
+        image_url: general.imageUrl || null,
+        accessibility: general.isPrivate ? "private" : "public",
+    };
+    let id: number;
+    if (draftId) {
+        const draft = await loadAutosavedDraft(actor.orgId, draftId);
+        const { error } = await supabaseAdmin.from("events").update({ ...fields, slug: draftSlug(name, draft.slug) }).eq("id", draft.id).eq("organization_id", actor.orgId);
+        if (error) throw error;
+        id = draft.id;
+    } else {
+        const { data, error } = await supabaseAdmin
+            .from("events")
+            .insert({ ...fields, slug: draftSlug(name, null), status: "draft", created_by: actor.userId, organization_id: actor.orgId })
+            .select("id")
+            .single();
+        if (error) throw error;
+        id = Number((data as any).id);
+    }
+    await syncEventCategory(id, general.category || null);
+    if (general.coverSettings !== undefined) await saveCoverSettings(id, actor.orgId, general.imageUrl ? general.coverSettings : null);
+    return { id };
 }

@@ -197,6 +197,8 @@ export function cardState(event, now = new Date()) {
   const tickets = event.tickets || [];
   const free = isFreeEventView(event);
   if (event.sale_state === "on_sale" && tickets.length) {
+    // Entradas numeradas: siempre el checkout con selector de asientos (también si son gratis)
+    if (event.seating) return "paid_multi";
     if (free) return "free";
     return tickets.length === 1 ? "paid_simple" : "paid_multi";
   }
@@ -348,6 +350,7 @@ export function attendeeFeedUrl(orders) {
  *   salesStart es la más próxima, para "Disponible desde el {fecha}")
  */
 export function checkoutFunctions(event, now = new Date()) {
+  if (event?.seating) return seatedCheckoutFunctions(event, now);
   const onSale = event?.tickets || [];
   const unavailable = event?.unavailable_tickets || [];
   const tiedIds = new Set([...onSale, ...unavailable].filter((t) => t.event_date_id != null).map((t) => String(t.event_date_id)));
@@ -373,6 +376,24 @@ export function checkoutFunctions(event, now = new Date()) {
         if (left <= 10) status = "few";
       }
       return { ...d, place: placeKey(d.venue), status, salesStart };
+    });
+  return { needsFunction: functions.length > 0, functions, places: placesOf(functions) };
+}
+
+/**
+ * Entradas numeradas: siempre se elige función (los asientos son por función). Una función se agota cuando no le
+ * quedan asientos (event.seating.seats_left) o no tiene entradas a la venta.
+ */
+function seatedCheckoutFunctions(event, now) {
+  const onSale = event.tickets || [];
+  const { map_of_date: mapOf = {}, seats_left: left = {} } = event.seating;
+  const functions = upcomingFunctions(event, now)
+    .filter((d) => d.id != null && mapOf[String(d.id)])
+    .map((d) => {
+      const pool = onSale.filter((t) => t.event_date_id == null || String(t.event_date_id) === String(d.id));
+      const seats = Number(left[String(d.id)] ?? 0);
+      const status = !pool.length || seats <= 0 ? "sold_out" : seats <= 10 ? "few" : "available";
+      return { ...d, place: placeKey(d.venue), status, salesStart: null };
     });
   return { needsFunction: functions.length > 0, functions, places: placesOf(functions) };
 }

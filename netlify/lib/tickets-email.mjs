@@ -185,12 +185,21 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
       .or('status.is.null,status.neq.cancelled')
     let attendeeRows = null
     let attendeesError = null
-    for (const extra of [' holder_name, holder_email, unit_id, seat_number, registration_answers,', ' holder_name, holder_email, unit_id, seat_number,', ' holder_name, holder_email,', '']) {
+    for (const extra of [' holder_name, holder_email, unit_id, seat_number, registration_answers, seat_label,', ' holder_name, holder_email, unit_id, seat_number, registration_answers,', ' holder_name, holder_email, unit_id, seat_number,', ' holder_name, holder_email,', '']) {
       ;({ data: attendeeRows, error: attendeesError } = await selectAttendees(extra))
       if (!attendeesError || !['42703', 'PGRST204'].includes(String(attendeesError.code || ''))) break
     }
     if (attendeesError) throw new Error(attendeesError.message)
     if (!attendeeRows?.length) throw new Error('La orden no tiene entradas emitidas')
+    // Entradas numeradas válidas para todas las funciones: la función comprada va en la línea de la orden
+    const detailFn = new Map(
+      (Array.isArray(order.ticket_details) ? order.ticket_details : []).filter(l => l?.event_date_id != null).map(l => [Number(l.id), Number(l.event_date_id)])
+    )
+    for (const row of attendeeRows) {
+      if (row.seat_label && row.event_tickets && row.event_tickets.event_date_id == null && detailFn.has(Number(row.event_ticket_id))) {
+        row.event_tickets = { ...row.event_tickets, event_date_id: detailFn.get(Number(row.event_ticket_id)) }
+      }
+    }
 
     const detailPrice = new Map(
       (Array.isArray(order.ticket_details) ? order.ticket_details : []).map(l => [Number(l?.id), Number(l?.price)])
@@ -296,7 +305,7 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
           cid,
           index: i + 1,
           total: withQr.length,
-          label: row.event_tickets?.ticket_name || 'Entrada',
+          label: `${row.event_tickets?.ticket_name || 'Entrada'}${row.seat_label ? ` · ${row.seat_label}` : ''}`,
           functionLabel: fn ? formatFunctionLabel(fn, { withPlace: false }) : '',
           holder: row.holder_name || '',
         })
@@ -403,7 +412,7 @@ export async function sendOrderTicketsEmail(orderId, { force = false } = {}) {
             buyerName,
             organizerName,
             eventName: event.name || 'Tu evento',
-            ticketName: row.event_tickets?.ticket_name || 'Entrada',
+            ticketName: `${row.event_tickets?.ticket_name || 'Entrada'}${row.seat_label ? ` · ${row.seat_label}` : ''}`,
             functionLabel: fn ? formatFunctionLabel(fn, { withPlace: false }) : '',
             dateLines: fn ? [{ date: formatDateOnlyLong(fn.date), time: formatTimeShort(fn.start_time), place: formatEventLocation(fn.event_locations) || event.location || '' }] : dateLines,
             secretLocation: event.secret_location || '',

@@ -3,7 +3,7 @@
 // ya tenía la página (src/data/landings.ts) y las propias de teatro. Tres se reformulan para teatro (teaser, reseñas,
 // primera obra): la respuesta es la de origen. Todo verificado en el código:
 //   aforo por función → event_tickets.event_date_id (EditEventForm.vue paso 3); "Últimas" / agotada → eventView.js
-//   butacas numeradas → no existen (tipos de entrada con cupo; no va como "Pronto", §0.6)
+//   butacas numeradas → sí: mapa de asientos por sala con plantillas (src/lib/seatMap.mjs)
 //   cortesías → CourtesyTicketsForm.vue y src/lib/courtesy.ts (no cuentan como venta); lista de invitados →
 //               tools/guests.ts (hoy solo desde el asistente de IA)
 //   otra función en la puerta → ValidateQR.vue (function_mismatch, "Validar de todas formas")
@@ -48,7 +48,7 @@ export const TEATRO_FAQ: FaqItem[] = [
     pick(theatreLanding.faq, "¿Puedo tener entradas generales y precios distintos por función?"),
     {
         q: "¿Tienen butacas numeradas?",
-        a: "No. AI Tickets no tiene mapa de asientos numerados: las entradas son por función y por tipo. Si separas zonas, como platea y galería, cada una es un tipo de entrada con su propio cupo.",
+        a: "Sí. Al crear el evento marcas «Entradas numeradas» y armas el mapa de tu sala desde una plantilla (cine, teatro con platea y balcón, auditorio), ajustando filas y asientos por sección. Quien compra elige su asiento y cada uno se vende una sola vez por función. Si cobras distinto por zona, cada sección tiene su tipo de entrada.",
     },
     {
         q: "¿Cómo mando las cortesías de prensa?",

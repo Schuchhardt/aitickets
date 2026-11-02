@@ -2,6 +2,7 @@
 // Paso 1 del checkout pagado (§6.3): lugar → función → entradas. Cada nivel se omite si tiene una sola opción.
 import { ref, computed, nextTick } from "vue";
 import QuantityStepper from "./QuantityStepper.vue";
+import SeatPicker from "./SeatPicker.vue";
 import { formatCLP, miniCalendar, hhmm, ticketMax, ticketRowsFor, groupByMonth, formatSaleStart } from "./eventView.js";
 import { isFeeAbsorbed } from "../Reservation/pricing.js";
 
@@ -13,8 +14,15 @@ const props = defineProps({
   functionId: { type: [String, Number], default: null },
   selection: { type: Object, default: () => ({}) },
   notice: { type: String, default: "" },
+  // Entradas numeradas: claves de los asientos elegidos y aviso del selector (asientos que alguien tomó)
+  seats: { type: Array, default: () => [] },
+  seatNotice: { type: String, default: "" },
 });
-const emit = defineEmits(["update:place", "update:functionId", "update:selection", "track"]);
+const emit = defineEmits(["update:place", "update:functionId", "update:selection", "update:seats", "track"]);
+
+const seatLines = computed(() => Object.entries(props.selection).map(([id, quantity]) => ({ id, quantity: Number(quantity) || 0 })));
+const showSeats = computed(() => Boolean(props.event.seating && props.functionId && seatLines.value.some((l) => l.quantity > 0)));
+const seatPicker = ref(null);
 
 const showPlaces = computed(() => props.model.places.length > 1);
 const placeFunctions = computed(() =>
@@ -39,6 +47,7 @@ const absorbed = computed(() => isFeeAbsorbed(props.event));
 // fila de entradas a la venta (al "+" de su stepper) en vez de al lugar o la fecha
 const rowsEl = ref(null);
 defineExpose({
+  refreshSeats: () => seatPicker.value?.refresh(),
   focusTickets() {
     const target = rowsEl.value?.$el?.querySelector('[data-ticket-row="available"] .stepper-plus');
     target?.focus({ preventScroll: true });
@@ -174,6 +183,20 @@ async function onRadioKey(e, items, current, select, keyOf) {
       <p class="rows-note">{{ absorbed ? "Precios finales." : "Precios finales: incluyen cargo por servicio e IVA del cargo." }}</p>
     </div>
     <p v-else-if="model.needsFunction && !functionId" class="pick-hint">Elige una fecha para ver las entradas.</p>
+
+    <!-- d) Asientos (entradas numeradas) -->
+    <SeatPicker
+      v-if="showSeats"
+      ref="seatPicker"
+      class="block"
+      :event="event"
+      :function-id="functionId"
+      :lines="seatLines"
+      :model-value="seats"
+      :notice="seatNotice"
+      @update:model-value="emit('update:seats', $event)"
+      @track="(name, params) => emit('track', name, params)"
+    />
   </div>
 </template>
 

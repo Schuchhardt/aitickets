@@ -29,7 +29,9 @@ const props = defineProps({
 const emit = defineEmits(["close"]);
 
 const model = computed(() => checkoutFunctions(props.event));
-const isSimple = computed(() => (props.event.tickets || []).length === 1);
+// Entradas numeradas: siempre hay paso 1 (función, cantidad y asientos)
+const seated = computed(() => Boolean(props.event.seating));
+const isSimple = computed(() => !seated.value && (props.event.tickets || []).length === 1);
 const hasStep1 = computed(() => !isSimple.value);
 // Un solo tipo de entrada: sin paso 1, la cantidad se ajusta en "Pagar" (en mobile la card con el stepper no se
 // muestra y la barra inferior abre el sheet directo en este paso)
@@ -53,6 +55,9 @@ const panel = ref(null);
 const body = ref(null);
 const visible = ref(false);
 const autoCode = ref(props.initial.code || "");
+const seats = ref([]);
+const seatNotice = ref("");
+const seatsReady = computed(() => !seated.value || (totals.value.quantity > 0 && seats.value.length === totals.value.quantity));
 
 // ---- Selección inicial (deep links validados contra las entradas a la venta) ----
 function initSelection() {
@@ -102,6 +107,8 @@ function initSelection() {
 
   step.value = init.step === 2 || isSimple.value ? 2 : 1;
   if (step.value === 2 && !totals.value.quantity) step.value = hasStep1.value ? 1 : 2;
+  // Los asientos no viajan en la URL: con entradas numeradas siempre se parte eligiéndolos
+  if (seated.value) step.value = 1;
   if (isSimple.value && !totals.value.quantity) selection.value = { [onSale[0].id]: 1 };
 }
 
@@ -174,6 +181,11 @@ watch([selection, functionId], () => visible.value && replaceUrl(), { deep: true
 
 function goStep2() {
   if (!totals.value.quantity) return;
+  if (!seatsReady.value) {
+    seatNotice.value = `Elige ${totals.value.quantity === 1 ? "tu asiento" : `tus ${totals.value.quantity} asientos`} en el mapa.`;
+    return;
+  }
+  seatNotice.value = "";
   direction.value = "fwd";
   step.value = 2;
   pushUrl();
@@ -323,6 +335,15 @@ function onPrimary() {
   if (step.value === 1) goStep2();
   else payStep.value?.submit();
 }
+// Alguien tomó un asiento elegido mientras se pagaba: de vuelta al mapa, sin esos asientos
+function onSeatsTaken(message) {
+  seats.value = [];
+  seatNotice.value = message || "Alguien tomó uno de tus asientos. Elige otro.";
+  direction.value = "back";
+  step.value = 1;
+  replaceUrl();
+  nextTick(() => chooseStep.value?.refreshSeats());
+}
 function onSoldOut(message) {
   if (hasStep1.value) {
     notice.value = message || "Se agotaron algunas entradas. Vuelve a elegirlas.";
@@ -432,9 +453,11 @@ onBeforeUnmount(() => {
                   v-model:place="place"
                   v-model:function-id="functionId"
                   v-model:selection="selection"
+                  v-model:seats="seats"
                   :event="event"
                   :model="model"
                   :notice="notice"
+                  :seat-notice="seatNotice"
                   data-testid="resv-step-tickets"
                   @track="(name, params) => trackFunnel(name, event, params)"
                 />
@@ -451,7 +474,9 @@ onBeforeUnmount(() => {
                   :can-go-back="hasStep1"
                   :qty-ticket="simpleTicket"
                   :buyer-prefill="buyerPrefill"
+                  :seats="seated && functionId ? { eventDateId: Number(functionId), keys: seats } : null"
                   data-testid="resv-step-buyer"
+                  @seats-taken="onSeatsTaken"
                   @update:qty="setSimpleQty"
                   @busy="busy = $event"
                   @back="goBack"
@@ -498,7 +523,7 @@ onBeforeUnmount(() => {
                 type="button"
                 class="ev-btn ev-btn-primary foot-cta"
                 data-testid="resv-pay-button"
-                :disabled="totals.quantity === 0"
+                :disabled="totals.quantity === 0 || (step === 1 && seated && !seatsReady)"
                 :aria-busy="busy ? 'true' : 'false'"
                 @click="onPrimary"
               >

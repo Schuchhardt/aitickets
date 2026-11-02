@@ -4,7 +4,7 @@
 // los envía; el invitado queda 'link_ready' hasta que se confirma con mark_guests_invited). issue_complimentary_tickets emite entradas gratis nominadas (src/lib/courtesy.ts).
 import { ToolError, type ToolDef, type ToolContext } from "../registry";
 import { eventIdSchema, loadOwnedEvent, eventPublicUrl } from "./common";
-import { issueCourtesyTickets, MAX_COURTESY_PER_REQUEST } from "../../courtesy";
+import { issueCourtesyTickets, ensureCourtesyTicket, CourtesyError, MAX_COURTESY_PER_REQUEST } from "../../courtesy";
 import { splitFullName, normalizePersonName } from "../../../../netlify/lib/buyer-name.mjs";
 import { sendTicketsEmail } from "../../../pages/api/_lib/server-utils";
 import { sendEmail, formatRecipient, isValidEmail, legalFooterHtml, legalFooterText } from "../../../../netlify/lib/mailer.mjs";
@@ -449,8 +449,10 @@ const issueComplimentary: ToolDef = {
     title: "Emitir cortesías",
     description:
         "Emite entradas GRATIS nominadas (DJ, staff, prensa) y las envía por correo a cada destinatario. Por defecto usa el tipo \"Cortesía\" " +
-        "del sistema (no cuenta como venta ni ocupa cupo de otros tipos); ticket_type_id permite usar otro tipo. Pueden superar el cupo " +
-        `del tipo de entrada (las decide el productor). Hasta 50 destinatarios y ${MAX_COURTESY_PER_REQUEST} entradas por destinatario. ` +
+        "del sistema (se crea solo la primera vez; no cuenta como venta ni ocupa cupo de otros tipos); ticket_type_id permite usar otro tipo. " +
+        `Pueden superar el cupo del tipo de entrada (las decide el productor). Hasta 50 destinatarios y ${MAX_COURTESY_PER_REQUEST} entradas por destinatario. ` +
+        "Evento con entradas numeradas (mapa de asientos): cada cortesía ocupa un asiento libre de la función event_date_id (obligatoria si el " +
+        "evento tiene varias funciones); se asignan juntos y al centro por destinatario y la respuesta dice cuáles. " +
         "Usa idempotency_key para que un reintento no duplique entradas.",
     scope: "write",
     permission: "guests.manage",
@@ -463,6 +465,7 @@ const issueComplimentary: ToolDef = {
         properties: {
             event_id: eventIdSchema,
             ticket_type_id: { type: "integer", minimum: 1, description: "Tipo de entrada (get_event → ticket_types). Omitir = el tipo Cortesía del sistema." },
+            event_date_id: { type: "integer", minimum: 1, description: "Solo entradas numeradas: función donde se asignan los asientos (get_event → functions)." },
             recipients: {
                 type: "array",
                 minItems: 1,
@@ -484,17 +487,15 @@ const issueComplimentary: ToolDef = {
     async handler(args, ctx) {
         const event = await loadOwnedEvent<any>(ctx, args.event_id, "id, name, cancelled_at");
         if (event.cancelled_at) throw new ToolError("conflict", "El evento está cancelado.");
-        let ticketQuery = ctx.supabase.from("event_tickets").select("id, ticket_name").eq("event_id", event.id);
-        ticketQuery = args.ticket_type_id ? ticketQuery.eq("id", args.ticket_type_id) : ticketQuery.eq("is_gift", true).order("id", { ascending: true }).limit(1);
-        const { data: ticket } = await ticketQuery.maybeSingle();
-        if (!ticket) {
-            throw new ToolError(
-                "not_found",
-                args.ticket_type_id
-                    ? `El tipo de entrada ${args.ticket_type_id} no existe en el evento ${event.id}.`
-                    : `El evento ${event.id} no tiene tipo de cortesía: indica ticket_type_id (get_event → ticket_types).`,
-            );
+        // Sin ticket_type_id: el tipo Cortesía del evento (se crea la primera vez)
+        let ticket: { id: number; ticket_name: string } | null;
+        if (args.ticket_type_id) {
+            const { data } = await ctx.supabase.from("event_tickets").select("id, ticket_name").eq("event_id", event.id).eq("id", args.ticket_type_id).maybeSingle();
+            ticket = data ? { id: Number(data.id), ticket_name: data.ticket_name } : null;
+        } else {
+            ticket = await ensureCourtesyTicket(ctx.supabase, Number(event.id));
         }
+        if (!ticket) throw new ToolError("not_found", `El tipo de entrada ${args.ticket_type_id} no existe en el evento ${event.id}.`);
         for (const r of args.recipients) {
             if (!isValidEmail(String(r.email).toLowerCase())) throw new ToolError("invalid_input", `Email inválido para ${r.name}.`);
         }
@@ -504,7 +505,7 @@ const issueComplimentary: ToolDef = {
             // Respeta nombres compuestos y normaliza ("maria jose PEREZ" => "Maria Jose" + "Perez")
             const { firstName, lastName } = splitFullName(String(r.name));
             try {
-                const { orderId } = await issueCourtesyTickets(ctx.supabase, {
+                const { orderId, seats } = await issueCourtesyTickets(ctx.supabase, {
                     event: { id: Number(event.id) },
                     ticket: { id: Number(ticket.id), ticket_name: ticket.ticket_name },
                     quantity: r.quantity ?? 1,
@@ -512,10 +513,18 @@ const issueComplimentary: ToolDef = {
                     lastName: lastName.slice(0, 100) || null,
                     email,
                     issuedBy: ctx.actor.userId,
+                    eventDateId: args.event_date_id ?? null,
                 });
                 const mail = await sendTicketsEmail(ctx.requestUrl, orderId);
-                results.push({ name: r.name, email, quantity: r.quantity ?? 1, order_id: orderId, email_sent: mail.ok });
+                results.push({ name: r.name, email, quantity: r.quantity ?? 1, order_id: orderId, email_sent: mail.ok, ...(seats.length ? { seats } : {}) });
             } catch (err: any) {
+                // Errores del productor (función o asientos): si es el primero se responde tal cual; si ya se emitieron
+                // otras, va en su fila para no esconder lo que sí se emitió
+                if (err instanceof CourtesyError) {
+                    if (!results.some((x) => x.order_id)) throw new ToolError("invalid_input", err.message);
+                    results.push({ name: r.name, email, quantity: r.quantity ?? 1, order_id: null, error: err.message });
+                    continue;
+                }
                 console.error("issue_complimentary_tickets:", err?.message || err);
                 results.push({ name: r.name, email, quantity: r.quantity ?? 1, order_id: null, error: "No se pudo emitir" });
             }

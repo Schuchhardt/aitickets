@@ -25,6 +25,8 @@ import { normalizeReviewSettings } from "../../netlify/lib/reviews.mjs";
 import { SECRET_PLACE_NAME } from "../../netlify/lib/secret-location.mjs";
 import { maxPerPurchase, loadTicketChain, waitingOnPrevious, loadPeoplePerTicket } from "../../netlify/lib/tickets.mjs";
 import { normalizeCheckoutFields } from "./checkoutFields.mjs";
+import { loadEventSeating, loadTicketSections, seatCounts } from "../../netlify/lib/seats.mjs";
+import { totalSeats } from "./seatMap.mjs";
 import { clientIpFrom } from "./sites";
 
 // Columnas públicas del evento. NUNCA incluir secret_location (C4).
@@ -448,11 +450,39 @@ export function toPublicTicket(t: any, { remaining, feeAbsorbed }: { remaining: 
  * el checkout de siempre.
  */
 async function loadCheckoutConfig(supabase: ReturnType<typeof getSupabaseAdmin>, eventId: number) {
-  const [fieldsRes, people] = await Promise.all([
+  const [fieldsRes, people, seating] = await Promise.all([
     supabase.from("events").select("checkout_fields").eq("id", eventId).maybeSingle(),
     loadPeoplePerTicket(supabase, eventId),
+    loadPublicSeating(supabase, eventId),
   ]);
-  return { fields: normalizeCheckoutFields(fieldsRes.error ? null : (fieldsRes.data as any)?.checkout_fields), people: people as Map<number, number> };
+  return {
+    fields: normalizeCheckoutFields(fieldsRes.error ? null : (fieldsRes.data as any)?.checkout_fields),
+    people: people as Map<number, number>,
+    seating,
+  };
+}
+
+/**
+ * Entradas numeradas (src/lib/seatMap.mjs, migración 202611020100): mapas por función y asientos libres de cada una.
+ * null = entrada general. Los asientos ocupados uno por uno los pide el selector a /api/events/seats.
+ */
+async function loadPublicSeating(supabase: ReturnType<typeof getSupabaseAdmin>, eventId: number) {
+  const seating = await loadEventSeating(supabase, eventId);
+  if (!seating.seated) return null;
+  const [sections, taken] = await Promise.all([loadTicketSections(supabase, eventId), seatCounts(supabase, eventId)]);
+  const maps: Record<string, any> = {};
+  const mapOfDate: Record<string, string> = {};
+  const seatsLeft: Record<string, number> = {};
+  const keyOf = new Map<any, string>();
+  for (const [dateId, map] of seating.mapsByDate as Map<number, any>) {
+    if (!keyOf.has(map)) {
+      keyOf.set(map, `m${keyOf.size + 1}`);
+      maps[keyOf.get(map)!] = map;
+    }
+    mapOfDate[String(dateId)] = keyOf.get(map)!;
+    seatsLeft[String(dateId)] = Math.max(0, totalSeats(map) - (taken.get(Number(dateId)) || 0));
+  }
+  return { maps, map_of_date: mapOfDate, seats_left: seatsLeft, sections: Object.fromEntries([...sections].map(([id, s]) => [String(id), s])) };
 }
 
 /**
@@ -691,7 +721,14 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
     // Agenda por día: [{ key, function_id, title, blocks: [{ start, end, title, speakers, room }] }] ([] = sin sección)
     agenda: agendaGroups(agendaBlocks, dates),
     // Mesa para N: people_per_ticket > 1 (un QR por persona; precio y cupo por mesa)
-    tickets: publicTickets.map((t) => ({ ...t, people_per_ticket: checkoutConfig.people.get(Number(t.id)) || 1 })),
+    tickets: publicTickets.map((t) => ({
+      ...t,
+      people_per_ticket: checkoutConfig.people.get(Number(t.id)) || 1,
+      // Entradas numeradas: secciones del mapa donde vale (null = todas)
+      ...(checkoutConfig.seating ? { seat_sections: checkoutConfig.seating.sections[String(t.id)] || null } : {}),
+    })),
+    // Entradas numeradas: { maps, map_of_date, seats_left } o null (entrada general)
+    seating: checkoutConfig.seating ? { maps: checkoutConfig.seating.maps, map_of_date: checkoutConfig.seating.map_of_date, seats_left: checkoutConfig.seating.seats_left } : null,
     unavailable_tickets: unavailableTickets,
     // Asistentes por entrada, datos de empresa y preguntas al inscribirse (src/lib/checkoutFields.mjs)
     checkout_fields: checkoutConfig.fields,

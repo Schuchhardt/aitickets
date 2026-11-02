@@ -17,8 +17,10 @@ export const POST: APIRoute = async (context) => {
     try {
         const body = await context.request.json();
         const { general, locations, tickets } = body || {};
+        // Borrador que el formulario ya guardó solo (/api/events/draft): se completa ese mismo evento
+        const draftId = Number(body?.draftId) > 0 ? Number(body.draftId) : null;
 
-        const created = await createEventGraph({ userId: dbUser.id, orgId: dbUser.organization_id }, { general, locations, tickets }, state);
+        const created = await createEventGraph({ userId: dbUser.id, orgId: dbUser.organization_id }, { general, locations, tickets }, state, { draftId });
 
         // Notificar en Slack
         const totalDates = locations.reduce((sum: number, loc: any) => sum + (loc.dates?.length || 0), 0);
