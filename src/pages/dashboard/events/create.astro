@@ -6,6 +6,7 @@ import { listOrgVenues, withVenueSeatMaps, type OrgVenue } from "../../../lib/or
 import { EVENT_MANAGER_ROLES } from "../../../lib/supabaseServer";
 import { requireDashboardSession } from "../_lib/guard";
 import IslandSkeleton from "../../../components/dashboard/IslandSkeleton.astro";
+import { loadAutosavedDraft } from "../../api/_lib/events";
 
 const guard = await requireDashboardSession(Astro, EVENT_MANAGER_ROLES);
 if (!guard.ok) return guard.response;
@@ -19,6 +20,37 @@ try {
 } catch (err) {
   console.error("Venues fetch error", err);
 }
+
+// Borrador guardado solo (?borrador=<id>, al recargar o volver): se sigue completando ese mismo evento. Si ya se
+// completó o se editó por otro lado, se abre su página de edición.
+let initialDraft: Record<string, unknown> | null = null;
+const draftParam = Number(Astro.url.searchParams.get("borrador"));
+if (Number.isInteger(draftParam) && draftParam > 0) {
+  const orgId = guard.session.dbUser.organization_id;
+  try {
+    await loadAutosavedDraft(orgId, draftParam);
+    const supabase = getSupabaseAdmin();
+    const { data: ev } = await supabase.from("events").select("id, name, description, image_url, accessibility").eq("id", draftParam).eq("organization_id", orgId).maybeSingle();
+    const [{ data: tag }, { data: cover }] = await Promise.all([
+      supabase.from("event_tags").select("category_tags ( name )").eq("event_id", draftParam).limit(1).maybeSingle(),
+      supabase.from("events").select("cover_settings").eq("id", draftParam).maybeSingle(),
+    ]);
+    if (ev) {
+      const tagRow: any = tag;
+      initialDraft = {
+        id: Number(ev.id),
+        name: ev.name || "",
+        description: ev.description || "",
+        imageUrl: ev.image_url || "",
+        isPrivate: ev.accessibility === "private",
+        category: (Array.isArray(tagRow?.category_tags) ? tagRow.category_tags[0]?.name : tagRow?.category_tags?.name) || "",
+        coverSettings: (cover as any)?.cover_settings ?? null,
+      };
+    }
+  } catch {
+    return Astro.redirect(`/dashboard/events/${draftParam}/edit`);
+  }
+}
 ---
 
 <DashboardLayout title="Crear Evento">
@@ -31,6 +63,6 @@ try {
     </div>
 
     <!-- The Wizard Form -->
-    <CreateEventForm client:only="vue" initialVenues={venues}><IslandSkeleton slot="fallback" fields={6} /></CreateEventForm>
+    <CreateEventForm client:only="vue" initialVenues={venues} initialDraft={initialDraft ?? undefined}><IslandSkeleton slot="fallback" fields={6} /></CreateEventForm>
   </div>
 </DashboardLayout>

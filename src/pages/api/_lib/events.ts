@@ -321,6 +321,8 @@ export async function createEventGraph(
     actor: { userId: number; orgId: number },
     input: EventGraphInput,
     state: { eventId: number | null } = { eventId: null },
+    // Borrador guardado solo desde el formulario (saveFormDraft): se completa ese evento en vez de crear otro
+    opts: { draftId?: number | null } = {},
 ): Promise<{ id: number; slug: string; name: string; ticketsPayload: any[] }> {
     const supabaseAdmin = getSupabaseAdmin();
     const { general, locations, tickets } = input || ({} as EventGraphInput);
@@ -346,30 +348,49 @@ export async function createEventGraph(
     validateFormTicketChain(tickets);
     const seatMaps = formSeatMaps(general, locations);
 
-    // 1. Crear evento (siempre como borrador; se publica aparte)
+    // 1. Crear evento (siempre como borrador; se publica aparte) o completar el borrador guardado solo
     const name = String(general.name).trim().slice(0, 200);
-    const slug = `${slugify(name) || "evento"}-${Date.now().toString().slice(-4)}`;
-
-    const { data: eventData, error: eventError } = await supabaseAdmin
-        .from("events")
-        .insert({
-            name,
-            title: name,
-            description: sanitizeRichText(general.description),
-            image_url: general.imageUrl || null,
-            slug,
-            status: "draft",
-            accessibility: general.isPrivate ? "private" : "public",
-            created_by: actor.userId,
-            organization_id: actor.orgId,
-        })
-        .select("id")
-        .single();
-    if (eventError) {
-        console.error("Event insert error:", eventError);
-        throw eventError;
+    let slug = `${slugify(name) || "evento"}-${Date.now().toString().slice(-4)}`;
+    let eventId: number;
+    if (opts.draftId) {
+        const draft = await loadAutosavedDraft(actor.orgId, opts.draftId);
+        slug = draftSlug(name, draft.slug);
+        const { error } = await supabaseAdmin
+            .from("events")
+            .update({
+                name,
+                title: name,
+                description: sanitizeRichText(general.description),
+                image_url: general.imageUrl || null,
+                slug,
+                accessibility: general.isPrivate ? "private" : "public",
+            })
+            .eq("id", draft.id)
+            .eq("organization_id", actor.orgId);
+        if (error) throw error;
+        eventId = draft.id;
+    } else {
+        const { data: eventData, error: eventError } = await supabaseAdmin
+            .from("events")
+            .insert({
+                name,
+                title: name,
+                description: sanitizeRichText(general.description),
+                image_url: general.imageUrl || null,
+                slug,
+                status: "draft",
+                accessibility: general.isPrivate ? "private" : "public",
+                created_by: actor.userId,
+                organization_id: actor.orgId,
+            })
+            .select("id")
+            .single();
+        if (eventError) {
+            console.error("Event insert error:", eventError);
+            throw eventError;
+        }
+        eventId = eventData.id as number;
     }
-    const eventId = eventData.id as number;
     state.eventId = eventId;
     // Dirección privada antes de refreshEventDenorm (la ubicación pública queda sin la calle)
     if (general.secretLocation) {
@@ -640,3 +661,76 @@ export async function loadEventSeatingForForm(eventId: number): Promise<{ maps: 
     return { maps, sections };
 }
 
+
+// ---------------------------------------------------------------------------------------------------------
+// Borrador automático del formulario "Crear evento" (/api/events/draft)
+//   Apenas el primer paso tiene nombre y algo más (categoría, descripción o imagen), el evento se guarda como
+//   borrador y cada cambio del primer paso lo actualiza. "Crear evento" completa ese mismo borrador
+//   (createEventGraph con draftId): nunca quedan dos eventos.
+// ---------------------------------------------------------------------------------------------------------
+
+/** Lo mínimo del primer paso para guardar el borrador: nombre (más de 3 letras) y categoría, descripción o imagen. */
+export function draftIsSavable(general: any): boolean {
+    const name = typeof general?.name === "string" ? general.name.trim() : "";
+    if (name.length <= 3) return false;
+    const hasDescription = typeof general?.description === "string" && general.description.replace(/<[^>]*>/g, "").trim().length > 0;
+    return Boolean((typeof general?.category === "string" && general.category.trim()) || hasDescription || general?.imageUrl);
+}
+
+/** Slug del borrador según su nombre actual, con el mismo sufijo (un borrador no tiene link público que cuidar). */
+export function draftSlug(name: string, currentSlug: string | null | undefined): string {
+    const suffix = /-(\d{4})$/.exec(String(currentSlug || ""))?.[1] || Date.now().toString().slice(-4);
+    return `${slugify(name) || "evento"}-${suffix}`;
+}
+
+/**
+ * Borrador de la organización que el formulario de creación puede seguir completando: en borrador y todavía sin
+ * funciones ni entradas a la venta (el tipo Cortesía, si lo creó la base, no cuenta). Si ya se completó o se editó
+ * en otra pestaña, EventInputError.
+ */
+export async function loadAutosavedDraft(orgId: number, draftId: number): Promise<{ id: number; slug: string | null }> {
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data: event, error } = await supabaseAdmin.from("events").select("id, slug, status").eq("id", draftId).eq("organization_id", orgId).maybeSingle();
+    if (error) throw error;
+    if (!event) throw new EventInputError("No encontramos ese borrador.", 404);
+    const [{ count: locations }, { count: tickets }] = await Promise.all([
+        supabaseAdmin.from("event_locations").select("id", { count: "exact", head: true }).eq("event_id", draftId),
+        supabaseAdmin.from("event_tickets").select("id", { count: "exact", head: true }).eq("event_id", draftId).not("is_gift", "is", true),
+    ]);
+    if ((event as any).status !== "draft" || (locations || 0) > 0 || (tickets || 0) > 0) {
+        throw new EventInputError("Este borrador ya se completó o se editó en otra pestaña. Ábrelo desde Mis eventos.", 409);
+    }
+    return { id: Number((event as any).id), slug: (event as any).slug ?? null };
+}
+
+/** Crea o actualiza el borrador con los datos del primer paso. Devuelve su id. */
+export async function saveFormDraft(actor: { userId: number; orgId: number }, general: any, draftId?: number | null): Promise<{ id: number }> {
+    if (!draftIsSavable(general)) throw new EventInputError("Escribe el nombre y al menos la categoría, la descripción o la imagen.");
+    const supabaseAdmin = getSupabaseAdmin();
+    const name = String(general.name).trim().slice(0, 200);
+    const fields = {
+        name,
+        title: name,
+        description: sanitizeRichText(general.description || ""),
+        image_url: general.imageUrl || null,
+        accessibility: general.isPrivate ? "private" : "public",
+    };
+    let id: number;
+    if (draftId) {
+        const draft = await loadAutosavedDraft(actor.orgId, draftId);
+        const { error } = await supabaseAdmin.from("events").update({ ...fields, slug: draftSlug(name, draft.slug) }).eq("id", draft.id).eq("organization_id", actor.orgId);
+        if (error) throw error;
+        id = draft.id;
+    } else {
+        const { data, error } = await supabaseAdmin
+            .from("events")
+            .insert({ ...fields, slug: draftSlug(name, null), status: "draft", created_by: actor.userId, organization_id: actor.orgId })
+            .select("id")
+            .single();
+        if (error) throw error;
+        id = Number((data as any).id);
+    }
+    await syncEventCategory(id, general.category || null);
+    if (general.coverSettings !== undefined) await saveCoverSettings(id, actor.orgId, general.imageUrl ? general.coverSettings : null);
+    return { id };
+}

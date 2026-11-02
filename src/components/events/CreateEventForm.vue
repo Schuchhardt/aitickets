@@ -21,6 +21,11 @@ const props = defineProps({
   initialVenues: {
     type: Array,
     required: true
+  },
+  // Borrador guardado solo que se sigue completando (?borrador=<id>): { id, name, description, imageUrl, category, isPrivate, coverSettings }
+  initialDraft: {
+    type: Object,
+    required: false
   }
 })
 
@@ -56,6 +61,19 @@ const form = ref({
     // { name: 'General', price: 0, quantity: 100, description: '' }
   ]
 })
+
+// Borrador retomado: datos del primer paso guardados en la base
+if (props.initialDraft) {
+  const d = props.initialDraft
+  Object.assign(form.value.general, {
+    name: d.name || '',
+    description: d.description || '',
+    imageUrl: d.imageUrl || '',
+    category: d.category || '',
+    isPrivate: Boolean(d.isPrivate),
+    coverSettings: d.coverSettings ?? null,
+  })
+}
 
 // IA de la descripción (evento aún sin guardar: solo lo que hay en el formulario)
 const descriptionAi = {
@@ -281,21 +299,136 @@ const isSubmitting = ref(false)
 const submitError = ref('')
 const submitSuccess = ref(false)
 
+// ---------------------------------------------------------------------------------------------------------
+// Borrador automático (/api/events/draft): apenas el primer paso tiene nombre y categoría, descripción o imagen, el
+// evento queda guardado como borrador y cada cambio del primer paso lo actualiza. La URL pasa a ?borrador=<id> para
+// retomarlo al recargar; los pasos 2 y 3 (todavía no están en la base) se guardan en este navegador.
+// "Crear Evento" completa ese mismo borrador.
+// ---------------------------------------------------------------------------------------------------------
+const draftId = ref(props.initialDraft?.id ? Number(props.initialDraft.id) : null)
+const draftStatus = ref(draftId.value ? 'saved' : 'idle') // idle | saving | saved | error | conflict
+const draftMessage = ref('')
+const LOCAL_KEY = (id) => `aitickets:create-draft:${id}`
+
+const draftSavable = computed(() => {
+  const g = form.value.general
+  return g.name.trim().length > 3 && Boolean(g.category || plainTextLength(g.description) > 0 || g.imageUrl)
+})
+const step1Snapshot = computed(() => {
+  const g = form.value.general
+  return JSON.stringify([g.name, g.description, g.imageUrl, g.category, g.isPrivate, g.coverSettings])
+})
+
+let savingPromise = null
+let pendingSave = false
+let draftTimer = null
+
+async function saveDraft() {
+  if (!draftSavable.value || draftStatus.value === 'conflict' || isSubmitting.value || submitSuccess.value) return
+  if (savingPromise) {
+    pendingSave = true
+    return savingPromise
+  }
+  draftStatus.value = 'saving'
+  const g = form.value.general
+  savingPromise = (async () => {
+    try {
+      const res = await fetch('/api/events/draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          draftId: draftId.value,
+          general: { name: g.name, description: g.description, imageUrl: g.imageUrl, category: g.category, isPrivate: g.isPrivate, coverSettings: g.coverSettings },
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.status === 409 || res.status === 404) {
+        draftStatus.value = 'conflict'
+        draftMessage.value = data.message || 'Este borrador ya no se puede seguir completando aquí.'
+        return
+      }
+      if (!res.ok || !data.id) throw new Error(data.message || 'No se pudo guardar el borrador')
+      if (!draftId.value) {
+        draftId.value = Number(data.id)
+        const url = new URL(window.location.href)
+        url.searchParams.set('borrador', String(data.id))
+        window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash)
+      }
+      draftStatus.value = 'saved'
+      draftMessage.value = ''
+      saveLocal()
+    } catch (e) {
+      draftStatus.value = 'error'
+      draftMessage.value = e?.message || 'No se pudo guardar el borrador'
+    } finally {
+      savingPromise = null
+      if (pendingSave) {
+        pendingSave = false
+        saveDraft()
+      }
+    }
+  })()
+  return savingPromise
+}
+
+watch(step1Snapshot, () => {
+  clearTimeout(draftTimer)
+  if (!draftSavable.value) return
+  draftTimer = setTimeout(saveDraft, 1000)
+})
+
+// Pasos 2 y 3 (y el resto del formulario) en este navegador, para retomarlos con el borrador
+function saveLocal() {
+  if (!draftId.value) return
+  try { localStorage.setItem(LOCAL_KEY(draftId.value), JSON.stringify({ savedAt: Date.now(), form: form.value })) } catch { /* sin almacenamiento */ }
+}
+let localTimer = null
+watch(form, () => {
+  clearTimeout(localTimer)
+  localTimer = setTimeout(saveLocal, 500)
+}, { deep: true })
+function restoreLocal() {
+  if (!draftId.value) return
+  try {
+    const raw = localStorage.getItem(LOCAL_KEY(draftId.value))
+    const saved = raw ? JSON.parse(raw)?.form : null
+    if (!saved?.general) return
+    // La copia de este navegador es lo último que escribió el productor (incluso si un guardado falló): manda
+    form.value = { ...form.value, ...saved }
+  } catch { /* datos corruptos: se parte de lo que hay */ }
+}
+function clearLocal() {
+  try { if (draftId.value) localStorage.removeItem(LOCAL_KEY(draftId.value)) } catch { /* sin almacenamiento */ }
+}
+onMounted(restoreLocal)
+
+const draftLabel = computed(() => {
+  if (draftStatus.value === 'saving') return 'Guardando borrador…'
+  if (draftStatus.value === 'saved') return 'Borrador guardado'
+  if (draftStatus.value === 'error') return 'No se pudo guardar el borrador. Lo intentamos de nuevo al seguir editando.'
+  if (draftStatus.value === 'conflict') return draftMessage.value
+  return draftSavable.value ? '' : 'Se guarda como borrador apenas tenga nombre y categoría, descripción o imagen.'
+})
+
 const submitEvent = async () => {
   isSubmitting.value = true
   submitError.value = ''
   
   try {
+    // Un guardado del borrador en curso termina antes (así se completa ese evento y no se crea otro)
+    clearTimeout(draftTimer)
+    if (savingPromise) await savingPromise
     const response = await fetch('/api/events/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form.value)
+      body: JSON.stringify({ ...form.value, ...(draftId.value && draftStatus.value !== 'conflict' ? { draftId: draftId.value } : {}) })
     })
     
     const result = await response.json()
     
     if (!response.ok) throw new Error(result.message || 'Error al crear evento')
     
+    clearLocal()
     submitSuccess.value = true
     setTimeout(() => {
       window.location.href = `/dashboard/events/${result.id}`
@@ -665,6 +798,22 @@ if (form.value.tickets.length === 0) addTicket()
 
       </div>
     </div>
+
+    <!-- Estado del borrador automático -->
+    <p
+      v-if="draftLabel"
+      class="px-4 sm:px-6 pt-3 text-xs flex items-center gap-1.5 justify-end"
+      :class="draftStatus === 'error' || draftStatus === 'conflict' ? 'text-red-600' : 'text-gray-500'"
+      role="status"
+      aria-live="polite"
+      data-testid="draft-status"
+    >
+      <span v-if="draftStatus === 'saving'" class="animate-spin w-3 h-3 border-2 border-gray-300 border-t-gray-600 rounded-full"></span>
+      <CheckCircle v-else-if="draftStatus === 'saved'" size="13" class="text-green-600" />
+      {{ draftLabel }}
+      <a v-if="draftStatus === 'saved' && draftId" :href="`/dashboard/events/${draftId}`" class="underline hover:text-black">Ver borrador</a>
+      <a v-if="draftStatus === 'conflict' && draftId" :href="`/dashboard/events/${draftId}/edit`" class="underline">Abrir el borrador</a>
+    </p>
 
     <!-- Footer Actions -->
     <div class="p-4 sm:p-6 border-t border-gray-100 bg-gray-50 rounded-b-xl flex justify-between items-center gap-3">
