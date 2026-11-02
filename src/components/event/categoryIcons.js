@@ -1,6 +1,6 @@
 // Ícono de cada categoría del evento (category_tags.name). Las del editor (EditEventForm.vue) son fijas, pero
 // hay nombres libres de eventos antiguos o del MCP: se busca por palabra clave y si no calza, una etiqueta.
-import { Mic, Drama, Music, PartyPopper, FerrisWheel, Tent, Footprints, Baby, Presentation, Trophy, UtensilsCrossed, Tag } from "lucide-vue-next";
+import { Mic, Drama, Music, PartyPopper, FerrisWheel, Tent, Footprints, Baby, Presentation, Trophy, UtensilsCrossed, Tag, Clapperboard, Cake, Gem } from "lucide-vue-next";
 
 const normalize = (s) =>
   String(s || "")
@@ -11,6 +11,9 @@ const normalize = (s) =>
 // Orden importa: la primera regla que calza gana ("Festival de música" => festival)
 const RULES = [
   [/stand.?up|comedia|humor|impro/, Mic],
+  [/\bcine\b|pelicula|film|documental/, Clapperboard],
+  [/cumple|fiesta privada/, Cake],
+  [/boda|matrimonio|casamiento/, Gem],
   [/festival|feria/, FerrisWheel],
   [/teatro|obra|musical/, Drama],
   [/circo|acrobac/, Tent],

@@ -196,9 +196,11 @@ const normalize = (s: string) =>
 // Orden importa, igual que en src/components/event/categoryIcons.js ("Festival de música" => musica)
 const PROFILE_RULES: [RegExp, EventProfile][] = [
     [/taller|charla|conferencia|curso|seminario|workshop|academia|clase/, "formacion"],
+    // Celebraciones privadas (cumpleaños, bodas): por invitación, sin promotores ni preventa como una fiesta abierta
+    [/cumple|fiesta privada|boda|matrimonio|casamiento/, "general"],
     [/fiesta|party|club|disco|dj|electronica/, "noche"],
     [/festival|musica|concierto|banda|rock|jazz|indie|tocata/, "musica"],
-    [/stand.?up|comedia|humor|impro|teatro|obra|musical|circo|danza|ballet|infantil|ninos/, "funciones"],
+    [/stand.?up|comedia|humor|impro|teatro|obra|musical|circo|danza|ballet|infantil|ninos|\bcine\b|pelicula|documental/, "funciones"],
 ];
 
 /** Perfil del evento según su categoría (category_tags.name, texto libre en eventos antiguos o del MCP). */

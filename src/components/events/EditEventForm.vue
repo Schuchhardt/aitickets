@@ -14,6 +14,7 @@ import FunctionRepeat from './FunctionRepeat.vue'
 import TicketCopyToFunctions from './TicketCopyToFunctions.vue'
 import CheckoutFieldsEditor from './CheckoutFieldsEditor.vue'
 import { MAX_PEOPLE_PER_TICKET } from '../../lib/checkoutFields.mjs'
+import { EVENT_CATEGORIES } from '../../lib/eventCategories.mjs'
 import SeatingSettings from './SeatingSettings.vue'
 import SeatTicketFields from './SeatTicketFields.vue'
 import { totalSeats } from '../../lib/seatMap.mjs'
@@ -436,8 +437,8 @@ const submitEvent = async ({ exit = false } = {}) => {
 <template>
   <div class="bg-white rounded-xl border border-gray-200 shadow-sm min-h-[600px] flex flex-col">
     <!-- Steps Header -->
-    <div class="border-b border-gray-100 p-6 pb-12 sm:pb-6">
-      <div class="flex items-center justify-between max-w-2xl mx-auto">
+    <div class="border-b border-gray-100 p-6 pb-12 sm:pb-10">
+      <div class="relative flex items-center justify-between max-w-2xl mx-auto">
         <button
           v-for="(step, index) in steps"
           :key="step.number"
@@ -467,9 +468,8 @@ const submitEvent = async ({ exit = false } = {}) => {
             {{ step.title }}
           </span>
         </button>
-        
-        <!-- Progress Bar Background (Simple visual hack) -->
-        <div class="absolute top-10 left-0 w-full h-0.5 bg-gray-100 -z-0 hidden md:block"></div> 
+        <!-- Línea que une los pasos, a la altura del centro de los círculos (detrás de ellos) -->
+        <div class="absolute left-5 right-5 top-5 -translate-y-1/2 h-0.5 bg-gray-100 hidden sm:block" aria-hidden="true"></div>
       </div>
     </div>
 
@@ -535,18 +535,7 @@ const submitEvent = async ({ exit = false } = {}) => {
               <label class="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
               <select v-model="form.general.category" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black focus:border-black outline-none bg-white">
                 <option value="">Selecciona una categoría...</option>
-              <option value="Comedia / Stand-up">Comedia / Stand-up</option>
-              <option value="Teatro">Teatro</option>
-              <option value="Música">Música</option>
-              <option value="Fiesta">Fiesta</option>
-              <option value="Festival">Festival</option>
-              <option value="Circo">Circo</option>
-              <option value="Danza">Danza</option>
-              <option value="Infantil">Infantil</option>
-              <option value="Taller / Charla">Taller / Charla</option>
-              <option value="Deportes">Deportes</option>
-              <option value="Gastronomía">Gastronomía</option>
-              <option value="Otro">Otro</option>
+                <option v-for="c in EVENT_CATEGORIES" :key="c" :value="c">{{ c }}</option>
               </select>
             </div>
             <div class="flex items-end">

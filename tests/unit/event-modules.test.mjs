@@ -17,6 +17,9 @@ describe('eventProfile', () => {
     ['Taller / Charla', 'formacion'],
     ['Seminario de RRHH', 'formacion'],
     ['Deportes', 'general'],
+    ['Cine', 'funciones'],
+    ['Cumpleaños / Fiesta privada', 'general'],
+    ['Boda', 'general'],
     ['', 'general'],
     [null, 'general'],
   ])('%s => %s', (cat, profile) => expect(eventProfile(cat)).toBe(profile))
