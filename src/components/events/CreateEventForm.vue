@@ -12,6 +12,9 @@ import FunctionRepeat from './FunctionRepeat.vue'
 import TicketCopyToFunctions from './TicketCopyToFunctions.vue'
 import CheckoutFieldsEditor from './CheckoutFieldsEditor.vue'
 import { MAX_PEOPLE_PER_TICKET } from '../../lib/checkoutFields.mjs'
+import SeatingSettings from './SeatingSettings.vue'
+import SeatTicketFields from './SeatTicketFields.vue'
+import { totalSeats } from '../../lib/seatMap.mjs'
 
 const props = defineProps({
   initialVenues: {
@@ -40,6 +43,8 @@ const form = ref({
     isPrivate: false,
     secretLocation: '',
     secretLocationRevealHours: '',
+    // Entradas numeradas: cada ubicación lleva su mapa (locations[].seatMap) y cada entrada sus secciones
+    seated: false,
   },
   // Step 2: List of Locations (Venue + Dates)
   locations: [
@@ -76,7 +81,8 @@ const isStep2Valid = computed(() => {
 })
 
 const isStep3Valid = computed(() => {
-  return form.value.tickets.length > 0 && form.value.tickets.every(t => t.name && t.price >= 0 && t.quantity > 0)
+  const seatsOk = !form.value.general.seated || form.value.locations.every((l) => l.seatMap && totalSeats(l.seatMap) > 0)
+  return seatsOk && form.value.tickets.length > 0 && form.value.tickets.every(t => t.name && t.price >= 0 && t.quantity > 0)
 })
 
 const canNext = computed(() => {
@@ -547,6 +553,12 @@ if (form.value.tickets.length === 0) addTicket()
            <p v-if="functionOptions.length > 1" class="text-sm text-gray-600 bg-blue-50 border border-blue-100 rounded-lg p-3">
              Para vender cupos separados por función, crea un tipo de entrada por función. Una entrada con "Todas las funciones" comparte su cupo entre todas las fechas.
            </p>
+           <SeatingSettings
+             v-model:seated="form.general.seated"
+             :locations="form.locations"
+             :venues="props.initialVenues"
+             :venue-name-for="venueNameFor"
+           />
            <TicketCopyToFunctions
              v-if="functionOptions.length > 1"
              :tickets="form.tickets"
@@ -574,11 +586,12 @@ if (form.value.tickets.length === 0) addTicket()
                     <input v-model="ticket.price" type="number" class="w-full pl-7 pr-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black outline-none" placeholder="0" />
                   </div>
                </div>
-               <div>
+               <div v-if="!form.general.seated">
                   <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Cantidad</label>
                   <input v-model="ticket.quantity" type="number" class="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black outline-none" />
                </div>
-               <div class="col-span-2">
+               <SeatTicketFields v-if="form.general.seated" :ticket="ticket" :locations="form.locations" />
+               <div v-if="!form.general.seated" class="col-span-2">
                   <label class="block text-xs font-bold text-gray-500 uppercase mb-1" :for="`people-${ticket.id}`">Personas por entrada</label>
                   <input :id="`people-${ticket.id}`" v-model.number="ticket.peoplePerTicket" type="number" min="1" :max="MAX_PEOPLE_PER_TICKET" placeholder="1" class="w-28 px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black outline-none" data-testid="ticket-people" />
                   <p class="mt-1 text-xs text-gray-500">
@@ -637,6 +650,7 @@ if (form.value.tickets.length === 0) addTicket()
 
                <div>
                  <p class="text-xs font-bold text-gray-500 uppercase mb-2">Entradas</p>
+                 <p v-if="form.general.seated" class="text-sm text-gray-600 mb-1">Numeradas · {{ form.locations.reduce((n, l) => n + (l.seatMap ? totalSeats(l.seatMap) : 0), 0) }} asientos</p>
                  <ul class="text-sm space-y-1">
                    <li v-for="t in form.tickets" :key="t.id">
                      {{ t.name }}: {{ t.quantity ?? 'Sin límite' }} x ${{ t.price }}

@@ -128,8 +128,8 @@ test("lo que no existe va con Pronto y sin testimonio real no hay crítica", asy
   await expect(page.locator("#salas").getByTestId("soon-badge")).toHaveCount(0);
   await expect(page.locator("#salas")).toContainText("Un borderó por función");
   await expect(page.locator("[data-te-testimonial]")).toHaveCount(0);
-  // Las butacas numeradas no son "Pronto": se dice que no hay
-  await expect(page.locator("#obra")).toContainText("No hay butacas numeradas");
+  // Butacas numeradas: mapa de asientos de la sala
+  await expect(page.locator("#obra")).toContainText("¿Butacas numeradas?");
 });
 
 test("los plazos de pago son los del código", async ({ page }) => {

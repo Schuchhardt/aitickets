@@ -107,7 +107,7 @@ export async function ticketAvailability(ctx: ToolContext, eventId: number, tick
 }
 
 /**
- * Tipo de entrada para la API. El tipo "Cortesía" lo crea la base de datos con cada evento (is_gift = true):
+ * Tipo de entrada para la API. El tipo "Cortesía" (is_gift = true) lo crea src/lib/courtesy.ts al emitir la primera cortesía:
  * es del sistema, nunca se vende y solo sirve para emitir cortesías (issue_complimentary_tickets).
  * on_sale_now exige además que el evento esté publicado (si se pasa `event`).
  */

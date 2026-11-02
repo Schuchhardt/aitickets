@@ -144,7 +144,7 @@ async function postJson(url, body) {
  * @returns {Promise<{ok:boolean,status:number,data:any,network?:boolean}>}
  */
 // holders / answers / company: datos extra que pide el evento (CheckoutExtras.vue, src/lib/checkoutFields.mjs).
-export function createOrder({ event, fullName, email, phone, tickets, discountCode, cfToken, termsAccepted = true, holders, answers, company }) {
+export function createOrder({ event, fullName, email, phone, tickets, discountCode, cfToken, termsAccepted = true, holders, answers, company, seats }) {
   const { ref, utm } = readAttribution();
   return postJson("/api/purchase-ticket", {
     eventId: event.id,
@@ -159,6 +159,8 @@ export function createOrder({ event, fullName, email, phone, tickets, discountCo
     holders: holders || undefined,
     answers: answers || undefined,
     company: company || undefined,
+    // Entradas numeradas: { eventDateId, keys }
+    seats: seats || undefined,
   });
 }
 

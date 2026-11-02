@@ -15,6 +15,9 @@
 // validan aquí contra la configuración del evento y se guardan en la orden después de reservar; al emitir, cada QR
 // toma su asistente (netlify/lib/tickets.mjs). Errores de validación: 400 { message, field: 'holders'|'answers'|'company' }.
 // Mesa para N (event_tickets.people_per_ticket): la línea de ticket_details lleva `people` y cupo/precio son por mesa.
+// Entradas numeradas (event_locations.seat_map, netlify/lib/seats.mjs): seats { eventDateId, keys: [clave] }, un
+// asiento por entrada. Se validan contra el mapa de la función, se guardan en event_orders.seat_selection y se toman
+// en aitickets_event_seats después de reservar la orden. Asiento tomado por otro: 409 { code: 'SEATS_TAKEN', seats }.
 // Respuesta: pagado -> { paymentLink, provider, orderId }; gratis -> { orderId, redirectUrl: '/order/<orderId>', provider: 'free' }
 // Orden gratis de un email que ya tiene una orden gratis pagada para el evento: 409 { code: 'ALREADY_REGISTERED' }
 // (no se crea un duplicado; la página ofrece reenviar la entrada). Agotado: 409 { code: 'SOLD_OUT' }.
@@ -55,6 +58,7 @@ import {
 import { isDemoEventSlug } from '../../../src/lib/demoEvent.mjs'
 import { splitFullName, normalizeNameParts } from '../../lib/buyer-name.mjs'
 import { holderSlots, validateHolders, validateAnswers, validateCompany } from '../../../src/lib/checkoutFields.mjs'
+import { loadEventSeating, loadTicketSections, validateSeatSelection, holdOrderSeats } from '../../lib/seats.mjs'
 
 const MAX_TICKET_LINES = 20
 const MAX_PENDING_PER_BUYER = 2
@@ -149,6 +153,9 @@ function validateRequest(body) {
     holders: Array.isArray(body?.holders) ? body.holders.slice(0, 600) : null,
     answers: body?.answers && typeof body.answers === 'object' && !Array.isArray(body.answers) ? body.answers : null,
     company: body?.company && typeof body.company === 'object' ? body.company : null,
+    seats: body?.seats && typeof body.seats === 'object' && !Array.isArray(body.seats)
+      ? { eventDateId: body.seats.eventDateId, keys: Array.isArray(body.seats.keys) ? body.seats.keys.slice(0, 50).map(k => String(k).slice(0, 60)) : [] }
+      : null,
   }
   return {
     extras,
@@ -458,6 +465,23 @@ export default async function handler(req) {
     })
     const grossSubtotal = ticketDetails.reduce((sum, t) => sum + t.total, 0)
 
+    // 4z. Entradas numeradas: un asiento del mapa de la función por entrada
+    let seatSelection = null
+    const seating = await loadEventSeating(supabase, eventId)
+    if (seating.seated) {
+      const sections = await loadTicketSections(supabase, eventId)
+      const seatCheck = validateSeatSelection({
+        seating,
+        lines: ticketDetails,
+        sectionsOf: (id) => sections.get(id) || null,
+        raw: extras.seats,
+        isFunctionOpen: (d) => functionEnd(d) >= now,
+      })
+      if (seatCheck.error) return json({ message: seatCheck.error, field: 'seats' }, 400)
+      seatSelection = seatCheck.selection
+      for (const t of ticketDetails) t.event_date_id = t.event_date_id ?? seatSelection.event_date_id
+    }
+
     // 4a. Código de descuento (validado aquí; el límite de usos definitivo lo aplica la reserva atómica)
     let discount = null
     if (discountCode) {
@@ -555,6 +579,33 @@ export default async function handler(req) {
         return json({ message: 'Una de las entradas seleccionadas ya no está a la venta' }, 409)
       }
       throw err
+    }
+
+    // Asientos: se guardan y se toman hasta que vence la orden. Si otro los tomó primero, la orden no sigue.
+    if (seatSelection) {
+      const failOrder = () => supabase.from('event_orders').update({ status: 'cancelled' }).eq('id', order.id).eq('status', 'pending')
+      const { error: seatSaveError } = await supabase.from('event_orders').update({ seat_selection: seatSelection }).eq('id', order.id)
+      if (seatSaveError) {
+        await failOrder()
+        throw new Error(`Error guardando asientos de la orden ${order.id}: ${seatSaveError.message}`)
+      }
+      let held
+      try {
+        held = await holdOrderSeats(supabase, order.id, seatSelection, new Date(Date.now() + holdMinutes * 60 * 1000))
+      } catch (err) {
+        await failOrder()
+        throw err
+      }
+      if (!held.ok) {
+        await failOrder()
+        return json({
+          code: 'SEATS_TAKEN',
+          seats: held.taken,
+          message: held.taken.length === 1
+            ? `Alguien acaba de tomar ${held.taken[0]}. Elige otro asiento.`
+            : `Alguien acaba de tomar ${held.taken.join(', ')}. Elige otros asientos.`,
+        }, 409)
+      }
     }
 
     // Cargo absorbido: la reserva atómica no conoce la columna; se marca la orden aparte (antes del pago).

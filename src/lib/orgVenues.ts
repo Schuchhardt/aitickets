@@ -115,3 +115,16 @@ export async function insertOrgVenue(
   if (error) throw error;
   return String(data.id);
 }
+
+/**
+ * Agrega a cada lugar su último mapa de asientos guardado (venues.seat_map, migración 202611020100) para que el
+ * formulario del evento lo proponga al marcar "Entradas numeradas". Sin la columna (deploy preview) los deja igual.
+ */
+export async function withVenueSeatMaps<T extends { id: string }>(supabase: any, venues: T[]): Promise<Array<T & { seat_map?: unknown }>> {
+  const ids = venues.map((v) => v.id);
+  if (!ids.length) return venues;
+  const { data, error } = await supabase.from("venues").select("id, seat_map").in("id", ids).not("seat_map", "is", null);
+  if (error) return venues;
+  const maps = new Map<string, unknown>((data || []).map((r: any) => [String(r.id), r.seat_map]));
+  return venues.map((v) => (maps.has(String(v.id)) ? { ...v, seat_map: maps.get(String(v.id)) } : v));
+}

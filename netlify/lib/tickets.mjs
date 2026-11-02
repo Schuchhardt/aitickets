@@ -2,6 +2,7 @@
 // Contrato C2: una entrada está a la venta si status='available' AND is_gift=false AND
 // (init_date IS NULL OR init_date <= now) AND (end_date IS NULL OR end_date >= now).
 import crypto from 'node:crypto'
+import { loadOrderSeatSelection, markSeatsSold } from './seats.mjs'
 
 // Cargo por servicio (8% + IVA del cargo): fuente única en fees.mjs.
 export { SERVICE_FEE_RATE, IVA_RATE, computeServiceFee, computeBuyerTotal } from './fees.mjs'
@@ -182,8 +183,15 @@ export function generateQrCode() {
  * @param {{eventId:number, attendeeId:number, orderId:string, lines:Array<{id:number, quantity:number}>, isComplimentary?:boolean,
  *          peopleOf?:(ticketId:number)=>number, holders?:Array<{ticket_id:number, name?:string|null, email?:string|null, answers?:any[]|null}>|null}} p
  */
-export function buildAttendeeRows({ eventId, attendeeId, orderId, lines, isComplimentary = false, peopleOf = () => 1, holders = null }) {
+export function buildAttendeeRows({ eventId, attendeeId, orderId, lines, isComplimentary = false, peopleOf = () => 1, holders = null, seats = null }) {
   const rows = []
+  // Asientos numerados por tipo de entrada, en orden (event_orders.seat_selection.seats)
+  const seatQueue = new Map()
+  for (const s of Array.isArray(seats) ? seats : []) {
+    const id = Number(s?.ticket_id)
+    if (!seatQueue.has(id)) seatQueue.set(id, [])
+    seatQueue.get(id).push(s)
+  }
   // Asistentes por tipo de entrada, en orden
   const queue = new Map()
   for (const h of Array.isArray(holders) ? holders : []) {
@@ -198,6 +206,7 @@ export function buildAttendeeRows({ eventId, attendeeId, orderId, lines, isCompl
       const unitId = people > 1 ? crypto.randomUUID() : null
       for (let seat = 1; seat <= people; seat++) {
         const holder = queue.get(Number(line.id))?.shift()
+        const seatOf = people === 1 ? seatQueue.get(Number(line.id))?.shift() : null
         rows.push({
           event_id: eventId,
           event_ticket_id: Number(line.id),
@@ -210,6 +219,7 @@ export function buildAttendeeRows({ eventId, attendeeId, orderId, lines, isCompl
           ...(holder?.name ? { holder_name: String(holder.name) } : {}),
           ...(holder?.email ? { holder_email: String(holder.email) } : {}),
           ...(Array.isArray(holder?.answers) && holder.answers.length ? { registration_answers: holder.answers } : {}),
+          ...(seatOf?.key ? { seat_key: String(seatOf.key), seat_label: String(seatOf.label || '') || null } : {}),
         })
       }
     }
@@ -275,7 +285,11 @@ export async function ensureOrderAttendees(supabase, order) {
     throw new Error('La orden contiene tipos de entrada que no pertenecen al evento')
   }
 
-  const [people, holders] = await Promise.all([loadPeoplePerTicket(supabase, order.event_id), loadOrderHolders(supabase, order)])
+  const [people, holders, seatSelection] = await Promise.all([
+    loadPeoplePerTicket(supabase, order.event_id),
+    loadOrderHolders(supabase, order),
+    loadOrderSeatSelection(supabase, order),
+  ])
   const rows = buildAttendeeRows({
     eventId: order.event_id,
     attendeeId: order.attendee_id,
@@ -283,7 +297,15 @@ export async function ensureOrderAttendees(supabase, order) {
     lines,
     peopleOf: (id) => people.get(id) || 1,
     holders,
+    seats: seatSelection?.seats || null,
   })
+  if (rows.some(r => r.seat_key)) {
+    // Con asientos no hay degradación: un QR sin su asiento sería una entrada distinta a la que se pagó
+    const { data: inserted, error } = await supabase.from('event_attendees').insert(rows).select('id, seat_key')
+    if (error) throw new Error(`Error insertando entradas con asiento: ${error.message}`)
+    await markSeatsSold(supabase, order.id, seatSelection.event_date_id, inserted)
+    return { created: rows.length, existing: 0 }
+  }
   let { error: insertError } = await supabase.from('event_attendees').insert(rows)
   if (insertError && MISSING_COLUMN.includes(String(insertError.code || '')) && rows.some(r => r.registration_answers)) {
     // Base sin respuestas por persona (202610310100): se emiten con el resto de los datos

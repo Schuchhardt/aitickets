@@ -178,6 +178,17 @@ describe('invitados', () => {
     expect(mocks.sendTicketsEmail).toHaveBeenCalledWith(expect.any(URL), String(order.id))
   })
 
+  it('issue_complimentary_tickets sin tipo crea el tipo Cortesía la primera vez y lo reutiliza', async () => {
+    expect(db.tables.event_tickets.some((t) => t.is_gift)).toBe(false)
+    const r1 = await call('issue_complimentary_tickets', { event_id: 10, recipients: [{ name: 'Prensa Uno', email: 'p1@x.cl' }] })
+    const r2 = await call('issue_complimentary_tickets', { event_id: 10, recipients: [{ name: 'Prensa Dos', email: 'p2@x.cl' }] })
+    expect(r1.ok && r2.ok).toBe(true)
+    const gifts = db.tables.event_tickets.filter((t) => t.event_id === 10 && t.is_gift)
+    expect(gifts).toHaveLength(1)
+    expect(r1.result.ticket_type).toEqual({ id: Number(gifts[0].id), name: 'Cortesía' })
+    expect(r2.result.ticket_type.id).toBe(Number(gifts[0].id))
+  })
+
   it('un validador (puerta) no puede gestionar invitados', async () => {
     actor.role = 'validator'
     const r = await call('add_guests', { event_id: 10, guests: [{ name: 'X' }] })

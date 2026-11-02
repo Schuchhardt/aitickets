@@ -4,7 +4,7 @@
 // precio y cupo (EditEventForm.vue), ventana de venta por entrada que hoy se programa desde el asistente de IA
 // (tools/tickets.ts), máximo por compra (DEFAULT_MAX_PER_PURCHASE), códigos con usos, límite por comprador y término
 // (discounts.mjs) y lista de "Avísame" (api/events/waitlist.ts), con aviso automático al liberarse entradas (netlify/lib/waitlist.mjs).
-// No hay mapa de asientos numerados y se dice (no va como "Pronto", §0.6). Al pie, la guía de preventa (links internos, §9).
+// Zonas = tipos de entrada; con butacas, entradas numeradas con mapa de asientos (src/lib/seatMap.mjs). Al pie, la guía de preventa (links internos, §9).
 import TierStack from "./TierStack.vue";
 import { DEFAULT_MAX_PER_PURCHASE } from "../../Reservation/pricing.js";
 
@@ -30,7 +30,7 @@ const capabilities = [
       <h2 id="mu-presale-title" class="mu-h2" data-lp-step>Preventa que se agota <span class="mu-outline">de verdad.</span></h2>
       <p class="ps-lead" data-lp-step>
         Cada tanda es un tipo de entrada con su precio y su cupo. Cuando se acaba, se ve agotada y queda la siguiente.
-        ¿Cancha, platea y VIP? También son tipos de entrada, cada uno con su cupo. No hay mapa de asientos numerados.
+        ¿Cancha, platea y VIP? También son tipos de entrada, cada uno con su cupo. Si hay butacas, vendes con mapa de asientos.
       </p>
       <ul class="ps-list">
         {

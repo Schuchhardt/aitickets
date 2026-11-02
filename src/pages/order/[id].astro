@@ -83,7 +83,7 @@ if (!id || !UUID_RE.test(id)) {
         supabase.from("event_attendees").select(`id, qr_code, status, validated_at,${extra} event_tickets ( ticket_name, price, event_date_id )`).eq("event_order_id", id);
       let ticketsData: any[] | null = null;
       let ticketsError: any = null;
-      for (const extra of [" holder_name, unit_id, seat_number,", " holder_name,", ""]) {
+      for (const extra of [" holder_name, unit_id, seat_number, seat_label,", " holder_name, unit_id, seat_number,", " holder_name,", ""]) {
         ({ data: ticketsData, error: ticketsError } = await selectTickets(extra));
         if (!ticketsError || !["42703", "PGRST204"].includes(String(ticketsError.code || ""))) break;
       }
@@ -100,7 +100,9 @@ if (!id || !UUID_RE.test(id)) {
         for (const t of rows) if (t.unit_id) seatsOf.set(t.unit_id, (seatsOf.get(t.unit_id) || 0) + 1);
         tickets = rows.map((t: any) => {
           const fn = functionsForTickets(event, [t.event_tickets?.event_date_id])[0];
-          const seat = t.unit_id && t.seat_number ? ` · invitado ${t.seat_number} de ${seatsOf.get(t.unit_id) || t.seat_number}` : "";
+          const seat = t.seat_label
+            ? ` · ${t.seat_label}`
+            : t.unit_id && t.seat_number ? ` · invitado ${t.seat_number} de ${seatsOf.get(t.unit_id) || t.seat_number}` : "";
           return {
             id: t.id,
             ticket_name: `${t.event_tickets?.ticket_name || "Entrada General"}${seat}`,

@@ -14,6 +14,9 @@ import FunctionRepeat from './FunctionRepeat.vue'
 import TicketCopyToFunctions from './TicketCopyToFunctions.vue'
 import CheckoutFieldsEditor from './CheckoutFieldsEditor.vue'
 import { MAX_PEOPLE_PER_TICKET } from '../../lib/checkoutFields.mjs'
+import SeatingSettings from './SeatingSettings.vue'
+import SeatTicketFields from './SeatTicketFields.vue'
+import { totalSeats } from '../../lib/seatMap.mjs'
 import { EVENT_PAGE_LAYOUTS, EVENT_PAGE_BACKGROUNDS, normalizePageSettings } from '../../lib/eventPageSettings'
 import IridescenceBg from '../event/IridescenceBg.vue'
 
@@ -140,6 +143,7 @@ const isStep2Valid = computed(() => {
 })
 
 const isStep3Valid = computed(() => {
+  if (form.value.general.seated && !form.value.locations.every((l) => l.seatMap && totalSeats(l.seatMap) > 0)) return false
   return form.value.tickets.length > 0 && form.value.tickets.every(t => t.name && t.price >= 0 && (t.quantity === null || t.quantity === '' || t.quantity > 0))
 })
 
@@ -824,6 +828,12 @@ const submitEvent = async ({ exit = false } = {}) => {
              :can-pin="canPinTicket"
              @apply="copyTicketsToFunctions"
            />
+           <SeatingSettings
+             v-model:seated="form.general.seated"
+             :locations="form.locations"
+             :venues="props.initialVenues"
+             :venue-name-for="venueNameFor"
+           />
            <div v-for="(ticket, index) in form.tickets" :key="ticket.id" class="p-4 sm:p-6 bg-gray-50 rounded-xl border border-gray-200 relative flex gap-4 sm:gap-6 items-start">
              <button @click="removeTicket(index)" v-if="form.tickets.length > 1" class="absolute top-3 right-3 sm:top-4 sm:right-4 p-1 text-gray-400 hover:text-red-500">
                <Trash2 size="18" />
@@ -845,11 +855,12 @@ const submitEvent = async ({ exit = false } = {}) => {
                     <input v-model="ticket.price" type="number" class="w-full pl-7 pr-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black outline-none" placeholder="0" />
                   </div>
                </div>
-               <div>
+               <div v-if="!form.general.seated">
                   <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Cantidad</label>
                   <input v-model="ticket.quantity" type="number" class="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black outline-none" />
                </div>
-               <div class="col-span-2">
+               <SeatTicketFields v-if="form.general.seated" :ticket="ticket" :locations="form.locations" />
+               <div v-if="!form.general.seated" class="col-span-2">
                   <label class="block text-xs font-bold text-gray-500 uppercase mb-1" :for="`people-${ticket.id}`">Personas por entrada</label>
                   <input :id="`people-${ticket.id}`" v-model.number="ticket.peoplePerTicket" type="number" min="1" :max="MAX_PEOPLE_PER_TICKET" placeholder="1" class="w-28 px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black outline-none" data-testid="ticket-people" />
                   <p class="mt-1 text-xs text-gray-500">

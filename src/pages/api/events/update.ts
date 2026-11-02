@@ -3,7 +3,7 @@ import { getSupabaseAdmin, getFriendlyErrorMessage } from "../../../lib/auth-hel
 import { getSessionContext, getOwnedEvent, hasRole, EVENT_MANAGER_ROLES, jsonResponse } from "../../../lib/supabaseServer";
 import { callInternalFunction, notifySlack, siteUrl } from "../_lib/server-utils";
 import { IDENTITY_REQUIRED_MESSAGE, eventRequiresIdentity, identityApproved, loadOrgIdentity, ticketsRequireIdentity } from "../../../lib/producerIdentity";
-import { syncEventCategory, refreshEventDenorm, normalizeTicket, isClientTempId, isValidDateInput, resolveTicketDateId, setEventStatus, EventInputError, saveCoverSettings, savePageSettings, validateFormTicketChain, saveFormTicketChain, saveFormEntryDeadlines, assertFunctionCount, saveCheckoutFields, saveFormTicketPeople } from "../_lib/events";
+import { syncEventCategory, refreshEventDenorm, normalizeTicket, isClientTempId, isValidDateInput, resolveTicketDateId, setEventStatus, EventInputError, saveCoverSettings, savePageSettings, validateFormTicketChain, saveFormTicketChain, saveFormEntryDeadlines, assertFunctionCount, saveCheckoutFields, saveFormTicketPeople, formSeatMaps, assertSeatChangesKeepSold, saveEventSeating } from "../_lib/events";
 import { sanitizeRichText } from "../../../lib/sanitize";
 import { saveSecretLocation } from "../../../../netlify/lib/secret-location.mjs";
 import { listOrgVenues, isVenueAllowed, insertOrgVenue } from "../../../lib/orgVenues";
@@ -96,9 +96,16 @@ export const POST: APIRoute = async (context) => {
         if (normalizedTickets.some((t: any) => !t.data)) {
             return jsonResponse({ message: "Revisa las entradas: nombre, precio y cantidad deben ser válidos" }, 400);
         }
+        // Entradas numeradas: el formulario las manda solo si conoce la función (general.seated definido)
+        const seatingInForm = typeof general.seated === "boolean";
+        let seatMaps: any[] = [];
         try {
             assertFunctionCount(locations);
             validateFormTicketChain(tickets);
+            if (seatingInForm) {
+                seatMaps = formSeatMaps(general, locations);
+                await assertSeatChangesKeepSold(event.id, locations, seatMaps);
+            }
         } catch (err) {
             if (err instanceof EventInputError) return jsonResponse({ message: err.message }, 400);
             throw err;
@@ -184,8 +191,9 @@ export const POST: APIRoute = async (context) => {
         const keptDateIds = new Set<string>();
         // id del formulario (real o temporal) -> id real de event_dates de este evento
         const dateIdMap = new Map<string, number>();
+        const seatLocations: Array<{ locationId: string | null; venueId: string | null; map: any }> = [];
 
-        for (const loc of locations) {
+        for (const [locIndex, loc] of locations.entries()) {
             let venueId = loc.venueId;
             if (createsVenue(loc)) {
                 venueId = await insertOrgVenue(
@@ -219,6 +227,7 @@ export const POST: APIRoute = async (context) => {
                 locationId = newLoc.id;
             }
             keptLocationIds.add(String(locationId));
+            seatLocations.push({ locationId: String(locationId), venueId: venueId ? String(venueId) : null, map: seatMaps[locIndex] ?? null });
 
             for (const d of loc.dates || []) {
                 const datePayload = {
@@ -317,6 +326,19 @@ export const POST: APIRoute = async (context) => {
             throw err;
         }
         await saveFormEntryDeadlines(event.id, tickets, (formId) => ticketIdMap.get(String(formId)));
+        if (seatingInForm) {
+            try {
+                await saveEventSeating(
+                    event.id,
+                    general.seated === true,
+                    seatLocations,
+                    tickets.map((t: any) => ({ id: ticketIdMap.get(String(t.id))!, seatSections: t.seatSections })).filter((t: any) => t.id),
+                );
+            } catch (err) {
+                if (err instanceof EventInputError) return jsonResponse({ message: err.message }, 400);
+                throw err;
+            }
+        }
 
         // Entradas eliminadas en el formulario: se borran si no tienen ventas; si tienen, se retiran de la venta
         for (const ticketId of existingTicketIds) {

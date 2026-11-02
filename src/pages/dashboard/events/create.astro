@@ -2,7 +2,7 @@
 import DashboardLayout from "../../../layouts/DashboardLayout.astro";
 import CreateEventForm from "../../../components/events/CreateEventForm.vue";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
-import { listOrgVenues, type OrgVenue } from "../../../lib/orgVenues";
+import { listOrgVenues, withVenueSeatMaps, type OrgVenue } from "../../../lib/orgVenues";
 import { EVENT_MANAGER_ROLES } from "../../../lib/supabaseServer";
 import { requireDashboardSession } from "../_lib/guard";
 import IslandSkeleton from "../../../components/dashboard/IslandSkeleton.astro";
@@ -14,6 +14,8 @@ if (!guard.ok) return guard.response;
 let venues: OrgVenue[] = [];
 try {
   ({ venues } = await listOrgVenues(getSupabaseAdmin(), guard.session.dbUser.organization_id));
+  // Último mapa de asientos de cada sala (entradas numeradas)
+  venues = await withVenueSeatMaps(getSupabaseAdmin(), venues);
 } catch (err) {
   console.error("Venues fetch error", err);
 }

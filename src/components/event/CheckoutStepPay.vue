@@ -14,6 +14,7 @@ import { useTurnstile } from "./useTurnstile.js";
 import { isValidEmail, normalizeDiscountCode } from "../Reservation/pricing.js";
 import { LEGAL } from "../../lib/legal";
 import { trackBeginCheckout } from "../../composables/useGoogleAnalytics.js";
+import { seatLabel } from "../../lib/seatMap.mjs";
 
 const props = defineProps({
   event: { type: Object, required: true },
@@ -25,8 +26,17 @@ const props = defineProps({
   canGoBack: { type: Boolean, default: false },
   qtyTicket: { type: Object, default: null }, // único tipo de entrada (sin paso 1): la cantidad se elige aquí
   buyerPrefill: { type: Object, default: null }, // { name, email } (asistente IA)
+  seats: { type: Object, default: null }, // entradas numeradas: { eventDateId, keys }
 });
-const emit = defineEmits(["update:discount", "update:qty", "busy", "back", "demo", "sold-out"]);
+const emit = defineEmits(["update:discount", "update:qty", "busy", "back", "demo", "sold-out", "seats-taken"]);
+
+// Asientos elegidos, para el resumen ("Fila C · Asiento 7")
+const seatLabels = computed(() => {
+  const s = props.event?.seating;
+  const key = props.seats ? s?.map_of_date?.[String(props.seats.eventDateId)] : null;
+  if (!key) return [];
+  return [...props.seats.keys].sort((a, b) => a.localeCompare(b, "es", { numeric: true })).map((k) => seatLabel(s.maps[key], k));
+});
 
 const name = ref("");
 const email = ref("");
@@ -137,6 +147,7 @@ async function submit() {
     cfToken,
     termsAccepted: true,
     ...(extrasRef.value?.payload() || {}),
+    ...(props.seats ? { seats: props.seats } : {}),
   });
   if (res.ok && res.data?.paymentLink) {
     // Se mantiene "Redirigiendo a Webpay…" hasta que el navegador cambie de página
@@ -152,6 +163,8 @@ async function submit() {
   if (res.data?.discountError) {
     emit("update:discount", null);
     serverError.value = `${res.data.message || "El código de descuento ya no es válido."} Quitamos el código: revisa el nuevo total.`;
+  } else if (res.data?.code === "SEATS_TAKEN" || res.data?.field === "seats") {
+    emit("seats-taken", res.data.message);
   } else if (res.data?.code === "SOLD_OUT") {
     emit("sold-out", res.data.message);
   } else if (res.data?.field && extrasRef.value) {
@@ -225,6 +238,7 @@ onMounted(() => {
               <span class="ev-tabular">{{ l.total > 0 ? formatCLP(lineFinal(l)) : "Gratis" }}</span>
             </li>
           </ul>
+          <p v-if="seatLabels.length" class="summary-fn" data-testid="pay-summary-seats">{{ seatLabels.length === 1 ? "Asiento" : "Asientos" }}: {{ seatLabels.join(", ") }}</p>
         </div>
       </div>
     </section>

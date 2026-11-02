@@ -12,6 +12,7 @@
 // - Sobreventa o monto/moneda que no coincide: 'review' + Slack, nunca se emite en silencio.
 // - Reintentos: si el correo falla se devuelve httpStatus 503 para que el proveedor reintente.
 import { ensureOrderAttendees, getSoldCounts } from './tickets.mjs'
+import { loadOrderSeatSelection, holdOrderSeats } from './seats.mjs'
 import { sendOrderTicketsEmail } from './tickets-email.mjs'
 import { notifySlack } from './slack.mjs'
 import { SITE_URL } from './mailer.mjs'
@@ -296,6 +297,19 @@ export async function confirmPaidOrder(supabase, orderId, payment) {
     await supabase.from('event_orders').update({ status: 'review', ...paymentFields }).eq('id', order.id).eq('status', 'processing')
     await notifySlack(`🚨 Sobreventa: la orden ${order.id} (evento ${order.event_id}) fue pagada en ${label} (${amount} CLP, ref ${externalId}) pero no hay stock: ${oversell}. Quedó en 'review': reembolsar o ampliar cupo y emitir manualmente.`)
     return { status: 'review', httpStatus: 200, message: 'Pago registrado para revisión (sin stock)' }
+  }
+
+  // Entradas numeradas: se vuelven a tomar los asientos (idempotente si la reserva sigue vigente). En un pago tardío
+  // alguien pudo tomarlos entretanto: no se emite en silencio un asiento ajeno.
+  const seatSelection = await loadOrderSeatSelection(supabase, order)
+  if (seatSelection) {
+    const held = await holdOrderSeats(supabase, order.id, seatSelection, new Date(Date.now() + 60 * 60 * 1000))
+    if (!held.ok) {
+      console.error(`⚠️ Orden ${order.id}: pagada pero sus asientos ya fueron tomados (${held.taken.join(', ')}). Requiere revisión manual.`)
+      await supabase.from('event_orders').update({ status: 'review', ...paymentFields }).eq('id', order.id).eq('status', 'processing')
+      await notifySlack(`🚨 Asientos tomados: la orden ${order.id} (evento ${order.event_id}) fue pagada en ${label} (${amount} CLP, ref ${externalId}) después de vencer su reserva y otro comprador tomó ${held.taken.join(', ')}. Quedó en 'review': reembolsar o reubicar y emitir manualmente.`)
+      return { status: 'review', httpStatus: 200, message: 'Pago registrado para revisión (asientos tomados)' }
+    }
   }
 
   // Códigos de descuento (pago tardío): la reserva atómica validó max_uses y per_buyer_limit, pero si la

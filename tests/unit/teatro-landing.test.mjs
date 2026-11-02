@@ -164,9 +164,9 @@ describe('TEATRO_FAQ (§4.10)', () => {
     expect(first?.a).toBe(PRODUCER_FAQ.find((f) => f.q === '¿Me ayudan a publicar mi primer evento?')?.a)
   })
 
-  it('el máximo por compra sale de DEFAULT_MAX_PER_PURCHASE y no promete butacas numeradas', () => {
+  it('el máximo por compra sale de DEFAULT_MAX_PER_PURCHASE y cuenta que hay butacas numeradas', () => {
     expect(TEATRO_FAQ.find((f) => f.q === '¿Puedo vender funciones para colegios o grupos?')?.a).toContain(`${DEFAULT_MAX_PER_PURCHASE} entradas`)
-    expect(TEATRO_FAQ.find((f) => f.q === '¿Tienen butacas numeradas?')?.a.startsWith('No.')).toBe(true)
+    expect(TEATRO_FAQ.find((f) => f.q === '¿Tienen butacas numeradas?')?.a.startsWith('Sí.')).toBe(true)
   })
 
   it('la invitación a la próxima obra usa las audiencias que existen (INVITE_AUDIENCES)', () => {
