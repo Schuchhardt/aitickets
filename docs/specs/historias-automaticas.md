@@ -95,18 +95,32 @@ Concierto de Primavera (activado el 26-oct, evento el 8-nov a las 12:00): histor
 
 ## 6. Link por DM (comment-automations de Zernio)
 
-- **Historias:** una automatización `story_reply` sin `platformPostId` (cualquier historia) **por cuenta de Instagram**,
-  compartida por las series vivas de esa cuenta. Con una serie responde con su evento; con varias, con el más próximo y la
-  página de la organización (si tiene sitio). `repeatPolicy: every_comment` con 12 h de enfriamiento, para que quien vuelva
-  a responder otro día reciba el link de nuevo.
+- **Historias de la cuenta (palabra clave):** una automatización `story_reply` sin `platformPostId` (cualquier historia)
+  **por cuenta de Instagram**, compartida por las series vivas de esa cuenta. Cubre las historias propias del productor
+  ("responde ENTRADAS"). Con una serie responde con su evento; con varias, con el más próximo y la página de la
+  organización (si tiene sitio). `repeatPolicy: every_comment` con 12 h de enfriamiento, para que quien vuelva a responder
+  otro día reciba el link de nuevo.
+- **Historias de la serie (cualquier respuesta):** al publicarse cada historia (webhook `post.platform.published`, que trae
+  su `platformPostId`) se crea una `story_reply` atada a esa historia con `keywords: []`: cualquier mensaje o reacción
+  recibe el link, una vez cada 12 h por persona. Va en `zernio_automation_id` del slot y se borra al cancelar o completar
+  la serie. No se crea para la historia "agotado" ni si la serie está agotada. Las dos automatizaciones llevan
+  `dedupeSameTextHours: 12` para no mandar dos DM iguales si la respuesta además trae la palabra clave. Interruptor:
+  `SOCIAL_SERIES_STORY_ANY_REPLY=false`.
 - **Posts:** una automatización `comment` **por post**, atada con `postId` al post de Zernio aún no publicado (se arma sola
   al publicarse) y con respuesta pública "¡Listo! Te mandamos el link por DM 📩". *Desviación de la spec original*: Zernio
   tiene un disparador por automatización, así que "una automatización con dos disparadores" son N automatizaciones.
-- Mensaje por defecto: "¡Hola! Aquí están tus entradas para Concierto de Primavera, el domingo 8 de noviembre a las 12:00:
-  https://aitickets.cl/eventos/concierto-de-primavera-2296?ref=ig-story-dm". Editable (`{link}` marca dónde va), más un
-  botón "Comprar entradas" con el mismo link (Zernio cuenta los clics).
+- Mensaje por defecto: "¡Hola! Aquí están tus entradas para Concierto de Primavera, el domingo 8 de noviembre a las 12:00.
+  Toca «Comprar entradas» aquí abajo 👇", con el botón "Comprar entradas" y el link con seguimiento (Zernio cuenta los
+  clics). Instagram no hace clickeable la URL del texto de estos mensajes y en instagram.com no muestra el botón: el botón
+  funciona en la app (verificado 04-11-2026). El mensaje propio del productor lleva el link en el texto solo si usa `{link}`.
 - **Tracking:** `ref=ig-story-dm` y `ref=ig-post-dm`: las ventas aparecen como canales propios en la analítica del evento.
-- Palabra clave ENTRADAS por defecto, `contains` sin distinguir mayúsculas, con variantes "entrada" y "link".
+- Palabra clave ENTRADAS por defecto, `contains`, con variantes "entrada" y "link". Zernio no distingue mayúsculas pero
+  **sí tildes** ("Entrádas" no coincide con "entrada"): cada palabra se manda también sin tilde y con una tilde en cada
+  vocal (`keywordVariants`; la ñ se conserva).
+- **Lo que no se contesta solo:** DMs directos al chat (sin responder una historia ni comentar). `alsoMatchInDms` queda
+  apagado: respondería a cualquier DM de la cuenta que contenga "entrada" o "link" ("¿cómo es la entrada al edificio?").
+- **Diagnóstico:** `GET /comment-automations/{id}/logs` trae `misses` (respuestas que no coincidieron, 14 días).
+  `get_social_series` las muestra en `dms.unmatched_replies` (total y las 5 últimas).
 
 ## 7. Integración con Zernio
 

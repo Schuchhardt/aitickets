@@ -46,6 +46,7 @@ function defaultZernio(path, opts, real) {
   if (path === '/posts' && opts.method === 'POST') return { post: { _id: hex24() } }
   if (path === '/comment-automations' && opts.method === 'POST') return { automation: { id: `auto-${zernioCalls.length}` } }
   if (path.startsWith('/comment-automations/') && opts.method === 'PATCH') return { success: true }
+  if (path.endsWith('/logs')) return { success: true, logs: [], misses: { total: 2, samples: [{ commentText: '🔥', at: '2026-10-30T05:28:01.523Z' }, { commentText: 'Entrádas', at: '2026-10-29T10:00:00.000Z' }] } }
   if (opts.method === 'DELETE') return { success: true }
   if (path.startsWith('/comment-automations/')) return { automation: { stats: { dmsSent: 5, dmsFailed: 0, linkClicks: 3, uniqueClicks: 2, triggered: 6 } } }
   throw new real.ZernioError(404, { error: `ruta no simulada ${path}` })
@@ -272,9 +273,9 @@ describe('preparar y aprobar', () => {
     expect(draft.series).toMatchObject({ status: 'draft', keyword: 'ENTRADAS', feed_posts_enabled: true })
     expect(draft.plan).toMatchObject({ stories: 10, feed_posts: 7, publish_time: '19:30' })
     expect(draft.plan.slots.find((s) => s.kind === 'feed_post').caption_example).toMatch(/Comenta ENTRADAS y te mandamos el link/)
-    expect(draft.dm_preview).toBe(
-      '¡Hola! Aquí están tus entradas para Concierto de Primavera, el domingo 8 de noviembre a las 12:00: https://aitickets.cl/eventos/concierto-de-primavera-2296?ref=ig-story-dm',
-    )
+    // El link va en el botón (Instagram no hace clickeable la URL del texto)
+    expect(draft.dm_preview).toBe('¡Hola! Aquí están tus entradas para Concierto de Primavera, el domingo 8 de noviembre a las 12:00. Toca «Comprar entradas» aquí abajo 👇')
+    expect(draft.dm_link).toBe('https://aitickets.cl/eventos/concierto-de-primavera-2296?ref=ig-story-dm')
     expect(zernioCalls).toHaveLength(0)
 
     const first = await call('approve_social_series', { event_id: 2296 })
@@ -295,8 +296,10 @@ describe('preparar y aprobar', () => {
       profileId: 'prof-7',
       accountId: 'acc-ig-7',
       trigger: 'story_reply',
-      keywords: ['ENTRADAS', 'entrada', 'link'],
+      keywords: ['ENTRADAS', 'entrada', 'link', 'éntradas', 'entrádas', 'entradás', 'éntrada', 'entráda', 'entradá', 'línk'],
       matchMode: 'contains',
+      repeatPolicy: { mode: 'every_comment', cooldownHours: 12 },
+      dedupeSameTextHours: 12,
       buttons: [{ type: 'url', title: 'Comprar entradas', url: 'https://aitickets.cl/eventos/concierto-de-primavera-2296?ref=ig-story-dm' }],
     })
     expect(created[0].body).not.toHaveProperty('platformPostId')
@@ -362,8 +365,9 @@ describe('despacho a Zernio (render tardío)', () => {
     const queuedPost = slots().find((s) => s.kind === 'feed_post' && s.status === 'queued')
     expect(automation.body).toMatchObject({
       postId: queuedPost.zernio_post_id,
-      keywords: ['ENTRADAS', 'entrada', 'link'],
-      dmMessage: expect.stringContaining('ref=ig-post-dm'),
+      keywords: ['ENTRADAS', 'entrada', 'link', 'éntradas', 'entrádas', 'entradás', 'éntrada', 'entráda', 'entradá', 'línk'],
+      dmMessage: expect.stringContaining('Toca «Comprar entradas»'),
+      buttons: [{ type: 'url', title: 'Comprar entradas', url: 'https://aitickets.cl/eventos/concierto-de-primavera-2296?ref=ig-post-dm' }],
     })
     expect(queuedPost.zernio_automation_id).toBeTruthy()
   }, 30_000)
@@ -507,7 +511,8 @@ describe('pausar, reanudar y cancelar', () => {
     const view = await call('get_social_series', { event_id: 2296 })
     expect(view.series.status).toBe('active')
     expect(view.next_slot).toMatchObject({ kind: 'story', stage: 'Faltan 13 días', status: 'planned' })
-    expect(view.dms).toMatchObject({ sent: 5, link_clicks: 3 })
+    expect(view.dms).toMatchObject({ sent: 5, link_clicks: 3, unmatched_replies: { total: 2, recent: [{ text: '🔥' }, { text: 'Entrádas' }] } })
+    expect(view.dms.note).toMatch(/cualquier mensaje o reacción/)
     expect(view.attributed_sales).toMatchObject({ orders: 1, tickets: 2, gross_clp: 10952, by_ref: { 'ig-story-dm': 2 } })
   })
 })
@@ -567,6 +572,111 @@ describe('webhooks de Zernio', () => {
     expect(series().status).toBe('paused')
     expect(db.tables.social_accounts[0].status).toBe('expired')
   }, 30_000)
+
+  // Historia de la serie publicada → su propia automatización "cualquier respuesta" con el link ?ref=ig-story-dm
+  const publishStory = async ({ mediaId = '18137212378657365', id = 'evt-story', before = () => {} } = {}) => {
+    process.env.ZERNIO_WEBHOOK_SECRET = SECRET
+    await activate()
+    setNow(local('2026-10-26', '18:00'))
+    await S.runSeriesJobs(db, { origin: SITE, budgetMs: 60_000 })
+    const slot = slots().find((s) => s.status === 'queued' && s.kind === 'story')
+    const platform = { platform: 'instagram', status: 'published', publishedUrl: 'https://www.instagram.com/stories/escueladire/1', ...(mediaId ? { platformPostId: mediaId } : {}) }
+    before()
+    zernioCalls.length = 0
+    const res = await post(
+      { id, event: 'post.platform.published', post: { id: slot.zernio_post_id, content: '', status: 'published', scheduledFor: slot.publish_at, publishedAt: slot.publish_at, platforms: [platform], metadata: { aitickets_slot_id: String(slot.id) } }, platform, timestamp: slot.publish_at },
+      { id },
+    )
+    expect(res.status).toBe(200)
+    return slot
+  }
+
+  it('historia publicada: crea la automatización de esa historia (cualquier respuesta, 12 h por persona) con el link ig-story-dm', async () => {
+    const slot = await publishStory()
+    const created = zernioCalls.filter((c) => c.path === '/comment-automations' && c.method === 'POST')
+    expect(created).toHaveLength(1)
+    expect(created[0].idempotencyKey).toBe(`aitickets-story-any-${slot.id}`)
+    expect(created[0].body).toMatchObject({
+      profileId: 'prof-7',
+      accountId: 'acc-ig-7',
+      trigger: 'story_reply',
+      platformPostId: '18137212378657365',
+      keywords: [],
+      repeatPolicy: { mode: 'every_comment', cooldownHours: 12 },
+      dedupeSameTextHours: 12,
+      buttons: [{ type: 'url', title: 'Comprar entradas', url: 'https://aitickets.cl/eventos/concierto-de-primavera-2296?ref=ig-story-dm' }],
+    })
+    expect(created[0].body.dmMessage).toMatch(/Toca «Comprar entradas»/)
+    expect(slot).toMatchObject({ status: 'published', zernio_automation_id: expect.any(String) })
+    const automationId = slot.zernio_automation_id
+
+    // Al cancelar la serie se borra junto con las demás
+    zernioCalls.length = 0
+    await confirmCall('cancel_social_series', { event_id: 2296 })
+    expect(zernioCalls).toContainEqual(expect.objectContaining({ method: 'DELETE', path: `/comment-automations/${automationId}` }))
+  }, 30_000)
+
+  it('historia sin id de Instagram: no crea la automatización (queda la de palabra clave de la cuenta)', async () => {
+    await publishStory({ mediaId: null })
+    expect(zernioCalls.filter((c) => c.path === '/comment-automations' && c.method === 'POST')).toHaveLength(0)
+  }, 30_000)
+
+  it('serie agotada: la historia no ofrece link, no crea la automatización', async () => {
+    const slot = await publishStory({ before: () => { series().sold_out_at = new Date().toISOString() } })
+    expect(slot.status).toBe('published')
+    expect(zernioCalls.filter((c) => c.path === '/comment-automations' && c.method === 'POST')).toHaveLength(0)
+  }, 30_000)
+
+  it('con el interruptor apagado no crea la automatización por historia', async () => {
+    process.env.SOCIAL_SERIES_STORY_ANY_REPLY = 'false'
+    try {
+      await publishStory()
+      expect(zernioCalls.filter((c) => c.path === '/comment-automations' && c.method === 'POST')).toHaveLength(0)
+    } finally {
+      delete process.env.SOCIAL_SERIES_STORY_ANY_REPLY
+    }
+  }, 30_000)
+
+  it('si Zernio rechaza la automatización por historia, el webhook igual marca la historia publicada', async () => {
+    zernioHandler = (path, opts, real) => {
+      if (path === '/comment-automations' && opts.method === 'POST' && opts.body?.platformPostId) throw new real.ZernioError(400, { error: 'invalid story' })
+      return defaultZernio(path, opts, real)
+    }
+    const slot = await publishStory()
+    expect(slot).toMatchObject({ status: 'published', zernio_automation_id: null })
+  }, 30_000)
+})
+
+describe('palabras clave del DM (Zernio: contains, sin mayúsculas, con tildes)', () => {
+  // Cómo compara Zernio, verificado en producción el 04-11-2026: "entradas" y "ENTRADAS" disparan; "Entrádas" no
+  const zernioMatches = (keywords, text) => keywords.some((k) => text.toLowerCase().includes(k.toLowerCase()))
+  const keywords = S.keywordVariants(['ENTRADAS', 'entrada', 'link'])
+
+  it('sin las variantes, "Entrádas" no dispara (el problema real)', () => {
+    expect(zernioMatches(['ENTRADAS', 'entrada', 'link'], 'Entrádas')).toBe(false)
+    expect(zernioMatches(['ENTRADAS', 'entrada', 'link'], 'entradas')).toBe(true)
+  })
+
+  it.each([
+    ['ENTRADAS'], ['entradas'], ['Entradas'], ['Entrádas'], ['ENTRÁDAS'], ['éntradas'], ['entradás'], ['quiero entradas'], ['Quiero una entrada!'],
+    ['me mandas el link?'], ['línk porfa'], ['  entradas  '],
+  ])('dispara con %j', (text) => {
+    expect(zernioMatches(keywords, text)).toBe(true)
+  })
+
+  it.each([['hola'], ['🔥'], ['👏'], ['¿a qué hora es?'], ['']])('no dispara con %j (lo cubre la automatización de la historia)', (text) => {
+    expect(zernioMatches(keywords, text)).toBe(false)
+  })
+
+  it('conserva la ñ, no repite variantes y tiene tope', () => {
+    const v = S.keywordVariants(['Señal', 'SEÑAL', 'música'])
+    expect(v).toContain('Señal')
+    expect(v).toContain('musica')
+    expect(v).toContain('músíca'.replace('í', 'i'))
+    expect(v).not.toContain('senal')
+    expect(v.filter((k) => k.toLowerCase() === 'señal')).toHaveLength(1)
+    expect(S.keywordVariants(Array.from({ length: 30 }, (_, i) => `palabra${i}`)).length).toBeLessThanOrEqual(60)
+  })
 })
 
 describe('MCP de admin', () => {

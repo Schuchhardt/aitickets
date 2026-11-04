@@ -314,7 +314,7 @@ const done = computed(() => (view.value?.slots || []).filter((s) => ['published'
                 :placeholder="view.dm_preview"
                 class="w-full bg-gray-50 border border-gray-200 text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-black"
               ></textarea>
-              <span class="block text-xs text-gray-400 mt-1">Escribe {link} donde va el link (si no, va al final). Vacío = el mensaje de ejemplo.</span>
+              <span class="block text-xs text-gray-400 mt-1">El link va en el botón «Comprar entradas». Escribe {link} si también lo quieres en el texto. Vacío = el mensaje de ejemplo.</span>
             </label>
 
             <fieldset class="space-y-2" data-testid="social-series-networks">
