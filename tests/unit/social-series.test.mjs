@@ -695,6 +695,82 @@ describe('MCP de admin', () => {
     expect(getAdminTool('org_approve_social_series')).toBeTruthy()
   })
 
+  // Caso real (serie 2, 02-11): list_social_series mostraba la caché vieja y get_social_series la lectura nueva
+  describe('DMs: mismos números en las dos herramientas, separados en serie y cuenta', () => {
+    // La story_reply de la cuenta (compartida) y la del post de la serie devuelven contadores distintos
+    let stats
+    const statsZernio = (path, opts, real) => {
+      if (!opts.method && path.startsWith('/comment-automations/')) {
+        const id = path.split('/').pop()
+        if (id === series().zernio_story_automation_id) return { automation: { stats: stats.account } }
+        return { automation: { stats: stats.post } }
+      }
+      return defaultZernio(path, opts, real)
+    }
+    const withPost = async () => {
+      await activate()
+      setNow(local('2026-11-01', '18:00'))
+      await S.runSeriesJobs(db, { origin: SITE, budgetMs: 60_000 })
+      expect(slots().filter((s) => s.zernio_automation_id)).toHaveLength(1)
+      stats = { account: { dmsSent: 0, triggered: 0, linkClicks: 0 }, post: { dmsSent: 3, dmsFailed: 0, triggered: 3, linkClicks: 2, uniqueClicks: 2 } }
+      zernioHandler = statsZernio
+      // El job ya dejó una lectura en caché con el Zernio por defecto
+      series().dm_stats = null
+      series().dm_stats_at = null
+    }
+
+    it('dms_sent_series (post) y dms_sent_account (historias de la cuenta) suman sent; visitas por DM aparte', async () => {
+      await withPost()
+      db.tables.event_visits.push(
+        { id: 1, event_id: 2296, ref: 'ig-post-dm', ip_hash: 'a', created_at: new Date().toISOString() },
+        { id: 2, event_id: 2296, ref: 'ig-post-dm', ip_hash: 'a', created_at: new Date().toISOString() },
+        { id: 3, event_id: 2296, ref: 'ig-story-dm', ip_hash: 'b', created_at: new Date().toISOString() },
+        { id: 4, event_id: 2296, ref: 'whatsapp', ip_hash: 'c', created_at: new Date().toISOString() },
+      )
+      const view = await call('get_social_series', { event_id: 2296 })
+      expect(view.dms).toMatchObject({
+        sent: 3,
+        dms_sent_series: 3,
+        dms_sent_account: 0,
+        link_clicks: 2,
+        link_clicks_series: 2,
+        link_clicks_account: 0,
+        dm_visits: { visits: 3, unique_visitors: 2, by_ref: { 'ig-post-dm': 2, 'ig-story-dm': 1 } },
+        as_of: expect.any(String),
+        partial: false,
+      })
+      expect(view.dms.note).toMatch(/compartida con las demás series/)
+    }, 30_000)
+
+    it('list_social_series y org_get_social_series leen la misma caché y se refrescan juntas al vencer', async () => {
+      await withPost()
+      const first = await call('get_social_series', { event_id: 2296 })
+      // Llega un DM nuevo por historia: dentro de los 10 min las dos herramientas siguen mostrando la misma lectura
+      stats.account = { dmsSent: 1, triggered: 1, linkClicks: 1 }
+      let list = (await run('list_social_series')).series[0]
+      expect(list).toMatchObject({ dms_sent: 3, dms_sent_series: 3, dms_sent_account: 0, dms_as_of: first.dms.as_of })
+      expect((await call('get_social_series', { event_id: 2296 })).dms.sent).toBe(3)
+
+      // Vencida la caché, la primera que pregunta refresca y la otra ve lo mismo
+      setNow(new Date(Date.now() + 11 * 60_000).toISOString())
+      list = (await run('list_social_series')).series[0]
+      expect(list).toMatchObject({ dms_sent: 4, dms_sent_series: 3, dms_sent_account: 1, dm_link_clicks: 3 })
+      const again = await call('get_social_series', { event_id: 2296 })
+      expect(again.dms).toMatchObject({ sent: 4, dms_sent_account: 1, as_of: list.dms_as_of })
+    }, 30_000)
+
+    it('si Zernio no responde, no pisa la última lectura con ceros', async () => {
+      await withPost()
+      await call('get_social_series', { event_id: 2296 })
+      zernioHandler = (path, opts, real) => {
+        if (!opts.method && path.startsWith('/comment-automations/')) throw new real.ZernioError(503, { error: 'caído' })
+        return defaultZernio(path, opts, real)
+      }
+      setNow(new Date(Date.now() + 11 * 60_000).toISOString())
+      expect((await run('list_social_series')).series[0]).toMatchObject({ dms_sent: 3, dms_sent_series: 3 })
+    }, 30_000)
+  })
+
   it('update_social_series_config cambia bandas y horas (y ajusta lo inválido)', async () => {
     const r = await run('update_social_series_config', { default_time: '20:00', daily_from_days: 5, reason: 'Probar con datos de octubre' })
     expect(r.changed).toEqual(expect.arrayContaining([{ key: 'default_time', before: '19:30', after: '20:00' }, { key: 'daily_from_days', before: 7, after: 5 }]))

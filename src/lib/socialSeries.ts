@@ -524,36 +524,126 @@ async function unmatchedStoryReplies(automationId: string | null): Promise<{ tot
     }
 }
 
-/** Contadores de DM (enviados y clics) de las automatizaciones de la serie, con caché de 10 min en la serie. */
-export async function refreshDmStats(supabase: any, series: any, slots: any[], force = false) {
-    if (!zernioConfigured()) return series.dm_stats || null;
-    if (!force && series.dm_stats_at && Date.now() - Date.parse(series.dm_stats_at) < DM_STATS_TTL_MS) return series.dm_stats;
-    const ids = [series.zernio_story_automation_id, ...slots.map((s) => s.zernio_automation_id)].filter(Boolean) as string[];
-    if (!ids.length) return series.dm_stats || null;
-    const stats = { dms_sent: 0, dms_failed: 0, link_clicks: 0, unique_clicks: 0, triggered: 0 };
-    // Una por historia y por post: en paralelo de a 8 (una serie larga con Facebook pasa de 20)
-    const unique = [...new Set(ids)].slice(0, 48);
+export type DmCounts = { dms_sent: number; dms_failed: number; link_clicks: number; unique_clicks: number; triggered: number };
+const emptyDmCounts = (): DmCounts => ({ dms_sent: 0, dms_failed: 0, link_clicks: 0, unique_clicks: 0, triggered: 0 });
+const addDmCounts = (a: DmCounts, b: DmCounts): DmCounts => ({
+    dms_sent: a.dms_sent + b.dms_sent,
+    dms_failed: a.dms_failed + b.dms_failed,
+    link_clicks: a.link_clicks + b.link_clicks,
+    unique_clicks: a.unique_clicks + b.unique_clicks,
+    triggered: a.triggered + b.triggered,
+});
+
+/** Suma los contadores de varias automatizaciones de Zernio (de a 8 en paralelo). Una que falla no suma. */
+async function automationCounts(ids: string[]): Promise<{ counts: DmCounts; errors: number }> {
+    let counts = emptyDmCounts();
+    let errors = 0;
+    const unique = [...new Set(ids.filter(Boolean))].slice(0, 48);
     for (let i = 0; i < unique.length; i += 8) {
-        await Promise.all(
+        const batch = await Promise.all(
             unique.slice(i, i + 8).map(async (id) => {
                 try {
                     const r: any = await zernioRequest(`/comment-automations/${encodeURIComponent(id)}`, { timeoutMs: 8000 });
                     const s = r?.automation?.stats || {};
-                    stats.dms_sent += Number(s.dmsSent) || 0;
-                    stats.dms_failed += Number(s.dmsFailed) || 0;
-                    stats.link_clicks += Number(s.linkClicks) || 0;
-                    stats.unique_clicks += Number(s.uniqueClicks) || 0;
-                    stats.triggered += Number(s.triggered) || 0;
+                    return {
+                        dms_sent: Number(s.dmsSent) || 0,
+                        dms_failed: Number(s.dmsFailed) || 0,
+                        link_clicks: Number(s.linkClicks) || 0,
+                        unique_clicks: Number(s.uniqueClicks) || 0,
+                        triggered: Number(s.triggered) || 0,
+                    };
                 } catch (err: any) {
                     console.warn("social series: stats:", err?.message || err);
+                    errors++;
+                    return null;
                 }
             }),
         );
+        for (const c of batch) if (c) counts = addDmCounts(counts, c);
     }
-    // La automatización de historias es compartida por las series de la cuenta: sus números son de la cuenta
-    const out = { ...stats, shared_story_automation: true, unmatched_replies: await unmatchedStoryReplies(series.zernio_story_automation_id) };
-    await supabase.from(SERIES_TABLE).update({ dm_stats: out, dm_stats_at: nowIso() }).eq("id", series.id);
+    return { counts, errors };
+}
+
+/**
+ * Contadores de DM (enviados y clics) con caché de 10 min en la serie (dm_stats + dm_stats_at). Separados en:
+ *   series:  automatizaciones propias de la serie (zernio_automation_id de cada slot: posts de feed, Facebook, historias).
+ *   account: la story_reply por palabra clave de la cuenta de Instagram, COMPARTIDA por todas las series de esa cuenta
+ *            y por las historias propias del productor: no es atribuible a una serie.
+ * dms_sent / link_clicks… (nivel superior) = series + account, para compatibilidad. list_social_series y
+ * get_social_series leen esta misma caché, así muestran lo mismo; as_of dice de cuándo es.
+ */
+export async function refreshDmStats(supabase: any, series: any, slots: any[], force = false) {
+    if (!zernioConfigured()) return series.dm_stats || null;
+    if (!force && series.dm_stats_at && Date.now() - Date.parse(series.dm_stats_at) < DM_STATS_TTL_MS) return series.dm_stats;
+    const storyId: string | null = series.zernio_story_automation_id || null;
+    const seriesIds = slots.map((s) => s.zernio_automation_id).filter((id) => id && id !== storyId) as string[];
+    if (!storyId && !seriesIds.length) return series.dm_stats || null;
+    const [own, account] = await Promise.all([automationCounts(seriesIds), automationCounts(storyId ? [storyId] : [])]);
+    // Si todo falló (Zernio caído) no se pisa la caché anterior con ceros
+    if (own.errors + account.errors > 0 && own.errors + account.errors === new Set(seriesIds).size + (storyId ? 1 : 0)) return series.dm_stats || null;
+    const at = nowIso();
+    const out = {
+        ...addDmCounts(own.counts, account.counts),
+        series: own.counts,
+        account: account.counts,
+        shared_story_automation: Boolean(storyId),
+        partial: own.errors + account.errors > 0,
+        as_of: at,
+        unmatched_replies: await unmatchedStoryReplies(storyId),
+    };
+    await supabase.from(SERIES_TABLE).update({ dm_stats: out, dm_stats_at: at }).eq("id", series.id);
     return out;
+}
+
+export const DM_STATS_NOTE =
+    "dms_sent_series: DMs de las automatizaciones propias de la serie (comentarios en sus publicaciones y respuestas a sus historias). " +
+    "dms_sent_account: la respuesta por palabra clave a historias de toda la cuenta de Instagram, compartida con las demás series de la cuenta " +
+    "y con las historias propias del productor (no se puede atribuir a una serie). sent = la suma. " +
+    "link_clicks son toques al botón del DM contados por Zernio (incluye repetidos); dm_visits son cargas de la página del evento con ref de DM " +
+    "(sin bots): no calzan 1 a 1. as_of: hora de la última lectura de Zernio (se refresca cada 10 min). " +
+    "Las historias de la serie responden con el link a cualquier mensaje o reacción (una vez cada 12 h por persona); en las demás historias " +
+    "de la cuenta solo responde quien escribe la palabra clave (con o sin tilde, mayúsculas da igual). unmatched_replies: respuestas a " +
+    "historias de la cuenta sin la palabra clave en los últimos 14 días (si eran a una historia de la serie, igual recibieron el link). " +
+    "Los DM directos al chat, sin responder una historia ni comentar, no se contestan solos.";
+
+/** Vista de los contadores de DM, la misma en get_social_series y list_social_series. */
+export function presentDmStats(dms: any, visits?: Awaited<ReturnType<typeof dmVisits>>) {
+    if (!dms) return null;
+    const split = Boolean(dms.series && dms.account);
+    return {
+        sent: dms.dms_sent ?? 0,
+        dms_sent_series: split ? dms.series.dms_sent : null,
+        dms_sent_account: split ? dms.account.dms_sent : null,
+        failed: dms.dms_failed ?? 0,
+        link_clicks: dms.link_clicks ?? 0,
+        unique_clicks: dms.unique_clicks ?? 0,
+        link_clicks_series: split ? dms.series.link_clicks : null,
+        link_clicks_account: split ? dms.account.link_clicks : null,
+        ...(visits !== undefined ? { dm_visits: visits } : {}),
+        as_of: dms.as_of || null,
+        partial: Boolean(dms.partial),
+        unmatched_replies: dms.unmatched_replies ?? null,
+    };
+}
+
+/**
+ * Visitas a la página del evento que llegaron desde un DM de la serie (ref ig-story-dm / ig-post-dm / fb-post-dm), para
+ * cuadrar con los clics de Zernio. No calzan 1 a 1: un clic de Zernio es cada toque del botón (incluye repetidos), la
+ * visita la registra la página al cargar (sin bots, y se pierde si la persona cierra antes de que cargue).
+ */
+export async function dmVisits(supabase: any, eventId: number): Promise<{ visits: number; unique_visitors: number; by_ref: Record<string, number> } | null> {
+    try {
+        const rows = await fetchAll<{ ref: string | null; ip_hash: string | null }>(
+            () => supabase.from("event_visits").select("ref, ip_hash").eq("event_id", eventId).in("ref", Object.values(DM_REFS)).order("id", { ascending: true }),
+            { max: 20000 },
+        );
+        const by_ref: Record<string, number> = {};
+        for (const r of rows) by_ref[String(r.ref)] = (by_ref[String(r.ref)] || 0) + 1;
+        return { visits: rows.length, unique_visitors: new Set(rows.map((r) => r.ip_hash).filter(Boolean)).size, by_ref };
+    } catch (err: any) {
+        if (isMissing(err)) return null;
+        throw err;
+    }
 }
 
 /** Ventas atribuidas a la serie: órdenes pagadas con las refs de la serie (DM de Instagram y Facebook, links de Facebook y TikTok), sin cortesías ni transferencias. */
