@@ -240,3 +240,88 @@ describe('recordEventVisit guarda ref', () => {
     expect('ref' in insert.values).toBe(false)
   })
 })
+
+// Evento 134: visitas de Prineville (escáner de links de Meta), "Mock City" (dev local con la BD de producción) y un
+// escáner por UA. Se guardan marcadas y la analítica las excluye; nada se borra.
+describe('bots y visitas de desarrollo', () => {
+  const human = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5.2 Mobile/15E148 Safari/604.1'
+  const request = (headers = {}, url = 'https://aitickets.cl/api/events/visit') =>
+    new Request(url, { headers: { 'user-agent': human, 'x-nf-client-connection-ip': '1.2.3.4', ...headers } })
+  const geo = (city, code) => ({ 'x-nf-geo': btoa(JSON.stringify({ city, country: { code } })) })
+
+  it('la ingesta guarda los bots marcados (antes los descartaba) y las personas sin marca', async () => {
+    await recordEventVisit(10, request({ 'user-agent': 'facebookexternalhit/1.1' }), {})
+    await recordEventVisit(10, request(geo('Prineville', 'US')), { referrer: 'https://www.facebook.com/' })
+    await recordEventVisit(10, request(geo('Mock City', 'mock')), {})
+    await recordEventVisit(10, request({}, 'http://localhost:4321/api/events/visit'), {})
+    await recordEventVisit(10, request(geo('Quilicura', 'CL')), { ref: 'ig-story-dm' })
+    expect(db.tables.event_visits.map((r) => [r.is_bot, r.bot_reason ?? null])).toEqual([
+      [true, 'ua:meta'],
+      [true, 'geo:meta-datacenter'],
+      [true, 'dev:mock-geo'],
+      [true, 'dev:host'],
+      [false, null],
+    ])
+    // A una persona no se le mandan las columnas (quedan con su default)
+    const inserts = db.calls.filter((c) => c.table === 'event_visits' && c.op === 'insert')
+    expect('is_bot' in inserts[4].values).toBe(false)
+  })
+
+  it('sin la migración (sin is_bot), un bot no se guarda, como antes, y una persona sí', async () => {
+    db.failOn('event_visits', 'insert', { code: 'PGRST204', message: "Could not find the 'is_bot' column of 'event_visits'" })
+    await recordEventVisit(10, request({ 'user-agent': 'curl/8.7.1' }), {})
+    expect(db.tables.event_visits).toHaveLength(0)
+    await recordEventVisit(10, request(), {})
+    expect(db.tables.event_visits).toHaveLength(1)
+  })
+
+  it('visitas, visitantes, conversión, fuentes, ubicaciones y horas pico excluyen las marcadas; se informa cuántas', async () => {
+    db = fakeDb({
+      event_visits: [
+        { id: 1, event_id: 10, created_at: '2026-10-10T15:00:00Z', ip_hash: 'a', city: 'Santiago', country: 'CL', referrer: 'https://instagram.com' },
+        { id: 2, event_id: 10, created_at: '2026-10-10T16:00:00Z', ip_hash: 'b', city: 'Quilicura', country: 'CL', referrer: null },
+        { id: 3, event_id: 10, created_at: '2026-10-10T03:00:00Z', ip_hash: 'm1', city: 'Prineville', country: 'US', referrer: 'https://www.facebook.com/', is_bot: true, bot_reason: 'geo:meta-datacenter' },
+        { id: 4, event_id: 10, created_at: '2026-10-10T03:00:00Z', ip_hash: 'm2', city: 'Mock City', country: 'mock', referrer: 'http://localhost:4400/', is_bot: true, bot_reason: 'dev:mock-geo' },
+        { id: 5, event_id: 10, created_at: '2026-10-10T03:00:00Z', ip_hash: 'm3', city: 'New York', country: 'US', referrer: null, is_bot: true, bot_reason: 'ua:tool' },
+      ],
+      event_orders: [sale('o1')],
+    })
+    const r = await analytics.getEventAnalytics(db, EVENT)
+    expect(r.kpis).toMatchObject({ visits: 2, unique_visitors: 2, conversion_pct: 50 })
+    expect(r.bot_visits_excluded).toBe(3)
+    const places = JSON.stringify(r.locations)
+    expect(places).not.toMatch(/Prineville|Mock City|New York/)
+    expect(JSON.stringify(r.sources)).not.toMatch(/facebook|localhost/)
+    expect(r.peak_hours[0]).toBe(0) // las 3 de la mañana UTC (00:00 en Chile) eran solo bots
+    // Fallback de conteo (sin la RPC): solo personas
+    expect(await analytics.eventVisitCounts(db, 10)).toMatchObject({ visits: 2, unique_visitors: 2 })
+  })
+
+  it('la RPC nueva devuelve también bot_visits', async () => {
+    db = fakeDb({}, { aitickets_event_visit_counts: () => [{ visits: 299, unique_visitors: 210, bot_visits: 12 }] })
+    expect(await analytics.eventVisitCounts(db, 10)).toEqual({ visits: 299, unique_visitors: 210, truncated: false, bot_visits: 12 })
+  })
+
+  it('sin la columna is_bot (deploy preview sin migrar) lee todas las visitas', async () => {
+    db = fakeDb({ event_visits: [{ id: 1, event_id: 10, created_at: '2026-10-10T15:00:00Z', ip_hash: 'a' }] })
+    db.failOn('event_visits', 'select', { code: '42703', message: 'column event_visits.is_bot does not exist' })
+    const r = await analytics.getEventAnalytics(db, EVENT)
+    expect(r.kpis.visits).toBe(1)
+    expect(r.ref_tracked).toBe(true)
+  })
+
+  it('get_event_performance (productor) también las excluye y lo explica', async () => {
+    const { eventPerformance } = await import('../../src/lib/producer-api/tools/analytics.ts')
+    db = fakeDb({
+      event_visits: [
+        { id: 1, event_id: 10, created_at: '2026-10-10T12:00:00Z', ip_hash: 'a', country: 'CL', city: 'Santiago' },
+        { id: 2, event_id: 10, created_at: '2026-10-10T12:00:00Z', ip_hash: 'z', country: 'US', city: 'Prineville', is_bot: true, bot_reason: 'geo:meta-datacenter' },
+      ],
+    })
+    const ctx = { supabase: db, actor: { orgId: 1, eventIds: null, scopes: ['read'] }, origin: 'https://aitickets.cl' }
+    const r = await eventPerformance(ctx, 10, 7)
+    expect(r.traffic).toMatchObject({ visits: 1, bot_visits_excluded: 1 })
+    expect(r.traffic.top_locations.map((l) => l.location).join()).not.toMatch(/Prineville/)
+    expect(r.traffic.note).toMatch(/bots/)
+  })
+})

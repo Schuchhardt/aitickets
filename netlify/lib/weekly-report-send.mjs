@@ -225,19 +225,36 @@ async function loadWeekAdsUnsafe(supabase, organizationId, eventIds, week) {
   return byEvent
 }
 
+/**
+ * Visitas de las 2 últimas semanas, solo personas (event_visits.is_bot = false: sin bots, escáneres de links ni visitas
+ * de desarrollo). Sin la columna (migración 202611040100 pendiente), todas.
+ */
+async function loadHumanVisits(supabase, eventId, week) {
+  const query = (human) =>
+    fetchAllRows(() => {
+      let q = supabase
+        .from('event_visits')
+        .select(VISIT_COLUMNS)
+        .eq('event_id', eventId)
+        .gte('created_at', week.prevStartAt.toISOString())
+        .lt('created_at', week.endAt.toISOString())
+      if (human) q = q.eq('is_bot', false)
+      return q.order('created_at', { ascending: true })
+    })
+  try {
+    return await query(true)
+  } catch (err) {
+    // fetchAllRows relanza solo el mensaje: se reconoce por el texto de la columna que falta
+    if (!['42703', 'PGRST204'].includes(String(err?.code || '')) && !/is_bot/.test(String(err?.message || ''))) throw err
+    return query(false)
+  }
+}
+
 /** Órdenes pagadas, visitas de las 2 últimas semanas y tipos de entrada de un evento -> cifras del reporte. */
 async function loadEventMetrics(supabase, event, week, now, ads = []) {
   const [orders, visits, ticketsRes] = await Promise.all([
     fetchAllRows(() => supabase.from('event_orders').select(ORDER_COLUMNS).eq('event_id', event.id).eq('status', 'paid').order('created_at', { ascending: true })),
-    fetchAllRows(() =>
-      supabase
-        .from('event_visits')
-        .select(VISIT_COLUMNS)
-        .eq('event_id', event.id)
-        .gte('created_at', week.prevStartAt.toISOString())
-        .lt('created_at', week.endAt.toISOString())
-        .order('created_at', { ascending: true })
-    ),
+    loadHumanVisits(supabase, event.id, week),
     supabase.from('event_tickets').select('id, total_quantity, is_gift').eq('event_id', event.id),
   ])
   if (ticketsRes.error) throw ticketsRes.error

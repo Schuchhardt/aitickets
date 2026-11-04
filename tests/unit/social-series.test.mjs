@@ -728,6 +728,8 @@ describe('MCP de admin', () => {
         { id: 2, event_id: 2296, ref: 'ig-post-dm', ip_hash: 'a', created_at: new Date().toISOString() },
         { id: 3, event_id: 2296, ref: 'ig-story-dm', ip_hash: 'b', created_at: new Date().toISOString() },
         { id: 4, event_id: 2296, ref: 'whatsapp', ip_hash: 'c', created_at: new Date().toISOString() },
+        // El escáner de links de Meta abrió el link del DM: no cuenta como visita
+        { id: 5, event_id: 2296, ref: 'ig-post-dm', ip_hash: 'z', created_at: new Date().toISOString(), is_bot: true, bot_reason: 'geo:meta-datacenter' },
       )
       const view = await call('get_social_series', { event_id: 2296 })
       expect(view.dms).toMatchObject({

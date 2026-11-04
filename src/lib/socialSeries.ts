@@ -36,7 +36,7 @@
 import { getSupabaseAdmin } from "./auth-helpers";
 import { serverEnv, notifySlack, callInternalFunction } from "../pages/api/_lib/server-utils";
 import { fetchAll, localDay, localDateTime } from "./producer-api/tools/common";
-import { eventCapacity, localHour } from "./eventAnalytics";
+import { eventCapacity, fetchHumanVisits, localHour } from "./eventAnalytics";
 import { buildEventContext, EVENT_CONTEXT_SELECT, htmlToPlainText } from "./marketing";
 import { generateSeriesCaption, isTextGenerationConfigured } from "./aiText";
 import { fetchPublic } from "./safe-fetch";
@@ -408,13 +408,13 @@ export function shortEventLink(origin: string, slug: string): string {
 /** Hora de publicación: hora pico de visitas del evento o, con pocas, de la organización; si no, la por defecto. */
 export async function publishTimeFor(supabase: any, event: { id: number; organization_id: number }, config: CadenceConfig) {
     const hoursOf = (rows: any[]) => rows.map((r) => localHour(r.created_at));
-    const eventVisits = await fetchAll<any>(() => supabase.from("event_visits").select("created_at").eq("event_id", event.id).order("created_at", { ascending: false }), { max: 5000 }).catch(() => []);
+    const eventVisits = await fetchHumanVisits<any>(supabase, "created_at", (q) => q.eq("event_id", event.id).order("created_at", { ascending: false }), { max: 5000 }).catch(() => []);
     if (eventVisits.length >= config.peak_min_visits) return { ...choosePublishTime(hoursOf(eventVisits), config), scope: "event" as const };
     const orgEvents = await fetchAll<any>(() => supabase.from("events").select("id").eq("organization_id", event.organization_id).order("id", { ascending: true }), { max: 2000 }).catch(() => []);
     const ids = orgEvents.map((e: any) => Number(e.id)).slice(-150);
     const since = new Date(Date.now() - 120 * 86400000).toISOString();
     const orgVisits = ids.length
-        ? await fetchAll<any>(() => supabase.from("event_visits").select("created_at").in("event_id", ids).gte("created_at", since).order("created_at", { ascending: false }), { max: 20000 }).catch(() => [])
+        ? await fetchHumanVisits<any>(supabase, "created_at", (q) => q.in("event_id", ids).gte("created_at", since).order("created_at", { ascending: false }), { max: 20000 }).catch(() => [])
         : [];
     const pick = orgVisits.length > eventVisits.length ? orgVisits : eventVisits;
     return { ...choosePublishTime(hoursOf(pick), config), scope: pick === orgVisits ? ("organization" as const) : ("event" as const) };
@@ -792,8 +792,10 @@ export function presentDmStats(dms: any, visits?: Awaited<ReturnType<typeof dmVi
  */
 export async function dmVisits(supabase: any, eventId: number): Promise<{ visits: number; unique_visitors: number; by_ref: Record<string, number> } | null> {
     try {
-        const rows = await fetchAll<{ ref: string | null; ip_hash: string | null }>(
-            () => supabase.from("event_visits").select("ref, ip_hash").eq("event_id", eventId).in("ref", Object.values(DM_REFS)).order("id", { ascending: true }),
+        const rows = await fetchHumanVisits<{ ref: string | null; ip_hash: string | null }>(
+            supabase,
+            "ref, ip_hash",
+            (q) => q.eq("event_id", eventId).in("ref", Object.values(DM_REFS)).order("id", { ascending: true }),
             { max: 20000 },
         );
         const by_ref: Record<string, number> = {};
