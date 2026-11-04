@@ -12,9 +12,13 @@
 //   detiene (y una historia "agotado" si el productor la activó, DM "agotado"); Instagram desconectado → pausa y
 //   correo, y al reconectar reanuda desde hoy; después de la última función → completed.
 //
-// DM: una automatización story_reply por cuenta de Instagram (compartida por sus series vivas: responde con el evento
-// más próximo y la página de la organización) + una automatización de comentarios por cada post de feed. Los links
-// llevan ref=ig-story-dm / ig-post-dm, así las ventas aparecen como canal propio en la analítica del evento.
+// DM: una automatización story_reply por palabra clave para toda la cuenta de Instagram (compartida por sus series
+// vivas: responde con el evento más próximo y la página de la organización; cubre las historias propias del
+// productor) + una story_reply por cada historia de la serie ya publicada, que responde a cualquier mensaje o
+// reacción (12 h de pausa por persona) + una automatización de comentarios por cada post de feed. Las palabras clave
+// van con variantes con tilde (Zernio no las ignora). El link va en el botón "Comprar entradas" (Instagram no hace
+// clickeable la URL del texto). Los links llevan ref=ig-story-dm / ig-post-dm, así las ventas aparecen como canal
+// propio en la analítica del evento.
 //
 // Redes extra (por evento, columna networks): Facebook (página) y TikTok publican con la misma cadencia, cada pieza
 // en su propia fila de slots (platform), así una red que falla o se desconecta no frena a las otras: sus pendientes se
@@ -311,16 +315,53 @@ export const seriesKeywords = (series: any): string[] => {
     return out;
 };
 
-/** Texto del DM: el del productor ({link} = el link con seguimiento; si no lo pone, va al final) o el por defecto. */
-export function dmMessageFor(series: any, event: any, anchor: Date | null, link: string): string {
+// Zernio compara las palabras clave sin distinguir mayúsculas pero CON tildes: "Entrádas" no coincide con "entrada"
+// (verificado en producción, 04-11-2026). Mandamos cada palabra tal cual, sin tildes y con una tilde en cada vocal.
+// Solo se quitan agudos, graves y diéresis: la ñ se conserva.
+const ACCENTED: Record<string, string> = { a: "á", e: "é", i: "í", o: "ó", u: "ú" };
+const stripAccents = (s: string) => s.normalize("NFD").replace(/[̀́̈]/g, "").normalize("NFC");
+const MAX_KEYWORD_VARIANTS = 60;
+
+export function keywordVariants(keywords: string[]): string[] {
+    const out: string[] = [];
+    const add = (k: string) => {
+        const clean = k.trim();
+        if (clean && out.length < MAX_KEYWORD_VARIANTS && !out.some((x) => x.toLowerCase() === clean.toLowerCase())) out.push(clean);
+    };
+    for (const k of keywords) add(k);
+    for (const k of keywords) {
+        const base = stripAccents(k.trim()).toLowerCase();
+        add(base);
+        for (let i = 0; i < base.length; i++) {
+            const accented = ACCENTED[base[i]];
+            if (accented) add(base.slice(0, i) + accented + base.slice(i + 1));
+        }
+    }
+    return out;
+}
+
+/**
+ * Texto del DM: el del productor ({link} = el link con seguimiento) o el por defecto. Con botón (button: true) el
+ * link va en el botón "Comprar entradas": Instagram no hace clickeable la URL en el texto de estos mensajes, así que
+ * el texto por defecto no la repite y el del productor solo la lleva si puso {link}. Sin botón, el link va en el texto.
+ */
+export function dmMessageFor(series: any, event: any, anchor: Date | null, link: string, { button = false }: { button?: boolean } = {}): string {
     if (series?.dm_message) {
         const custom = String(series.dm_message).trim();
-        return (custom.includes("{link}") ? custom.replaceAll("{link}", link) : `${custom} ${link}`).slice(0, 640);
+        if (custom.includes("{link}")) return custom.replaceAll("{link}", link).slice(0, 640);
+        return (button ? custom : `${custom} ${link}`).slice(0, 640);
     }
     const labels = anchor ? eventLabels(event, anchor) : null;
     const when = labels ? `, el ${labels.dateLabel} a las ${labels.startTime}` : "";
-    return `¡Hola! Aquí están tus entradas para ${labels?.name || event.name}${when}: ${link}`.slice(0, 640);
+    const name = labels?.name || event.name;
+    if (button) return `¡Hola! Aquí están tus entradas para ${name}${when}. Toca «Comprar entradas» aquí abajo 👇`.slice(0, 640);
+    return `¡Hola! Aquí están tus entradas para ${name}${when}: ${link}`.slice(0, 640);
 }
+
+/** Respuesta a cualquier mensaje en las historias de la serie (también reacciones): desactivable con SOCIAL_SERIES_STORY_ANY_REPLY=false. */
+export const storyAnyReplyEnabled = () => serverEnv("SOCIAL_SERIES_STORY_ANY_REPLY") !== "false";
+/** Una persona recibe el link a lo más una vez cada 12 h, aunque responda varias historias o vuelva a escribir. */
+const STORY_DM_COOLDOWN_HOURS = 12;
 
 export const soldOutDmMessage = (event: any, orgPage: string | null) =>
     `¡Hola! Las entradas para ${event.title || event.name} se agotaron. ¡Gracias por tu interés!${orgPage ? ` Mira nuestros próximos eventos: ${orgPage}` : ""}`.slice(0, 640);
@@ -369,14 +410,16 @@ export async function syncStoryAutomation(supabase: any, accountId: string | nul
     const link = dmTrackingUrl(origin, nearestEvent?.slug || "", DM_REFS.story);
     let message = nearest.sold_out_at
         ? soldOutDmMessage(nearestEvent, orgPage)
-        : dmMessageFor(nearest, nearestEvent, nearest.anchor_starts_at ? new Date(nearest.anchor_starts_at) : null, link);
+        : dmMessageFor(nearest, nearestEvent, nearest.anchor_starts_at ? new Date(nearest.anchor_starts_at) : null, link, { button: true });
     if (live.length > 1 && orgPage && !message.includes(orgPage)) message = `${message}\n\nTodos nuestros eventos: ${orgPage}`.slice(0, 640);
-    const keywords = [...new Set(live.flatMap(seriesKeywords))];
+    const keywords = keywordVariants(live.flatMap(seriesKeywords));
     const body = {
         keywords,
         matchMode: "contains",
         dmMessage: message,
         buttons: nearest.sold_out_at ? [] : linkButton(link),
+        // Si la historia de la serie ya respondió (automatización por historia, mismo texto), no se repite
+        dedupeSameTextHours: STORY_DM_COOLDOWN_HOURS,
         isActive: true,
     };
     let keep = (nearest.zernio_story_automation_id as string | null) || ids[0] || null;
@@ -400,7 +443,7 @@ export async function syncStoryAutomation(supabase: any, accountId: string | nul
                 trigger: "story_reply",
                 ...body,
                 // Una persona que vuelve a responder otro día recibe el link de nuevo (series de varias semanas)
-                repeatPolicy: { mode: "every_comment", cooldownHours: 12 },
+                repeatPolicy: { mode: "every_comment", cooldownHours: STORY_DM_COOLDOWN_HOURS },
             },
         });
         keep = created?.automation?.id || created?.automation?._id || null;
@@ -424,14 +467,61 @@ async function createPostAutomation(series: any, event: any, slot: any, zernioPo
             name: `AI Tickets · ${platform === "facebook" ? "Facebook" : "post"} ${localDay(slot.publish_at)} · ${String(event.name || "").slice(0, 40)}`,
             trigger: "comment",
             postId: zernioPostId,
-            keywords: seriesKeywords(series),
+            keywords: keywordVariants(seriesKeywords(series)),
             matchMode: "contains",
-            dmMessage: dmMessageFor(series, event, series.anchor_starts_at ? new Date(series.anchor_starts_at) : null, link),
+            dmMessage: dmMessageFor(series, event, series.anchor_starts_at ? new Date(series.anchor_starts_at) : null, link, { button: true }),
             buttons: linkButton(link),
             commentReply: "¡Listo! Te mandamos el link por DM 📩",
         },
     });
     return created?.automation?.id || created?.automation?._id || null;
+}
+
+/**
+ * Automatización de UNA historia de la serie ya publicada (platformPostId = id de la historia en Instagram): cualquier
+ * respuesta o reacción recibe el link, sin palabra clave, con 12 h de pausa por persona. Va atada a la historia para
+ * no contestar las historias propias del productor (esas siguen con la automatización por palabra clave de la cuenta).
+ * Las borra cancelSeries/completar como las de los posts (zernio_automation_id del slot).
+ */
+async function createStoryReplyAutomation(supabase: any, series: any, slot: any, storyMediaId: string, origin: string): Promise<string | null> {
+    const event = await loadSeriesEvent(supabase, Number(series.event_id));
+    if (!event?.slug) return null;
+    const link = dmTrackingUrl(origin, event.slug, DM_REFS.story);
+    const created: any = await zernioRequest("/comment-automations", {
+        method: "POST",
+        idempotencyKey: `aitickets-story-any-${slot.id}`,
+        body: {
+            profileId: series.zernio_profile_id,
+            accountId: series.zernio_account_id,
+            name: `AI Tickets · historia ${localDay(slot.publish_at)} · ${String(event.name || "").slice(0, 40)}`,
+            trigger: "story_reply",
+            platformPostId: storyMediaId,
+            keywords: [],
+            matchMode: "contains",
+            dmMessage: dmMessageFor(series, event, series.anchor_starts_at ? new Date(series.anchor_starts_at) : null, link, { button: true }),
+            buttons: linkButton(link),
+            repeatPolicy: { mode: "every_comment", cooldownHours: STORY_DM_COOLDOWN_HOURS },
+            // Si además coincidió la palabra clave en la automatización de la cuenta (mismo texto), un solo DM
+            dedupeSameTextHours: STORY_DM_COOLDOWN_HOURS,
+        },
+    });
+    return created?.automation?.id || created?.automation?._id || null;
+}
+
+/** Respuestas a las historias de la cuenta que no tenían la palabra clave (Zernio guarda 14 días): no recibieron el link. */
+async function unmatchedStoryReplies(automationId: string | null): Promise<{ total: number; recent: { text: string; at: string }[] } | null> {
+    if (!automationId) return null;
+    try {
+        const r: any = await zernioRequest(`/comment-automations/${encodeURIComponent(automationId)}/logs`, { query: { limit: 1 }, timeoutMs: 8000 });
+        const misses = r?.misses || {};
+        const recent = (Array.isArray(misses.samples) ? misses.samples : [])
+            .slice(0, 5)
+            .map((s: any) => ({ text: String(s?.commentText || "").slice(0, 120), at: String(s?.at || "") }));
+        return { total: Number(misses.total) || 0, recent };
+    } catch (err: any) {
+        console.warn("social series: misses:", err?.message || err);
+        return null;
+    }
 }
 
 /** Contadores de DM (enviados y clics) de las automatizaciones de la serie, con caché de 10 min en la serie. */
@@ -441,21 +531,27 @@ export async function refreshDmStats(supabase: any, series: any, slots: any[], f
     const ids = [series.zernio_story_automation_id, ...slots.map((s) => s.zernio_automation_id)].filter(Boolean) as string[];
     if (!ids.length) return series.dm_stats || null;
     const stats = { dms_sent: 0, dms_failed: 0, link_clicks: 0, unique_clicks: 0, triggered: 0 };
-    for (const id of [...new Set(ids)].slice(0, 20)) {
-        try {
-            const r: any = await zernioRequest(`/comment-automations/${encodeURIComponent(id)}`, { timeoutMs: 8000 });
-            const s = r?.automation?.stats || {};
-            stats.dms_sent += Number(s.dmsSent) || 0;
-            stats.dms_failed += Number(s.dmsFailed) || 0;
-            stats.link_clicks += Number(s.linkClicks) || 0;
-            stats.unique_clicks += Number(s.uniqueClicks) || 0;
-            stats.triggered += Number(s.triggered) || 0;
-        } catch (err: any) {
-            console.warn("social series: stats:", err?.message || err);
-        }
+    // Una por historia y por post: en paralelo de a 8 (una serie larga con Facebook pasa de 20)
+    const unique = [...new Set(ids)].slice(0, 48);
+    for (let i = 0; i < unique.length; i += 8) {
+        await Promise.all(
+            unique.slice(i, i + 8).map(async (id) => {
+                try {
+                    const r: any = await zernioRequest(`/comment-automations/${encodeURIComponent(id)}`, { timeoutMs: 8000 });
+                    const s = r?.automation?.stats || {};
+                    stats.dms_sent += Number(s.dmsSent) || 0;
+                    stats.dms_failed += Number(s.dmsFailed) || 0;
+                    stats.link_clicks += Number(s.linkClicks) || 0;
+                    stats.unique_clicks += Number(s.uniqueClicks) || 0;
+                    stats.triggered += Number(s.triggered) || 0;
+                } catch (err: any) {
+                    console.warn("social series: stats:", err?.message || err);
+                }
+            }),
+        );
     }
     // La automatización de historias es compartida por las series de la cuenta: sus números son de la cuenta
-    const out = { ...stats, shared_story_automation: true };
+    const out = { ...stats, shared_story_automation: true, unmatched_replies: await unmatchedStoryReplies(series.zernio_story_automation_id) };
     await supabase.from(SERIES_TABLE).update({ dm_stats: out, dm_stats_at: nowIso() }).eq("id", series.id);
     return out;
 }
@@ -1306,6 +1402,28 @@ async function slotForPost(supabase: any, post: any): Promise<any | null> {
     return data?.[0] || null;
 }
 
+/**
+ * Historia de Instagram de la serie recién publicada: le crea su automatización "cualquier respuesta" (ver
+ * createStoryReplyAutomation). No la crea si la serie ya no está activa o se agotó (la historia "agotado" no ofrece
+ * link). Un error no tumba el webhook: la historia queda cubierta por la automatización por palabra clave de la cuenta.
+ */
+async function attachStoryReplyAutomation(supabase: any, slot: any, platform: SeriesPlatform, storyMediaId: unknown, origin: string): Promise<string | null> {
+    if (platform !== "instagram" || slot.kind !== "story" || slot.variant === "sold_out" || slot.zernio_automation_id) return null;
+    if (!storyAnyReplyEnabled() || !zernioConfigured()) return null;
+    const mediaId = typeof storyMediaId === "string" || typeof storyMediaId === "number" ? String(storyMediaId).trim() : "";
+    if (!mediaId) return "historia sin id de Instagram: sin DM por cualquier respuesta";
+    const { data: series } = await supabase.from(SERIES_TABLE).select("*").eq("id", slot.series_id).maybeSingle();
+    if (!series || series.status !== "active" || series.sold_out_at || !series.zernio_account_id) return null;
+    try {
+        const automationId = await createStoryReplyAutomation(supabase, series, slot, mediaId, origin);
+        if (automationId) await supabase.from(SLOTS_TABLE).update({ zernio_automation_id: automationId, updated_at: nowIso() }).eq("id", slot.id);
+        return automationId ? "DM por cualquier respuesta activo" : null;
+    } catch (err: any) {
+        console.warn(`social series: story automation slot ${slot.id}:`, err?.message || err);
+        return "no se pudo activar el DM por cualquier respuesta";
+    }
+}
+
 /** Procesa un webhook de Zernio (ya verificado y deduplicado). Devuelve un resumen para el registro. */
 export async function handleZernioWebhook(supabase: any, payload: any, origin: string): Promise<string> {
     const event = String(payload?.event || "");
@@ -1319,10 +1437,11 @@ export async function handleZernioWebhook(supabase: any, payload: any, origin: s
         if (event === "post.platform.published" || event === "post.published") {
             await supabase
                 .from(SLOTS_TABLE)
-                .update({ status: "published", published_at: post.publishedAt || nowIso(), platform_post_url: ig.publishedUrl || null, error: null, updated_at: nowIso() })
+                .update({ status: "published", published_at: post.publishedAt || nowIso(), platform_post_url: ig.publishedUrl || ig.platformPostUrl || null, error: null, updated_at: nowIso() })
                 .eq("id", slot.id)
                 .in("status", ["queued", "rendering", "planned", "failed"]);
-            return `slot ${slot.id} publicado`;
+            const storyDm = await attachStoryReplyAutomation(supabase, slot, slotPlatform, ig.platformPostId, origin);
+            return `slot ${slot.id} publicado${storyDm ? ` · ${storyDm}` : ""}`;
         }
         if (event === "post.platform.failed" || event === "post.failed" || event === "post.partial") {
             const error = String(ig.error || ig.platformError?.message || `${NETWORK_NAMES[slotPlatform]} rechazó la publicación`).slice(0, 480);

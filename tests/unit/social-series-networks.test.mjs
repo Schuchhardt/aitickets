@@ -294,7 +294,7 @@ describe('despacho por red', () => {
     // DM por comentarios: Instagram y Facebook (Messenger); TikTok no tiene
     const automations = zernioCalls.filter((c) => c.path === '/comment-automations' && c.body.trigger === 'comment')
     expect(automations.map((a) => a.body.accountId).sort()).toEqual(['acc-fb-7', 'acc-ig-7'])
-    expect(automations.find((a) => a.body.accountId === 'acc-fb-7').body.dmMessage).toMatch(/ref=fb-post-dm/)
+    expect(automations.find((a) => a.body.accountId === 'acc-fb-7').body.buttons[0].url).toMatch(/ref=fb-post-dm/)
     expect(of('tiktok', 'queued')[0].zernio_automation_id).toBeNull()
   }, 60_000)
 

@@ -191,12 +191,19 @@ export async function seriesView(ctx: ToolContext, eventId: number, { refreshSta
                   failed: dms.dms_failed ?? 0,
                   link_clicks: dms.link_clicks ?? 0,
                   unique_clicks: dms.unique_clicks ?? 0,
-                  note: "Incluye las respuestas a historias de la cuenta (la automatización de historias es una por cuenta).",
+                  unmatched_replies: dms.unmatched_replies ?? null,
+                  note:
+                      "Las historias de la serie responden con el link a cualquier mensaje o reacción (una vez cada 12 h por persona). " +
+                      "En las demás historias de la cuenta solo responde quien escribe la palabra clave (con o sin tilde, mayúsculas da igual); " +
+                      "esas cifras son de toda la cuenta. unmatched_replies: respuestas a historias sin la palabra clave en los últimos 14 días " +
+                      "(si eran a una historia de la serie, igual recibieron el link por la automatización de esa historia). " +
+                      "Los DM directos al chat, sin responder una historia ni comentar, no se contestan solos.",
               }
             : null,
         attributed_sales: await S.attributedSales(supabase, [Number(event.id)]),
         tickets: tickets ? { capacity: tickets.capacity, issued: tickets.issued, remaining: tickets.remaining, sold_out: tickets.soldOut } : null,
-        dm_preview: S.dmMessageFor(live || series || {}, event, anchor, storyLink),
+        dm_preview: S.dmMessageFor(live || series || {}, event, anchor, storyLink, { button: true }),
+        dm_link: storyLink,
         base_image: {
             url: baseImage,
             source: live?.base_image_url ? "elegida para la serie" : event.image_url ? "portada del evento" : event.cover_video?.poster_url ? "fotograma del video de portada" : null,
@@ -222,8 +229,9 @@ const getSocialSeries: ToolDef = {
     title: "Ver difusión automática (historias)",
     description:
         "Estado de las historias y publicaciones automáticas de un evento (Instagram y, si están activadas, Facebook y TikTok): si se puede activar (y qué falta), el calendario propuesto " +
-        "(borrador) o las piezas programadas y publicadas con su estado, la próxima publicación, DMs enviados y clics, y ventas atribuidas a " +
-        "los DM (ref ig-story-dm / ig-post-dm). Responde \"¿cómo va mi difusión?\".",
+        "(borrador) o las piezas programadas y publicadas con su estado, la próxima publicación, DMs enviados y clics, respuestas a historias " +
+        "que no recibieron el link (dms.unmatched_replies), el texto del DM (dm_preview; el link va en el botón «Comprar entradas», dm_link) y " +
+        "ventas atribuidas a los DM (ref ig-story-dm / ig-post-dm). Responde \"¿cómo va mi difusión?\" y \"¿por qué no llegan DMs?\".",
     scope: "read",
     annotations: { readOnlyHint: true },
     inputSchema: { type: "object", required: ["event_id"], additionalProperties: false, properties: { event_id: eventIdSchema } },
@@ -254,9 +262,19 @@ const prepareSocialSeries: ToolDef = {
             event_id: eventIdSchema,
             feed_posts_enabled: { type: "boolean", description: "Una publicación diaria en el feed la última semana (por defecto sí)." },
             sold_out_story_enabled: { type: "boolean", description: "Si se agota, publicar una historia \"Entradas agotadas, gracias\" (por defecto no)." },
-            keyword: { type: "string", pattern: KEYWORD_PATTERN, description: "Palabra que la gente responde o comenta para recibir el link (por defecto ENTRADAS)." },
-            extra_keywords: { type: "array", maxItems: 5, items: { type: "string", pattern: KEYWORD_PATTERN }, description: "Variantes que también activan el DM (por defecto entrada y link)." },
-            dm_message: { type: "string", maxLength: 600, description: "Texto del DM. {link} se reemplaza por el link con seguimiento (si no está, va al final). Vacío = mensaje por defecto." },
+            keyword: {
+                type: "string",
+                pattern: KEYWORD_PATTERN,
+                description:
+                    "Palabra que la gente comenta en las publicaciones, o responde en historias que no son de la serie, para recibir el link (por defecto ENTRADAS). " +
+                    "Basta que el mensaje la contenga; da igual mayúsculas y tildes. Las historias de la serie responden a cualquier mensaje.",
+            },
+            extra_keywords: { type: "array", maxItems: 5, items: { type: "string", pattern: KEYWORD_PATTERN }, description: "Variantes que también activan el DM (por defecto entrada y link). Las variantes con tilde se agregan solas." },
+            dm_message: {
+                type: "string",
+                maxLength: 600,
+                description: "Texto del DM. El link va siempre en el botón «Comprar entradas» (Instagram no hace clickeable la URL del texto); {link} lo repite en el texto. Vacío = mensaje por defecto.",
+            },
             base_image_url: { type: "string", maxLength: 2000, pattern: "^(https://.*)?$", description: "Foto base (de upload_image). Vacío = la portada del evento." },
             facebook_enabled: { type: "boolean", description: "Publicar también las historias y publicaciones en la página de Facebook conectada (por defecto no)." },
             tiktok_enabled: { type: "boolean", description: "Publicar también en TikTok: una publicación con foto vertical cada día de la última semana (por defecto no)." },
@@ -297,7 +315,8 @@ const approveSocialSeries: ToolDef = {
     title: "Aprobar y programar difusión automática",
     description:
         "Aprueba la serie (aprobación única): desde aquí AI Tickets publica sola las historias (y las publicaciones en el feed) en el Instagram de la " +
-        "organización (y en Facebook y TikTok si se activaron) hasta el día del evento y responde por DM con el link a quien responda o comente la palabra clave. Acción pública: el " +
+        "organización (y en Facebook y TikTok si se activaron) hasta el día del evento y responde por DM con el link a quien responda una historia de la serie " +
+        "(cualquier mensaje o reacción, una vez cada 12 h por persona) o comente la palabra clave en una publicación. Acción pública: el " +
         "servidor devuelve primero el resumen y solo activa al repetir la llamada con confirmation_token.",
     scope: "publish",
     async confirm(args, ctx) {
