@@ -159,6 +159,8 @@ export async function seriesView(ctx: ToolContext, eventId: number, { refreshSta
     const anchor = series?.anchor_starts_at ? new Date(series.anchor_starts_at) : S.anchorFor(event);
     const storyLink = S.dmTrackingUrl(ctx.origin, event.slug || "", S.DM_REFS.story);
     const baseImage = S.baseImageUrlFor(live, event);
+    // Avisos no bloqueantes (no impiden activar ni frenan la serie): hoy, el reel activado sin video
+    const reelNotice = S.reelNoticeFor({ series: live, event, slots, uploadUrl: `${eventDashboardUrl(ctx, Number(event.id))}#pagina` });
 
     return {
         event: { id: Number(event.id), name: event.name, status: event.status, public_url: eventPublicUrl(ctx, event.slug) },
@@ -180,6 +182,7 @@ export async function seriesView(ctx: ToolContext, eventId: number, { refreshSta
         },
         can_activate: blockers.length === 0 && (!live || live.status === "draft"),
         blockers,
+        notices: reelNotice ? [reelNotice] : [],
         series: series ? presentSeries(series) : null,
         plan,
         slots: shown.map(presentSlot),
@@ -223,7 +226,10 @@ const getSocialSeries: ToolDef = {
         "la serie, + dms_sent_account, la respuesta por palabra clave a historias de toda la cuenta, compartida con otras series), clics del botón " +
         "del DM (Zernio) frente a visitas a la página que llegaron por DM (dms.dm_visits), hora de la lectura (dms.as_of), respuestas a historias " +
         "que no recibieron el link (dms.unmatched_replies), el texto del DM (dm_preview; el link va en el botón «Comprar entradas», dm_link) y " +
-        "ventas atribuidas a los DM (ref ig-story-dm / ig-post-dm). Responde \"¿cómo va mi difusión?\" y \"¿por qué no llegan DMs?\".",
+        "ventas atribuidas a los DM (ref ig-story-dm / ig-post-dm). Responde \"¿cómo va mi difusión?\" y \"¿por qué no llegan DMs?\". " +
+        "blockers impiden activar; notices son avisos que no bloquean (p. ej. reel_without_video: el reel está activado pero el evento no tiene " +
+        "video vertical de 3 a 60 s, así que no saldrá reel; reel_video_missing: hay un reel programado sin video que sirva). Cada aviso trae " +
+        "cta.url para subir el video de portada o de galería en el panel del evento: díselo al productor.",
     scope: "read",
     annotations: { readOnlyHint: true },
     inputSchema: { type: "object", required: ["event_id"], additionalProperties: false, properties: { event_id: eventIdSchema } },
@@ -241,7 +247,7 @@ const prepareSocialSeries: ToolDef = {
         "última semana y el día del evento), publicaciones en el feed la última semana (feed_posts_enabled), palabra clave del DM (ENTRADAS por defecto), " +
         "mensaje del DM ({link} = link con seguimiento), foto base (por defecto la portada), si publica también en la página de Facebook " +
         "(facebook_enabled) y en TikTok (tiktok_enabled; foto vertical cada día de la última semana), y el reel con el video vertical del " +
-        "evento (reel_enabled; 3 a 60 s). Devuelve el calendario para que el productor lo " +
+        "evento (reel_enabled; 3 a 60 s; sin video no sale reel y la respuesta lo avisa en notices). Devuelve el calendario para que el productor lo " +
         "revise; se activa con approve_social_series. Se puede llamar varias veces para ajustar el borrador.",
     scope: "write",
     audit: (args) => ({ summary: "Preparó la difusión automática (borrador)", target: `event:${args.event_id}` }),
@@ -308,7 +314,8 @@ const approveSocialSeries: ToolDef = {
     description:
         "Aprueba la serie (aprobación única): desde aquí AI Tickets publica sola las historias (y las publicaciones en el feed) en el Instagram de la " +
         "organización (y en Facebook y TikTok si se activaron) hasta el día del evento y responde por DM con el link a quien responda una historia de la serie " +
-        "(cualquier mensaje o reacción, una vez cada 12 h por persona) o comente la palabra clave en una publicación. Acción pública: el " +
+        "(cualquier mensaje o reacción, una vez cada 12 h por persona) o comente la palabra clave en una publicación. El reel solo se programa si el evento ya tiene video al aprobar (si no, " +
+        "va en warnings; subirlo después no lo agrega a una difusión activa). Acción pública: el " +
         "servidor devuelve primero el resumen y solo activa al repetir la llamada con confirmation_token.",
     scope: "publish",
     async confirm(args, ctx) {
@@ -338,6 +345,7 @@ const approveSocialSeries: ToolDef = {
                     dm_preview: view.dm_preview,
                 },
                 warnings: [
+                    ...view.notices.map((n) => n.message),
                     !view.base_image.url ? "El evento no tiene portada ni foto base: las piezas usarán un fondo liso. Sube una foto para que se vean mejor." : null,
                     "Instagram no permite stickers de link por API: el link va por DM a quien responda la historia.",
                     plan.tiktok_posts ? "En TikTok se publica como contenido de tu marca, público y con comentarios activos; el link va en la descripción (TikTok no lo hace clickeable)." : null,

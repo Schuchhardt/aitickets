@@ -261,6 +261,22 @@ const done = computed(() => (view.value?.slots || []).filter((s) => ['published'
           <AlertTriangle :size="16" class="shrink-0 mt-0.5" /> <span>{{ series.notice }}</span>
         </div>
 
+        <!-- Avisos que no bloquean (p. ej. reel activado sin video): con CTA para subir el video -->
+        <div
+          v-for="n in view.notices || []"
+          :key="n.code"
+          class="flex gap-2 p-3 rounded-lg border text-sm"
+          :class="n.level === 'warning' ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-gray-50 border-gray-200 text-gray-700'"
+          role="status"
+          :data-testid="`series-notice-${n.code}`"
+        >
+          <Clapperboard :size="16" class="shrink-0 mt-0.5" />
+          <span>
+            {{ n.message }}
+            <a v-if="n.cta" :href="n.cta.url" class="font-medium underline whitespace-nowrap" :data-track="`Aviso difusión: ${n.code}`">{{ n.cta.label }}</a>
+          </span>
+        </div>
+
         <!-- Sin activar -->
         <template v-if="!isLive">
           <div v-if="view.blockers.length" class="space-y-2">
