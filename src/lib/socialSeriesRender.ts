@@ -42,6 +42,8 @@ export type PieceData = {
      * en vez de "Responde PALABRA". Sin esto, el llamado de Instagram.
      */
     linkLabel?: string | null;
+    /** Verbo del llamado; por defecto "Responde" en la historia y "Comenta" en el post. El reel (formato historia) usa "Comenta". */
+    replyVerb?: "Responde" | "Comenta";
 };
 
 export type PieceText = { kicker: string | null; bigLines: string[]; message: string[]; scarcity: string | null; cta: string | null };
@@ -84,7 +86,7 @@ export function pieceText(raw: PieceData): PieceText {
     const d = { ...raw, eventName: withoutEmoji(raw.eventName), venue: raw.venue ? withoutEmoji(raw.venue) || null : null };
     const when = [d.dateLabel, d.startTime ? `${d.startTime} h` : null].filter(Boolean).join(" · ");
     const where = d.venue || null;
-    const reply = d.kind === "story" ? "Responde" : "Comenta";
+    const reply = d.replyVerb || (d.kind === "story" ? "Responde" : "Comenta");
     const cta = d.linkLabel ? `Entradas en ${d.linkLabel}` : `${reply} ${d.keyword} y te mandamos el link`;
     const scarcity = d.remaining != null && d.remaining > 0 ? `Quedan ${d.remaining.toLocaleString("es-CL")} ${d.remaining === 1 ? "entrada" : "entradas"}` : null;
     if (d.variant === "sold_out") {

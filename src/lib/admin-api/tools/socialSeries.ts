@@ -4,8 +4,9 @@
 import { fetchAll, localDateTime } from "../../producer-api/tools/common";
 import type { JsonSchema } from "../../producer-api/registry";
 import { DEFAULT_CADENCE, normalizeCadence, type CadenceConfig } from "../../socialSeriesCadence";
-import { attributedSales, loadCadenceConfig, networkStates, presentDmStats, reelNoticeFor, refreshDmStats, saveCadenceConfig, SERIES_TABLE, SLOTS_TABLE } from "../../socialSeries";
+import { attributedSales, baseImageUrlFor, loadCadenceConfig, networkStates, presentDmStats, reelNoticeFor, refreshDmStats, saveCadenceConfig, SERIES_TABLE, SLOTS_TABLE } from "../../socialSeries";
 import type { AdminToolDef } from "../registry";
+import { fallbackReelEnabled } from "../../socialSeriesReel";
 import { organizationIdSchema } from "./organizations";
 import { orgNames } from "./analytics";
 
@@ -67,7 +68,7 @@ const listSocialSeries: AdminToolDef = {
         // cover_video / gallery_video para el aviso del reel sin video (tolera la migración pendiente)
         const loadEvents = (cols: string) => fetchAll<any>(() => supabase.from("events").select(cols).in("id", eventIds).order("id", { ascending: true }));
         const events = eventIds.length
-            ? await loadEvents("id, name, slug, start_date, status, cover_video, gallery_video").catch((e: any) => (isMissing(e) ? loadEvents("id, name, slug, start_date, status") : Promise.reject(e)))
+            ? await loadEvents("id, name, slug, start_date, status, image_url, cover_video, gallery_video").catch((e: any) => (isMissing(e) ? loadEvents("id, name, slug, start_date, status, image_url") : Promise.reject(e)))
             : [];
         const eventById = new Map(events.map((e: any) => [Number(e.id), e]));
         const names = await orgNames(supabase, top.map((s: any) => Number(s.organization_id)));
@@ -93,7 +94,7 @@ const listSocialSeries: AdminToolDef = {
                 last_error: lastFailed?.error || null,
                 pause_reason: s.pause_reason || null,
                 notice: s.notice || null,
-                notices: [reelNoticeFor({ series: s, event: ev || {}, slots, uploadUrl: `${actx.origin}/dashboard/events/${s.event_id}#pagina` })].filter(Boolean),
+                notices: [reelNoticeFor({ series: s, event: ev || {}, slots, uploadUrl: `${actx.origin}/dashboard/events/${s.event_id}#pagina`, fallback: fallbackReelEnabled() && Boolean(baseImageUrlFor(s, ev)) })].filter(Boolean),
                 sold_out: Boolean(s.sold_out_at),
                 ...dmFields(await dmStatsFor(supabase, s, slots)),
                 attributed_sales: s.approved_at ? await attributedSales(supabase, [Number(s.event_id)]) : null,

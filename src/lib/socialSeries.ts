@@ -28,10 +28,13 @@
 //   TikTok:   un post de foto vertical (photo post de Zernio) cada día de la última semana, con el link en la
 //             descripción (tiktok-serie; TikTok no lo hace clickeable).
 //   Reel:     si el evento tiene un video vertical de 3 a 60 s (portada o galería), sale como reel unos días antes
-//             en cada red activa (en TikTok, como video). AI Tickets no genera video desde el afiche: no hay un
-//             codificador de video que quepa en las funciones (sin ffmpeg).
+//             en cada red activa (en TikTok, como video). Si no tiene y SOCIAL_SERIES_FALLBACK_REEL=true, se arma un
+//             reel de respaldo con la portada y la galería (socialSeriesReel.ts + ffmpeg en la background function
+//             social-series-reel-background). Al despachar se usa el video vigente del evento (si lo cambiaron o
+//             subieron después de aprobar, el nuevo); si la serie se aprobó sin reel y después hay video (o respaldo),
+//             reconcileSeries lo agrega en el día con historia más cercano a D-3 que quede.
 import { getSupabaseAdmin } from "./auth-helpers";
-import { serverEnv, notifySlack } from "../pages/api/_lib/server-utils";
+import { serverEnv, notifySlack, callInternalFunction } from "../pages/api/_lib/server-utils";
 import { fetchAll, localDay, localDateTime } from "./producer-api/tools/common";
 import { eventCapacity, localHour } from "./eventAnalytics";
 import { buildEventContext, EVENT_CONTEXT_SELECT, htmlToPlainText } from "./marketing";
@@ -41,12 +44,24 @@ import { IMAGE_BUCKET } from "./imageStorage";
 import { isCourtesyOrder, isTransferOrder } from "./orderKinds";
 import { siteUrl as orgSiteUrl } from "./sites";
 import {
-    choosePublishTime, DEFAULT_KEYWORD, EXTRA_NETWORKS, expandNetworkSlots, normalizeCadence, nextFunctionStart, planSlots,
+    choosePublishTime, DEFAULT_CADENCE, DEFAULT_KEYWORD, EXTRA_NETWORKS, expandNetworkSlots, normalizeCadence, nextFunctionStart, planSlots, reelSlot,
     type CadenceConfig, type ExtraNetwork, type PlannedSlot, type SeriesPlatform,
 } from "./socialSeriesCadence";
 import { longDateLabel, renderPiece, type BaseImageOptions, type PieceData } from "./socialSeriesRender";
 import { normalizeCoverSettings } from "./eventCover";
 import { normalizeEventVideo } from "./eventVideo";
+import { GALLERY_TABLE } from "./eventGallery";
+import {
+    FALLBACK_REEL_PREFIX,
+    FALLBACK_REEL_PREP_HOURS,
+    FALLBACK_REEL_RETRY_MS,
+    GALLERY_PHOTOS,
+    fallbackReelEnabled,
+    fallbackReelMusicUrl,
+    isFallbackReelUrl,
+    reelPhotos,
+    renderReelFrames,
+} from "./socialSeriesReel";
 import { tiktokSettings, tiktokTitle } from "./socialPlatforms";
 import { SECRET_PLACE_NAME } from "../../netlify/lib/secret-location.mjs";
 import { zernioRequest, ZernioError } from "../../netlify/lib/zernio-ads.mjs";
@@ -235,6 +250,48 @@ export function reelVideoFor(event: any): { url: string; poster_url: string | nu
     return null;
 }
 
+/**
+ * Video del reel al despachar: el del evento si sirve (aunque lo hayan cambiado o subido después de aprobar) o el reel
+ * de respaldo ya armado para ese slot. null = no hay con qué publicarlo.
+ */
+export function reelVideoUrlFor(event: any, slot: any): string | null {
+    return reelVideoFor(event)?.url || (isFallbackReelUrl(slot?.video_url) ? slot.video_url : null);
+}
+
+/** Fotos de la galería del evento (las primeras, en orden), para el reel de respaldo. */
+export async function loadGalleryPhotos(supabase: any, eventId: number, limit = GALLERY_PHOTOS): Promise<{ url: string }[]> {
+    const { data, error } = await supabase.from(GALLERY_TABLE).select("url, position").eq("event_id", eventId).order("position", { ascending: true }).limit(limit);
+    if (error) return [];
+    return (data || []).filter((r: any) => r?.url);
+}
+
+/** ¿Habrá reel? Activado y con video del evento, o con el reel de respaldo (flag) y alguna foto con qué armarlo. */
+export async function reelSource(supabase: any, series: any, event: any): Promise<"video" | "fallback" | null> {
+    if (!event || series?.reel_enabled === false) return null;
+    if (reelVideoFor(event)) return "video";
+    if (!fallbackReelEnabled()) return null;
+    if (baseImageUrlFor(series, event)) return "fallback";
+    return (await loadGalleryPhotos(supabase, Number(event.id), 1)).length ? "fallback" : null;
+}
+
+/** Margen mínimo para agregar un reel a una serie activa (render del respaldo + programarlo en Zernio). */
+const LATE_REEL_MARGIN_MS = 3 * 60 * 60_000;
+
+/**
+ * Día del reel que todavía se puede agregar a una serie activa: entre sus historias de Instagram pendientes, la más
+ * cercana a D-3 (la misma regla que al aprobar), con al menos LATE_REEL_MARGIN_MS por delante.
+ */
+export function lateReelDay(slots: any[], now = new Date(), config: CadenceConfig = DEFAULT_CADENCE): PlannedSlot | null {
+    const pending = slots
+        .filter((s) => s.kind === "story" && (s.platform || "instagram") === "instagram" && (s.variant || "countdown") === "countdown" && s.status === "planned")
+        .filter((s) => Date.parse(s.publish_at) > now.getTime() + LATE_REEL_MARGIN_MS)
+        .map((s) => ({ kind: "story" as const, days_to_event: Number(s.days_to_event), publish_at: s.publish_at }) as PlannedSlot);
+    return reelSlot(pending, config);
+}
+
+/** Reels que cuentan como "la serie ya tiene reel" (uno omitido al replanificar no cuenta: el plan nuevo trae el suyo). */
+const effectiveReels = (slots: any[]) => slots.filter((s) => s.kind === "reel" && !(s.status === "skipped" && String(s.skip_reason || "").startsWith("replanificada")));
+
 export type SeriesNotice = {
     code: string;
     level: "warning" | "info";
@@ -244,24 +301,47 @@ export type SeriesNotice = {
 };
 
 /**
- * Aviso (no bloqueante) cuando el reel está activado pero no puede salir por falta de video. Casos:
- * - Sin activar: sin video vertical de 3 a 60 s no habrá reel → CTA para subirlo antes de activar.
- * - Activa con un reel pendiente cuyo video ya no sirve (lo borraron o cambiaron): ese reel va a fallar → CTA.
- * - Activa sin reel (se aprobó sin video): avisa que esta difusión no tiene reel. Subir el video ahora no lo agrega
- *   (los slots se crean al aprobar), así que el CTA solo aparece si todavía no hay video.
- * Solo lee: no crea ni cambia slots. uploadUrl: dónde se sube el video de portada o de galería (panel del evento).
+ * Aviso (no bloqueante) sobre el reel cuando está activado y el evento no tiene un video que sirva, o cuando una serie
+ * activa todavía no tiene reel. Solo lee: no crea ni cambia slots. Códigos:
+ * - reel_without_video (warning antes de activar; info con la serie activa): sin video no hay reel → CTA para subirlo.
+ *   Con la serie activa, si todavía queda un día para el reel, subirlo lo agrega (reconcileSeries).
+ * - reel_fallback (info): no hay video, pero se arma un reel de respaldo con las fotos (flag); el CTA permite
+ *   reemplazarlo por un video propio.
+ * - reel_video_missing (warning): hay un reel pendiente y su video ya no sirve (y no hay respaldo): no se publicará.
+ * - reel_pending (info): la serie activa no tenía reel y ya hay con qué hacerlo: se agrega en la próxima pasada.
+ * fallback: si el reel de respaldo está disponible para este evento (flag + alguna foto). uploadUrl: panel del evento.
  */
-export function reelNoticeFor(
-    { series, event, slots = [], uploadUrl }: { series: any | null; event: any; slots?: any[]; uploadUrl: string },
-): SeriesNotice | null {
+export function reelNoticeFor({
+    series,
+    event,
+    slots = [],
+    uploadUrl,
+    fallback = false,
+    now = new Date(),
+}: {
+    series: any | null;
+    event: any;
+    slots?: any[];
+    uploadUrl: string;
+    fallback?: boolean;
+    now?: Date;
+}): SeriesNotice | null {
     if (series && series.reel_enabled === false) return null;
     if (!series && event?.status !== "published") return null;
     const video = reelVideoFor(event);
     const cta = { label: "Subir video del evento", url: uploadUrl };
     const need = `un video vertical de ${REEL_SECONDS.min} a ${REEL_SECONDS.max} segundos como video de portada o de galería`;
+    const fallbackNotice = (when: string): SeriesNotice => ({
+        code: "reel_fallback",
+        level: "info",
+        blocking: false,
+        message: `El evento no tiene video: ${when} armamos el reel con la portada y las fotos de la galería. Si prefieres el tuyo, sube ${need} antes de que se publique.`,
+        cta,
+    });
     const live = series && ["active", "paused"].includes(series.status);
     if (!live) {
         if (video) return null;
+        if (fallback) return fallbackNotice("al activar la difusión");
         return {
             code: "reel_without_video",
             level: "warning",
@@ -270,10 +350,12 @@ export function reelNoticeFor(
             cta,
         };
     }
-    const reels = slots.filter((s) => s.kind === "reel");
+    const reels = effectiveReels(slots);
     const pending = reels.filter((s) => ["planned", "rendering", "queued"].includes(s.status));
     if (pending.length) {
         if (video) return null;
+        if (pending.every((s) => isFallbackReelUrl(s.video_url))) return fallbackNotice("ya");
+        if (fallback) return fallbackNotice("unas horas antes de publicarlo");
         return {
             code: "reel_video_missing",
             level: "warning",
@@ -283,14 +365,32 @@ export function reelNoticeFor(
         };
     }
     if (reels.length) return null;
+    const config = normalizeCadence(series.cadence_config);
+    const canAdd = !series.sold_out_at && series.status === "active" && Boolean(lateReelDay(slots, now, config));
+    if (canAdd && (video || fallback)) {
+        return {
+            code: "reel_pending",
+            level: "info",
+            blocking: false,
+            message: video ? "Ya hay video: lo agregamos como reel a la difusión en los próximos minutos." : "Agregamos un reel armado con las fotos del evento en los próximos minutos.",
+            cta: null,
+        };
+    }
+    if (canAdd) {
+        return {
+            code: "reel_without_video",
+            level: "info",
+            blocking: false,
+            message: `Esta difusión todavía no tiene reel porque el evento no tiene video. Si subes ${need}, lo agregamos antes del evento.`,
+            cta,
+        };
+    }
     return {
         code: "reel_without_video",
         level: "info",
         blocking: false,
-        message: video
-            ? "Esta difusión no incluye reel: se activó cuando el evento aún no tenía video. Las demás piezas siguen igual."
-            : `Esta difusión no incluye reel porque el evento no tiene video. Para tu próximo evento, sube ${need} antes de activar la difusión.`,
-        cta: video ? null : cta,
+        message: "Esta difusión no incluye reel: ya no quedan días antes del evento para agregarlo. Las demás piezas siguen igual.",
+        cta: null,
     };
 }
 
@@ -770,11 +870,13 @@ async function insertSlots(
     const active = activePlatforms(series);
     const on = platforms ? active.filter((p) => platforms.includes(p)) : active;
     if (!on.length) return;
-    const video = variant === "countdown" && series.reel_enabled !== false && event ? reelVideoFor(event) : null;
+    // Reel: con el video del evento, o (flag) con el respaldo que se arma unas horas antes (video_url null hasta entonces)
+    const source = variant === "countdown" ? await reelSource(supabase, series, event) : null;
+    const video = source === "video" ? reelVideoFor(event) : null;
     const expanded =
         variant === "sold_out"
             ? slots.flatMap((s) => on.filter((p) => p !== "tiktok").map((platform) => ({ ...s, platform })))
-            : expandNetworkSlots(slots, { platforms: on, reel: Boolean(video), config: normalizeCadence(series.cadence_config) });
+            : expandNetworkSlots(slots, { platforms: on, reel: Boolean(source), config: normalizeCadence(series.cadence_config) });
     const rows = expanded.map((s) => ({
         series_id: series.id,
         organization_id: series.organization_id,
@@ -1184,6 +1286,9 @@ export async function reconcileSeries(supabase: any, series: any, origin: string
             console.warn("social series: DM pendiente:", err?.message || err);
         }
     }
+    if (await addMissingReel(supabase, current, event, now).catch((err: any) => (console.warn(`social series ${series.id}: reel tardío:`, err?.message || err), false))) {
+        return "reel_added";
+    }
     return net.changes.length ? `networks:${net.changes.join(",")}` : "ok";
 }
 
@@ -1363,8 +1468,13 @@ async function dispatchSlot(supabase: any, series: any, event: any, slot: any, o
         if (platform !== "instagram") data.linkLabel = shortEventLink(origin, event.slug);
         const image = await renderPiece(data, await loadBaseImage(baseImageUrlFor(series, event)), baseImageOptionsFor(series, event));
         imageUrl = await uploadPiece(supabase, series, slot, image);
-    } else if (!slot.video_url) {
-        throw new ZernioError(400, { error: "El evento ya no tiene un video para el reel" });
+    }
+    // Reel: el video vigente del evento (aunque lo hayan cambiado después de aprobar) o el reel de respaldo ya armado
+    const videoUrl = slot.kind === "reel" ? reelVideoUrlFor(event, slot) : null;
+    if (slot.kind === "reel" && !videoUrl) {
+        throw new ZernioError(400, {
+            error: fallbackReelEnabled() ? "No alcanzó a armarse el reel automático (sin fotos del evento o falló el render)" : "El evento ya no tiene un video para el reel",
+        });
     }
     let caption: string | null = null;
     if (slot.kind !== "story") {
@@ -1376,7 +1486,10 @@ async function dispatchSlot(supabase: any, series: any, event: any, slot: any, o
         const ref = platform === "facebook" ? LINK_REFS.facebook : platform === "tiktok" ? LINK_REFS.tiktok : null;
         caption = `${body}\n\n${captionClosing(platform, keyword, ref ? dmTrackingUrl(origin, event.slug, ref) : "")}`.slice(0, 2200);
     }
-    await supabase.from(SLOTS_TABLE).update({ image_url: imageUrl, caption, rendered_at: nowIso(), updated_at: nowIso() }).eq("id", slot.id);
+    await supabase
+        .from(SLOTS_TABLE)
+        .update({ image_url: imageUrl, caption, ...(videoUrl ? { video_url: videoUrl } : {}), rendered_at: nowIso(), updated_at: nowIso() })
+        .eq("id", slot.id);
 
     const scheduledFor = new Date(Math.max(Date.parse(slot.publish_at), now.getTime() + 2 * 60_000)).toISOString();
     const created: any = await zernioRequest("/posts", {
@@ -1387,7 +1500,7 @@ async function dispatchSlot(supabase: any, series: any, event: any, slot: any, o
             kind: slot.kind,
             accountId,
             imageUrl,
-            videoUrl: slot.video_url || null,
+            videoUrl,
             caption,
             scheduledFor,
             metadata: { aitickets_slot_id: String(slot.id), aitickets_series_id: String(series.id), aitickets_event_id: String(series.event_id) },
@@ -1411,7 +1524,135 @@ async function dispatchSlot(supabase: any, series: any, event: any, slot: any, o
     return caption;
 }
 
-export type JobSummary = { reconciled: Record<string, number>; dispatched: number; failed: number; retried: number; skipped: number; remaining: number };
+// ---------------------------------------------------------------------------
+// Reel de respaldo y reel agregado tarde
+// ---------------------------------------------------------------------------
+
+export const REEL_BACKGROUND_PATH = "/.netlify/functions/social-series-reel-background";
+export type ReelJob = { slotIds: number[]; frames: string[]; outPath: string; musicUrl: string | null };
+type ReelTrigger = (job: ReelJob) => Promise<{ ok: boolean; status: number; data?: any }>;
+const defaultReelTrigger = (origin: string): ReelTrigger => (job) => callInternalFunction(new URL(origin), REEL_BACKGROUND_PATH, job);
+
+/**
+ * Arma (flag SOCIAL_SERIES_FALLBACK_REEL) los reels de respaldo que publican en las próximas FALLBACK_REEL_PREP_HOURS:
+ * renderiza los cuadros con las plantillas, los sube y pide el video a la background function. Un video por serie, día
+ * y llamado (Instagram y Facebook comparten "Comenta ENTRADAS"; TikTok muestra el link). No hace nada si el evento ya
+ * tiene video (se usa ese), si el reel ya está armado o si hay un pedido en curso (rendered_at hace menos de
+ * FALLBACK_REEL_RETRY_MS). Devuelve cuántos pedidos hizo (máximo maxJobs por pasada: el render toma unos segundos).
+ */
+export async function prepareFallbackReels(
+    supabase: any,
+    seriesList: any[],
+    { origin, now = new Date(), maxJobs = 1, trigger = defaultReelTrigger(origin) }: { origin: string; now?: Date; maxJobs?: number; trigger?: ReelTrigger },
+): Promise<number> {
+    if (!fallbackReelEnabled() || !seriesList.length) return 0;
+    const byId = new Map(seriesList.map((x: any) => [Number(x.id), x]));
+    const reels = await fetchAll<any>(() =>
+        supabase
+            .from(SLOTS_TABLE)
+            .select("*")
+            .eq("kind", "reel")
+            .eq("status", "planned")
+            .in("series_id", [...byId.keys()])
+            .lte("publish_at", new Date(now.getTime() + FALLBACK_REEL_PREP_HOURS * 3_600_000).toISOString())
+            .gte("publish_at", new Date(now.getTime() - MISSED_AFTER_MS).toISOString())
+            .order("publish_at", { ascending: true }),
+    ).catch(() => []);
+    const groups = new Map<string, any[]>();
+    for (const r of reels) {
+        const key = `${r.series_id}:${r.days_to_event}:${r.platform === "tiktok" ? "tiktok" : "meta"}`;
+        groups.set(key, [...(groups.get(key) || []), r]);
+    }
+    let jobs = 0;
+    for (const [key, group] of groups) {
+        if (jobs >= maxJobs) break;
+        const series = byId.get(Number(group[0].series_id));
+        if (!series || series.sold_out_at) continue;
+        if (group.some((g) => isFallbackReelUrl(g.video_url))) continue;
+        if (group.some((g) => g.rendered_at && now.getTime() - Date.parse(g.rendered_at) < FALLBACK_REEL_RETRY_MS)) continue;
+        const event = await loadSeriesEvent(supabase, Number(series.event_id));
+        if (!event || reelVideoFor(event)) continue;
+        const photos = reelPhotos(baseImageUrlFor(series, event), await loadGalleryPhotos(supabase, Number(event.id)));
+        if (!photos.length) continue;
+        const ids = group.map((g) => Number(g.id));
+        try {
+            const config = normalizeCadence(series.cadence_config);
+            const anchor = group[0].anchor_starts_at ? new Date(group[0].anchor_starts_at) : series.anchor_starts_at ? new Date(series.anchor_starts_at) : anchorFor(event, now);
+            const data = await pieceDataFor(supabase, series, event, { kind: "story", variant: "countdown", days_to_event: Number(group[0].days_to_event) }, config, anchor);
+            if (key.endsWith(":tiktok")) data.linkLabel = shortEventLink(origin, event.slug);
+            const frames = await renderReelFrames(data, photos, { load: loadBaseImage, baseOptions: baseImageOptionsFor(series, event) });
+            if (!frames.length) continue;
+            const stamp = now.getTime().toString(36);
+            const urls: string[] = [];
+            for (let i = 0; i < frames.length; i++) {
+                const path = `social-series/${series.organization_id}/reel-frames/${series.id}-${ids[0]}-${i}-${stamp}.jpg`;
+                const { error } = await supabase.storage.from(IMAGE_BUCKET).upload(path, frames[i], { contentType: "image/jpeg", cacheControl: "31536000", upsert: false });
+                if (error) throw new Error(`No se pudo guardar un cuadro del reel: ${error.message}`);
+                urls.push(supabase.storage.from(IMAGE_BUCKET).getPublicUrl(path).data.publicUrl);
+            }
+            await supabase.from(SLOTS_TABLE).update({ rendered_at: now.toISOString(), error: null, updated_at: nowIso() }).in("id", ids).eq("status", "planned");
+            const outPath = `${FALLBACK_REEL_PREFIX}${series.organization_id}/${series.id}-${ids[0]}-${stamp}.mp4`;
+            const res = await trigger({ slotIds: ids, frames: urls, outPath, musicUrl: fallbackReelMusicUrl() });
+            if (!res.ok) throw new Error(`la función del reel respondió ${res.status}`);
+            jobs++;
+        } catch (err: any) {
+            const message = `No se pudo armar el reel automático: ${String(err?.message || err)}`.slice(0, 480);
+            console.error(`social series ${series.id}: reel de respaldo:`, message);
+            await supabase.from(SLOTS_TABLE).update({ rendered_at: null, error: message, updated_at: nowIso() }).in("id", ids).eq("status", "planned");
+        }
+    }
+    return jobs;
+}
+
+/**
+ * Serie activa aprobada sin reel (no había video) que ahora sí puede tenerlo (el productor subió un video o el reel
+ * de respaldo está activado): agrega el reel en cada red activa el día con historia más cercano a D-3 que quede. En
+ * TikTok el video reemplaza la foto de ese día, como al aprobar. Devuelve true si agregó.
+ */
+async function addMissingReel(supabase: any, series: any, event: any, now: Date): Promise<boolean> {
+    if (series.status !== "active" || series.reel_enabled === false || series.sold_out_at) return false;
+    const slots = await loadSlots(supabase, series.id);
+    if (effectiveReels(slots).length) return false;
+    const source = await reelSource(supabase, series, event);
+    if (!source) return false;
+    const day = lateReelDay(slots, now, normalizeCadence(series.cadence_config));
+    if (!day) return false;
+    const platforms = activePlatforms(series);
+    const story = slots.find((x) => x.kind === "story" && x.status === "planned" && x.publish_at === day.publish_at);
+    const rows = platforms.map((platform) => ({
+        series_id: series.id,
+        organization_id: series.organization_id,
+        platform,
+        kind: "reel",
+        variant: "countdown",
+        publish_at: day.publish_at,
+        days_to_event: Math.max(0, day.days_to_event),
+        anchor_starts_at: story?.anchor_starts_at || series.anchor_starts_at || null,
+        video_url: source === "video" ? reelVideoFor(event)?.url || null : null,
+        status: "planned",
+    }));
+    const { error } = await supabase.from(SLOTS_TABLE).insert(rows);
+    if (error) {
+        if (isMissing(error)) return false;
+        throw error;
+    }
+    if (platforms.includes("tiktok")) {
+        await supabase
+            .from(SLOTS_TABLE)
+            .update({ status: "skipped", skip_reason: "reemplazada por el reel", updated_at: nowIso() })
+            .eq("series_id", series.id)
+            .eq("platform", "tiktok")
+            .eq("kind", "feed_post")
+            .eq("status", "planned")
+            .eq("publish_at", day.publish_at);
+    }
+    const when = localDateTime(day.publish_at)?.replace("T", " ") || day.publish_at;
+    const notice = source === "video" ? `Agregamos el reel con el video del evento: sale el ${when}.` : `Agregamos un reel armado con las fotos del evento: sale el ${when}.`;
+    await supabase.from(SERIES_TABLE).update({ notice, updated_at: nowIso() }).eq("id", series.id);
+    return true;
+}
+
+export type JobSummary = { reconciled: Record<string, number>; dispatched: number; failed: number; retried: number; skipped: number; remaining: number; reels_requested?: number };
 
 /**
  * Pasada del job (cada 15 min): libera claims huérfanos, reconcilia las series vivas (cortes) y despacha los slots
@@ -1481,6 +1722,11 @@ export async function runSeriesJobs(supabase: any, { origin, now = new Date(), b
             summary.skipped++;
             continue;
         }
+        if (slot.kind === "reel" && !reelVideoFor(events.get(Number(series.event_id)) ?? (await loadEventInto(events, supabase, series))) && !isFallbackReelUrl(slot.video_url)) {
+            // Reel de respaldo en preparación: se espera hasta 20 min antes de publicar (después, se intenta y falla con el motivo)
+            const preparing = fallbackReelEnabled() && slot.rendered_at && now.getTime() - Date.parse(slot.rendered_at) < FALLBACK_REEL_RETRY_MS;
+            if (preparing && Date.parse(slot.publish_at) - now.getTime() > 20 * 60_000) continue;
+        }
         if (series.sold_out_at && slot.variant !== "sold_out") {
             await supabase.from(SLOTS_TABLE).update({ status: "skipped", skip_reason: "agotado", updated_at: nowIso() }).eq("id", slot.id).eq("status", "planned");
             summary.skipped++;
@@ -1533,7 +1779,20 @@ export async function runSeriesJobs(supabase: any, { origin, now = new Date(), b
             }
         }
     }
+    // Reels de respaldo de las próximas horas, con el tiempo que sobre (primero va lo que publica pronto)
+    if (fallbackReelEnabled() && Date.now() - started < budgetMs / 2) {
+        summary.reels_requested = await prepareFallbackReels(supabase, [...byId.values()], { origin, now }).catch((err: any) => {
+            console.error("social series: reels de respaldo:", err?.message || err);
+            return 0;
+        });
+    }
     return summary;
+}
+
+async function loadEventInto(cache: Map<number, any>, supabase: any, series: any) {
+    const event = await loadSeriesEvent(supabase, Number(series.event_id));
+    cache.set(Number(series.event_id), event);
+    return event;
 }
 
 // ---------------------------------------------------------------------------
