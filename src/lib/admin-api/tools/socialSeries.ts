@@ -4,12 +4,33 @@
 import { fetchAll, localDateTime } from "../../producer-api/tools/common";
 import type { JsonSchema } from "../../producer-api/registry";
 import { DEFAULT_CADENCE, normalizeCadence, type CadenceConfig } from "../../socialSeriesCadence";
-import { attributedSales, loadCadenceConfig, networkStates, saveCadenceConfig, SERIES_TABLE, SLOTS_TABLE } from "../../socialSeries";
+import { attributedSales, loadCadenceConfig, networkStates, presentDmStats, refreshDmStats, saveCadenceConfig, SERIES_TABLE, SLOTS_TABLE } from "../../socialSeries";
 import type { AdminToolDef } from "../registry";
 import { organizationIdSchema } from "./organizations";
 import { orgNames } from "./analytics";
 
 const STATUSES = ["draft", "active", "paused", "completed", "cancelled"] as const;
+
+/**
+ * Misma caché de 10 min que get_social_series (refreshDmStats): las series vivas se refrescan si está vencida, así
+ * las dos herramientas muestran los mismos números. Canceladas y completadas ya no tienen automatizaciones en Zernio:
+ * queda la última lectura.
+ */
+async function dmStatsFor(supabase: any, series: any, slots: any[]) {
+    if (series.status !== "active" && series.status !== "paused") return series.dm_stats || null;
+    return refreshDmStats(supabase, series, slots).catch(() => series.dm_stats || null);
+}
+
+function dmFields(dms: any) {
+    const v = presentDmStats(dms);
+    return {
+        dms_sent: v?.sent ?? null,
+        dms_sent_series: v?.dms_sent_series ?? null,
+        dms_sent_account: v?.dms_sent_account ?? null,
+        dm_link_clicks: v?.link_clicks ?? null,
+        dms_as_of: v?.as_of ?? null,
+    };
+}
 
 const listSocialSeries: AdminToolDef = {
     name: "list_social_series",
@@ -17,7 +38,9 @@ const listSocialSeries: AdminToolDef = {
     description:
         "Series de historias automáticas de todos los productores (o una organización): estado, evento, hora de publicación, redes (Instagram " +
         "y, si se activaron, Facebook y TikTok con su estado), piezas publicadas, pendientes y fallidas por red (con el último error), avisos, " +
-        "DMs enviados y ventas atribuidas. Por defecto las vivas " +
+        "DMs enviados (dms_sent = dms_sent_series, los de la serie, + dms_sent_account, la respuesta por palabra clave a historias de la cuenta, " +
+        "compartida con otras series de esa cuenta), clics del botón del DM, dms_as_of (misma lectura que org_get_social_series, se refresca " +
+        "cada 10 min) y ventas atribuidas. Por defecto las vivas " +
         "(borrador, activas y pausadas). Para el detalle de una usa org_get_social_series.",
     readOnly: true,
     inputSchema: {
@@ -65,7 +88,7 @@ const listSocialSeries: AdminToolDef = {
                 pause_reason: s.pause_reason || null,
                 notice: s.notice || null,
                 sold_out: Boolean(s.sold_out_at),
-                dms_sent: s.dm_stats?.dms_sent ?? null,
+                ...dmFields(await dmStatsFor(supabase, s, slots)),
                 attributed_sales: s.approved_at ? await attributedSales(supabase, [Number(s.event_id)]) : null,
             });
         }

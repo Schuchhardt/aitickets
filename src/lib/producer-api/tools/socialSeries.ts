@@ -185,21 +185,7 @@ export async function seriesView(ctx: ToolContext, eventId: number, { refreshSta
         slots: shown.map(presentSlot),
         slot_counts: counts,
         next_slot: next ? presentSlot(next) : null,
-        dms: dms
-            ? {
-                  sent: dms.dms_sent ?? 0,
-                  failed: dms.dms_failed ?? 0,
-                  link_clicks: dms.link_clicks ?? 0,
-                  unique_clicks: dms.unique_clicks ?? 0,
-                  unmatched_replies: dms.unmatched_replies ?? null,
-                  note:
-                      "Las historias de la serie responden con el link a cualquier mensaje o reacción (una vez cada 12 h por persona). " +
-                      "En las demás historias de la cuenta solo responde quien escribe la palabra clave (con o sin tilde, mayúsculas da igual); " +
-                      "esas cifras son de toda la cuenta. unmatched_replies: respuestas a historias sin la palabra clave en los últimos 14 días " +
-                      "(si eran a una historia de la serie, igual recibieron el link por la automatización de esa historia). " +
-                      "Los DM directos al chat, sin responder una historia ni comentar, no se contestan solos.",
-              }
-            : null,
+        dms: dms ? { ...S.presentDmStats(dms, await S.dmVisits(supabase, Number(event.id)).catch(() => null)), note: S.DM_STATS_NOTE } : null,
         attributed_sales: await S.attributedSales(supabase, [Number(event.id)]),
         tickets: tickets ? { capacity: tickets.capacity, issued: tickets.issued, remaining: tickets.remaining, sold_out: tickets.soldOut } : null,
         dm_preview: S.dmMessageFor(live || series || {}, event, anchor, storyLink, { button: true }),
@@ -229,7 +215,9 @@ const getSocialSeries: ToolDef = {
     title: "Ver difusión automática (historias)",
     description:
         "Estado de las historias y publicaciones automáticas de un evento (Instagram y, si están activadas, Facebook y TikTok): si se puede activar (y qué falta), el calendario propuesto " +
-        "(borrador) o las piezas programadas y publicadas con su estado, la próxima publicación, DMs enviados y clics, respuestas a historias " +
+        "(borrador) o las piezas programadas y publicadas con su estado, la próxima publicación, DMs enviados (dms.sent = dms_sent_series, los de " +
+        "la serie, + dms_sent_account, la respuesta por palabra clave a historias de toda la cuenta, compartida con otras series), clics del botón " +
+        "del DM (Zernio) frente a visitas a la página que llegaron por DM (dms.dm_visits), hora de la lectura (dms.as_of), respuestas a historias " +
         "que no recibieron el link (dms.unmatched_replies), el texto del DM (dm_preview; el link va en el botón «Comprar entradas», dm_link) y " +
         "ventas atribuidas a los DM (ref ig-story-dm / ig-post-dm). Responde \"¿cómo va mi difusión?\" y \"¿por qué no llegan DMs?\".",
     scope: "read",

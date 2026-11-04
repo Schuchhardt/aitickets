@@ -422,6 +422,13 @@ const done = computed(() => (view.value?.slots || []).filter((s) => ['published'
             <div class="p-3 rounded-lg bg-gray-50">
               <p class="text-xl font-bold">{{ view.dms?.sent ?? '—' }}</p>
               <p class="text-xs text-gray-500">DMs enviados</p>
+              <p
+                v-if="view.dms?.dms_sent_account"
+                class="text-[11px] text-gray-400 mt-0.5"
+                title="Las respuestas por palabra clave a historias son de toda la cuenta de Instagram: incluyen otras series y tus propias historias."
+              >
+                {{ view.dms.dms_sent_series }} de la serie · {{ view.dms.dms_sent_account }} de la cuenta
+              </p>
             </div>
             <div class="p-3 rounded-lg bg-gray-50">
               <p class="text-xl font-bold">{{ view.attributed_sales.tickets }}</p>
