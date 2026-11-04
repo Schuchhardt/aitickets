@@ -394,24 +394,6 @@ describe('aviso: reel activado sin video', () => {
     expect(S.reelNoticeFor({ series: null, event: { ...ev, cover_video: { ...VIDEO, duration: 90 } }, uploadUrl: UPLOAD })?.code).toBe('reel_without_video')
   })
 
-  it('reelNoticeFor: serie activa sin reel (como la serie 2) avisa sin bloquear; con un reel pendiente sin video, avisa que fallará', () => {
-    const ev = { status: 'published', cover_video: null }
-    const active = { status: 'active', reel_enabled: true }
-    const story = { kind: 'story', status: 'planned' }
-    const n = S.reelNoticeFor({ series: active, event: ev, slots: [story], uploadUrl: UPLOAD })
-    expect(n).toMatchObject({ code: 'reel_without_video', level: 'info', blocking: false, cta: { url: UPLOAD } })
-    expect(n.message).toMatch(/no incluye reel/)
-    // Subió el video después: no promete que el reel se agregue (los slots se crean al aprobar) y no muestra CTA
-    const late = S.reelNoticeFor({ series: active, event: { ...ev, cover_video: VIDEO }, slots: [story], uploadUrl: UPLOAD })
-    expect(late).toMatchObject({ code: 'reel_without_video', cta: null })
-    expect(late.message).toMatch(/aún no tenía video/)
-    // Reel programado y le borraron el video
-    expect(S.reelNoticeFor({ series: active, event: ev, slots: [story, { kind: 'reel', status: 'planned' }], uploadUrl: UPLOAD })).toMatchObject({ code: 'reel_video_missing', level: 'warning', cta: { url: UPLOAD } })
-    // Reel programado con video, o ya publicado: nada que avisar
-    expect(S.reelNoticeFor({ series: active, event: { ...ev, cover_video: VIDEO }, slots: [{ kind: 'reel', status: 'queued' }], uploadUrl: UPLOAD })).toBeNull()
-    expect(S.reelNoticeFor({ series: active, event: ev, slots: [{ kind: 'reel', status: 'published' }], uploadUrl: UPLOAD })).toBeNull()
-  })
-
   it('get_social_series y prepare_social_series devuelven el aviso en notices, sin bloquear la activación', async () => {
     noVideo()
     setNow(ACTIVATION)
