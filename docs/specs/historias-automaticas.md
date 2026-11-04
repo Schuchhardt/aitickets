@@ -171,6 +171,8 @@ de columnas en la migración. `aitickets_zernio_webhook_events` deduplica los we
 | Fallo de publicación | Slot fallido visible en la tarjeta y aviso a Slack; el siguiente sigue normal |
 | Serie pausada | El job no despacha; al reanudar, lo que no salió queda omitido y se recalcula desde hoy |
 | Job caído más de 30 min | El slot vencido se omite ("no alcanzó a publicarse a tiempo"): no se publica tarde |
+| Reel activado sin video vertical de 3 a 60 s | No se programa reel y el resto sale igual. Aviso no bloqueante (`notices`, código `reel_without_video`) en la tarjeta, `get_social_series`, `prepare_social_series`, los warnings de `approve_social_series` y `list_social_series`, con CTA para subir el video (panel del evento, pestaña Página). Si la serie ya está activa, subir el video después **no** agrega el reel (los slots se crean al aprobar) y el aviso lo dice |
+| Reel programado y le quitan el video | Aviso `reel_video_missing` con CTA: si no hay video al despachar, ese reel falla y las demás piezas siguen |
 
 ## 10. Métricas
 

@@ -235,6 +235,65 @@ export function reelVideoFor(event: any): { url: string; poster_url: string | nu
     return null;
 }
 
+export type SeriesNotice = {
+    code: string;
+    level: "warning" | "info";
+    blocking: false;
+    message: string;
+    cta: { label: string; url: string } | null;
+};
+
+/**
+ * Aviso (no bloqueante) cuando el reel está activado pero no puede salir por falta de video. Casos:
+ * - Sin activar: sin video vertical de 3 a 60 s no habrá reel → CTA para subirlo antes de activar.
+ * - Activa con un reel pendiente cuyo video ya no sirve (lo borraron o cambiaron): ese reel va a fallar → CTA.
+ * - Activa sin reel (se aprobó sin video): avisa que esta difusión no tiene reel. Subir el video ahora no lo agrega
+ *   (los slots se crean al aprobar), así que el CTA solo aparece si todavía no hay video.
+ * Solo lee: no crea ni cambia slots. uploadUrl: dónde se sube el video de portada o de galería (panel del evento).
+ */
+export function reelNoticeFor(
+    { series, event, slots = [], uploadUrl }: { series: any | null; event: any; slots?: any[]; uploadUrl: string },
+): SeriesNotice | null {
+    if (series && series.reel_enabled === false) return null;
+    if (!series && event?.status !== "published") return null;
+    const video = reelVideoFor(event);
+    const cta = { label: "Subir video del evento", url: uploadUrl };
+    const need = `un video vertical de ${REEL_SECONDS.min} a ${REEL_SECONDS.max} segundos como video de portada o de galería`;
+    const live = series && ["active", "paused"].includes(series.status);
+    if (!live) {
+        if (video) return null;
+        return {
+            code: "reel_without_video",
+            level: "warning",
+            blocking: false,
+            message: `El reel está activado, pero el evento no tiene video: sin él la difusión sale sin reel. Sube ${need} antes de activarla.`,
+            cta,
+        };
+    }
+    const reels = slots.filter((s) => s.kind === "reel");
+    const pending = reels.filter((s) => ["planned", "rendering", "queued"].includes(s.status));
+    if (pending.length) {
+        if (video) return null;
+        return {
+            code: "reel_video_missing",
+            level: "warning",
+            blocking: false,
+            message: `Hay un reel programado pero el evento ya no tiene un video que sirva: si no subes ${need}, ese reel no se publicará.`,
+            cta,
+        };
+    }
+    if (reels.length) return null;
+    return {
+        code: "reel_without_video",
+        level: "info",
+        blocking: false,
+        message: video
+            ? "Esta difusión no incluye reel: se activó cuando el evento aún no tenía video. Las demás piezas siguen igual."
+            : `Esta difusión no incluye reel porque el evento no tiene video. Para tu próximo evento, sube ${need} antes de activar la difusión.`,
+        cta: video ? null : cta,
+    };
+}
+
 /** "aitickets.cl/eventos/slug": el link que muestran las piezas de Facebook y TikTok (sin https ni ref). */
 export function shortEventLink(origin: string, slug: string): string {
     let host = "aitickets.cl";

@@ -4,11 +4,12 @@
 import { fetchAll, localDateTime } from "../../producer-api/tools/common";
 import type { JsonSchema } from "../../producer-api/registry";
 import { DEFAULT_CADENCE, normalizeCadence, type CadenceConfig } from "../../socialSeriesCadence";
-import { attributedSales, loadCadenceConfig, networkStates, presentDmStats, refreshDmStats, saveCadenceConfig, SERIES_TABLE, SLOTS_TABLE } from "../../socialSeries";
+import { attributedSales, loadCadenceConfig, networkStates, presentDmStats, reelNoticeFor, refreshDmStats, saveCadenceConfig, SERIES_TABLE, SLOTS_TABLE } from "../../socialSeries";
 import type { AdminToolDef } from "../registry";
 import { organizationIdSchema } from "./organizations";
 import { orgNames } from "./analytics";
 
+const isMissing = (error: any) => ["42703", "PGRST204"].includes(String(error?.code || ""));
 const STATUSES = ["draft", "active", "paused", "completed", "cancelled"] as const;
 
 /**
@@ -37,7 +38,8 @@ const listSocialSeries: AdminToolDef = {
     title: "Difusiones automáticas (toda la plataforma)",
     description:
         "Series de historias automáticas de todos los productores (o una organización): estado, evento, hora de publicación, redes (Instagram " +
-        "y, si se activaron, Facebook y TikTok con su estado), piezas publicadas, pendientes y fallidas por red (con el último error), avisos, " +
+        "y, si se activaron, Facebook y TikTok con su estado), piezas publicadas, pendientes y fallidas por red (con el último error), avisos (notice: el último de la serie; notices: avisos no bloqueantes como reel_without_video, " +
+        "reel activado sin video vertical de 3 a 60 s), " +
         "DMs enviados (dms_sent = dms_sent_series, los de la serie, + dms_sent_account, la respuesta por palabra clave a historias de la cuenta, " +
         "compartida con otras series de esa cuenta), clics del botón del DM, dms_as_of (misma lectura que org_get_social_series, se refresca " +
         "cada 10 min) y ventas atribuidas. Por defecto las vivas " +
@@ -62,7 +64,11 @@ const listSocialSeries: AdminToolDef = {
         }, { max: 2000 }).catch(() => []);
         const top = series.slice(0, args.limit);
         const eventIds = [...new Set(top.map((s: any) => Number(s.event_id)))];
-        const events = eventIds.length ? await fetchAll<any>(() => supabase.from("events").select("id, name, slug, start_date").in("id", eventIds).order("id", { ascending: true })) : [];
+        // cover_video / gallery_video para el aviso del reel sin video (tolera la migración pendiente)
+        const loadEvents = (cols: string) => fetchAll<any>(() => supabase.from("events").select(cols).in("id", eventIds).order("id", { ascending: true }));
+        const events = eventIds.length
+            ? await loadEvents("id, name, slug, start_date, status, cover_video, gallery_video").catch((e: any) => (isMissing(e) ? loadEvents("id, name, slug, start_date, status") : Promise.reject(e)))
+            : [];
         const eventById = new Map(events.map((e: any) => [Number(e.id), e]));
         const names = await orgNames(supabase, top.map((s: any) => Number(s.organization_id)));
         const out = [];
@@ -87,6 +93,7 @@ const listSocialSeries: AdminToolDef = {
                 last_error: lastFailed?.error || null,
                 pause_reason: s.pause_reason || null,
                 notice: s.notice || null,
+                notices: [reelNoticeFor({ series: s, event: ev || {}, slots, uploadUrl: `${actx.origin}/dashboard/events/${s.event_id}#pagina` })].filter(Boolean),
                 sold_out: Boolean(s.sold_out_at),
                 ...dmFields(await dmStatsFor(supabase, s, slots)),
                 attributed_sales: s.approved_at ? await attributedSales(supabase, [Number(s.event_id)]) : null,
