@@ -67,7 +67,7 @@ export function rememberOrder(event, { orderId, quantity, amount = 0, email = ""
 
 /** Evento de embudo (§14) con event_id y la atribución guardada por la página. */
 export function trackFunnel(name, event, params = {}) {
-  const { ref, utm } = readAttribution();
+  const { ref, utm } = readAttribution(event?.id);
   trackEvent(name, {
     event_id: event?.id,
     ...(ref ? { ref } : {}),
@@ -145,7 +145,7 @@ async function postJson(url, body) {
  */
 // holders / answers / company: datos extra que pide el evento (CheckoutExtras.vue, src/lib/checkoutFields.mjs).
 export function createOrder({ event, fullName, email, phone, tickets, discountCode, cfToken, termsAccepted = true, holders, answers, company, seats }) {
-  const { ref, utm } = readAttribution();
+  const { ref, utm } = readAttribution(event?.id);
   return postJson("/api/purchase-ticket", {
     eventId: event.id,
     buyer: { fullName: fullName.trim(), email: email.trim(), phone: phone?.trim() || undefined },
@@ -167,7 +167,7 @@ export function createOrder({ event, fullName, email, phone, tickets, discountCo
 export const resendTickets = (event, email) => postJson("/api/rsvp/resend", { eventId: event.id, email: email.trim() });
 
 export function joinWaitlist(event, { email, kind, functionId }) {
-  const { utm } = readAttribution();
+  const { utm } = readAttribution(event?.id);
   return postJson("/api/events/waitlist", { eventId: event.id, email: email.trim(), kind, functionId: functionId || undefined, utm });
 }
 

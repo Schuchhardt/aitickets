@@ -60,24 +60,11 @@ const visitEventId = preview ? null : eventData.id;
     canonicalPath={seo.canonicalPath}
     noindex={seo.noindex || preview}
   />
-  <script is:inline>
-    // Atribución (C10): guardar ?ref= y utm_* para enviarlos con la compra
-    (function () {
-      try {
-        var p = new URLSearchParams(window.location.search);
-        var ref = p.get('ref');
-        var source = p.get('utm_source');
-        var medium = p.get('utm_medium');
-        var campaign = p.get('utm_campaign');
-        if (!ref && !source && !medium && !campaign) return;
-        var clip = function (v) { return v ? String(v).slice(0, 128) : null; };
-        sessionStorage.setItem('aitickets_attribution', JSON.stringify({
-          ref: clip(ref),
-          utm: { source: clip(source), medium: clip(medium), campaign: clip(campaign) },
-          landing_at: new Date().toISOString()
-        }));
-      } catch (e) { /* sessionStorage no disponible */ }
-    })();
+  <script>
+    // Atribución (C10): último toque por evento, 7 días (src/lib/attribution.js). El id del evento va en el main.
+    import { captureAttribution } from "../../../../lib/attribution.js";
+    const host = document.querySelector("[data-attribution-event-id]");
+    captureAttribution(host?.getAttribute("data-attribution-event-id") || null, window.location.search);
   </script>
   <script is:inline define:vars={{ visitEventId }}>
     if (visitEventId) {
@@ -100,7 +87,7 @@ const visitEventId = preview ? null : eventData.id;
     }
   </script>
   <SiteHeader site={props} base={base} variant="light" />
-  <main class="bg-white text-gray-900">
+  <main class="bg-white text-gray-900" data-attribution-event-id={eventData.id}>
     <EventDetail event={eventData} siteMode={true} client:idle />
   </main>
   <SiteFooter site={props} base={base} />

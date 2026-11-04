@@ -110,17 +110,5 @@ export const formatCLP = (value) => `$${Math.round(Number(value) || 0).toLocaleS
 export const EMAIL_RE = /^[^\s@<>(),;:"[\]]+@[^\s@<>(),;:"[\]]+\.[^\s@<>(),;:"[\]]{2,}$/;
 export const isValidEmail = (email) => typeof email === "string" && email.length <= 254 && EMAIL_RE.test(email.trim());
 
-/** Atribución guardada por la página del evento (contrato C10). */
-export const readAttribution = () => {
-  try {
-    const raw = sessionStorage.getItem("aitickets_attribution");
-    if (!raw) return {};
-    const a = JSON.parse(raw) || {};
-    const utm = a.utm && typeof a.utm === "object"
-      ? { source: a.utm.source || undefined, medium: a.utm.medium || undefined, campaign: a.utm.campaign || undefined }
-      : undefined;
-    return { ref: a.ref || undefined, utm };
-  } catch {
-    return {};
-  }
-};
+/** Atribución guardada por la página del evento (contrato C10): último toque del evento, 7 días (src/lib/attribution.js). */
+export { readAttribution } from "../../lib/attribution.js";
