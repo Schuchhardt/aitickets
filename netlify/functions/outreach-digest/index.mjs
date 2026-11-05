@@ -3,8 +3,9 @@ import { getSupabaseAdmin } from '../../lib/supabase.mjs'
 import { getOutreachConfig } from '../../lib/outreach/config.mjs'
 import { buildDigest } from '../../lib/outreach/digest.mjs'
 import { notifyOutreach } from '../../lib/outreach/notify.mjs'
+import { withHeartbeat } from '../../lib/job-heartbeat.mjs'
 
-export default async () => {
+export default withHeartbeat('outreach-digest', async () => {
   if (!getOutreachConfig().enabled) {
     console.log('outreach disabled')
     return new Response('outreach disabled', { status: 200 })
@@ -17,7 +18,7 @@ export default async () => {
     console.error('[outreach-digest] error:', err?.message)
     return new Response('error', { status: 200 })
   }
-}
+})
 
 export const config = {
   schedule: '0 23 * * *',

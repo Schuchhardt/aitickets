@@ -7,12 +7,13 @@
 // - DOMAIN_CHECKS_DISABLED=true la desactiva (kill switch).
 import { getSupabaseAdmin, json } from '../../lib/supabase.mjs'
 import { getDomainProvider, refreshSiteDomain, SITE_DOMAIN_COLUMNS } from '../../lib/domains/index.mjs'
+import { withHeartbeat } from '../../lib/job-heartbeat.mjs'
 
 const BATCH_LIMIT = 20
 const TIME_BUDGET_MS = 22000
 const ACTIVE_RECHECK_MS = 6 * 60 * 60 * 1000
 
-export default async function handler() {
+export default withHeartbeat('check-custom-domains', async function handler() {
   if (process.env.DOMAIN_CHECKS_DISABLED === 'true') return json({ skipped: 'disabled' }, 200)
   const started = Date.now()
   const supabase = getSupabaseAdmin()
@@ -60,7 +61,7 @@ export default async function handler() {
 
   if (summary.changed) console.log('🌐 check-custom-domains:', JSON.stringify(summary))
   return json(summary, 200)
-}
+})
 
 export const config = {
   schedule: '*/15 * * * *',

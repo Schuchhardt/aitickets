@@ -5,8 +5,9 @@
 // Disparo manual: POST /.netlify/functions/passline-watch-background con header x-internal-secret.
 import { functionsOrigin, triggerBackground } from '../../lib/outreach/background.mjs'
 import { passlineWatchGate } from '../../lib/leads/passline-watch.mjs'
+import { withHeartbeat } from '../../lib/job-heartbeat.mjs'
 
-export default async (req) => {
+export default withHeartbeat('passline-watch', async (req) => {
   const gate = passlineWatchGate()
   if (!gate.ok) {
     console.log('[passline-watch] omitido:', gate.reason)
@@ -15,7 +16,7 @@ export default async (req) => {
   const result = await triggerBackground(functionsOrigin(req), 'passline-watch-background')
   console.log('[passline-watch]', JSON.stringify(result))
   return Response.json(result)
-}
+})
 
 export const config = {
   schedule: '0 11 * * *',

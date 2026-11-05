@@ -12,6 +12,7 @@ import { isPaused, isWithinSendWindow } from '../../lib/outreach/guardrails.mjs'
 import { functionsOrigin, triggerBackground } from '../../lib/outreach/background.mjs'
 import { retryPendingBlocks } from '../../lib/outreach/provider-block.mjs'
 import { syncProviderCampaign } from '../../lib/outreach/provider-campaign.mjs'
+import { withHeartbeat } from '../../lib/job-heartbeat.mjs'
 
 const TICK_BUDGET_MS = 25_000
 const RETRY_BUDGET_MS = 8_000
@@ -31,7 +32,7 @@ async function retryBlocks(supabase, started) {
   }
 }
 
-export default async (req) => {
+export default withHeartbeat('outreach-tick', async (req) => {
   const started = Date.now()
   const cfg = getOutreachConfig()
   const supabase = getSupabaseAdmin()
@@ -96,7 +97,7 @@ export default async (req) => {
   await retryBlocks(supabase, started)
   console.log('[outreach-tick]', JSON.stringify({ paused, campaign: campaign.action, results }))
   return Response.json({ paused, campaign: campaign.action, results })
-}
+})
 
 export const config = {
   // 24/7: el interruptor de emergencia (pausar la campaña en el proveedor) debe aplicarse en ≤20 min a

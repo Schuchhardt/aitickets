@@ -2,12 +2,13 @@
 // (aitickets_producer_activity) con más de 12 meses (docs/runbooks/retencion-de-registros.md). Borra en lotes con la
 // RPC aitickets_purge_producer_activity (202610280100_producer_activity.sql) hasta vaciar o llegar al tope.
 import { getSupabaseAdmin } from '../../lib/supabase.mjs'
+import { withHeartbeat } from '../../lib/job-heartbeat.mjs'
 
 export const KEEP_DAYS = 365
 const BATCH = 20000
 const MAX_BATCHES = 25
 
-export default async function handler() {
+export default withHeartbeat('purge-producer-activity', async function handler() {
   try {
     const supabase = getSupabaseAdmin()
     let deleted = 0
@@ -27,7 +28,7 @@ export default async function handler() {
     console.error('Error en purge-producer-activity:', error?.message)
     return new Response(JSON.stringify({ error: 'Error interno' }), { status: 500 })
   }
-}
+})
 
 export const config = {
   schedule: '50 7 * * *', // 07:50 UTC (madrugada en Chile), fuera de la hora de los demás procesos
