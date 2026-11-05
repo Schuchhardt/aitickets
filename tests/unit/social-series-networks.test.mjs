@@ -374,3 +374,62 @@ describe('una red que falla no frena a las demás', () => {
     expect(of('tiktok').filter((x) => x.days_to_event === 4)[0]).toMatchObject({ status: 'skipped' })
   }, 60_000)
 })
+
+// ---------------------------------------------------------------------------
+// Caso real (serie 2, evento 134): reel_enabled true pero sin video vertical de 3 a 60 s → no sale reel y nadie se enteraba.
+describe('aviso: reel activado sin video', () => {
+  const UPLOAD = `${SITE}/dashboard/events/2296#pagina`
+  const noVideo = () => { db.tables.events[0].cover_video = null; db.tables.events[0].gallery_video = null }
+
+  it('reelNoticeFor: sin activar, avisa con CTA; con video, desactivado o evento en borrador, no', () => {
+    const ev = { status: 'published', cover_video: null }
+    expect(S.reelNoticeFor({ series: null, event: ev, uploadUrl: UPLOAD })).toMatchObject({
+      code: 'reel_without_video', level: 'warning', blocking: false, cta: { label: 'Subir video del evento', url: UPLOAD },
+    })
+    expect(S.reelNoticeFor({ series: { status: 'draft', reel_enabled: true }, event: ev, uploadUrl: UPLOAD })?.code).toBe('reel_without_video')
+    expect(S.reelNoticeFor({ series: null, event: { ...ev, cover_video: VIDEO }, uploadUrl: UPLOAD })).toBeNull()
+    expect(S.reelNoticeFor({ series: { status: 'draft', reel_enabled: false }, event: ev, uploadUrl: UPLOAD })).toBeNull()
+    expect(S.reelNoticeFor({ series: null, event: { ...ev, status: 'draft' }, uploadUrl: UPLOAD })).toBeNull()
+    // Video horizontal o de 90 s no sirve: igual avisa
+    expect(S.reelNoticeFor({ series: null, event: { ...ev, cover_video: { ...VIDEO, duration: 90 } }, uploadUrl: UPLOAD })?.code).toBe('reel_without_video')
+  })
+
+  it('get_social_series y prepare_social_series devuelven el aviso en notices, sin bloquear la activación', async () => {
+    noVideo()
+    setNow(ACTIVATION)
+    const before = await call('get_social_series', { event_id: 2296 })
+    expect(before.reel).toMatchObject({ available: false, enabled: true })
+    expect(before.notices).toEqual([expect.objectContaining({ code: 'reel_without_video', blocking: false, cta: { label: 'Subir video del evento', url: UPLOAD } })])
+    expect(before.blockers).toEqual([])
+    expect(before.can_activate).toBe(true)
+
+    const draft = await call('prepare_social_series', { event_id: 2296 })
+    expect(draft.notices.map((n) => n.code)).toEqual(['reel_without_video'])
+    expect(draft.plan.reels).toEqual([])
+
+    // Con el reel desactivado no hay aviso
+    const off = await call('prepare_social_series', { event_id: 2296, reel_enabled: false })
+    expect(off.notices).toEqual([])
+  })
+
+  it('approve_social_series lo muestra en warnings y activa igual; después la vista dice que esta difusión no tiene reel', async () => {
+    noVideo()
+    setNow(ACTIVATION)
+    await call('prepare_social_series', { event_id: 2296 })
+    const first = await call('approve_social_series', { event_id: 2296 })
+    expect(first.warnings.some((w) => /reel está activado/.test(w))).toBe(true)
+    await call('approve_social_series', { event_id: 2296, confirmation_token: first.confirmation_token })
+    expect(series().status).toBe('active')
+    expect(slots().some((s) => s.kind === 'reel')).toBe(false)
+
+    const view = await call('get_social_series', { event_id: 2296 })
+    expect(view.notices).toEqual([expect.objectContaining({ code: 'reel_without_video', level: 'info', blocking: false })])
+  })
+
+  it('con video no hay aviso y el reel se programa como antes', async () => {
+    const view = await activateAll()
+    expect(slots().filter((s) => s.kind === 'reel').length).toBeGreaterThan(0)
+    expect((await call('get_social_series', { event_id: 2296 })).notices).toEqual([])
+    expect(view).toBeTruthy()
+  })
+})
