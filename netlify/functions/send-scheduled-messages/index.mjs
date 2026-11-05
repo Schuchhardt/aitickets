@@ -7,6 +7,7 @@
 import { getSupabaseAdmin } from '../../lib/supabase.mjs'
 import { notifySlack } from '../../lib/slack.mjs'
 import { BACKGROUND_PATH, MESSAGE_COLUMNS, STUCK_SENDING_MINUTES, claimScheduledMessage, releaseScheduledMessage } from '../../lib/scheduled-messages.mjs'
+import { withHeartbeat } from '../../lib/job-heartbeat.mjs'
 
 const MAX_PER_RUN = 20
 
@@ -15,7 +16,7 @@ function functionsOrigin() {
   return /^https?:\/\//i.test(trusted) ? trusted : ''
 }
 
-export default async function handler() {
+export default withHeartbeat('send-scheduled-messages', async function handler() {
   const supabase = getSupabaseAdmin()
   const now = new Date()
   try {
@@ -71,7 +72,7 @@ export default async function handler() {
     console.error('send-scheduled-messages:', err?.message)
     return new Response(JSON.stringify({ error: 'Error interno' }), { status: 500 })
   }
-}
+})
 
 export const config = {
   schedule: '*/10 * * * *',

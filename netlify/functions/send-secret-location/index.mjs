@@ -7,8 +7,9 @@ import { renderSecretLocationEmail } from '../../lib/emails/index.mjs'
 import { greetingName, holderName } from '../../lib/buyer-name.mjs'
 import { formatDateOnlyLong, formatTimeShort } from '../../lib/dates.mjs'
 import { sendSecretLocationReveals } from '../../lib/secret-location.mjs'
+import { withHeartbeat } from '../../lib/job-heartbeat.mjs'
 
-export default async function handler() {
+export default withHeartbeat('send-secret-location', async function handler() {
   try {
     const result = await sendSecretLocationReveals(getSupabaseAdmin(), {
       sendEmail,
@@ -29,7 +30,7 @@ export default async function handler() {
     console.error('Error en send-secret-location:', error?.message)
     return new Response(JSON.stringify({ error: 'Error interno' }), { status: 500 })
   }
-}
+})
 
 export const config = {
   schedule: '2,17,32,47 * * * *', // cada 15 min (a los :02, :17, :32 y :47, para no coincidir con las otras)

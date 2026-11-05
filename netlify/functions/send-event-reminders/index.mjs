@@ -17,11 +17,12 @@ import { LEGAL } from '../../lib/legal.mjs'
 import { greetingName, holderName } from '../../lib/buyer-name.mjs'
 import { EVENT_DATE_COLUMNS, todayInTimeZone, addDays, formatDateOnlyLong, formatTimeShort, formatEventLocation } from '../../lib/dates.mjs'
 import { loadSecretLocation, functionStart, isRevealed, revealAt, pendingRevealText, publicPlace } from '../../lib/secret-location.mjs'
+import { withHeartbeat } from '../../lib/job-heartbeat.mjs'
 
 const REMINDER_TYPE = 'reminder_24h'
 const DEDUPE_WINDOW_HOURS = 20
 
-export default async function handler() {
+export default withHeartbeat('send-event-reminders', async function handler() {
   console.log('🔔 Revisando recordatorios de eventos...')
   const supabase = getSupabaseAdmin()
 
@@ -180,7 +181,7 @@ export default async function handler() {
     console.error('Error en send-event-reminders:', error?.message)
     return new Response(JSON.stringify({ error: 'Error interno' }), { status: 500 })
   }
-}
+})
 
 export const config = {
   schedule: '0 13 * * *', // 13:00 UTC = 09:00 (invierno, UTC-4) / 10:00 (verano, UTC-3) hora de Chile

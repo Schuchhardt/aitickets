@@ -1,5 +1,6 @@
 // Herramientas de admin: bandeja de operación (lo que espera a AI Tickets) y salud de los procesos de fondo.
-// Todo se infiere de las tablas de cada proceso; tolera tablas o columnas que aún no existen (deploy sin migrar).
+// La salud de las funciones programadas sale de sus latidos (aitickets_job_heartbeats, netlify/lib/job-heartbeat.mjs); lo
+// demás se infiere de las tablas de cada proceso. Tolera tablas o columnas que aún no existen (deploy sin migrar).
 import type { AdminToolDef } from "../registry";
 import { orgNames } from "./finance";
 
@@ -178,13 +179,48 @@ const listPendingOperations: AdminToolDef = {
     },
 };
 
+/** Cada cuántas horas corre cada función programada (su config.schedule). send-weekly-reports: domingos. */
+const SCHEDULED_JOBS: { job: string; label: string; everyHours: number; note: string }[] = [
+    { job: "send-event-reminders", label: "send-event-reminders (recordatorio 24 h)", everyHours: 24, note: "Corre a diario (13:00 UTC); envía si hay funciones al día siguiente." },
+    { job: "send-review-requests", label: "send-review-requests (pedir reseñas)", everyHours: 1, note: "Corre cada hora; envía cuando termina un evento." },
+    { job: "send-scheduled-messages", label: "send-scheduled-messages", everyHours: 1 / 6, note: "Corre cada 10 min; envía si hay mensajes programados." },
+    { job: "check-custom-domains", label: "check-custom-domains", everyHours: 1 / 4, note: "Corre cada 15 min; revisa dominios pendientes y, cada ~6 h, los activos." },
+    { job: "passline-watch", label: "passline-watch (leads)", everyHours: 24, note: "Corre a diario (11:00 UTC). Solo busca si LEADS_PASSLINE_ENABLED=true y hay FIRECRAWL_API_KEY: si no, last_note dice skipped." },
+    { job: "outreach-tick", label: "outreach", everyHours: 1 / 3, note: "Corre cada 20 min; solo envía con OUTREACH_ENABLED=true." },
+    { job: "outreach-digest", label: "outreach-digest", everyHours: 24, note: "Corre a diario (23:00 UTC); solo con OUTREACH_ENABLED=true." },
+    { job: "expire-pending-orders", label: "expire-pending-orders", everyHours: 1 / 6, note: "Corre cada 10 min: concilia con Flow y expira pendientes." },
+    { job: "funds-watch", label: "funds-watch", everyHours: 1, note: "Corre cada hora." },
+    { job: "send-secret-location", label: "send-secret-location", everyHours: 1 / 4, note: "Corre cada 15 min; envía cuando toca revelar una dirección." },
+    { job: "send-waitlist-notifications", label: "send-waitlist-notifications", everyHours: 1 / 4, note: "Corre cada 15 min; avisa si hay entradas para la lista de espera." },
+    { job: "send-weekly-reports", label: "send-weekly-reports", everyHours: 168, note: "Corre los domingos." },
+    { job: "purge-producer-activity", label: "purge-producer-activity", everyHours: 24, note: "Corre a diario (07:50 UTC)." },
+];
+
+/** Estado de un job según su latido. Sin latido no se puede saber, salvo que los demás ya lleven tiempo escribiendo. */
+function jobHealth(heartbeat: any, everyHours: number, firstHeartbeatAt: string | null) {
+    const staleAfter = Math.max(everyHours * 2, 1);
+    const failing = Boolean(heartbeat?.last_error_at && (!heartbeat.last_success_at || Date.parse(heartbeat.last_error_at) >= Date.parse(heartbeat.last_success_at)));
+    return {
+        last_run_at: heartbeat?.last_run_at ?? null,
+        last_success_at: heartbeat?.last_success_at ?? null,
+        last_error: heartbeat?.last_error ?? null,
+        items_processed: heartbeat?.items_processed ?? null,
+        last_note: heartbeat?.last_note ?? null,
+        hours_since: hoursSince(heartbeat?.last_run_at),
+        expected_every_hours: Math.round(everyHours * 100) / 100,
+        looks_stale: heartbeat ? (hoursSince(heartbeat.last_run_at) || 0) > staleAfter : firstHeartbeatAt ? (hoursSince(firstHeartbeatAt) || 0) > staleAfter : null,
+        failing,
+    };
+}
+
 const getSystemHealth: AdminToolDef = {
     name: "get_system_health",
     title: "Salud de los procesos",
     description:
-        "Última actividad observada de cada proceso de fondo (recordatorios, solicitudes de reseña, mensajes programados, revisión de dominios, " +
-        "passline-watch, outreach, expiración de órdenes, historias automáticas, bitácora del panel), errores de la API/MCP de productores en 24 h por código, órdenes atascadas y correos " +
-        "fallidos. Se infiere de las tablas: un proceso sin filas recientes puede ser normal (p. ej. sin eventos mañana), revísalo con su note.",
+        "Estado de cada proceso de fondo, errores de la API/MCP de productores en 24 h por código, órdenes atascadas y correos fallidos. Las funciones programadas registran un latido en " +
+        "cada ejecución: last_run_at (cuándo corrió, aunque no tuviera nada que hacer), last_success_at, last_error, failing (su última ejecución falló), items_processed, last_note (p. ej. skipped: " +
+        "un interruptor la tiene apagada) y looks_stale (no corre hace más del doble de lo esperado; null si aún no hay latidos). Por ejecución sin trabajo ya no hay falsos positivos. last_activity_at es la " +
+        "última vez que hizo algo visible. Historias automáticas y bitácora del panel todavía se infieren de sus tablas: un proceso sin filas recientes puede ser normal, revísalo con su note.",
     readOnly: true,
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
     async handler(_args, actx) {
@@ -198,7 +234,8 @@ const getSystemHealth: AdminToolDef = {
                 return q.order(column, { ascending: false, nullsFirst: false }).limit(1);
             }).then((r) => ({ at: r.data[0]?.[column] ?? null, missing: r.missing }));
 
-        const [reminders, reviewRequests, schedSent, schedOverdue, schedStuck, domainCheck, passline, outreachEvent, outreachPaused, pendingOverdue, processingStuck, apiErrors, emails, panelViews, panelClient, seriesQueued, seriesOverdue] = await Promise.all([
+        const [heartbeats, reminders, reviewRequests, schedSent, schedOverdue, schedStuck, domainCheck, passline, outreachEvent, outreachPaused, pendingOverdue, processingStuck, apiErrors, emails, panelViews, panelClient, seriesQueued, seriesOverdue] = await Promise.all([
+            rows(() => supabase.from("aitickets_job_heartbeats").select("job, last_run_at, last_success_at, last_error, last_error_at, items_processed, last_note, created_at")),
             last("notification_log", "created_at", (q) => q.eq("type", "reminder_24h")),
             last("notification_log", "created_at", (q) => q.eq("type", "review_request")),
             last("aitickets_scheduled_messages", "sent_at", (q) => q.eq("status", "sent")),
@@ -242,7 +279,33 @@ const getSystemHealth: AdminToolDef = {
             note: missing ? `${note} (tabla o columna aún no existe en esta base)` : note,
         });
 
+        // Funciones programadas: su estado sale del latido
+        const beatByJob = new Map(heartbeats.data.map((h: any) => [h.job, h]));
+        const firstHeartbeatAt = heartbeats.data.map((h: any) => h.created_at).filter(Boolean).sort()[0] ?? null;
+        const LAST_ACTIVITY: Record<string, { at: string | null }> = {
+            "send-event-reminders": reminders,
+            "send-review-requests": reviewRequests,
+            "send-scheduled-messages": schedSent,
+            "check-custom-domains": domainCheck,
+            "passline-watch": { at: passlineRow?.last_run_at ?? null },
+            "outreach-tick": outreachEvent,
+        };
+        const EXTRA: Record<string, Record<string, unknown>> = {
+            "send-scheduled-messages": { overdue_scheduled: schedOverdue, stuck_sending: schedStuck },
+            "passline-watch": { enabled: passlineRow?.enabled ?? null, last_result: passlineRow?.last_result ?? null },
+            "outreach-tick": { paused: pausedValue?.paused ?? false },
+            "expire-pending-orders": { pending_overdue: pendingOverdue, processing_stuck: processingStuck },
+        };
+        const jobs = SCHEDULED_JOBS.map((j) => {
+            const heartbeat = beatByJob.get(j.job);
+            return { ...j, heartbeat, health: jobHealth(heartbeat, j.everyHours, firstHeartbeatAt), extra: EXTRA[j.job] };
+        });
+
         const alerts: string[] = [];
+        for (const j of jobs) {
+            if (j.health.failing) alerts.push(`${j.job}: su última ejecución falló (${j.health.last_error || "sin detalle"}).`);
+            if (j.health.looks_stale) alerts.push(`${j.job} no corre hace más de ${Math.max(j.everyHours * 2, 1)} h: revisa la función programada en Netlify.`);
+        }
         if ((pendingOverdue || 0) > 0) alerts.push(`${pendingOverdue} orden(es) pending con la reserva vencida hace más de 1 h: expire-pending-orders podría no estar corriendo.`);
         if ((processingStuck || 0) > 0) alerts.push(`${processingStuck} orden(es) en 'processing' hace más de 30 min.`);
         if ((schedOverdue || 0) > 0) alerts.push(`${schedOverdue} mensaje(s) programado(s) vencidos sin enviar: revisa send-scheduled-messages.`);
@@ -261,23 +324,12 @@ const getSystemHealth: AdminToolDef = {
             generated_at: new Date().toISOString(),
             alerts,
             processes: [
-                proc("send-event-reminders (recordatorio 24 h)", reminders.at, 24, "Corre a diario (13:00 UTC); solo escribe si hay funciones al día siguiente.", reminders.missing),
-                proc("send-review-requests (pedir reseñas)", reviewRequests.at, 24, "Corre cada hora; solo escribe cuando termina un evento.", reviewRequests.missing),
-                { ...proc("send-scheduled-messages", schedSent.at, 24, "Corre cada 10 min; solo escribe si hay mensajes programados.", schedSent.missing), overdue_scheduled: schedOverdue, stuck_sending: schedStuck },
-                proc("check-custom-domains", domainCheck.at, 1, "Corre cada 15 min sobre sitios con dominio propio.", domainCheck.missing),
+                ...jobs.map((j) => {
+                    const activity = LAST_ACTIVITY[j.job];
+                    return { process: j.label, ...j.health, ...(activity ? { last_activity_at: activity.at } : {}), ...(j.extra || {}), note: heartbeats.missing ? `${j.note} (latidos: falta la migración)` : j.heartbeat ? j.note : `${j.note} Todavía sin latido.` };
+                }),
                 {
-                    process: "passline-watch (leads)",
-                    enabled: passlineRow?.enabled ?? null,
-                    last_activity_at: passlineRow?.last_run_at ?? null,
-                    hours_since: hoursSince(passlineRow?.last_run_at),
-                    expected_every_hours: 24,
-                    last_result: passlineRow?.last_result ?? null,
-                    note: passline.missing ? "La tabla de fuentes de leads no existe." : "Corre a diario (11:00 UTC) si LEADS_PASSLINE_ENABLED=true.",
-                },
-                { ...proc("outreach", outreachEvent.at, 24, "Solo con OUTREACH_ENABLED=true.", outreachEvent.missing), paused: pausedValue?.paused ?? false },
-                { process: "expire-pending-orders", pending_overdue: pendingOverdue, processing_stuck: processingStuck, note: "Corre cada 10 min: concilia con Flow y expira pendientes." },
-                {
-                    ...proc("social-series-dispatch (historias automáticas)", seriesQueued.at, 24, "Corre cada 15 min; solo escribe cuando hay historias o publicaciones por salir en las próximas 2 h.", seriesQueued.missing),
+                    ...proc("social-series-dispatch (historias automáticas)", seriesQueued.at, 24, "Corre cada 15 min; solo escribe cuando hay historias o publicaciones por salir en las próximas 2 h. Todavía sin latido: se infiere de sus piezas.", seriesQueued.missing),
                     overdue_planned: seriesOverdue,
                 },
                 {

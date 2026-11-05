@@ -2,8 +2,9 @@
 // liberan entradas. La lógica (a quién, cuándo, deduplicación) vive en netlify/lib/waitlist.mjs.
 import { getSupabaseAdmin } from '../../lib/supabase.mjs'
 import { notifyWaitlist } from '../../lib/waitlist.mjs'
+import { withHeartbeat } from '../../lib/job-heartbeat.mjs'
 
-export default async function handler() {
+export default withHeartbeat('send-waitlist-notifications', async function handler() {
   try {
     const result = await notifyWaitlist(getSupabaseAdmin())
     console.log(`📣 Lista de espera: ${result.sent} aviso(s) en ${result.events} evento(s)${result.failed ? `, ${result.failed} fallidos` : ''}`)
@@ -12,7 +13,7 @@ export default async function handler() {
     console.error('Error en send-waitlist-notifications:', error?.message)
     return new Response(JSON.stringify({ error: 'Error interno' }), { status: 500 })
   }
-}
+})
 
 export const config = {
   schedule: '7,22,37,52 * * * *', // cada 15 min (a los :07, :22, :37 y :52, para no coincidir con las otras)

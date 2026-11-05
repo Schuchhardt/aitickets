@@ -3,8 +3,9 @@
 // La lógica (qué funciones, a quién, deduplicación) vive en netlify/lib/review-requests.mjs.
 import { getSupabaseAdmin } from '../../lib/supabase.mjs'
 import { sendReviewRequests } from '../../lib/review-requests.mjs'
+import { withHeartbeat } from '../../lib/job-heartbeat.mjs'
 
-export default async function handler() {
+export default withHeartbeat('send-review-requests', async function handler() {
   try {
     const result = await sendReviewRequests(getSupabaseAdmin())
     console.log(`⭐ Reseñas pedidas: ${result.sent} correo(s) en ${result.events} evento(s)${result.failed ? `, ${result.failed} fallidos` : ''}`)
@@ -13,7 +14,7 @@ export default async function handler() {
     console.error('Error en send-review-requests:', error?.message)
     return new Response(JSON.stringify({ error: 'Error interno' }), { status: 500 })
   }
-}
+})
 
 export const config = {
   schedule: '20 * * * *', // cada hora (a los :20, para no coincidir con los recordatorios y los mensajes)

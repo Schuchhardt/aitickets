@@ -39,6 +39,7 @@ const adminRoute = await import('../../src/pages/api/admin/mcp.ts')
 
 const SITE = 'https://aitickets.cl'
 const DAY = 86400000
+const HOUR = 3600000
 const iso = (ms) => new Date(Date.now() + ms).toISOString()
 const P1 = '11111111-1111-4111-8111-111111111111'
 const P2 = '22222222-2222-4222-8222-222222222222'
@@ -347,6 +348,55 @@ describe('bandeja, salud y finanzas', () => {
     const r = await run('get_system_health', {})
     expect(r.ok).toBe(true)
     expect(r.result.alerts.join(' ')).toMatch(/Outreach en pausa/)
+  })
+
+  describe('get_system_health: latidos de las funciones programadas', () => {
+    const health = async () => (await run('get_system_health', {})).result
+    const proc = (r, name) => r.processes.find((p) => p.process.startsWith(name))
+    const beat = (job, over = {}) => ({ job, last_run_at: iso(-5 * 60_000), last_success_at: iso(-5 * 60_000), last_error: null, last_error_at: null, items_processed: 0, last_note: null, created_at: iso(-30 * DAY), ...over })
+
+    it('un job que corrió sin trabajo no aparece atrasado, aunque no haya escrito nada en días', async () => {
+      db.tables.aitickets_job_heartbeats = [beat('send-event-reminders', { last_run_at: iso(-20 * HOUR), last_success_at: iso(-20 * HOUR) }), beat('send-scheduled-messages'), beat('check-custom-domains')]
+      const r = await health()
+      for (const name of ['send-event-reminders', 'send-scheduled-messages', 'check-custom-domains']) {
+        expect(proc(r, name)).toMatchObject({ looks_stale: false, failing: false })
+      }
+    })
+
+    it('un job que dejó de correr, o que nunca corrió, se avisa', async () => {
+      db.tables.aitickets_job_heartbeats = [beat('check-custom-domains', { last_run_at: iso(-3 * HOUR) }), beat('send-event-reminders')]
+      const r = await health()
+      expect(proc(r, 'check-custom-domains').looks_stale).toBe(true)
+      expect(proc(r, 'funds-watch')).toMatchObject({ last_run_at: null, looks_stale: true })
+      expect(r.alerts.join(' ')).toMatch(/check-custom-domains no corre/)
+    })
+
+    it('el último fallo sale en alerts; si después corrió bien, ya no', async () => {
+      db.tables.aitickets_job_heartbeats = [beat('funds-watch', { last_success_at: iso(-2 * HOUR), last_error: 'HTTP 500: Error interno', last_error_at: iso(-5 * 60_000) })]
+      let r = await health()
+      expect(proc(r, 'funds-watch')).toMatchObject({ failing: true, last_error: 'HTTP 500: Error interno' })
+      expect(r.alerts.join(' ')).toMatch(/funds-watch: su última ejecución falló/)
+
+      db.tables.aitickets_job_heartbeats = [beat('funds-watch', { last_success_at: iso(-60_000), last_error: null, last_error_at: iso(-5 * 60_000) })]
+      r = await health()
+      expect(proc(r, 'funds-watch').failing).toBe(false)
+      expect(r.alerts.join(' ')).not.toMatch(/funds-watch/)
+    })
+
+    it('passline-watch: la fuente activada con el interruptor apagado corre, pero se ve que se omite', async () => {
+      db.tables.aitickets_lead_sources = [{ key: 'passline_search', enabled: true, last_run_at: null, last_result: null }]
+      db.tables.aitickets_job_heartbeats = [beat('passline-watch', { last_note: 'skipped: LEADS_PASSLINE_ENABLED=false' })]
+      expect(proc(await health(), 'passline-watch')).toMatchObject({ enabled: true, last_activity_at: null, looks_stale: false, last_note: 'skipped: LEADS_PASSLINE_ENABLED=false' })
+    })
+
+    it('sin latidos (antes de la primera ejecución o de la migración) no afirma nada', async () => {
+      db.tables.aitickets_job_heartbeats = []
+      expect(proc(await health(), 'send-event-reminders').looks_stale).toBeNull()
+      delete db.tables.aitickets_job_heartbeats
+      const r = await run('get_system_health', {})
+      expect(r.ok).toBe(true)
+      expect(proc(r.result, 'send-event-reminders')).toMatchObject({ looks_stale: null })
+    })
   })
 
   it('get_platform_finance: ingresos de AI Tickets, IVA, costo Flow, reembolsos y margen', async () => {
