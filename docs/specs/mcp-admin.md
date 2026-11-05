@@ -483,6 +483,8 @@ Admin").
 | `update_organization` | Perfil de la org (nombre público, razón social, RUT, correo, redes). Los productores no tienen herramienta MCP para esto | No | — |
 | `add_organization_note` | Nota interna (CRM de soporte) | No | — |
 | `send_login_help` | Reenvía el correo de verificación o un link mágico **al correo registrado del usuario** (nunca a otro) | No | — |
+| `update_lead` | Estado y notas de un lead para contacto manual. Un lead con baja o duplicado no cambia de estado; los del outreach automático solo aceptan notas. No envía nada | No | — |
+| `add_suppression` | Baja de un lead, un correo o un dominio. Frena a todos los leads con ese contacto, salvo clientes. No se deshace desde el MCP | Sí | Sí |
 
 **Fase 4 (opcionales):**
 
@@ -491,6 +493,8 @@ Admin").
 - `set_outreach_paused`.
 - `recheck_domain`.
 - `set_organization_suspended`: requiere una columna nueva y hacerla cumplir en la compra y en el panel.
+
+**Leads, solo lectura** (`docs/runbooks/passline-leads.md`): `list_leads` (por prioridad, con `contactable` y `blocked_reason`), `get_lead` (fuente de cada contacto y eventos vistos) y `export_leads` (CSV con los filtros de `scripts/export-leads.mjs`; exige la llave completa).
 
 ### 5.7 Actuar como productor: el espejo `org_*`
 
