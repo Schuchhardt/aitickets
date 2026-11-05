@@ -114,6 +114,10 @@ Concierto de Primavera (activado el 26-oct, evento el 8-nov a las 12:00): histor
   clics). Instagram no hace clickeable la URL del texto de estos mensajes y en instagram.com no muestra el botón: el botón
   funciona en la app (verificado 04-11-2026). El mensaje propio del productor lleva el link en el texto solo si usa `{link}`.
 - **Tracking:** `ref=ig-story-dm` y `ref=ig-post-dm`: las ventas aparecen como canales propios en la analítica del evento.
+- **Atribución de la venta** (`src/lib/attribution.js`): último toque por evento, ventana de 7 días, en el navegador
+  (localStorage, con sessionStorage de respaldo). Un link posterior con `ref`/`utm_*` pisa al anterior; una visita sin
+  parámetros no. El toque se manda en el body de `/api/purchase-ticket`, queda en `event_orders.ref`/`utm_*` y
+  `attributedSales` cuenta las órdenes pagadas con las refs de la serie. Se pierde al cambiar de navegador o dispositivo.
 - Palabra clave ENTRADAS por defecto, `contains`, con variantes "entrada" y "link". Zernio no distingue mayúsculas pero
   **sí tildes** ("Entrádas" no coincide con "entrada"): cada palabra se manda también sin tilde y con una tilde en cada
   vocal (`keywordVariants`; la ñ se conserva).

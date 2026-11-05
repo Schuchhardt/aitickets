@@ -200,7 +200,11 @@ export async function seriesView(ctx: ToolContext, eventId: number, { refreshSta
             facebook_dm_ref: S.DM_REFS.facebook_post,
             facebook_link_ref: S.LINK_REFS.facebook,
             tiktok_link_ref: S.LINK_REFS.tiktok,
-            note: "Las ventas aparecen como canales ig-story-dm, ig-post-dm, fb-post-dm, fb-serie y tiktok-serie en la analítica del evento.",
+            note:
+                "Las ventas aparecen como canales ig-story-dm, ig-post-dm, fb-post-dm, fb-serie y tiktok-serie en la analítica del evento. " +
+                "Atribución: último toque por evento con ventana de 7 días, en el navegador de la persona: cuenta si compra hasta 7 días después de " +
+                "llegar por el link, aunque sea en otra pestaña, salvo que antes llegue por un link de otro canal. Se pierde si cambia de navegador " +
+                "(p. ej. del navegador de Instagram a Safari) o de dispositivo.",
         },
         dashboard_url: eventDashboardUrl(ctx, Number(event.id)),
     };
