@@ -11,6 +11,7 @@ día del evento, con el link por DM a quien responda o comente la palabra clave.
 | Herramientas de productor (MCP, REST, panel, admin `org_*`) | `src/lib/producer-api/tools/socialSeries.ts` |
 | Tarjeta del panel y sus rutas | `SocialSeriesCard.vue`, `/api/events/social-series`, `/api/events/social-series-preview` |
 | Job cada 15 min | `netlify/functions/social-series-dispatch` → `POST /api/social-series/run` (`x-internal-secret`) |
+| Vistas previas (sesión del panel o `preview_url` firmado de 24 h) | `/api/events/social-series-preview`, `src/lib/socialSeriesPreview.ts` |
 | Webhooks de Zernio | `POST /api/webhooks/zernio` |
 | Admin | `list_social_series`, `update_social_series_config`; `social_series` en `get_platform_overview` y `get_event_analytics` |
 
