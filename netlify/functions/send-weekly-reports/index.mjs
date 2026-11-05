@@ -7,8 +7,9 @@
 // (ver docs/runbooks/reporte-semanal.md).
 import { functionsOrigin, triggerBackground } from '../../lib/outreach/background.mjs'
 import { weeklyReportsEnabled } from '../../lib/weekly-report.mjs'
+import { withHeartbeat } from '../../lib/job-heartbeat.mjs'
 
-export default async (req) => {
+export default withHeartbeat('send-weekly-reports', async (req) => {
   if (!weeklyReportsEnabled()) {
     console.log('[send-weekly-reports] desactivado (WEEKLY_REPORTS_ENABLED=false)')
     return new Response('weekly reports disabled', { status: 200 })
@@ -16,7 +17,7 @@ export default async (req) => {
   const result = await triggerBackground(functionsOrigin(req), 'send-weekly-reports-background')
   console.log('[send-weekly-reports]', JSON.stringify(result))
   return Response.json(result)
-}
+})
 
 export const config = {
   schedule: '40 13-22 * * 0',

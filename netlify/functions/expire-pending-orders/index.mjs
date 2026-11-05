@@ -30,6 +30,7 @@ import { reconcileOrder } from '../../lib/payments/reconcile.mjs'
 import { FLOW_STATUS, isFlowConfigured } from '../../lib/payments/flow.mjs'
 import { isMissingSchemaError, markOrderFailed, PROCESSING_STALE_MINUTES, LEGACY_HOLD_MINUTES } from '../../lib/orders.mjs'
 import { notifySlack } from '../../lib/slack.mjs'
+import { withHeartbeat } from '../../lib/job-heartbeat.mjs'
 
 const BATCH_LIMIT = 100
 const SWEEP_LIMIT = 20
@@ -284,7 +285,7 @@ async function sweepProcessing(supabase, started, counters) {
   }
 }
 
-export default async function handler() {
+export default withHeartbeat('expire-pending-orders', async function handler() {
   const started = Date.now()
   const supabase = getSupabaseAdmin()
   const counters = { expired: 0, recovered: 0, scanned: 0, reconciled: 0, rescued: 0, closed: 0, deferred: 0, late_checked: 0 }
@@ -321,7 +322,7 @@ export default async function handler() {
     )
   }
   return json({ expired, recovered, scanned, reconciled, rescued, closed, deferred, late_checked, ...(skipped ? { skipped } : {}) }, 200)
-}
+})
 
 export const config = {
   schedule: '*/10 * * * *',
