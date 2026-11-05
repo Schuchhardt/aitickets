@@ -137,7 +137,8 @@ const getEventAnalyticsTool: AdminToolDef = {
         "visitas y visitantes únicos, conversión (órdenes ÷ visitantes únicos), ocupación (emitidas ÷ capacidad), serie diaria en hora de Chile, " +
         "horas pico, fuentes de tráfico, ubicación de visitantes, ventas y conversión por canal (ref/UTM), por medio de pago y por tipo de entrada, " +
         "reembolsos, más el resumen de check-in, de reseñas (sin datos personales) y de la difusión automática en Instagram (piezas publicadas, " +
-        "DMs y ventas por DM). Ventas sin cortesías ni transferencias.",
+        "DMs y ventas por DM). Ventas sin cortesías ni transferencias. Las visitas excluyen bots, escáneres de links y visitas de desarrollo " +
+        "(event_visits.is_bot; bot_visits_excluded dice cuántas).",
     readOnly: true,
     inputSchema: {
         type: "object",

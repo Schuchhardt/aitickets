@@ -171,6 +171,19 @@ de columnas en la migración. `aitickets_zernio_webhook_events` deduplica los we
 | Fallo de publicación | Slot fallido visible en la tarjeta y aviso a Slack; el siguiente sigue normal |
 | Serie pausada | El job no despacha; al reanudar, lo que no salió queda omitido y se recalcula desde hoy |
 | Job caído más de 30 min | El slot vencido se omite ("no alcanzó a publicarse a tiempo"): no se publica tarde |
+| Reel activado sin video vertical de 3 a 60 s | Sin el flag `SOCIAL_SERIES_FALLBACK_REEL`, no se programa reel y el resto sale igual. Con el flag y alguna foto (portada o galería), se programa un **reel de respaldo** (ver abajo). Aviso no bloqueante en `notices` (`reel_without_video` o `reel_fallback`) en la tarjeta, `get_social_series`, `prepare_social_series`, los warnings de `approve_social_series` y `list_social_series`, con CTA para subir el video (panel del evento, pestaña Página) |
+| Serie activa aprobada sin reel y después hay video (o se activa el respaldo) | `reconcileSeries` agrega el reel en cada red activa el día con historia de Instagram pendiente más cercano a D-3, con al menos 3 h por delante (aviso `reel_pending` mientras tanto; luego un `notice` con la fecha). En TikTok el video reemplaza la foto de ese día. Sin día disponible, el aviso dice que ya no se puede |
+| Cambian o quitan el video después de aprobar | Al despachar se usa el video vigente del evento. Si ya no hay uno que sirva: el reel de respaldo si existe; si no, el reel falla con el motivo (`reel_video_missing` lo avisa antes) y las demás piezas siguen |
+| Serie activa con tráfico desde una red sin conectar | Desde 5 visitas de personas (sin bots) desde Facebook o TikTok, aviso `network_traffic_<red>` en la tarjeta y `get_social_series`, con CTA a Promocionar. Es solo una sugerencia: una serie activa no suma redes, así que conectar sirve para las próximas difusiones |
+
+### Reel de respaldo (flag `SOCIAL_SERIES_FALLBACK_REEL=true`, apagado por defecto)
+
+- **Cuadros** (`src/lib/socialSeriesReel.ts`, 1080×1920): apertura con la plantilla del día sobre la portada (o la foto base de la serie), hasta 3 fotos de la galería a pantalla completa y cierre con la plantilla y el llamado ("Comenta ENTRADAS…"; en TikTok, el link). Sin ninguna foto no hay respaldo.
+- **Cuándo**: el job (`prepareFallbackReels`, con el tiempo que sobra en cada pasada) toma los reels que publican en las próximas 24 h sin video, renderiza los cuadros, los sube a Storage (`social-series/{org}/reel-frames/`) y llama a la background function `social-series-reel-background`. Un video por serie, día y llamado (Instagram y Facebook comparten uno; TikTok tiene el suyo). `rendered_at` marca el pedido en curso; sin resultado en 30 min, se repite.
+- **Video** (`netlify/lib/reel-video.mjs`, ffmpeg de `ffmpeg-static`, dependencia opcional): 3,5 s por cuadro con acercamiento lento alternado (Ken Burns) y fundidos de 0,5 s (4 cuadros = 12,5 s), H.264 + AAC, 30 fps, `+faststart`. Se sube a `social-series-reels/{org}/…mp4` y se escribe en `video_url` de los slots pendientes.
+- **Música**: `SOCIAL_SERIES_REEL_MUSIC_URL`, una pista de nuestra biblioteca libre de derechos en nuestro Storage (se repite y se funde al final). Sin ella, el reel va con una pista silenciosa.
+- **Despacho**: el job espera el video hasta 20 min antes de publicar; si no llegó, el reel falla con "No alcanzó a armarse el reel automático" y las demás piezas siguen. Si el productor sube su video antes, se usa el suyo.
+- **Seguridad**: la background function solo acepta `x-internal-secret`, cuadros y música de nuestro Storage público y una salida bajo `social-series-reels/`.
 
 ## 10. Métricas
 

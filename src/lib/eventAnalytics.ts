@@ -27,6 +27,39 @@ const isMissingColumn = (error: any) =>
     ["42703", "PGRST204"].includes(String(error?.code || "")) || /column .* does not exist|could not find .* column/i.test(String(error?.message || ""));
 const isMissingFunction = (error: any) => ["42883", "PGRST202"].includes(String(error?.code || ""));
 
+/**
+ * Visitas que no cuentan en la analítica: bots, escáneres de links (p. ej. el de Meta desde sus datacenters) y
+ * visitas de desarrollo. Se guardan marcadas (event_visits.is_bot, netlify/lib/visit-bots.mjs) y se excluyen de
+ * visitas, conversión, fuentes, ubicaciones y hora pico.
+ */
+export const BOT_VISITS_NOTE =
+    "Las visitas excluyen bots y escáneres de links (vistas previas de Instagram, Facebook y WhatsApp, buscadores, IA) y las de desarrollo; bot_visits_excluded dice cuántas se dejaron fuera.";
+
+/**
+ * Lee event_visits paginando, solo personas (is_bot = false). Si la columna aún no existe (deploy preview sin la
+ * migración 202611040100), lee todas. scope agrega filtros y orden.
+ */
+export async function fetchHumanVisits<T>(supabase: any, cols: string, scope: (q: any) => any, opts: { max?: number } = {}): Promise<T[]> {
+    const run = (human: boolean) =>
+        fetchAll<T>(() => {
+            const q = supabase.from("event_visits").select(cols);
+            return scope(human ? q.eq("is_bot", false) : q);
+        }, opts);
+    try {
+        return await run(true);
+    } catch (err: any) {
+        // Solo si la que falta es is_bot (otra columna faltante, p. ej. ref, la maneja quien llama)
+        if (!isMissingColumn(err) || !/is_bot/.test(String(err?.message || ""))) throw err;
+        return run(false);
+    }
+}
+
+/** Cuántas visitas del evento se excluyeron por bots (null si la columna aún no existe). */
+export async function botVisitCount(supabase: any, eventId: number): Promise<number | null> {
+    const { count, error } = await supabase.from("event_visits").select("id", { count: "exact", head: true }).eq("event_id", eventId).eq("is_bot", true);
+    return error ? null : count ?? 0;
+}
+
 const pct = (part: number, total: number) => (total > 0 ? Math.round((part / total) * 1000) / 10 : null);
 
 const hourFmt = new Intl.DateTimeFormat("en-US", { timeZone: TZ, hour: "2-digit", hourCycle: "h23" });
@@ -85,19 +118,23 @@ const VISIT_COLUMNS = "created_at, ip_hash, referrer, utm_source, utm_medium, ut
  * Visitas de un evento (hasta `max`). `refTracked` = false si la columna ref aún no existe (deploy preview sin la
  * migración 202610270200): las visitas se leen igual, sin ref.
  */
-export async function loadEventVisits(supabase: any, eventId: number, { max = MAX_VISITS } = {}): Promise<{ visits: VisitRow[]; truncated: boolean; refTracked: boolean }> {
-    const build = (cols: string) => () =>
-        supabase.from("event_visits").select(cols).eq("event_id", eventId).order("created_at", { ascending: true }).order("id", { ascending: true });
+export async function loadEventVisits(
+    supabase: any,
+    eventId: number,
+    { max = MAX_VISITS } = {},
+): Promise<{ visits: VisitRow[]; truncated: boolean; refTracked: boolean; botVisits: number | null }> {
+    const scope = (q: any) => q.eq("event_id", eventId).order("created_at", { ascending: true }).order("id", { ascending: true });
     let refTracked = true;
     let visits: VisitRow[];
     try {
-        visits = await fetchAll<VisitRow>(build(`${VISIT_COLUMNS}, ref`), { max });
+        visits = await fetchHumanVisits<VisitRow>(supabase, `${VISIT_COLUMNS}, ref`, scope, { max });
     } catch (err) {
         if (!isMissingColumn(err)) throw err;
         refTracked = false;
-        visits = await fetchAll<VisitRow>(build(VISIT_COLUMNS), { max });
+        visits = await fetchHumanVisits<VisitRow>(supabase, VISIT_COLUMNS, scope, { max });
     }
-    return { visits, truncated: visits.length >= max, refTracked };
+    const botVisits = await botVisitCount(supabase, eventId).catch(() => null);
+    return { visits, truncated: visits.length >= max, refTracked, botVisits };
 }
 
 export const PAID_ORDER_COLUMNS =
@@ -111,15 +148,22 @@ export async function loadPaidOrders(supabase: any, eventId: number): Promise<an
 }
 
 /** Visitas y visitantes únicos sin traer las filas (RPC); si la función aún no existe, se cuentan paginando. */
-export async function eventVisitCounts(supabase: any, eventId: number): Promise<{ visits: number; unique_visitors: number; truncated: boolean }> {
+export async function eventVisitCounts(
+    supabase: any,
+    eventId: number,
+): Promise<{ visits: number; unique_visitors: number; truncated: boolean; bot_visits?: number | null }> {
     const { data, error } = await supabase.rpc("aitickets_event_visit_counts", { p_event_id: Number(eventId) });
     const row = Array.isArray(data) ? data[0] : data;
-    if (!error && row) return { visits: Number(row.visits) || 0, unique_visitors: Number(row.unique_visitors) || 0, truncated: false };
+    if (!error && row) {
+        return {
+            visits: Number(row.visits) || 0,
+            unique_visitors: Number(row.unique_visitors) || 0,
+            truncated: false,
+            ...(row.bot_visits != null ? { bot_visits: Number(row.bot_visits) } : {}),
+        };
+    }
     if (error && !isMissingFunction(error)) console.error("aitickets_event_visit_counts:", error.message);
-    const rows = await fetchAll<{ ip_hash: string | null }>(
-        () => supabase.from("event_visits").select("ip_hash").eq("event_id", eventId).order("id", { ascending: true }),
-        { max: MAX_VISITS },
-    );
+    const rows = await fetchHumanVisits<{ ip_hash: string | null }>(supabase, "ip_hash", (q) => q.eq("event_id", eventId).order("id", { ascending: true }), { max: MAX_VISITS });
     return { visits: rows.length, unique_visitors: new Set(rows.map((v) => v.ip_hash)).size, truncated: rows.length >= MAX_VISITS };
 }
 
@@ -533,7 +577,7 @@ export async function issuedByTicketType(supabase: any, eventId: number) {
  * iba quien visitó).
  */
 export async function getEventAnalytics(supabase: any, event: { id: number; status?: string | null }, { eventDateId = null }: { eventDateId?: number | null } = {}) {
-    const [{ visits, truncated: visitsTruncated, refTracked }, orders, capacity, ticketTypes, { count: refunded }, { functions, ticketFunction }] = await Promise.all([
+    const [{ visits, truncated: visitsTruncated, refTracked, botVisits }, orders, capacity, ticketTypes, { count: refunded }, { functions, ticketFunction }] = await Promise.all([
         loadEventVisits(supabase, event.id),
         loadPaidOrders(supabase, event.id),
         eventCapacity(supabase, event),
@@ -570,6 +614,7 @@ export async function getEventAnalytics(supabase: any, event: { id: number; stat
         refunded_orders: refunded || 0,
         visits_truncated: visitsTruncated,
         ref_tracked: refTracked,
+        bot_visits_excluded: botVisits,
         functions,
         sales_by_function: functions.length > 1 ? salesByFunction(sales.sales, functions, ticketFunction) : [],
         selected_function: selectedFunction,

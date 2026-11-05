@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import SkeletonRows from './SkeletonRows.vue'
-import { Instagram, Facebook, Music2, Clapperboard, CalendarClock, Pause, Play, X, RefreshCw, ImagePlus, MessageCircle, Check, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-vue-next'
+import { Instagram, Facebook, Music2, Clapperboard, CalendarClock, Pause, Play, X, RefreshCw, ImagePlus, MessageCircle, Check, AlertTriangle, ChevronLeft, ChevronRight, Megaphone } from 'lucide-vue-next'
 import { CANVA_REEL_URL } from '../../lib/socialPlatforms'
 
 // Difusión automática (docs/specs/historias-automaticas.md): el productor aprueba una vez y AI Tickets publica
@@ -259,6 +259,22 @@ const done = computed(() => (view.value?.slots || []).filter((s) => ['published'
       <template v-else-if="view">
         <div v-if="series?.notice" class="flex gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-900" role="status">
           <AlertTriangle :size="16" class="shrink-0 mt-0.5" /> <span>{{ series.notice }}</span>
+        </div>
+
+        <!-- Avisos que no bloquean (p. ej. reel activado sin video): con CTA para subir el video -->
+        <div
+          v-for="n in view.notices || []"
+          :key="n.code"
+          class="flex gap-2 p-3 rounded-lg border text-sm"
+          :class="n.level === 'warning' ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-gray-50 border-gray-200 text-gray-700'"
+          role="status"
+          :data-testid="`series-notice-${n.code}`"
+        >
+          <component :is="n.code.startsWith('reel') ? Clapperboard : Megaphone" :size="16" class="shrink-0 mt-0.5" />
+          <span>
+            {{ n.message }}
+            <a v-if="n.cta" :href="n.cta.url" class="font-medium underline whitespace-nowrap" :data-track="`Aviso difusión: ${n.code}`">{{ n.cta.label }}</a>
+          </span>
         </div>
 
         <!-- Sin activar -->
