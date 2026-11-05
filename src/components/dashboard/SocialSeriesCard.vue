@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import SkeletonRows from './SkeletonRows.vue'
-import { Instagram, Facebook, Music2, Clapperboard, CalendarClock, Pause, Play, X, RefreshCw, ImagePlus, MessageCircle, Check, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-vue-next'
+import { Instagram, Facebook, Music2, Clapperboard, CalendarClock, Pause, Play, X, RefreshCw, ImagePlus, MessageCircle, Check, AlertTriangle, ChevronLeft, ChevronRight, Megaphone } from 'lucide-vue-next'
 import { CANVA_REEL_URL } from '../../lib/socialPlatforms'
 
 // Difusión automática (docs/specs/historias-automaticas.md): el productor aprueba una vez y AI Tickets publica
@@ -270,7 +270,7 @@ const done = computed(() => (view.value?.slots || []).filter((s) => ['published'
           role="status"
           :data-testid="`series-notice-${n.code}`"
         >
-          <Clapperboard :size="16" class="shrink-0 mt-0.5" />
+          <component :is="n.code.startsWith('reel') ? Clapperboard : Megaphone" :size="16" class="shrink-0 mt-0.5" />
           <span>
             {{ n.message }}
             <a v-if="n.cta" :href="n.cta.url" class="font-medium underline whitespace-nowrap" :data-track="`Aviso difusión: ${n.code}`">{{ n.cta.label }}</a>

@@ -161,8 +161,18 @@ export async function seriesView(ctx: ToolContext, eventId: number, { refreshSta
     const anchor = series?.anchor_starts_at ? new Date(series.anchor_starts_at) : S.anchorFor(event);
     const storyLink = S.dmTrackingUrl(ctx.origin, event.slug || "", S.DM_REFS.story);
     const baseImage = S.baseImageUrlFor(live, event);
-    // Avisos no bloqueantes (no impiden activar ni frenan la serie): hoy, el reel activado sin video
+    // Avisos no bloqueantes (no impiden activar ni frenan la serie): el reel activado sin video
     const reelNotice = S.reelNoticeFor({ series: live, event, slots, uploadUrl: `${eventDashboardUrl(ctx, Number(event.id))}#pagina`, fallback: reelSource === "fallback" });
+    // Sugerencia de conectar una red con tráfico: solo si aplica, y si la lectura falla la vista sale igual
+    const trafficNotices =
+        live?.status === "active" && (!fb || !tt)
+            ? S.networkTrafficNotices({
+                  series: live,
+                  connected: { facebook: Boolean(fb), tiktok: Boolean(tt) },
+                  traffic: await S.loadNetworkTraffic(supabase, Number(event.id)).catch(() => ({})),
+                  connectUrl: `${ctx.origin}/dashboard/promote`,
+              })
+            : [];
 
     return {
         event: { id: Number(event.id), name: event.name, status: event.status, public_url: eventPublicUrl(ctx, event.slug) },
@@ -187,7 +197,7 @@ export async function seriesView(ctx: ToolContext, eventId: number, { refreshSta
         },
         can_activate: blockers.length === 0 && (!live || live.status === "draft"),
         blockers,
-        notices: reelNotice ? [reelNotice] : [],
+        notices: [...(reelNotice ? [reelNotice] : []), ...trafficNotices],
         series: series ? presentSeries(series) : null,
         plan,
         slots: shown.map(presentSlot),
@@ -233,8 +243,8 @@ const getSocialSeries: ToolDef = {
         "que no recibieron el link (dms.unmatched_replies), el texto del DM (dm_preview; el link va en el botón «Comprar entradas», dm_link) y " +
         "ventas atribuidas a los DM (ref ig-story-dm / ig-post-dm). Responde \"¿cómo va mi difusión?\" y \"¿por qué no llegan DMs?\". " +
         "blockers impiden activar; notices son avisos que no bloquean (p. ej. reel_without_video: el reel está activado pero el evento no tiene " +
-        "video vertical de 3 a 60 s, así que no saldrá reel; reel_video_missing: hay un reel programado sin video que sirva; reel_fallback: sin video, se arma un reel con la portada y las fotos de la galería; reel_pending: la difusión activa no tenía reel y se agrega en minutos). reel.source dice de dónde sale el reel (video, fallback o null). Cada aviso trae " +
-        "cta.url para subir el video de portada o de galería en el panel del evento: díselo al productor.",
+        "video vertical de 3 a 60 s, así que no saldrá reel; reel_video_missing: hay un reel programado sin video que sirva; reel_fallback: sin video, se arma un reel con la portada y las fotos de la galería; reel_pending: la difusión activa no tenía reel y se agrega en minutos; network_traffic_facebook / network_traffic_tiktok: la difusión activa recibe visitas desde una red que no está conectada; conectarla sirve para las próximas difusiones, la activa no cambia). reel.source dice de dónde sale el reel (video, fallback o null). Cada aviso trae " +
+        "cta.url (subir el video en el panel del evento, o conectar la red en Promocionar): díselo al productor.",
     scope: "read",
     annotations: { readOnlyHint: true },
     inputSchema: { type: "object", required: ["event_id"], additionalProperties: false, properties: { event_id: eventIdSchema } },

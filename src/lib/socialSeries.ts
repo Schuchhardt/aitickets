@@ -36,7 +36,7 @@
 import { getSupabaseAdmin } from "./auth-helpers";
 import { serverEnv, notifySlack, callInternalFunction } from "../pages/api/_lib/server-utils";
 import { fetchAll, localDay, localDateTime } from "./producer-api/tools/common";
-import { eventCapacity, fetchHumanVisits, localHour } from "./eventAnalytics";
+import { categorizeReferrer, eventCapacity, fetchHumanVisits, localHour } from "./eventAnalytics";
 import { buildEventContext, EVENT_CONTEXT_SELECT, htmlToPlainText } from "./marketing";
 import { generateSeriesCaption, isTextGenerationConfigured } from "./aiText";
 import { fetchPublic } from "./safe-fetch";
@@ -392,6 +392,58 @@ export function reelNoticeFor({
         message: "Esta difusión no incluye reel: ya no quedan días antes del evento para agregarlo. Las demás piezas siguen igual.",
         cta: null,
     };
+}
+
+/** Visitas de personas desde una red, a partir de las que vale la pena sugerir conectarla. */
+export const NETWORK_TRAFFIC_MIN_VISITS = 5;
+
+/** Red extra de la que viene una fuente de tráfico (utm_source o referrer, ver categorizeReferrer), o null. */
+export function trafficNetwork(source: string | null | undefined): ExtraNetwork | null {
+    const s = String(source ?? "").trim().toLowerCase();
+    if (s === "fb" || s.includes("facebook")) return "facebook";
+    if (s === "tt" || s.includes("tiktok")) return "tiktok";
+    return null;
+}
+
+/** Visitas de personas al evento por red extra (solo lectura; los bots no cuentan). */
+export async function loadNetworkTraffic(supabase: any, eventId: number): Promise<Record<ExtraNetwork, number>> {
+    const rows = await fetchHumanVisits<{ referrer: string | null; utm_source: string | null }>(supabase, "referrer, utm_source", (q) => q.eq("event_id", eventId).order("id", { ascending: true }));
+    const out = Object.fromEntries(EXTRA_NETWORKS.map((n) => [n, 0])) as Record<ExtraNetwork, number>;
+    for (const v of rows) {
+        const n = trafficNetwork(categorizeReferrer(v.referrer, v.utm_source));
+        if (n) out[n]++;
+    }
+    return out;
+}
+
+/**
+ * Sugerencia (no bloqueante) de conectar una red cuando una serie activa recibe tráfico desde ella y la organización no
+ * tiene cuenta ahí. Una serie activa no puede sumar redes (prepareSeries solo edita borradores y syncNetworks solo retoma
+ * las activadas al aprobar), así que el aviso promete las próximas difusiones, no esta. Una red activada y desconectada
+ * no entra: ya tiene su aviso y al reconectarla se retoma sola.
+ */
+export function networkTrafficNotices({
+    series,
+    connected,
+    traffic,
+    connectUrl,
+}: {
+    series: any | null;
+    connected: Partial<Record<ExtraNetwork, boolean>>;
+    traffic: Partial<Record<ExtraNetwork, number>>;
+    connectUrl: string;
+}): SeriesNotice[] {
+    if (series?.status !== "active") return [];
+    const states = networkStates(series);
+    return EXTRA_NETWORKS.filter((n) => !states[n].enabled && !connected[n] && (traffic[n] || 0) >= NETWORK_TRAFFIC_MIN_VISITS)
+        .sort((a, b) => (traffic[b] || 0) - (traffic[a] || 0))
+        .map((n) => ({
+            code: `network_traffic_${n}`,
+            level: "info" as const,
+            blocking: false as const,
+            message: `${traffic[n]} visitas a este evento llegaron desde ${NETWORK_NAMES[n]}, pero la difusión no publica ahí. Conecta ${NETWORK_NAMES[n]} para publicar también ahí en tus próximas difusiones; la de este evento sigue igual.`,
+            cta: { label: `Conectar ${NETWORK_NAMES[n]}`, url: connectUrl },
+        }));
 }
 
 /** "aitickets.cl/eventos/slug": el link que muestran las piezas de Facebook y TikTok (sin https ni ref). */

@@ -433,3 +433,86 @@ describe('aviso: reel activado sin video', () => {
     expect(view).toBeTruthy()
   })
 })
+
+// ---------------------------------------------------------------------------
+describe('sugerencia: tráfico desde una red sin conectar', () => {
+  const PROMOTE = `${SITE}/dashboard/promote`
+  const visits = (n, row) => Array.from({ length: n }, () => ({ event_id: 2296, created_at: ACTIVATION, referrer: null, utm_source: null, ...row }))
+  const dropAccount = (platform) => { db.tables.social_accounts = db.tables.social_accounts.filter((a) => a.platform !== platform) }
+  const activateInstagramOnly = async () => {
+    setNow(ACTIVATION)
+    await call('prepare_social_series', { event_id: 2296 })
+    await confirmCall('approve_social_series', { event_id: 2296 })
+  }
+  const codes = async () => (await call('get_social_series', { event_id: 2296 })).notices.map((n) => n.code)
+
+  it('trafficNetwork reconoce Facebook y TikTok por referrer o utm, y nada más', () => {
+    expect(S.trafficNetwork('Facebook')).toBe('facebook')
+    expect(S.trafficNetwork('fb')).toBe('facebook')
+    expect(S.trafficNetwork('TikTok')).toBe('tiktok')
+    expect(S.trafficNetwork('Instagram')).toBeNull()
+    expect(S.trafficNetwork('Directo')).toBeNull()
+    expect(S.trafficNetwork(null)).toBeNull()
+  })
+
+  it('serie activa solo en Instagram, sin cuenta de Facebook y con tráfico: sugiere conectar, sin prometer cambios en esta serie', async () => {
+    dropAccount('facebook')
+    await activateInstagramOnly()
+    const before = slots().length
+    db.tables.event_visits = visits(4, { referrer: 'https://l.facebook.com/' }).concat(visits(2, { utm_source: 'fb' }))
+    const view = await call('get_social_series', { event_id: 2296 })
+    expect(view.notices).toEqual([
+      expect.objectContaining({ code: 'network_traffic_facebook', level: 'info', blocking: false, cta: { label: 'Conectar Facebook', url: PROMOTE } }),
+    ])
+    expect(view.notices[0].message).toMatch(/^6 visitas/)
+    expect(view.notices[0].message).toMatch(/próximas difusiones/)
+    // Solo lee: no toca la serie ni sus piezas
+    expect(slots().length).toBe(before)
+    expect(series().networks.facebook?.enabled ?? false).toBe(false)
+  })
+
+  it('los bots no cuentan: bajo el mínimo de visitas de personas no hay sugerencia', async () => {
+    dropAccount('facebook')
+    await activateInstagramOnly()
+    db.tables.event_visits = visits(S.NETWORK_TRAFFIC_MIN_VISITS - 1, { referrer: 'https://l.facebook.com/' }).concat(visits(20, { referrer: 'https://l.facebook.com/', is_bot: true }))
+    expect(await codes()).toEqual([])
+  })
+
+  it('no sugiere si la red ya está conectada, ni antes de activar, ni con la serie pausada', async () => {
+    db.tables.event_visits = visits(10, { referrer: 'https://l.facebook.com/' })
+    await activateInstagramOnly()
+    expect(await codes()).toEqual([])
+
+    dropAccount('facebook')
+    expect(await codes()).toEqual(['network_traffic_facebook'])
+    series().status = 'paused'
+    expect(await codes()).toEqual([])
+    series().status = 'cancelled'
+    expect(await codes()).toEqual([])
+  })
+
+  it('una red activada que se desconectó no repite el aviso: al reconectarla se retoma sola', () => {
+    const series = { status: 'active', networks: { facebook: { enabled: true, account_id: 'acc', status: 'disconnected' } } }
+    expect(S.networkTrafficNotices({ series, connected: {}, traffic: { facebook: 50 }, connectUrl: PROMOTE })).toEqual([])
+  })
+
+  it('con las dos redes sin conectar, primero la de más tráfico', () => {
+    const notices = S.networkTrafficNotices({ series: { status: 'active' }, connected: {}, traffic: { facebook: 6, tiktok: 9 }, connectUrl: PROMOTE })
+    expect(notices.map((n) => n.code)).toEqual(['network_traffic_tiktok', 'network_traffic_facebook'])
+    expect(notices[0].cta.label).toBe('Conectar TikTok')
+  })
+
+  it('si falla la lectura de visitas, la vista sale igual', async () => {
+    dropAccount('facebook')
+    await activateInstagramOnly()
+    const from = db.from.bind(db)
+    db.from = (t) => {
+      if (t !== 'event_visits') return from(t)
+      throw new Error('boom')
+    }
+    const view = await runTool(getTool('get_social_series'), { event_id: 2296 }, ctx())
+    db.from = from
+    expect(view.ok).toBe(true)
+    expect(view.result.notices.filter((n) => n.code.startsWith('network_traffic'))).toEqual([])
+  })
+})
