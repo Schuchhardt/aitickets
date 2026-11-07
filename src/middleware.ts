@@ -97,7 +97,7 @@ function isCrossSiteRequest(request: Request, url: URL): boolean {
 const EDGE_TENANT_PREFIX = "/o/_host";
 
 /** En un host de tenant estas rutas viven en aitickets.cl. */
-const MAIN_ONLY_PREFIXES = ["/dashboard", "/organizadores", "/auth", "/api/auth", "/oauth", "/qr", "/order", "/ticket", "/mis-entradas", "/payment-confirmation", "/pago", "/invitacion"];
+const MAIN_ONLY_PREFIXES = ["/dashboard", "/organizadores", "/auth", "/api/auth", "/oauth", "/qr", "/validador", "/order", "/ticket", "/mis-entradas", "/payment-confirmation", "/pago", "/invitacion"];
 
 /** APIs de Astro permitidas en un host de tenant. */
 const TENANT_API_ALLOWLIST = new Set(["/api/sites/contact", "/api/events/visit"]);
@@ -223,7 +223,8 @@ export const onRequest = defineMiddleware(async (context, next) => {
     const { pathname } = url;
     const isDashboard = pathname === PROTECTED_PAGE_PREFIX || pathname.startsWith(`${PROTECTED_PAGE_PREFIX}/`);
     const isApi = pathname.startsWith("/api/");
-    const isQrValidator = pathname.startsWith("/qr/");
+    // App de puerta (/validador, y /qr/<slug> que redirige ahí): necesita la sesión vigente (el portero la deja abierta horas)
+    const isQrValidator = pathname.startsWith("/qr/") || pathname === "/validador" || pathname.startsWith("/validador/");
     // /o/<slug>: la vista previa de un sitio no publicado necesita la sesión del dueño vigente
     const isSitePreviewable = pathname.startsWith("/o/");
     // Consentimiento OAuth: necesita la sesión vigente del productor

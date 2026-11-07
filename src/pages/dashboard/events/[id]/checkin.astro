@@ -4,18 +4,17 @@ import { getSupabaseAdmin } from "../../../../lib/auth-helpers";
 import ValidateQR from "../../../../components/ValidateQR.vue";
 import { requireDashboardSession } from "../../_lib/guard";
 import { canAccessEventByStaff } from "../../../../../netlify/lib/event-staff.mjs";
-import { attachSessionCheckins, attachEntryDeadlines } from "../../../../../netlify/lib/checkin.mjs";
+import { CHECKIN_ROLES, loadCheckinEvent, validatorEventPath } from "../../../../lib/validatorApp";
 
-// Check-in: todos los roles del equipo (incluidos validadores)
-const CHECKIN_ROLES = ["admin", "producer", "editor", "validator"];
-
+// Check-in dentro del panel (dueños, administradores y marketing). El rol Puerta usa la app de puerta
+// (/validador/<slug>, sin el menú del panel): se lo redirige allá.
 const { id } = Astro.params;
 const guard = await requireDashboardSession(Astro, CHECKIN_ROLES);
 if (!guard.ok) return guard.response;
 const { dbUser } = guard.session;
-// Acceso por evento (aitickets_event_staff): un miembro con eventos asignados solo opera esos
-if (!(await canAccessEventByStaff(getSupabaseAdmin(), dbUser.id, Astro.params.id))) return Astro.redirect("/dashboard/events");
 const supabaseAdmin = getSupabaseAdmin();
+// Acceso por evento (aitickets_event_staff): un miembro con eventos asignados solo opera esos
+if (!(await canAccessEventByStaff(supabaseAdmin, dbUser.id, id))) return Astro.redirect(dbUser.role === "validator" ? "/validador" : "/dashboard/events");
 
 const { data: eventRow, error } = await supabaseAdmin
     .from("events")
@@ -25,64 +24,13 @@ const { data: eventRow, error } = await supabaseAdmin
     .single();
 
 if (error || !eventRow) {
-    return Astro.redirect("/dashboard/events");
+    return Astro.redirect(dbUser.role === "validator" ? "/validador" : "/dashboard/events");
 }
+if (dbUser.role === "validator") return Astro.redirect(validatorEventPath(eventRow.slug));
 
-// Asistentes con la información necesaria para validar / buscar / reenviar.
-// Paginado con .range(): PostgREST devuelve como máximo 1000 filas por consulta.
-const PAGE_SIZE = 1000;
-const event_attendees: any[] = [];
-let attendeesError: string | null = null;
-for (let from = 0; ; from += PAGE_SIZE) {
-    const { data: page, error: pageError } = await supabaseAdmin
-        .from("event_attendees")
-        .select(`
-            id,
-            event_id,
-            event_ticket_id,
-            event_order_id,
-            qr_code,
-            status,
-            is_complimentary,
-            validated_at,
-            attendees (
-                first_name,
-                last_name,
-                email
-            ),
-            event_tickets (
-                ticket_name,
-                event_date_id
-            )
-        `)
-        .eq("event_id", eventRow.id)
-        .order("id", { ascending: true })
-        .range(from, from + PAGE_SIZE - 1);
-    if (pageError) {
-        attendeesError = pageError.message;
-        break;
-    }
-    event_attendees.push(...(page || []));
-    if (!page || page.length < PAGE_SIZE) break;
-}
-
-// Funciones del evento (aviso de "otra función" en el check-in, contrato R1)
-const { data: eventDates } = await supabaseAdmin
-    .from("event_dates")
-    .select("id, date, start_time")
-    .eq("event_id", eventRow.id)
-    .order("date", { ascending: true })
-    .order("start_time", { ascending: true });
-
-if (attendeesError) console.error("Error loading attendees:", attendeesError);
-// Entradas multifunción: a qué funciones ya entró cada una
-const attendeesWithSessions = await attachEntryDeadlines(
-    supabaseAdmin,
-    eventRow.id,
-    await attachSessionCheckins(supabaseAdmin, eventRow.id, event_attendees, eventDates || []),
-);
-const event = { ...eventRow, dates: eventDates || [], attendees: attendeesWithSessions };
-const backHref = dbUser.role === "validator" ? "/dashboard/events" : `/dashboard/events/${event.id}`;
+// Entradas (paginadas), funciones, ingresos por función y hora límite (src/lib/validatorApp.ts)
+const event = await loadCheckinEvent(supabaseAdmin, eventRow);
+const validatorHref = validatorEventPath(event.slug);
 ---
 
 <DashboardLayout title={`Check-in · ${event.name}`}>
@@ -94,7 +42,7 @@ const backHref = dbUser.role === "validator" ? "/dashboard/events" : `/dashboard
             >
             <span class="text-gray-300">/</span>
             <a
-                href={backHref}
+                href={`/dashboard/events/${event.id}`}
                 class="text-gray-500 hover:text-black transition truncate min-w-0 max-w-[200px]"
                 >{event.name}</a
             >
@@ -103,6 +51,15 @@ const backHref = dbUser.role === "validator" ? "/dashboard/events" : `/dashboard
         </div>
         <h1 class="text-2xl md:text-3xl font-bold font-[Unbounded]">Check-in</h1>
         <p class="text-sm sm:text-base text-gray-500 mt-1">Escanea los códigos QR, busca asistentes por nombre o email para validarlos manualmente, o reenvía sus entradas.</p>
+        <div class="mt-3 flex flex-col sm:flex-row sm:items-center gap-2 text-sm bg-gray-50 border border-gray-200 rounded-lg p-3">
+            <p class="text-gray-600 flex-1">
+                Para la puerta usa el <strong>validador</strong> en el teléfono: pantalla completa y sigue funcionando sin conexión.
+                Tu equipo de puerta entra con el rol <strong>Puerta</strong> en <span class="font-mono">aitickets.cl/validador</span> (créalo en <a href="/dashboard/team" class="underline">Equipo</a>).
+            </p>
+            <a href={validatorHref} class="shrink-0 inline-flex items-center justify-center px-3 py-2 rounded-lg bg-black text-white font-medium hover:bg-gray-800" data-testid="open-validator">
+                Abrir validador
+            </a>
+        </div>
     </div>
 
     <ValidateQR event={event} client:load />

@@ -42,7 +42,7 @@ if (resolved) {
         .order("date", { ascending: true })
         .order("start_time", { ascending: true });
     const withSessions = await attachEntryDeadlines(supabase, resolved.event.id, await attachSessionCheckins(supabase, resolved.event.id, attendees, dates || []));
-    event = { ...resolved.event, dates: dates || [], attendees: withSessions.map(presentDoorTicket) };
+    event = { ...resolved.event, dates: dates || [], attendees: withSessions.map(presentDoorTicket), rendered_at: new Date().toISOString() };
 } else {
     Astro.response.status = 404;
 }

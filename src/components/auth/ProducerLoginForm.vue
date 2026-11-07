@@ -16,10 +16,10 @@ const needsVerification = ref(false)
 const resendLoading = ref(false)
 const resendMsg = ref('')
 const infoMsg = ref('')
-// Destino tras iniciar sesión (?next=). Solo rutas internas del panel o de autorización OAuth: nunca otro
+// Destino tras iniciar sesión (?next=). Solo rutas internas del panel, del validador o de autorización OAuth: nunca otro
 // sitio (evita redirecciones abiertas).
 const nextPath = ref('/dashboard')
-const safeNext = (raw) => (typeof raw === 'string' && /^\/(dashboard|oauth\/)/.test(raw) && !raw.startsWith('//') && !raw.includes('\\') ? raw : '/dashboard')
+const safeNext = (raw) => (typeof raw === 'string' && /^\/(dashboard|validador(\/|\?|$)|oauth\/)/.test(raw) && !raw.startsWith('//') && !raw.includes('\\') ? raw : '/dashboard')
 const nextQuery = computed(() => (nextPath.value && nextPath.value !== '/dashboard' ? `?next=${encodeURIComponent(nextPath.value)}` : ''))
 const registerHref = computed(() => `/organizadores/registro${nextQuery.value}`)
 const googleHref = computed(() => `/api/auth/google${nextQuery.value}`)
@@ -30,6 +30,7 @@ onMounted(() => {
     if (params.get('verificado') === '1') infoMsg.value = '¡Correo confirmado! Ya puedes iniciar sesión.'
     nextPath.value = safeNext(params.get('next'))
     if (nextPath.value.startsWith('/oauth/') || nextPath.value.startsWith('/dashboard/ia')) infoMsg.value = 'Inicia sesión para conectar tu asistente de IA con AI Tickets.'
+    else if (nextPath.value.startsWith('/validador')) infoMsg.value = 'Inicia sesión para validar entradas en la puerta.'
     const err = params.get('error')
     if (err === 'google_email_in_use') errorMsg.value = 'Ya tienes una cuenta con ese correo. Ingresa con tu contraseña (o recupérala).'
     else if (err === 'google') errorMsg.value = 'No pudimos completar el acceso con Google. Intenta de nuevo.'

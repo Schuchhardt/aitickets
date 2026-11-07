@@ -14,6 +14,7 @@ import {
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
+  QrCode,
   X
 } from 'lucide-vue-next'
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
@@ -103,12 +104,15 @@ const EVENT_MANAGER_ROLES = ['admin', 'producer', 'editor']
 const ORG_ADMIN_ROLES = ['admin', 'producer']
 // finance: ingresos y configuración (datos bancarios); viewer: solo lectura
 const OVERVIEW_ROLES = [...EVENT_MANAGER_ROLES, 'finance', 'viewer']
-const API_ROLES = [...EVENT_MANAGER_ROLES, 'finance', 'validator', 'viewer']
+// El rol Puerta (validator) solo ve el validador de entradas (/validador) y su perfil (src/lib/validatorApp.ts)
+const API_ROLES = [...EVENT_MANAGER_ROLES, 'finance', 'viewer']
+const CHECKIN_ROLES = [...EVENT_MANAGER_ROLES, 'validator']
 
 // roles: quién ve cada ítem (el servidor también valida en cada página/API)
 const allMenuItems = [
   { name: 'Resumen', path: '/dashboard', icon: LayoutDashboard, roles: OVERVIEW_ROLES },
-  { name: 'Mis Eventos', path: '/dashboard/events', icon: CalendarDays, roles: null },
+  { name: 'Mis Eventos', path: '/dashboard/events', icon: CalendarDays, roles: OVERVIEW_ROLES },
+  { name: 'Validar entradas', path: '/validador', icon: QrCode, roles: CHECKIN_ROLES },
   { name: 'Entradas', path: '/dashboard/tickets', icon: Ticket, roles: EVENT_MANAGER_ROLES },
   { name: 'Comunidad', path: '/dashboard/community', icon: Users, roles: EVENT_MANAGER_ROLES },
   { name: 'Descuentos', path: '/dashboard/descuentos', icon: Tag, roles: EVENT_MANAGER_ROLES },

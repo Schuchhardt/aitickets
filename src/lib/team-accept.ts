@@ -20,7 +20,8 @@ export type AcceptResult =
 const fail = (status: number, code: string, message: string): AcceptResult => ({ ok: false, status, code, message });
 const escapeLike = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
 
-export const homeForRole = (role: string) => (role === "validator" ? "/dashboard/events" : role === "finance" ? "/dashboard/finance" : "/dashboard");
+// Rol Puerta: el validador de entradas (/validador, src/lib/validatorApp.ts), lo único que ve
+export const homeForRole = (role: string) => (role === "validator" ? "/validador" : role === "finance" ? "/dashboard/finance" : "/dashboard");
 
 async function signIn(authClient: any, email: string, password: string) {
     const { data, error } = await authClient.auth.signInWithPassword({ email, password });

@@ -4,8 +4,10 @@
 import type { AstroGlobal } from "astro";
 import { getSessionContext, hasRole, type SessionContext } from "../../../lib/supabaseServer";
 import { isOnboardingPending, onboardingUrl } from "../../../lib/onboarding";
+import { VALIDATOR_APP_PATH, validatorMayOpen } from "../../../lib/validatorApp";
 
-export const VALIDATOR_HOME = "/dashboard/events";
+/** El rol Puerta (validator) solo usa el validador de entradas (src/lib/validatorApp.ts). */
+export const VALIDATOR_HOME = VALIDATOR_APP_PATH;
 
 type GuardResult =
     | { ok: true; session: SessionContext }
@@ -13,7 +15,7 @@ type GuardResult =
 
 /**
  * Exige sesión de productor. Si se pasan `roles`, además exige uno de ellos; un usuario sin el rol
- * es redirigido (validadores → lista de eventos para hacer check-in).
+ * es redirigido. El rol Puerta solo ve el validador (/validador): del panel solo puede abrir su perfil.
  */
 export async function requireDashboardSession(Astro: AstroGlobal, roles?: string[]): Promise<GuardResult> {
     const session = await getSessionContext(Astro);
@@ -26,6 +28,9 @@ export async function requireDashboardSession(Astro: AstroGlobal, roles?: string
         return { ok: false, response: Astro.redirect(onboardingUrl(Astro.url.pathname + Astro.url.search)) };
     }
     (Astro.locals as any).sessionContext = session;
+    if (session.dbUser.role === "validator" && !validatorMayOpen(Astro.url.pathname)) {
+        return { ok: false, response: Astro.redirect(VALIDATOR_HOME) };
+    }
     if (roles && !hasRole(session.dbUser, roles)) {
         return { ok: false, response: Astro.redirect(session.dbUser.role === "validator" ? VALIDATOR_HOME : "/dashboard") };
     }

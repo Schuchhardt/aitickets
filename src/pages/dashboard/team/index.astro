@@ -285,7 +285,7 @@ const roleConfig: Record<string, { label: string; color: string; icon: string }>
                     </div>
 
                     <!-- Form -->
-                    <form id="addMemberForm" class="p-4 sm:p-6 space-y-5">
+                    <form id="addMemberForm" class="p-4 sm:p-6 space-y-5" data-org-name={organization?.public_name || ""}>
                         <div id="formMessage" class="hidden p-4 rounded-lg text-sm"></div>
 
                         <div>
@@ -327,11 +327,11 @@ const roleConfig: Record<string, { label: string; color: string; icon: string }>
                                 <option value="admin">Administrador - Acceso total</option>
                                 {dbUser.role === "producer" && <option value="finance">Finanzas - Ingresos, retiros y reembolsos</option>}
                                 <option value="editor">Marketing (editor) - Gestionar eventos</option>
-                                <option value="validator">Puerta (validador) - Solo validar entradas</option>
+                                <option value="validator">Puerta (validador) - Solo el validador de entradas</option>
                                 <option value="viewer">Solo lectura - Ver eventos y estadísticas</option>
                             </select>
                             <p class="mt-2 text-xs text-gray-500">
-                                Los administradores gestionan el equipo; finanzas ve ingresos y gestiona retiros y reembolsos; marketing crea y edita eventos; puerta solo valida entradas; solo lectura ve eventos y estadísticas.
+                                Los administradores gestionan el equipo; finanzas ve ingresos y gestiona retiros y reembolsos; marketing crea y edita eventos; puerta solo ve el validador de entradas (aitickets.cl/validador: escanear QR y buscar en la lista, también sin conexión); solo lectura ve eventos y estadísticas.
                             </p>
                         </div>
 
@@ -425,14 +425,14 @@ const roleConfig: Record<string, { label: string; color: string; icon: string }>
                                 <option value="admin">Administrador - Acceso total</option>
                                 <option value="finance">Finanzas - Ingresos, retiros y reembolsos</option>
                                 <option value="editor">Marketing (editor) - Gestionar eventos</option>
-                                <option value="validator">Puerta (validador) - Solo validar entradas</option>
+                                <option value="validator">Puerta (validador) - Solo el validador de entradas</option>
                                 <option value="viewer">Solo lectura - Ver eventos y estadísticas</option>
                             </select>
                             <p id="editRoleWarning" class="mt-2 text-xs text-amber-600 hidden">
                                 ⚠️ No puedes remover tu propio rol de administrador.
                             </p>
                             <p class="mt-2 text-xs text-gray-500">
-                                Los administradores gestionan el equipo; finanzas ve ingresos y gestiona retiros y reembolsos; marketing crea y edita eventos; puerta solo valida entradas; solo lectura ve eventos y estadísticas.
+                                Los administradores gestionan el equipo; finanzas ve ingresos y gestiona retiros y reembolsos; marketing crea y edita eventos; puerta solo ve el validador de entradas (aitickets.cl/validador: escanear QR y buscar en la lista, también sin conexión); solo lectura ve eventos y estadísticas.
                             </p>
                         </div>
 
@@ -597,7 +597,63 @@ const roleConfig: Record<string, { label: string; color: string; icon: string }>
         }
     }
 
+    let memberAdded = false;
+
+    /** Mensaje con el acceso del nuevo miembro, para copiarlo o mandarlo por WhatsApp. Puerta entra a /validador. */
+    function appendShareAccess(container: HTMLElement, m: { name: string; email: string; role: string; tempPassword: string }) {
+        const isDoor = m.role === 'validator';
+        const url = `${window.location.origin}${isDoor ? '/validador' : '/organizadores/login'}`;
+        const org = (form?.dataset.orgName || '').trim();
+        const firstName = m.name.trim().split(/\s+/)[0] || '';
+        const text = isDoor
+            ? `Hola${firstName ? ` ${firstName}` : ''}, te sumé al equipo de puerta${org ? ` de ${org}` : ''} en AI Tickets. Para validar entradas abre en tu teléfono ${url} e inicia sesión con tu correo ${m.email} y la contraseña temporal ${m.tempPassword}. Puedes cambiarla después en "Mi perfil".`
+            : `Hola${firstName ? ` ${firstName}` : ''}, te sumé al equipo${org ? ` de ${org}` : ''} en AI Tickets. Entra a ${url} con tu correo ${m.email} y la contraseña temporal ${m.tempPassword}. Puedes cambiarla después en "Mi perfil".`;
+
+        const box = document.createElement('div');
+        box.className = 'mt-3 pt-3 border-t border-green-200 space-y-2';
+        if (isDoor) {
+            const p = document.createElement('p');
+            p.className = 'text-xs';
+            p.append('Solo verá el validador de entradas en ');
+            const strong = document.createElement('strong');
+            strong.textContent = url.replace(/^https?:\/\//, '');
+            p.append(strong, ': escanear QR, buscar asistentes y sincronizar (funciona sin conexión).');
+            box.append(p);
+        }
+        const preview = document.createElement('p');
+        preview.className = 'text-xs bg-white/70 border border-green-200 rounded p-2 whitespace-pre-wrap break-words';
+        preview.textContent = text;
+        preview.dataset.testid = 'share-access-text';
+        const actions = document.createElement('div');
+        actions.className = 'flex flex-wrap gap-2';
+        const copyBtn = document.createElement('button');
+        copyBtn.type = 'button';
+        copyBtn.className = 'px-3 py-1.5 rounded-lg bg-green-700 text-white text-xs font-medium hover:bg-green-800';
+        copyBtn.textContent = 'Copiar acceso';
+        copyBtn.addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(text);
+                copyBtn.textContent = '¡Copiado!';
+            } catch {
+                copyBtn.textContent = 'Selecciona y copia el texto';
+            }
+        });
+        const waLink = document.createElement('a');
+        waLink.href = `https://wa.me/?text=${encodeURIComponent(text)}`;
+        waLink.target = '_blank';
+        waLink.rel = 'noopener noreferrer';
+        waLink.className = 'px-3 py-1.5 rounded-lg border border-green-700 text-green-800 text-xs font-medium hover:bg-green-100';
+        waLink.textContent = 'Enviar por WhatsApp';
+        actions.append(copyBtn, waLink);
+        box.append(preview, actions);
+        container.append(box);
+    }
+
     function closeModal() {
+        if (memberAdded) {
+            window.location.reload();
+            return;
+        }
         if (modal) {
             modal.classList.add('hidden');
             document.body.style.overflow = '';
@@ -669,10 +725,16 @@ const roleConfig: Record<string, { label: string; color: string; icon: string }>
                         hint.textContent = 'Comparte esta contraseña con el nuevo miembro.';
                         formMessage.replaceChildren(title, document.createElement('br'), pwLine, document.createElement('br'), hint);
                     }
-                    // Reload page after 3 seconds
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 3000);
+                    if (formMessage) appendShareAccess(formMessage, {
+                        name: String(data.name || ''),
+                        email: String(data.email || '').trim().toLowerCase(),
+                        role: String(data.role || ''),
+                        tempPassword: String(result.tempPassword ?? ''),
+                    });
+                    // La contraseña temporal no se vuelve a mostrar: la página se recarga al cerrar ("Listo"), no sola
+                    memberAdded = true;
+                    if (submitBtn) submitBtn.classList.add('hidden');
+                    if (cancelBtn) cancelBtn.textContent = 'Listo';
                 } else {
                     throw new Error(result.error || 'Error al agregar miembro');
                 }

@@ -1,0 +1,118 @@
+---
+// Marco de la app de puerta (/validador): pantalla simple para el teléfono de la puerta, sin el menú del panel.
+// Registra public/validador-sw.js (la página vuelve a abrir sin conexión) y cierra sesión borrando lo guardado.
+import Layout from "./Layout.astro";
+import logoImg from "../images/logo.png";
+import { ROLE_LABELS } from "../lib/producer-api/permissions";
+import "../styles/global.css";
+
+interface Props {
+    title: string;
+    userName?: string | null;
+    role?: string | null;
+    /** Enlace "volver" (p. ej. a la lista de eventos desde el escáner). */
+    back?: { href: string; label: string } | null;
+}
+
+const { title, userName, role, back = null } = Astro.props;
+// El rol Puerta solo ve el validador; el resto puede volver al panel
+const panelHref = role && role !== "validator" ? "/dashboard" : null;
+const roleLabel = role ? ROLE_LABELS[role] || role : "";
+---
+
+<Layout title={title} noindex={true} analytics={false}>
+    <div class="min-h-dvh bg-gray-50 font-[Prompt]">
+        <header class="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-gray-200">
+            <div class="max-w-4xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-3">
+                <a href="/validador" class="shrink-0" aria-label="Validador de entradas">
+                    <img src={logoImg.src} alt="AI Tickets" class="h-7" />
+                </a>
+                <span class="hidden sm:inline text-xs font-semibold uppercase tracking-wide text-gray-500">Validador</span>
+                <div class="ml-auto flex items-center gap-2 min-w-0">
+                    {userName && (
+                        <span class="hidden sm:block text-xs text-gray-500 truncate max-w-[200px]" title={roleLabel ? `${userName} · ${roleLabel}` : userName}>
+                            {userName}{roleLabel && ` · ${roleLabel}`}
+                        </span>
+                    )}
+                    {panelHref && (
+                        <a href={panelHref} class="text-xs sm:text-sm px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 whitespace-nowrap">
+                            Ir al panel
+                        </a>
+                    )}
+                    <button
+                        type="button"
+                        data-validator-logout
+                        class="text-xs sm:text-sm px-3 py-1.5 rounded-lg text-red-600 hover:bg-red-50 whitespace-nowrap"
+                    >
+                        Cerrar sesión
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="max-w-4xl mx-auto px-4 sm:px-6 py-5 sm:py-6">
+            {back && (
+                <a href={back.href} class="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-black mb-3" data-testid="validator-back">
+                    <span aria-hidden="true">←</span> {back.label}
+                </a>
+            )}
+            <slot />
+        </main>
+    </div>
+</Layout>
+
+<script is:inline>
+    (function () {
+        // Guardar la página para abrirla sin conexión (public/validador-sw.js)
+        if ("serviceWorker" in navigator) {
+            window.addEventListener("load", function () {
+                navigator.serviceWorker
+                    .register("/validador-sw.js", { scope: "/validador" })
+                    .then(function () {
+                        return navigator.serviceWorker.ready;
+                    })
+                    .then(function (reg) {
+                        var urls = [location.pathname];
+                        try {
+                            performance.getEntriesByType("resource").forEach(function (entry) {
+                                urls.push(entry.name);
+                            });
+                        } catch (e) {}
+                        if (reg.active) reg.active.postMessage({ type: "precache", urls: urls });
+                    })
+                    .catch(function (err) {
+                        console.warn("validador: no se pudo activar el modo sin conexión", err);
+                    });
+            });
+        }
+
+        function pendingCount() {
+            var total = 0;
+            try {
+                for (var i = 0; i < localStorage.length; i++) {
+                    var key = localStorage.key(i) || "";
+                    if (key.indexOf("pending_validations_") !== 0) continue;
+                    var list = JSON.parse(localStorage.getItem(key) || "[]");
+                    if (Array.isArray(list)) total += list.length;
+                }
+            } catch (e) {}
+            return total;
+        }
+
+        document.addEventListener("click", function (e) {
+            var btn = e.target && e.target.closest && e.target.closest("[data-validator-logout]");
+            if (!btn) return;
+            var pending = pendingCount();
+            if (pending && !confirm("Hay " + pending + " validación(es) sin sincronizar en este teléfono. Si cierras sesión no se enviarán hasta que vuelvas a entrar y sincronices. ¿Cerrar sesión igual?")) return;
+            btn.disabled = true;
+            var clearCaches = window.caches
+                ? caches.keys().then(function (keys) {
+                      return Promise.all(keys.filter(function (k) { return k.indexOf("validador-") === 0; }).map(function (k) { return caches.delete(k); }));
+                  })
+                : Promise.resolve();
+            Promise.all([fetch("/api/auth/logout", { method: "POST" }).catch(function () {}), clearCaches.catch(function () {})]).then(function () {
+                window.location.href = "/organizadores/login?next=" + encodeURIComponent("/validador");
+            });
+        });
+    })();
+</script>
