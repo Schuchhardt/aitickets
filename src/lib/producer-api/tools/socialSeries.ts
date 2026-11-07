@@ -8,6 +8,7 @@
 import { ToolError, type ToolContext, type ToolDef } from "../registry";
 import { eventDashboardUrl, eventIdSchema, eventPublicUrl, loadOwnedEvent, localDateTime } from "./common";
 import { serverEnv } from "../../../pages/api/_lib/server-utils";
+import { previewLink } from "../../socialSeriesPreview";
 import * as S from "../../socialSeries";
 import { EXTRA_NETWORKS, expandNetworkSlots, normalizeCadence, type SeriesPlatform } from "../../socialSeriesCadence";
 import { pieceText } from "../../socialSeriesRender";
@@ -45,7 +46,11 @@ const stageLabel = (kind: string, variant: string, days: number) => {
     return t.bigLines.join(" ");
 };
 
-function presentSlot(s: any) {
+const PREVIEW_NOTE =
+    "image_url es la imagen ya generada para publicar (unas 2 h antes). preview_url abre la pieza pendiente con los datos de ahora; la final puede cambiar si cambian las " +
+    "entradas restantes, la foto, el nombre o el lugar. Vence a las 24 h: vuelve a consultar para un link nuevo. Los reels se ven en video_url y el caption se escribe al programar la pieza.";
+
+function presentSlot(s: any, previewUrl: string | null = null) {
     const platform = s.platform || "instagram";
     return {
         id: Number(s.id),
@@ -61,6 +66,7 @@ function presentSlot(s: any) {
         status: s.status,
         status_label: STATUS_LABELS[s.status] || s.status,
         image_url: s.image_url || null,
+        preview_url: previewUrl,
         video_url: s.video_url || null,
         caption: s.caption || null,
         post_url: s.platform_post_url || null,
@@ -143,6 +149,7 @@ export async function seriesView(ctx: ToolContext, eventId: number, { refreshSta
                 stage: stageLabel(s.kind, "countdown", s.days_to_event),
                 publish_at: s.publish_at,
                 publish_local: localDateTime(s.publish_at),
+                preview_url: previewLink(ctx.origin, Number(event.id), s),
                 ...(s.kind === "feed_post" ? { caption_example: `${S.fallbackCaption(event, s.days_to_event, p.anchorStart)}\n\nComenta ${live?.keyword || S.DEFAULT_KEYWORD} y te mandamos el link 📩` } : {}),
             })),
             event_label: labels ? `${labels.dateLabel} a las ${labels.startTime}${labels.venue ? ` · ${labels.venue}` : ""}` : null,
@@ -159,6 +166,8 @@ export async function seriesView(ctx: ToolContext, eventId: number, { refreshSta
     const anchor = series?.anchor_starts_at ? new Date(series.anchor_starts_at) : S.anchorFor(event);
     const storyLink = S.dmTrackingUrl(ctx.origin, event.slug || "", S.DM_REFS.story);
     const baseImage = S.baseImageUrlFor(live, event);
+    // Una pieza por publicar aún no tiene image_url: se le da un link para verla con los datos de ahora
+    const present = (s: any) => presentSlot(s, !s.image_url && ["planned", "rendering", "queued"].includes(s.status) ? previewLink(ctx.origin, Number(event.id), s) : null);
 
     return {
         event: { id: Number(event.id), name: event.name, status: event.status, public_url: eventPublicUrl(ctx, event.slug) },
@@ -182,9 +191,10 @@ export async function seriesView(ctx: ToolContext, eventId: number, { refreshSta
         blockers,
         series: series ? presentSeries(series) : null,
         plan,
-        slots: shown.map(presentSlot),
+        slots: shown.map(present),
         slot_counts: counts,
-        next_slot: next ? presentSlot(next) : null,
+        next_slot: next ? present(next) : null,
+        preview_note: PREVIEW_NOTE,
         dms: dms ? { ...S.presentDmStats(dms, await S.dmVisits(supabase, Number(event.id)).catch(() => null)), note: S.DM_STATS_NOTE } : null,
         attributed_sales: await S.attributedSales(supabase, [Number(event.id)]),
         tickets: tickets ? { capacity: tickets.capacity, issued: tickets.issued, remaining: tickets.remaining, sold_out: tickets.soldOut } : null,
@@ -223,7 +233,8 @@ const getSocialSeries: ToolDef = {
         "la serie, + dms_sent_account, la respuesta por palabra clave a historias de toda la cuenta, compartida con otras series), clics del botón " +
         "del DM (Zernio) frente a visitas a la página que llegaron por DM (dms.dm_visits), hora de la lectura (dms.as_of), respuestas a historias " +
         "que no recibieron el link (dms.unmatched_replies), el texto del DM (dm_preview; el link va en el botón «Comprar entradas», dm_link) y " +
-        "ventas atribuidas a los DM (ref ig-story-dm / ig-post-dm). Responde \"¿cómo va mi difusión?\" y \"¿por qué no llegan DMs?\".",
+        "ventas atribuidas a los DM (ref ig-story-dm / ig-post-dm). Cada pieza por publicar trae preview_url, un link de 24 h para abrir su imagen con los datos de ahora: entrégaselo " +
+        "al productor (ver preview_note); image_url queda vacío hasta que se genera la final, unas 2 h antes. Responde \"¿cómo va mi difusión?\", \"¿por qué no llegan DMs?\" y \"¿cómo se va a ver?\".",
     scope: "read",
     annotations: { readOnlyHint: true },
     inputSchema: { type: "object", required: ["event_id"], additionalProperties: false, properties: { event_id: eventIdSchema } },

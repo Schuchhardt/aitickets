@@ -82,6 +82,10 @@ Concierto de Primavera (activado el 26-oct, evento el 8-nov a las 12:00): histor
 - **Escasez real:** "Quedan N entradas" solo si queda menos del 30% (configurable) y solo la última semana. Nunca un número
   inventado: se calcula al renderizar.
 - **Render tardío:** la imagen se genera unas 2 h antes de publicar con los datos vigentes. La vista previa usa los de ese momento.
+- **Vistas previas de piezas pendientes:** no se guardan; se generan al abrirlas. El panel las pide con la sesión (también en el
+  calendario de una serie activa) y `get_social_series` / `org_get_social_series` entregan `preview_url`, un link firmado de 24 h
+  para esa pieza, porque el MCP no tiene sesión. `image_url` sigue siendo solo la imagen ya generada para publicar. Los captions
+  no tienen vista previa en una serie activa: Claude los escribe al programar la pieza para no repetir los anteriores.
 - **Caption del post:** Claude desde la descripción del evento (cambia el ángulo respecto de los anteriores; sin hashtags ni
   links inventados) y siempre termina en "Comenta ENTRADAS y te mandamos el link 📩". Sin IA configurada, texto fijo.
 - **Fondo = la portada del evento o una versión de ella** (o la foto base elegida para la serie; sin portada, el
