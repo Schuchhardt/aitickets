@@ -4,13 +4,15 @@ import { Plus, Calendar, MapPin, Eye, Edit, ListFilter, Globe, FileText, QrCode,
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { hasRole, EVENT_MANAGER_ROLES } from "../../../lib/supabaseServer";
 import { requireDashboardSession } from "../_lib/guard";
+import { CHECKIN_ROLES } from "../../../lib/validatorApp";
 import { getStaffEventIds } from "../../../../netlify/lib/event-staff.mjs";
 
-// Todos los roles pueden ver la lista (los validadores solo acceden al check-in)
+// Todos los roles salvo Puerta (el guard lo manda al validador, /validador). Finanzas y solo lectura ven la lista sin acciones.
 const guard = await requireDashboardSession(Astro);
 if (!guard.ok) return guard.response;
 const { dbUser } = guard.session;
 const canManage = hasRole(dbUser, EVENT_MANAGER_ROLES);
+const canCheckin = hasRole(dbUser, CHECKIN_ROLES);
 
 const events: any[] = [];
 {
@@ -181,14 +183,14 @@ const cardStatus = (e: any) => (e.archived_at ? "archived" : e.status === "publi
                       <Copy size={16} />
                     </button>
                   </>
-                ) : (
+                ) : canCheckin ? (
                   <a
                     href={`/dashboard/events/${event.id}/checkin`}
                     class="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-white bg-black rounded-lg hover:bg-gray-800 transition"
                   >
                     <QrCode size={16} /> Check-in
                   </a>
-                )}
+                ) : null}
               </div>
             </div>
           </div>

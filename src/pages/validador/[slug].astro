@@ -1,0 +1,52 @@
+---
+// Escáner de entradas de un evento (app de puerta). Escanea QR, busca por nombre, valida a mano y sincroniza; la lista
+// queda en el teléfono para seguir validando sin conexión (ValidateQR.vue). Exige sesión con rol de check-in de la
+// organización dueña del evento y acceso al evento (aitickets_event_staff). Reemplaza a /qr/<slug>.
+import ValidatorLayout from "../../layouts/ValidatorLayout.astro";
+import ValidateQR from "../../components/ValidateQR.vue";
+import { getSupabaseAdmin } from "../../lib/auth-helpers";
+import { resolveEventSlugRedirect, slugRedirectResponse } from "../../lib/eventSlug";
+import { canAccessEventByStaff } from "../../../netlify/lib/event-staff.mjs";
+import { VALIDATOR_APP_PATH, loadCheckinEvent, requireCheckinSession, validatorEventPath } from "../../lib/validatorApp";
+
+export const prerender = false;
+
+// Datos de asistentes: nunca en cachés intermedias (la copia sin conexión la guarda solo public/validador-sw.js)
+Astro.response.headers.set("Cache-Control", "no-store");
+Astro.response.headers.set("Referrer-Policy", "no-referrer");
+
+const guard = await requireCheckinSession(Astro);
+if (!guard.ok) return guard.response;
+const { dbUser } = guard.session;
+const supabase = getSupabaseAdmin();
+const slug = String(Astro.params.slug || "");
+
+const { data: eventRow } = await supabase
+    .from("events")
+    .select("id, name, slug, start_date, end_date")
+    .eq("slug", slug)
+    .eq("organization_id", dbUser.organization_id)
+    .maybeSingle();
+
+if (!eventRow) {
+    // Links guardados con el slug anterior (src/lib/eventSlug.ts)
+    const currentSlug = await resolveEventSlugRedirect(slug, { organizationId: dbUser.organization_id, supabase });
+    if (currentSlug) return slugRedirectResponse(validatorEventPath(currentSlug));
+    return Astro.redirect(VALIDATOR_APP_PATH);
+}
+if (!(await canAccessEventByStaff(supabase, dbUser.id, eventRow.id))) return Astro.redirect(VALIDATOR_APP_PATH);
+
+const event = await loadCheckinEvent(supabase, eventRow);
+---
+
+<ValidatorLayout
+    title={`Validar: ${event.name} | AI Tickets`}
+    userName={dbUser.name}
+    role={dbUser.role}
+    back={{ href: VALIDATOR_APP_PATH, label: "Eventos" }}
+>
+    <!-- ValidateQR trae su propio margen lateral -->
+    <div class="-mx-4 sm:-mx-6">
+        <ValidateQR event={event} client:load />
+    </div>
+</ValidatorLayout>

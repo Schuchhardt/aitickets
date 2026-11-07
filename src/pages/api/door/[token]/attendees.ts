@@ -30,7 +30,7 @@ export const GET: APIRoute = async ({ params, request }) => {
             .order("date", { ascending: true })
             .order("start_time", { ascending: true });
         const withSessions = await attachEntryDeadlines(auth.supabase, auth.event.id, await attachSessionCheckins(auth.supabase, auth.event.id, attendees, dates || []));
-        return doorJson({ attendees: withSessions.map(presentDoorTicket), dates: dates || [] });
+        return doorJson({ attendees: withSessions.map(presentDoorTicket), dates: dates || [], rendered_at: new Date().toISOString() });
     } catch (err: any) {
         console.error("door attendees:", err?.message);
         return doorJson({ message: "No se pudieron obtener los asistentes." }, 500);

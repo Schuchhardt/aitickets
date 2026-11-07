@@ -226,7 +226,7 @@ describe('acceptTeamInvitation', () => {
     const inv = addInvitation()
     db.auth = { admin: { createUser: vi.fn(async () => ({ data: { user: { id: 'au-new' } }, error: null })) } }
     const res = await acceptTeamInvitation(db, authFor(), inv, { name: 'Nuevo', password: 'secreto123' }, NOW)
-    expect(res).toMatchObject({ ok: true, role: 'validator', redirectTo: '/dashboard/events' })
+    expect(res).toMatchObject({ ok: true, role: 'validator', redirectTo: '/validador' })
     const user = db.tables.users.find((u) => u.email === 'nuevo@prod.cl')
     expect(user).toMatchObject({ organization_id: 7, role: 'validator', active: true, auth_user_id: 'au-new' })
     expect(db.auth.admin.createUser.mock.calls[0][0].app_metadata).toEqual({ app: 'aitickets' })

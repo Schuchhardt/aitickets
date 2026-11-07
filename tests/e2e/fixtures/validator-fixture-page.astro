@@ -1,0 +1,54 @@
+---
+// Validador de entradas (/validador/<slug>) con datos fijos para los e2e sin BD: mismo marco (ValidatorLayout, que
+// registra el service worker con scope /validador) y mismo escáner (ValidateQR.vue). Las APIs del escáner
+// (/api/get-event-attendees, /api/confirm-ticket, /api/validate-ticket) las simula cada test con page.route.
+// No vive en src/pages: astro.config.mjs la inyecta solo en `astro dev` con E2E_FIXTURES=1.
+//   ?delay=<ms>  demora la respuesta (simula red lenta: el service worker sirve la copia guardada a los 5 s)
+import ValidatorLayout from "../../../src/layouts/ValidatorLayout.astro";
+import ValidateQR from "../../../src/components/ValidateQR.vue";
+
+export const prerender = false;
+
+const escenario = Astro.params.escenario || "";
+if (escenario !== "basico") return new Response("Escenario desconocido", { status: 404 });
+
+const delay = Math.min(Number(Astro.url.searchParams.get("delay")) || 0, 15_000);
+if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
+
+const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Santiago", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+
+const FIXTURE_ATTENDEES = [
+    { id: "00000000-0000-4000-8000-000000000001", first: "Camila", last: "Rojas", email: "camila@example.com", qr: "QR-CAMILA", ticket: "General" },
+    { id: "00000000-0000-4000-8000-000000000002", first: "Diego", last: "Muñoz", email: "diego@example.com", qr: "QR-DIEGO", ticket: "VIP" },
+    { id: "00000000-0000-4000-8000-000000000003", first: "Valentina", last: "Soto", email: "vale@example.com", qr: "QR-VALE", ticket: "General" },
+];
+
+const event = {
+    id: 990001,
+    name: "Fiesta de prueba del validador",
+    slug: "e2e-validador-basico",
+    start_date: `${today}T23:00:00.000Z`,
+    end_date: null,
+    dates: [{ id: 77001, date: today, start_time: "22:00:00" }],
+    attendees: FIXTURE_ATTENDEES.map((a, i) => ({
+        id: a.id,
+        event_id: 990001,
+        event_ticket_id: 1,
+        event_order_id: 5000 + i,
+        qr_code: a.qr,
+        status: "active",
+        is_complimentary: false,
+        validated_at: null,
+        attendees: { first_name: a.first, last_name: a.last, email: a.email },
+        event_tickets: { ticket_name: a.ticket, event_date_id: null },
+    })),
+    rendered_at: new Date().toISOString(),
+};
+---
+
+<ValidatorLayout title={`Validar: ${event.name} | AI Tickets`} userName="Portero Prueba" role="validator" back={{ href: "/validador", label: "Eventos" }}>
+    <!-- ValidateQR trae su propio margen lateral -->
+    <div class="-mx-4 sm:-mx-6">
+        <ValidateQR event={event} client:load />
+    </div>
+</ValidatorLayout>

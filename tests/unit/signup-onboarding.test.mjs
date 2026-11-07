@@ -27,7 +27,10 @@ describe('safeNextPath / afterSignupPath', () => {
   it('solo rutas del panel u OAuth', () => {
     expect(onboarding.safeNextPath('/dashboard/ia')).toBe('/dashboard/ia')
     expect(onboarding.safeNextPath('/oauth/authorize?client_id=x')).toBe('/oauth/authorize?client_id=x')
-    for (const bad of ['https://evil.com', '//evil.com', '/dashboardx', '/organizadores', '/dashboard\\x', '/dashboard/ia\nSet-Cookie:x', null, 42]) {
+    // Validador de entradas (rol Puerta): vuelve al evento después de iniciar sesión
+    expect(onboarding.safeNextPath('/validador')).toBe('/validador')
+    expect(onboarding.safeNextPath('/validador/mi-fiesta')).toBe('/validador/mi-fiesta')
+    for (const bad of ['https://evil.com', '//evil.com', '/dashboardx', '/organizadores', '/dashboard\\x', '/dashboard/ia\nSet-Cookie:x', '/validadorx', '/validador\\x', null, 42]) {
       expect(onboarding.safeNextPath(bad)).toBeNull()
     }
   })
