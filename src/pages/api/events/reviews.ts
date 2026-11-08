@@ -6,13 +6,14 @@
 // POST { eventId, action: "review_status", id, public_status: "visible" | "hidden" } → { ok }
 //      (ocultar un comentario NO cambia el promedio: todas las calificaciones cuentan)
 // POST { eventId, action: "photo_status", id, status: "visible" | "hidden" } → { ok }
-// POST { eventId, action: "photo_delete", id } → { ok }
+// POST { eventId, action: "photo_delete", id } → { ok }  (también videos: photos[].media_type; borra el archivo)
 // Los cambios que se ven en la página pública vacían su caché (src/middleware.ts, PURGE_ON_WRITE). Las
 // invitaciones al próximo evento van por /api/events/invitations (no tocan la página).
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { getSessionContext, getOwnedEvent, hasRole, EVENT_MANAGER_ROLES, jsonResponse, type SessionContext } from "../../../lib/supabaseServer";
 import { isMissingSchema, REVIEWS_UNAVAILABLE } from "../../../lib/eventReviews";
+import { ATTENDEE_VIDEO_FOLDER, attendeeVideoPathPrefix, ownVideoLocationAt, removeVideoAt } from "../../../lib/videoStorage";
 import { recentInvitations } from "../../../lib/invitations";
 import { isEventEnded } from "../../../components/event/eventView.js";
 import {
@@ -24,6 +25,7 @@ import {
   normalizeReviewSettings,
   summarizeRatings,
   functionEndsAt,
+  mediaTypeOf,
 } from "../../../../netlify/lib/reviews.mjs";
 import { formatFunctionLabel } from "../../../../netlify/lib/dates.mjs";
 
@@ -39,6 +41,14 @@ async function authorize(context: Parameters<typeof getSessionContext>[0], event
   const event = await getOwnedEvent(eventId, session.dbUser.organization_id, "id", session.dbUser.id);
   if (!event) return jsonResponse({ message: "Evento no encontrado" }, 404);
   return { session };
+}
+
+/** Fotos y videos de la galería de asistentes para moderar (sin la migración de videos, solo fotos). */
+async function loadMedia(supabase: any, eventId: number) {
+  const query = (cols: string) => supabase.from(REVIEW_PHOTOS_TABLE).select(cols).eq("event_id", eventId).order("created_at", { ascending: false }).limit(500);
+  const res = await query("id, email, display_name, url, thumb_url, status, created_at, media_type, duration");
+  if (res.error && ["42703", "PGRST204"].includes(String(res.error.code || ""))) return query("id, email, display_name, url, thumb_url, status, created_at");
+  return res;
 }
 
 const failure = (error: any, label: string) => {
@@ -86,7 +96,7 @@ export const GET: APIRoute = async (context) => {
       .eq("event_id", eventId)
       .order("created_at", { ascending: false })
       .limit(2000),
-    supabase.from(REVIEW_PHOTOS_TABLE).select("id, email, display_name, url, thumb_url, status, created_at").eq("event_id", eventId).order("created_at", { ascending: false }).limit(500),
+    loadMedia(supabase, eventId),
     supabase.from("notification_log").select("id", { count: "exact", head: true }).eq("event_id", eventId).eq("type", REVIEW_REQUEST_TYPE),
     supabase.from("event_dates").select("id, date, start_time, end_time").eq("event_id", eventId),
   ]);
@@ -130,7 +140,17 @@ export const GET: APIRoute = async (context) => {
       created_at: r.created_at,
       updated_at: r.updated_at,
     })),
-    photos: ((photosRes.data || []) as any[]).map((p) => ({ id: p.id, url: p.url, thumb_url: p.thumb_url, status: p.status, name: p.display_name, email: p.email, created_at: p.created_at })),
+    photos: ((photosRes.data || []) as any[]).map((p) => ({
+      id: p.id,
+      media_type: mediaTypeOf(p),
+      url: p.url,
+      thumb_url: p.thumb_url,
+      duration: p.duration ?? null,
+      status: p.status,
+      name: p.display_name,
+      email: p.email,
+      created_at: p.created_at,
+    })),
     stats: { requests_sent: requestsRes.count || 0, rewards_granted: rewardIds.length, rewards_used: rewardsUsed },
     upcoming_events: await upcomingEvents(supabase, orgId, eventId),
     invitations: await recentInvitations(supabase, orgId, eventId),
@@ -186,8 +206,12 @@ export const POST: APIRoute = async (context) => {
 
     case "photo_delete": {
       if (!UUID_RE.test(String(body.id))) return jsonResponse({ message: "Foto no válida" }, 400);
-      const { error } = await supabase.from(REVIEW_PHOTOS_TABLE).delete().eq("id", body.id).eq("event_id", eventId);
+      const { data: deleted, error } = await supabase.from(REVIEW_PHOTOS_TABLE).delete().eq("id", body.id).eq("event_id", eventId).select("id, url");
       if (error) return failure(error, "photo_delete");
+      // Un video de asistente: también su archivo (ownVideoLocationAt solo acepta la carpeta de videos de este evento)
+      for (const row of (deleted || []) as any[]) {
+        if (String(row.url || "").includes(`/${ATTENDEE_VIDEO_FOLDER}/`)) await removeVideoAt(ownVideoLocationAt(row.url, attendeeVideoPathPrefix(eventId)));
+      }
       return jsonResponse({ ok: true });
     }
 

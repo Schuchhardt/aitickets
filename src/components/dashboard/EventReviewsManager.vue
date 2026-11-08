@@ -5,7 +5,7 @@ import { Star, Lock, Eye, EyeOff, Trash2, Download, Send, Gift, ChevronDown } fr
 
 // Reseñas del evento (panel): resumen, configuración (correos para calificar, premio por calificar, moderación de fotos,
 // mostrarlas en la página mientras quedan funciones),
-// comentarios públicos y privados, fotos de los asistentes e invitación masiva al próximo evento.
+// comentarios públicos y privados, fotos y videos de los asistentes e invitación masiva al próximo evento.
 // API: /api/events/reviews (lectura y moderación) y /api/events/invitations (invitaciones).
 
 const props = defineProps({
@@ -71,7 +71,7 @@ const settingsSummary = computed(() => {
   return [
     s.enabled ? 'hasta 3 correos para calificar' : 'sin correos',
     s.reward ? `premio ${s.reward.value}% por ${s.reward.valid_days} días` : 'sin premio',
-    s.moderate_photos ? 'fotos con revisión' : 'fotos al tiro',
+    s.moderate_photos ? 'fotos y videos con revisión' : 'fotos y videos al tiro',
     s.show_while_on_sale ? 'en la página mientras quedan funciones' : 'en la página al terminar',
   ].join(' · ')
 })
@@ -141,9 +141,12 @@ const downloadCsv = () => {
   URL.revokeObjectURL(a.href)
 }
 
-// ---- Fotos ----
+// ---- Fotos y videos (media_type) ----
 const photos = computed(() => data.value?.photos || [])
 const pendingPhotos = computed(() => photos.value.filter((p) => p.status === 'pending').length)
+const videoCount = computed(() => photos.value.filter((p) => p.media_type === 'video').length)
+const mediaLabel = (p) => (p.media_type === 'video' ? 'video' : 'foto')
+const formatSeconds = (s) => (s ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : '')
 const setPhoto = async (p, status) => {
   busyId.value = p.id
   try {
@@ -156,7 +159,7 @@ const setPhoto = async (p, status) => {
   }
 }
 const deletePhoto = async (p) => {
-  if (!confirm('¿Borrar esta foto de la galería? No se puede deshacer.')) return
+  if (!confirm(`¿Borrar ${p.media_type === 'video' ? 'este video' : 'esta foto'} de la galería? No se puede deshacer.`)) return
   busyId.value = p.id
   try {
     await post('/api/events/reviews', { action: 'photo_delete', id: p.id })
@@ -226,12 +229,12 @@ const sendInvite = async () => {
 <template>
   <section id="resenas" class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden scroll-mt-24" data-testid="event-reviews-manager">
     <div class="p-4 md:p-6 border-b border-gray-100">
-      <h3 class="font-bold text-lg flex items-center gap-2"><Star size="18" /> Reseñas y fotos de asistentes</h3>
+      <h3 class="font-bold text-lg flex items-center gap-2"><Star size="18" /> Reseñas, fotos y videos de asistentes</h3>
       <p class="text-sm text-gray-500 mt-1">
         Después de cada función les pedimos calificar de 1 a 5 estrellas: el primer correo sale 4 h después del término
         (8 h si termina de noche, siempre entre las 10:00 y las 23:00) y hay dos recordatorios a los 2 y 5 días, solo a
         quienes aún no califican. Pueden dejar un comentario público (se ve en la página del evento terminado), un mensaje
-        privado solo para ti y subir fotos a la galería compartida.
+        privado solo para ti y subir fotos y videos a la galería compartida.
       </p>
     </div>
 
@@ -288,7 +291,7 @@ const sendInvite = async () => {
           </div>
           <label class="flex items-start gap-3 text-sm">
             <input v-model="form.moderate" type="checkbox" class="mt-1" />
-            <span><strong>Revisar las fotos antes de publicarlas.</strong> Si no, se publican al tiro y puedes ocultarlas después.</span>
+            <span><strong>Revisar las fotos y videos antes de publicarlos.</strong> Si no, se publican al tiro y puedes ocultarlos después.</span>
           </label>
           <label class="flex items-start gap-3 text-sm">
             <input v-model="form.whileOnSale" type="checkbox" class="mt-1" data-testid="reviews-while-on-sale" />
@@ -348,18 +351,23 @@ const sendInvite = async () => {
 
       <!-- Fotos -->
       <div class="p-4 md:p-6 border-b border-gray-100">
-        <h4 class="font-semibold text-sm mb-1">Fotos de los asistentes ({{ photos.length }})</h4>
-        <p v-if="pendingPhotos" class="text-xs text-amber-700 mb-3">{{ pendingPhotos }} {{ pendingPhotos === 1 ? 'foto espera' : 'fotos esperan' }} tu revisión.</p>
-        <p v-if="!photos.length" class="text-sm text-gray-500">Todavía no suben fotos.</p>
+        <h4 class="font-semibold text-sm mb-1">Fotos y videos de los asistentes ({{ photos.length }}<template v-if="videoCount">, {{ videoCount }} {{ videoCount === 1 ? 'video' : 'videos' }}</template>)</h4>
+        <p v-if="pendingPhotos" class="text-xs text-amber-700 mb-3">{{ pendingPhotos }} {{ pendingPhotos === 1 ? 'archivo espera' : 'archivos esperan' }} tu revisión.</p>
+        <p v-if="!photos.length" class="text-sm text-gray-500">Todavía no suben fotos ni videos.</p>
         <ul v-else class="grid grid-cols-3 sm:grid-cols-4 gap-2">
           <li v-for="p in photos" :key="p.id" class="relative group rounded-lg overflow-hidden bg-gray-100 aspect-square">
-            <a :href="p.url" target="_blank" rel="noopener"><img :src="p.thumb_url || p.url" :alt="p.name ? `Foto de ${p.name}` : 'Foto de asistente'" class="w-full h-full object-cover" :class="p.status === 'hidden' ? 'opacity-40' : ''" loading="lazy" /></a>
-            <span v-if="p.status !== 'visible'" class="absolute top-1 left-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-black/70 text-white">{{ p.status === 'pending' ? 'Por revisar' : 'Oculta' }}</span>
+            <a :href="p.url" target="_blank" rel="noopener" :title="p.media_type === 'video' ? 'Ver video' : 'Ver foto'">
+              <img v-if="p.media_type !== 'video' || p.thumb_url" :src="p.thumb_url || p.url" :alt="p.name ? `${p.media_type === 'video' ? 'Video' : 'Foto'} de ${p.name}` : `${p.media_type === 'video' ? 'Video' : 'Foto'} de asistente`" class="w-full h-full object-cover" :class="p.status === 'hidden' ? 'opacity-40' : ''" loading="lazy" />
+              <span v-else class="w-full h-full flex items-center justify-center bg-gray-800" :class="p.status === 'hidden' ? 'opacity-40' : ''"></span>
+              <span v-if="p.media_type === 'video'" class="absolute inset-0 flex items-center justify-center text-white text-2xl drop-shadow pointer-events-none" aria-hidden="true">▶</span>
+            </a>
+            <span v-if="p.status !== 'visible'" class="absolute top-1 left-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-black/70 text-white">{{ p.status === 'pending' ? 'Por revisar' : p.media_type === 'video' ? 'Oculto' : 'Oculta' }}</span>
+            <span v-else-if="p.media_type === 'video' && p.duration" class="absolute top-1 left-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-black/70 text-white">🎬 {{ formatSeconds(p.duration) }}</span>
             <div class="absolute inset-x-0 bottom-0 flex justify-between p-1 bg-gradient-to-t from-black/70 to-transparent">
               <button type="button" :disabled="busyId === p.id" class="text-[11px] font-semibold text-white px-1.5 py-0.5 rounded hover:bg-white/20" @click="setPhoto(p, p.status === 'visible' ? 'hidden' : 'visible')">
                 {{ p.status === 'visible' ? 'Ocultar' : 'Publicar' }}
               </button>
-              <button type="button" :disabled="busyId === p.id" class="text-white p-1 rounded hover:bg-white/20" aria-label="Borrar foto" @click="deletePhoto(p)"><Trash2 size="13" /></button>
+              <button type="button" :disabled="busyId === p.id" class="text-white p-1 rounded hover:bg-white/20" :aria-label="`Borrar ${mediaLabel(p)}`" @click="deletePhoto(p)"><Trash2 size="13" /></button>
             </div>
           </li>
         </ul>

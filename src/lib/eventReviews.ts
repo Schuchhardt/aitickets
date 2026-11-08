@@ -9,6 +9,10 @@ import {
   PUBLIC_REVIEWS_PAGE,
   PUBLIC_PHOTOS_MAX,
   MAX_PHOTOS_PER_PERSON,
+  MAX_VIDEOS_PER_PERSON,
+  ATTENDEE_VIDEO_MAX_BYTES,
+  ATTENDEE_VIDEO_MAX_SECONDS,
+  mediaTypeOf,
   normalizeReviewSettings,
   reviewsOpen,
   findAttendanceByEmail,
@@ -77,7 +81,12 @@ export async function openReviewSession(
 }
 
 export const REVIEW_COLUMNS = "id, event_id, organization_id, attendee_id, email, display_name, rating, public_comment, private_comment, public_status, verified_via, reward_code_id, reward_code, created_at, updated_at";
-export const PHOTO_COLUMNS = "id, event_id, email, display_name, url, thumb_url, width, height, status, created_at";
+export const PHOTO_COLUMNS = "id, event_id, email, display_name, url, thumb_url, width, height, status, created_at, media_type, duration";
+/** Sin la migración 202611080400 (deploy previews): sin media_type ni duration, todo es foto. */
+export const LEGACY_PHOTO_COLUMNS = "id, event_id, email, display_name, url, thumb_url, width, height, status, created_at";
+
+/** Fotos y videos que subió una persona, para su lista y los límites. */
+export const ownMediaItem = (p: any) => ({ id: p.id, media_type: mediaTypeOf(p), url: p.url, thumb_url: p.thumb_url, status: p.status, duration: p.duration ?? null });
 
 export async function loadOwnReview(supabase: Supabase, eventId: number, email: string) {
   const { data, error } = await supabase.from(REVIEWS_TABLE).select(REVIEW_COLUMNS).eq("event_id", eventId).eq("email", email).maybeSingle();
@@ -85,17 +94,27 @@ export async function loadOwnReview(supabase: Supabase, eventId: number, email: 
   return data as any;
 }
 
+/** Fotos y videos de una persona en un evento (media_type dice cuál es cuál). */
 export async function loadOwnPhotos(supabase: Supabase, eventId: number, email: string) {
-  const { data, error } = await supabase
-    .from(REVIEW_PHOTOS_TABLE)
-    .select(PHOTO_COLUMNS)
-    .eq("event_id", eventId)
-    .eq("email", email)
-    .order("created_at", { ascending: true })
-    .limit(MAX_PHOTOS_PER_PERSON * 2);
+  const query = (cols: string) =>
+    supabase
+      .from(REVIEW_PHOTOS_TABLE)
+      .select(cols)
+      .eq("event_id", eventId)
+      .eq("email", email)
+      .order("created_at", { ascending: true })
+      .limit((MAX_PHOTOS_PER_PERSON + MAX_VIDEOS_PER_PERSON) * 2);
+  let { data, error }: { data: any; error: any } = await query(PHOTO_COLUMNS);
+  if (error && ["42703", "PGRST204"].includes(String(error.code || ""))) ({ data, error } = await query(LEGACY_PHOTO_COLUMNS));
   if (error) throw error;
   return (data || []) as any[];
 }
+
+/** Cuántas fotos y cuántos videos hay en una lista de loadOwnPhotos. */
+export const countMedia = (rows: any[]) => ({
+  photos: rows.filter((r) => mediaTypeOf(r) === "photo").length,
+  videos: rows.filter((r) => mediaTypeOf(r) === "video").length,
+});
 
 /** Premio entregado (código, etiqueta y vencimiento) de una reseña, o null. */
 export async function loadGrantedReward(supabase: Supabase, review: any) {
@@ -124,8 +143,11 @@ export async function sessionPayload(supabase: Supabase, session: ReviewSession)
       : null,
     reward_offer: session.settings.reward ? { label: rewardLabel(session.settings.reward), valid_days: session.settings.reward.valid_days } : null,
     reward: await loadGrantedReward(supabase, review),
-    photos: photos.map((p) => ({ id: p.id, url: p.url, thumb_url: p.thumb_url, status: p.status })),
+    photos: photos.map(ownMediaItem),
     max_photos: MAX_PHOTOS_PER_PERSON,
+    max_videos: MAX_VIDEOS_PER_PERSON,
+    max_video_bytes: ATTENDEE_VIDEO_MAX_BYTES,
+    max_video_seconds: ATTENDEE_VIDEO_MAX_SECONDS,
     moderate_photos: session.settings.moderate_photos,
   };
 }
@@ -170,10 +192,19 @@ export async function grantReviewReward(
   return null;
 }
 
+/** Fotos y videos visibles de la galería de asistentes (sin la migración de videos, solo las columnas de siempre). */
+async function loadPublicMedia(supabase: Supabase, eventId: number): Promise<{ data: any; error: any }> {
+  const query = (cols: string) =>
+    supabase.from(REVIEW_PHOTOS_TABLE).select(cols).eq("event_id", eventId).eq("status", "visible").order("created_at", { ascending: true }).limit(PUBLIC_PHOTOS_MAX);
+  const res: { data: any; error: any } = await query("id, url, thumb_url, width, height, display_name, media_type, duration");
+  if (res.error && ["42703", "PGRST204"].includes(String(res.error.code || ""))) return query("id, url, thumb_url, width, height, display_name");
+  return res;
+}
+
 /**
  * Lo que muestra la página pública de un evento terminado: resumen de calificaciones (TODAS cuentan, también las
- * de comentario oculto: ocultar un comentario no cambia el promedio), comentarios públicos visibles y fotos
- * visibles. null si las tablas aún no existen.
+ * de comentario oculto: ocultar un comentario no cambia el promedio), comentarios públicos visibles y fotos y videos
+ * visibles (photos[].media_type). null si las tablas aún no existen.
  */
 export async function loadPublicReviews(
   eventId: number,
@@ -189,15 +220,7 @@ export async function loadPublicReviews(
       .not("public_comment", "is", null)
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1),
-    withPhotos
-      ? supabase
-          .from(REVIEW_PHOTOS_TABLE)
-          .select("id, url, thumb_url, width, height, display_name")
-          .eq("event_id", eventId)
-          .eq("status", "visible")
-          .order("created_at", { ascending: true })
-          .limit(PUBLIC_PHOTOS_MAX)
-      : Promise.resolve({ data: [], error: null }),
+    withPhotos ? loadPublicMedia(supabase, eventId) : Promise.resolve({ data: [], error: null }),
   ]);
   const failed = [ratingsRes, commentsRes, photosRes].find((r: any) => r.error);
   if (failed) {

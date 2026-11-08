@@ -7,7 +7,7 @@
 import { Link, Img } from '@react-email/components'
 import { h, str, multiline, safeHref, COLORS, FONT_FAMILY, EmailLayout, TABLE_PROPS, Title, Subtitle, Paragraph, Badge, PrimaryButton, Panel, KeyValueTable, FallbackLink, renderEmail } from './layout.mjs'
 import { NAME_PLACEHOLDER } from './attendees.mjs'
-import { MAX_PHOTOS_PER_PERSON } from '../reviews.mjs'
+import { MAX_PHOTOS_PER_PERSON, MAX_VIDEOS_PER_PERSON } from '../reviews.mjs'
 
 export const REVIEW_URL_PLACEHOLDER = '%recipient.review_url%'
 export const UNSUBSCRIBE_PLACEHOLDER = '%recipient.unsubscribe_url%'
@@ -60,20 +60,20 @@ export async function renderReviewRequestEmail({ eventName, organizerName, rewar
   const copy = {
     1: {
       subject: `⭐ ¿Cómo estuvo ${name}?`,
-      preview: reward ? `Califícalo en 10 segundos y recibe ${reward} para tu próximo evento.` : 'Cuéntanos cómo lo pasaste: califícalo en 10 segundos y sube tus fotos.',
+      preview: reward ? `Califícalo en 10 segundos y recibe ${reward} para tu próximo evento.` : 'Cuéntanos cómo lo pasaste: califícalo en 10 segundos y sube tus fotos y videos.',
       badge: 'Tu opinión',
       title: `${NAME_PLACEHOLDER}, ¿cómo estuvo?`,
       body: `Toca las estrellas para calificarlo de 1 a 5. ${reads} y puedes dejar un comentario público o uno privado solo para ellos.`,
       button: 'Calificar y subir fotos',
-      hint: `También puedes subir hasta ${MAX_PHOTOS_PER_PERSON} fotos a la galería del evento.`,
+      hint: `También puedes subir hasta ${MAX_PHOTOS_PER_PERSON} fotos y ${MAX_VIDEOS_PER_PERSON} videos a la galería del evento.`,
     },
     2: {
-      subject: `📸 ¿Tienes fotos de ${name}?`,
-      preview: 'Súbelas a la galería del evento y cuéntanos cómo lo pasaste.',
-      badge: 'Fotos del evento',
-      title: `${NAME_PLACEHOLDER}, ¿nos compartes tus fotos?`,
-      body: `Arma con los demás asistentes la galería de ${name}: sube hasta ${MAX_PHOTOS_PER_PERSON} fotos y califícalo de 1 a 5 estrellas. ${reads}.`,
-      button: 'Subir fotos y calificar',
+      subject: `📸 ¿Tienes fotos o videos de ${name}?`,
+      preview: 'Súbelos a la galería del evento y cuéntanos cómo lo pasaste.',
+      badge: 'Fotos y videos del evento',
+      title: `${NAME_PLACEHOLDER}, ¿nos compartes tus fotos y videos?`,
+      body: `Arma con los demás asistentes la galería de ${name}: sube hasta ${MAX_PHOTOS_PER_PERSON} fotos y ${MAX_VIDEOS_PER_PERSON} videos y califícalo de 1 a 5 estrellas. ${reads}.`,
+      button: 'Subir fotos o videos',
       hint: 'Toma 10 segundos y no necesitas crear una cuenta.',
     },
     3: {
@@ -81,7 +81,7 @@ export async function renderReviewRequestEmail({ eventName, organizerName, rewar
       preview: reward ? `Es el último correo: califícalo y recibe ${reward}.` : 'Es el último correo que te mandamos sobre este evento.',
       badge: 'Último recordatorio',
       title: `${NAME_PLACEHOLDER}, tu opinión cuenta`,
-      body: `Es el último correo que te mandamos sobre ${name}. Califícalo en 10 segundos y, si tienes fotos, súbelas a la galería del evento. ${reads}.`,
+      body: `Es el último correo que te mandamos sobre ${name}. Califícalo en 10 segundos y, si tienes fotos o videos, súbelos a la galería del evento. ${reads}.`,
       button: 'Calificar ahora',
       hint: 'Después de este correo no te escribiremos más sobre este evento.',
     },

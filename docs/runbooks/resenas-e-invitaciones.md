@@ -44,6 +44,14 @@ Migración `db/migrations/202610220100_event_reviews.sql`. Reglas en `netlify/li
    panel/API ni cuentan para el máximo de 500.
 5. **Fotos** (`/api/reviews/photos`): hasta 6 por persona, optimizadas en `event-attendee-photos/<evento>/`.
    Visibles al tiro o "pendientes" si la productora activó la revisión previa.
+   **Videos** (`/api/reviews/videos`, migración `202611080400_review_videos.sql`): hasta 2 por persona, de 50 MB y 60 s
+   como máximo (la duración la mide el navegador; el peso lo verifica el servidor). No pasan por las funciones de
+   Netlify: el navegador pide una URL firmada (`upload_url`), sube directo al bucket `aitickets-event-videos`
+   (`event-attendee-videos/<evento>/video-*.mp4|webm|mov`) y confirma (`set`, con un cuadro del video como póster en
+   `event-attendee-photos/<evento>/poster-*`). Comparten tabla y moderación con las fotos
+   (`aitickets_event_review_photos.media_type = 'video'`) y se muestran en "Videos de los asistentes". Borrar un video
+   (quien lo subió o la productora) borra también el archivo. Un archivo subido sin confirmar queda huérfano en Storage
+   (igual que con el video de portada).
 6. **Panel** (`EventReviewsManager.vue`, en la ficha del evento): promedio y distribución, configuración,
    comentarios con filtro y CSV, mensajes privados, moderación de fotos e invitación al próximo evento.
    Ocultar un comentario lo saca de la página pero **su nota sigue contando en el promedio**.
@@ -69,7 +77,8 @@ Migración `db/migrations/202610220100_event_reviews.sql`. Reglas en `netlify/li
   23:00 y las 10:00, y que el primer correo de una función que termina de noche sale a las 10:00 o más tarde.
 - ¿Cuántos correos lleva cada persona?
   `SELECT email, count(*), min(created_at), max(created_at) FROM notification_log WHERE event_id = <id> AND type = 'review_request' GROUP BY email;`
-- Contenido ofensivo: la productora lo oculta desde el panel. Para borrarlo a mano:
+- Contenido ofensivo (también videos): la productora lo oculta desde el panel, o el MCP de administración con
+  `moderate_review` y `photo_id`. Para borrarlo a mano:
   `DELETE FROM aitickets_event_review_photos WHERE id = '<uuid>';` o
   `UPDATE aitickets_event_reviews SET public_status = 'hidden' WHERE id = '<uuid>';`.
 - Una invitación quedó `sending` más de 30 min: la función `send-scheduled-messages` la marca `failed` y avisa por

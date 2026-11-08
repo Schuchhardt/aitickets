@@ -382,10 +382,10 @@ const UUID_PATTERN = "^[0-9a-fA-F-]{36}$";
 
 const moderateReview: AdminToolDef = {
     name: "moderate_review",
-    title: "Ocultar o mostrar reseña o foto",
+    title: "Ocultar o mostrar reseña, foto o video",
     description:
-        "Oculta (o vuelve a mostrar) una reseña o una foto de asistente en la página pública del evento. Reemplaza el SQL del runbook de reseñas. " +
-        "Indica review_id o photo_id (ver org_list_event_reviews). Reversible.",
+        "Oculta (o vuelve a mostrar) una reseña o una foto o video de asistente en la página pública del evento. Reemplaza el SQL del runbook de reseñas. " +
+        "Indica review_id o photo_id (los videos usan photo_id; ver org_list_event_reviews). Reversible.",
     readOnly: false,
     inputSchema: {
         type: "object",

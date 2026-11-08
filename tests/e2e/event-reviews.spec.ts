@@ -42,6 +42,59 @@ test("evento terminado: resumen, comentarios y galería de asistentes", async ({
   // Abre el visor de fotos con el pie "Foto de <nombre>"
   await reviews.getByTestId("attendee-gallery").getByRole("button").first().click();
   await expect(page.getByRole("dialog")).toContainText("Foto de Ana R.");
+  await page.keyboard.press("Escape");
+  // Los videos van aparte, con su póster y reproductor
+  const videos = reviews.getByTestId("attendee-videos");
+  await expect(videos).toContainText("Videos de los asistentes");
+  await expect(videos).toContainText("Video de Beto S.");
+  await expect(videos.locator("video")).toHaveAttribute("poster", "/videos/aitickets-demo-poster.jpg");
+});
+
+test("subir un video: URL firmada, subida directa a Storage y confirmación con póster y duración", async ({ page }) => {
+  const calls: any[] = [];
+  await page.route("**/api/reviews/session", (route) =>
+    route.fulfill({ json: session({ max_videos: 2, max_video_bytes: 50 * 1024 * 1024, max_video_seconds: 60 }) }),
+  );
+  await page.route("https://storage.test/**", async (route) => {
+    calls.push({ storage: route.request().method() });
+    await route.fulfill({ status: 200, json: { Key: "ok" } });
+  });
+  await page.route("**/api/reviews/videos", async (route) => {
+    const type = route.request().headers()["content-type"] || "";
+    if (type.includes("application/json")) {
+      calls.push({ upload_url: route.request().postDataJSON() });
+      return route.fulfill({ json: { uploadUrl: "https://storage.test/upload/video-1.webm", publicUrl: "https://storage.test/public/video-1.webm" } });
+    }
+    const body = route.request().postDataBuffer()?.toString("latin1") || "";
+    calls.push({ set: { action: /name="action"\r\n\r\nset/.test(body), url: body.includes("https://storage.test/public/video-1.webm"), poster: body.includes('name="poster"'), duration: /name="duration"\r\n\r\n\d+/.test(body) } });
+    const video = { id: "v9", media_type: "video", url: "https://storage.test/public/video-1.webm", thumb_url: null, status: "visible", duration: 12 };
+    return route.fulfill({ status: 201, json: { video, photos: [video], message: "¡Listo! Tu video ya está en la galería." } });
+  });
+  await openScenario(page, "#resena=tok.del.correo");
+  const box = page.getByTestId("review-videos");
+  await expect(box).toContainText("Tus videos del evento");
+  await expect(box).toContainText("Hasta 60 segundos y 50 MB");
+  await box.getByTestId("review-video-input").setInputFiles("public/videos/aitickets-demo.webm");
+  await expect(box.getByRole("status")).toContainText("Tu video ya está en la galería");
+  await expect(box.locator(".thumb")).toHaveCount(1);
+  expect(calls[0].upload_url).toMatchObject({ token: "tok.del.correo", action: "upload_url", contentType: "video/webm" });
+  expect(calls[0].upload_url.duration).toBeGreaterThan(0);
+  expect(calls[1]).toEqual({ storage: "PUT" });
+  expect(calls[2]).toEqual({ set: { action: true, url: true, poster: true, duration: true } });
+});
+
+test("un video demasiado pesado se rechaza en el navegador, sin subir nada", async ({ page }) => {
+  let apiCalls = 0;
+  await page.route("**/api/reviews/session", (route) => route.fulfill({ json: session({ max_videos: 2, max_video_bytes: 1024 * 1024, max_video_seconds: 60 }) }));
+  await page.route("**/api/reviews/videos", (route) => {
+    apiCalls += 1;
+    return route.fulfill({ status: 500, json: {} });
+  });
+  await openScenario(page, "#resena=tok.del.correo");
+  const box = page.getByTestId("review-videos");
+  await box.getByTestId("review-video-input").setInputFiles("public/videos/aitickets-demo.webm");
+  await expect(box.getByRole("alert")).toContainText("el máximo es 1 MB");
+  expect(apiCalls).toBe(0);
 });
 
 test("obra en cartelera: reseñas de las funciones pasadas junto al botón de compra", async ({ page }) => {

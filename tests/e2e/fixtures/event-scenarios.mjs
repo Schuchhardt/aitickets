@@ -208,8 +208,10 @@ export const FIXTURE_REVIEWS = {
   ],
   comments_total: 2,
   photos: [
-    { id: "p1", url: "/aitickets_preview.png", thumb_url: null, width: 1200, height: 630, name: "Ana R." },
-    { id: "p2", url: "/aitickets_preview.png", thumb_url: null, width: 1200, height: 630, name: null },
+    { id: "p1", media_type: "photo", url: "/aitickets_preview.png", thumb_url: null, width: 1200, height: 630, duration: null, name: "Ana R." },
+    { id: "p2", media_type: "photo", url: "/aitickets_preview.png", thumb_url: null, width: 1200, height: 630, duration: null, name: null },
+    // Video de un asistente (galería de reseñas): va en "Videos de los asistentes", no en el visor de fotos
+    { id: "v1", media_type: "video", url: "/videos/aitickets-demo.webm", thumb_url: "/videos/aitickets-demo-poster.jpg", width: 1920, height: 1080, duration: 12, name: "Beto S." },
   ],
 };
 

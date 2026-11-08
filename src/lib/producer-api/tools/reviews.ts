@@ -1,5 +1,5 @@
 // Herramientas: reseñas de asistentes e invitación al próximo evento (migración 202610220100).
-// - list_event_reviews: calificaciones, comentarios públicos y privados, fotos y estadísticas de un evento.
+// - list_event_reviews: calificaciones, comentarios públicos y privados, fotos, videos y estadísticas de un evento.
 // - update_review_settings: correos para calificar (el primero y dos recordatorios), premio por calificar y moderación de fotos.
 // - invite_past_attendees: invitación masiva a los asistentes de un evento para uno próximo (con confirmación;
 //   la envía la cola de mensajes, src/lib/invitations.ts).
@@ -33,7 +33,7 @@ const listEventReviews: ToolDef = {
   title: "Ver reseñas del evento",
   description:
     "Calificaciones (1 a 5) de quienes asistieron a un evento: promedio, distribución, comentarios públicos (los que se ven en la página " +
-    "del evento terminado) y mensajes PRIVADOS para la productora, fotos subidas a la galería y premios entregados. Contiene datos " +
+    "del evento terminado) y mensajes PRIVADOS para la productora, fotos y videos subidos a la galería y premios entregados. Contiene datos " +
     "personales (emails). Úsala para resumir el feedback y proponer mejoras concretas para el próximo evento.",
   scope: "attendees",
   permission: "attendees.read",
@@ -60,7 +60,7 @@ const listEventReviews: ToolDef = {
         .eq("event_id", event.id)
         .order("created_at", { ascending: false })
         .limit(5000),
-      ctx.supabase.from(REVIEW_PHOTOS_TABLE).select("id, status").eq("event_id", event.id).limit(5000),
+      ctx.supabase.from(REVIEW_PHOTOS_TABLE).select("id, status, media_type").eq("event_id", event.id).limit(5000),
       ctx.supabase.from("notification_log").select("id", { count: "exact", head: true }).eq("event_id", event.id).eq("type", REVIEW_REQUEST_TYPE),
     ]);
     for (const r of [reviewsRes, photosRes]) {
@@ -73,7 +73,9 @@ const listEventReviews: ToolDef = {
     let rows = all;
     if (args.max_rating) rows = rows.filter((r) => r.rating <= args.max_rating);
     if (args.only_with_comments) rows = rows.filter((r) => r.public_comment || r.private_comment);
-    const photos = (photosRes.data || []) as any[];
+    const media = (photosRes.data || []) as any[];
+    const photos = media.filter((p) => p.media_type !== "video");
+    const videos = media.filter((p) => p.media_type === "video");
     return {
       event_id: Number(event.id),
       event_name: event.name,
@@ -85,6 +87,11 @@ const listEventReviews: ToolDef = {
         total: photos.length,
         visible: photos.filter((p) => p.status === "visible").length,
         pending_review: photos.filter((p) => p.status === "pending").length,
+      },
+      videos: {
+        total: videos.length,
+        visible: videos.filter((p) => p.status === "visible").length,
+        pending_review: videos.filter((p) => p.status === "pending").length,
       },
       rewards_granted: all.filter((r) => r.reward_code).length,
       total: rows.length,
