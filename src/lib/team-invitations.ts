@@ -51,8 +51,8 @@ export function isUnclaimedAuthUser(user: any): boolean {
 
 /**
  * ¿Al aceptar la invitación hay que pedir la contraseña de una cuenta existente? false = se crea una contraseña
- * nueva (correo sin cuenta, o usuario sin organización con una cuenta que nadie ha usado). Debe coincidir con
- * acceptTeamInvitation (src/lib/team-accept.ts).
+ * nueva: correo sin cuenta, o una cuenta que nadie ha usado (huérfano de un alta a medias, o un miembro al que se
+ * le "reenvía el acceso" porque nunca entró). Debe coincidir con acceptTeamInvitation (src/lib/team-accept.ts).
  */
 export async function invitationNeedsExistingPassword(supabase: any, email: string): Promise<boolean> {
     const { data: user } = await supabase
@@ -61,7 +61,6 @@ export async function invitationNeedsExistingPassword(supabase: any, email: stri
         .ilike("email", String(email).trim().toLowerCase().replace(/[\\%_]/g, (c: string) => `\\${c}`))
         .maybeSingle();
     if (!user?.auth_user_id) return false;
-    if (user.organization_id != null) return true;
     try {
         const { data } = await supabase.auth.admin.getUserById(user.auth_user_id);
         return !isUnclaimedAuthUser(data?.user);

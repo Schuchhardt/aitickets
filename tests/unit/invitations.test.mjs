@@ -124,10 +124,16 @@ describe('deliverInvitation', () => {
   })
 
   it('la cola de mensajes entrega las invitaciones y deja el estado final', async () => {
-    db.tables.aitickets_scheduled_messages.push({ ...message, status: 'sending' })
-    const result = await deliverScheduledMessage(db, { ...message, target_event_id: undefined })
-    expect(result).toMatchObject({ status: 'sent', sent: 2, failed: 0 })
-    expect(db.tables.aitickets_scheduled_messages[0]).toMatchObject({ status: 'sent', recipients_count: 2, failed_count: 0 })
+    // deliverScheduledMessage usa el reloj real: con la fecha fija el evento destino (07-11) sigue siendo futuro
+    vi.useFakeTimers({ now: NOW, toFake: ['Date'] })
+    try {
+      db.tables.aitickets_scheduled_messages.push({ ...message, status: 'sending' })
+      const result = await deliverScheduledMessage(db, { ...message, target_event_id: undefined })
+      expect(result).toMatchObject({ status: 'sent', sent: 2, failed: 0 })
+      expect(db.tables.aitickets_scheduled_messages[0]).toMatchObject({ status: 'sent', recipients_count: 2, failed_count: 0 })
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 
