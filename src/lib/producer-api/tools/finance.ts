@@ -632,7 +632,8 @@ async function planPayout(args: any, ctx: ToolContext) {
     if (state.coolingActive) {
         throw new ToolError("conflict", `La cuenta bancaria cambió hace poco: por seguridad los retiros quedan habilitados desde ${state.holdUntil!.toISOString()}.`);
     }
-    const ledger = await computeOrgLedger(ctx.supabase, ctx.actor.orgId);
+    // Un miembro con acceso limitado a ciertos eventos solo retira el saldo de esos eventos (igual que get_balance)
+    const ledger = await computeOrgLedger(ctx.supabase, ctx.actor.orgId, { eventIds: ctx.actor.eventIds });
     const available = ledger.totals.available;
     if (available <= 0) {
         const why = ledger.hold_reasons.length ? ` Retenido hasta resolver: ${ledger.hold_reasons.map((r) => r.label).join("; ")}.` : "";
@@ -735,7 +736,7 @@ const requestPayout: ToolDef = {
             throw wError;
         }
         // Dos solicitudes simultáneas podrían asignar el mismo saldo: se revisa después de insertar.
-        const after = await computeOrgLedger(ctx.supabase, ctx.actor.orgId);
+        const after = await computeOrgLedger(ctx.supabase, ctx.actor.orgId, { eventIds: ctx.actor.eventIds });
         if (after.events.some((l) => (l.net_due < 0 || l.released_due < 0) && plan.allocations.some((a) => a.event_id === l.event_id))) {
             await rollback();
             throw new ToolError("conflict", "El saldo cambió mientras se procesaba el retiro (¿otra solicitud en curso?). Revisa get_balance y vuelve a intentarlo.");

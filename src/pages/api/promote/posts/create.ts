@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "../../../../lib/auth-helpers";
 import { getSessionContext, hasRole, EVENT_MANAGER_ROLES } from "../../../../lib/supabaseServer";
 import { canAccessEventByStaff } from "../../../../../netlify/lib/event-staff.mjs";
 import { postMediaProblem } from "../../../../lib/socialPlatforms";
+import { checkSocialPostInput } from "../../../../lib/socialPostInput";
 
 export const POST: APIRoute = async (context) => {
     const session = await getSessionContext(context);
@@ -23,6 +24,9 @@ export const POST: APIRoute = async (context) => {
         }
         const problem = postMediaProblem([...new Set<string>(platforms)], Array.isArray(imageUrls) ? imageUrls.length : 0, String(content).length);
         if (problem) return new Response(JSON.stringify({ message: problem }), { status: 400 });
+        // Mismas reglas que create_social_post: imágenes de AI Tickets y fecha válida, al menos 5 minutos en el futuro
+        const input = checkSocialPostInput({ imageUrls, scheduledFor });
+        if (!input.ok) return new Response(JSON.stringify({ message: input.message }), { status: 400 });
 
         const supabaseAdmin = getSupabaseAdmin();
 
@@ -45,7 +49,7 @@ export const POST: APIRoute = async (context) => {
             return new Response(JSON.stringify({ message: "Evento no encontrado" }), { status: 404 });
         }
 
-        const status = scheduledFor ? "scheduled" : "draft";
+        const status = input.scheduledFor ? "scheduled" : "draft";
 
         const { data: post, error } = await supabaseAdmin
             .from("social_posts")
@@ -56,7 +60,7 @@ export const POST: APIRoute = async (context) => {
                 image_urls: imageUrls || [],
                 platforms: [...new Set<string>(platforms)],
                 status,
-                scheduled_for: scheduledFor || null,
+                scheduled_for: input.scheduledFor,
             })
             .select()
             .single();

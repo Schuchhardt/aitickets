@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { getSessionContext, hasRole, ORG_ADMIN_ROLES, jsonResponse } from "../../../lib/supabaseServer";
 import { notifySlack } from "../_lib/server-utils";
 import { recomputeHolderMatch, syncOrganizerLegalData } from "../../../lib/producerIdentity";
+import { roleAllows } from "../../../lib/producer-api/permissions";
 
 // Campos editables de la organización (public.organizations) y su largo máximo
 const ORG_FIELDS: Record<string, number> = {
@@ -67,6 +68,11 @@ export const POST: APIRoute = async (context) => {
 
         if (!isOrgAdmin && Object.keys(orgData).length) {
             return jsonResponse({ message: "Tu rol solo permite editar los datos para pagos" }, 403);
+        }
+        // Datos para pagos (cuenta bancaria donde se transfieren los retiros): solo el dueño y finanzas (finance.manage),
+        // como dice la regla de roles. Antes un administrador también podía cambiar la cuenta.
+        if (Object.keys(payoutData).length && !roleAllows(dbUser.role, "finance.manage")) {
+            return jsonResponse({ message: "Solo el dueño de la cuenta o finanzas pueden cambiar los datos para pagos" }, 403);
         }
         if ("public_name" in orgData && !orgData.public_name) {
             return jsonResponse({ message: "El nombre de la organización es obligatorio" }, 400);

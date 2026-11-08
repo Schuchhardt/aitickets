@@ -42,7 +42,7 @@ if (isCI && (useEnvDb || externalBaseUrl)) {
 
 // Entorno del servidor de desarrollo en modo sin BD. Un valor definido en process.env tiene prioridad
 // sobre el .env (Astro lee process.env primero), así que el .env local nunca se usa para estas claves.
-const offlineEnv: Record<string, string> = {
+export const offlineEnv: Record<string, string> = {
   SUPABASE_URL: "http://127.0.0.1:9",
   SUPABASE_SERVICE_ROLE_KEY: "e2e-dummy-service-role",
   SUPABASE_ANON_KEY: "",
@@ -84,6 +84,8 @@ const offlineEnv: Record<string, string> = {
 
 export default defineConfig({
   testDir: "tests/e2e",
+  // tests/e2e/stack corre aparte, con base real local (playwright.stack.config.ts)
+  testIgnore: ["stack/**"],
   globalSetup: "./tests/e2e/global-setup.ts",
   fullyParallel: true,
   forbidOnly: isCI,

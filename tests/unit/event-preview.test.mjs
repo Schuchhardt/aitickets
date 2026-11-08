@@ -149,6 +149,13 @@ describe('herramientas de la API de productores', () => {
     expect(after.result.links[0].status).toBe('revoked')
   })
 
+  it('revoke_preview_link: un miembro limitado a otro evento no revoca el link (forbidden) y sigue activo', async () => {
+    const created = await run('create_preview_link', { event_id: 10 })
+    const limited = { ...ctx(), actor: { ...ctx().actor, role: 'editor', eventIds: [11] } }
+    expect(await run('revoke_preview_link', { link_id: created.result.link.id }, limited)).toMatchObject({ ok: false, code: 'forbidden' })
+    expect((await run('list_preview_links', { event_id: 10 })).result.links[0].status).toBe('active')
+  })
+
   it('evento publicado: public_url activo', async () => {
     const res = await run('create_preview_link', { event_id: 11 })
     expect(res.result).toMatchObject({ is_published: true, public_url: `${ORIGIN}/eventos/pub-1` })

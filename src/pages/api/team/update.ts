@@ -12,8 +12,14 @@ export const POST: APIRoute = async (context) => {
         return json({ error: "Solo los administradores pueden editar miembros" }, 403);
     }
 
+    let body: any;
     try {
-        const body = await context.request.json();
+        body = await context.request.json();
+    } catch {
+        return json({ error: "Solicitud inválida" }, 400);
+    }
+
+    try {
         const userId = body?.userId;
         const name = String(body?.name || "").trim().slice(0, 150);
         const email = String(body?.email || "").trim().toLowerCase().slice(0, 200);
@@ -54,8 +60,14 @@ export const POST: APIRoute = async (context) => {
         if ((OWNER_ONLY_ROLES.includes(role) || OWNER_ONLY_ROLES.includes(targetUser.role || "")) && role !== targetUser.role && currentUser.role !== "producer") {
             return json({ error: "Solo el dueño de la cuenta puede dar o quitar el rol de finanzas" }, 403);
         }
-        // Si el formulario no ofrece 'producer', mantenerlo cuando el producer se edita a sí mismo como admin
-        if (targetUser.role === "producer" && role === "admin" && targetUser.id === currentUser.id) {
+        // El dueño conserva su rol: el formulario no ofrece 'producer' (manda 'admin') y nadie lo baja desde aquí, ni él
+        // mismo ni otro producer (update_member_role tampoco lo permite)
+        if (targetUser.role === "producer") {
+            if (!ORG_ADMIN_ROLES.includes(role)) {
+                return targetUser.id === currentUser.id
+                    ? json({ error: "No puedes quitarte tu propio rol de administrador" }, 400)
+                    : json({ error: "El rol del dueño de la cuenta no se puede cambiar" }, 403);
+            }
             role = "producer";
         }
 
@@ -72,6 +84,17 @@ export const POST: APIRoute = async (context) => {
         }
 
         const emailChanged = email !== (targetUser.email || "").toLowerCase();
+        // Cambiar el correo de otra persona es tomar su cuenta: "¿Olvidaste tu contraseña?" llega al correo nuevo. Un
+        // administrador no puede hacerlo con roles que él no puede dar (administrador y finanzas: retiros, reembolsos,
+        // cuenta bancaria); solo el dueño. A sí mismo y a los demás roles, sí.
+        if (
+            emailChanged &&
+            targetUser.id !== currentUser.id &&
+            currentUser.role !== "producer" &&
+            [...ORG_ADMIN_ROLES, ...OWNER_ONLY_ROLES].includes(targetUser.role || "")
+        ) {
+            return json({ error: "Solo el dueño de la cuenta puede cambiar el correo de un administrador o de finanzas" }, 403);
+        }
         if (emailChanged) {
             const { data: existingUser } = await supabaseAdmin
                 .from("users")

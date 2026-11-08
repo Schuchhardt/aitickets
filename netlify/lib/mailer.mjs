@@ -87,7 +87,32 @@ function resendKey() {
   return key
 }
 
+/**
+ * Buzón local para los e2e con base real (tests/e2e/stack): con MAIL_OUTBOX_DIR cada correo se escribe como JSON en esa
+ * carpeta en vez de ir a Resend, para que el test lea el link de verificación o de la invitación. Nunca en producción.
+ */
+export function mailOutboxDir() {
+  const dir = env('MAIL_OUTBOX_DIR')
+  if (!dir || env('CONTEXT') === 'production' || env('NETLIFY') === 'true') return null
+  return dir
+}
+
+async function writeOutbox(dir, path, payload) {
+  const { mkdir, writeFile } = await import('node:fs/promises')
+  await mkdir(dir, { recursive: true })
+  const items = Array.isArray(payload) ? payload : [payload]
+  const ids = []
+  for (const item of items) {
+    const id = `outbox_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+    await writeFile(`${dir}/${id}.json`, JSON.stringify({ id, endpoint: path, sent_at: new Date().toISOString(), ...item }, null, 2))
+    ids.push(id)
+  }
+  return Array.isArray(payload) ? { data: ids.map((id) => ({ id })) } : { id: ids[0] }
+}
+
 async function resendRequest(path, payload, idempotencyKey) {
+  const outbox = mailOutboxDir()
+  if (outbox) return writeOutbox(outbox, path, payload)
   const headers = { Authorization: `Bearer ${resendKey()}`, 'Content-Type': 'application/json' }
   if (idempotencyKey) headers['Idempotency-Key'] = String(idempotencyKey).slice(0, 256)
   const res = await fetch(`${RESEND_API}${path}`, { method: 'POST', headers, body: JSON.stringify(payload) })

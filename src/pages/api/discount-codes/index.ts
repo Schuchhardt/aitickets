@@ -5,18 +5,21 @@
 //   PATCH /api/discount-codes              { id, active?, maxUses?, perBuyerLimit?, startsAt?, endsAt? }
 // Código, tipo, valor y evento no se editan (las órdenes ya emitidas los referencian): se desactiva y se crea otro.
 // Roles: EVENT_MANAGER_ROLES. Todas las consultas filtran por organization_id de la sesión; un evento solo
-// se acepta si pertenece a la organización (getOwnedEvent).
+// se acepta si pertenece a la organización (getOwnedEvent). Acceso por evento (aitickets_event_staff): un miembro
+// limitado a ciertos eventos solo ve y cambia los códigos de esos eventos; los de toda la organización solo los
+// crea o cambia quien no tiene acceso limitado (igual que las herramientas de la API de productores).
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { getSessionContext, getOwnedEvent, hasRole, EVENT_MANAGER_ROLES, jsonResponse } from "../../../lib/supabaseServer";
 import { validateDiscountInput, describeDiscount, isMissingDiscountSchema, withoutRewardCodes, DISCOUNT_CODE_COLUMNS } from "../../../../netlify/lib/discounts.mjs";
+import { getStaffEventIds } from "../../../../netlify/lib/event-staff.mjs";
 
 export const prerender = false;
 
 const MAX_CODES_PER_ORG = 500;
 const UNAVAILABLE = "Los códigos de descuento aún no están disponibles. Intenta nuevamente en unos minutos.";
 
-type ManagerAuth = { ok: false; response: Response } | { ok: true; orgId: number; userId: number | null };
+type ManagerAuth = { ok: false; response: Response } | { ok: true; orgId: number; userId: number | null; staffEventIds: number[] | null };
 
 async function requireManager(context: Parameters<APIRoute>[0]): Promise<ManagerAuth> {
   const session = await getSessionContext(context);
@@ -24,7 +27,9 @@ async function requireManager(context: Parameters<APIRoute>[0]): Promise<Manager
   if (!hasRole(session.dbUser, EVENT_MANAGER_ROLES) || !session.dbUser.organization_id) {
     return { ok: false, response: jsonResponse({ message: "No tienes permisos para gestionar códigos de descuento" }, 403) };
   }
-  return { ok: true, orgId: Number(session.dbUser.organization_id), userId: session.dbUser.id ?? null };
+  const userId = session.dbUser.id ?? null;
+  const staffEventIds = userId == null ? null : await getStaffEventIds(getSupabaseAdmin(), userId);
+  return { ok: true, orgId: Number(session.dbUser.organization_id), userId, staffEventIds };
 }
 
 type Stats = { uses: number; paid_orders: number; discount_total: number; revenue: number };
@@ -103,8 +108,10 @@ export const GET: APIRoute = async (context) => {
     console.error("discount-codes GET:", error.message);
     return jsonResponse({ message: "No se pudieron cargar los códigos" }, 500);
   }
-  // Con evento: los del evento + los de toda la organización (también aplican a este evento)
-  const list = (rows || []).filter((r: any) => eventId == null || r.event_id == null || Number(r.event_id) === eventId);
+  // Con evento: los del evento + los de toda la organización (también aplican a este evento). Un miembro limitado, sin
+  // evento: los de sus eventos + los de toda la organización (nunca los de eventos que no tiene asignados)
+  const allowed = eventId != null ? [eventId] : auth.staffEventIds;
+  const list = (rows || []).filter((r: any) => !allowed || r.event_id == null || allowed.includes(Number(r.event_id)));
   const [stats, names] = await Promise.all([loadStats(supabase, list.map((r: any) => r.id)), eventNamesFor(supabase, auth.orgId, list)]);
   return jsonResponse({ codes: list.map((r: any) => present(r, stats.get(String(r.id)), names)) });
 };
@@ -127,6 +134,8 @@ export const POST: APIRoute = async (context) => {
   if (values.event_id != null) {
     const event = await getOwnedEvent<{ id: number }>(values.event_id, auth.orgId, "id", auth.userId);
     if (!event) return jsonResponse({ message: "Evento no encontrado o no autorizado" }, 404);
+  } else if (auth.staffEventIds) {
+    return jsonResponse({ message: "Tu acceso está limitado a ciertos eventos: elige uno de tus eventos para el código." }, 403);
   }
 
   const { count, error: countError } = await withoutRewardCodes((filter: (q: any) => any) =>
@@ -188,6 +197,13 @@ export const PATCH: APIRoute = async (context) => {
     return jsonResponse({ message: "No se pudo cargar el código" }, 500);
   }
   if (!existing) return jsonResponse({ message: "Código no encontrado" }, 404);
+  if (existing.event_id != null) {
+    if (!(await getOwnedEvent<{ id: number }>(existing.event_id, auth.orgId, "id", auth.userId))) {
+      return jsonResponse({ message: "Código no encontrado" }, 404);
+    }
+  } else if (auth.staffEventIds) {
+    return jsonResponse({ message: "Tu acceso está limitado a ciertos eventos: no puedes cambiar códigos que aplican a todos los eventos." }, 403);
+  }
 
   const startsAt = values.starts_at !== undefined ? values.starts_at : existing.starts_at;
   const endsAt = values.ends_at !== undefined ? values.ends_at : existing.ends_at;
