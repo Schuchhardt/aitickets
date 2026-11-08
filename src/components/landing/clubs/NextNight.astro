@@ -1,16 +1,16 @@
 ---
 // 9 · La próxima noche se llena con esta (SPEC_landing_clubs §4.9, DOM 12:00): reseñas con fotos entre
-// REVIEW_REQUEST_DELAY_HOURS y REVIEW_REQUEST_WINDOW_HOURS después (reviews.mjs, con código de premio opcional),
+// REVIEW_FIRST_DELAY_HOURS.night después, con recordatorios (reviews.mjs, con código de premio opcional),
 // invitar a la próxima noche a quienes entraron o calificaron con 4 o 5 estrellas (INVITE_AUDIENCES: checked_in y
 // promoters) y el reporte semanal de los domingos (send-weekly-reports). Mobile: carrusel con scroll-snap (card al 86%).
 import LedHeading from "./LedHeading.astro";
 import NightHour from "./NightHour.astro";
-import { REVIEW_REQUEST_DELAY_HOURS, REVIEW_REQUEST_WINDOW_HOURS } from "../../../../netlify/lib/reviews.mjs";
+import { REVIEW_FIRST_DELAY_HOURS } from "../../../../netlify/lib/reviews.mjs";
 
 const cards = [
   {
     title: "Fotos y estrellas de tu público.",
-    text: `Entre ${REVIEW_REQUEST_DELAY_HOURS} y ${REVIEW_REQUEST_WINDOW_HOURS} h después de la noche les llega un correo para calificar y subir fotos. Si quieres, premias con un código para la próxima.`,
+    text: `Cuando ya despertaron (${REVIEW_FIRST_DELAY_HOURS.night} h después de la noche) les llega un correo para calificar y subir fotos, con recordatorios a quien no califica. Si quieres, premias con un código para la próxima.`,
   },
   {
     title: "Invita solo a los que vinieron.",

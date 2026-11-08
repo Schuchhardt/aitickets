@@ -107,7 +107,7 @@ const initialFormState = {
         secretLocationRevealHours: secretLocation.revealHours ?? "",
         seated: seating.maps.size > 0,
     },
-    // Toggle al final del formulario: correo "¿Cómo estuvo?" 24 h después de cada función
+    // Toggle al final del formulario: correos "¿Cómo estuvo?" después de cada función
     reviews: { enabled: normalizeReviewSettings(event.review_settings).enabled },
     locations:
         event.event_locations?.map((loc: any) => ({

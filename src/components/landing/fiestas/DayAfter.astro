@@ -1,7 +1,7 @@
 ---
 // 9 · El día después (SPEC_landing_fiestas §4.9, cobalto, pulsera EL DÍA DESPUÉS): la hoja de contactos (seis fotos de
 // desechable con fecha estampada, recortes de los mismos archivos) con dos reseñas de ejemplo (RATING_LABELS) y cuatro
-// cards. Verificado: correo de reseña con fotos entre REVIEW_REQUEST_DELAY_HOURS y REVIEW_REQUEST_WINDOW_HOURS h
+// cards. Verificado: correo de reseña con fotos REVIEW_FIRST_DELAY_HOURS.night h
 // después, hasta MAX_PHOTOS_PER_PERSON fotos y código de premio (reviews.mjs); invitar a la próxima a las audiencias de
 // INVITE_AUDIENCES; el muro pasa a "Así lo vivieron" (AttendeeFeed.vue); duplicar copia etapas y preguntas
 // (eventDuplicate.ts); reporte semanal los domingos (weekly-report-send.mjs).
@@ -13,8 +13,7 @@ import { CONTACT_SHEET, PARTY_PHOTOS } from "./fiestasLanding.js";
 import {
   MAX_PHOTOS_PER_PERSON,
   RATING_LABELS,
-  REVIEW_REQUEST_DELAY_HOURS,
-  REVIEW_REQUEST_WINDOW_HOURS,
+  REVIEW_FIRST_DELAY_HOURS,
 } from "../../../../netlify/lib/reviews.mjs";
 
 interface Props {
@@ -24,7 +23,7 @@ const { stamp } = Astro.props;
 const cards = [
   {
     title: "Fotos y estrellas de tu público.",
-    text: `Entre ${REVIEW_REQUEST_DELAY_HOURS} y ${REVIEW_REQUEST_WINDOW_HOURS} h después de la fiesta les llega un correo para calificar y subir hasta ${MAX_PHOTOS_PER_PERSON} fotos. Si quieres, premias con un código para la próxima.`,
+    text: `Cuando ya despertaron (${REVIEW_FIRST_DELAY_HOURS.night} h después de la fiesta) les llega un correo para calificar y subir hasta ${MAX_PHOTOS_PER_PERSON} fotos, con recordatorios a quien no califica. Si quieres, premias con un código para la próxima.`,
   },
   {
     title: "Invita solo a los que vinieron.",

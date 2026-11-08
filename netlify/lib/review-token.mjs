@@ -1,9 +1,11 @@
 // Tokens firmados de reseñas e invitaciones: base64url(JSON) + '.' + base64url(HMAC-SHA256). Solo servidor.
 //
 // - Reseña:   {p:'rv', e:eventId, m:email, v:vía, x:exp}. Da derecho a calificar y subir fotos de ESE evento como ESE
-//   email. Llega en el correo de 24 h, en el correo "tu link para calificar" o al validar una orden/entrada en la
-//   página del evento. Vence a los REVIEW_TOKEN_TTL_DAYS días. v: cómo se validó ('o' orden, 't' entrada,
-//   sin v = correo).
+//   email. Llega en los correos "¿Cómo estuvo?" (el primero y sus recordatorios), en el correo "tu link para
+//   calificar" o al validar una orden/entrada en la página del evento. Vence a los REVIEW_TOKEN_TTL_DAYS días.
+//   v: cómo se validó ('o' orden, 't' entrada, sin v = correo).
+// - Baja de los recordatorios de reseña de un evento: {p:'ro', e:eventId, m:email}, sin vencimiento. Va en la query
+//   del enlace de baja (no da acceso a calificar, por eso es un tipo aparte del de reseña).
 // - Baja de invitaciones: {p:'io', o:organizationId, m:email}, sin vencimiento (el enlace de baja debe seguir
 //   funcionando siempre, Ley 19.496 art. 28 B).
 // - Baja del reporte semanal a productores: {p:'wr', u:userId} (public.users.id), sin vencimiento. Sirve para darse de
@@ -64,4 +66,19 @@ export function verifyWeeklyReportOptoutToken(token, { now = new Date() } = {}) 
   const payload = verify(token, 'wr', now)
   if (!payload || !Number.isSafeInteger(payload.u) || payload.u <= 0) return null
   return { userId: payload.u }
+}
+
+/** Token del enlace "no quiero más recordatorios" de los correos de reseña de un evento. '' si falta el secreto. */
+export function signReviewReminderOptoutToken({ eventId, email }) {
+  const id = Number(eventId)
+  const m = cleanEmail(email)
+  if (!Number.isSafeInteger(id) || id <= 0 || !m) return ''
+  return sign({ p: 'ro', e: id, m })
+}
+
+/** @returns {{ eventId: number, email: string } | null} */
+export function verifyReviewReminderOptoutToken(token, { now = new Date() } = {}) {
+  const payload = verify(token, 'ro', now)
+  if (!payload || !Number.isSafeInteger(payload.e) || payload.e <= 0 || typeof payload.m !== 'string' || !payload.m) return null
+  return { eventId: payload.e, email: payload.m }
 }

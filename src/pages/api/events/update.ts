@@ -11,7 +11,7 @@ import { loadSchedule, describeScheduleChange } from "../_lib/eventSchedule";
 import { changeEventSlug, EventSlugError, type SlugChangeResult } from "../../../lib/eventSlug";
 import { normalizeReviewSettings } from "../../../../netlify/lib/reviews.mjs";
 
-/** Correo "¿Cómo estuvo?" 24 h después de cada función (toggle al final del formulario). Premio y moderación no cambian. */
+/** Correos "¿Cómo estuvo?" después de cada función (toggle al final del formulario). Premio y moderación no cambian. */
 async function saveReviewsEnabled(supabase: ReturnType<typeof getSupabaseAdmin>, eventId: number, organizationId: number, enabled: boolean) {
     const { data, error } = await supabase.from("events").select("review_settings").eq("id", eventId).maybeSingle();
     // Deploy previews: la migración de reseñas puede no estar aplicada todavía

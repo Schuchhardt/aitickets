@@ -4,10 +4,13 @@
 // Sin dependencias de Node: también se importa desde el navegador. Las funciones con BD reciben el cliente de
 // Supabase (service role) como parámetro.
 //
-// Reglas (pedido del dueño, oct 2026):
-//   * 24 h después de que termina cada función se manda "¿Cómo estuvo?" a quienes tenían entradas para ella; las
-//     entradas "cualquier función" (event_date_id NULL) solo después de la última función. Un correo por persona
-//     y evento (notification_log type 'review_request'), nunca a quien ya calificó.
+// Reglas (pedido del dueño, oct 2026; cadencia de 3 correos, nov 2026):
+//   * "¿Cómo estuvo?" a quienes tenían entradas de cada función (titular, comprador y asistente del QR): el primero
+//     4 h después del término si la función termina de día y 8 h si termina de noche, siempre entre las 10:00 y las
+//     23:00 de Chile para que estén despiertos (firstReviewRequestAt); dos recordatorios, 2 y 5 días después del
+//     primero (nextReviewReminderAt). Las entradas "cualquier función" (event_date_id NULL) solo después de la
+//     última función. Máximo REVIEW_REQUEST_STEPS correos por persona y evento (notification_log type
+//     'review_request'), nunca a quien ya calificó ni a quien pidió no recibir más recordatorios.
 //   * Una reseña por persona (email) y evento: 1 a 5 estrellas, comentario público (página del evento) y privado
 //     (solo la productora). Calificar de nuevo la actualiza.
 //   * Premio opcional por calificar (events.review_settings.reward): un código de un solo uso, % de descuento en
@@ -17,22 +20,40 @@
 //     revisarlas antes (moderate_photos). La productora puede ocultar comentarios y fotos.
 //   * Invitaciones al próximo evento: a los asistentes de un evento terminado, sin quienes se dieron de baja de
 //     esa productora, sin quienes ya tienen entradas para el evento al que se invita y sin repetir invitación.
-import { zonedDateTimeToUtc } from './dates.mjs'
+import { zonedDateTimeToUtc, addDays, EVENT_TIMEZONE } from './dates.mjs'
 
 export const REVIEWS_TABLE = 'aitickets_event_reviews'
 export const REVIEW_PHOTOS_TABLE = 'aitickets_event_review_photos'
 export const OPTOUTS_TABLE = 'aitickets_org_email_optouts'
 
 export const REVIEW_REQUEST_TYPE = 'review_request'
+/** notification_log: la persona pidió no recibir más recordatorios de reseña de ESE evento (enlace del correo). */
+export const REVIEW_REQUEST_OPTOUT_TYPE = 'review_request_optout'
 export const NEXT_EVENT_INVITE_TYPE = 'next_event_invite'
 
 export const RATING_LABELS = Object.freeze({ 1: 'Malo', 2: 'Regular', 3: 'Bueno', 4: 'Muy bueno', 5: 'Excelente' })
 export const PUBLIC_COMMENT_MAX = 1000
 export const PRIVATE_COMMENT_MAX = 2000
 export const MAX_PHOTOS_PER_PERSON = 6
-/** Cuánto después del término de una función se pide la reseña, y hasta cuándo (si la función programada no corrió). */
-export const REVIEW_REQUEST_DELAY_HOURS = 24
+// ---- Cadencia del correo "¿Cómo estuvo?" (hora de Chile) ----
+/** Correos de reseña por persona y evento: el primero y dos recordatorios. */
+export const REVIEW_REQUEST_STEPS = 3
+/** Primer correo: 4 h después del término si la función termina de día; 8 h si termina de noche (se van a dormir). */
+export const REVIEW_FIRST_DELAY_HOURS = Object.freeze({ day: 4, night: 8 })
+/** "Termina de noche": desde las 21:00 hasta antes de las 08:00. */
+export const REVIEW_NIGHT_HOURS = Object.freeze({ from: 21, until: 8 })
+/**
+ * Ventana de envío [from, until): ningún correo de reseña sale fuera de ella. Un correo que vencería antes se corre a
+ * las 10:00 de ese día y uno que vencería después, a las 10:00 del día siguiente. La función programada corre a los
+ * :20, así que en la práctica salen entre las 10:20 y las 22:20.
+ */
+export const REVIEW_SEND_HOURS = Object.freeze({ from: 10, until: 23 })
+/** Recordatorios: el 2º, 2 días después del 1º; el 3º (último), 3 días después del 2º. */
+export const REVIEW_REMINDER_GAP_HOURS = Object.freeze([48, 72])
+/** El primer correo se manda hasta 72 h después del término (cubre ejecuciones perdidas de la función programada). */
 export const REVIEW_REQUEST_WINDOW_HOURS = 72
+/** Ningún recordatorio más de 10 días después del primer correo. */
+export const REVIEW_REMINDER_MAX_DAYS = 10
 /** Duración supuesta de una función sin hora de término (misma regla que la página del evento). */
 export const DEFAULT_FUNCTION_HOURS = 3
 export const REVIEW_TOKEN_TTL_DAYS = 90
@@ -149,17 +170,95 @@ export function functionStartsAt(fn) {
   return zonedDateTimeToUtc(date, fn.start_time || '00:00')
 }
 
+const toDate = (value) => {
+  if (value == null || value === '') return null
+  const d = value instanceof Date ? value : new Date(value)
+  return Number.isNaN(d.getTime()) ? null : d
+}
+const pad2 = (n) => String(n).padStart(2, '0')
+
+/** Fecha (YYYY-MM-DD) y minutos desde la medianoche de un instante, en hora de Chile. */
+export function chileClock(instant) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: EVENT_TIMEZONE,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).formatToParts(toDate(instant) || new Date(NaN))
+  const p = Object.fromEntries(parts.map((x) => [x.type, x.value]))
+  return { date: `${p.year}-${p.month}-${p.day}`, minutes: (Number(p.hour) % 24) * 60 + Number(p.minute) }
+}
+
+/** ¿Es hora de mandar correos de reseña? (dentro de REVIEW_SEND_HOURS) */
+export function isReviewSendTime(now = new Date()) {
+  const { minutes } = chileClock(now)
+  return minutes >= REVIEW_SEND_HOURS.from * 60 && minutes < REVIEW_SEND_HOURS.until * 60
+}
+
+/** Corre un instante a la ventana de envío: antes de las 10:00 => 10:00 de ese día; desde las 23:00 => 10:00 del siguiente. */
+export function clampToReviewSendWindow(instant) {
+  const at = toDate(instant)
+  if (!at) return null
+  const { date, minutes } = chileClock(at)
+  const opening = `${pad2(REVIEW_SEND_HOURS.from)}:00`
+  if (minutes < REVIEW_SEND_HOURS.from * 60) return zonedDateTimeToUtc(date, opening)
+  if (minutes >= REVIEW_SEND_HOURS.until * 60) return zonedDateTimeToUtc(addDays(date, 1), opening)
+  return at
+}
+
+/** ¿La función termina de noche (REVIEW_NIGHT_HOURS)? Entonces la gente se va a dormir y el primer correo espera más. */
+export function endsAtNight(endsAt) {
+  const { minutes } = chileClock(endsAt)
+  return minutes >= REVIEW_NIGHT_HOURS.from * 60 || minutes < REVIEW_NIGHT_HOURS.until * 60
+}
+
 /**
- * Funciones cuya reseña corresponde pedir ahora: terminaron hace entre DELAY y WINDOW horas.
- * @param {Array<any>} dates filas de event_dates
- * @returns {Array<any>} las mismas filas con `ends_at` (Date)
+ * Cuándo sale el primer correo de reseña de una función que termina en `endsAt`: 4 h después si termina de día,
+ * 8 h si termina de noche, corrido a la ventana de envío para que estén despiertos. Ejemplos (hora de Chile):
+ * termina 13:00 => 17:00 · 18:00 => 22:00 · 20:00 => 10:00 del día siguiente · 23:00 => 10:00 · 02:00 => 10:00 ·
+ * 05:00 => 13:00.
  */
-export function dueReviewFunctions(dates, now = new Date(), { delayHours = REVIEW_REQUEST_DELAY_HOURS, windowHours = REVIEW_REQUEST_WINDOW_HOURS } = {}) {
-  const latest = now.getTime() - delayHours * 3600_000
+export function firstReviewRequestAt(endsAt) {
+  const end = toDate(endsAt)
+  if (!end) return null
+  const delay = endsAtNight(end) ? REVIEW_FIRST_DELAY_HOURS.night : REVIEW_FIRST_DELAY_HOURS.day
+  return clampToReviewSendWindow(new Date(end.getTime() + delay * 3600_000))
+}
+
+/**
+ * Cuándo corresponde el siguiente correo a quien ya recibió `sentCount` (el último en `lastSentAt`); null si ya
+ * recibió los REVIEW_REQUEST_STEPS o no hay fecha.
+ */
+export function nextReviewReminderAt(sentCount, lastSentAt) {
+  const gap = REVIEW_REMINDER_GAP_HOURS[Number(sentCount) - 1]
+  const last = toDate(lastSentAt)
+  if (!gap || !last) return null
+  return clampToReviewSendWindow(new Date(last.getTime() + gap * 3600_000))
+}
+
+/**
+ * Instante de término para la reseña: la función (event_dates) o, en eventos antiguos sin funciones, events.end_date.
+ * @param {{ date?: string, start_time?: string | null, end_time?: string | null, end_date?: string | null }} fn
+ */
+const endOf = (fn) => (fn?.date ? functionEndsAt(fn) : toDate(fn?.end_date))
+
+/**
+ * Funciones cuyo PRIMER correo de reseña corresponde ahora: ya llegó su firstReviewRequestAt y terminaron hace menos
+ * de REVIEW_REQUEST_WINDOW_HOURS (si la función programada estuvo caída, no se piden reseñas de eventos viejos).
+ * @param {Array<any>} dates filas de event_dates (o { id, end_date } para eventos sin funciones)
+ * @returns {Array<any>} las mismas filas con `ends_at` y `first_request_at` (Date)
+ */
+export function dueReviewFunctions(dates, now = new Date(), { windowHours = REVIEW_REQUEST_WINDOW_HOURS } = {}) {
   const earliest = now.getTime() - windowHours * 3600_000
   return (dates || [])
-    .map((fn) => ({ ...fn, ends_at: functionEndsAt(fn) }))
-    .filter((fn) => fn.ends_at && fn.ends_at.getTime() <= latest && fn.ends_at.getTime() > earliest)
+    .map((fn) => {
+      const ends_at = endOf(fn)
+      return { ...fn, ends_at, first_request_at: firstReviewRequestAt(ends_at) }
+    })
+    .filter((fn) => fn.ends_at && fn.first_request_at && fn.first_request_at.getTime() <= now.getTime() && fn.ends_at.getTime() > earliest)
 }
 
 /** La función que termina más tarde (la "última" del evento). */
@@ -278,6 +377,27 @@ export async function findAttendanceByEmail(supabase, eventId, email) {
         last_name: order.buyer_last_name || null,
         checkedIn: live.some((t) => t.status === 'validated' || t.validated_at),
       }
+    }
+  }
+  // Asistente de un QR con correo propio (event_attendees.holder_email, migración 202610300100): recibe su entrada
+  // y los correos de reseña, así que también puede calificar. No tiene fila en attendees (attendeeId null).
+  const { data: held, error: hError } = await supabase
+    .from('event_attendees')
+    .select('id, status, validated_at, holder_name')
+    .eq('event_id', eventId)
+    .ilike('holder_email', escapeLike(target))
+    .limit(200)
+  if (hError && !['42703', 'PGRST204'].includes(String(hError.code || ''))) throw hError
+  const liveHeld = (held || []).filter((t) => isLiveTicketStatus(t.status))
+  if (liveHeld.length) {
+    const named = liveHeld.find((t) => String(t.holder_name ?? '').trim())
+    const [first, ...rest] = String(named?.holder_name ?? '').trim().split(/\s+/)
+    return {
+      attendeeId: null,
+      email: target,
+      first_name: first || null,
+      last_name: rest.join(' ') || null,
+      checkedIn: liveHeld.some((t) => t.status === 'validated' || t.validated_at),
     }
   }
   return null

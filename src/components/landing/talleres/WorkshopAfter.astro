@@ -1,7 +1,7 @@
 ---
 // 7 · Después: del taller de prueba al nivel 2 (SPEC_landing_talleres §4.7, ancla #despues): tres pasos numerados a
 // mano y la demo de invitación (InviteNextLevel). Verificado en el código:
-//   reseñas → REVIEW_REQUEST_DELAY_HOURS / REVIEW_REQUEST_WINDOW_HOURS / MAX_PHOTOS_PER_PERSON (reviews.mjs), código para
+//   reseñas → REVIEW_FIRST_DELAY_HOURS / MAX_PHOTOS_PER_PERSON (reviews.mjs), código para
 //             quien califica (EventReviewsManager.vue, REWARD_CODE_PREFIX); en la página, mientras quedan fechas si
 //             se activa en la configuración de reseñas (review_settings.show_while_on_sale, EventDetail.vue)
 //   invitar → invitations.ts con INVITE_AUDIENCES (reviews.mjs), sin bajas ni quienes ya tienen entrada
@@ -13,14 +13,13 @@ import { INVITE_AUDIENCE_TEXT } from "../../../data/inviteAudience";
 import {
   INVITE_AUDIENCES,
   MAX_PHOTOS_PER_PERSON,
-  REVIEW_REQUEST_DELAY_HOURS,
-  REVIEW_REQUEST_WINDOW_HOURS,
+  REVIEW_FIRST_DELAY_HOURS,
 } from "../../../../netlify/lib/reviews.mjs";
 
 const steps = [
   {
     title: "Te cuentan cómo les fue.",
-    text: `Entre ${REVIEW_REQUEST_DELAY_HOURS} y ${REVIEW_REQUEST_WINDOW_HOURS} horas después, les llega un correo para calificar con estrellas, comentar y subir hasta ${MAX_PHOTOS_PER_PERSON} fotos de lo que hicieron. Si quieres, premias a quien califica con un código para tu próximo taller.`,
+    text: `${REVIEW_FIRST_DELAY_HOURS.day} horas después, les llega un correo para calificar con estrellas, comentar y subir hasta ${MAX_PHOTOS_PER_PERSON} fotos de lo que hicieron. Si quieres, premias a quien califica con un código para tu próximo taller.`,
   },
   {
     title: "Los invitas al siguiente.",

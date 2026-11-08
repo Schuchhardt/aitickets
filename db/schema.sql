@@ -458,9 +458,11 @@ CREATE TABLE public.notification_log (
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   event_id bigint NOT NULL,
   attendee_id bigint,
-  type text NOT NULL, -- 'reminder_24h', 'general_update', 'date_change', 'venue_change', 'cancellation'
+  type text NOT NULL, -- 'reminder_24h', 'general_update', 'date_change', 'venue_change', 'cancellation', 'review_request', 'review_request_optout'
   channel text NOT NULL DEFAULT 'email'::text, -- 'email', 'whatsapp'
   status text NOT NULL DEFAULT 'sent'::text,
+  -- 202611080300: destinatario (correos de reseña a compradores y asistentes por QR sin fila en attendees)
+  email text,
   CONSTRAINT notification_log_pkey PRIMARY KEY (id)
 );
 
