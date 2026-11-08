@@ -220,6 +220,28 @@ describe('sendReviewRequests: destinatarios', () => {
     expect(kim).toMatchObject({ event_id: 30, attendee_id: null, type: 'review_request' })
   })
 
+  it('escribe a todos los que tienen entrada, con o sin check-in y también con cortesía; no a entradas anuladas', async () => {
+    db.tables.events.push({ id: 40, name: 'Concierto', slug: 'concierto', status: 'published', organization_id: 7, review_settings: null })
+    db.tables.event_dates.push({ id: 401, event_id: 40, date: '2026-10-17', start_time: '20:00', end_time: '23:00' })
+    const sin = person(41, 'sin-checkin@x.cl', 'Sol')
+    const con = person(42, 'con-checkin@x.cl', 'Leo')
+    const cortesia = person(43, 'cortesia@x.cl', 'Mar')
+    const anulada = person(44, 'anulada@x.cl', 'Ian')
+    const reembolsada = person(45, 'reembolsada@x.cl', 'Eva')
+    db.tables.event_attendees.push(
+      ticket(41, 40, sin, 401),
+      ticket(42, 40, con, 401, 'validated', { validated_at: '2026-10-17T23:30:00Z' }),
+      ticket(43, 40, cortesia, null, 'active', { is_complimentary: true }),
+      ticket(44, 40, cortesia, 401, 'validated', { is_complimentary: true, validated_at: '2026-10-17T23:31:00Z' }),
+      ticket(45, 40, anulada, 401, 'cancelled'),
+      ticket(46, 40, reembolsada, 401, 'refunded'),
+      ticket(47, 40, person(46, 'sin-estado@x.cl', 'Ana'), 401, null) // entradas antiguas sin estado = vigentes
+    )
+    await run(T0)
+    const call = sendEmail.mock.calls.find((c) => c[0].idempotencyKey.startsWith('review-40-'))
+    expect(recipientsOf(call)).toEqual(['con-checkin@x.cl', 'cortesia@x.cl', 'sin-checkin@x.cl', 'sin-estado@x.cl'])
+  })
+
   it('sin la columna notification_log.email (base sin migrar) omite a quien no tiene attendee_id', async () => {
     db.tables.events = [{ id: 30, name: 'Fiesta', slug: 'fiesta', status: 'published', organization_id: 7, review_settings: null }]
     db.tables.event_dates = [{ id: 301, event_id: 30, date: '2026-10-17', start_time: '22:00', end_time: '04:00' }]
