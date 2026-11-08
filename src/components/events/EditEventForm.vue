@@ -75,7 +75,7 @@ const form = ref(JSON.parse(JSON.stringify(props.initialFormState)));
 // Diseño de la página pública y organizador visible (events.page_settings)
 form.value.general.pageSettings = normalizePageSettings(form.value.general.pageSettings)
 if (typeof form.value.general.slug !== 'string') form.value.general.slug = ''
-// Reseñas: correo "¿Cómo estuvo?" 24 h después de cada función (toggle al final del formulario)
+// Reseñas: correos "¿Cómo estuvo?" después de cada función (toggle al final del formulario)
 if (!form.value.reviews) form.value.reviews = { enabled: true }
 
 // Link público (/eventos/<slug>). Se normaliza al salir del campo; el servidor valida que esté libre y, si el
@@ -932,7 +932,8 @@ const submitEvent = async ({ exit = false } = {}) => {
              <div class="min-w-0">
                <p id="reviewsToggleLabel" class="text-sm font-semibold text-gray-900 flex items-center gap-1.5"><Star size="16" /> Pedir reseñas a los asistentes</p>
                <p class="text-xs text-gray-500 mt-1">
-                 24 h después de cada función les enviamos un correo para calificar de 1 a 5 estrellas, comentar y subir fotos.
+                 Después de cada función les enviamos un correo para calificar de 1 a 5 estrellas, comentar y subir fotos (4 u 8 h
+                 después del término, cuando estén despiertos) y dos recordatorios a quienes aún no califican.
                  El premio por calificar y la revisión de fotos se configuran en
                  <a :href="`/dashboard/events/${props.eventId}#resenas`" class="underline hover:text-black">Reseñas</a>.
                </p>

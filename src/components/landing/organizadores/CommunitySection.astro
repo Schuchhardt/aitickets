@@ -15,8 +15,8 @@ import { EVENT_VIDEO_MAX_BYTES } from "../../../lib/eventVideo";
 import { FEED_EMOJIS, FEED_MESSAGE_MAX } from "../../../../netlify/lib/attendee-community.mjs";
 import {
   MAX_PHOTOS_PER_PERSON,
-  REVIEW_REQUEST_DELAY_HOURS,
-  REVIEW_REQUEST_WINDOW_HOURS,
+  REVIEW_FIRST_DELAY_HOURS,
+  REVIEW_REQUEST_STEPS,
   REWARD_CODE_PREFIX,
   REWARD_LIMITS,
 } from "../../../../netlify/lib/reviews.mjs";
@@ -177,8 +177,9 @@ const comments = [
           <p class="comm-stage">Después</p>
           <h3 class="lp-h3 lp-h3-lg comm-h3">Reseñas que te traen al próximo evento.</h3>
           <p class="lp-body comm-text">
-            Entre {REVIEW_REQUEST_DELAY_HOURS} y {REVIEW_REQUEST_WINDOW_HOURS} horas después de cada función, cada asistente
-            recibe un correo “¿Cómo estuvo?” y califica en segundos, sin crear cuenta. La página del evento terminado muestra
+            {REVIEW_FIRST_DELAY_HOURS.day} horas después de cada función ({REVIEW_FIRST_DELAY_HOURS.night} si termina de noche), cada asistente
+            recibe un correo “¿Cómo estuvo?” y califica en segundos, sin crear cuenta; si no califica, le recordamos hasta
+            {REVIEW_REQUEST_STEPS - 1} veces. La página del evento terminado muestra
             el promedio, los comentarios y las fotos que suben tus asistentes.
           </p>
           <ul class="comm-checks">{reviewChecks.map((c) => <li class="lp-check">{c}</li>)}</ul>

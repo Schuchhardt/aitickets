@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import SkeletonRows from './SkeletonRows.vue'
 import { Star, Lock, Eye, EyeOff, Trash2, Download, Send, Gift, ChevronDown } from 'lucide-vue-next'
 
-// Reseñas del evento (panel): resumen, configuración (correo de 24 h, premio por calificar, moderación de fotos,
+// Reseñas del evento (panel): resumen, configuración (correos para calificar, premio por calificar, moderación de fotos,
 // mostrarlas en la página mientras quedan funciones),
 // comentarios públicos y privados, fotos de los asistentes e invitación masiva al próximo evento.
 // API: /api/events/reviews (lectura y moderación) y /api/events/invitations (invitaciones).
@@ -69,7 +69,7 @@ const settingsSummary = computed(() => {
   const s = data.value?.settings
   if (!s) return ''
   return [
-    s.enabled ? 'correo a las 24 h' : 'sin correo',
+    s.enabled ? 'hasta 3 correos para calificar' : 'sin correos',
     s.reward ? `premio ${s.reward.value}% por ${s.reward.valid_days} días` : 'sin premio',
     s.moderate_photos ? 'fotos con revisión' : 'fotos al tiro',
     s.show_while_on_sale ? 'en la página mientras quedan funciones' : 'en la página al terminar',
@@ -228,8 +228,10 @@ const sendInvite = async () => {
     <div class="p-4 md:p-6 border-b border-gray-100">
       <h3 class="font-bold text-lg flex items-center gap-2"><Star size="18" /> Reseñas y fotos de asistentes</h3>
       <p class="text-sm text-gray-500 mt-1">
-        24 h después de cada función les pedimos calificar de 1 a 5 estrellas. Pueden dejar un comentario público
-        (se ve en la página del evento terminado), un mensaje privado solo para ti y subir fotos a la galería compartida.
+        Después de cada función les pedimos calificar de 1 a 5 estrellas: el primer correo sale 4 h después del término
+        (8 h si termina de noche, siempre entre las 10:00 y las 23:00) y hay dos recordatorios a los 2 y 5 días, solo a
+        quienes aún no califican. Pueden dejar un comentario público (se ve en la página del evento terminado), un mensaje
+        privado solo para ti y subir fotos a la galería compartida.
       </p>
     </div>
 
@@ -267,7 +269,7 @@ const sendInvite = async () => {
         <form v-if="showSettings" class="mt-4 space-y-4" @submit.prevent="saveSettings">
           <label class="flex items-start gap-3 text-sm">
             <input v-model="form.enabled" type="checkbox" class="mt-1" />
-            <span><strong>Enviar el correo “¿Cómo estuvo?”</strong> 24 horas después de cada función.</span>
+            <span><strong>Enviar los correos “¿Cómo estuvo?”</strong> después de cada función: el primero 4 u 8 horas después del término y dos recordatorios a quienes no califican.</span>
           </label>
           <div class="rounded-lg border border-gray-200 p-3 space-y-3">
             <label class="flex items-start gap-3 text-sm">
@@ -315,7 +317,7 @@ const sendInvite = async () => {
           </button>
         </div>
         <p v-if="!data.reviews.length" class="text-sm text-gray-500 py-4">
-          {{ data.ended ? 'Aún no hay reseñas. Llegan a partir de 24 h después de que termina cada función.' : 'Aún no hay reseñas. El correo para calificar sale 24 h después de cada función.' }}
+          {{ data.ended ? 'Aún no hay reseñas. El correo para calificar sale 4 u 8 h después de que termina cada función, con dos recordatorios.' : 'Aún no hay reseñas. El correo para calificar sale 4 u 8 h después de cada función, con dos recordatorios.' }}
         </p>
         <p v-else-if="!reviews.length" class="text-sm text-gray-500 py-4">No hay reseñas con ese filtro.</p>
         <ul v-else class="divide-y divide-gray-100" data-track-mask>

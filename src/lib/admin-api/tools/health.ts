@@ -182,7 +182,7 @@ const listPendingOperations: AdminToolDef = {
 /** Cada cuántas horas corre cada función programada (su config.schedule). send-weekly-reports: domingos. */
 const SCHEDULED_JOBS: { job: string; label: string; everyHours: number; note: string }[] = [
     { job: "send-event-reminders", label: "send-event-reminders (recordatorio 24 h)", everyHours: 24, note: "Corre a diario (13:00 UTC); envía si hay funciones al día siguiente." },
-    { job: "send-review-requests", label: "send-review-requests (pedir reseñas)", everyHours: 1, note: "Corre cada hora; envía cuando termina un evento." },
+    { job: "send-review-requests", label: "send-review-requests (pedir reseñas)", everyHours: 1, note: "Corre cada hora; hasta 3 correos por persona después de cada función, solo entre 10:00 y 23:00 (de noche no envía)." },
     { job: "send-scheduled-messages", label: "send-scheduled-messages", everyHours: 1 / 6, note: "Corre cada 10 min; envía si hay mensajes programados." },
     { job: "check-custom-domains", label: "check-custom-domains", everyHours: 1 / 4, note: "Corre cada 15 min; revisa dominios pendientes y, cada ~6 h, los activos." },
     { job: "passline-watch", label: "passline-watch (leads)", everyHours: 24, note: "Corre a diario (11:00 UTC). Solo busca si LEADS_PASSLINE_ENABLED=true y hay FIRECRAWL_API_KEY: si no, last_note dice skipped." },

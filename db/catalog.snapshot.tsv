@@ -941,6 +941,7 @@ column:newsletter.user_agent	text notnull=false default=-
 column:notification_log.attendee_id	bigint notnull=false default=-
 column:notification_log.channel	text notnull=true default='email'::text
 column:notification_log.created_at	timestamp with time zone notnull=true default=now()
+column:notification_log.email	text notnull=false default=-
 column:notification_log.event_id	bigint notnull=true default=-
 column:notification_log.id	bigint notnull=true default=- identity=a
 column:notification_log.status	text notnull=true default='sent'::text

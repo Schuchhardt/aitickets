@@ -10,6 +10,10 @@ import {
   summarizeRatings,
   functionEndsAt,
   dueReviewFunctions,
+  firstReviewRequestAt,
+  nextReviewReminderAt,
+  isReviewSendTime,
+  clampToReviewSendWindow,
   lastFunctionOf,
   reviewsOpen,
   generateRewardCode,
@@ -70,7 +74,7 @@ describe('summarizeRatings', () => {
   })
 })
 
-describe('término de funciones y ventana del correo de 24 h', () => {
+describe('término de funciones y horario de los correos de reseña', () => {
   // 2026-10-17 es primavera en Chile (UTC-3)
   it('usa end_time, o start + 3 h, y cruza medianoche', () => {
     expect(functionEndsAt({ date: '2026-10-17', start_time: '20:00', end_time: '23:30' }).toISOString()).toBe('2026-10-18T02:30:00.000Z')
@@ -78,13 +82,40 @@ describe('término de funciones y ventana del correo de 24 h', () => {
     expect(functionEndsAt({ date: '2026-10-17', start_time: '22:00', end_time: '04:00' }).toISOString()).toBe('2026-10-18T07:00:00.000Z')
     expect(functionEndsAt({ date: 'nope' })).toBeNull()
   })
-  it('pide la reseña entre 24 y 72 h después del término', () => {
-    const fn = { id: 1, date: '2026-10-17', start_time: '20:00', end_time: '23:00' } // termina 2026-10-18T02:00Z
+  it('primer correo: 4 h después si termina de día, 8 h si termina de noche, siempre entre las 10:00 y las 23:00', () => {
+    // Noviembre: horario de verano de Chile (UTC-3). Hora local => instante UTC
+    const local = (d, t) => new Date(`${d}T${t}:00-03:00`)
+    const first = (d, t) => firstReviewRequestAt(local(d, t)).toISOString()
+    expect(first('2026-11-14', '13:00')).toBe(local('2026-11-14', '17:00').toISOString()) // día: +4 h
+    expect(first('2026-11-14', '18:00')).toBe(local('2026-11-14', '22:00').toISOString()) // día: +4 h, aún despiertos
+    expect(first('2026-11-14', '19:30')).toBe(local('2026-11-15', '10:00').toISOString()) // 23:30 => mañana a las 10:00
+    expect(first('2026-11-14', '23:00')).toBe(local('2026-11-15', '10:00').toISOString()) // noche: +8 h = 07:00 => 10:00
+    expect(first('2026-11-15', '02:00')).toBe(local('2026-11-15', '10:00').toISOString()) // noche: +8 h
+    expect(first('2026-11-15', '05:00')).toBe(local('2026-11-15', '13:00').toISOString()) // fiesta hasta las 5: +8 h
+    expect(first('2026-11-15', '08:00')).toBe(local('2026-11-15', '12:00').toISOString()) // desde las 08:00 es de día
+    expect(firstReviewRequestAt(null)).toBeNull()
+  })
+  it('recordatorios: el 2º a las 48 h del 1º, el 3º a las 72 h del 2º, corridos a la ventana de envío', () => {
+    const local = (d, t) => new Date(`${d}T${t}:00-03:00`)
+    expect(nextReviewReminderAt(1, local('2026-11-15', '10:20')).toISOString()).toBe(local('2026-11-17', '10:20').toISOString())
+    expect(nextReviewReminderAt(2, local('2026-11-17', '10:20')).toISOString()).toBe(local('2026-11-20', '10:20').toISOString())
+    expect(nextReviewReminderAt(3, local('2026-11-20', '10:20'))).toBeNull()
+    expect(nextReviewReminderAt(1, null)).toBeNull()
+    expect(clampToReviewSendWindow(local('2026-11-15', '23:00')).toISOString()).toBe(local('2026-11-16', '10:00').toISOString())
+    expect(isReviewSendTime(local('2026-11-15', '09:59'))).toBe(false)
+    expect(isReviewSendTime(local('2026-11-15', '10:00'))).toBe(true)
+    expect(isReviewSendTime(local('2026-11-15', '22:59'))).toBe(true)
+    expect(isReviewSendTime(local('2026-11-15', '23:00'))).toBe(false)
+  })
+  it('dueReviewFunctions: desde el primer correo hasta 72 h después del término', () => {
+    const fn = { id: 1, date: '2026-10-17', start_time: '20:00', end_time: '23:00' } // termina 2026-10-18T02:00Z (23:00)
     const due = (iso) => dueReviewFunctions([fn], new Date(iso)).map((f) => f.id)
-    expect(due('2026-10-19T01:59:00Z')).toEqual([]) // 23 h 59
-    expect(due('2026-10-19T02:00:00Z')).toEqual([1]) // 24 h
+    expect(due('2026-10-18T12:59:00Z')).toEqual([]) // 09:59: aún no
+    expect(due('2026-10-18T13:00:00Z')).toEqual([1]) // 10:00
     expect(due('2026-10-21T01:59:00Z')).toEqual([1]) // < 72 h
     expect(due('2026-10-21T02:00:00Z')).toEqual([]) // 72 h: ya no
+    // Evento antiguo sin funciones: events.end_date
+    expect(dueReviewFunctions([{ id: 'e', end_date: '2026-10-18T16:00:00Z' }], new Date('2026-10-18T20:00:00Z')).map((f) => f.id)).toEqual(['e'])
   })
   it('última función y apertura de reseñas', () => {
     const dates = [
@@ -216,6 +247,9 @@ describe('asistencia', () => {
           { id: '22222222-2222-4222-8222-222222222222', event_id: 10, attendee_id: 2, status: 'cancelled', event_order_id: null, attendees: { id: 2, email: 'beto@x.cl' } },
           // Caro compró una entrada a nombre de Beto (otra persona)
           { id: '33333333-3333-4333-8333-333333333333', event_id: 10, attendee_id: 2, status: 'active', event_order_id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', attendees: { id: 2, email: 'beto@x.cl' } },
+          // Asistente de un QR con correo propio (compra con datos por asistente)
+          { id: '44444444-4444-4444-8444-444444444444', event_id: 10, attendee_id: 1, status: 'active', event_order_id: ORDER, holder_name: 'Kim Lee Park', holder_email: 'kim@x.cl' },
+          { id: '55555555-5555-4555-8555-555555555555', event_id: 10, attendee_id: 1, status: 'cancelled', event_order_id: ORDER, holder_name: 'Lu', holder_email: 'lu@x.cl' },
         ],
       },
     })
@@ -227,6 +261,10 @@ describe('asistencia', () => {
   it('por email: comprador que compró para otro también puede calificar', async () => {
     const found = await findAttendanceByEmail(db(), 10, 'caro@x.cl')
     expect(found).toMatchObject({ email: 'caro@x.cl', first_name: 'Caro', checkedIn: false })
+  })
+  it('por email: asistente de un QR con correo propio (holder_email) también puede calificar', async () => {
+    expect(await findAttendanceByEmail(db(), 10, 'KIM@x.cl')).toEqual({ attendeeId: null, email: 'kim@x.cl', first_name: 'Kim', last_name: 'Lee Park', checkedIn: false })
+    expect(await findAttendanceByEmail(db(), 10, 'lu@x.cl')).toBeNull() // entrada anulada
   })
   it('por email: sin entradas vigentes o de otro evento => null', async () => {
     expect(await findAttendanceByEmail(db(), 12, 'ana@x.cl')).toBeNull()

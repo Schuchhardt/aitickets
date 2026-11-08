@@ -1,6 +1,6 @@
 // Herramientas: reseñas de asistentes e invitación al próximo evento (migración 202610220100).
 // - list_event_reviews: calificaciones, comentarios públicos y privados, fotos y estadísticas de un evento.
-// - update_review_settings: correo de 24 h, premio por calificar y moderación de fotos.
+// - update_review_settings: correos para calificar (el primero y dos recordatorios), premio por calificar y moderación de fotos.
 // - invite_past_attendees: invitación masiva a los asistentes de un evento para uno próximo (con confirmación;
 //   la envía la cola de mensajes, src/lib/invitations.ts).
 import { ToolError, type ToolDef } from "../registry";
@@ -106,7 +106,9 @@ const updateReviewSettings: ToolDef = {
   name: "update_review_settings",
   title: "Configurar reseñas",
   description:
-    "Configura las reseñas de un evento: si se envía el correo \"¿Cómo estuvo?\" 24 h después de cada función, el premio por calificar " +
+    "Configura las reseñas de un evento: si se envían los correos \"¿Cómo estuvo?\" (hasta 3 por persona: el primero 4 h después del término " +
+    "de cada función si termina de día u 8 h si termina de noche, siempre entre las 10:00 y las 23:00, y dos recordatorios a los 2 y 5 días; " +
+    "nunca a quien ya calificó), el premio por calificar " +
     `(un código de descuento de un solo uso, ${REWARD_LIMITS.minValue}-${REWARD_LIMITS.maxValue}%, para cualquier evento de la organización; reward_percent=0 lo quita) ` +
     "si las fotos de los asistentes esperan revisión antes de publicarse y si la página muestra las reseñas de las funciones pasadas " +
     "mientras quedan funciones a la venta (show_while_on_sale: una obra en cartelera, un taller con fechas; sin esto, solo cuando el evento terminó).",
@@ -119,7 +121,7 @@ const updateReviewSettings: ToolDef = {
     additionalProperties: false,
     properties: {
       event_id: eventIdSchema,
-      send_request_email: { type: "boolean", description: "Enviar el correo de reseña 24 h después de cada función." },
+      send_request_email: { type: "boolean", description: "Enviar los correos para calificar (el primero y dos recordatorios) después de cada función." },
       reward_percent: { type: "integer", minimum: 0, maximum: REWARD_LIMITS.maxValue, description: `Descuento del premio (${REWARD_LIMITS.minValue}-${REWARD_LIMITS.maxValue}). 0 = sin premio.` },
       reward_valid_days: { type: "integer", minimum: REWARD_LIMITS.minDays, maximum: REWARD_LIMITS.maxDays, description: `Días de vigencia del código (por defecto ${REWARD_LIMITS.defaultDays}).` },
       moderate_photos: { type: "boolean", description: "true = las fotos esperan tu aprobación antes de verse en la página." },
