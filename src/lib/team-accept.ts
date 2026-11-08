@@ -5,10 +5,16 @@
 //    verifica su contraseña, se reactiva con el rol de la invitación y se desbloquea en Auth si la cuenta la
 //    creó AI Tickets.
 //  - El correo pertenece a otra organización: se rechaza.
+//  - Fila en public.users SIN organización (alta a medias, registro abandonado): se suma a esta organización con
+//    el rol de la invitación.
+//  - Cuenta que nadie ha usado (creada por AI Tickets, sin ningún ingreso: un huérfano, o un miembro al que se le
+//    reenvía el acceso porque nunca pudo entrar): el link de la invitación, que llegó a ese correo, prueba que es
+//    suyo, así que se le pone la contraseña que elija. Una cuenta ya usada exige su contraseña.
 //  - Sin fila en public.users: se crea la cuenta de Auth (marcada app=aitickets). Si el correo ya existe en
-//    Auth (proyecto compartido con otras apps) se pide la contraseña de esa cuenta y se vincula.
+//    Auth (proyecto compartido con otras apps) se pide la contraseña de esa cuenta y se vincula. Si algo falla
+//    antes de vincularla, la cuenta recién creada se borra.
 // La invitación se "reclama" primero con un UPDATE condicional (un solo uso aunque lleguen dos envíos).
-import { invitationStatus } from "./team-invitations";
+import { invitationStatus, isUnclaimedAuthUser } from "./team-invitations";
 
 export const MIN_PASSWORD_LENGTH = 8;
 const AITICKETS_APP_METADATA = { app: "aitickets" } as const;
@@ -84,6 +90,8 @@ export async function acceptTeamInvitation(
         }
     }
 
+    // Cuenta de Auth creada en ESTA aceptación: si algo falla antes de vincularla, se borra (sin huérfanos)
+    let createdAuthUserId: string | null = null;
     try {
         let authUserId: string | null = existing?.auth_user_id || null;
         let signed: Awaited<ReturnType<typeof signIn>> = null;
@@ -91,15 +99,31 @@ export async function acceptTeamInvitation(
         if (authUserId) {
             // Cuenta existente: desbloquear (si la bloqueó AI Tickets al desactivarla) y verificar la contraseña
             let unbanned = false;
+            let authUser: any = null;
             try {
                 const { data } = await supabase.auth.admin.getUserById(authUserId);
-                const user = data?.user;
-                if ((user?.app_metadata as any)?.app === "aitickets" && user?.banned_until && new Date(user.banned_until).getTime() > now.getTime()) {
+                authUser = data?.user || null;
+                if ((authUser?.app_metadata as any)?.app === "aitickets" && authUser?.banned_until && new Date(authUser.banned_until).getTime() > now.getTime()) {
                     await supabase.auth.admin.updateUserById(authUserId, { ban_duration: "none" });
                     unbanned = true;
                 }
             } catch (err: any) {
                 console.warn("accept-invitation getUserById:", err?.message || err);
+            }
+            // Cuenta que nadie ha usado (huérfano de un alta a medias, o miembro que nunca pudo entrar): queda con la
+            // contraseña que elija ahora. El link llegó a ese correo: prueba que es suyo, como un "recuperar contraseña".
+            if (isUnclaimedAuthUser(authUser)) {
+                if (password.length < MIN_PASSWORD_LENGTH) {
+                    await release();
+                    return fail(400, "invalid_input", `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.`);
+                }
+                const { error: pwError } = await supabase.auth.admin.updateUserById(authUserId, { password });
+                if (pwError) {
+                    await release();
+                    const weak = /weak|short|password/i.test(pwError.message || "");
+                    if (!weak) console.error("accept-invitation updateUserById:", pwError.message || pwError);
+                    return fail(weak ? 400 : 500, weak ? "weak_password" : "internal", weak ? "Esa contraseña es muy débil. Prueba con una más larga." : "No pudimos crear tu cuenta. Intenta de nuevo.");
+                }
             }
             signed = await signIn(authClient, email, password);
             if (!signed) {
@@ -139,6 +163,7 @@ export async function acceptTeamInvitation(
                 }
             } else {
                 authUserId = created.user.id;
+                createdAuthUserId = created.user.id;
             }
         }
 
@@ -147,7 +172,9 @@ export async function acceptTeamInvitation(
         let userId: number;
         let role = invitation.role;
         if (existing) {
-            if (existing.role === "producer") role = "producer";
+            // El dueño de ESTA organización no se degrada al reaceptar. Un 'producer' sin organización (o de otra) no
+            // se vuelve dueño de esta: recibe el rol de la invitación.
+            if (existing.role === "producer" && Number(existing.organization_id) === orgId) role = "producer";
             const { error } = await supabase
                 .from("users")
                 .update({ active: true, role, organization_id: orgId, auth_user_id: authUserId, ...(name ? { name } : {}), updated_at: nowIso })
@@ -197,6 +224,23 @@ export async function acceptTeamInvitation(
         return { ok: true, session: signed.session, role, userId, redirectTo: homeForRole(role) };
     } catch (err) {
         await release();
+        if (createdAuthUserId) await discardCreatedAccount(supabase, createdAuthUserId);
         throw err;
+    }
+}
+
+/**
+ * Revierte una cuenta de Auth recién creada que no alcanzó a quedar en la organización. Primero la fila sin
+ * organización que creó el trigger handle_new_user (users.auth_user_id referencia a auth.users sin ON DELETE: con
+ * la fila presente deleteUser falla) y después la cuenta. Si la fila ya quedó vinculada no se toca nada.
+ */
+async function discardCreatedAccount(supabase: any, authUserId: string) {
+    try {
+        const { error: rowError } = await supabase.from("users").delete().eq("auth_user_id", authUserId).is("organization_id", null);
+        if (rowError) console.error("accept-invitation: no se pudo borrar la fila de la cuenta revertida:", rowError.message || rowError);
+        const { error } = await supabase.auth.admin.deleteUser(authUserId);
+        if (error) console.error(`accept-invitation: no se pudo borrar la cuenta de Auth ${authUserId}:`, error.message || error);
+    } catch (err: any) {
+        console.error("accept-invitation: reversión de la cuenta:", err?.message || err);
     }
 }

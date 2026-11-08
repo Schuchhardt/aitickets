@@ -5,7 +5,7 @@
 import { ToolError, type ToolContext, type ToolDef } from "../registry";
 import { ASSIGNABLE_ROLES, PERMISSION_LABELS, ROLE_LABELS, ROLE_PERMISSIONS } from "../permissions";
 import {
-    INVITATION_COLUMNS, INVITATION_TTL_DAYS, addEventStaff, generateInvitationToken, invitationStatus, invitationUrl, roleDescription, roleLabel,
+    INVITATION_COLUMNS, INVITATION_TTL_DAYS, addEventStaff, generateInvitationToken, invitationStatus, invitationUrl, isUnclaimedAuthUser, roleDescription, roleLabel,
 } from "../../team-invitations";
 import { sendEmail, isValidEmail, formatRecipient } from "../../../../netlify/lib/mailer.mjs";
 import { renderTeamInvitationEmail } from "../../../../netlify/lib/emails/team.mjs";
@@ -33,6 +33,17 @@ async function loadMember(ctx: ToolContext, userId: number) {
         .maybeSingle();
     if (!data) throw new ToolError("not_found", `No existe el miembro ${userId} en tu organización. Usa list_members.`);
     return data;
+}
+
+/** ¿La cuenta de este usuario nunca se ha usado? (sin cuenta de Auth, o una creada por AI Tickets sin ningún ingreso) */
+async function neverUsedAccount(ctx: ToolContext, user: { auth_user_id?: string | null }): Promise<boolean> {
+    if (!user.auth_user_id) return true;
+    try {
+        const { data } = await ctx.supabase.auth.admin.getUserById(user.auth_user_id);
+        return isUnclaimedAuthUser(data?.user);
+    } catch {
+        return false;
+    }
 }
 
 /** Dueños/administradores activos de la organización, excluyendo opcionalmente a un usuario. */
@@ -153,7 +164,8 @@ const inviteMember: ToolDef = {
     description:
         "Invita a una persona al equipo con un rol (admin, finance, editor = marketing, validator = puerta, viewer = solo lectura). " +
         "Le llega un correo con un link personal (vence en 7 días) para crear su contraseña o entrar con su cuenta. " +
-        "Opcional: event_ids para limitar su acceso a esos eventos. El link nunca se muestra en el chat.",
+        "Opcional: event_ids para limitar su acceso a esos eventos. El link nunca se muestra en el chat. " +
+        "También sirve para reenviar el acceso a un miembro que nunca pudo entrar (crea su contraseña con el link).",
     scope: "team",
     permission: "team.manage",
     idempotent: true,
@@ -180,12 +192,25 @@ const inviteMember: ToolDef = {
         }
         const eventIds = await ownedEventIds(ctx, args.event_ids);
 
-        const { data: existing } = await ctx.supabase.from("users").select("id, organization_id, active").ilike("email", escapeLike(email)).maybeSingle();
-        if (existing) {
-            if (Number(existing.organization_id) !== ctx.actor.orgId) {
-                throw new ToolError("conflict", "Ese correo ya tiene una cuenta en otra organización de AI Tickets: pídele que use otro correo.");
-            }
-            if (isActive(existing)) throw new ToolError("conflict", `Esa persona ya es miembro activo (id ${existing.id}). Usa update_member_role para cambiar su rol.`);
+        // Un usuario SIN organización (organization_id NULL: alta a medias, registro abandonado) no es de "otra
+        // organización": se puede invitar y al aceptar queda en esta. Number(null) = 0 lo hacía pasar por ajeno.
+        const { data: sameEmail, error: lookupError } = await ctx.supabase
+            .from("users")
+            .select("id, organization_id, active, auth_user_id, role")
+            .ilike("email", escapeLike(email));
+        if (lookupError) throw lookupError;
+        const withOrg = (sameEmail || []).filter((u: any) => u.organization_id != null);
+        if (withOrg.some((u: any) => Number(u.organization_id) !== ctx.actor.orgId)) {
+            throw new ToolError("conflict", "Ese correo ya tiene una cuenta en otra organización de AI Tickets: pídele que use otro correo.");
+        }
+        const member = withOrg.find((u: any) => isActive(u));
+        // Miembro activo que nunca pudo entrar (su cuenta nadie la ha usado: p. ej. un alta antigua cuya contraseña
+        // temporal se perdió): la invitación le sirve para crear su contraseña ("reenviar acceso"). Si ya la usó, es conflicto.
+        if (member && !(await neverUsedAccount(ctx, member))) {
+            throw new ToolError("conflict", `Esa persona ya es miembro activo (id ${member.id}). Usa update_member_role para cambiar su rol.`);
+        }
+        if (member && OWNER_ONLY_ROLES.includes(member.role) && ctx.actor.role !== "producer") {
+            throw new ToolError("forbidden", "Solo el dueño de la cuenta puede reenviar el acceso a un administrador o a finanzas.");
         }
 
         // Una invitación pendiente por correo: la anterior se revoca y se reemplaza

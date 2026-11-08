@@ -15,7 +15,7 @@ vi.mock('../../netlify/lib/emails/team.mjs', () => ({
 const { teamTools } = await import('../../src/lib/producer-api/tools/team.ts')
 const { runTool } = await import('../../src/lib/producer-api/registry.ts')
 const { acceptTeamInvitation } = await import('../../src/lib/team-accept.ts')
-const { hashInvitationToken, generateInvitationToken } = await import('../../src/lib/team-invitations.ts')
+const { hashInvitationToken, generateInvitationToken, invitationNeedsExistingPassword } = await import('../../src/lib/team-invitations.ts')
 const { getStaffEventIds, canAccessEventByStaff } = await import('../../netlify/lib/event-staff.mjs')
 
 const tool = (name) => teamTools.find((t) => t.name === name)
@@ -101,6 +101,36 @@ describe('invite_member', () => {
     expect(await call('invite_member', { email: 'out@otra.cl', role: 'viewer' })).toMatchObject({ ok: false, code: 'conflict' })
     expect(await call('invite_member', { email: 'bea@prod.cl', role: 'viewer' })).toMatchObject({ ok: false, code: 'conflict' })
     expect(await call('invite_member', { email: 'z@prod.cl', role: 'viewer', event_ids: [20] })).toMatchObject({ ok: false, code: 'not_found' })
+  })
+
+  it('un usuario SIN organización (huérfano) se puede invitar: no es "otra organización" ni "miembro activo"', async () => {
+    db.tables.users.push({ id: 71, name: 'Romy', email: 'romy@mail.cl', organization_id: null, role: 'admin', active: true, auth_user_id: 'au71' })
+    const out = await call('invite_member', { email: 'Romy@mail.cl', role: 'validator' })
+    expect(out.ok).toBe(true)
+    expect(db.tables.aitickets_team_invitations[0]).toMatchObject({ email: 'romy@mail.cl', role: 'validator', organization_id: 7 })
+    // Un miembro desactivado de esta organización también se puede reinvitar
+    expect((await call('invite_member', { email: 'old@prod.cl', role: 'viewer' })).ok).toBe(true)
+  })
+
+  it('reenviar acceso: un miembro activo que nunca usó su cuenta se puede invitar; uno que sí la usó, no', async () => {
+    const accounts = { au71: { app_metadata: { app: 'aitickets' }, last_sign_in_at: null }, au2: { app_metadata: { app: 'aitickets' }, last_sign_in_at: '2026-10-01T00:00:00Z' } }
+    db.auth = { admin: { getUserById: async (id) => ({ data: { user: accounts[id] || null } }) } }
+    db.tables.users.push({ id: 71, name: 'Romy', email: 'romy@mail.cl', organization_id: 7, role: 'validator', active: true, auth_user_id: 'au71' })
+    expect((await call('invite_member', { email: 'romy@mail.cl', role: 'validator' })).ok).toBe(true)
+    expect(await call('invite_member', { email: 'bea@prod.cl', role: 'admin' })).toMatchObject({ ok: false, code: 'conflict' })
+    // Un administrador no puede "reenviar acceso" a otro administrador (cambiaría su rol sin ser el dueño)
+    accounts.au9 = { app_metadata: { app: 'aitickets' }, last_sign_in_at: null }
+    db.tables.users.push({ id: 9, name: 'Adm', email: 'adm@prod.cl', organization_id: 7, role: 'admin', active: true, auth_user_id: 'au9' })
+    expect(await call('invite_member', { email: 'adm@prod.cl', role: 'viewer' }, ctxFor(2, 'admin'))).toMatchObject({ ok: false, code: 'forbidden' })
+    expect((await call('invite_member', { email: 'adm@prod.cl', role: 'admin' })).ok).toBe(true)
+  })
+
+  it('correo de otra organización: conflict y ninguna invitación ni cuenta creada', async () => {
+    db.auth = { admin: { createUser: vi.fn(), getUserById: vi.fn() } }
+    expect(await call('invite_member', { email: 'OUT@otra.cl', role: 'viewer' })).toMatchObject({ ok: false, code: 'conflict' })
+    expect(db.tables.aitickets_team_invitations).toHaveLength(0)
+    expect(db.auth.admin.createUser).not.toHaveBeenCalled()
+    expect(sent).toHaveLength(0)
   })
 
   it('solo el dueño invita administradores', async () => {
@@ -259,7 +289,8 @@ describe('acceptTeamInvitation', () => {
 
   it('reactiva a un miembro desactivado de la misma organización si la contraseña es correcta', async () => {
     const inv = addInvitation({ email: 'old@prod.cl', role: 'finance', event_ids: [] })
-    db.auth = { admin: { getUserById: async () => ({ data: { user: { app_metadata: { app: 'aitickets' }, banned_until: '2100-01-01T00:00:00Z' } } }), updateUserById: vi.fn(async () => ({})) } }
+    // Cuenta ya usada (tiene ingresos): exige su contraseña. Una nunca usada elegiría una nueva (ver "reenviar acceso").
+    db.auth = { admin: { getUserById: async () => ({ data: { user: { app_metadata: { app: 'aitickets' }, banned_until: '2100-01-01T00:00:00Z', last_sign_in_at: '2026-09-01T00:00:00Z' } } }), updateUserById: vi.fn(async () => ({})) } }
     const bad = await acceptTeamInvitation(db, authFor(false), inv, { password: 'mala' }, NOW)
     expect(bad).toMatchObject({ ok: false, code: 'wrong_password' })
     expect(db.tables.aitickets_team_invitations[0].accepted_at).toBeNull()
@@ -274,6 +305,114 @@ describe('acceptTeamInvitation', () => {
     expect(await acceptTeamInvitation(db, authFor(), { ...addInvitation(), expires_at: '2026-10-01T00:00:00Z' }, { password: 'x' }, NOW)).toMatchObject({ ok: false, code: 'expired' })
     expect(await acceptTeamInvitation(db, authFor(), { ...addInvitation(), revoked_at: '2026-10-02T00:00:00Z' }, { password: 'x' }, NOW)).toMatchObject({ ok: false, code: 'revoked' })
     expect(await acceptTeamInvitation(db, authFor(), null, { password: 'x' }, NOW)).toMatchObject({ ok: false, code: 'not_found' })
+  })
+
+  it('usuario sin organización con una cuenta nunca usada: elige su contraseña y queda vinculado a la organización', async () => {
+    db.tables.users.push({ id: 71, name: 'Romyna', email: 'romy@mail.cl', organization_id: null, role: 'admin', active: true, auth_user_id: 'au71' })
+    const inv = addInvitation({ email: 'romy@mail.cl', event_ids: [] })
+    const updateUserById = vi.fn(async () => ({ data: {}, error: null }))
+    db.auth = {
+      admin: {
+        getUserById: async () => ({ data: { user: { id: 'au71', app_metadata: { app: 'aitickets' }, last_sign_in_at: null } } }),
+        updateUserById,
+        createUser: vi.fn(),
+      },
+    }
+    expect(await invitationNeedsExistingPassword(db, 'Romy@mail.cl')).toBe(false) // la página pide CREAR contraseña
+    const signIn = vi.fn(async () => ({ data: { session, user: { id: 'au71' } }, error: null }))
+    const res = await acceptTeamInvitation(db, { auth: { signInWithPassword: signIn } }, inv, { password: 'nuevaclave1' }, NOW)
+    expect(res).toMatchObject({ ok: true, role: 'validator', userId: 71, redirectTo: '/validador' })
+    expect(updateUserById).toHaveBeenCalledWith('au71', { password: 'nuevaclave1' })
+    expect(signIn).toHaveBeenCalledWith({ email: 'romy@mail.cl', password: 'nuevaclave1' })
+    expect(db.auth.admin.createUser).not.toHaveBeenCalled()
+    expect(db.tables.users.filter((u) => u.email === 'romy@mail.cl')).toEqual([expect.objectContaining({ id: 71, organization_id: 7, role: 'validator', active: true, auth_user_id: 'au71' })])
+    expect(db.tables.aitickets_team_invitations[0]).toMatchObject({ accepted_user_id: 71 })
+    expect(db.tables.aitickets_team_invitations[0].accepted_at).toBeTruthy()
+  })
+
+  it('usuario sin organización con una cuenta ya usada: exige SU contraseña y no la cambia', async () => {
+    db.tables.users.push({ id: 73, name: 'Romyna', email: 'romy@mail.cl', organization_id: null, role: 'producer', active: true, auth_user_id: 'au73' })
+    const inv = addInvitation({ email: 'romy@mail.cl', role: 'viewer', event_ids: [] })
+    const updateUserById = vi.fn(async () => ({ data: {}, error: null }))
+    db.auth = { admin: { getUserById: async () => ({ data: { user: { id: 'au73', app_metadata: { app: 'aitickets' }, last_sign_in_at: '2026-11-08T02:21:19Z' } } }), updateUserById } }
+    expect(await invitationNeedsExistingPassword(db, 'romy@mail.cl')).toBe(true)
+    const bad = await acceptTeamInvitation(db, authFor(false), inv, { password: 'adivino123' }, NOW)
+    expect(bad).toMatchObject({ ok: false, code: 'wrong_password' })
+    expect(updateUserById).not.toHaveBeenCalled()
+    expect(db.tables.aitickets_team_invitations[0].accepted_at).toBeNull()
+    // Con su contraseña queda vinculado con el rol de la invitación: un 'producer' sin organización NO se vuelve dueño de esta
+    const ok = await acceptTeamInvitation(db, authFor(true), db.tables.aitickets_team_invitations[0], { password: 'lasuya123' }, NOW)
+    expect(ok).toMatchObject({ ok: true, role: 'viewer', userId: 73 })
+    expect(db.tables.users.find((u) => u.id === 73)).toMatchObject({ organization_id: 7, role: 'viewer' })
+  })
+
+  it('invitationNeedsExistingPassword: correo nuevo => crear; cuenta ya usada => la suya; error al leer => la suya', async () => {
+    db.auth = { admin: { getUserById: vi.fn(async () => ({ data: { user: { app_metadata: { app: 'aitickets' }, last_sign_in_at: '2026-01-01T00:00:00Z' } } })) } }
+    expect(await invitationNeedsExistingPassword(db, 'nadie@mail.cl')).toBe(false)
+    expect(await invitationNeedsExistingPassword(db, 'old@prod.cl')).toBe(true)
+    expect(db.auth.admin.getUserById).toHaveBeenCalledWith('au5')
+    db.auth.admin.getUserById = vi.fn(async () => { throw new Error('red') })
+    expect(await invitationNeedsExistingPassword(db, 'old@prod.cl')).toBe(true)
+  })
+
+  // Auth como en producción: createUser dispara handle_new_user (fila SIN organización, role NULL) y
+  // users.auth_user_id referencia a auth.users sin ON DELETE (deleteUser falla si queda una fila que lo apunta).
+  const authWithTrigger = () => {
+    const accounts = []
+    const admin = {
+      accounts,
+      createUser: vi.fn(async ({ email, user_metadata }) => {
+        const user = { id: `au-t${accounts.length + 1}`, email, app_metadata: { app: 'aitickets' }, last_sign_in_at: null }
+        accounts.push(user)
+        if (!db.tables.users.some((u) => String(u.email).toLowerCase() === email)) {
+          db.tables.users.push({ id: 900 + accounts.length, auth_user_id: user.id, email, name: user_metadata?.full_name ?? null, organization_id: null, role: null, active: true })
+        }
+        return { data: { user }, error: null }
+      }),
+      deleteUser: vi.fn(async (id) => {
+        if (db.tables.users.some((u) => u.auth_user_id === id)) return { data: null, error: { message: 'Database error deleting user' } }
+        accounts.splice(accounts.findIndex((a) => a.id === id), 1)
+        return { data: {}, error: null }
+      }),
+    }
+    db.auth = { admin }
+    return admin
+  }
+
+  it('correo nuevo: completa la fila que creó el trigger (sin INSERT) y no deja huérfanos', async () => {
+    const inv = addInvitation({ event_ids: [] })
+    authWithTrigger()
+    const res = await acceptTeamInvitation(db, { auth: { signInWithPassword: async () => ({ data: { session, user: { id: 'au-t1' } }, error: null }) } }, inv, { name: 'Nuevo', password: 'secreto123' }, NOW)
+    expect(res).toMatchObject({ ok: true, role: 'validator' })
+    expect(db.tables.users.filter((u) => u.email === 'nuevo@prod.cl')).toEqual([expect.objectContaining({ auth_user_id: 'au-t1', organization_id: 7, role: 'validator', active: true })])
+    expect(db.tables.users.filter((u) => u.organization_id == null)).toHaveLength(0)
+    expect(db.calls.some((c) => c.table === 'users' && c.op === 'insert')).toBe(false)
+    // La organización y el rol nunca viajan en la metadata (el trigger corre también en el registro público)
+    expect(JSON.stringify(db.auth.admin.createUser.mock.calls[0][0])).not.toMatch(/organization|validator/)
+  })
+
+  it('falla después de createUser: borra la fila del trigger y LUEGO la cuenta de Auth, y libera la invitación', async () => {
+    const inv = addInvitation({ event_ids: [] })
+    const auth = authWithTrigger()
+    db.failOn('users', 'update', { code: '57014', message: 'statement timeout' })
+    await expect(acceptTeamInvitation(db, authFor(), inv, { name: 'Nuevo', password: 'secreto123' }, NOW)).rejects.toMatchObject({ code: '57014' })
+    expect(db.tables.users.some((u) => u.email === 'nuevo@prod.cl')).toBe(false)
+    expect(auth.accounts).toHaveLength(0)
+    expect(await auth.deleteUser.mock.results[0].value).toMatchObject({ error: null })
+    expect(db.tables.aitickets_team_invitations[0].accepted_at).toBeNull()
+  })
+
+  it('reenviar acceso: miembro de esta organización que nunca entró elige su contraseña', async () => {
+    db.tables.users.push({ id: 71, name: 'Romyna', email: 'romy@mail.cl', organization_id: 7, role: 'validator', active: true, auth_user_id: 'au71', last_access_at: null })
+    const updateUserById = vi.fn(async () => ({ data: {}, error: null }))
+    db.auth = { admin: { getUserById: async () => ({ data: { user: { id: 'au71', app_metadata: { app: 'aitickets' }, last_sign_in_at: null } } }), updateUserById } }
+    const out = await call('invite_member', { email: 'romy@mail.cl', role: 'validator' })
+    expect(out.ok).toBe(true)
+    expect(await invitationNeedsExistingPassword(db, 'romy@mail.cl')).toBe(false)
+    const inv = db.tables.aitickets_team_invitations.at(-1)
+    const res = await acceptTeamInvitation(db, authFor(true), inv, { password: 'nuevaclave1' }, NOW)
+    expect(res).toMatchObject({ ok: true, userId: 71, role: 'validator' })
+    expect(updateUserById).toHaveBeenCalledWith('au71', { password: 'nuevaclave1' })
   })
 
   it('correo ya existente en Auth (otra app): vincula con su contraseña', async () => {
