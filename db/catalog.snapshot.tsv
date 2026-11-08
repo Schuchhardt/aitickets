@@ -1,0 +1,1863 @@
+# Catálogo de la base que arman db/schema.sql + db/migrations (db/catalog.sql). NO editar a mano:
+# npm run db:snapshot lo regenera. scripts/db-drift.mjs --check compara una base real contra este archivo.
+bucket:Events	public=true limit=- mimes=-
+bucket:aitickets-event-documents	public=false limit=15728640 mimes=application/pdf,image/jpeg,image/png,image/webp
+bucket:aitickets-event-videos	public=true limit=52428800 mimes=video/mp4,video/webm,video/quicktime
+column:ad_account_connections.access_token	text notnull=false default=-
+column:ad_account_connections.account_name	text notnull=false default=-
+column:ad_account_connections.created_at	timestamp with time zone notnull=true default=now()
+column:ad_account_connections.currency	text notnull=false default=-
+column:ad_account_connections.id	bigint notnull=true default=- identity=a
+column:ad_account_connections.meta_ad_account_id	text notnull=false default=-
+column:ad_account_connections.meta_user_id	text notnull=false default=-
+column:ad_account_connections.minimum_daily_budget	numeric notnull=false default=-
+column:ad_account_connections.organization_id	bigint notnull=true default=-
+column:ad_account_connections.platform	text notnull=true default='meta'::text
+column:ad_account_connections.provider	text notnull=true default='meta_direct'::text
+column:ad_account_connections.status	text notnull=true default='active'::text
+column:ad_account_connections.timezone_name	text notnull=false default=-
+column:ad_account_connections.token_expires_at	timestamp with time zone notnull=false default=-
+column:ad_account_connections.unusable_reason	text notnull=false default=-
+column:ad_account_connections.updated_at	timestamp with time zone notnull=true default=now()
+column:ad_account_connections.zernio_account_id	text notnull=false default=-
+column:ad_campaigns.ad_account_connection_id	bigint notnull=true default=-
+column:ad_campaigns.ad_copy	text notnull=false default=-
+column:ad_campaigns.ad_type	text notnull=true default='standalone'::text
+column:ad_campaigns.call_to_action	text notnull=false default='LEARN_MORE'::text
+column:ad_campaigns.clicks	bigint notnull=false default=0
+column:ad_campaigns.conversions	bigint notnull=false default=0
+column:ad_campaigns.cpc	numeric notnull=false default=0
+column:ad_campaigns.cpm	numeric notnull=false default=0
+column:ad_campaigns.created_at	timestamp with time zone notnull=true default=now()
+column:ad_campaigns.created_by	bigint notnull=false default=-
+column:ad_campaigns.ctr	numeric notnull=false default=0
+column:ad_campaigns.currency	text notnull=true default='CLP'::text
+column:ad_campaigns.daily_budget	numeric notnull=true default=0
+column:ad_campaigns.destination_url	text notnull=false default=-
+column:ad_campaigns.duration_days	integer notnull=false default=-
+column:ad_campaigns.end_date	timestamp with time zone notnull=false default=-
+column:ad_campaigns.error_message	text notnull=false default=-
+column:ad_campaigns.event_id	bigint notnull=true default=-
+column:ad_campaigns.headline	text notnull=false default=-
+column:ad_campaigns.id	bigint notnull=true default=- identity=a
+column:ad_campaigns.image_urls	text[] notnull=false default='{}'::text[]
+column:ad_campaigns.impressions	bigint notnull=false default=0
+column:ad_campaigns.last_synced_at	timestamp with time zone notnull=false default=-
+column:ad_campaigns.meta_ad_id	text notnull=false default=-
+column:ad_campaigns.meta_adset_id	text notnull=false default=-
+column:ad_campaigns.meta_campaign_id	text notnull=false default=-
+column:ad_campaigns.name	text notnull=true default=-
+column:ad_campaigns.objective	text notnull=true default='OUTCOME_TRAFFIC'::text
+column:ad_campaigns.organization_id	bigint notnull=true default=-
+column:ad_campaigns.provider	text notnull=true default='meta_direct'::text
+column:ad_campaigns.reach	bigint notnull=false default=0
+column:ad_campaigns.review_status	text notnull=false default=-
+column:ad_campaigns.social_post_id	bigint notnull=false default=-
+column:ad_campaigns.spend	numeric notnull=false default=0
+column:ad_campaigns.start_date	timestamp with time zone notnull=false default=-
+column:ad_campaigns.status	text notnull=true default='draft'::text
+column:ad_campaigns.target_audience	jsonb notnull=false default='{}'::jsonb
+column:ad_campaigns.total_budget	numeric notnull=false default=-
+column:ad_campaigns.updated_at	timestamp with time zone notnull=true default=now()
+column:ad_campaigns.zernio_ad_id	text notnull=false default=-
+column:ad_campaigns.zernio_request	jsonb notnull=false default=-
+column:aitickets_admin_audit.args_hash	text notnull=false default=-
+column:aitickets_admin_audit.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_admin_audit.duration_ms	integer notnull=false default=-
+column:aitickets_admin_audit.error_code	text notnull=false default=-
+column:aitickets_admin_audit.event_id	bigint notnull=false default=-
+column:aitickets_admin_audit.id	bigint notnull=true default=- identity=a
+column:aitickets_admin_audit.ip_hash	text notnull=false default=-
+column:aitickets_admin_audit.key_fingerprint	text notnull=true default=-
+column:aitickets_admin_audit.key_kind	text notnull=true default=-
+column:aitickets_admin_audit.ok	boolean notnull=true default=-
+column:aitickets_admin_audit.organization_id	bigint notnull=false default=-
+column:aitickets_admin_audit.read_only	boolean notnull=true default=-
+column:aitickets_admin_audit.reason	text notnull=false default=-
+column:aitickets_admin_audit.summary	text notnull=false default=-
+column:aitickets_admin_audit.target	text notnull=false default=-
+column:aitickets_admin_audit.tool	text notnull=true default=-
+column:aitickets_admin_confirmations.args_hash	text notnull=true default=-
+column:aitickets_admin_confirmations.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_admin_confirmations.expires_at	timestamp with time zone notnull=true default=-
+column:aitickets_admin_confirmations.id	uuid notnull=true default=gen_random_uuid()
+column:aitickets_admin_confirmations.key_fingerprint	text notnull=true default=-
+column:aitickets_admin_confirmations.summary	jsonb notnull=false default=-
+column:aitickets_admin_confirmations.token_hash	text notnull=true default=-
+column:aitickets_admin_confirmations.tool	text notnull=true default=-
+column:aitickets_admin_confirmations.used_at	timestamp with time zone notnull=false default=-
+column:aitickets_admin_idempotency.args_hash	text notnull=true default=-
+column:aitickets_admin_idempotency.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_admin_idempotency.id	bigint notnull=true default=- identity=a
+column:aitickets_admin_idempotency.idem_key	text notnull=true default=-
+column:aitickets_admin_idempotency.response	jsonb notnull=false default=-
+column:aitickets_admin_idempotency.status	text notnull=true default='in_progress'::text
+column:aitickets_admin_idempotency.tool	text notnull=true default=-
+column:aitickets_admin_notes.body	text notnull=true default=-
+column:aitickets_admin_notes.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_admin_notes.id	bigint notnull=true default=- identity=a
+column:aitickets_admin_notes.organization_id	bigint notnull=true default=-
+column:aitickets_api_audit.api_key_id	uuid notnull=false default=-
+column:aitickets_api_audit.channel	text notnull=true default=-
+column:aitickets_api_audit.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_api_audit.error_code	text notnull=false default=-
+column:aitickets_api_audit.event_id	bigint notnull=false default=-
+column:aitickets_api_audit.id	bigint notnull=true default=- identity=a
+column:aitickets_api_audit.ok	boolean notnull=true default=-
+column:aitickets_api_audit.organization_id	bigint notnull=true default=-
+column:aitickets_api_audit.summary	text notnull=false default=-
+column:aitickets_api_audit.target	text notnull=false default=-
+column:aitickets_api_audit.tool	text notnull=true default=-
+column:aitickets_api_audit.user_id	bigint notnull=false default=-
+column:aitickets_api_confirmations.api_key_id	uuid notnull=false default=-
+column:aitickets_api_confirmations.args_hash	text notnull=true default=-
+column:aitickets_api_confirmations.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_api_confirmations.expires_at	timestamp with time zone notnull=true default=-
+column:aitickets_api_confirmations.id	uuid notnull=true default=gen_random_uuid()
+column:aitickets_api_confirmations.organization_id	bigint notnull=true default=-
+column:aitickets_api_confirmations.summary	jsonb notnull=false default=-
+column:aitickets_api_confirmations.token_hash	text notnull=true default=-
+column:aitickets_api_confirmations.tool	text notnull=true default=-
+column:aitickets_api_confirmations.used_at	timestamp with time zone notnull=false default=-
+column:aitickets_api_confirmations.user_id	bigint notnull=true default=-
+column:aitickets_api_idempotency.args_hash	text notnull=true default=-
+column:aitickets_api_idempotency.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_api_idempotency.id	bigint notnull=true default=- identity=a
+column:aitickets_api_idempotency.idem_key	text notnull=true default=-
+column:aitickets_api_idempotency.organization_id	bigint notnull=true default=-
+column:aitickets_api_idempotency.response	jsonb notnull=false default=-
+column:aitickets_api_idempotency.status	text notnull=true default='in_progress'::text
+column:aitickets_api_idempotency.tool	text notnull=true default=-
+column:aitickets_api_keys.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_api_keys.expires_at	timestamp with time zone notnull=false default=-
+column:aitickets_api_keys.id	uuid notnull=true default=gen_random_uuid()
+column:aitickets_api_keys.key_hash	text notnull=true default=-
+column:aitickets_api_keys.key_prefix	text notnull=true default=-
+column:aitickets_api_keys.last_used_at	timestamp with time zone notnull=false default=-
+column:aitickets_api_keys.name	text notnull=true default=-
+column:aitickets_api_keys.oauth_grant_id	uuid notnull=false default=-
+column:aitickets_api_keys.organization_id	bigint notnull=true default=-
+column:aitickets_api_keys.revoked_at	timestamp with time zone notnull=false default=-
+column:aitickets_api_keys.scopes	text[] notnull=true default=ARRAY['read'::text]
+column:aitickets_api_keys.user_id	bigint notnull=true default=-
+column:aitickets_attendee_checkins.checked_in_at	timestamp with time zone notnull=true default=now()
+column:aitickets_attendee_checkins.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_attendee_checkins.event_attendee_id	uuid notnull=true default=-
+column:aitickets_attendee_checkins.event_date_id	bigint notnull=true default=-
+column:aitickets_attendee_checkins.event_id	bigint notnull=true default=-
+column:aitickets_attendee_checkins.id	bigint notnull=true default=- identity=a
+column:aitickets_attendee_messages.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_attendee_messages.delivered_at	timestamp with time zone notnull=false default=-
+column:aitickets_attendee_messages.email	text notnull=true default=-
+column:aitickets_attendee_messages.event_id	bigint notnull=true default=-
+column:aitickets_attendee_messages.id	uuid notnull=true default=gen_random_uuid()
+column:aitickets_attendee_messages.mail_error	text notnull=false default=-
+column:aitickets_attendee_messages.message	text notnull=true default=-
+column:aitickets_attendee_messages.name	text notnull=false default=-
+column:aitickets_attendee_messages.order_id	uuid notnull=false default=-
+column:aitickets_attendee_messages.organization_id	bigint notnull=true default=-
+column:aitickets_attendee_messages.read_at	timestamp with time zone notnull=false default=-
+column:aitickets_auth_link_sends.auth_user_id	uuid notnull=true default=-
+column:aitickets_auth_link_sends.id	bigint notnull=true default=- identity=d
+column:aitickets_auth_link_sends.purpose	text notnull=true default=-
+column:aitickets_auth_link_sends.sent_at	timestamp with time zone notnull=true default=now()
+column:aitickets_auth_link_tokens.auth_user_id	uuid notnull=true default=-
+column:aitickets_auth_link_tokens.expires_at	timestamp with time zone notnull=true default=-
+column:aitickets_auth_link_tokens.jti	text notnull=true default=-
+column:aitickets_auth_link_tokens.purpose	text notnull=true default=-
+column:aitickets_auth_link_tokens.used_at	timestamp with time zone notnull=true default=now()
+column:aitickets_certificate_sends.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_certificate_sends.created_by	bigint notnull=false default=-
+column:aitickets_certificate_sends.event_id	bigint notnull=true default=-
+column:aitickets_certificate_sends.hours	numeric(5,1) notnull=false default=-
+column:aitickets_certificate_sends.id	bigint notnull=true default=- identity=a
+column:aitickets_certificate_sends.min_sessions	integer notnull=true default=1
+column:aitickets_certificate_sends.organization_id	bigint notnull=true default=-
+column:aitickets_certificate_sends.recipients_count	integer notnull=true default=0
+column:aitickets_certificate_sends.ticket_ids	jsonb notnull=true default='[]'::jsonb
+column:aitickets_checkin_links.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_checkin_links.created_by	bigint notnull=false default=-
+column:aitickets_checkin_links.event_id	bigint notnull=true default=-
+column:aitickets_checkin_links.expires_at	timestamp with time zone notnull=true default=-
+column:aitickets_checkin_links.id	uuid notnull=true default=gen_random_uuid()
+column:aitickets_checkin_links.label	text notnull=false default=-
+column:aitickets_checkin_links.last_opened_at	timestamp with time zone notnull=false default=-
+column:aitickets_checkin_links.last_used_at	timestamp with time zone notnull=false default=-
+column:aitickets_checkin_links.organization_id	bigint notnull=true default=-
+column:aitickets_checkin_links.revoked_at	timestamp with time zone notnull=false default=-
+column:aitickets_checkin_links.scan_count	integer notnull=true default=0
+column:aitickets_checkin_links.token_hash	text notnull=true default=-
+column:aitickets_competitor_events.category	text notnull=false default=-
+column:aitickets_competitor_events.city	text notnull=false default=-
+column:aitickets_competitor_events.event_date	date notnull=false default=-
+column:aitickets_competitor_events.first_seen_at	timestamp with time zone notnull=true default=now()
+column:aitickets_competitor_events.id	bigint notnull=true default=- identity=d
+column:aitickets_competitor_events.last_seen_at	timestamp with time zone notnull=true default=now()
+column:aitickets_competitor_events.lead_id	uuid notnull=false default=-
+column:aitickets_competitor_events.platform	text notnull=true default='passline'::text
+column:aitickets_competitor_events.producer_name	text notnull=false default=-
+column:aitickets_competitor_events.producer_ref	text notnull=false default=-
+column:aitickets_competitor_events.region	text notnull=false default=-
+column:aitickets_competitor_events.seen_via	text notnull=true default='search'::text
+column:aitickets_competitor_events.snippet	text notnull=false default=-
+column:aitickets_competitor_events.times_seen	integer notnull=true default=1
+column:aitickets_competitor_events.title	text notnull=false default=-
+column:aitickets_competitor_events.url	text notnull=true default=-
+column:aitickets_competitor_events.venue	text notnull=false default=-
+column:aitickets_discount_codes.active	boolean notnull=true default=true
+column:aitickets_discount_codes.code	text notnull=true default=-
+column:aitickets_discount_codes.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_discount_codes.created_by	bigint notnull=false default=-
+column:aitickets_discount_codes.ends_at	timestamp with time zone notnull=false default=-
+column:aitickets_discount_codes.event_id	bigint notnull=false default=-
+column:aitickets_discount_codes.id	uuid notnull=true default=gen_random_uuid()
+column:aitickets_discount_codes.kind	text notnull=true default=-
+column:aitickets_discount_codes.max_uses	integer notnull=false default=-
+column:aitickets_discount_codes.organization_id	bigint notnull=true default=-
+column:aitickets_discount_codes.per_buyer_limit	integer notnull=false default=-
+column:aitickets_discount_codes.source	text notnull=true default='producer'::text
+column:aitickets_discount_codes.starts_at	timestamp with time zone notnull=false default=-
+column:aitickets_discount_codes.updated_at	timestamp with time zone notnull=true default=now()
+column:aitickets_discount_codes.uses	integer notnull=true default=0
+column:aitickets_discount_codes.value	numeric notnull=true default=-
+column:aitickets_disputes.amount	integer notnull=false default=-
+column:aitickets_disputes.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_disputes.event_date_id	bigint notnull=false default=-
+column:aitickets_disputes.event_id	bigint notnull=true default=-
+column:aitickets_disputes.id	uuid notnull=true default=gen_random_uuid()
+column:aitickets_disputes.kind	text notnull=true default='chargeback'::text
+column:aitickets_disputes.notes	text notnull=false default=-
+column:aitickets_disputes.order_id	uuid notnull=false default=-
+column:aitickets_disputes.organization_id	bigint notnull=false default=-
+column:aitickets_disputes.resolved_at	timestamp with time zone notnull=false default=-
+column:aitickets_disputes.source	text notnull=false default=-
+column:aitickets_disputes.status	text notnull=true default='open'::text
+column:aitickets_email_log.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_email_log.error	text notnull=false default=-
+column:aitickets_email_log.event_id	bigint notnull=false default=-
+column:aitickets_email_log.events	jsonb notnull=true default='[]'::jsonb
+column:aitickets_email_log.id	bigint notnull=true default=- identity=a
+column:aitickets_email_log.kind	text notnull=true default='tickets'::text
+column:aitickets_email_log.last_event_at	timestamp with time zone notnull=false default=-
+column:aitickets_email_log.order_id	uuid notnull=false default=-
+column:aitickets_email_log.provider	text notnull=true default='resend'::text
+column:aitickets_email_log.provider_message_id	text notnull=false default=-
+column:aitickets_email_log.recipient	text notnull=false default=-
+column:aitickets_email_log.status	text notnull=true default=-
+column:aitickets_email_log.updated_at	timestamp with time zone notnull=true default=now()
+column:aitickets_event_agenda.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_event_agenda.ends_at	time without time zone notnull=false default=-
+column:aitickets_event_agenda.event_date_id	bigint notnull=false default=-
+column:aitickets_event_agenda.event_id	bigint notnull=true default=-
+column:aitickets_event_agenda.id	bigint notnull=true default=- identity=a
+column:aitickets_event_agenda.position	integer notnull=true default=0
+column:aitickets_event_agenda.room	text notnull=false default=-
+column:aitickets_event_agenda.speakers	text notnull=false default=-
+column:aitickets_event_agenda.starts_at	time without time zone notnull=true default=-
+column:aitickets_event_agenda.title	text notnull=true default=-
+column:aitickets_event_documents.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_event_documents.event_id	bigint notnull=true default=-
+column:aitickets_event_documents.file_name	text notnull=false default=-
+column:aitickets_event_documents.id	uuid notnull=true default=gen_random_uuid()
+column:aitickets_event_documents.kind	text notnull=true default=-
+column:aitickets_event_documents.mime_type	text notnull=false default=-
+column:aitickets_event_documents.notes	text notnull=false default=-
+column:aitickets_event_documents.organization_id	bigint notnull=true default=-
+column:aitickets_event_documents.reviewed_at	timestamp with time zone notnull=false default=-
+column:aitickets_event_documents.reviewed_by	text notnull=false default=-
+column:aitickets_event_documents.size_bytes	integer notnull=false default=-
+column:aitickets_event_documents.status	text notnull=true default='pending'::text
+column:aitickets_event_documents.storage_path	text notnull=true default=-
+column:aitickets_event_documents.uploaded_by	bigint notnull=false default=-
+column:aitickets_event_feed_posts.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_event_feed_posts.display_name	text notnull=false default=-
+column:aitickets_event_feed_posts.email	text notnull=true default=-
+column:aitickets_event_feed_posts.emoji	text notnull=true default=-
+column:aitickets_event_feed_posts.event_id	bigint notnull=true default=-
+column:aitickets_event_feed_posts.id	uuid notnull=true default=gen_random_uuid()
+column:aitickets_event_feed_posts.message	text notnull=false default=-
+column:aitickets_event_feed_posts.order_id	uuid notnull=false default=-
+column:aitickets_event_feed_posts.organization_id	bigint notnull=true default=-
+column:aitickets_event_feed_posts.status	text notnull=true default='visible'::text
+column:aitickets_event_feed_posts.updated_at	timestamp with time zone notnull=true default=now()
+column:aitickets_event_gallery_images.caption	text notnull=false default=-
+column:aitickets_event_gallery_images.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_event_gallery_images.created_by_user_id	bigint notnull=false default=-
+column:aitickets_event_gallery_images.event_id	bigint notnull=true default=-
+column:aitickets_event_gallery_images.height	integer notnull=false default=-
+column:aitickets_event_gallery_images.id	uuid notnull=true default=gen_random_uuid()
+column:aitickets_event_gallery_images.organization_id	bigint notnull=true default=-
+column:aitickets_event_gallery_images.position	integer notnull=true default=0
+column:aitickets_event_gallery_images.thumb_url	text notnull=false default=-
+column:aitickets_event_gallery_images.url	text notnull=true default=-
+column:aitickets_event_gallery_images.width	integer notnull=false default=-
+column:aitickets_event_preview_links.consumed_at	timestamp with time zone notnull=false default=-
+column:aitickets_event_preview_links.consumed_nonce_hash	text notnull=false default=-
+column:aitickets_event_preview_links.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_event_preview_links.created_by_user_id	bigint notnull=false default=-
+column:aitickets_event_preview_links.created_via	text notnull=true default='dashboard'::text
+column:aitickets_event_preview_links.event_id	bigint notnull=true default=-
+column:aitickets_event_preview_links.expires_at	timestamp with time zone notnull=false default=-
+column:aitickets_event_preview_links.id	uuid notnull=true default=gen_random_uuid()
+column:aitickets_event_preview_links.label	text notnull=false default=-
+column:aitickets_event_preview_links.last_viewed_at	timestamp with time zone notnull=false default=-
+column:aitickets_event_preview_links.organization_id	bigint notnull=true default=-
+column:aitickets_event_preview_links.revoked_at	timestamp with time zone notnull=false default=-
+column:aitickets_event_preview_links.single_use	boolean notnull=true default=false
+column:aitickets_event_preview_links.token_hash	text notnull=true default=-
+column:aitickets_event_preview_links.view_count	integer notnull=true default=0
+column:aitickets_event_review_photos.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_event_review_photos.display_name	text notnull=false default=-
+column:aitickets_event_review_photos.email	text notnull=true default=-
+column:aitickets_event_review_photos.event_id	bigint notnull=true default=-
+column:aitickets_event_review_photos.height	integer notnull=false default=-
+column:aitickets_event_review_photos.id	uuid notnull=true default=gen_random_uuid()
+column:aitickets_event_review_photos.organization_id	bigint notnull=true default=-
+column:aitickets_event_review_photos.status	text notnull=true default='visible'::text
+column:aitickets_event_review_photos.thumb_url	text notnull=false default=-
+column:aitickets_event_review_photos.url	text notnull=true default=-
+column:aitickets_event_review_photos.width	integer notnull=false default=-
+column:aitickets_event_reviews.attendee_id	bigint notnull=false default=-
+column:aitickets_event_reviews.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_event_reviews.display_name	text notnull=false default=-
+column:aitickets_event_reviews.email	text notnull=true default=-
+column:aitickets_event_reviews.event_id	bigint notnull=true default=-
+column:aitickets_event_reviews.id	uuid notnull=true default=gen_random_uuid()
+column:aitickets_event_reviews.organization_id	bigint notnull=true default=-
+column:aitickets_event_reviews.private_comment	text notnull=false default=-
+column:aitickets_event_reviews.public_comment	text notnull=false default=-
+column:aitickets_event_reviews.public_status	text notnull=true default='visible'::text
+column:aitickets_event_reviews.rating	smallint notnull=true default=-
+column:aitickets_event_reviews.reward_code	text notnull=false default=-
+column:aitickets_event_reviews.reward_code_id	uuid notnull=false default=-
+column:aitickets_event_reviews.updated_at	timestamp with time zone notnull=true default=now()
+column:aitickets_event_reviews.verified_via	text notnull=true default=-
+column:aitickets_event_seats.attendee_ticket_id	uuid notnull=false default=-
+column:aitickets_event_seats.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_event_seats.event_date_id	bigint notnull=true default=-
+column:aitickets_event_seats.event_id	bigint notnull=true default=-
+column:aitickets_event_seats.expires_at	timestamp with time zone notnull=false default=-
+column:aitickets_event_seats.id	bigint notnull=true default=- identity=a
+column:aitickets_event_seats.order_id	uuid notnull=false default=-
+column:aitickets_event_seats.seat_key	text notnull=true default=-
+column:aitickets_event_seats.status	text notnull=true default='held'::text
+column:aitickets_event_slug_redirects.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_event_slug_redirects.created_by_user_id	bigint notnull=false default=-
+column:aitickets_event_slug_redirects.event_id	bigint notnull=true default=-
+column:aitickets_event_slug_redirects.old_slug	text notnull=true default=-
+column:aitickets_event_slug_redirects.organization_id	bigint notnull=true default=-
+column:aitickets_event_staff.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_event_staff.created_by	bigint notnull=false default=-
+column:aitickets_event_staff.event_id	bigint notnull=true default=-
+column:aitickets_event_staff.id	bigint notnull=true default=- identity=a
+column:aitickets_event_staff.organization_id	bigint notnull=true default=-
+column:aitickets_event_staff.user_id	bigint notnull=true default=-
+column:aitickets_event_waitlist.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_event_waitlist.email	text notnull=true default=-
+column:aitickets_event_waitlist.event_date_id	bigint notnull=false default=-
+column:aitickets_event_waitlist.event_id	bigint notnull=true default=-
+column:aitickets_event_waitlist.id	uuid notnull=true default=gen_random_uuid()
+column:aitickets_event_waitlist.kind	text notnull=true default='full'::text
+column:aitickets_event_waitlist.notified_at	timestamp with time zone notnull=false default=-
+column:aitickets_event_waitlist.utm_campaign	text notnull=false default=-
+column:aitickets_event_waitlist.utm_medium	text notnull=false default=-
+column:aitickets_event_waitlist.utm_source	text notnull=false default=-
+column:aitickets_guests.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_guests.created_by	bigint notnull=false default=-
+column:aitickets_guests.email	text notnull=false default=-
+column:aitickets_guests.event_id	bigint notnull=true default=-
+column:aitickets_guests.id	uuid notnull=true default=gen_random_uuid()
+column:aitickets_guests.invite_channel	text notnull=false default=-
+column:aitickets_guests.invite_count	integer notnull=true default=0
+column:aitickets_guests.invited_at	timestamp with time zone notnull=false default=-
+column:aitickets_guests.name	text notnull=true default=-
+column:aitickets_guests.notes	text notnull=false default=-
+column:aitickets_guests.organization_id	bigint notnull=true default=-
+column:aitickets_guests.phone	text notnull=false default=-
+column:aitickets_guests.plus_ones	integer notnull=true default=0
+column:aitickets_guests.removed_at	timestamp with time zone notnull=false default=-
+column:aitickets_guests.status	text notnull=true default='pending'::text
+column:aitickets_job_heartbeats.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_job_heartbeats.items_processed	integer notnull=false default=-
+column:aitickets_job_heartbeats.job	text notnull=true default=-
+column:aitickets_job_heartbeats.last_error	text notnull=false default=-
+column:aitickets_job_heartbeats.last_error_at	timestamp with time zone notnull=false default=-
+column:aitickets_job_heartbeats.last_note	text notnull=false default=-
+column:aitickets_job_heartbeats.last_run_at	timestamp with time zone notnull=true default=-
+column:aitickets_job_heartbeats.last_success_at	timestamp with time zone notnull=false default=-
+column:aitickets_lead_sources.config	jsonb notnull=true default='{}'::jsonb
+column:aitickets_lead_sources.cursor	jsonb notnull=false default=-
+column:aitickets_lead_sources.enabled	boolean notnull=true default=false
+column:aitickets_lead_sources.key	text notnull=true default=-
+column:aitickets_lead_sources.last_result	jsonb notnull=false default=-
+column:aitickets_lead_sources.last_run_at	timestamp with time zone notnull=false default=-
+column:aitickets_leads.categories	text[] notnull=false default=-
+column:aitickets_leads.city	text notnull=false default=-
+column:aitickets_leads.consent_at	timestamp with time zone notnull=false default=-
+column:aitickets_leads.contact_sources	jsonb notnull=true default='[]'::jsonb
+column:aitickets_leads.contacts_enriched_at	timestamp with time zone notnull=false default=-
+column:aitickets_leads.country	character(2) notnull=true default='CL'::bpchar
+column:aitickets_leads.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_leads.current_ticketing	text notnull=false default=-
+column:aitickets_leads.domain	text notnull=false default=-
+column:aitickets_leads.email	text notnull=false default=-
+column:aitickets_leads.email_found_at	timestamp with time zone notnull=false default=-
+column:aitickets_leads.email_source_url	text notnull=false default=-
+column:aitickets_leads.email_type	text notnull=false default=-
+column:aitickets_leads.enrich_attempts	integer notnull=true default=0
+column:aitickets_leads.events_on_passline	integer notnull=true default=0
+column:aitickets_leads.id	uuid notnull=true default=gen_random_uuid()
+column:aitickets_leads.instagram	text notnull=false default=-
+column:aitickets_leads.invalid_reason	text notnull=false default=-
+column:aitickets_leads.last_contacted_at	timestamp with time zone notnull=false default=-
+column:aitickets_leads.last_passline_event	jsonb notnull=false default=-
+column:aitickets_leads.last_seen_event_at	timestamp with time zone notnull=false default=-
+column:aitickets_leads.lawful_basis	text notnull=true default='legitimate_interest_b2b'::text
+column:aitickets_leads.lead_type	text notnull=false default=-
+column:aitickets_leads.manual_only	boolean notnull=true default=false
+column:aitickets_leads.name_key	text notnull=false default=-
+column:aitickets_leads.next_action_at	timestamp with time zone notnull=false default=-
+column:aitickets_leads.notes	text notnull=false default=-
+column:aitickets_leads.org_name	text notnull=false default=-
+column:aitickets_leads.organization_id	bigint notnull=false default=-
+column:aitickets_leads.place_id	text notnull=false default=-
+column:aitickets_leads.score	integer notnull=false default=-
+column:aitickets_leads.score_reasons	jsonb notnull=false default=-
+column:aitickets_leads.sequence_step	integer notnull=true default=0
+column:aitickets_leads.source	text notnull=false default=-
+column:aitickets_leads.source_refs	jsonb notnull=true default='[]'::jsonb
+column:aitickets_leads.status	text notnull=true default='new'::text
+column:aitickets_leads.upcoming_event	jsonb notnull=false default=-
+column:aitickets_leads.updated_at	timestamp with time zone notnull=true default=now()
+column:aitickets_leads.website	text notnull=false default=-
+column:aitickets_leads.whatsapp	text notnull=false default=-
+column:aitickets_oauth_clients.client_id	text notnull=true default=-
+column:aitickets_oauth_clients.client_name	text notnull=true default=-
+column:aitickets_oauth_clients.client_secret_hash	text notnull=false default=-
+column:aitickets_oauth_clients.client_uri	text notnull=false default=-
+column:aitickets_oauth_clients.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_oauth_clients.logo_uri	text notnull=false default=-
+column:aitickets_oauth_clients.redirect_uris	text[] notnull=true default=-
+column:aitickets_oauth_clients.token_endpoint_auth_method	text notnull=true default='none'::text
+column:aitickets_oauth_codes.client_id	text notnull=true default=-
+column:aitickets_oauth_codes.client_name	text notnull=true default=-
+column:aitickets_oauth_codes.code_challenge	text notnull=true default=-
+column:aitickets_oauth_codes.code_hash	text notnull=true default=-
+column:aitickets_oauth_codes.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_oauth_codes.expires_at	timestamp with time zone notnull=true default=-
+column:aitickets_oauth_codes.organization_id	bigint notnull=true default=-
+column:aitickets_oauth_codes.redirect_uri	text notnull=true default=-
+column:aitickets_oauth_codes.resource	text notnull=false default=-
+column:aitickets_oauth_codes.scopes	text[] notnull=true default=-
+column:aitickets_oauth_codes.used_at	timestamp with time zone notnull=false default=-
+column:aitickets_oauth_codes.user_id	bigint notnull=true default=-
+column:aitickets_oauth_grants.client_id	text notnull=true default=-
+column:aitickets_oauth_grants.client_name	text notnull=true default=-
+column:aitickets_oauth_grants.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_oauth_grants.id	uuid notnull=true default=gen_random_uuid()
+column:aitickets_oauth_grants.last_used_at	timestamp with time zone notnull=false default=-
+column:aitickets_oauth_grants.organization_id	bigint notnull=true default=-
+column:aitickets_oauth_grants.refresh_expires_at	timestamp with time zone notnull=true default=-
+column:aitickets_oauth_grants.refresh_hash	text notnull=true default=-
+column:aitickets_oauth_grants.revoked_at	timestamp with time zone notnull=false default=-
+column:aitickets_oauth_grants.scopes	text[] notnull=true default=-
+column:aitickets_oauth_grants.user_id	bigint notnull=true default=-
+column:aitickets_org_email_optouts.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_org_email_optouts.email	text notnull=true default=-
+column:aitickets_org_email_optouts.organization_id	bigint notnull=true default=-
+column:aitickets_org_email_optouts.source	text notnull=true default='unsubscribe_link'::text
+column:aitickets_outreach_events.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_outreach_events.id	bigint notnull=true default=nextval('aitickets_outreach_events_id_seq'::regclass)
+column:aitickets_outreach_events.lead_id	uuid notnull=false default=-
+column:aitickets_outreach_events.message_id	uuid notnull=false default=-
+column:aitickets_outreach_events.payload	jsonb notnull=false default=-
+column:aitickets_outreach_events.provider_event_id	text notnull=false default=-
+column:aitickets_outreach_events.type	text notnull=true default=-
+column:aitickets_outreach_messages.ai_confidence	numeric notnull=false default=-
+column:aitickets_outreach_messages.ai_intent	text notnull=false default=-
+column:aitickets_outreach_messages.ai_payload	jsonb notnull=false default=-
+column:aitickets_outreach_messages.approved_by	text notnull=false default=-
+column:aitickets_outreach_messages.auto_sent	boolean notnull=true default=false
+column:aitickets_outreach_messages.body_text	text notnull=false default=-
+column:aitickets_outreach_messages.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_outreach_messages.direction	text notnull=true default=-
+column:aitickets_outreach_messages.error	text notnull=false default=-
+column:aitickets_outreach_messages.id	uuid notnull=true default=gen_random_uuid()
+column:aitickets_outreach_messages.lead_id	uuid notnull=true default=-
+column:aitickets_outreach_messages.mailbox	text notnull=false default=-
+column:aitickets_outreach_messages.provider	text notnull=false default=-
+column:aitickets_outreach_messages.provider_message_id	text notnull=false default=-
+column:aitickets_outreach_messages.scheduled_at	timestamp with time zone notnull=false default=-
+column:aitickets_outreach_messages.sent_at	timestamp with time zone notnull=false default=-
+column:aitickets_outreach_messages.status	text notnull=true default=-
+column:aitickets_outreach_messages.step	integer notnull=false default=-
+column:aitickets_outreach_messages.subject	text notnull=false default=-
+column:aitickets_outreach_messages.thread_id	text notnull=false default=-
+column:aitickets_outreach_state.key	text notnull=true default=-
+column:aitickets_outreach_state.updated_at	timestamp with time zone notnull=true default=now()
+column:aitickets_outreach_state.value	jsonb notnull=true default='{}'::jsonb
+column:aitickets_payment_events.id	text notnull=true default=-
+column:aitickets_payment_events.order_id	uuid notnull=false default=-
+column:aitickets_payment_events.payload	jsonb notnull=false default=-
+column:aitickets_payment_events.provider	text notnull=true default=-
+column:aitickets_payment_events.received_at	timestamp with time zone notnull=true default=now()
+column:aitickets_payment_events.type	text notnull=true default=-
+column:aitickets_payouts.amount	bigint notnull=true default=-
+column:aitickets_payouts.bank_account_last4	text notnull=false default=-
+column:aitickets_payouts.bank_account_type	text notnull=false default=-
+column:aitickets_payouts.bank_name	text notnull=false default=-
+column:aitickets_payouts.cancelled_at	timestamp with time zone notnull=false default=-
+column:aitickets_payouts.cancelled_by	bigint notnull=false default=-
+column:aitickets_payouts.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_payouts.estimated_payment_date	date notnull=false default=-
+column:aitickets_payouts.failure_reason	text notnull=false default=-
+column:aitickets_payouts.id	uuid notnull=true default=gen_random_uuid()
+column:aitickets_payouts.organization_id	bigint notnull=true default=-
+column:aitickets_payouts.paid_at	timestamp with time zone notnull=false default=-
+column:aitickets_payouts.processed_by	text notnull=false default=-
+column:aitickets_payouts.reference	text notnull=false default=-
+column:aitickets_payouts.requested_by	bigint notnull=false default=-
+column:aitickets_payouts.requested_via	text notnull=true default='mcp'::text
+column:aitickets_payouts.status	text notnull=true default='requested'::text
+column:aitickets_payouts.updated_at	timestamp with time zone notnull=true default=now()
+column:aitickets_platform_settings.key	text notnull=true default=-
+column:aitickets_platform_settings.updated_at	timestamp with time zone notnull=true default=now()
+column:aitickets_platform_settings.value	jsonb notnull=true default=-
+column:aitickets_producer_activity.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_producer_activity.data	jsonb notnull=true default='{}'::jsonb
+column:aitickets_producer_activity.duration_ms	integer notnull=false default=-
+column:aitickets_producer_activity.event_id	bigint notnull=false default=-
+column:aitickets_producer_activity.id	bigint notnull=true default=- identity=a
+column:aitickets_producer_activity.label	text notnull=false default=-
+column:aitickets_producer_activity.occurred_at	timestamp with time zone notnull=true default=now()
+column:aitickets_producer_activity.organization_id	bigint notnull=true default=-
+column:aitickets_producer_activity.page_view_id	uuid notnull=false default=-
+column:aitickets_producer_activity.path	text notnull=false default=-
+column:aitickets_producer_activity.route	text notnull=false default=-
+column:aitickets_producer_activity.status	integer notnull=false default=-
+column:aitickets_producer_activity.target	text notnull=false default=-
+column:aitickets_producer_activity.type	text notnull=true default=-
+column:aitickets_producer_activity.user_id	bigint notnull=false default=-
+column:aitickets_promoter_links.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_promoter_links.created_by	bigint notnull=false default=-
+column:aitickets_promoter_links.event_id	bigint notnull=false default=-
+column:aitickets_promoter_links.id	uuid notnull=true default=gen_random_uuid()
+column:aitickets_promoter_links.last_opened_at	timestamp with time zone notnull=false default=-
+column:aitickets_promoter_links.name	text notnull=true default=-
+column:aitickets_promoter_links.open_count	integer notnull=true default=0
+column:aitickets_promoter_links.organization_id	bigint notnull=true default=-
+column:aitickets_promoter_links.ref	text notnull=true default=-
+column:aitickets_promoter_links.revoked_at	timestamp with time zone notnull=false default=-
+column:aitickets_promoter_links.token_hash	text notnull=true default=-
+column:aitickets_rate_limits.bucket	text notnull=true default=-
+column:aitickets_rate_limits.count	integer notnull=true default=0
+column:aitickets_rate_limits.key_hash	text notnull=true default=-
+column:aitickets_rate_limits.window_start	timestamp with time zone notnull=true default=-
+column:aitickets_refunds.cancelled_ticket_ids	uuid[] notnull=true default='{}'::uuid[]
+column:aitickets_refunds.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_refunds.event_id	bigint notnull=true default=-
+column:aitickets_refunds.failure_reason	text notnull=false default=-
+column:aitickets_refunds.fee_amount	bigint notnull=true default=0
+column:aitickets_refunds.id	uuid notnull=true default=gen_random_uuid()
+column:aitickets_refunds.kind	text notnull=true default=-
+column:aitickets_refunds.order_id	uuid notnull=true default=-
+column:aitickets_refunds.organization_id	bigint notnull=true default=-
+column:aitickets_refunds.processed_at	timestamp with time zone notnull=false default=-
+column:aitickets_refunds.processed_by	text notnull=false default=-
+column:aitickets_refunds.provider_reference	text notnull=false default=-
+column:aitickets_refunds.reason	text notnull=false default=-
+column:aitickets_refunds.requested_by	bigint notnull=false default=-
+column:aitickets_refunds.requested_via	text notnull=true default='mcp'::text
+column:aitickets_refunds.source	text notnull=true default='refund_order'::text
+column:aitickets_refunds.status	text notnull=true default='requested'::text
+column:aitickets_refunds.ticket_amount	bigint notnull=true default=0
+column:aitickets_refunds.total_amount	bigint notnull=true default=-
+column:aitickets_scheduled_messages.audience	text notnull=true default='all'::text
+column:aitickets_scheduled_messages.body	text notnull=true default=-
+column:aitickets_scheduled_messages.claimed_at	timestamp with time zone notnull=false default=-
+column:aitickets_scheduled_messages.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_scheduled_messages.created_by	bigint notnull=false default=-
+column:aitickets_scheduled_messages.created_via	text notnull=true default='mcp'::text
+column:aitickets_scheduled_messages.event_id	bigint notnull=true default=-
+column:aitickets_scheduled_messages.failed_count	integer notnull=false default=-
+column:aitickets_scheduled_messages.id	uuid notnull=true default=gen_random_uuid()
+column:aitickets_scheduled_messages.kind	text notnull=true default=-
+column:aitickets_scheduled_messages.organization_id	bigint notnull=true default=-
+column:aitickets_scheduled_messages.recipients_count	integer notnull=false default=-
+column:aitickets_scheduled_messages.send_at	timestamp with time zone notnull=true default=-
+column:aitickets_scheduled_messages.sent_at	timestamp with time zone notnull=false default=-
+column:aitickets_scheduled_messages.status	text notnull=true default='scheduled'::text
+column:aitickets_scheduled_messages.subject	text notnull=true default=-
+column:aitickets_scheduled_messages.target_event_id	bigint notnull=false default=-
+column:aitickets_schema_migrations.applied_at	timestamp with time zone notnull=true default=now()
+column:aitickets_schema_migrations.applied_by	text notnull=false default=-
+column:aitickets_schema_migrations.checksum	text notnull=true default=-
+column:aitickets_schema_migrations.duration_ms	integer notnull=true default=0
+column:aitickets_schema_migrations.filename	text notnull=true default=-
+column:aitickets_site_banners.active	boolean notnull=true default=true
+column:aitickets_site_banners.alt	text notnull=false default=-
+column:aitickets_site_banners.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_site_banners.ends_at	timestamp with time zone notnull=false default=-
+column:aitickets_site_banners.id	bigint notnull=true default=- identity=a
+column:aitickets_site_banners.image_url	text notnull=true default=-
+column:aitickets_site_banners.link_url	text notnull=false default=-
+column:aitickets_site_banners.placement	text notnull=true default='hero'::text
+column:aitickets_site_banners.site_id	bigint notnull=true default=-
+column:aitickets_site_banners.sort_order	integer notnull=true default=0
+column:aitickets_site_banners.starts_at	timestamp with time zone notnull=false default=-
+column:aitickets_site_contact_messages.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_site_contact_messages.delivered_at	timestamp with time zone notnull=false default=-
+column:aitickets_site_contact_messages.email	text notnull=true default=-
+column:aitickets_site_contact_messages.id	bigint notnull=true default=- identity=a
+column:aitickets_site_contact_messages.ip_hash	text notnull=false default=-
+column:aitickets_site_contact_messages.mail_error	text notnull=false default=-
+column:aitickets_site_contact_messages.message	text notnull=true default=-
+column:aitickets_site_contact_messages.name	text notnull=true default=-
+column:aitickets_site_contact_messages.phone	text notnull=false default=-
+column:aitickets_site_contact_messages.site_id	bigint notnull=true default=-
+column:aitickets_site_contact_messages.user_agent	text notnull=false default=-
+column:aitickets_sites.contact_email	text notnull=false default=-
+column:aitickets_sites.contact_form_enabled	boolean notnull=true default=true
+column:aitickets_sites.content	jsonb notnull=true default='{}'::jsonb
+column:aitickets_sites.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_sites.custom_domain	text notnull=false default=-
+column:aitickets_sites.domain_checked_at	timestamp with time zone notnull=false default=-
+column:aitickets_sites.domain_error	text notnull=false default=-
+column:aitickets_sites.domain_provider	text notnull=false default=-
+column:aitickets_sites.domain_provider_id	text notnull=false default=-
+column:aitickets_sites.domain_requested_at	timestamp with time zone notnull=false default=-
+column:aitickets_sites.domain_status	text notnull=true default='none'::text
+column:aitickets_sites.domain_verification	jsonb notnull=false default=-
+column:aitickets_sites.domain_verified_at	timestamp with time zone notnull=false default=-
+column:aitickets_sites.id	bigint notnull=true default=- identity=a
+column:aitickets_sites.organization_id	bigint notnull=true default=-
+column:aitickets_sites.published	boolean notnull=true default=true
+column:aitickets_sites.published_at	timestamp with time zone notnull=false default=-
+column:aitickets_sites.seo	jsonb notnull=true default='{}'::jsonb
+column:aitickets_sites.slug	text notnull=true default=-
+column:aitickets_sites.template	text notnull=true default='clasico'::text
+column:aitickets_sites.theme	jsonb notnull=true default='{}'::jsonb
+column:aitickets_sites.updated_at	timestamp with time zone notnull=true default=now()
+column:aitickets_social_series.anchor_starts_at	timestamp with time zone notnull=false default=-
+column:aitickets_social_series.approved_at	timestamp with time zone notnull=false default=-
+column:aitickets_social_series.approved_by	bigint notnull=false default=-
+column:aitickets_social_series.base_image_url	text notnull=false default=-
+column:aitickets_social_series.cadence_config	jsonb notnull=true default='{}'::jsonb
+column:aitickets_social_series.cancel_reason	text notnull=false default=-
+column:aitickets_social_series.cancelled_at	timestamp with time zone notnull=false default=-
+column:aitickets_social_series.completed_at	timestamp with time zone notnull=false default=-
+column:aitickets_social_series.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_social_series.created_by	bigint notnull=false default=-
+column:aitickets_social_series.created_via	text notnull=false default=-
+column:aitickets_social_series.dm_message	text notnull=false default=-
+column:aitickets_social_series.dm_stats	jsonb notnull=false default=-
+column:aitickets_social_series.dm_stats_at	timestamp with time zone notnull=false default=-
+column:aitickets_social_series.event_id	bigint notnull=true default=-
+column:aitickets_social_series.extra_keywords	text[] notnull=true default=ARRAY['entrada'::text, 'link'::text]
+column:aitickets_social_series.feed_posts_enabled	boolean notnull=true default=true
+column:aitickets_social_series.id	bigint notnull=true default=- identity=a
+column:aitickets_social_series.keyword	text notnull=true default='ENTRADAS'::text
+column:aitickets_social_series.networks	jsonb notnull=true default='{}'::jsonb
+column:aitickets_social_series.notice	text notnull=false default=-
+column:aitickets_social_series.organization_id	bigint notnull=true default=-
+column:aitickets_social_series.pause_reason	text notnull=false default=-
+column:aitickets_social_series.paused_at	timestamp with time zone notnull=false default=-
+column:aitickets_social_series.reel_enabled	boolean notnull=true default=true
+column:aitickets_social_series.sold_out_at	timestamp with time zone notnull=false default=-
+column:aitickets_social_series.sold_out_story_enabled	boolean notnull=true default=false
+column:aitickets_social_series.status	text notnull=true default='draft'::text
+column:aitickets_social_series.updated_at	timestamp with time zone notnull=true default=now()
+column:aitickets_social_series.zernio_account_id	text notnull=false default=-
+column:aitickets_social_series.zernio_profile_id	text notnull=false default=-
+column:aitickets_social_series.zernio_story_automation_id	text notnull=false default=-
+column:aitickets_social_series_slots.anchor_starts_at	timestamp with time zone notnull=false default=-
+column:aitickets_social_series_slots.attempts	integer notnull=true default=0
+column:aitickets_social_series_slots.caption	text notnull=false default=-
+column:aitickets_social_series_slots.claimed_at	timestamp with time zone notnull=false default=-
+column:aitickets_social_series_slots.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_social_series_slots.days_to_event	integer notnull=true default=-
+column:aitickets_social_series_slots.error	text notnull=false default=-
+column:aitickets_social_series_slots.id	bigint notnull=true default=- identity=a
+column:aitickets_social_series_slots.image_url	text notnull=false default=-
+column:aitickets_social_series_slots.kind	text notnull=true default=-
+column:aitickets_social_series_slots.organization_id	bigint notnull=true default=-
+column:aitickets_social_series_slots.platform	text notnull=true default='instagram'::text
+column:aitickets_social_series_slots.platform_post_url	text notnull=false default=-
+column:aitickets_social_series_slots.publish_at	timestamp with time zone notnull=true default=-
+column:aitickets_social_series_slots.published_at	timestamp with time zone notnull=false default=-
+column:aitickets_social_series_slots.queued_at	timestamp with time zone notnull=false default=-
+column:aitickets_social_series_slots.rendered_at	timestamp with time zone notnull=false default=-
+column:aitickets_social_series_slots.series_id	bigint notnull=true default=-
+column:aitickets_social_series_slots.skip_reason	text notnull=false default=-
+column:aitickets_social_series_slots.status	text notnull=true default='planned'::text
+column:aitickets_social_series_slots.updated_at	timestamp with time zone notnull=true default=now()
+column:aitickets_social_series_slots.variant	text notnull=true default='countdown'::text
+column:aitickets_social_series_slots.video_url	text notnull=false default=-
+column:aitickets_social_series_slots.zernio_automation_id	text notnull=false default=-
+column:aitickets_social_series_slots.zernio_post_id	text notnull=false default=-
+column:aitickets_suppressions.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_suppressions.domain	text notnull=false default=-
+column:aitickets_suppressions.email	text notnull=false default=-
+column:aitickets_suppressions.id	bigint notnull=true default=nextval('aitickets_suppressions_id_seq'::regclass)
+column:aitickets_suppressions.reason	text notnull=true default=-
+column:aitickets_suppressions.source	text notnull=false default=-
+column:aitickets_team_invitations.accepted_at	timestamp with time zone notnull=false default=-
+column:aitickets_team_invitations.accepted_user_id	bigint notnull=false default=-
+column:aitickets_team_invitations.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_team_invitations.email	text notnull=true default=-
+column:aitickets_team_invitations.email_sent_at	timestamp with time zone notnull=false default=-
+column:aitickets_team_invitations.event_ids	bigint[] notnull=true default='{}'::bigint[]
+column:aitickets_team_invitations.expires_at	timestamp with time zone notnull=true default=-
+column:aitickets_team_invitations.id	uuid notnull=true default=gen_random_uuid()
+column:aitickets_team_invitations.invited_by	bigint notnull=false default=-
+column:aitickets_team_invitations.invited_via	text notnull=true default='mcp'::text
+column:aitickets_team_invitations.name	text notnull=false default=-
+column:aitickets_team_invitations.organization_id	bigint notnull=true default=-
+column:aitickets_team_invitations.revoked_at	timestamp with time zone notnull=false default=-
+column:aitickets_team_invitations.role	text notnull=true default=-
+column:aitickets_team_invitations.token_hash	text notnull=true default=-
+column:aitickets_user_email_optouts.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_user_email_optouts.source	text notnull=true default='unsubscribe_link'::text
+column:aitickets_user_email_optouts.topic	text notnull=true default=-
+column:aitickets_user_email_optouts.user_id	bigint notnull=true default=-
+column:aitickets_weekly_reports.ai_provider	text notnull=false default=-
+column:aitickets_weekly_reports.attempts	integer notnull=true default=1
+column:aitickets_weekly_reports.claimed_at	timestamp with time zone notnull=true default=now()
+column:aitickets_weekly_reports.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_weekly_reports.error	text notnull=false default=-
+column:aitickets_weekly_reports.events	integer notnull=true default=0
+column:aitickets_weekly_reports.id	uuid notnull=true default=gen_random_uuid()
+column:aitickets_weekly_reports.organization_id	bigint notnull=true default=-
+column:aitickets_weekly_reports.recipients	integer notnull=true default=0
+column:aitickets_weekly_reports.sent_at	timestamp with time zone notnull=false default=-
+column:aitickets_weekly_reports.status	text notnull=true default='sending'::text
+column:aitickets_weekly_reports.summary	jsonb notnull=false default=-
+column:aitickets_weekly_reports.week_start	date notnull=true default=-
+column:aitickets_zernio_webhook_events.event	text notnull=true default=-
+column:aitickets_zernio_webhook_events.event_id	text notnull=true default=-
+column:aitickets_zernio_webhook_events.received_at	timestamp with time zone notnull=true default=now()
+column:aitickets_zernio_webhook_events.result	text notnull=false default=-
+column:attendees.created_at	timestamp with time zone notnull=true default=now()
+column:attendees.email	text notnull=false default=-
+column:attendees.first_name	text notnull=false default=-
+column:attendees.id	bigint notnull=true default=- identity=d
+column:attendees.last_access_at	timestamp with time zone notnull=false default=-
+column:attendees.last_name	text notnull=false default=-
+column:attendees.phone	text notnull=false default=-
+column:category_tags.created_at	timestamp with time zone notnull=true default=now()
+column:category_tags.id	bigint notnull=true default=- identity=d
+column:category_tags.name	character varying notnull=true default=-
+column:event_attendees.attendee_id	bigint notnull=false default=-
+column:event_attendees.created_at	timestamp with time zone notnull=true default=now()
+column:event_attendees.event_id	bigint notnull=false default=-
+column:event_attendees.event_order_id	uuid notnull=false default=-
+column:event_attendees.event_ticket_id	bigint notnull=false default=-
+column:event_attendees.holder_email	text notnull=false default=-
+column:event_attendees.holder_name	text notnull=false default=-
+column:event_attendees.id	uuid notnull=true default=gen_random_uuid()
+column:event_attendees.is_complimentary	boolean notnull=false default=-
+column:event_attendees.qr_code	text notnull=false default=-
+column:event_attendees.registration_answers	jsonb notnull=false default=-
+column:event_attendees.seat_key	text notnull=false default=-
+column:event_attendees.seat_label	text notnull=false default=-
+column:event_attendees.seat_number	smallint notnull=false default=-
+column:event_attendees.status	text notnull=false default=-
+column:event_attendees.unit_id	uuid notnull=false default=-
+column:event_attendees.validated_at	timestamp with time zone notnull=false default=-
+column:event_dates.created_at	timestamp with time zone notnull=true default=now()
+column:event_dates.date	date notnull=true default=-
+column:event_dates.end_time	time without time zone notnull=false default=-
+column:event_dates.event_id	bigint notnull=true default=-
+column:event_dates.event_location_id	uuid notnull=false default=-
+column:event_dates.held_attested_at	timestamp with time zone notnull=false default=-
+column:event_dates.held_attested_by	bigint notnull=false default=-
+column:event_dates.held_attested_note	text notnull=false default=-
+column:event_dates.id	bigint notnull=true default=- identity=d
+column:event_dates.start_time	time without time zone notnull=true default=-
+column:event_faqs.answer	text notnull=true default=-
+column:event_faqs.created_at	timestamp with time zone notnull=true default=now()
+column:event_faqs.event_id	bigint notnull=true default=-
+column:event_faqs.id	bigint notnull=true default=- identity=d
+column:event_faqs.question	text notnull=true default=-
+column:event_locations.access_notes	text notnull=false default=-
+column:event_locations.address_line1_override	text notnull=false default=-
+column:event_locations.address_line2_override	text notnull=false default=-
+column:event_locations.capacity_override	integer notnull=false default=-
+column:event_locations.city_override	text notnull=false default=-
+column:event_locations.country_code_override	character(2) notnull=false default=-
+column:event_locations.created_at	timestamp with time zone notnull=true default=now()
+column:event_locations.display_name	text notnull=false default=-
+column:event_locations.entrance_instructions	text notnull=false default=-
+column:event_locations.event_id	bigint notnull=true default=-
+column:event_locations.id	uuid notnull=true default=gen_random_uuid()
+column:event_locations.is_virtual	boolean notnull=true default=false
+column:event_locations.latitude_override	numeric(9,6) notnull=false default=-
+column:event_locations.longitude_override	numeric(9,6) notnull=false default=-
+column:event_locations.name	text notnull=false default=-
+column:event_locations.postal_code_override	text notnull=false default=-
+column:event_locations.seat_map	jsonb notnull=false default=-
+column:event_locations.state_province_override	text notnull=false default=-
+column:event_locations.stream_url	text notnull=false default=-
+column:event_locations.updated_at	timestamp with time zone notnull=true default=now()
+column:event_locations.venue_id	uuid notnull=true default=-
+column:event_orders.amount	bigint notnull=true default=-
+column:event_orders.attendee_holders	jsonb notnull=false default=-
+column:event_orders.attendee_id	bigint notnull=true default=-
+column:event_orders.balance	bigint notnull=false default=-
+column:event_orders.buyer_email	text notnull=false default=-
+column:event_orders.buyer_first_name	text notnull=false default=-
+column:event_orders.buyer_last_name	text notnull=false default=-
+column:event_orders.buyer_phone	text notnull=false default=-
+column:event_orders.company_name	text notnull=false default=-
+column:event_orders.company_rut	text notnull=false default=-
+column:event_orders.created_at	timestamp with time zone notnull=true default=now()
+column:event_orders.currency	text notnull=true default='CLP'::text
+column:event_orders.discount_amount	bigint notnull=false default=0
+column:event_orders.discount_code	text notnull=false default=-
+column:event_orders.discount_code_id	uuid notnull=false default=-
+column:event_orders.email_claimed_at	timestamp with time zone notnull=false default=-
+column:event_orders.email_sent_at	timestamp with time zone notnull=false default=-
+column:event_orders.event_id	bigint notnull=true default=-
+column:event_orders.fee_absorbed	boolean notnull=true default=false
+column:event_orders.hold_expires_at	timestamp with time zone notnull=false default=-
+column:event_orders.id	uuid notnull=true default=gen_random_uuid()
+column:event_orders.payment_commerce_id	text notnull=false default=-
+column:event_orders.payment_external_id	text notnull=false default=-
+column:event_orders.payment_fee	bigint notnull=false default=-
+column:event_orders.payment_intent_id	text notnull=false default=-
+column:event_orders.payment_provider	text notnull=true default='flow'::text
+column:event_orders.processing_started_at	timestamp with time zone notnull=false default=-
+column:event_orders.provider_session_id	text notnull=false default=-
+column:event_orders.ref	text notnull=false default=-
+column:event_orders.refunded_at	timestamp with time zone notnull=false default=-
+column:event_orders.registration_answers	jsonb notnull=false default=-
+column:event_orders.seat_selection	jsonb notnull=false default=-
+column:event_orders.service_fee_tax	bigint notnull=false default=0
+column:event_orders.status	text notnull=false default=-
+column:event_orders.terms_accepted_at	timestamp with time zone notnull=false default=-
+column:event_orders.terms_version	text notnull=false default=-
+column:event_orders.ticket_details	jsonb notnull=false default=-
+column:event_orders.ticket_fee	bigint notnull=false default=-
+column:event_orders.ticket_qty	integer notnull=false default=-
+column:event_orders.total_payment	bigint notnull=false default=-
+column:event_orders.utm_campaign	text notnull=false default=-
+column:event_orders.utm_medium	text notnull=false default=-
+column:event_orders.utm_source	text notnull=false default=-
+column:event_tags.created_at	timestamp with time zone notnull=true default=now()
+column:event_tags.event_id	bigint notnull=false default=-
+column:event_tags.id	bigint notnull=true default=- identity=d
+column:event_tags.tag_id	bigint notnull=false default=-
+column:event_tickets.created_at	timestamp with time zone notnull=true default=now()
+column:event_tickets.end_date	timestamp with time zone notnull=false default=-
+column:event_tickets.entry_until	time without time zone notnull=false default=-
+column:event_tickets.event_date_id	bigint notnull=false default=-
+column:event_tickets.event_id	bigint notnull=true default=-
+column:event_tickets.id	bigint notnull=true default=- identity=d
+column:event_tickets.init_date	timestamp with time zone notnull=false default=-
+column:event_tickets.is_gift	boolean notnull=false default=false
+column:event_tickets.max_quantity	integer notnull=false default=-
+column:event_tickets.opens_after_ticket_id	bigint notnull=false default=-
+column:event_tickets.people_per_ticket	smallint notnull=true default=1
+column:event_tickets.price	numeric notnull=true default=-
+column:event_tickets.seat_sections	text[] notnull=false default=-
+column:event_tickets.status	text notnull=false default='available'::text
+column:event_tickets.ticket_name	text notnull=true default=-
+column:event_tickets.total_quantity	integer notnull=false default=-
+column:event_visits.city	text notnull=false default=-
+column:event_visits.country	text notnull=false default=-
+column:event_visits.created_at	timestamp with time zone notnull=true default=now()
+column:event_visits.event_id	bigint notnull=true default=-
+column:event_visits.id	bigint notnull=true default=- identity=a
+column:event_visits.ip_hash	text notnull=true default=-
+column:event_visits.ip_raw	text notnull=false default=-
+column:event_visits.ref	text notnull=false default=-
+column:event_visits.referrer	text notnull=false default=-
+column:event_visits.user_agent	text notnull=false default=-
+column:event_visits.utm_campaign	text notnull=false default=-
+column:event_visits.utm_medium	text notnull=false default=-
+column:event_visits.utm_source	text notnull=false default=-
+column:event_withdrawals.account_holder_name	text notnull=true default=-
+column:event_withdrawals.account_holder_rut	text notnull=true default=-
+column:event_withdrawals.account_number	text notnull=true default=-
+column:event_withdrawals.amount	numeric notnull=true default=-
+column:event_withdrawals.bank_name	text notnull=true default=-
+column:event_withdrawals.created_at	timestamp with time zone notnull=true default=now()
+column:event_withdrawals.estimated_payment_date	date notnull=false default=-
+column:event_withdrawals.event_id	bigint notnull=true default=-
+column:event_withdrawals.id	bigint notnull=true default=- identity=d
+column:event_withdrawals.paid_at	timestamp with time zone notnull=false default=-
+column:event_withdrawals.payout_id	uuid notnull=false default=-
+column:event_withdrawals.status	text notnull=true default='requested'::text
+column:event_withdrawals.user_id	bigint notnull=true default=-
+column:events.accessibility	text notnull=false default=-
+column:events.archived_at	timestamp with time zone notnull=false default=-
+column:events.cancellation_reason	text notnull=false default=-
+column:events.cancelled_at	timestamp with time zone notnull=false default=-
+column:events.capacity	bigint notnull=false default=-
+column:events.checkout_fields	jsonb notnull=false default=-
+column:events.cover_meta	jsonb notnull=false default=-
+column:events.cover_settings	jsonb notnull=false default=-
+column:events.cover_video	jsonb notnull=false default=-
+column:events.created_at	timestamp with time zone notnull=false default=now()
+column:events.created_by	bigint notnull=false default=-
+column:events.description	text notnull=false default=-
+column:events.end_date	timestamp with time zone notnull=false default=-
+column:events.fee_absorbed	boolean notnull=true default=false
+column:events.gallery_video	jsonb notnull=false default=-
+column:events.held_attested_at	timestamp with time zone notnull=false default=-
+column:events.held_attested_by	bigint notnull=false default=-
+column:events.id	bigint notnull=true default=- identity=d
+column:events.image_url	text notnull=false default=-
+column:events.is_massive	boolean notnull=true default=false
+column:events.location	text notnull=false default=-
+column:events.name	text notnull=false default=-
+column:events.organization_id	bigint notnull=false default=-
+column:events.page_settings	jsonb notnull=false default=-
+column:events.panel_modules	jsonb notnull=false default=-
+column:events.permit_status	text notnull=true default='none'::text
+column:events.requires_documents	boolean notnull=true default=false
+column:events.reserve_pct	integer notnull=true default=0
+column:events.review_settings	jsonb notnull=false default=-
+column:events.risk_computed_at	timestamp with time zone notnull=false default=-
+column:events.risk_level	text notnull=false default=-
+column:events.risk_locked	boolean notnull=true default=false
+column:events.risk_score	integer notnull=false default=-
+column:events.risk_signals	jsonb notnull=false default=-
+column:events.secret_location	text notnull=false default=-
+column:events.secret_location_reveal_hours	integer notnull=false default=-
+column:events.slug	text notnull=false default=-
+column:events.start_date	timestamp with time zone notnull=false default=-
+column:events.status	text notnull=false default='draft'::text
+column:events.title	text notnull=false default=-
+column:newsletter.country	character varying notnull=false default=-
+column:newsletter.created_at	timestamp with time zone notnull=true default=now()
+column:newsletter.email	text notnull=false default=-
+column:newsletter.id	bigint notnull=true default=- identity=d
+column:newsletter.ip	character varying notnull=false default=-
+column:newsletter.language	text notnull=false default=-
+column:newsletter.referrer	text notnull=false default=-
+column:newsletter.timezone	text notnull=false default=-
+column:newsletter.user_agent	text notnull=false default=-
+column:notification_log.attendee_id	bigint notnull=false default=-
+column:notification_log.channel	text notnull=true default='email'::text
+column:notification_log.created_at	timestamp with time zone notnull=true default=now()
+column:notification_log.event_id	bigint notnull=true default=-
+column:notification_log.id	bigint notnull=true default=- identity=a
+column:notification_log.status	text notnull=true default='sent'::text
+column:notification_log.type	text notnull=true default=-
+column:organization_payout_accounts.bank_account_holder	text notnull=false default=-
+column:organization_payout_accounts.bank_account_number	text notnull=false default=-
+column:organization_payout_accounts.bank_account_rut	text notnull=false default=-
+column:organization_payout_accounts.bank_account_type	text notnull=false default=-
+column:organization_payout_accounts.bank_changed_at	timestamp with time zone notnull=false default=-
+column:organization_payout_accounts.bank_name	text notnull=false default=-
+column:organization_payout_accounts.holder_checked_at	timestamp with time zone notnull=false default=-
+column:organization_payout_accounts.holder_match_status	text notnull=false default=-
+column:organization_payout_accounts.legal_name	text notnull=false default=-
+column:organization_payout_accounts.legal_rut	text notnull=false default=-
+column:organization_payout_accounts.organization_id	bigint notnull=true default=-
+column:organization_payout_accounts.removed_at	timestamp with time zone notnull=false default=-
+column:organization_payout_accounts.updated_at	timestamp with time zone notnull=true default=now()
+column:organization_payout_accounts.updated_by	bigint notnull=false default=-
+column:organization_payout_accounts.verification_notes	text notnull=false default=-
+column:organization_payout_accounts.verification_rejected_at	timestamp with time zone notnull=false default=-
+column:organization_payout_accounts.verified_at	timestamp with time zone notnull=false default=-
+column:organization_payout_accounts.verified_by	text notnull=false default=-
+column:organizations.country	text notnull=false default=-
+column:organizations.created_at	timestamp with time zone notnull=true default=now()
+column:organizations.email	text notnull=false default=-
+column:organizations.email_verified_at	timestamp with time zone notnull=false default=-
+column:organizations.email_verified_for	text notnull=false default=-
+column:organizations.facebook	text notnull=false default=-
+column:organizations.id	bigint notnull=true default=- identity=d
+column:organizations.identity_checked_at	timestamp with time zone notnull=false default=-
+column:organizations.identity_consent_at	timestamp with time zone notnull=false default=-
+column:organizations.identity_kind	text notnull=false default=-
+column:organizations.identity_name	text notnull=false default=-
+column:organizations.identity_rut	text notnull=false default=-
+column:organizations.identity_session_id	text notnull=false default=-
+column:organizations.identity_status	text notnull=false default=-
+column:organizations.identity_verified_at	timestamp with time zone notnull=false default=-
+column:organizations.instagram	text notnull=false default=-
+column:organizations.legal_id	text notnull=false default=-
+column:organizations.legal_name	text notnull=false default=-
+column:organizations.linkedin	text notnull=false default=-
+column:organizations.onboarding_pending	boolean notnull=true default=false
+column:organizations.phone	text notnull=false default=-
+column:organizations.public_name	text notnull=true default=-
+column:organizations.signup_ref	text notnull=false default=-
+column:organizations.signup_referrer	text notnull=false default=-
+column:organizations.signup_utm_campaign	text notnull=false default=-
+column:organizations.signup_utm_medium	text notnull=false default=-
+column:organizations.signup_utm_source	text notnull=false default=-
+column:organizations.terms_accepted_at	timestamp with time zone notnull=false default=-
+column:organizations.terms_version	text notnull=false default=-
+column:organizations.tiktok	text notnull=false default=-
+column:organizations.website	text notnull=false default=-
+column:organizations.zernio_profile_id	text notnull=false default=-
+column:questions.created_at	timestamp with time zone notnull=true default=now()
+column:questions.event_id	bigint notnull=false default=-
+column:questions.id	bigint notnull=true default=- identity=d
+column:questions.question	text notnull=false default=-
+column:questions.user_email	text notnull=false default=-
+column:questions.user_name	text notnull=false default=-
+column:social_accounts.account_name	text notnull=false default=-
+column:social_accounts.avatar_url	text notnull=false default=-
+column:social_accounts.created_at	timestamp with time zone notnull=true default=now()
+column:social_accounts.id	bigint notnull=true default=- identity=a
+column:social_accounts.organization_id	bigint notnull=true default=-
+column:social_accounts.platform	text notnull=true default=-
+column:social_accounts.status	text notnull=true default='active'::text
+column:social_accounts.zernio_account_id	text notnull=false default=-
+column:social_posts.content	text notnull=true default=-
+column:social_posts.created_at	timestamp with time zone notnull=true default=now()
+column:social_posts.error_message	text notnull=false default=-
+column:social_posts.event_id	bigint notnull=true default=-
+column:social_posts.id	bigint notnull=true default=- identity=a
+column:social_posts.image_urls	text[] notnull=false default='{}'::text[]
+column:social_posts.organization_id	bigint notnull=true default=-
+column:social_posts.platforms	text[] notnull=true default='{}'::text[]
+column:social_posts.published_at	timestamp with time zone notnull=false default=-
+column:social_posts.scheduled_for	timestamp with time zone notnull=false default=-
+column:social_posts.status	text notnull=true default='draft'::text
+column:social_posts.zernio_post_id	text notnull=false default=-
+column:users.active	boolean notnull=false default=true
+column:users.auth_user_id	uuid notnull=false default=-
+column:users.created_at	timestamp with time zone notnull=true default=now()
+column:users.email	text notnull=false default=-
+column:users.encrypted_password	text notnull=false default=-
+column:users.id	bigint notnull=true default=- identity=d
+column:users.last_access_at	timestamp with time zone notnull=false default=-
+column:users.login_count	integer notnull=true default=0
+column:users.name	text notnull=false default=-
+column:users.organization_id	bigint notnull=false default=-
+column:users.phone	text notnull=false default=-
+column:users.role	text notnull=false default='admin'::text
+column:users.updated_at	timestamp with time zone notnull=false default=-
+column:venues.address_line1	text notnull=false default=-
+column:venues.address_line2	text notnull=false default=-
+column:venues.capacity	integer notnull=false default=-
+column:venues.city	text notnull=false default=-
+column:venues.contact_email	text notnull=false default=-
+column:venues.contact_phone	text notnull=false default=-
+column:venues.country_code	character(2) notnull=false default=-
+column:venues.created_at	timestamp with time zone notnull=true default=now()
+column:venues.id	uuid notnull=true default=gen_random_uuid()
+column:venues.latitude	numeric(9,6) notnull=false default=-
+column:venues.longitude	numeric(9,6) notnull=false default=-
+column:venues.name	text notnull=true default=-
+column:venues.notes	text notnull=false default=-
+column:venues.organization_id	bigint notnull=false default=-
+column:venues.postal_code	text notnull=false default=-
+column:venues.seat_map	jsonb notnull=false default=-
+column:venues.slug	text notnull=false default=regexp_replace(lower(name), '[^a-z0-9]+'::text, '-'::text, 'g'::text)
+column:venues.state_province	text notnull=false default=-
+column:venues.timezone	text notnull=false default=-
+column:venues.updated_at	timestamp with time zone notnull=true default=now()
+column:venues.website_url	text notnull=false default=-
+constraint:ad_account_connections.ad_account_connections_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:ad_account_connections.ad_account_connections_pkey	PRIMARY KEY (id)
+constraint:ad_account_connections.ad_account_connections_provider_check	CHECK ((provider = ANY (ARRAY['meta_direct'::text, 'zernio'::text])))
+constraint:ad_campaigns.ad_campaigns_ad_account_connection_id_fkey	FOREIGN KEY (ad_account_connection_id) REFERENCES ad_account_connections(id) ON DELETE CASCADE
+constraint:ad_campaigns.ad_campaigns_ad_type_check	CHECK ((ad_type = ANY (ARRAY['standalone'::text, 'boost'::text])))
+constraint:ad_campaigns.ad_campaigns_created_by_fkey	FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+constraint:ad_campaigns.ad_campaigns_duration_days_check	CHECK (((duration_days IS NULL) OR ((duration_days >= 1) AND (duration_days <= 90))))
+constraint:ad_campaigns.ad_campaigns_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+constraint:ad_campaigns.ad_campaigns_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:ad_campaigns.ad_campaigns_pkey	PRIMARY KEY (id)
+constraint:ad_campaigns.ad_campaigns_provider_check	CHECK ((provider = ANY (ARRAY['meta_direct'::text, 'zernio'::text])))
+constraint:ad_campaigns.ad_campaigns_social_post_id_fkey	FOREIGN KEY (social_post_id) REFERENCES social_posts(id) ON DELETE SET NULL
+constraint:aitickets_admin_audit.aitickets_admin_audit_args_hash_check	CHECK (((args_hash IS NULL) OR (args_hash ~ '^[0-9a-f]{64}$'::text)))
+constraint:aitickets_admin_audit.aitickets_admin_audit_error_code_check	CHECK (((error_code IS NULL) OR (char_length(error_code) <= 40)))
+constraint:aitickets_admin_audit.aitickets_admin_audit_ip_hash_check	CHECK (((ip_hash IS NULL) OR (ip_hash ~ '^[0-9a-f]{64}$'::text)))
+constraint:aitickets_admin_audit.aitickets_admin_audit_key_fingerprint_check	CHECK ((char_length(key_fingerprint) <= 16))
+constraint:aitickets_admin_audit.aitickets_admin_audit_key_kind_check	CHECK ((key_kind = ANY (ARRAY['full'::text, 'readonly'::text])))
+constraint:aitickets_admin_audit.aitickets_admin_audit_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE SET NULL
+constraint:aitickets_admin_audit.aitickets_admin_audit_pkey	PRIMARY KEY (id)
+constraint:aitickets_admin_audit.aitickets_admin_audit_reason_check	CHECK (((reason IS NULL) OR (char_length(reason) <= 300)))
+constraint:aitickets_admin_audit.aitickets_admin_audit_summary_check	CHECK (((summary IS NULL) OR (char_length(summary) <= 300)))
+constraint:aitickets_admin_audit.aitickets_admin_audit_target_check	CHECK (((target IS NULL) OR (char_length(target) <= 120)))
+constraint:aitickets_admin_audit.aitickets_admin_audit_tool_check	CHECK (((char_length(tool) >= 1) AND (char_length(tool) <= 80)))
+constraint:aitickets_admin_confirmations.aitickets_admin_confirmations_args_hash_check	CHECK ((args_hash ~ '^[0-9a-f]{64}$'::text))
+constraint:aitickets_admin_confirmations.aitickets_admin_confirmations_pkey	PRIMARY KEY (id)
+constraint:aitickets_admin_confirmations.aitickets_admin_confirmations_token_hash_check	CHECK ((token_hash ~ '^[0-9a-f]{64}$'::text))
+constraint:aitickets_admin_confirmations.aitickets_admin_confirmations_token_key	UNIQUE (token_hash)
+constraint:aitickets_admin_idempotency.aitickets_admin_idempotency_idem_key_check	CHECK (((char_length(idem_key) >= 1) AND (char_length(idem_key) <= 200)))
+constraint:aitickets_admin_idempotency.aitickets_admin_idempotency_key	UNIQUE (tool, idem_key)
+constraint:aitickets_admin_idempotency.aitickets_admin_idempotency_pkey	PRIMARY KEY (id)
+constraint:aitickets_admin_idempotency.aitickets_admin_idempotency_status_check	CHECK ((status = ANY (ARRAY['in_progress'::text, 'done'::text])))
+constraint:aitickets_admin_notes.aitickets_admin_notes_body_check	CHECK (((char_length(body) >= 1) AND (char_length(body) <= 4000)))
+constraint:aitickets_admin_notes.aitickets_admin_notes_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:aitickets_admin_notes.aitickets_admin_notes_pkey	PRIMARY KEY (id)
+constraint:aitickets_api_audit.aitickets_api_audit_api_key_id_fkey	FOREIGN KEY (api_key_id) REFERENCES aitickets_api_keys(id) ON DELETE SET NULL
+constraint:aitickets_api_audit.aitickets_api_audit_channel_check	CHECK ((channel = ANY (ARRAY['mcp'::text, 'rest'::text, 'dashboard'::text, 'admin'::text])))
+constraint:aitickets_api_audit.aitickets_api_audit_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:aitickets_api_audit.aitickets_api_audit_pkey	PRIMARY KEY (id)
+constraint:aitickets_api_confirmations.aitickets_api_confirmations_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:aitickets_api_confirmations.aitickets_api_confirmations_pkey	PRIMARY KEY (id)
+constraint:aitickets_api_confirmations.aitickets_api_confirmations_token_hash_check	CHECK ((token_hash ~ '^[0-9a-f]{64}$'::text))
+constraint:aitickets_api_confirmations.aitickets_api_confirmations_token_key	UNIQUE (token_hash)
+constraint:aitickets_api_idempotency.aitickets_api_idempotency_idem_key_check	CHECK (((char_length(idem_key) >= 1) AND (char_length(idem_key) <= 200)))
+constraint:aitickets_api_idempotency.aitickets_api_idempotency_key	UNIQUE (organization_id, tool, idem_key)
+constraint:aitickets_api_idempotency.aitickets_api_idempotency_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:aitickets_api_idempotency.aitickets_api_idempotency_pkey	PRIMARY KEY (id)
+constraint:aitickets_api_idempotency.aitickets_api_idempotency_status_check	CHECK ((status = ANY (ARRAY['in_progress'::text, 'done'::text])))
+constraint:aitickets_api_keys.aitickets_api_keys_hash_key	UNIQUE (key_hash)
+constraint:aitickets_api_keys.aitickets_api_keys_key_hash_check	CHECK ((key_hash ~ '^[0-9a-f]{64}$'::text))
+constraint:aitickets_api_keys.aitickets_api_keys_name_check	CHECK (((length(name) >= 1) AND (length(name) <= 80)))
+constraint:aitickets_api_keys.aitickets_api_keys_oauth_grant_id_fkey	FOREIGN KEY (oauth_grant_id) REFERENCES aitickets_oauth_grants(id) ON DELETE CASCADE
+constraint:aitickets_api_keys.aitickets_api_keys_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:aitickets_api_keys.aitickets_api_keys_pkey	PRIMARY KEY (id)
+constraint:aitickets_api_keys.aitickets_api_keys_scopes_v2_check	CHECK ((scopes <@ ARRAY['read'::text, 'write'::text, 'publish'::text, 'attendees'::text, 'finance'::text, 'team'::text]))
+constraint:aitickets_api_keys.aitickets_api_keys_user_id_fkey	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+constraint:aitickets_attendee_checkins.aitickets_attendee_checkins_event_attendee_id_fkey	FOREIGN KEY (event_attendee_id) REFERENCES event_attendees(id) ON DELETE CASCADE
+constraint:aitickets_attendee_checkins.aitickets_attendee_checkins_event_date_id_fkey	FOREIGN KEY (event_date_id) REFERENCES event_dates(id) ON DELETE CASCADE
+constraint:aitickets_attendee_checkins.aitickets_attendee_checkins_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+constraint:aitickets_attendee_checkins.aitickets_attendee_checkins_once	UNIQUE (event_attendee_id, event_date_id)
+constraint:aitickets_attendee_checkins.aitickets_attendee_checkins_pkey	PRIMARY KEY (id)
+constraint:aitickets_attendee_messages.aitickets_attendee_messages_email_check	CHECK (((email = lower(email)) AND ((char_length(email) >= 3) AND (char_length(email) <= 254))))
+constraint:aitickets_attendee_messages.aitickets_attendee_messages_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+constraint:aitickets_attendee_messages.aitickets_attendee_messages_mail_error_check	CHECK (((mail_error IS NULL) OR (char_length(mail_error) <= 500)))
+constraint:aitickets_attendee_messages.aitickets_attendee_messages_message_check	CHECK (((char_length(message) >= 2) AND (char_length(message) <= 2000)))
+constraint:aitickets_attendee_messages.aitickets_attendee_messages_name_check	CHECK (((name IS NULL) OR (char_length(name) <= 160)))
+constraint:aitickets_attendee_messages.aitickets_attendee_messages_order_id_fkey	FOREIGN KEY (order_id) REFERENCES event_orders(id) ON DELETE SET NULL
+constraint:aitickets_attendee_messages.aitickets_attendee_messages_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:aitickets_attendee_messages.aitickets_attendee_messages_pkey	PRIMARY KEY (id)
+constraint:aitickets_auth_link_sends.aitickets_auth_link_sends_pkey	PRIMARY KEY (id)
+constraint:aitickets_auth_link_sends.aitickets_auth_link_sends_purpose_check	CHECK ((purpose = ANY (ARRAY['recovery'::text, 'change-password'::text, 'login'::text])))
+constraint:aitickets_auth_link_tokens.aitickets_auth_link_tokens_pkey	PRIMARY KEY (jti)
+constraint:aitickets_auth_link_tokens.aitickets_auth_link_tokens_purpose_check	CHECK ((purpose = ANY (ARRAY['recovery'::text, 'change-password'::text, 'login'::text])))
+constraint:aitickets_certificate_sends.aitickets_certificate_sends_created_by_fkey	FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+constraint:aitickets_certificate_sends.aitickets_certificate_sends_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+constraint:aitickets_certificate_sends.aitickets_certificate_sends_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:aitickets_certificate_sends.aitickets_certificate_sends_pkey	PRIMARY KEY (id)
+constraint:aitickets_checkin_links.aitickets_checkin_links_created_by_fkey	FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+constraint:aitickets_checkin_links.aitickets_checkin_links_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+constraint:aitickets_checkin_links.aitickets_checkin_links_label_check	CHECK (((label IS NULL) OR (char_length(label) <= 80)))
+constraint:aitickets_checkin_links.aitickets_checkin_links_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:aitickets_checkin_links.aitickets_checkin_links_pkey	PRIMARY KEY (id)
+constraint:aitickets_checkin_links.aitickets_checkin_links_token_hash_check	CHECK ((token_hash ~ '^[0-9a-f]{64}$'::text))
+constraint:aitickets_checkin_links.aitickets_checkin_links_token_key	UNIQUE (token_hash)
+constraint:aitickets_competitor_events.aitickets_competitor_events_lead_id_fkey	FOREIGN KEY (lead_id) REFERENCES aitickets_leads(id) ON DELETE SET NULL
+constraint:aitickets_competitor_events.aitickets_competitor_events_pkey	PRIMARY KEY (id)
+constraint:aitickets_competitor_events.aitickets_competitor_events_url_key	UNIQUE (url)
+constraint:aitickets_discount_codes.aitickets_discount_codes_code_check	CHECK ((code ~ '^[A-Z0-9_-]{3,30}$'::text))
+constraint:aitickets_discount_codes.aitickets_discount_codes_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+constraint:aitickets_discount_codes.aitickets_discount_codes_kind_check	CHECK ((kind = ANY (ARRAY['percent'::text, 'fixed'::text])))
+constraint:aitickets_discount_codes.aitickets_discount_codes_max_uses_check	CHECK (((max_uses IS NULL) OR (max_uses > 0)))
+constraint:aitickets_discount_codes.aitickets_discount_codes_org_code_key	UNIQUE (organization_id, code)
+constraint:aitickets_discount_codes.aitickets_discount_codes_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:aitickets_discount_codes.aitickets_discount_codes_per_buyer_limit_check	CHECK (((per_buyer_limit IS NULL) OR (per_buyer_limit > 0)))
+constraint:aitickets_discount_codes.aitickets_discount_codes_pkey	PRIMARY KEY (id)
+constraint:aitickets_discount_codes.aitickets_discount_codes_source_check	CHECK ((source = ANY (ARRAY['producer'::text, 'review_reward'::text])))
+constraint:aitickets_discount_codes.aitickets_discount_codes_value_check	CHECK ((((kind = 'percent'::text) AND (value >= (1)::numeric) AND (value <= (100)::numeric)) OR ((kind = 'fixed'::text) AND (value > (0)::numeric) AND (value = trunc(value)))))
+constraint:aitickets_discount_codes.aitickets_discount_codes_window_check	CHECK (((starts_at IS NULL) OR (ends_at IS NULL) OR (ends_at > starts_at)))
+constraint:aitickets_disputes.aitickets_disputes_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+constraint:aitickets_disputes.aitickets_disputes_kind_check	CHECK ((kind = ANY (ARRAY['chargeback'::text, 'complaint'::text, 'sernac'::text, 'other'::text])))
+constraint:aitickets_disputes.aitickets_disputes_notes_check	CHECK (((notes IS NULL) OR (char_length(notes) <= 2000)))
+constraint:aitickets_disputes.aitickets_disputes_order_id_fkey	FOREIGN KEY (order_id) REFERENCES event_orders(id) ON DELETE SET NULL
+constraint:aitickets_disputes.aitickets_disputes_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:aitickets_disputes.aitickets_disputes_pkey	PRIMARY KEY (id)
+constraint:aitickets_disputes.aitickets_disputes_source_check	CHECK (((source IS NULL) OR (char_length(source) <= 80)))
+constraint:aitickets_disputes.aitickets_disputes_status_check	CHECK ((status = ANY (ARRAY['open'::text, 'won'::text, 'lost'::text, 'closed'::text])))
+constraint:aitickets_email_log.aitickets_email_log_error_check	CHECK (((error IS NULL) OR (char_length(error) <= 500)))
+constraint:aitickets_email_log.aitickets_email_log_kind_check	CHECK (((char_length(kind) >= 1) AND (char_length(kind) <= 40)))
+constraint:aitickets_email_log.aitickets_email_log_pkey	PRIMARY KEY (id)
+constraint:aitickets_email_log.aitickets_email_log_provider_check	CHECK ((provider = 'resend'::text))
+constraint:aitickets_email_log.aitickets_email_log_provider_message_id_check	CHECK (((provider_message_id IS NULL) OR (char_length(provider_message_id) <= 200)))
+constraint:aitickets_email_log.aitickets_email_log_recipient_check	CHECK (((recipient IS NULL) OR (char_length(recipient) <= 320)))
+constraint:aitickets_email_log.aitickets_email_log_status_check	CHECK ((status = ANY (ARRAY['sent'::text, 'failed'::text, 'delivered'::text, 'delayed'::text, 'bounced'::text, 'complained'::text])))
+constraint:aitickets_event_agenda.aitickets_event_agenda_event_date_id_fkey	FOREIGN KEY (event_date_id) REFERENCES event_dates(id) ON DELETE SET NULL
+constraint:aitickets_event_agenda.aitickets_event_agenda_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+constraint:aitickets_event_agenda.aitickets_event_agenda_pkey	PRIMARY KEY (id)
+constraint:aitickets_event_agenda.aitickets_event_agenda_room_check	CHECK (((room IS NULL) OR (char_length(room) <= 80)))
+constraint:aitickets_event_agenda.aitickets_event_agenda_speakers_check	CHECK (((speakers IS NULL) OR (char_length(speakers) <= 300)))
+constraint:aitickets_event_agenda.aitickets_event_agenda_title_check	CHECK (((char_length(title) >= 1) AND (char_length(title) <= 160)))
+constraint:aitickets_event_documents.aitickets_event_documents_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+constraint:aitickets_event_documents.aitickets_event_documents_file_name_check	CHECK (((file_name IS NULL) OR (char_length(file_name) <= 200)))
+constraint:aitickets_event_documents.aitickets_event_documents_kind_check	CHECK ((kind = ANY (ARRAY['delegacion_presidencial'::text, 'venue_permit'::text, 'rc_insurance'::text, 'other'::text])))
+constraint:aitickets_event_documents.aitickets_event_documents_notes_check	CHECK (((notes IS NULL) OR (char_length(notes) <= 1000)))
+constraint:aitickets_event_documents.aitickets_event_documents_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:aitickets_event_documents.aitickets_event_documents_pkey	PRIMARY KEY (id)
+constraint:aitickets_event_documents.aitickets_event_documents_status_check	CHECK ((status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text])))
+constraint:aitickets_event_documents.aitickets_event_documents_storage_path_check	CHECK ((char_length(storage_path) <= 500))
+constraint:aitickets_event_feed_posts.aitickets_event_feed_posts_display_name_check	CHECK (((display_name IS NULL) OR (char_length(display_name) <= 80)))
+constraint:aitickets_event_feed_posts.aitickets_event_feed_posts_email_check	CHECK (((email = lower(email)) AND ((char_length(email) >= 3) AND (char_length(email) <= 254))))
+constraint:aitickets_event_feed_posts.aitickets_event_feed_posts_emoji_check	CHECK (((char_length(emoji) >= 1) AND (char_length(emoji) <= 16)))
+constraint:aitickets_event_feed_posts.aitickets_event_feed_posts_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+constraint:aitickets_event_feed_posts.aitickets_event_feed_posts_message_check	CHECK (((message IS NULL) OR (char_length(message) <= 280)))
+constraint:aitickets_event_feed_posts.aitickets_event_feed_posts_order_id_fkey	FOREIGN KEY (order_id) REFERENCES event_orders(id) ON DELETE SET NULL
+constraint:aitickets_event_feed_posts.aitickets_event_feed_posts_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:aitickets_event_feed_posts.aitickets_event_feed_posts_pkey	PRIMARY KEY (id)
+constraint:aitickets_event_feed_posts.aitickets_event_feed_posts_status_check	CHECK ((status = ANY (ARRAY['visible'::text, 'hidden'::text])))
+constraint:aitickets_event_gallery_images.aitickets_event_gallery_images_caption_check	CHECK (((caption IS NULL) OR (char_length(caption) <= 200)))
+constraint:aitickets_event_gallery_images.aitickets_event_gallery_images_created_by_user_id_fkey	FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+constraint:aitickets_event_gallery_images.aitickets_event_gallery_images_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+constraint:aitickets_event_gallery_images.aitickets_event_gallery_images_height_check	CHECK (((height IS NULL) OR (height > 0)))
+constraint:aitickets_event_gallery_images.aitickets_event_gallery_images_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:aitickets_event_gallery_images.aitickets_event_gallery_images_pkey	PRIMARY KEY (id)
+constraint:aitickets_event_gallery_images.aitickets_event_gallery_images_thumb_url_check	CHECK (((thumb_url IS NULL) OR ((thumb_url ~ '^https://'::text) AND (char_length(thumb_url) <= 1000))))
+constraint:aitickets_event_gallery_images.aitickets_event_gallery_images_url_check	CHECK (((url ~ '^https://'::text) AND (char_length(url) <= 1000)))
+constraint:aitickets_event_gallery_images.aitickets_event_gallery_images_width_check	CHECK (((width IS NULL) OR (width > 0)))
+constraint:aitickets_event_preview_links.aitickets_event_preview_links_consumed_nonce_hash_check	CHECK (((consumed_nonce_hash IS NULL) OR (consumed_nonce_hash ~ '^[0-9a-f]{64}$'::text)))
+constraint:aitickets_event_preview_links.aitickets_event_preview_links_created_by_user_id_fkey	FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+constraint:aitickets_event_preview_links.aitickets_event_preview_links_created_via_check	CHECK ((created_via = ANY (ARRAY['dashboard'::text, 'mcp'::text, 'rest'::text, 'admin'::text])))
+constraint:aitickets_event_preview_links.aitickets_event_preview_links_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+constraint:aitickets_event_preview_links.aitickets_event_preview_links_label_check	CHECK (((label IS NULL) OR (char_length(label) <= 80)))
+constraint:aitickets_event_preview_links.aitickets_event_preview_links_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:aitickets_event_preview_links.aitickets_event_preview_links_pkey	PRIMARY KEY (id)
+constraint:aitickets_event_preview_links.aitickets_event_preview_links_token_hash_check	CHECK ((token_hash ~ '^[0-9a-f]{64}$'::text))
+constraint:aitickets_event_preview_links.aitickets_event_preview_links_token_key	UNIQUE (token_hash)
+constraint:aitickets_event_review_photos.aitickets_event_review_photos_display_name_check	CHECK (((display_name IS NULL) OR (char_length(display_name) <= 80)))
+constraint:aitickets_event_review_photos.aitickets_event_review_photos_email_check	CHECK (((email = lower(email)) AND ((char_length(email) >= 3) AND (char_length(email) <= 254))))
+constraint:aitickets_event_review_photos.aitickets_event_review_photos_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+constraint:aitickets_event_review_photos.aitickets_event_review_photos_height_check	CHECK (((height IS NULL) OR (height > 0)))
+constraint:aitickets_event_review_photos.aitickets_event_review_photos_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:aitickets_event_review_photos.aitickets_event_review_photos_pkey	PRIMARY KEY (id)
+constraint:aitickets_event_review_photos.aitickets_event_review_photos_status_check	CHECK ((status = ANY (ARRAY['visible'::text, 'pending'::text, 'hidden'::text])))
+constraint:aitickets_event_review_photos.aitickets_event_review_photos_thumb_url_check	CHECK (((thumb_url IS NULL) OR ((thumb_url ~ '^https://'::text) AND (char_length(thumb_url) <= 1000))))
+constraint:aitickets_event_review_photos.aitickets_event_review_photos_url_check	CHECK (((url ~ '^https://'::text) AND (char_length(url) <= 1000)))
+constraint:aitickets_event_review_photos.aitickets_event_review_photos_width_check	CHECK (((width IS NULL) OR (width > 0)))
+constraint:aitickets_event_reviews.aitickets_event_reviews_attendee_id_fkey	FOREIGN KEY (attendee_id) REFERENCES attendees(id) ON DELETE SET NULL
+constraint:aitickets_event_reviews.aitickets_event_reviews_display_name_check	CHECK (((display_name IS NULL) OR (char_length(display_name) <= 80)))
+constraint:aitickets_event_reviews.aitickets_event_reviews_email_check	CHECK (((email = lower(email)) AND ((char_length(email) >= 3) AND (char_length(email) <= 254))))
+constraint:aitickets_event_reviews.aitickets_event_reviews_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+constraint:aitickets_event_reviews.aitickets_event_reviews_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:aitickets_event_reviews.aitickets_event_reviews_pkey	PRIMARY KEY (id)
+constraint:aitickets_event_reviews.aitickets_event_reviews_private_comment_check	CHECK (((private_comment IS NULL) OR (char_length(private_comment) <= 2000)))
+constraint:aitickets_event_reviews.aitickets_event_reviews_public_comment_check	CHECK (((public_comment IS NULL) OR (char_length(public_comment) <= 1000)))
+constraint:aitickets_event_reviews.aitickets_event_reviews_public_status_check	CHECK ((public_status = ANY (ARRAY['visible'::text, 'hidden'::text])))
+constraint:aitickets_event_reviews.aitickets_event_reviews_rating_check	CHECK (((rating >= 1) AND (rating <= 5)))
+constraint:aitickets_event_reviews.aitickets_event_reviews_reward_code_check	CHECK (((reward_code IS NULL) OR (char_length(reward_code) <= 30)))
+constraint:aitickets_event_reviews.aitickets_event_reviews_reward_code_id_fkey	FOREIGN KEY (reward_code_id) REFERENCES aitickets_discount_codes(id) ON DELETE SET NULL
+constraint:aitickets_event_reviews.aitickets_event_reviews_verified_via_check	CHECK ((verified_via = ANY (ARRAY['email_link'::text, 'order'::text, 'ticket'::text])))
+constraint:aitickets_event_seats.aitickets_event_seats_attendee_ticket_id_fkey	FOREIGN KEY (attendee_ticket_id) REFERENCES event_attendees(id) ON DELETE SET NULL
+constraint:aitickets_event_seats.aitickets_event_seats_event_date_id_fkey	FOREIGN KEY (event_date_id) REFERENCES event_dates(id) ON DELETE CASCADE
+constraint:aitickets_event_seats.aitickets_event_seats_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+constraint:aitickets_event_seats.aitickets_event_seats_order_id_fkey	FOREIGN KEY (order_id) REFERENCES event_orders(id) ON DELETE CASCADE
+constraint:aitickets_event_seats.aitickets_event_seats_pkey	PRIMARY KEY (id)
+constraint:aitickets_event_seats.aitickets_event_seats_seat_key	UNIQUE (event_date_id, seat_key)
+constraint:aitickets_event_seats.aitickets_event_seats_seat_key_check	CHECK ((seat_key ~ '^[a-z0-9-]{1,40}:[A-Z]{1,2}:[0-9]{1,3}$'::text))
+constraint:aitickets_event_seats.aitickets_event_seats_status_check	CHECK ((status = ANY (ARRAY['held'::text, 'sold'::text])))
+constraint:aitickets_event_slug_redirects.aitickets_event_slug_redirects_created_by_user_id_fkey	FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+constraint:aitickets_event_slug_redirects.aitickets_event_slug_redirects_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+constraint:aitickets_event_slug_redirects.aitickets_event_slug_redirects_old_slug_check	CHECK (((old_slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::text) AND (char_length(old_slug) <= 120)))
+constraint:aitickets_event_slug_redirects.aitickets_event_slug_redirects_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:aitickets_event_slug_redirects.aitickets_event_slug_redirects_pkey	PRIMARY KEY (old_slug)
+constraint:aitickets_event_staff.aitickets_event_staff_created_by_fkey	FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+constraint:aitickets_event_staff.aitickets_event_staff_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+constraint:aitickets_event_staff.aitickets_event_staff_key	UNIQUE (event_id, user_id)
+constraint:aitickets_event_staff.aitickets_event_staff_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:aitickets_event_staff.aitickets_event_staff_pkey	PRIMARY KEY (id)
+constraint:aitickets_event_staff.aitickets_event_staff_user_id_fkey	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+constraint:aitickets_event_waitlist.aitickets_event_waitlist_email_check	CHECK (((char_length(email) >= 3) AND (char_length(email) <= 254)))
+constraint:aitickets_event_waitlist.aitickets_event_waitlist_event_date_id_fkey	FOREIGN KEY (event_date_id) REFERENCES event_dates(id) ON DELETE SET NULL
+constraint:aitickets_event_waitlist.aitickets_event_waitlist_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+constraint:aitickets_event_waitlist.aitickets_event_waitlist_kind_check	CHECK ((kind = ANY (ARRAY['full'::text, 'sold_out'::text, 'sale_opens'::text])))
+constraint:aitickets_event_waitlist.aitickets_event_waitlist_pkey	PRIMARY KEY (id)
+constraint:aitickets_event_waitlist.aitickets_event_waitlist_utm_campaign_check	CHECK (((utm_campaign IS NULL) OR (char_length(utm_campaign) <= 128)))
+constraint:aitickets_event_waitlist.aitickets_event_waitlist_utm_medium_check	CHECK (((utm_medium IS NULL) OR (char_length(utm_medium) <= 128)))
+constraint:aitickets_event_waitlist.aitickets_event_waitlist_utm_source_check	CHECK (((utm_source IS NULL) OR (char_length(utm_source) <= 128)))
+constraint:aitickets_guests.aitickets_guests_created_by_fkey	FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+constraint:aitickets_guests.aitickets_guests_email_check	CHECK (((email IS NULL) OR (char_length(email) <= 200)))
+constraint:aitickets_guests.aitickets_guests_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+constraint:aitickets_guests.aitickets_guests_invite_channel_check	CHECK (((invite_channel IS NULL) OR (invite_channel = ANY (ARRAY['email'::text, 'whatsapp'::text]))))
+constraint:aitickets_guests.aitickets_guests_name_check	CHECK (((char_length(name) >= 1) AND (char_length(name) <= 150)))
+constraint:aitickets_guests.aitickets_guests_notes_check	CHECK (((notes IS NULL) OR (char_length(notes) <= 300)))
+constraint:aitickets_guests.aitickets_guests_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:aitickets_guests.aitickets_guests_phone_check	CHECK (((phone IS NULL) OR (char_length(phone) <= 30)))
+constraint:aitickets_guests.aitickets_guests_pkey	PRIMARY KEY (id)
+constraint:aitickets_guests.aitickets_guests_plus_ones_check	CHECK (((plus_ones >= 0) AND (plus_ones <= 20)))
+constraint:aitickets_guests.aitickets_guests_status_v2_check	CHECK ((status = ANY (ARRAY['pending'::text, 'link_ready'::text, 'invited'::text, 'removed'::text])))
+constraint:aitickets_job_heartbeats.aitickets_job_heartbeats_pkey	PRIMARY KEY (job)
+constraint:aitickets_lead_sources.aitickets_lead_sources_pkey	PRIMARY KEY (key)
+constraint:aitickets_leads.aitickets_leads_domain_key	UNIQUE (domain)
+constraint:aitickets_leads.aitickets_leads_domain_lower	CHECK (((domain IS NULL) OR (domain = lower(domain))))
+constraint:aitickets_leads.aitickets_leads_email_type_check	CHECK (((email_type IS NULL) OR (email_type = ANY (ARRAY['role'::text, 'personal'::text]))))
+constraint:aitickets_leads.aitickets_leads_lead_type_check	CHECK (((lead_type IS NULL) OR (lead_type = ANY (ARRAY['producer'::text, 'venue'::text]))))
+constraint:aitickets_leads.aitickets_leads_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE SET NULL
+constraint:aitickets_leads.aitickets_leads_pkey	PRIMARY KEY (id)
+constraint:aitickets_leads.aitickets_leads_status_check	CHECK ((status = ANY (ARRAY['new'::text, 'enriched'::text, 'queued'::text, 'contacted'::text, 'replied'::text, 'interested'::text, 'converted'::text, 'lost'::text, 'suppressed'::text, 'invalid'::text])))
+constraint:aitickets_oauth_clients.aitickets_oauth_clients_client_secret_hash_check	CHECK (((client_secret_hash IS NULL) OR (client_secret_hash ~ '^[0-9a-f]{64}$'::text)))
+constraint:aitickets_oauth_clients.aitickets_oauth_clients_pkey	PRIMARY KEY (client_id)
+constraint:aitickets_oauth_clients.aitickets_oauth_clients_redirect_uris_check	CHECK (((cardinality(redirect_uris) >= 1) AND (cardinality(redirect_uris) <= 10)))
+constraint:aitickets_oauth_clients.aitickets_oauth_clients_token_endpoint_auth_method_check	CHECK ((token_endpoint_auth_method = ANY (ARRAY['none'::text, 'client_secret_post'::text, 'client_secret_basic'::text])))
+constraint:aitickets_oauth_codes.aitickets_oauth_codes_code_hash_check	CHECK ((code_hash ~ '^[0-9a-f]{64}$'::text))
+constraint:aitickets_oauth_codes.aitickets_oauth_codes_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:aitickets_oauth_codes.aitickets_oauth_codes_pkey	PRIMARY KEY (code_hash)
+constraint:aitickets_oauth_codes.aitickets_oauth_codes_scopes_v2_check	CHECK ((scopes <@ ARRAY['read'::text, 'write'::text, 'publish'::text, 'attendees'::text, 'finance'::text, 'team'::text]))
+constraint:aitickets_oauth_codes.aitickets_oauth_codes_user_id_fkey	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+constraint:aitickets_oauth_grants.aitickets_oauth_grants_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:aitickets_oauth_grants.aitickets_oauth_grants_pkey	PRIMARY KEY (id)
+constraint:aitickets_oauth_grants.aitickets_oauth_grants_refresh_hash_check	CHECK ((refresh_hash ~ '^[0-9a-f]{64}$'::text))
+constraint:aitickets_oauth_grants.aitickets_oauth_grants_refresh_key	UNIQUE (refresh_hash)
+constraint:aitickets_oauth_grants.aitickets_oauth_grants_scopes_v2_check	CHECK ((scopes <@ ARRAY['read'::text, 'write'::text, 'publish'::text, 'attendees'::text, 'finance'::text, 'team'::text]))
+constraint:aitickets_oauth_grants.aitickets_oauth_grants_user_id_fkey	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+constraint:aitickets_org_email_optouts.aitickets_org_email_optouts_email_check	CHECK (((email = lower(email)) AND ((char_length(email) >= 3) AND (char_length(email) <= 254))))
+constraint:aitickets_org_email_optouts.aitickets_org_email_optouts_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:aitickets_org_email_optouts.aitickets_org_email_optouts_pkey	PRIMARY KEY (organization_id, email)
+constraint:aitickets_org_email_optouts.aitickets_org_email_optouts_source_check	CHECK ((source = ANY (ARRAY['unsubscribe_link'::text, 'one_click'::text, 'producer'::text])))
+constraint:aitickets_outreach_events.aitickets_outreach_events_lead_id_fkey	FOREIGN KEY (lead_id) REFERENCES aitickets_leads(id) ON DELETE SET NULL
+constraint:aitickets_outreach_events.aitickets_outreach_events_message_id_fkey	FOREIGN KEY (message_id) REFERENCES aitickets_outreach_messages(id) ON DELETE SET NULL
+constraint:aitickets_outreach_events.aitickets_outreach_events_pkey	PRIMARY KEY (id)
+constraint:aitickets_outreach_events.aitickets_outreach_events_provider_event_id_key	UNIQUE (provider_event_id)
+constraint:aitickets_outreach_messages.aitickets_outreach_messages_direction_check	CHECK ((direction = ANY (ARRAY['in'::text, 'out'::text])))
+constraint:aitickets_outreach_messages.aitickets_outreach_messages_lead_id_fkey	FOREIGN KEY (lead_id) REFERENCES aitickets_leads(id) ON DELETE CASCADE
+constraint:aitickets_outreach_messages.aitickets_outreach_messages_pkey	PRIMARY KEY (id)
+constraint:aitickets_outreach_messages.aitickets_outreach_messages_status_check	CHECK ((status = ANY (ARRAY['draft'::text, 'sending'::text, 'scheduled'::text, 'sent'::text, 'failed'::text, 'received'::text, 'approved'::text, 'rejected'::text])))
+constraint:aitickets_outreach_state.aitickets_outreach_state_pkey	PRIMARY KEY (key)
+constraint:aitickets_payment_events.aitickets_payment_events_pkey	PRIMARY KEY (id)
+constraint:aitickets_payouts.aitickets_payouts_amount_check	CHECK ((amount > 0))
+constraint:aitickets_payouts.aitickets_payouts_cancelled_by_fkey	FOREIGN KEY (cancelled_by) REFERENCES users(id) ON DELETE SET NULL
+constraint:aitickets_payouts.aitickets_payouts_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:aitickets_payouts.aitickets_payouts_pkey	PRIMARY KEY (id)
+constraint:aitickets_payouts.aitickets_payouts_requested_by_fkey	FOREIGN KEY (requested_by) REFERENCES users(id) ON DELETE SET NULL
+constraint:aitickets_payouts.aitickets_payouts_requested_via_check	CHECK ((requested_via = ANY (ARRAY['dashboard'::text, 'mcp'::text, 'rest'::text, 'admin'::text])))
+constraint:aitickets_payouts.aitickets_payouts_status_check	CHECK ((status = ANY (ARRAY['requested'::text, 'processing'::text, 'paid'::text, 'cancelled'::text, 'failed'::text])))
+constraint:aitickets_platform_settings.aitickets_platform_settings_key_check	CHECK (((char_length(key) >= 1) AND (char_length(key) <= 80)))
+constraint:aitickets_platform_settings.aitickets_platform_settings_pkey	PRIMARY KEY (key)
+constraint:aitickets_producer_activity.aitickets_producer_activity_data_check	CHECK ((octet_length((data)::text) <= 4096))
+constraint:aitickets_producer_activity.aitickets_producer_activity_duration_ms_check	CHECK (((duration_ms IS NULL) OR (duration_ms >= 0)))
+constraint:aitickets_producer_activity.aitickets_producer_activity_label_check	CHECK (((label IS NULL) OR (char_length(label) <= 300)))
+constraint:aitickets_producer_activity.aitickets_producer_activity_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:aitickets_producer_activity.aitickets_producer_activity_path_check	CHECK (((path IS NULL) OR (char_length(path) <= 300)))
+constraint:aitickets_producer_activity.aitickets_producer_activity_pkey	PRIMARY KEY (id)
+constraint:aitickets_producer_activity.aitickets_producer_activity_route_check	CHECK (((route IS NULL) OR (char_length(route) <= 200)))
+constraint:aitickets_producer_activity.aitickets_producer_activity_status_check	CHECK (((status IS NULL) OR ((status >= 0) AND (status <= 999))))
+constraint:aitickets_producer_activity.aitickets_producer_activity_target_check	CHECK (((target IS NULL) OR (char_length(target) <= 300)))
+constraint:aitickets_producer_activity.aitickets_producer_activity_type_check	CHECK ((type = ANY (ARRAY['page_view'::text, 'page_time'::text, 'click'::text, 'rage_click'::text, 'dead_click'::text, 'form_start'::text, 'form_submit'::text, 'navigation'::text, 'api_call'::text, 'api_error'::text, 'js_error'::text, 'ui_message'::text, 'custom'::text])))
+constraint:aitickets_producer_activity.aitickets_producer_activity_user_id_fkey	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+constraint:aitickets_promoter_links.aitickets_promoter_links_created_by_fkey	FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+constraint:aitickets_promoter_links.aitickets_promoter_links_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+constraint:aitickets_promoter_links.aitickets_promoter_links_name_check	CHECK (((char_length(name) >= 1) AND (char_length(name) <= 80)))
+constraint:aitickets_promoter_links.aitickets_promoter_links_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:aitickets_promoter_links.aitickets_promoter_links_pkey	PRIMARY KEY (id)
+constraint:aitickets_promoter_links.aitickets_promoter_links_ref_check	CHECK ((ref ~ '^[a-z0-9_.-]{1,64}$'::text))
+constraint:aitickets_promoter_links.aitickets_promoter_links_token_hash_check	CHECK ((token_hash ~ '^[0-9a-f]{64}$'::text))
+constraint:aitickets_promoter_links.aitickets_promoter_links_token_key	UNIQUE (token_hash)
+constraint:aitickets_rate_limits.aitickets_rate_limits_pkey	PRIMARY KEY (bucket, key_hash, window_start)
+constraint:aitickets_refunds.aitickets_refunds_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+constraint:aitickets_refunds.aitickets_refunds_fee_amount_check	CHECK ((fee_amount >= 0))
+constraint:aitickets_refunds.aitickets_refunds_kind_check	CHECK ((kind = ANY (ARRAY['full'::text, 'partial'::text])))
+constraint:aitickets_refunds.aitickets_refunds_order_id_fkey	FOREIGN KEY (order_id) REFERENCES event_orders(id) ON DELETE CASCADE
+constraint:aitickets_refunds.aitickets_refunds_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:aitickets_refunds.aitickets_refunds_pkey	PRIMARY KEY (id)
+constraint:aitickets_refunds.aitickets_refunds_requested_by_fkey	FOREIGN KEY (requested_by) REFERENCES users(id) ON DELETE SET NULL
+constraint:aitickets_refunds.aitickets_refunds_requested_via_check	CHECK ((requested_via = ANY (ARRAY['dashboard'::text, 'mcp'::text, 'rest'::text, 'admin'::text])))
+constraint:aitickets_refunds.aitickets_refunds_source_check	CHECK ((source = ANY (ARRAY['refund_order'::text, 'cancel_event'::text, 'dashboard'::text])))
+constraint:aitickets_refunds.aitickets_refunds_status_check	CHECK ((status = ANY (ARRAY['requested'::text, 'processing'::text, 'completed'::text, 'failed'::text, 'cancelled'::text])))
+constraint:aitickets_refunds.aitickets_refunds_ticket_amount_check	CHECK ((ticket_amount >= 0))
+constraint:aitickets_refunds.aitickets_refunds_total_amount_check	CHECK ((total_amount >= 0))
+constraint:aitickets_scheduled_messages.aitickets_scheduled_messages_audience_check	CHECK ((audience = ANY (ARRAY['all'::text, 'not_checked_in'::text, 'checked_in'::text, 'reviewers'::text, 'promoters'::text])))
+constraint:aitickets_scheduled_messages.aitickets_scheduled_messages_body_check	CHECK (((char_length(body) >= 1) AND (char_length(body) <= 4000)))
+constraint:aitickets_scheduled_messages.aitickets_scheduled_messages_created_by_fkey	FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+constraint:aitickets_scheduled_messages.aitickets_scheduled_messages_created_via_check	CHECK ((created_via = ANY (ARRAY['dashboard'::text, 'mcp'::text, 'rest'::text, 'admin'::text])))
+constraint:aitickets_scheduled_messages.aitickets_scheduled_messages_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+constraint:aitickets_scheduled_messages.aitickets_scheduled_messages_invitation_target_check	CHECK (((kind <> 'invitation'::text) OR (target_event_id IS NOT NULL)))
+constraint:aitickets_scheduled_messages.aitickets_scheduled_messages_kind_check	CHECK ((kind = ANY (ARRAY['message'::text, 'reminder'::text, 'invitation'::text])))
+constraint:aitickets_scheduled_messages.aitickets_scheduled_messages_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:aitickets_scheduled_messages.aitickets_scheduled_messages_pkey	PRIMARY KEY (id)
+constraint:aitickets_scheduled_messages.aitickets_scheduled_messages_status_check	CHECK ((status = ANY (ARRAY['scheduled'::text, 'sending'::text, 'sent'::text, 'failed'::text, 'cancelled'::text])))
+constraint:aitickets_scheduled_messages.aitickets_scheduled_messages_subject_check	CHECK (((char_length(subject) >= 1) AND (char_length(subject) <= 150)))
+constraint:aitickets_scheduled_messages.aitickets_scheduled_messages_target_event_id_fkey	FOREIGN KEY (target_event_id) REFERENCES events(id) ON DELETE CASCADE
+constraint:aitickets_schema_migrations.aitickets_schema_migrations_pkey	PRIMARY KEY (filename)
+constraint:aitickets_site_banners.aitickets_site_banners_pkey	PRIMARY KEY (id)
+constraint:aitickets_site_banners.aitickets_site_banners_placement_check	CHECK ((placement = ANY (ARRAY['hero'::text, 'top_bar'::text, 'inline'::text])))
+constraint:aitickets_site_banners.aitickets_site_banners_site_id_fkey	FOREIGN KEY (site_id) REFERENCES aitickets_sites(id) ON DELETE CASCADE
+constraint:aitickets_site_contact_messages.aitickets_site_contact_messages_pkey	PRIMARY KEY (id)
+constraint:aitickets_site_contact_messages.aitickets_site_contact_messages_site_id_fkey	FOREIGN KEY (site_id) REFERENCES aitickets_sites(id) ON DELETE CASCADE
+constraint:aitickets_sites.aitickets_sites_custom_domain_key	UNIQUE (custom_domain)
+constraint:aitickets_sites.aitickets_sites_custom_domain_lower	CHECK (((custom_domain IS NULL) OR (custom_domain = lower(custom_domain))))
+constraint:aitickets_sites.aitickets_sites_domain_status_check	CHECK ((domain_status = ANY (ARRAY['none'::text, 'pending_provider'::text, 'pending_dns'::text, 'pending_ssl'::text, 'active'::text, 'failed'::text, 'removing'::text])))
+constraint:aitickets_sites.aitickets_sites_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:aitickets_sites.aitickets_sites_organization_id_key	UNIQUE (organization_id)
+constraint:aitickets_sites.aitickets_sites_pkey	PRIMARY KEY (id)
+constraint:aitickets_sites.aitickets_sites_slug_format	CHECK ((slug ~ '^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$'::text))
+constraint:aitickets_sites.aitickets_sites_slug_key	UNIQUE (slug)
+constraint:aitickets_sites.aitickets_sites_slug_reserved	CHECK ((slug <> ALL (ARRAY['www'::text, 'api'::text, 'app'::text, 'admin'::text, 'dashboard'::text, 'mail'::text, 'mg'::text, 'sites'::text, 'sites-origin'::text, 'status'::text, 'blog'::text, 'docs'::text, 'cdn'::text, 'static'::text, 'assets'::text, 'soporte'::text, 'ayuda'::text, 'demo'::text, 'o'::text, 'eventos'::text, 'organizadores'::text, 'precios'::text, 'comparar'::text, 'web-gratis'::text, 'bot'::text, 'outreach'::text, 'order'::text, 'ticket'::text, 'pago'::text, 'qr'::text])))
+constraint:aitickets_sites.aitickets_sites_template_check	CHECK ((template = ANY (ARRAY['clasico'::text, 'nocturno'::text, 'minimal'::text, 'festival'::text, 'teatro'::text, 'musica'::text, 'fiestas'::text, 'clubs'::text, 'standup'::text, 'seminarios'::text, 'talleres'::text, 'academias'::text])))
+constraint:aitickets_social_series.aitickets_social_series_approved_by_fkey	FOREIGN KEY (approved_by) REFERENCES users(id) ON DELETE SET NULL
+constraint:aitickets_social_series.aitickets_social_series_base_image_url_check	CHECK (((base_image_url IS NULL) OR (char_length(base_image_url) <= 2000)))
+constraint:aitickets_social_series.aitickets_social_series_cancel_reason_check	CHECK (((cancel_reason IS NULL) OR (char_length(cancel_reason) <= 200)))
+constraint:aitickets_social_series.aitickets_social_series_created_by_fkey	FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+constraint:aitickets_social_series.aitickets_social_series_created_via_check	CHECK (((created_via IS NULL) OR (created_via = ANY (ARRAY['mcp'::text, 'rest'::text, 'dashboard'::text, 'admin'::text]))))
+constraint:aitickets_social_series.aitickets_social_series_dm_message_check	CHECK (((dm_message IS NULL) OR (char_length(dm_message) <= 600)))
+constraint:aitickets_social_series.aitickets_social_series_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+constraint:aitickets_social_series.aitickets_social_series_keyword_check	CHECK (((char_length(keyword) >= 2) AND (char_length(keyword) <= 30)))
+constraint:aitickets_social_series.aitickets_social_series_notice_check	CHECK (((notice IS NULL) OR (char_length(notice) <= 500)))
+constraint:aitickets_social_series.aitickets_social_series_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:aitickets_social_series.aitickets_social_series_pause_reason_check	CHECK (((pause_reason IS NULL) OR (char_length(pause_reason) <= 60)))
+constraint:aitickets_social_series.aitickets_social_series_pkey	PRIMARY KEY (id)
+constraint:aitickets_social_series.aitickets_social_series_status_check	CHECK ((status = ANY (ARRAY['draft'::text, 'active'::text, 'paused'::text, 'completed'::text, 'cancelled'::text])))
+constraint:aitickets_social_series_slots.aitickets_social_series_slots_caption_check	CHECK (((caption IS NULL) OR (char_length(caption) <= 2200)))
+constraint:aitickets_social_series_slots.aitickets_social_series_slots_days_to_event_check	CHECK (((days_to_event >= 0) AND (days_to_event <= 400)))
+constraint:aitickets_social_series_slots.aitickets_social_series_slots_error_check	CHECK (((error IS NULL) OR (char_length(error) <= 500)))
+constraint:aitickets_social_series_slots.aitickets_social_series_slots_kind_check	CHECK ((kind = ANY (ARRAY['story'::text, 'feed_post'::text, 'reel'::text])))
+constraint:aitickets_social_series_slots.aitickets_social_series_slots_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:aitickets_social_series_slots.aitickets_social_series_slots_pkey	PRIMARY KEY (id)
+constraint:aitickets_social_series_slots.aitickets_social_series_slots_platform_check	CHECK ((platform = ANY (ARRAY['instagram'::text, 'facebook'::text, 'tiktok'::text])))
+constraint:aitickets_social_series_slots.aitickets_social_series_slots_series_id_fkey	FOREIGN KEY (series_id) REFERENCES aitickets_social_series(id) ON DELETE CASCADE
+constraint:aitickets_social_series_slots.aitickets_social_series_slots_skip_reason_check	CHECK (((skip_reason IS NULL) OR (char_length(skip_reason) <= 120)))
+constraint:aitickets_social_series_slots.aitickets_social_series_slots_status_check	CHECK ((status = ANY (ARRAY['planned'::text, 'rendering'::text, 'queued'::text, 'published'::text, 'failed'::text, 'skipped'::text])))
+constraint:aitickets_social_series_slots.aitickets_social_series_slots_variant_check	CHECK ((variant = ANY (ARRAY['countdown'::text, 'sold_out'::text])))
+constraint:aitickets_social_series_slots.aitickets_social_series_slots_video_url_check	CHECK (((video_url IS NULL) OR (char_length(video_url) <= 2000)))
+constraint:aitickets_suppressions.aitickets_suppressions_pkey	PRIMARY KEY (id)
+constraint:aitickets_suppressions.aitickets_suppressions_reason_check	CHECK ((reason = ANY (ARRAY['unsubscribe'::text, 'complaint'::text, 'hard_bounce'::text, 'not_interested'::text, 'manual'::text, 'customer'::text, 'bot_optout'::text])))
+constraint:aitickets_suppressions.aitickets_suppressions_target	CHECK (((email IS NOT NULL) OR (domain IS NOT NULL)))
+constraint:aitickets_team_invitations.aitickets_team_invitations_accepted_user_id_fkey	FOREIGN KEY (accepted_user_id) REFERENCES users(id) ON DELETE SET NULL
+constraint:aitickets_team_invitations.aitickets_team_invitations_email_check	CHECK (((char_length(email) >= 3) AND (char_length(email) <= 200)))
+constraint:aitickets_team_invitations.aitickets_team_invitations_invited_by_fkey	FOREIGN KEY (invited_by) REFERENCES users(id) ON DELETE SET NULL
+constraint:aitickets_team_invitations.aitickets_team_invitations_invited_via_check	CHECK ((invited_via = ANY (ARRAY['dashboard'::text, 'mcp'::text, 'rest'::text, 'admin'::text])))
+constraint:aitickets_team_invitations.aitickets_team_invitations_name_check	CHECK (((name IS NULL) OR (char_length(name) <= 150)))
+constraint:aitickets_team_invitations.aitickets_team_invitations_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:aitickets_team_invitations.aitickets_team_invitations_pkey	PRIMARY KEY (id)
+constraint:aitickets_team_invitations.aitickets_team_invitations_role_check	CHECK ((role = ANY (ARRAY['admin'::text, 'finance'::text, 'editor'::text, 'validator'::text, 'viewer'::text])))
+constraint:aitickets_team_invitations.aitickets_team_invitations_token_hash_check	CHECK ((token_hash ~ '^[0-9a-f]{64}$'::text))
+constraint:aitickets_team_invitations.aitickets_team_invitations_token_key	UNIQUE (token_hash)
+constraint:aitickets_user_email_optouts.aitickets_user_email_optouts_pkey	PRIMARY KEY (user_id, topic)
+constraint:aitickets_user_email_optouts.aitickets_user_email_optouts_source_check	CHECK ((source = ANY (ARRAY['unsubscribe_link'::text, 'one_click'::text, 'dashboard'::text])))
+constraint:aitickets_user_email_optouts.aitickets_user_email_optouts_topic_check	CHECK ((topic = 'weekly_report'::text))
+constraint:aitickets_user_email_optouts.aitickets_user_email_optouts_user_id_fkey	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+constraint:aitickets_weekly_reports.aitickets_weekly_reports_ai_provider_check	CHECK (((ai_provider IS NULL) OR (char_length(ai_provider) <= 40)))
+constraint:aitickets_weekly_reports.aitickets_weekly_reports_attempts_check	CHECK ((attempts >= 0))
+constraint:aitickets_weekly_reports.aitickets_weekly_reports_error_check	CHECK (((error IS NULL) OR (char_length(error) <= 1000)))
+constraint:aitickets_weekly_reports.aitickets_weekly_reports_events_check	CHECK ((events >= 0))
+constraint:aitickets_weekly_reports.aitickets_weekly_reports_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:aitickets_weekly_reports.aitickets_weekly_reports_pkey	PRIMARY KEY (id)
+constraint:aitickets_weekly_reports.aitickets_weekly_reports_recipients_check	CHECK ((recipients >= 0))
+constraint:aitickets_weekly_reports.aitickets_weekly_reports_status_check	CHECK ((status = ANY (ARRAY['sending'::text, 'sent'::text, 'skipped'::text, 'failed'::text])))
+constraint:aitickets_zernio_webhook_events.aitickets_zernio_webhook_events_event_check	CHECK (((char_length(event) >= 1) AND (char_length(event) <= 80)))
+constraint:aitickets_zernio_webhook_events.aitickets_zernio_webhook_events_event_id_check	CHECK (((char_length(event_id) >= 1) AND (char_length(event_id) <= 120)))
+constraint:aitickets_zernio_webhook_events.aitickets_zernio_webhook_events_pkey	PRIMARY KEY (event_id)
+constraint:aitickets_zernio_webhook_events.aitickets_zernio_webhook_events_result_check	CHECK (((result IS NULL) OR (char_length(result) <= 200)))
+constraint:attendees.attendees_pkey	PRIMARY KEY (id)
+constraint:category_tags.category_tags_name_key	UNIQUE (name)
+constraint:category_tags.category_tags_pkey	PRIMARY KEY (id)
+constraint:event_attendees.event_attendees_attendee_id_fkey	FOREIGN KEY (attendee_id) REFERENCES attendees(id)
+constraint:event_attendees.event_attendees_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id)
+constraint:event_attendees.event_attendees_event_order_id_fkey	FOREIGN KEY (event_order_id) REFERENCES event_orders(id)
+constraint:event_attendees.event_attendees_event_ticket_id_fkey	FOREIGN KEY (event_ticket_id) REFERENCES event_tickets(id)
+constraint:event_attendees.event_attendees_internal_id_key	UNIQUE (id)
+constraint:event_attendees.event_attendees_pkey	PRIMARY KEY (id)
+constraint:event_dates.event_date_pkey	PRIMARY KEY (id)
+constraint:event_dates.event_dates_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+constraint:event_dates.event_dates_event_location_id_fkey	FOREIGN KEY (event_location_id) REFERENCES event_locations(id) ON DELETE RESTRICT
+constraint:event_faqs.event_faqs_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+constraint:event_faqs.event_faqs_pkey	PRIMARY KEY (id)
+constraint:event_locations.event_locations_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+constraint:event_locations.event_locations_pkey	PRIMARY KEY (id)
+constraint:event_locations.event_locations_venue_id_fkey	FOREIGN KEY (venue_id) REFERENCES venues(id) ON DELETE RESTRICT
+constraint:event_orders.event_orders_attendee_id_fkey	FOREIGN KEY (attendee_id) REFERENCES attendees(id)
+constraint:event_orders.event_orders_discount_code_id_fkey	FOREIGN KEY (discount_code_id) REFERENCES aitickets_discount_codes(id) ON DELETE SET NULL
+constraint:event_orders.event_orders_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id)
+constraint:event_orders.event_orders_payment_provider_check	CHECK ((payment_provider = ANY (ARRAY['flow'::text, 'stripe'::text, 'free'::text, 'demo'::text, 'courtesy'::text])))
+constraint:event_orders.event_orders_pkey	PRIMARY KEY (id)
+constraint:event_tags.event_tags_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+constraint:event_tags.event_tags_pkey	PRIMARY KEY (id)
+constraint:event_tags.event_tags_tag_id_fkey	FOREIGN KEY (tag_id) REFERENCES category_tags(id)
+constraint:event_tickets.event_tickets_event_date_id_fkey	FOREIGN KEY (event_date_id) REFERENCES event_dates(id) ON DELETE SET NULL
+constraint:event_tickets.event_tickets_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+constraint:event_tickets.event_tickets_opens_after_not_self	CHECK (((opens_after_ticket_id IS NULL) OR (opens_after_ticket_id <> id)))
+constraint:event_tickets.event_tickets_opens_after_ticket_id_fkey	FOREIGN KEY (opens_after_ticket_id) REFERENCES event_tickets(id) ON DELETE SET NULL
+constraint:event_tickets.event_tickets_people_per_ticket_range	CHECK (((people_per_ticket >= 1) AND (people_per_ticket <= 30)))
+constraint:event_tickets.event_tickets_pkey	PRIMARY KEY (id)
+constraint:event_visits.event_visits_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+constraint:event_visits.event_visits_pkey	PRIMARY KEY (id)
+constraint:event_withdrawals.event_withdrawals_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id)
+constraint:event_withdrawals.event_withdrawals_payout_id_fkey	FOREIGN KEY (payout_id) REFERENCES aitickets_payouts(id) ON DELETE SET NULL
+constraint:event_withdrawals.event_withdrawals_pkey	PRIMARY KEY (id)
+constraint:event_withdrawals.event_withdrawals_user_id_fkey	FOREIGN KEY (user_id) REFERENCES users(id)
+constraint:events.events_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id)
+constraint:events.events_permit_status_check	CHECK ((permit_status = ANY (ARRAY['none'::text, 'pending'::text, 'approved'::text, 'rejected'::text])))
+constraint:events.events_pkey	PRIMARY KEY (id)
+constraint:events.events_reserve_pct_check	CHECK (((reserve_pct >= 0) AND (reserve_pct <= 100)))
+constraint:events.events_risk_level_check	CHECK (((risk_level IS NULL) OR (risk_level = ANY (ARRAY['low'::text, 'medium'::text, 'high'::text]))))
+constraint:events.events_secret_location_reveal_hours_range	CHECK (((secret_location_reveal_hours IS NULL) OR ((secret_location_reveal_hours >= 0) AND (secret_location_reveal_hours <= 168))))
+constraint:newsletter.newsletter_email_key	UNIQUE (email)
+constraint:newsletter.newsletter_pkey	PRIMARY KEY (id)
+constraint:notification_log.notification_log_pkey	PRIMARY KEY (id)
+constraint:organization_payout_accounts.organization_payout_accounts_holder_match_check	CHECK (((holder_match_status IS NULL) OR (holder_match_status = ANY (ARRAY['match'::text, 'mismatch'::text, 'pending'::text]))))
+constraint:organization_payout_accounts.organization_payout_accounts_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:organization_payout_accounts.organization_payout_accounts_pkey	PRIMARY KEY (organization_id)
+constraint:organization_payout_accounts.organization_payout_accounts_updated_by_fkey	FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
+constraint:organizations.organizations_identity_kind_check	CHECK (((identity_kind IS NULL) OR (identity_kind = ANY (ARRAY['person'::text, 'company'::text]))))
+constraint:organizations.organizations_identity_status_check	CHECK (((identity_status IS NULL) OR (identity_status = ANY (ARRAY['pending'::text, 'approved'::text, 'declined'::text, 'in_review'::text]))))
+constraint:organizations.organizations_pkey	PRIMARY KEY (id)
+constraint:questions.questions_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id)
+constraint:questions.questions_pkey	PRIMARY KEY (id)
+constraint:social_accounts.social_accounts_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:social_accounts.social_accounts_pkey	PRIMARY KEY (id)
+constraint:social_posts.social_posts_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+constraint:social_posts.social_posts_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:social_posts.social_posts_pkey	PRIMARY KEY (id)
+constraint:users.users_auth_user_id_fkey	FOREIGN KEY (auth_user_id) REFERENCES auth.users(id)
+constraint:users.users_email_key	UNIQUE (email)
+constraint:users.users_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id)
+constraint:users.users_pkey	PRIMARY KEY (id)
+constraint:venues.venues_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE SET NULL
+constraint:venues.venues_pkey	PRIMARY KEY (id)
+function:aitickets_admin_visit_counts(p_from timestamp with time zone, p_to timestamp with time zone, p_event_ids bigint[], p_group text)	md5=7eb78367d3784ae5a3314c44a25e4329 lang=sql secdef=true returns=TABLE(bucket text, visits bigint, unique_visitors bigint) config=search_path=public
+function:aitickets_attendees_normalize_names()	md5=c9c7375c9a0291c787dac42269c69896 lang=plpgsql secdef=false returns=trigger config=search_path=public
+function:aitickets_claim_outreach_batch(p_limit integer)	md5=2b5a5b7c8faae97e1038896cc4fd5a97 lang=plpgsql secdef=true returns=SETOF aitickets_leads config=search_path=public
+function:aitickets_discount_code_stats(p_code_ids uuid[])	md5=4635931b79c257a658cdcf3d11cf1edb lang=sql secdef=true returns=TABLE(code_id uuid, uses integer, paid_orders integer, discount_total bigint, revenue bigint) config=search_path=public
+function:aitickets_discount_code_usage(p_code_id uuid, p_email text)	md5=76965d4f810237c3e105a9043f32eecf lang=sql secdef=true returns=TABLE(uses integer, buyer_uses integer) config=search_path=public
+function:aitickets_event_orders_normalize_names()	md5=83fa1180867758ffc4eb2c0ca7c0edea lang=plpgsql secdef=false returns=trigger config=search_path=public
+function:aitickets_event_visit_counts(p_event_id bigint)	md5=d4a3fdf3e24709e2c5073dff448b6d80 lang=sql secdef=true returns=TABLE(visits bigint, unique_visitors bigint) config=search_path=public
+function:aitickets_guests_normalize_name()	md5=cbc3cbad2726b56af3934a780e68aa91 lang=plpgsql secdef=false returns=trigger config=search_path=public
+function:aitickets_hold_seats(p_order_id uuid, p_event_date_id bigint, p_keys text[], p_expires_at timestamp with time zone)	md5=82d1ed67e1b1faa4ccc7e2fed30acc99 lang=plpgsql secdef=true returns=text[] config=search_path=public
+function:aitickets_mask_account_number(v text)	md5=17cf3f6040cc53e1593fae6cfc595ecf lang=sql secdef=false returns=text config=search_path=public
+function:aitickets_mask_person_name(v text)	md5=2065f8824337839f6c2559581a85f84f lang=sql secdef=false returns=text config=search_path=public
+function:aitickets_mask_rut(v text)	md5=cd5eb94f0a8ce21c012cf32dc4077dcb lang=plpgsql secdef=false returns=text config=search_path=public
+function:aitickets_normalize_person_name(p_name text, p_continuation boolean)	md5=67f05e8615e9ba29b2cb13f57e7627d9 lang=sql secdef=false returns=text config=search_path=public
+function:aitickets_outreach_bump_counter(p_key text, p_delta bigint)	md5=3c1cfabf60ef1da2dd24f17ff0bffa14 lang=plpgsql secdef=true returns=bigint config=search_path=public
+function:aitickets_payout_account_changed()	md5=bb748cde7981edd1c492ed98febbbecc lang=plpgsql secdef=false returns=trigger config=search_path=public
+function:aitickets_payout_sync_withdrawals()	md5=420e3181144b44f59e6ba60c9eb07700 lang=plpgsql secdef=true returns=trigger config=search_path=public
+function:aitickets_payout_touch()	md5=5492f1791d9571e8e4bed2321c9f36f7 lang=plpgsql secdef=false returns=trigger config=search_path=public
+function:aitickets_public_event_page(p_slug text, p_event_id bigint)	md5=c90de63c75d000ef0b2e291242687bbc lang=sql secdef=true returns=jsonb config=search_path=public
+function:aitickets_purge_producer_activity(p_keep_days integer, p_batch integer)	md5=e25fca9c9cbcd6ce61389df471193bb1 lang=plpgsql secdef=true returns=integer config=search_path=public
+function:aitickets_rate_limit_hit(p_bucket text, p_key_hash text, p_window_seconds integer, p_max integer)	md5=92624dd79140e02c60b8044ab507acea lang=plpgsql secdef=true returns=boolean config=search_path=public
+function:aitickets_reserve_order(p_event_id bigint, p_lines jsonb, p_order jsonb, p_hold_minutes integer)	md5=e9cd3d0a3dbd7ab4e260f214194412cd lang=plpgsql secdef=true returns=uuid config=search_path=public
+function:aitickets_reserve_order_v2(p_event_id bigint, p_lines jsonb, p_order jsonb, p_hold_minutes integer, p_discount_code_id uuid, p_discount_amount bigint)	md5=c1616e5a4a5a0ebb0257afcaa2957039 lang=plpgsql secdef=true returns=uuid config=search_path=public
+function:aitickets_seat_counts(p_event_id bigint)	md5=95ff66c40138c96ca5e52a1ba1270e4d lang=sql secdef=true returns=TABLE(event_date_id bigint, taken integer) config=search_path=public
+function:aitickets_seat_is_live(p_status text, p_expires_at timestamp with time zone, p_order_id uuid, p_attendee_id uuid)	md5=9a0aa9806185fdc43c6bbffc0e368ba2 lang=sql secdef=true returns=boolean config=search_path=public
+function:aitickets_set_payout_status(p_payout_id uuid, p_status text, p_reference text, p_failure_reason text, p_actor text, p_force boolean)	md5=4df99e1d5db34022840ac920ab02300c lang=plpgsql secdef=true returns=jsonb config=search_path=public
+function:aitickets_set_refund_status(p_refund_id uuid, p_status text, p_provider_reference text, p_reason text, p_actor text)	md5=20e3c17fd0a3f75b25bb0f43b66a04ca lang=plpgsql secdef=true returns=jsonb config=search_path=public
+function:aitickets_taken_seats(p_event_date_id bigint)	md5=5486c19e537fbc8c03df74eb46c33428 lang=sql secdef=true returns=TABLE(seat_key text, status text) config=search_path=public
+function:aitickets_ticket_availability(p_event_id bigint)	md5=de38e88bbd8e87963b8c77b9c190f8cb lang=sql secdef=true returns=TABLE(ticket_id bigint, sold integer, pending integer) config=search_path=public
+function:aitickets_touch_competitor_events(p_rows jsonb, p_seen_via text)	md5=902723b6a7773877d4d0156ed52a7b88 lang=plpgsql secdef=true returns=TABLE(id bigint, url text, lead_id uuid, inserted boolean) config=search_path=public
+function:aitickets_verify_payout_account(p_organization_id bigint, p_decision text, p_verified_by text, p_notes text, p_expected_last4 text)	md5=0920ddcfab16dd43db54cfba445a3a20 lang=plpgsql secdef=true returns=jsonb config=search_path=public
+function:handle_new_user()	md5=5549f89372e87c73b30b08cd1f39aa20 lang=plpgsql secdef=true returns=trigger config=search_path=public
+function_grant:aitickets_admin_visit_counts(p_from timestamp with time zone, p_to timestamp with time zone, p_event_ids bigint[], p_group text)	service_role
+function_grant:aitickets_attendees_normalize_names()	service_role
+function_grant:aitickets_claim_outreach_batch(p_limit integer)	service_role
+function_grant:aitickets_discount_code_stats(p_code_ids uuid[])	service_role
+function_grant:aitickets_discount_code_usage(p_code_id uuid, p_email text)	service_role
+function_grant:aitickets_event_orders_normalize_names()	service_role
+function_grant:aitickets_event_visit_counts(p_event_id bigint)	service_role
+function_grant:aitickets_guests_normalize_name()	service_role
+function_grant:aitickets_hold_seats(p_order_id uuid, p_event_date_id bigint, p_keys text[], p_expires_at timestamp with time zone)	service_role
+function_grant:aitickets_mask_account_number(v text)	service_role
+function_grant:aitickets_mask_person_name(v text)	service_role
+function_grant:aitickets_mask_rut(v text)	service_role
+function_grant:aitickets_normalize_person_name(p_name text, p_continuation boolean)	service_role
+function_grant:aitickets_outreach_bump_counter(p_key text, p_delta bigint)	service_role
+function_grant:aitickets_payout_account_changed()	service_role
+function_grant:aitickets_payout_sync_withdrawals()	service_role
+function_grant:aitickets_payout_touch()	service_role
+function_grant:aitickets_public_event_page(p_slug text, p_event_id bigint)	service_role
+function_grant:aitickets_purge_producer_activity(p_keep_days integer, p_batch integer)	service_role
+function_grant:aitickets_rate_limit_hit(p_bucket text, p_key_hash text, p_window_seconds integer, p_max integer)	service_role
+function_grant:aitickets_reserve_order(p_event_id bigint, p_lines jsonb, p_order jsonb, p_hold_minutes integer)	service_role
+function_grant:aitickets_reserve_order_v2(p_event_id bigint, p_lines jsonb, p_order jsonb, p_hold_minutes integer, p_discount_code_id uuid, p_discount_amount bigint)	service_role
+function_grant:aitickets_seat_counts(p_event_id bigint)	service_role
+function_grant:aitickets_seat_is_live(p_status text, p_expires_at timestamp with time zone, p_order_id uuid, p_attendee_id uuid)	service_role
+function_grant:aitickets_set_payout_status(p_payout_id uuid, p_status text, p_reference text, p_failure_reason text, p_actor text, p_force boolean)	service_role
+function_grant:aitickets_set_refund_status(p_refund_id uuid, p_status text, p_provider_reference text, p_reason text, p_actor text)	service_role
+function_grant:aitickets_taken_seats(p_event_date_id bigint)	service_role
+function_grant:aitickets_ticket_availability(p_event_id bigint)	service_role
+function_grant:aitickets_touch_competitor_events(p_rows jsonb, p_seen_via text)	service_role
+function_grant:aitickets_verify_payout_account(p_organization_id bigint, p_decision text, p_verified_by text, p_notes text, p_expected_last4 text)	service_role
+function_grant:handle_new_user()	service_role
+grant:ad_account_connections	-
+grant:ad_campaigns	-
+grant:aitickets_admin_audit	-
+grant:aitickets_admin_confirmations	-
+grant:aitickets_admin_idempotency	-
+grant:aitickets_admin_notes	-
+grant:aitickets_api_audit	-
+grant:aitickets_api_confirmations	-
+grant:aitickets_api_idempotency	-
+grant:aitickets_api_keys	-
+grant:aitickets_attendee_checkins	-
+grant:aitickets_attendee_messages	-
+grant:aitickets_auth_link_sends	-
+grant:aitickets_auth_link_tokens	-
+grant:aitickets_certificate_sends	-
+grant:aitickets_checkin_links	-
+grant:aitickets_competitor_events	-
+grant:aitickets_discount_codes	-
+grant:aitickets_disputes	-
+grant:aitickets_email_log	-
+grant:aitickets_event_agenda	-
+grant:aitickets_event_documents	-
+grant:aitickets_event_feed_posts	-
+grant:aitickets_event_gallery_images	-
+grant:aitickets_event_preview_links	-
+grant:aitickets_event_review_photos	-
+grant:aitickets_event_reviews	-
+grant:aitickets_event_seats	-
+grant:aitickets_event_slug_redirects	-
+grant:aitickets_event_staff	-
+grant:aitickets_event_waitlist	-
+grant:aitickets_guests	-
+grant:aitickets_job_heartbeats	-
+grant:aitickets_lead_sources	-
+grant:aitickets_leads	-
+grant:aitickets_oauth_clients	-
+grant:aitickets_oauth_codes	-
+grant:aitickets_oauth_grants	-
+grant:aitickets_org_email_optouts	-
+grant:aitickets_outreach_events	-
+grant:aitickets_outreach_messages	-
+grant:aitickets_outreach_state	-
+grant:aitickets_payment_events	-
+grant:aitickets_payouts	-
+grant:aitickets_platform_settings	-
+grant:aitickets_producer_activity	-
+grant:aitickets_promoter_links	-
+grant:aitickets_rate_limits	-
+grant:aitickets_refunds	-
+grant:aitickets_scheduled_messages	-
+grant:aitickets_schema_migrations	-
+grant:aitickets_site_banners	-
+grant:aitickets_site_contact_messages	-
+grant:aitickets_sites	-
+grant:aitickets_social_series	-
+grant:aitickets_social_series_slots	-
+grant:aitickets_suppressions	-
+grant:aitickets_team_invitations	-
+grant:aitickets_user_email_optouts	-
+grant:aitickets_weekly_reports	-
+grant:aitickets_zernio_webhook_events	-
+grant:attendees	-
+grant:category_tags	-
+grant:event_attendees	-
+grant:event_dates	-
+grant:event_faqs	-
+grant:event_locations	-
+grant:event_orders	-
+grant:event_tags	-
+grant:event_tickets	-
+grant:event_visits	-
+grant:event_withdrawals	-
+grant:events	-
+grant:newsletter	-
+grant:notification_log	-
+grant:organization_payout_accounts	-
+grant:organizations	-
+grant:questions	-
+grant:social_accounts	-
+grant:social_posts	-
+grant:users	-
+grant:venues	-
+index:ad_account_connections.idx_ad_account_connections_org	CREATE INDEX idx_ad_account_connections_org ON ad_account_connections USING btree (organization_id)
+index:ad_account_connections.idx_ad_account_connections_org_provider	CREATE INDEX idx_ad_account_connections_org_provider ON ad_account_connections USING btree (organization_id, provider, status)
+index:ad_campaigns.idx_ad_campaigns_event	CREATE INDEX idx_ad_campaigns_event ON ad_campaigns USING btree (event_id)
+index:ad_campaigns.idx_ad_campaigns_event_provider	CREATE INDEX idx_ad_campaigns_event_provider ON ad_campaigns USING btree (event_id, provider)
+index:ad_campaigns.idx_ad_campaigns_org	CREATE INDEX idx_ad_campaigns_org ON ad_campaigns USING btree (organization_id)
+index:ad_campaigns.idx_ad_campaigns_org_provider_created	CREATE INDEX idx_ad_campaigns_org_provider_created ON ad_campaigns USING btree (organization_id, provider, created_at DESC)
+index:aitickets_admin_audit.aitickets_admin_audit_created_idx	CREATE INDEX aitickets_admin_audit_created_idx ON aitickets_admin_audit USING btree (created_at DESC)
+index:aitickets_admin_audit.aitickets_admin_audit_org_idx	CREATE INDEX aitickets_admin_audit_org_idx ON aitickets_admin_audit USING btree (organization_id, created_at DESC)
+index:aitickets_admin_audit.aitickets_admin_audit_tool_idx	CREATE INDEX aitickets_admin_audit_tool_idx ON aitickets_admin_audit USING btree (tool, created_at DESC)
+index:aitickets_admin_confirmations.aitickets_admin_confirmations_exp_idx	CREATE INDEX aitickets_admin_confirmations_exp_idx ON aitickets_admin_confirmations USING btree (expires_at)
+index:aitickets_admin_notes.aitickets_admin_notes_org_idx	CREATE INDEX aitickets_admin_notes_org_idx ON aitickets_admin_notes USING btree (organization_id, created_at DESC)
+index:aitickets_api_audit.aitickets_api_audit_org_idx	CREATE INDEX aitickets_api_audit_org_idx ON aitickets_api_audit USING btree (organization_id, created_at DESC)
+index:aitickets_api_audit.aitickets_api_audit_org_tool_idx	CREATE INDEX aitickets_api_audit_org_tool_idx ON aitickets_api_audit USING btree (organization_id, tool, created_at DESC)
+index:aitickets_api_confirmations.aitickets_api_confirmations_exp_idx	CREATE INDEX aitickets_api_confirmations_exp_idx ON aitickets_api_confirmations USING btree (expires_at)
+index:aitickets_api_keys.aitickets_api_keys_grant_idx	CREATE INDEX aitickets_api_keys_grant_idx ON aitickets_api_keys USING btree (oauth_grant_id) WHERE (oauth_grant_id IS NOT NULL)
+index:aitickets_api_keys.aitickets_api_keys_org_idx	CREATE INDEX aitickets_api_keys_org_idx ON aitickets_api_keys USING btree (organization_id)
+index:aitickets_attendee_checkins.aitickets_attendee_checkins_event_idx	CREATE INDEX aitickets_attendee_checkins_event_idx ON aitickets_attendee_checkins USING btree (event_id, event_date_id)
+index:aitickets_attendee_messages.aitickets_attendee_messages_event_idx	CREATE INDEX aitickets_attendee_messages_event_idx ON aitickets_attendee_messages USING btree (event_id, created_at DESC)
+index:aitickets_attendee_messages.aitickets_attendee_messages_order_idx	CREATE INDEX aitickets_attendee_messages_order_idx ON aitickets_attendee_messages USING btree (order_id, created_at DESC)
+index:aitickets_attendee_messages.aitickets_attendee_messages_org_idx	CREATE INDEX aitickets_attendee_messages_org_idx ON aitickets_attendee_messages USING btree (organization_id, created_at DESC)
+index:aitickets_auth_link_sends.aitickets_auth_link_sends_user_idx	CREATE INDEX aitickets_auth_link_sends_user_idx ON aitickets_auth_link_sends USING btree (auth_user_id, sent_at DESC)
+index:aitickets_auth_link_tokens.aitickets_auth_link_tokens_expires_idx	CREATE INDEX aitickets_auth_link_tokens_expires_idx ON aitickets_auth_link_tokens USING btree (expires_at)
+index:aitickets_certificate_sends.aitickets_certificate_sends_event_idx	CREATE INDEX aitickets_certificate_sends_event_idx ON aitickets_certificate_sends USING btree (event_id, created_at DESC)
+index:aitickets_checkin_links.aitickets_checkin_links_event_idx	CREATE INDEX aitickets_checkin_links_event_idx ON aitickets_checkin_links USING btree (event_id)
+index:aitickets_competitor_events.aitickets_competitor_events_event_date_idx	CREATE INDEX aitickets_competitor_events_event_date_idx ON aitickets_competitor_events USING btree (event_date)
+index:aitickets_competitor_events.aitickets_competitor_events_lead_idx	CREATE INDEX aitickets_competitor_events_lead_idx ON aitickets_competitor_events USING btree (lead_id) WHERE (lead_id IS NOT NULL)
+index:aitickets_competitor_events.aitickets_competitor_events_platform_seen_idx	CREATE INDEX aitickets_competitor_events_platform_seen_idx ON aitickets_competitor_events USING btree (platform, last_seen_at DESC)
+index:aitickets_competitor_events.aitickets_competitor_events_producer_idx	CREATE INDEX aitickets_competitor_events_producer_idx ON aitickets_competitor_events USING btree (lower(producer_name)) WHERE (producer_name IS NOT NULL)
+index:aitickets_discount_codes.aitickets_discount_codes_event_idx	CREATE INDEX aitickets_discount_codes_event_idx ON aitickets_discount_codes USING btree (event_id) WHERE (event_id IS NOT NULL)
+index:aitickets_disputes.aitickets_disputes_created_idx	CREATE INDEX aitickets_disputes_created_idx ON aitickets_disputes USING btree (created_at DESC)
+index:aitickets_disputes.aitickets_disputes_event_idx	CREATE INDEX aitickets_disputes_event_idx ON aitickets_disputes USING btree (event_id, status)
+index:aitickets_email_log.aitickets_email_log_created_idx	CREATE INDEX aitickets_email_log_created_idx ON aitickets_email_log USING btree (created_at DESC)
+index:aitickets_email_log.aitickets_email_log_order_idx	CREATE INDEX aitickets_email_log_order_idx ON aitickets_email_log USING btree (order_id, created_at DESC)
+index:aitickets_email_log.aitickets_email_log_provider_message_key	CREATE UNIQUE INDEX aitickets_email_log_provider_message_key ON aitickets_email_log USING btree (provider, provider_message_id) WHERE (provider_message_id IS NOT NULL)
+index:aitickets_email_log.aitickets_email_log_status_idx	CREATE INDEX aitickets_email_log_status_idx ON aitickets_email_log USING btree (status, created_at DESC)
+index:aitickets_event_agenda.aitickets_event_agenda_event_idx	CREATE INDEX aitickets_event_agenda_event_idx ON aitickets_event_agenda USING btree (event_id, event_date_id, starts_at)
+index:aitickets_event_documents.aitickets_event_documents_event_idx	CREATE INDEX aitickets_event_documents_event_idx ON aitickets_event_documents USING btree (event_id, kind, created_at DESC)
+index:aitickets_event_documents.aitickets_event_documents_pending_idx	CREATE INDEX aitickets_event_documents_pending_idx ON aitickets_event_documents USING btree (status, created_at) WHERE (status = 'pending'::text)
+index:aitickets_event_feed_posts.aitickets_event_feed_posts_event_created_idx	CREATE INDEX aitickets_event_feed_posts_event_created_idx ON aitickets_event_feed_posts USING btree (event_id, status, created_at DESC)
+index:aitickets_event_feed_posts.aitickets_event_feed_posts_event_email_idx	CREATE UNIQUE INDEX aitickets_event_feed_posts_event_email_idx ON aitickets_event_feed_posts USING btree (event_id, email)
+index:aitickets_event_gallery_images.aitickets_event_gallery_images_event_idx	CREATE INDEX aitickets_event_gallery_images_event_idx ON aitickets_event_gallery_images USING btree (event_id, "position", created_at)
+index:aitickets_event_preview_links.aitickets_event_preview_links_event_idx	CREATE INDEX aitickets_event_preview_links_event_idx ON aitickets_event_preview_links USING btree (event_id, created_at DESC)
+index:aitickets_event_review_photos.aitickets_event_review_photos_event_email_idx	CREATE INDEX aitickets_event_review_photos_event_email_idx ON aitickets_event_review_photos USING btree (event_id, email)
+index:aitickets_event_review_photos.aitickets_event_review_photos_event_idx	CREATE INDEX aitickets_event_review_photos_event_idx ON aitickets_event_review_photos USING btree (event_id, status, created_at)
+index:aitickets_event_reviews.aitickets_event_reviews_event_created_idx	CREATE INDEX aitickets_event_reviews_event_created_idx ON aitickets_event_reviews USING btree (event_id, created_at DESC)
+index:aitickets_event_reviews.aitickets_event_reviews_event_email_idx	CREATE UNIQUE INDEX aitickets_event_reviews_event_email_idx ON aitickets_event_reviews USING btree (event_id, email)
+index:aitickets_event_reviews.aitickets_event_reviews_org_idx	CREATE INDEX aitickets_event_reviews_org_idx ON aitickets_event_reviews USING btree (organization_id, created_at DESC)
+index:aitickets_event_seats.aitickets_event_seats_event_idx	CREATE INDEX aitickets_event_seats_event_idx ON aitickets_event_seats USING btree (event_id)
+index:aitickets_event_seats.aitickets_event_seats_order_idx	CREATE INDEX aitickets_event_seats_order_idx ON aitickets_event_seats USING btree (order_id) WHERE (order_id IS NOT NULL)
+index:aitickets_event_slug_redirects.aitickets_event_slug_redirects_event_idx	CREATE INDEX aitickets_event_slug_redirects_event_idx ON aitickets_event_slug_redirects USING btree (event_id)
+index:aitickets_event_staff.aitickets_event_staff_user_idx	CREATE INDEX aitickets_event_staff_user_idx ON aitickets_event_staff USING btree (user_id)
+index:aitickets_event_waitlist.aitickets_event_waitlist_event_email_kind_idx	CREATE UNIQUE INDEX aitickets_event_waitlist_event_email_kind_idx ON aitickets_event_waitlist USING btree (event_id, lower(email), kind)
+index:aitickets_guests.aitickets_guests_event_idx	CREATE INDEX aitickets_guests_event_idx ON aitickets_guests USING btree (event_id, created_at)
+index:aitickets_leads.aitickets_leads_email_lower_uidx	CREATE UNIQUE INDEX aitickets_leads_email_lower_uidx ON aitickets_leads USING btree (lower(email)) WHERE (email IS NOT NULL)
+index:aitickets_leads.aitickets_leads_name_key_uidx	CREATE UNIQUE INDEX aitickets_leads_name_key_uidx ON aitickets_leads USING btree (name_key)
+index:aitickets_leads.aitickets_leads_organization_idx	CREATE INDEX aitickets_leads_organization_idx ON aitickets_leads USING btree (organization_id) WHERE (organization_id IS NOT NULL)
+index:aitickets_leads.aitickets_leads_source_idx	CREATE INDEX aitickets_leads_source_idx ON aitickets_leads USING btree (source, status)
+index:aitickets_leads.aitickets_leads_status_next_idx	CREATE INDEX aitickets_leads_status_next_idx ON aitickets_leads USING btree (status, next_action_at)
+index:aitickets_oauth_codes.aitickets_oauth_codes_expires_idx	CREATE INDEX aitickets_oauth_codes_expires_idx ON aitickets_oauth_codes USING btree (expires_at)
+index:aitickets_oauth_grants.aitickets_oauth_grants_org_idx	CREATE INDEX aitickets_oauth_grants_org_idx ON aitickets_oauth_grants USING btree (organization_id)
+index:aitickets_outreach_events.aitickets_outreach_events_type_idx	CREATE INDEX aitickets_outreach_events_type_idx ON aitickets_outreach_events USING btree (type, created_at)
+index:aitickets_outreach_messages.aitickets_outreach_messages_lead_idx	CREATE INDEX aitickets_outreach_messages_lead_idx ON aitickets_outreach_messages USING btree (lead_id, created_at)
+index:aitickets_outreach_messages.aitickets_outreach_messages_provider_idx	CREATE INDEX aitickets_outreach_messages_provider_idx ON aitickets_outreach_messages USING btree (provider_message_id) WHERE (provider_message_id IS NOT NULL)
+index:aitickets_outreach_messages.aitickets_outreach_messages_status_idx	CREATE INDEX aitickets_outreach_messages_status_idx ON aitickets_outreach_messages USING btree (direction, status, sent_at)
+index:aitickets_payment_events.idx_aitickets_payment_events_order	CREATE INDEX idx_aitickets_payment_events_order ON aitickets_payment_events USING btree (order_id)
+index:aitickets_payouts.aitickets_payouts_org_idx	CREATE INDEX aitickets_payouts_org_idx ON aitickets_payouts USING btree (organization_id, created_at DESC)
+index:aitickets_payouts.aitickets_payouts_status_created_idx	CREATE INDEX aitickets_payouts_status_created_idx ON aitickets_payouts USING btree (status, created_at)
+index:aitickets_producer_activity.aitickets_producer_activity_occurred_idx	CREATE INDEX aitickets_producer_activity_occurred_idx ON aitickets_producer_activity USING btree (occurred_at DESC)
+index:aitickets_producer_activity.aitickets_producer_activity_org_idx	CREATE INDEX aitickets_producer_activity_org_idx ON aitickets_producer_activity USING btree (organization_id, occurred_at DESC)
+index:aitickets_producer_activity.aitickets_producer_activity_user_idx	CREATE INDEX aitickets_producer_activity_user_idx ON aitickets_producer_activity USING btree (user_id, occurred_at DESC)
+index:aitickets_promoter_links.aitickets_promoter_links_event_idx	CREATE INDEX aitickets_promoter_links_event_idx ON aitickets_promoter_links USING btree (event_id) WHERE (event_id IS NOT NULL)
+index:aitickets_promoter_links.aitickets_promoter_links_org_idx	CREATE INDEX aitickets_promoter_links_org_idx ON aitickets_promoter_links USING btree (organization_id, created_at DESC)
+index:aitickets_rate_limits.aitickets_rate_limits_window_idx	CREATE INDEX aitickets_rate_limits_window_idx ON aitickets_rate_limits USING btree (window_start)
+index:aitickets_refunds.aitickets_refunds_event_idx	CREATE INDEX aitickets_refunds_event_idx ON aitickets_refunds USING btree (event_id)
+index:aitickets_refunds.aitickets_refunds_order_idx	CREATE INDEX aitickets_refunds_order_idx ON aitickets_refunds USING btree (order_id)
+index:aitickets_refunds.aitickets_refunds_org_idx	CREATE INDEX aitickets_refunds_org_idx ON aitickets_refunds USING btree (organization_id, created_at DESC)
+index:aitickets_refunds.aitickets_refunds_status_created_idx	CREATE INDEX aitickets_refunds_status_created_idx ON aitickets_refunds USING btree (status, created_at)
+index:aitickets_scheduled_messages.aitickets_scheduled_messages_due_idx	CREATE INDEX aitickets_scheduled_messages_due_idx ON aitickets_scheduled_messages USING btree (status, send_at)
+index:aitickets_scheduled_messages.aitickets_scheduled_messages_event_idx	CREATE INDEX aitickets_scheduled_messages_event_idx ON aitickets_scheduled_messages USING btree (event_id, created_at DESC)
+index:aitickets_site_banners.aitickets_site_banners_site_idx	CREATE INDEX aitickets_site_banners_site_idx ON aitickets_site_banners USING btree (site_id, sort_order)
+index:aitickets_site_contact_messages.aitickets_site_contact_messages_ip_idx	CREATE INDEX aitickets_site_contact_messages_ip_idx ON aitickets_site_contact_messages USING btree (ip_hash, created_at DESC)
+index:aitickets_site_contact_messages.aitickets_site_contact_messages_site_idx	CREATE INDEX aitickets_site_contact_messages_site_idx ON aitickets_site_contact_messages USING btree (site_id, created_at DESC)
+index:aitickets_sites.aitickets_sites_custom_domain_lower_idx	CREATE UNIQUE INDEX aitickets_sites_custom_domain_lower_idx ON aitickets_sites USING btree (lower(custom_domain)) WHERE (custom_domain IS NOT NULL)
+index:aitickets_sites.aitickets_sites_domain_status_idx	CREATE INDEX aitickets_sites_domain_status_idx ON aitickets_sites USING btree (domain_status) WHERE (domain_status <> 'none'::text)
+index:aitickets_social_series.aitickets_social_series_account_idx	CREATE INDEX aitickets_social_series_account_idx ON aitickets_social_series USING btree (zernio_account_id) WHERE (status = ANY (ARRAY['active'::text, 'paused'::text]))
+index:aitickets_social_series.aitickets_social_series_live_event_key	CREATE UNIQUE INDEX aitickets_social_series_live_event_key ON aitickets_social_series USING btree (event_id) WHERE (status = ANY (ARRAY['draft'::text, 'active'::text, 'paused'::text]))
+index:aitickets_social_series.aitickets_social_series_org_idx	CREATE INDEX aitickets_social_series_org_idx ON aitickets_social_series USING btree (organization_id, created_at DESC)
+index:aitickets_social_series.aitickets_social_series_status_idx	CREATE INDEX aitickets_social_series_status_idx ON aitickets_social_series USING btree (status) WHERE (status = ANY (ARRAY['active'::text, 'paused'::text]))
+index:aitickets_social_series_slots.aitickets_social_series_slots_due_idx	CREATE INDEX aitickets_social_series_slots_due_idx ON aitickets_social_series_slots USING btree (status, publish_at)
+index:aitickets_social_series_slots.aitickets_social_series_slots_series_idx	CREATE INDEX aitickets_social_series_slots_series_idx ON aitickets_social_series_slots USING btree (series_id, publish_at)
+index:aitickets_social_series_slots.aitickets_social_series_slots_unique_key	CREATE UNIQUE INDEX aitickets_social_series_slots_unique_key ON aitickets_social_series_slots USING btree (series_id, platform, kind, variant, publish_at) WHERE (status <> 'skipped'::text)
+index:aitickets_social_series_slots.aitickets_social_series_slots_zernio_idx	CREATE INDEX aitickets_social_series_slots_zernio_idx ON aitickets_social_series_slots USING btree (zernio_post_id) WHERE (zernio_post_id IS NOT NULL)
+index:aitickets_suppressions.aitickets_suppressions_domain_idx	CREATE INDEX aitickets_suppressions_domain_idx ON aitickets_suppressions USING btree (lower(domain)) WHERE (domain IS NOT NULL)
+index:aitickets_suppressions.aitickets_suppressions_target_uidx	CREATE UNIQUE INDEX aitickets_suppressions_target_uidx ON aitickets_suppressions USING btree (lower(COALESCE(email, ''::text)), lower(COALESCE(domain, ''::text)))
+index:aitickets_team_invitations.aitickets_team_invitations_org_idx	CREATE INDEX aitickets_team_invitations_org_idx ON aitickets_team_invitations USING btree (organization_id, created_at DESC)
+index:aitickets_weekly_reports.aitickets_weekly_reports_org_week_idx	CREATE UNIQUE INDEX aitickets_weekly_reports_org_week_idx ON aitickets_weekly_reports USING btree (organization_id, week_start)
+index:aitickets_weekly_reports.aitickets_weekly_reports_week_status_idx	CREATE INDEX aitickets_weekly_reports_week_status_idx ON aitickets_weekly_reports USING btree (week_start, status)
+index:aitickets_zernio_webhook_events.aitickets_zernio_webhook_events_received_idx	CREATE INDEX aitickets_zernio_webhook_events_received_idx ON aitickets_zernio_webhook_events USING btree (received_at)
+index:event_attendees.idx_event_attendees_event_order_id	CREATE INDEX idx_event_attendees_event_order_id ON event_attendees USING btree (event_order_id)
+index:event_attendees.idx_event_attendees_event_ticket	CREATE INDEX idx_event_attendees_event_ticket ON event_attendees USING btree (event_id, event_ticket_id)
+index:event_attendees.idx_event_attendees_qr_code	CREATE INDEX idx_event_attendees_qr_code ON event_attendees USING btree (qr_code)
+index:event_dates.event_dates_event_location_id_idx	CREATE INDEX event_dates_event_location_id_idx ON event_dates USING btree (event_location_id)
+index:event_locations.event_locations_event_id_idx	CREATE INDEX event_locations_event_id_idx ON event_locations USING btree (event_id)
+index:event_locations.event_locations_unique_named	CREATE UNIQUE INDEX event_locations_unique_named ON event_locations USING btree (event_id, venue_id, name) WHERE (name IS NOT NULL)
+index:event_locations.event_locations_unique_unnamed	CREATE UNIQUE INDEX event_locations_unique_unnamed ON event_locations USING btree (event_id, venue_id) WHERE (name IS NULL)
+index:event_locations.event_locations_venue_id_idx	CREATE INDEX event_locations_venue_id_idx ON event_locations USING btree (venue_id)
+index:event_orders.aitickets_event_orders_buyer_email_idx	CREATE INDEX aitickets_event_orders_buyer_email_idx ON event_orders USING btree (buyer_email, created_at DESC)
+index:event_orders.aitickets_event_orders_ref_idx	CREATE INDEX aitickets_event_orders_ref_idx ON event_orders USING btree (event_id, ref) WHERE (ref IS NOT NULL)
+index:event_orders.aitickets_event_orders_status_created_idx	CREATE INDEX aitickets_event_orders_status_created_idx ON event_orders USING btree (status, created_at)
+index:event_orders.event_orders_discount_code_idx	CREATE INDEX event_orders_discount_code_idx ON event_orders USING btree (discount_code_id) WHERE (discount_code_id IS NOT NULL)
+index:event_orders.idx_event_orders_event_attendee_status	CREATE INDEX idx_event_orders_event_attendee_status ON event_orders USING btree (event_id, attendee_id, status)
+index:event_orders.idx_event_orders_event_status_created	CREATE INDEX idx_event_orders_event_status_created ON event_orders USING btree (event_id, status, created_at)
+index:event_orders.idx_event_orders_event_status_hold	CREATE INDEX idx_event_orders_event_status_hold ON event_orders USING btree (event_id, status, hold_expires_at)
+index:event_orders.idx_event_orders_provider_session_id	CREATE INDEX idx_event_orders_provider_session_id ON event_orders USING btree (provider_session_id)
+index:event_orders.idx_event_orders_status_hold	CREATE INDEX idx_event_orders_status_hold ON event_orders USING btree (status, hold_expires_at)
+index:event_tags.idx_event_tags_event_id	CREATE INDEX idx_event_tags_event_id ON event_tags USING btree (event_id)
+index:event_tickets.event_tickets_event_date_id_idx	CREATE INDEX event_tickets_event_date_id_idx ON event_tickets USING btree (event_date_id) WHERE (event_date_id IS NOT NULL)
+index:event_tickets.event_tickets_opens_after_idx	CREATE INDEX event_tickets_opens_after_idx ON event_tickets USING btree (opens_after_ticket_id) WHERE (opens_after_ticket_id IS NOT NULL)
+index:event_visits.aitickets_event_visits_created_idx	CREATE INDEX aitickets_event_visits_created_idx ON event_visits USING btree (created_at)
+index:event_visits.idx_event_visits_event_id	CREATE INDEX idx_event_visits_event_id ON event_visits USING btree (event_id)
+index:event_visits.idx_event_visits_utm	CREATE INDEX idx_event_visits_utm ON event_visits USING btree (event_id, utm_source)
+index:event_withdrawals.event_withdrawals_event_status_idx	CREATE INDEX event_withdrawals_event_status_idx ON event_withdrawals USING btree (event_id, status)
+index:event_withdrawals.event_withdrawals_payout_idx	CREATE INDEX event_withdrawals_payout_idx ON event_withdrawals USING btree (payout_id)
+index:notification_log.idx_notification_log_event	CREATE INDEX idx_notification_log_event ON notification_log USING btree (event_id, type)
+index:organizations.aitickets_organizations_created_idx	CREATE INDEX aitickets_organizations_created_idx ON organizations USING btree (created_at)
+index:organizations.organizations_identity_session_idx	CREATE INDEX organizations_identity_session_idx ON organizations USING btree (identity_session_id) WHERE (identity_session_id IS NOT NULL)
+index:social_accounts.idx_social_accounts_org	CREATE INDEX idx_social_accounts_org ON social_accounts USING btree (organization_id)
+index:social_posts.idx_social_posts_event	CREATE INDEX idx_social_posts_event ON social_posts USING btree (event_id)
+index:social_posts.idx_social_posts_org	CREATE INDEX idx_social_posts_org ON social_posts USING btree (organization_id)
+index:venues.venues_city_idx	CREATE INDEX venues_city_idx ON venues USING btree (city)
+index:venues.venues_organization_id_idx	CREATE INDEX venues_organization_id_idx ON venues USING btree (organization_id)
+index:venues.venues_slug_key	CREATE UNIQUE INDEX venues_slug_key ON venues USING btree (slug)
+table:ad_account_connections	rls=true force=false
+table:ad_campaigns	rls=true force=false
+table:aitickets_admin_audit	rls=true force=false
+table:aitickets_admin_confirmations	rls=true force=false
+table:aitickets_admin_idempotency	rls=true force=false
+table:aitickets_admin_notes	rls=true force=false
+table:aitickets_api_audit	rls=true force=false
+table:aitickets_api_confirmations	rls=true force=false
+table:aitickets_api_idempotency	rls=true force=false
+table:aitickets_api_keys	rls=true force=false
+table:aitickets_attendee_checkins	rls=true force=false
+table:aitickets_attendee_messages	rls=true force=false
+table:aitickets_auth_link_sends	rls=true force=false
+table:aitickets_auth_link_tokens	rls=true force=false
+table:aitickets_certificate_sends	rls=true force=false
+table:aitickets_checkin_links	rls=true force=false
+table:aitickets_competitor_events	rls=true force=false
+table:aitickets_discount_codes	rls=true force=false
+table:aitickets_disputes	rls=true force=false
+table:aitickets_email_log	rls=true force=false
+table:aitickets_event_agenda	rls=true force=false
+table:aitickets_event_documents	rls=true force=false
+table:aitickets_event_feed_posts	rls=true force=false
+table:aitickets_event_gallery_images	rls=true force=false
+table:aitickets_event_preview_links	rls=true force=false
+table:aitickets_event_review_photos	rls=true force=false
+table:aitickets_event_reviews	rls=true force=false
+table:aitickets_event_seats	rls=true force=false
+table:aitickets_event_slug_redirects	rls=true force=false
+table:aitickets_event_staff	rls=true force=false
+table:aitickets_event_waitlist	rls=true force=false
+table:aitickets_guests	rls=true force=false
+table:aitickets_job_heartbeats	rls=true force=false
+table:aitickets_lead_sources	rls=true force=false
+table:aitickets_leads	rls=true force=false
+table:aitickets_oauth_clients	rls=true force=false
+table:aitickets_oauth_codes	rls=true force=false
+table:aitickets_oauth_grants	rls=true force=false
+table:aitickets_org_email_optouts	rls=true force=false
+table:aitickets_outreach_events	rls=true force=false
+table:aitickets_outreach_messages	rls=true force=false
+table:aitickets_outreach_state	rls=true force=false
+table:aitickets_payment_events	rls=true force=false
+table:aitickets_payouts	rls=true force=false
+table:aitickets_platform_settings	rls=true force=false
+table:aitickets_producer_activity	rls=true force=false
+table:aitickets_promoter_links	rls=true force=false
+table:aitickets_rate_limits	rls=true force=false
+table:aitickets_refunds	rls=true force=false
+table:aitickets_scheduled_messages	rls=true force=false
+table:aitickets_schema_migrations	rls=true force=false
+table:aitickets_site_banners	rls=true force=false
+table:aitickets_site_contact_messages	rls=true force=false
+table:aitickets_sites	rls=true force=false
+table:aitickets_social_series	rls=true force=false
+table:aitickets_social_series_slots	rls=true force=false
+table:aitickets_suppressions	rls=true force=false
+table:aitickets_team_invitations	rls=true force=false
+table:aitickets_user_email_optouts	rls=true force=false
+table:aitickets_weekly_reports	rls=true force=false
+table:aitickets_zernio_webhook_events	rls=true force=false
+table:attendees	rls=true force=false
+table:category_tags	rls=true force=false
+table:event_attendees	rls=true force=false
+table:event_dates	rls=true force=false
+table:event_faqs	rls=true force=false
+table:event_locations	rls=true force=false
+table:event_orders	rls=true force=false
+table:event_tags	rls=true force=false
+table:event_tickets	rls=true force=false
+table:event_visits	rls=true force=false
+table:event_withdrawals	rls=true force=false
+table:events	rls=true force=false
+table:newsletter	rls=true force=false
+table:notification_log	rls=true force=false
+table:organization_payout_accounts	rls=true force=false
+table:organizations	rls=true force=false
+table:questions	rls=true force=false
+table:social_accounts	rls=true force=false
+table:social_posts	rls=true force=false
+table:users	rls=true force=false
+table:venues	rls=true force=false
+trigger:auth.users.on_auth_user_created	CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION handle_new_user()
+trigger:public.aitickets_guests.aitickets_guests_normalize_name	CREATE TRIGGER aitickets_guests_normalize_name BEFORE INSERT OR UPDATE OF name ON aitickets_guests FOR EACH ROW EXECUTE FUNCTION aitickets_guests_normalize_name()
+trigger:public.aitickets_payouts.aitickets_payout_sync_withdrawals	CREATE TRIGGER aitickets_payout_sync_withdrawals AFTER UPDATE OF status, paid_at ON aitickets_payouts FOR EACH ROW WHEN (((old.status IS DISTINCT FROM new.status) OR (old.paid_at IS DISTINCT FROM new.paid_at))) EXECUTE FUNCTION aitickets_payout_sync_withdrawals()
+trigger:public.aitickets_payouts.aitickets_payout_touch	CREATE TRIGGER aitickets_payout_touch BEFORE UPDATE ON aitickets_payouts FOR EACH ROW EXECUTE FUNCTION aitickets_payout_touch()
+trigger:public.attendees.aitickets_attendees_normalize_names	CREATE TRIGGER aitickets_attendees_normalize_names BEFORE INSERT OR UPDATE OF first_name, last_name ON attendees FOR EACH ROW EXECUTE FUNCTION aitickets_attendees_normalize_names()
+trigger:public.event_orders.aitickets_event_orders_normalize_names	CREATE TRIGGER aitickets_event_orders_normalize_names BEFORE INSERT OR UPDATE OF buyer_first_name, buyer_last_name ON event_orders FOR EACH ROW EXECUTE FUNCTION aitickets_event_orders_normalize_names()
+trigger:public.organization_payout_accounts.aitickets_payout_account_changed	CREATE TRIGGER aitickets_payout_account_changed BEFORE INSERT OR UPDATE ON organization_payout_accounts FOR EACH ROW EXECUTE FUNCTION aitickets_payout_account_changed()

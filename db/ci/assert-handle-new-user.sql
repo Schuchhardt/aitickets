@@ -2,15 +2,23 @@
 -- Kefy) y de las altas que completan su fila. Corre sobre la BD desechable de la CI después de las migraciones;
 -- NUNCA contra Supabase. Todo dentro de una transacción con ROLLBACK.
 --
--- En Supabase el trigger ya existe (heredado); en la CI se crea aquí para probar la función de las migraciones.
+-- El trigger lo crea la migración 202611080200 (en producción ya existía): aquí solo se verifica que esté.
 \set ON_ERROR_STOP on
 BEGIN;
 
--- La CI crea la organización 1 con OVERRIDING SYSTEM VALUE: la identidad sigue en 1 y el INSERT del trigger chocaría
-SELECT setval(pg_get_serial_sequence('public.organizations', 'id'), (SELECT max(id) FROM public.organizations));
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger t
+    WHERE t.tgname = 'on_auth_user_created' AND t.tgrelid = 'auth.users'::regclass
+      AND t.tgfoid = 'public.handle_new_user()'::regprocedure AND t.tgenabled = 'O'
+  ) THEN
+    RAISE EXCEPTION 'Falta el trigger on_auth_user_created (auth.users → public.handle_new_user): lo crea 202611080200';
+  END IF;
+END $$;
 
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+-- La CI crea la organización 1 con un id explícito: la identidad sigue en 1 y el INSERT del trigger chocaría
+SELECT setval(pg_get_serial_sequence('public.organizations', 'id'), (SELECT max(id) FROM public.organizations));
 
 DO $$
 DECLARE
