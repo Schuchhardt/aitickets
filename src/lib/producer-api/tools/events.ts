@@ -771,11 +771,15 @@ const revokePreviewLinkTool: ToolDef = {
     },
     audit: (args) => ({ summary: "Revocó un link de vista previa", target: `preview_link:${args.link_id}` }),
     async handler(args, ctx) {
-        const ok = await revokePreviewLink(args.link_id, ctx.actor.orgId, ctx.supabase);
-        if (!ok) throw new ToolError("not_found", "Link de vista previa no encontrado en tu organización.");
-        // event_id para la bitácora (filtro por evento en list_audit_log)
+        const notFound = () => new ToolError("not_found", "Link de vista previa no encontrado en tu organización.");
         const { data: link } = await ctx.supabase.from("aitickets_event_preview_links").select("event_id").eq("id", args.link_id).eq("organization_id", ctx.actor.orgId).maybeSingle();
-        return { link_id: args.link_id, status: "revoked", ...(link?.event_id ? { event_id: Number(link.event_id) } : {}) };
+        if (!link) throw notFound();
+        // Mismo acceso que para listarlo: un miembro limitado a ciertos eventos no revoca los links de otros eventos
+        await loadOwnedEvent(ctx, Number(link.event_id), "id");
+        const ok = await revokePreviewLink(args.link_id, ctx.actor.orgId, ctx.supabase);
+        if (!ok) throw notFound();
+        // event_id para la bitácora (filtro por evento en list_audit_log)
+        return { link_id: args.link_id, status: "revoked", event_id: Number(link.event_id) };
     },
 };
 

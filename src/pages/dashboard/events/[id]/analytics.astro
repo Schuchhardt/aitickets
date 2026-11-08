@@ -5,7 +5,7 @@ import LineChart from "../../../../components/dashboard/analytics/LineChart.vue"
 import BarChart from "../../../../components/dashboard/analytics/BarChart.vue";
 import GeoTable from "../../../../components/dashboard/analytics/GeoTable.vue";
 import { Eye, Users, Ticket, BarChart3, TrendingUp, Gauge } from "lucide-vue-next";
-import { EVENT_MANAGER_ROLES } from "../../../../lib/supabaseServer";
+import { EVENT_MANAGER_ROLES, ORG_ADMIN_ROLES, hasRole } from "../../../../lib/supabaseServer";
 import { requireDashboardSession } from "../../_lib/guard";
 import { canAccessEventByStaff } from "../../../../../netlify/lib/event-staff.mjs";
 import { getEventAnalytics } from "../../../../lib/eventAnalytics";
@@ -14,6 +14,8 @@ const { id } = Astro.params;
 const guard = await requireDashboardSession(Astro, EVENT_MANAGER_ROLES);
 if (!guard.ok) return guard.response;
 const { dbUser } = guard.session;
+// El borderó (neto al productor) es de finanzas: marketing ve la analítica pero no el link
+const canSeeBordero = hasRole(dbUser, [...ORG_ADMIN_ROLES, "finance"]);
 // Acceso por evento (aitickets_event_staff): un miembro con eventos asignados solo opera esos
 if (!(await canAccessEventByStaff(getSupabaseAdmin(), dbUser.id, Astro.params.id))) return Astro.redirect("/dashboard/events");
 const supabaseAdmin = getSupabaseAdmin();
@@ -251,7 +253,9 @@ const peakDatasets = JSON.stringify([
                                     {row.event_date_id != null && (
                                         <a href={`?funcion=${row.event_date_id}#canales`} class="text-blue-600 hover:underline">Por canal</a>
                                     )}
-                                    <a href={`/dashboard/events/${event.id}/bordero?funcion=${row.event_date_id ?? "all"}`} class="ml-3 text-blue-600 hover:underline">Borderó</a>
+                                    {canSeeBordero && (
+                                        <a href={`/dashboard/events/${event.id}/bordero?funcion=${row.event_date_id ?? "all"}`} class="ml-3 text-blue-600 hover:underline">Borderó</a>
+                                    )}
                                 </td>
                             </tr>
                         ))}

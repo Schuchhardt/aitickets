@@ -12,8 +12,17 @@ export const POST: APIRoute = async (context) => {
         });
     }
 
+    let body: any;
     try {
-        const body = await context.request.json();
+        body = await context.request.json();
+    } catch {
+        return new Response(JSON.stringify({ error: "Solicitud inválida" }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+        });
+    }
+
+    try {
         const full_name = typeof body?.full_name === "string" ? body.full_name.trim().slice(0, 150) : undefined;
         const phone = typeof body?.phone === "string" ? body.phone.trim().slice(0, 50) : undefined;
         const user = session.authUser;

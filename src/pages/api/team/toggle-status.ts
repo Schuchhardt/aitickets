@@ -12,8 +12,14 @@ export const POST: APIRoute = async (context) => {
         return json({ error: "Solo los administradores pueden cambiar el estado de miembros" }, 403);
     }
 
+    let body: any;
     try {
-        const body = await context.request.json();
+        body = await context.request.json();
+    } catch {
+        return json({ error: "Solicitud inválida" }, 400);
+    }
+
+    try {
         const { userId, active } = body || {};
 
         if (!userId || typeof active !== "boolean") {

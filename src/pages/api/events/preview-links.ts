@@ -7,6 +7,7 @@
 import type { APIRoute } from "astro";
 import { getSessionContext, getOwnedEvent, hasRole, EVENT_MANAGER_ROLES, jsonResponse } from "../../../lib/supabaseServer";
 import { createPreviewLink, listPreviewLinks, revokePreviewLink, PreviewLinkError } from "../../../lib/eventPreview";
+import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { siteUrl } from "../_lib/server-utils";
 
 export const prerender = false;
@@ -71,6 +72,18 @@ export const DELETE: APIRoute = async (context) => {
     if (!auth.ok) return auth.response;
     const id = context.url.searchParams.get("id") || "";
     try {
+        // Mismo acceso que para listarlo: el evento del link debe estar dentro del acceso del miembro (un miembro limitado
+        // a ciertos eventos no revoca los links de otros eventos)
+        if (!/^[0-9a-f-]{36}$/i.test(id)) return jsonResponse({ message: "Link no encontrado" }, 404);
+        const { data: link } = await getSupabaseAdmin()
+            .from("aitickets_event_preview_links")
+            .select("event_id")
+            .eq("id", id)
+            .eq("organization_id", auth.orgId)
+            .maybeSingle();
+        if (!link || !(await getOwnedEvent(link.event_id, auth.orgId, "id", auth.userId))) {
+            return jsonResponse({ message: "Link no encontrado" }, 404);
+        }
         const ok = await revokePreviewLink(id, auth.orgId);
         return ok ? jsonResponse({ ok: true }) : jsonResponse({ message: "Link no encontrado" }, 404);
     } catch (err) {

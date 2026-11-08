@@ -24,9 +24,13 @@ const TOOLS: Record<string, string> = {
 };
 const PREPARE_FIELDS = ["feed_posts_enabled", "sold_out_story_enabled", "keyword", "extra_keywords", "dm_message", "base_image_url", "facebook_enabled", "tiktok_enabled", "reel_enabled"];
 
-const run = async (context: Parameters<APIRoute>[0], tool: string, args: Record<string, unknown>) => {
-    const auth = await dashboardToolContext(context);
-    if (!auth.ok) return jsonResponse({ ok: false, error: { code: auth.status === 401 ? "unauthorized" : "forbidden", message: auth.error } }, auth.status);
+type ToolAuth = Awaited<ReturnType<typeof dashboardToolContext>>;
+const denied = (auth: Extract<ToolAuth, { ok: false }>) =>
+    jsonResponse({ ok: false, error: { code: auth.status === 401 ? "unauthorized" : "forbidden", message: auth.error } }, auth.status);
+
+const run = async (context: Parameters<APIRoute>[0], tool: string, args: Record<string, unknown>, known?: ToolAuth) => {
+    const auth = known ?? (await dashboardToolContext(context));
+    if (!auth.ok) return denied(auth);
     const outcome = await runTool(getTool(tool)!, args, auth.ctx);
     if (!outcome.ok) return jsonResponse({ ok: false, error: { code: outcome.code, message: outcome.message } }, HTTP_STATUS[outcome.code]);
     return jsonResponse({ ok: true, data: outcome.result });
@@ -38,6 +42,9 @@ export const GET: APIRoute = async (context) => {
 };
 
 export const POST: APIRoute = async (context) => {
+    // Primero la sesión: un anónimo recibe 401 aunque la acción no exista
+    const auth = await dashboardToolContext(context);
+    if (!auth.ok) return denied(auth);
     const body = await context.request.json().catch(() => null);
     const tool = TOOLS[String(body?.action || "")];
     if (!tool) return jsonResponse({ ok: false, error: { code: "invalid_input", message: "Acción inválida." } }, 400);
@@ -45,5 +52,5 @@ export const POST: APIRoute = async (context) => {
     if (body.action === "prepare") for (const k of PREPARE_FIELDS) if (body[k] !== undefined) args[k] = body[k];
     if (body.action === "cancel" && body.reason) args.reason = String(body.reason).slice(0, 200);
     if (body.confirmation_token) args.confirmation_token = String(body.confirmation_token);
-    return run(context, tool, args);
+    return run(context, tool, args, auth);
 };
