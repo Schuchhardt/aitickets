@@ -18,6 +18,8 @@ export const TICKETS = {
   // Quedan 5 de 100: "Últimas entradas"
   generalLast: { id: 9104, ticket_name: "General", price: 4000, max_quantity: null, total_quantity: 5 },
   free: { id: 9105, ticket_name: "Entrada liberada", price: 0, max_quantity: null, total_quantity: null },
+  // Cupo de 100 (el avance de la venta lo da el escenario con salesProgress: sales_progress de src/lib/eventPage.ts)
+  generalHundred: { id: 9108, ticket_name: "General", price: 4000, max_quantity: null, total_quantity: 100 },
   // Quedan 8 cupos: "Gratis · Quedan 8 cupos"
   freeFew: { id: 9106, ticket_name: "Entrada liberada", price: 0, max_quantity: null, total_quantity: 8 },
   // Mesa para 4 (people_per_ticket): un QR por persona, precio y cupo por mesa
@@ -160,6 +162,10 @@ export const SCENARIOS = {
   "gratis-pocos-cupos": { layout: "poster", tickets: [TICKETS.freeFew] },
   "gratis-lleno": { layout: "poster", tickets: [], unavailable: [{ ...TICKETS.free, reason: "sold_out" }], saleState: "sold_out" },
   "pagado-ultimas": { layout: "poster", tickets: [TICKETS.generalLast] },
+  // % vendido de todo el evento (src/lib/salesProgress.mjs): desde la mitad "N% de entradas vendidas"
+  "pagado-mitad-vendida": { layout: "poster", tickets: [TICKETS.generalHundred], salesProgress: { sold_percent: 65, remaining: 35 } },
+  // Quedan 5 de la preventa a la venta, pero después viene la general (205 por vender): no son "Últimas entradas"
+  "pagado-preventa-con-general": { layout: "poster", tickets: [TICKETS.generalLast], salesProgress: { sold_percent: null, remaining: 205 } },
   "varias-funciones": { layout: "poster", ...TOUR },
   // Funciones v2 (tests/e2e/event-functions.spec.ts)
   "muchas-funciones": { layout: "poster", ...SEASON },
@@ -290,6 +296,7 @@ export function fixtureEvent(name, { toPublicTicket, now = new Date() }) {
     })),
     seating: scenario.seating ? scenario.seating(dates) : null,
     checkout_fields: scenario.checkoutFields || null,
+    ...(scenario.salesProgress !== undefined ? { sales_progress: scenario.salesProgress } : {}),
     unavailable_tickets: (scenario.unavailable || []).map((t) => ({
       id: t.id,
       ticket_name: t.ticket_name,

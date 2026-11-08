@@ -116,6 +116,25 @@ test.describe("pagado a la venta", () => {
     await expect(label(page)).toHaveClass(/is-warning/);
   });
 
+  test("más de la mitad vendida: N% DE ENTRADAS VENDIDAS en la card", async ({ page, isMobile }) => {
+    test.skip(isMobile, desktopOnly);
+    await openScenario(page, "pagado-mitad-vendida");
+    await expect(label(page)).toHaveText("65% de entradas vendidas");
+    await expect(label(page)).toHaveClass(/is-warning/);
+  });
+
+  test("preventa casi agotada con la general por venir: no son las últimas", async ({ page, isMobile }) => {
+    test.skip(isMobile, desktopOnly);
+    await openScenario(page, "pagado-preventa-con-general");
+    await expect(label(page)).toHaveCount(0);
+    await expect(page.locator(".badge", { hasText: "Últimas entradas" })).toHaveCount(0);
+  });
+
+  test("más de la mitad vendida: el % también arriba del título (lo único que se ve en mobile)", async ({ page }) => {
+    await openScenario(page, "pagado-mitad-vendida");
+    await expect(page.locator(".badge", { hasText: "65% de entradas vendidas" })).toBeVisible();
+  });
+
   test("varias funciones: N FUNCIONES · M LUGARES, chips y el chip abre el checkout con esa función", async ({ page, isMobile }) => {
     const card = await openScenario(page, "varias-funciones");
     // También en mobile: la card va inline después del lugar y los chips en una fila con scroll horizontal
