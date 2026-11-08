@@ -241,16 +241,20 @@ Card: fondo `--surface-0`, borde `--border`, radio `--r-lg`, padding 20 px, `--s
 | Estado | Badge sobre título | Contenido de la card | CTA |
 |---|---|---|---|
 | Gratis, cupos disponibles | `Gratis` (lima) | Formulario inline de registro (§5) | `Confirmar asistencia` |
-| Gratis, pocos cupos (≤ 15% o ≤ 10) | `Gratis` + `Quedan N cupos` | ídem | ídem |
+| Gratis, la mitad o más reservada (50–79 %) | `Gratis` + `N% de cupos reservados` (warning, sin pulso) | ídem | ídem |
+| Gratis, pocos cupos (≥ 80 % reservado o ≤ 10) | `Gratis` + `Quedan N cupos` | ídem | ídem |
 | Gratis, lleno | `Gratis` | "Se llenaron los cupos." + formulario de lista de espera (email) | `Avisarme si se libera un cupo` |
 | Gratis, requiere aprobación (si existe en backend) | `Gratis · Con aprobación` | Formulario | `Solicitar entrada` |
 | Pagado, 1 función, 1 tipo de entrada | `$4.381` | Precio final + stepper de cantidad inline | `Comprar entrada` / `Comprar 2 entradas` |
 | Pagado, varias funciones o tipos | `Desde $4.381` | Resumen: "3 funciones · 2 lugares" + próxima función | `Elegir entradas` |
-| Pagado, últimas entradas | badge `Últimas entradas` (warning) | ídem | ídem |
+| Pagado, la mitad o más vendida (50–79 %) | badge `N% de entradas vendidas` (warning, sin pulso); en la card el mismo rótulo | ídem | ídem |
+| Pagado, últimas entradas (≥ 80 % vendido o ≤ 10) | badge `Últimas entradas` (warning) | ídem | ídem |
 | Venta aún no abre | `Venta abre el 20 oct, 10:00` | Contador si faltan < 24 h | `Avisarme cuando abra` (email) |
 | Agotado | `Agotado` | "Se vendieron todas las entradas." | `Avisarme si se liberan` |
 | Evento terminado | `Evento finalizado` | "Este evento ya ocurrió." + link a otros eventos del organizador | — |
 | Evento de demostración | banner superior existente se mantiene, más discreto (§8) | normal | normal |
+
+El % vendido es de **todo el evento** (`sales_progress` de `src/lib/eventPage.ts`, `src/lib/salesProgress.mjs`): cuenta las tandas agotadas, las por abrir y las encadenadas, no solo lo que está a la venta (una preventa que se agota no es "Últimas entradas" si después viene la general). Una entrada con la venta cerrada suma solo lo que vendió; las funciones que ya pasaron no cuentan. El % se redondea hacia abajo y bajo el 50 % no se publica. Si alguna entrada que se vende o se venderá es ilimitada, no hay % ni "Últimas entradas".
 
 Debajo de la card (fuera de ella), fila de acciones secundarias en texto (no botones con borde):
 `↗ Compartir` · `+ Añadir al calendario`  — tamaño 14 px, `--text-2`, hover `--text-1`.

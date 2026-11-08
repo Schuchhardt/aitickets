@@ -28,6 +28,7 @@ import { normalizeCheckoutFields } from "./checkoutFields.mjs";
 import { loadEventSeating, loadTicketSections, seatCounts } from "../../netlify/lib/seats.mjs";
 import { totalSeats } from "./seatMap.mjs";
 import { clientIpFrom } from "./sites";
+import { computeSalesProgress } from "./salesProgress.mjs";
 
 // Columnas públicas del evento. NUNCA incluir secret_location (C4).
 export const EVENT_PUBLIC_COLUMNS =
@@ -439,7 +440,8 @@ export function toPublicTicket(t: any, { remaining, feeAbsorbed }: { remaining: 
     // R1: null = válida para cualquier función; si no, id de event.dates[]
     event_date_id: t.event_date_id ?? null,
     remaining,
-    // Para "Quedan N cupos" (≤ 15 % del total o ≤ 10)
+    // Cupo de la entrada. El "N% vendido" / "Últimas entradas" de la página sale de sales_progress (todo el evento);
+    // stockSummary (eventView.js) usa esto solo sin sales_progress (landings y eventos sintéticos)
     total_quantity: t.total_quantity === null || t.total_quantity === undefined ? null : Number(t.total_quantity),
   };
 }
@@ -677,6 +679,13 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
       })),
   ].filter((t) => liveFunction(t.event_date_id));
 
+  // % vendido de TODO el evento (src/lib/salesProgress.mjs): "60% de entradas vendidas" y "Últimas entradas". Cuenta las
+  // agotadas, las por abrir y las tandas que esperan, no solo las que están a la venta; no las de funciones que ya pasaron
+  const salesProgress = computeSalesProgress(
+    allTickets.filter((t: any) => liveFunction(t.event_date_id)),
+    { sold, pending, now }
+  );
+
   // Reseñas y fotos de los asistentes: cuando el evento ya terminó (src/lib/eventReviews.ts) o, si la productora lo
   // activó (review_settings.show_while_on_sale), desde que pasa la primera función aunque queden otras a la venta
   const ended = !isDemo && !isPreview && isEventEnded({ dates, end_date: endDate, is_demo: isDemo }, now);
@@ -730,6 +739,8 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
     // Entradas numeradas: { maps, map_of_date, seats_left } o null (entrada general)
     seating: checkoutConfig.seating ? { maps: checkoutConfig.seating.maps, map_of_date: checkoutConfig.seating.map_of_date, seats_left: checkoutConfig.seating.seats_left } : null,
     unavailable_tickets: unavailableTickets,
+    // { sold_percent (null bajo el 50 %), remaining } de todo el evento, o null si alguna entrada es ilimitada
+    sales_progress: salesProgress,
     // Asistentes por entrada, datos de empresa y preguntas al inscribirse (src/lib/checkoutFields.mjs)
     checkout_fields: checkoutConfig.fields,
     theme: eventThemeFrom(coverMeta),

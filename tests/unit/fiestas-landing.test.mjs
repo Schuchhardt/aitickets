@@ -141,7 +141,7 @@ describe('la escalera: playPresale (§4.3)', () => {
     expect(buyerRows(stages, d12).rows.map((x) => x.name)).toEqual(['Preventa 1', 'Preventa 3', 'General'])
   })
 
-  it('"Últimas entradas" con el criterio de la página del evento (≤ 10 o ≤ 15%) y "Agotado" al final', () => {
+  it('"Últimas entradas" con el criterio de la página del evento (≤ 10 o ≥ 80% vendido) y "Agotado" al final', () => {
     const r = playPresale(stages)
     const d23 = r.frames.find((f) => f.day === 23) // Preventa 1: 140 de 150
     expect(buyerRows(stages, d23).label).toBe('Últimas entradas')
