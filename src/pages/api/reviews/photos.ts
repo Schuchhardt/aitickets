@@ -2,7 +2,8 @@
 // POST multipart { token, file } — con token de reseña: sube una foto (JPG/PNG/WEBP/GIF, máx. 5 MB; el navegador
 //      ya la achica) y la deja visible, o pendiente si la productora revisa las fotos antes de publicarlas.
 //      → 201 { photo, photos } | 400 | 401 | 403 | 409 (límite) | 429 | 503
-// POST JSON { token, action: "delete", id } — quien la subió la borra. → 200 { photos }
+// POST JSON { token, action: "delete", id } — quien la subió la borra (también sus videos, /api/reviews/videos: se
+//      borra el archivo de Storage). → 200 { photos } (fotos y videos, con media_type)
 // Se optimizan como las de la galería del productor (src/lib/imageStorage.ts) y se guardan en
 // event-attendee-photos/<evento>/ sin datos personales en la ruta.
 import type { APIRoute } from "astro";
@@ -13,7 +14,8 @@ import { sniffImageType, IMAGE_EXT } from "../../../lib/imageOptimize";
 import { storeOptimizedImage } from "../../../lib/imageStorage";
 import { rateLimit } from "../../../../netlify/lib/rate-limit.mjs";
 import { REVIEW_PHOTOS_TABLE, MAX_PHOTOS_PER_PERSON, reviewDisplayName } from "../../../../netlify/lib/reviews.mjs";
-import { openReviewSession, loadOwnPhotos, isMissingSchema, REVIEWS_UNAVAILABLE, PHOTO_COLUMNS } from "../../../lib/eventReviews";
+import { openReviewSession, loadOwnPhotos, countMedia, ownMediaItem, isMissingSchema, REVIEWS_UNAVAILABLE, LEGACY_PHOTO_COLUMNS } from "../../../lib/eventReviews";
+import { attendeeVideoPathPrefix, ownVideoLocationAt, removeVideoAt } from "../../../lib/videoStorage";
 
 export const prerender = false;
 
@@ -21,7 +23,7 @@ const MAX_BYTES = 5 * 1024 * 1024;
 const LIMIT_IP = { windowSeconds: 10 * 60, max: 40 };
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const ownList = (rows: any[]) => rows.map((p) => ({ id: p.id, url: p.url, thumb_url: p.thumb_url, status: p.status }));
+const ownList = (rows: any[]) => rows.map(ownMediaItem);
 
 export const POST: APIRoute = async ({ request }) => {
   const byIp = await rateLimit("reviews-photos:ip", clientIpFrom(request), LIMIT_IP);
@@ -37,8 +39,15 @@ export const POST: APIRoute = async ({ request }) => {
       const opened = await openReviewSession(body?.token, { supabase });
       if (!opened.ok) return jsonResponse({ message: opened.message }, opened.status);
       const { session } = opened;
+      const own = (await loadOwnPhotos(supabase, session.event.id, session.email)).find((p) => String(p.id) === String(body.id));
       const { error } = await supabase.from(REVIEW_PHOTOS_TABLE).delete().eq("id", body.id).eq("event_id", session.event.id).eq("email", session.email);
       if (error) throw error;
+      // Un video pesa: se borra también el archivo (solo si está en la carpeta de videos de asistentes de este evento y
+      // ninguna otra fila lo usa)
+      if (own?.media_type === "video") {
+        const { data: others } = await supabase.from(REVIEW_PHOTOS_TABLE).select("id").eq("event_id", session.event.id).eq("url", own.url).limit(1);
+        if (!others?.length) await removeVideoAt(ownVideoLocationAt(own.url, attendeeVideoPathPrefix(Number(session.event.id))));
+      }
       return jsonResponse({ photos: ownList(await loadOwnPhotos(supabase, session.event.id, session.email)) });
     }
 
@@ -51,7 +60,7 @@ export const POST: APIRoute = async ({ request }) => {
     if (file.size > MAX_BYTES) return jsonResponse({ message: "La foto no debe superar los 5 MB." }, 400);
 
     const current = await loadOwnPhotos(supabase, session.event.id, session.email);
-    if (current.length >= MAX_PHOTOS_PER_PERSON) {
+    if (countMedia(current).photos >= MAX_PHOTOS_PER_PERSON) {
       return jsonResponse({ message: `Puedes subir hasta ${MAX_PHOTOS_PER_PERSON} fotos. Borra alguna para subir otra.` }, 409);
     }
 
@@ -77,7 +86,7 @@ export const POST: APIRoute = async ({ request }) => {
         height: stored.height,
         status: session.settings.moderate_photos ? "pending" : "visible",
       })
-      .select(PHOTO_COLUMNS)
+      .select(LEGACY_PHOTO_COLUMNS)
       .single();
     if (error) throw error;
     return jsonResponse(

@@ -308,10 +308,12 @@ column:aitickets_event_preview_links.token_hash	text notnull=true default=-
 column:aitickets_event_preview_links.view_count	integer notnull=true default=0
 column:aitickets_event_review_photos.created_at	timestamp with time zone notnull=true default=now()
 column:aitickets_event_review_photos.display_name	text notnull=false default=-
+column:aitickets_event_review_photos.duration	integer notnull=false default=-
 column:aitickets_event_review_photos.email	text notnull=true default=-
 column:aitickets_event_review_photos.event_id	bigint notnull=true default=-
 column:aitickets_event_review_photos.height	integer notnull=false default=-
 column:aitickets_event_review_photos.id	uuid notnull=true default=gen_random_uuid()
+column:aitickets_event_review_photos.media_type	text notnull=true default='photo'::text
 column:aitickets_event_review_photos.organization_id	bigint notnull=true default=-
 column:aitickets_event_review_photos.status	text notnull=true default='visible'::text
 column:aitickets_event_review_photos.thumb_url	text notnull=false default=-
@@ -1210,9 +1212,11 @@ constraint:aitickets_event_preview_links.aitickets_event_preview_links_pkey	PRIM
 constraint:aitickets_event_preview_links.aitickets_event_preview_links_token_hash_check	CHECK ((token_hash ~ '^[0-9a-f]{64}$'::text))
 constraint:aitickets_event_preview_links.aitickets_event_preview_links_token_key	UNIQUE (token_hash)
 constraint:aitickets_event_review_photos.aitickets_event_review_photos_display_name_check	CHECK (((display_name IS NULL) OR (char_length(display_name) <= 80)))
+constraint:aitickets_event_review_photos.aitickets_event_review_photos_duration_check	CHECK (((duration IS NULL) OR ((duration > 0) AND (duration <= 3600))))
 constraint:aitickets_event_review_photos.aitickets_event_review_photos_email_check	CHECK (((email = lower(email)) AND ((char_length(email) >= 3) AND (char_length(email) <= 254))))
 constraint:aitickets_event_review_photos.aitickets_event_review_photos_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
 constraint:aitickets_event_review_photos.aitickets_event_review_photos_height_check	CHECK (((height IS NULL) OR (height > 0)))
+constraint:aitickets_event_review_photos.aitickets_event_review_photos_media_type_check	CHECK ((media_type = ANY (ARRAY['photo'::text, 'video'::text])))
 constraint:aitickets_event_review_photos.aitickets_event_review_photos_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
 constraint:aitickets_event_review_photos.aitickets_event_review_photos_pkey	PRIMARY KEY (id)
 constraint:aitickets_event_review_photos.aitickets_event_review_photos_status_check	CHECK ((status = ANY (ARRAY['visible'::text, 'pending'::text, 'hidden'::text])))

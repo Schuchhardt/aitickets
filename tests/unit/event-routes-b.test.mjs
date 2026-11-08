@@ -792,6 +792,19 @@ describe('/api/events/reviews', () => {
     expect(db.tables.aitickets_event_review_photos.map((p) => p.id)).toEqual([P.p20])
     expect((await post('producer', { eventId: 10, action: 'otra' })).status).toBe(400)
   })
+
+  it('videos de asistentes: el GET los marca con media_type y borrar uno borra también su archivo', async () => {
+    const BASE = 'https://proj.supabase.co/storage/v1/object/public/'
+    const removed = []
+    db.storage = { from: (bucket) => ({ getPublicUrl: (p) => ({ data: { publicUrl: `${BASE}${bucket}/${p}` } }), remove: async (paths) => (removed.push(...paths.map((p) => `${bucket}/${p}`)), { data: [], error: null }) }) }
+    const V = uuid(82)
+    db.tables.aitickets_event_review_photos.push({ id: V, event_id: 10, email: 'ana@x.cl', media_type: 'video', duration: 21, url: `${BASE}aitickets-event-videos/event-attendee-videos/10/video-a.mp4`, thumb_url: 'https://img.test/p.jpg', status: 'visible', created_at: '2026-10-04' })
+    const out = await hit(reviews.GET, 'producer', { query: { eventId: 10 } })
+    expect(out.body.photos.find((p) => p.id === V)).toMatchObject({ media_type: 'video', duration: 21 })
+    expect(out.body.photos.find((p) => p.id === P.p10).media_type).toBe('photo')
+    expect((await post('producer', { eventId: 10, action: 'photo_delete', id: V })).status).toBe(200)
+    expect(removed).toEqual(['aitickets-event-videos/event-attendee-videos/10/video-a.mp4'])
+  })
 })
 
 // ---------------------------------------------------------------------------

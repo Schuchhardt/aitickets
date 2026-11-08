@@ -1,8 +1,9 @@
 <script setup>
 // Reseñas en la página del evento terminado, en cartelera si la productora lo activó (review_settings.show_while_on_sale)
 // o con el link del correo "¿Cómo estuvo?": resumen de
-// calificaciones, formulario para calificar de 1 a 5 con comentario público y privado, subida de fotos a la
-// galería compartida, comentarios de otros asistentes y la galería de fotos de los asistentes.
+// calificaciones, formulario para calificar de 1 a 5 con comentario público y privado, subida de fotos y videos a la
+// galería compartida, comentarios de otros asistentes, la galería de fotos y los videos de los asistentes.
+// Los videos se suben directo a Storage con una URL firmada (/api/reviews/videos, src/lib/clientVideo.js).
 // Para calificar hay que validar la asistencia (las APIs devuelven un token firmado, netlify/lib/review-token.mjs):
 //   - link del correo (#resena=<token>, se guarda en sessionStorage y se borra de la URL),
 //   - compra hecha en este navegador (localStorage "purchase_event_<id>"),
@@ -15,6 +16,7 @@ import AutoHeight from "./AutoHeight.vue";
 import { storedOrders } from "./checkoutApi.js";
 import { readReviewHash, formatRating, reviewsCountLabel, formatReviewDate } from "./eventView.js";
 import { prepareImageForUpload } from "../../lib/clientImage.js";
+import { VIDEO_TYPES, VIDEO_FORMAT_ERROR, formatMb, readVideoMeta, uploadToSignedUrl } from "../../lib/clientVideo.js";
 import { PUBLIC_COMMENT_MAX, PRIVATE_COMMENT_MAX, PUBLIC_REVIEWS_PAGE } from "../../../netlify/lib/reviews.mjs";
 
 const props = defineProps({
@@ -64,7 +66,7 @@ const total = ref(props.event.reviews?.comments_total ?? list.value.length);
 const loadingMore = ref(false);
 const hasMore = computed(() => !props.externalOrigin && list.value.length < total.value);
 const photos = computed(() =>
-  (data.value?.photos || []).map((p) => ({ id: p.id, url: p.url, thumb_url: p.thumb_url, caption: p.name ? `Foto de ${p.name}` : null })),
+  (data.value?.photos || []).filter((p) => p.media_type !== "video").map((p) => ({ id: p.id, url: p.url, thumb_url: p.thumb_url, caption: p.name ? `Foto de ${p.name}` : null })),
 );
 const bars = computed(() =>
   [5, 4, 3, 2, 1].map((n) => {
@@ -211,7 +213,7 @@ const fileInput = ref(null);
 const uploading = ref("");
 const photoMessage = ref("");
 const photoError = ref("");
-const myPhotos = computed(() => session.value?.photos || []);
+const myPhotos = computed(() => (session.value?.photos || []).filter((p) => p.media_type !== "video"));
 const slotsLeft = computed(() => Math.max(0, (session.value?.max_photos || 6) - myPhotos.value.length));
 
 async function onFiles(e) {
@@ -239,14 +241,81 @@ async function onFiles(e) {
 }
 
 async function removePhoto(photo) {
-  if (!window.confirm("¿Borrar esta foto?")) return;
+  const isVideo = photo.media_type === "video";
+  if (!window.confirm(isVideo ? "¿Borrar este video?" : "¿Borrar esta foto?")) return;
   try {
     const res = await api("/api/reviews/photos", { body: { token: token.value, action: "delete", id: photo.id } });
     session.value = { ...session.value, photos: res.photos };
   } catch (err) {
-    photoError.value = err.message;
+    (isVideo ? videoError : photoError).value = err.message;
   }
 }
+
+// ---- Videos ----
+const videoInput = ref(null);
+const uploadingVideo = ref("");
+const videoProgress = ref(0);
+const videoMessage = ref("");
+const videoError = ref("");
+const myVideos = computed(() => (session.value?.photos || []).filter((p) => p.media_type === "video"));
+const videoSlotsLeft = computed(() => Math.max(0, (session.value?.max_videos || 0) - myVideos.value.length));
+const formatSeconds = (s) => (s ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}` : "");
+
+async function onVideo(e) {
+  const file = e.target.files?.[0];
+  e.target.value = "";
+  if (!file) return;
+  videoError.value = "";
+  videoMessage.value = "";
+  const maxBytes = session.value?.max_video_bytes || 50 * 1024 * 1024;
+  const maxSeconds = session.value?.max_video_seconds || 60;
+  if (!VIDEO_TYPES.includes(file.type)) {
+    videoError.value = VIDEO_FORMAT_ERROR;
+    return;
+  }
+  if (file.size > maxBytes) {
+    videoError.value = `Tu video pesa ${formatMb(file.size)}; el máximo es ${formatMb(maxBytes)}. Recórtalo o grábalo en menor calidad.`;
+    return;
+  }
+  uploadingVideo.value = "Preparando…";
+  videoProgress.value = 0;
+  try {
+    const meta = await readVideoMeta(file, { posterMaxWidth: 960 });
+    if (meta.duration && meta.duration > maxSeconds + 1) {
+      throw new Error(`Tu video dura ${formatSeconds(meta.duration)}; el máximo es ${maxSeconds} segundos. Recórtalo y vuelve a intentarlo.`);
+    }
+    const { uploadUrl, publicUrl } = await api("/api/reviews/videos", {
+      body: { token: token.value, action: "upload_url", contentType: file.type, size: file.size, duration: meta.duration },
+    });
+    uploadingVideo.value = "Subiendo video…";
+    await uploadToSignedUrl(uploadUrl, file, {
+      maxBytes,
+      onProgress: (pct) => {
+        videoProgress.value = pct;
+        uploadingVideo.value = `Subiendo video… ${pct}%`;
+      },
+    });
+    uploadingVideo.value = "Guardando…";
+    videoProgress.value = 100;
+    const form = new FormData();
+    form.append("token", token.value);
+    form.append("action", "set");
+    form.append("url", publicUrl);
+    for (const key of ["width", "height", "duration"]) if (meta[key]) form.append(key, String(meta[key]));
+    if (meta.poster) form.append("poster", new File([meta.poster], "poster.jpg", { type: "image/jpeg" }));
+    const res = await api("/api/reviews/videos", { form });
+    session.value = { ...session.value, photos: res.photos };
+    videoMessage.value = res.message || "";
+  } catch (err) {
+    videoError.value = err.message;
+  } finally {
+    uploadingVideo.value = "";
+    videoProgress.value = 0;
+  }
+}
+
+// Videos visibles de los asistentes (la galería de fotos va aparte, en EventGallery)
+const videos = computed(() => (data.value?.photos || []).filter((p) => p.media_type === "video"));
 
 // ---- Inicio ----
 const root = ref(null);
@@ -292,7 +361,7 @@ const organizer = computed(() => props.event.organization?.name || "la productor
     <div class="card" data-testid="review-card">
       <template v-if="externalOrigin">
         <p class="card-title">¿Fuiste? Califica el evento</p>
-        <p class="muted">Cuéntanos cómo lo pasaste y sube tus fotos a la galería.</p>
+        <p class="muted">Cuéntanos cómo lo pasaste y sube tus fotos y videos a la galería.</p>
         <a class="ev-btn ev-btn-primary" :href="reviewUrl">Calificar el evento</a>
       </template>
 
@@ -301,7 +370,7 @@ const organizer = computed(() => props.event.organization?.name || "la productor
       <!-- Sin validar -->
       <template v-else-if="!session">
         <p class="card-title">¿Fuiste? Califica el evento</p>
-        <p class="muted">Califícalo de 1 a 5, deja un comentario público o uno privado para {{ organizer }} y sube tus fotos a la galería.</p>
+        <p class="muted">Califícalo de 1 a 5, deja un comentario público o uno privado para {{ organizer }} y sube tus fotos y videos a la galería.</p>
         <p v-if="sessionError" class="ev-error" role="alert">{{ sessionError }}</p>
 
         <AutoHeight>
@@ -404,6 +473,34 @@ const organizer = computed(() => props.event.organization?.name || "la productor
           <p v-if="photoMessage" class="ok" role="status">{{ photoMessage }}</p>
           <p v-if="photoError" class="ev-error" role="alert">{{ photoError }}</p>
         </div>
+
+        <!-- Videos -->
+        <div v-if="session.max_videos" class="photos" data-testid="review-videos">
+          <p class="ev-label">Tus videos del evento <span class="opt">({{ myVideos.length }}/{{ session.max_videos }})</span></p>
+          <p class="hint">
+            Hasta {{ session.max_video_seconds }} segundos y {{ formatMb(session.max_video_bytes) }} cada uno. Se suman a la galería de esta página{{ session.moderate_photos ? " cuando la productora los revise" : "" }}.
+          </p>
+          <ul v-if="myVideos.length" class="thumbs">
+            <li v-for="v in myVideos" :key="v.id" class="thumb">
+              <img v-if="v.thumb_url" :src="v.thumb_url" alt="Tu video" loading="lazy" />
+              <span class="play" aria-hidden="true">▶</span>
+              <span v-if="v.status === 'pending'" class="tag">En revisión</span>
+              <span v-else-if="v.status === 'hidden'" class="tag">Oculto</span>
+              <span v-else-if="v.duration" class="tag">{{ formatSeconds(v.duration) }}</span>
+              <button type="button" class="thumb-del" aria-label="Borrar video" @click="removePhoto(v)">×</button>
+            </li>
+          </ul>
+          <input ref="videoInput" type="file" :accept="VIDEO_TYPES.join(',')" class="sr-only" data-testid="review-video-input" @change="onVideo" />
+          <button v-if="videoSlotsLeft" type="button" class="ev-btn ev-btn-secondary" :disabled="Boolean(uploadingVideo)" @click="videoInput?.click()">
+            <span v-if="uploadingVideo" class="ev-spinner ev-spinner-dark" aria-hidden="true"></span>
+            {{ uploadingVideo || "🎬 Subir un video" }}
+          </button>
+          <span v-if="uploadingVideo && videoProgress" class="progress" role="progressbar" :aria-valuenow="videoProgress" aria-valuemin="0" aria-valuemax="100">
+            <span class="progress-fill" :style="{ width: `${videoProgress}%` }"></span>
+          </span>
+          <p v-if="videoMessage" class="ok" role="status">{{ videoMessage }}</p>
+          <p v-if="videoError" class="ev-error" role="alert">{{ videoError }}</p>
+        </div>
       </template>
     </div>
 
@@ -432,6 +529,25 @@ const organizer = computed(() => props.event.organization?.name || "la productor
       embedded
       class="attendee-gallery"
     />
+
+    <div v-if="videos.length" id="videos-asistentes" class="attendee-videos" data-testid="attendee-videos">
+      <h2 class="videos-title">Videos de los asistentes</h2>
+      <ul class="video-grid">
+        <li v-for="v in videos" :key="v.id" class="video-item">
+          <video
+            :src="v.url"
+            :poster="v.thumb_url || undefined"
+            :preload="v.thumb_url ? 'none' : 'metadata'"
+            controls
+            playsinline
+            class="video"
+            :style="v.width && v.height ? { aspectRatio: `${v.width} / ${v.height}` } : undefined"
+            :aria-label="v.name ? `Video de ${v.name}` : 'Video de un asistente'"
+          ></video>
+          <p v-if="v.name" class="video-name">Video de {{ v.name }}</p>
+        </li>
+      </ul>
+    </div>
   </section>
 </template>
 
@@ -687,6 +803,68 @@ const organizer = computed(() => props.event.organization?.name || "la productor
   font-size: 16px;
   line-height: 24px;
   cursor: pointer;
+}
+.play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 22px;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+.progress {
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface-1);
+  overflow: hidden;
+}
+.progress-fill {
+  display: block;
+  height: 100%;
+  background: currentColor;
+  transition: width 0.2s ease;
+}
+.attendee-videos {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.videos-title {
+  font-family: "Unbounded", sans-serif;
+  font-weight: 700;
+  font-size: 1.125rem;
+  margin: 0;
+}
+.video-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.video-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.video {
+  width: 100%;
+  /* Vertical (celular) si no se conoce la proporción; si se conoce, la del video (ver :style) */
+  aspect-ratio: 9 / 16;
+  max-height: 420px;
+  object-fit: contain;
+  background: #000;
+  border-radius: var(--r-sm);
+}
+.video-name {
+  font-size: 13px;
+  color: var(--text-2);
+  margin: 0;
 }
 .sr-only {
   position: absolute;

@@ -18,6 +18,8 @@
 //     subtotal, igual que cualquier código), por eso es opcional y lo configura ella.
 //   * Fotos: hasta MAX_PHOTOS_PER_PERSON por persona y evento; visibles al tiro salvo que la productora pida
 //     revisarlas antes (moderate_photos). La productora puede ocultar comentarios y fotos.
+//   * Videos (nov 2026): hasta MAX_VIDEOS_PER_PERSON por persona y evento, de ATTENDEE_VIDEO_MAX_BYTES y
+//     ATTENDEE_VIDEO_MAX_SECONDS como máximo. Misma tabla, estados y moderación que las fotos (media_type 'video').
 //   * Invitaciones al próximo evento: a los asistentes de un evento terminado, sin quienes se dieron de baja de
 //     esa productora, sin quienes ya tienen entradas para el evento al que se invita y sin repetir invitación.
 import { zonedDateTimeToUtc, addDays, EVENT_TIMEZONE } from './dates.mjs'
@@ -35,6 +37,12 @@ export const RATING_LABELS = Object.freeze({ 1: 'Malo', 2: 'Regular', 3: 'Bueno'
 export const PUBLIC_COMMENT_MAX = 1000
 export const PRIVATE_COMMENT_MAX = 2000
 export const MAX_PHOTOS_PER_PERSON = 6
+/** Videos de los asistentes: por persona y evento, peso (igual al límite del bucket) y duración (la valida el navegador). */
+export const MAX_VIDEOS_PER_PERSON = 2
+export const ATTENDEE_VIDEO_MAX_BYTES = 50 * 1024 * 1024
+export const ATTENDEE_VIDEO_MAX_SECONDS = 60
+/** Tipo de una fila de la galería de asistentes: 'photo' (también filas anteriores a la columna) o 'video'. */
+export const mediaTypeOf = (row) => (row?.media_type === 'video' ? 'video' : 'photo')
 // ---- Cadencia del correo "¿Cómo estuvo?" (hora de Chile) ----
 /** Correos de reseña por persona y evento: el primero y dos recordatorios. */
 export const REVIEW_REQUEST_STEPS = 3
@@ -489,14 +497,16 @@ export function publicReview(row) {
   }
 }
 
-/** Foto tal como la ve el público. */
+/** Foto o video tal como lo ve el público (en un video, url es el archivo y thumb_url su póster). */
 export function publicPhoto(row) {
   return {
     id: row.id,
+    media_type: mediaTypeOf(row),
     url: row.url,
     thumb_url: row.thumb_url || null,
     width: row.width ?? null,
     height: row.height ?? null,
+    duration: row.duration ?? null,
     name: row.display_name || null,
   }
 }

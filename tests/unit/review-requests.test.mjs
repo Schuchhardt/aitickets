@@ -149,7 +149,7 @@ describe('sendReviewRequests: recordatorios', () => {
     let byEvent = callsByEvent()
     expect(recipientsOf(byEvent['10'])).toEqual(['ana@x.cl', 'fran@x.cl'])
     expect(recipientsOf(byEvent['11'])).toEqual(['gabi@x.cl', 'hugo@x.cl'])
-    expect(byEvent['10'][0].subject).toBe('📸 ¿Tienes fotos de Gira?')
+    expect(byEvent['10'][0].subject).toBe('📸 ¿Tienes fotos o videos de Gira?')
     expect(byEvent['10'][0].idempotencyKey).toMatch(/^review-10-s2-/)
 
     sendEmail.mockClear()
