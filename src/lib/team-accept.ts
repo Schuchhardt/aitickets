@@ -5,10 +5,14 @@
 //    verifica su contraseña, se reactiva con el rol de la invitación y se desbloquea en Auth si la cuenta la
 //    creó AI Tickets.
 //  - El correo pertenece a otra organización: se rechaza.
+//  - Fila en public.users SIN organización (alta a medias, registro abandonado): se suma a esta organización con
+//    el rol de la invitación. Si su cuenta de Auth la creó AI Tickets y nunca se ha usado (nadie conoce su
+//    contraseña), el link de la invitación, que llegó a ese correo, prueba que es suyo: se le pone la contraseña
+//    que elija. Si la cuenta ya se usó, se pide su contraseña como a cualquier cuenta existente.
 //  - Sin fila en public.users: se crea la cuenta de Auth (marcada app=aitickets). Si el correo ya existe en
 //    Auth (proyecto compartido con otras apps) se pide la contraseña de esa cuenta y se vincula.
 // La invitación se "reclama" primero con un UPDATE condicional (un solo uso aunque lleguen dos envíos).
-import { invitationStatus } from "./team-invitations";
+import { invitationStatus, isUnclaimedAuthUser } from "./team-invitations";
 
 export const MIN_PASSWORD_LENGTH = 8;
 const AITICKETS_APP_METADATA = { app: "aitickets" } as const;
@@ -91,15 +95,30 @@ export async function acceptTeamInvitation(
         if (authUserId) {
             // Cuenta existente: desbloquear (si la bloqueó AI Tickets al desactivarla) y verificar la contraseña
             let unbanned = false;
+            let authUser: any = null;
             try {
                 const { data } = await supabase.auth.admin.getUserById(authUserId);
-                const user = data?.user;
-                if ((user?.app_metadata as any)?.app === "aitickets" && user?.banned_until && new Date(user.banned_until).getTime() > now.getTime()) {
+                authUser = data?.user || null;
+                if ((authUser?.app_metadata as any)?.app === "aitickets" && authUser?.banned_until && new Date(authUser.banned_until).getTime() > now.getTime()) {
                     await supabase.auth.admin.updateUserById(authUserId, { ban_duration: "none" });
                     unbanned = true;
                 }
             } catch (err: any) {
                 console.warn("accept-invitation getUserById:", err?.message || err);
+            }
+            // Usuario sin organización con una cuenta que nadie ha usado: queda con la contraseña que elija ahora
+            if (existing.organization_id == null && isUnclaimedAuthUser(authUser)) {
+                if (password.length < MIN_PASSWORD_LENGTH) {
+                    await release();
+                    return fail(400, "invalid_input", `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.`);
+                }
+                const { error: pwError } = await supabase.auth.admin.updateUserById(authUserId, { password });
+                if (pwError) {
+                    await release();
+                    const weak = /weak|short|password/i.test(pwError.message || "");
+                    if (!weak) console.error("accept-invitation updateUserById:", pwError.message || pwError);
+                    return fail(weak ? 400 : 500, weak ? "weak_password" : "internal", weak ? "Esa contraseña es muy débil. Prueba con una más larga." : "No pudimos crear tu cuenta. Intenta de nuevo.");
+                }
             }
             signed = await signIn(authClient, email, password);
             if (!signed) {
@@ -147,7 +166,9 @@ export async function acceptTeamInvitation(
         let userId: number;
         let role = invitation.role;
         if (existing) {
-            if (existing.role === "producer") role = "producer";
+            // El dueño de ESTA organización no se degrada al reaceptar. Un 'producer' sin organización (o de otra) no
+            // se vuelve dueño de esta: recibe el rol de la invitación.
+            if (existing.role === "producer" && Number(existing.organization_id) === orgId) role = "producer";
             const { error } = await supabase
                 .from("users")
                 .update({ active: true, role, organization_id: orgId, auth_user_id: authUserId, ...(name ? { name } : {}), updated_at: nowIso })

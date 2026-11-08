@@ -63,11 +63,18 @@ describe('ensureGoogleProducer', () => {
   })
 
   it('fila creada por el trigger handle_new_user (sin organización): la completa en vez de duplicarla', async () => {
-    db.tables.users.push({ id: 9, auth_user_id: 'auth-g1', organization_id: null, email: 'ana@gmail.com', role: 'admin' })
+    db.tables.users.push({ id: 9, auth_user_id: 'auth-g1', organization_id: null, email: 'ana@gmail.com', role: null })
     const res = await google.ensureGoogleProducer(googleUser())
     expect(res).toMatchObject({ ok: true, created: true, onboardingPending: true })
     expect(db.tables.users).toHaveLength(1)
-    expect(db.tables.users[0]).toMatchObject({ id: 9, organization_id: db.tables.organizations[0].id, name: 'Ana Pérez' })
+    // Quien crea la organización es su dueño: sin 'producer' la organización quedaba sin dueño (orgs 46-49)
+    expect(db.tables.users[0]).toMatchObject({ id: 9, organization_id: db.tables.organizations[0].id, name: 'Ana Pérez', role: 'producer' })
+  })
+
+  it('fila del trigger antigua con role admin (antes de 202611080100): también queda como producer', async () => {
+    db.tables.users.push({ id: 73, auth_user_id: 'auth-g1', organization_id: null, email: 'ana@gmail.com', role: 'admin' })
+    await google.ensureGoogleProducer(googleUser())
+    expect(db.tables.users[0]).toMatchObject({ id: 73, role: 'producer' })
   })
 
   it('usuario existente: inicia sesión sin crear nada', async () => {

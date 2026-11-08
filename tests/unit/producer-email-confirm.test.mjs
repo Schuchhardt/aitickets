@@ -271,6 +271,49 @@ describe('/api/auth/register — registro en dos pasos', () => {
     expect(sendEmail).toHaveBeenCalled()
   })
 
+  it('completa la fila que creó el trigger handle_new_user: quien crea la organización queda como producer', async () => {
+    // En producción createUser dispara el trigger, que ya creó la fila sin organización (role NULL/admin)
+    const admin = fakeAdmin({
+      tables: {
+        organizations: () => ({ data: { id: 42 }, error: null }),
+        users: (op) => (op.action === 'select' ? { data: { id: 7, organization_id: null }, error: null } : { data: null, error: null }),
+      },
+    })
+    state.admin = admin
+    state.ephemeral = { auth: { signInWithPassword: vi.fn() } }
+    const res = await register(apiContext(jsonRequest('https://aitickets.cl/api/auth/register', { email: 'nueva@prod.cl', password: 'Secreta123', acceptedTerms: true, cfToken: 'ok' })))
+    expect(res.status).toBe(200)
+    const update = admin.log.find((o) => o.table === 'users' && o.action === 'update')
+    expect(update.payload).toMatchObject({ organization_id: 42, role: 'producer' })
+    expect(update.filters).toContainEqual(['eq', 'id', 7])
+    expect(admin.log.some((o) => o.table === 'users' && o.action === 'insert')).toBe(false)
+  })
+
+  it('si falla la organización, borra la fila del trigger ANTES que la cuenta de Auth (FK sin ON DELETE)', async () => {
+    const admin = fakeAdmin({
+      tables: {
+        organizations: (op) => (op.action === 'insert' ? { data: null, error: { code: '57014', message: 'timeout' } } : { data: null, error: null }),
+        users: () => ({ data: null, error: null }),
+      },
+    })
+    const order = []
+    admin.auth.admin.deleteUser = vi.fn(async () => { order.push('auth'); return { error: null } })
+    const from = admin.from
+    admin.from = (table) => {
+      const b = from(table)
+      const del = b.delete
+      b.delete = () => { if (table === 'users') order.push('users'); return del() }
+      return b
+    }
+    state.admin = admin
+    state.ephemeral = { auth: { signInWithPassword: vi.fn() } }
+    const res = await register(apiContext(jsonRequest('https://aitickets.cl/api/auth/register', { email: 'nueva@prod.cl', password: 'Secreta123', acceptedTerms: true, cfToken: 'ok' })))
+    expect(res.status).toBe(500)
+    expect(order).toEqual(['users', 'auth'])
+    const del = admin.log.find((o) => o.table === 'users' && o.action === 'delete')
+    expect(del.filters).toEqual([['eq', 'auth_user_id', UID], ['is', 'organization_id', null]])
+  })
+
   it('rechaza correo inválido o contraseña corta', async () => {
     state.admin = fakeAdmin()
     const bad = await register(apiContext(jsonRequest('https://aitickets.cl/api/auth/register', { email: 'x', password: 'Secreta123', acceptedTerms: true, cfToken: 'ok' })))

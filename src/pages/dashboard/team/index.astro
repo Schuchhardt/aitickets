@@ -600,14 +600,18 @@ const roleConfig: Record<string, { label: string; color: string; icon: string }>
     let memberAdded = false;
 
     /** Mensaje con el acceso del nuevo miembro, para copiarlo o mandarlo por WhatsApp. Puerta entra a /validador. */
-    function appendShareAccess(container: HTMLElement, m: { name: string; email: string; role: string; tempPassword: string }) {
+    function appendShareAccess(container: HTMLElement, m: { name: string; email: string; role: string; tempPassword: string | null }) {
         const isDoor = m.role === 'validator';
         const url = `${window.location.origin}${isDoor ? '/validador' : '/organizadores/login'}`;
         const org = (form?.dataset.orgName || '').trim();
         const firstName = m.name.trim().split(/\s+/)[0] || '';
+        // Sin contraseña temporal: ya tenía cuenta, entra con la suya (o la recupera)
+        const credentials = m.tempPassword
+            ? `con tu correo ${m.email} y la contraseña temporal ${m.tempPassword}. Puedes cambiarla después en "Mi perfil".`
+            : `con tu correo ${m.email} y tu contraseña de siempre. Si no la recuerdas, recupérala en ${window.location.origin}/organizadores/recuperar.`;
         const text = isDoor
-            ? `Hola${firstName ? ` ${firstName}` : ''}, te sumé al equipo de puerta${org ? ` de ${org}` : ''} en AI Tickets. Para validar entradas abre en tu teléfono ${url} e inicia sesión con tu correo ${m.email} y la contraseña temporal ${m.tempPassword}. Puedes cambiarla después en "Mi perfil".`
-            : `Hola${firstName ? ` ${firstName}` : ''}, te sumé al equipo${org ? ` de ${org}` : ''} en AI Tickets. Entra a ${url} con tu correo ${m.email} y la contraseña temporal ${m.tempPassword}. Puedes cambiarla después en "Mi perfil".`;
+            ? `Hola${firstName ? ` ${firstName}` : ''}, te sumé al equipo de puerta${org ? ` de ${org}` : ''} en AI Tickets. Para validar entradas abre en tu teléfono ${url} e inicia sesión ${credentials}`
+            : `Hola${firstName ? ` ${firstName}` : ''}, te sumé al equipo${org ? ` de ${org}` : ''} en AI Tickets. Entra a ${url} ${credentials}`;
 
         const box = document.createElement('div');
         box.className = 'mt-3 pt-3 border-t border-green-200 space-y-2';
@@ -710,26 +714,35 @@ const roleConfig: Record<string, { label: string; color: string; icon: string }>
                 }
 
                 if (response.ok) {
+                    // tempPassword null: ya tenía una cuenta en uso y quedó en el equipo; entra con su propia contraseña
+                    const tempPassword = result.tempPassword ? String(result.tempPassword) : null;
                     if (formMessage) {
                         formMessage.classList.add('bg-green-50', 'text-green-800', 'border', 'border-green-200');
                         const title = document.createElement('strong');
                         title.textContent = '¡Miembro agregado exitosamente!';
-                        const pwLine = document.createElement('span');
-                        pwLine.className = 'text-xs';
-                        const code = document.createElement('code');
-                        code.className = 'bg-green-100 px-1 rounded';
-                        code.textContent = String(result.tempPassword ?? '');
-                        pwLine.append('Contraseña temporal: ', code);
-                        const hint = document.createElement('span');
-                        hint.className = 'text-xs text-green-600';
-                        hint.textContent = 'Comparte esta contraseña con el nuevo miembro.';
-                        formMessage.replaceChildren(title, document.createElement('br'), pwLine, document.createElement('br'), hint);
+                        if (tempPassword) {
+                            const pwLine = document.createElement('span');
+                            pwLine.className = 'text-xs';
+                            const code = document.createElement('code');
+                            code.className = 'bg-green-100 px-1 rounded';
+                            code.textContent = tempPassword;
+                            pwLine.append('Contraseña temporal: ', code);
+                            const hint = document.createElement('span');
+                            hint.className = 'text-xs text-green-600';
+                            hint.textContent = 'Comparte esta contraseña con el nuevo miembro.';
+                            formMessage.replaceChildren(title, document.createElement('br'), pwLine, document.createElement('br'), hint);
+                        } else {
+                            const note = document.createElement('span');
+                            note.className = 'text-xs';
+                            note.textContent = String(result.message || '');
+                            formMessage.replaceChildren(title, document.createElement('br'), note);
+                        }
                     }
                     if (formMessage) appendShareAccess(formMessage, {
                         name: String(data.name || ''),
                         email: String(data.email || '').trim().toLowerCase(),
                         role: String(data.role || ''),
-                        tempPassword: String(result.tempPassword ?? ''),
+                        tempPassword,
                     });
                     // La contraseña temporal no se vuelve a mostrar: la página se recarga al cerrar ("Listo"), no sola
                     memberAdded = true;

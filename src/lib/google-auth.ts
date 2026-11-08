@@ -197,9 +197,11 @@ export async function ensureGoogleProducer(
     }
     if (orgId === null) return { ok: false, error: "server" };
 
+    // Quien crea la organización es su dueño ('producer'). La fila existente casi siempre es la que crea el trigger
+    // handle_new_user (sin organización): sin el rol aquí quedaba como estaba y la organización sin dueño.
     const profileRow = { auth_user_id: user.id, organization_id: orgId, name, email, role: "producer", active: true };
     const { error: userError } = sameEmail
-        ? await supabase.from("users").update({ organization_id: orgId, ...(name ? { name } : {}) }).eq("id", sameEmail.id)
+        ? await supabase.from("users").update({ organization_id: orgId, role: "producer", ...(name ? { name } : {}) }).eq("id", sameEmail.id)
         : await supabase.from("users").insert(profileRow);
     if (userError) {
         console.error("google-auth: no se pudo crear el perfil", userError.message);

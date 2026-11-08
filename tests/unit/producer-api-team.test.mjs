@@ -15,7 +15,7 @@ vi.mock('../../netlify/lib/emails/team.mjs', () => ({
 const { teamTools } = await import('../../src/lib/producer-api/tools/team.ts')
 const { runTool } = await import('../../src/lib/producer-api/registry.ts')
 const { acceptTeamInvitation } = await import('../../src/lib/team-accept.ts')
-const { hashInvitationToken, generateInvitationToken } = await import('../../src/lib/team-invitations.ts')
+const { hashInvitationToken, generateInvitationToken, invitationNeedsExistingPassword } = await import('../../src/lib/team-invitations.ts')
 const { getStaffEventIds, canAccessEventByStaff } = await import('../../netlify/lib/event-staff.mjs')
 
 const tool = (name) => teamTools.find((t) => t.name === name)
@@ -101,6 +101,15 @@ describe('invite_member', () => {
     expect(await call('invite_member', { email: 'out@otra.cl', role: 'viewer' })).toMatchObject({ ok: false, code: 'conflict' })
     expect(await call('invite_member', { email: 'bea@prod.cl', role: 'viewer' })).toMatchObject({ ok: false, code: 'conflict' })
     expect(await call('invite_member', { email: 'z@prod.cl', role: 'viewer', event_ids: [20] })).toMatchObject({ ok: false, code: 'not_found' })
+  })
+
+  it('un usuario SIN organización (huérfano) se puede invitar: no es "otra organización" ni "miembro activo"', async () => {
+    db.tables.users.push({ id: 71, name: 'Romy', email: 'romy@mail.cl', organization_id: null, role: 'admin', active: true, auth_user_id: 'au71' })
+    const out = await call('invite_member', { email: 'Romy@mail.cl', role: 'validator' })
+    expect(out.ok).toBe(true)
+    expect(db.tables.aitickets_team_invitations[0]).toMatchObject({ email: 'romy@mail.cl', role: 'validator', organization_id: 7 })
+    // Un miembro desactivado de esta organización también se puede reinvitar
+    expect((await call('invite_member', { email: 'old@prod.cl', role: 'viewer' })).ok).toBe(true)
   })
 
   it('solo el dueño invita administradores', async () => {
@@ -274,6 +283,52 @@ describe('acceptTeamInvitation', () => {
     expect(await acceptTeamInvitation(db, authFor(), { ...addInvitation(), expires_at: '2026-10-01T00:00:00Z' }, { password: 'x' }, NOW)).toMatchObject({ ok: false, code: 'expired' })
     expect(await acceptTeamInvitation(db, authFor(), { ...addInvitation(), revoked_at: '2026-10-02T00:00:00Z' }, { password: 'x' }, NOW)).toMatchObject({ ok: false, code: 'revoked' })
     expect(await acceptTeamInvitation(db, authFor(), null, { password: 'x' }, NOW)).toMatchObject({ ok: false, code: 'not_found' })
+  })
+
+  it('usuario sin organización con una cuenta nunca usada: elige su contraseña y queda vinculado a la organización', async () => {
+    db.tables.users.push({ id: 71, name: 'Romyna', email: 'romy@mail.cl', organization_id: null, role: 'admin', active: true, auth_user_id: 'au71' })
+    const inv = addInvitation({ email: 'romy@mail.cl', event_ids: [] })
+    const updateUserById = vi.fn(async () => ({ data: {}, error: null }))
+    db.auth = {
+      admin: {
+        getUserById: async () => ({ data: { user: { id: 'au71', app_metadata: { app: 'aitickets' }, last_sign_in_at: null } } }),
+        updateUserById,
+        createUser: vi.fn(),
+      },
+    }
+    expect(await invitationNeedsExistingPassword(db, 'Romy@mail.cl')).toBe(false) // la página pide CREAR contraseña
+    const signIn = vi.fn(async () => ({ data: { session, user: { id: 'au71' } }, error: null }))
+    const res = await acceptTeamInvitation(db, { auth: { signInWithPassword: signIn } }, inv, { password: 'nuevaclave1' }, NOW)
+    expect(res).toMatchObject({ ok: true, role: 'validator', userId: 71, redirectTo: '/validador' })
+    expect(updateUserById).toHaveBeenCalledWith('au71', { password: 'nuevaclave1' })
+    expect(signIn).toHaveBeenCalledWith({ email: 'romy@mail.cl', password: 'nuevaclave1' })
+    expect(db.auth.admin.createUser).not.toHaveBeenCalled()
+    expect(db.tables.users.filter((u) => u.email === 'romy@mail.cl')).toEqual([expect.objectContaining({ id: 71, organization_id: 7, role: 'validator', active: true, auth_user_id: 'au71' })])
+    expect(db.tables.aitickets_team_invitations[0]).toMatchObject({ accepted_user_id: 71 })
+    expect(db.tables.aitickets_team_invitations[0].accepted_at).toBeTruthy()
+  })
+
+  it('usuario sin organización con una cuenta ya usada: exige SU contraseña y no la cambia', async () => {
+    db.tables.users.push({ id: 73, name: 'Romyna', email: 'romy@mail.cl', organization_id: null, role: 'producer', active: true, auth_user_id: 'au73' })
+    const inv = addInvitation({ email: 'romy@mail.cl', role: 'viewer', event_ids: [] })
+    const updateUserById = vi.fn(async () => ({ data: {}, error: null }))
+    db.auth = { admin: { getUserById: async () => ({ data: { user: { id: 'au73', app_metadata: { app: 'aitickets' }, last_sign_in_at: '2026-11-08T02:21:19Z' } } }), updateUserById } }
+    expect(await invitationNeedsExistingPassword(db, 'romy@mail.cl')).toBe(true)
+    const bad = await acceptTeamInvitation(db, authFor(false), inv, { password: 'adivino123' }, NOW)
+    expect(bad).toMatchObject({ ok: false, code: 'wrong_password' })
+    expect(updateUserById).not.toHaveBeenCalled()
+    expect(db.tables.aitickets_team_invitations[0].accepted_at).toBeNull()
+    // Con su contraseña queda vinculado con el rol de la invitación: un 'producer' sin organización NO se vuelve dueño de esta
+    const ok = await acceptTeamInvitation(db, authFor(true), db.tables.aitickets_team_invitations[0], { password: 'lasuya123' }, NOW)
+    expect(ok).toMatchObject({ ok: true, role: 'viewer', userId: 73 })
+    expect(db.tables.users.find((u) => u.id === 73)).toMatchObject({ organization_id: 7, role: 'viewer' })
+  })
+
+  it('invitationNeedsExistingPassword: correo nuevo => crear; miembro con organización => la suya', async () => {
+    db.auth = { admin: { getUserById: vi.fn() } }
+    expect(await invitationNeedsExistingPassword(db, 'nadie@mail.cl')).toBe(false)
+    expect(await invitationNeedsExistingPassword(db, 'old@prod.cl')).toBe(true)
+    expect(db.auth.admin.getUserById).not.toHaveBeenCalled()
   })
 
   it('correo ya existente en Auth (otra app): vincula con su contraseña', async () => {

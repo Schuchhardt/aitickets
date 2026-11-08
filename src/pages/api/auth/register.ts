@@ -130,9 +130,13 @@ export const POST: APIRoute = async (context) => {
             createdAuthUserId = authData.user.id;
         }
 
-        // Si un paso posterior falla, no dejar una cuenta de Auth recién creada sin perfil
+        // Si un paso posterior falla, no dejar una cuenta de Auth recién creada sin perfil. Primero la fila de
+        // public.users que creó el trigger handle_new_user: users.auth_user_id referencia a auth.users sin ON DELETE,
+        // así que con la fila presente deleteUser falla y quedaban ambas huérfanas.
         const rollbackAuthUser = async () => {
             if (!createdAuthUserId) return;
+            const { error: rowError } = await supabaseAdmin.from('users').delete().eq('auth_user_id', createdAuthUserId).is('organization_id', null);
+            if (rowError) console.error("No se pudo borrar la fila de public.users del registro revertido:", rowError.message);
             const { error } = await supabaseAdmin.auth.admin.deleteUser(createdAuthUserId);
             if (error) console.error("No se pudo revertir el usuario de Auth:", error.message);
         };
@@ -218,15 +222,18 @@ export const POST: APIRoute = async (context) => {
             await supabaseAdmin.from('organizations').delete().eq('id', orgId);
             return new Response(JSON.stringify({ message: "Este correo electrónico ya está registrado. Intenta iniciar sesión." }), { status: 400 });
         } else {
-            // Perfil existe pero sin organización (registro parcial previo), actualizar
+            // Perfil existe pero sin organización: casi siempre la fila que acaba de crear el trigger handle_new_user
+            // (o un registro parcial previo). Quien crea la organización es su dueño: role 'producer' (sin esto
+            // quedaba con el rol del trigger y la organización sin dueño).
             const { error: updateError } = await supabaseAdmin
                 .from('users')
-                .update({ organization_id: orgId, ...(name ? { name } : {}), ...(phone ? { phone } : {}) })
+                .update({ organization_id: orgId, role: 'producer', ...(name ? { name } : {}), ...(phone ? { phone } : {}) })
                 .eq('id', existingProfile.id);
 
             if (updateError) {
                 console.error("Error updating user profile:", updateError);
                 await supabaseAdmin.from('organizations').delete().eq('id', orgId);
+                await rollbackAuthUser();
                 return new Response(JSON.stringify({ message: "Error al actualizar perfil de usuario: " + getFriendlyErrorMessage(updateError) }), { status: 500 });
             }
         }

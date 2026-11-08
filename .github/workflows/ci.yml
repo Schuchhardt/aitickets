@@ -118,6 +118,8 @@ jobs:
             END \$\$;"
       - name: Permisos (anon/authenticated sin acceso; RLS activo)
         run: psql -v ON_ERROR_STOP=1 -f db/ci/assert-grants.sql
+      - name: Trigger handle_new_user (altas en auth.users, compartido con Kefy)
+        run: psql -v ON_ERROR_STOP=1 -f db/ci/assert-handle-new-user.sql
       - name: Rechazo del transaction pooler (6543)
         run: |
           if SUPABASE_DB_URL=postgresql://u:p@localhost:6543/postgres node scripts/migrate.mjs --status; then

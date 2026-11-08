@@ -1,8 +1,10 @@
+// POST /api/team/add { name, email, role } — suma un miembro al equipo desde el panel (Mi equipo).
+// La lógica (fila del trigger handle_new_user, huérfanos, reversión) está en src/lib/team-add.ts.
 import type { APIRoute } from "astro";
-import { randomBytes } from "node:crypto";
-import { getSupabaseAdmin, getFriendlyErrorMessage } from "../../../lib/auth-helpers";
+import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { getSessionContext, hasRole, ORG_ADMIN_ROLES } from "../../../lib/supabaseServer";
-import { AITICKETS_APP_METADATA, ASSIGNABLE_ROLES, EMAIL_RE, OWNER_ONLY_ROLES, json } from "./_team";
+import { addTeamMember } from "../../../lib/team-add";
+import { ASSIGNABLE_ROLES, EMAIL_RE, OWNER_ONLY_ROLES, json } from "./_team";
 
 export const POST: APIRoute = async (context) => {
     const session = await getSessionContext(context);
@@ -33,51 +35,10 @@ export const POST: APIRoute = async (context) => {
             return json({ error: "Solo el dueño de la cuenta puede agregar miembros de finanzas" }, 403);
         }
 
-        const supabaseAdmin = getSupabaseAdmin();
-
-        const { data: existingUser } = await supabaseAdmin
-            .from("users")
-            .select("id")
-            .ilike("email", email.replace(/[\\%_]/g, "\\$&"))
-            .maybeSingle();
-        if (existingUser) {
-            return json({ error: "Este correo electrónico ya está registrado" }, 400);
-        }
-
-        // Contraseña temporal aleatoria
-        const tempPassword = randomBytes(9).toString("base64url") + "Aa1!";
-
-        const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-            email,
-            password: tempPassword,
-            email_confirm: true,
-            user_metadata: { full_name: name },
-            // Cuenta creada por AI Tickets: solo estas se pueden bloquear o cambiar de email desde el dashboard
-            app_metadata: { ...AITICKETS_APP_METADATA },
-        });
-
-        if (authError) {
-            console.error("Auth user creation error:", authError);
-            return json({ error: getFriendlyErrorMessage(authError) }, 400);
-        }
-
-        const { error: dbError } = await supabaseAdmin.from("users").insert({
-            name,
-            email,
-            role,
-            organization_id: currentUser.organization_id,
-            auth_user_id: authData.user.id,
-            active: true,
-        });
-
-        if (dbError) {
-            console.error("Database insert error:", dbError);
-            await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-            return json({ error: getFriendlyErrorMessage(dbError) }, 500);
-        }
-
-        // TODO: enviar invitación por email. Por ahora se devuelve para que el administrador la comparta.
-        return json({ message: "Miembro agregado exitosamente", tempPassword });
+        const result = await addTeamMember(getSupabaseAdmin(), Number(currentUser.organization_id), { name, email, role });
+        if (!result.ok) return json({ error: result.message, code: result.code }, result.status);
+        // La contraseña temporal (null si ya tenía una cuenta en uso) se muestra una vez para que el administrador la comparta
+        return json({ message: result.message, tempPassword: result.tempPassword, adopted: result.adopted, userId: result.userId });
     } catch (error) {
         console.error("Add team member error:", error);
         return json({ error: "Internal Server Error" }, 500);

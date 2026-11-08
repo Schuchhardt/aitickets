@@ -180,13 +180,16 @@ const inviteMember: ToolDef = {
         }
         const eventIds = await ownedEventIds(ctx, args.event_ids);
 
-        const { data: existing } = await ctx.supabase.from("users").select("id, organization_id, active").ilike("email", escapeLike(email)).maybeSingle();
-        if (existing) {
-            if (Number(existing.organization_id) !== ctx.actor.orgId) {
-                throw new ToolError("conflict", "Ese correo ya tiene una cuenta en otra organización de AI Tickets: pídele que use otro correo.");
-            }
-            if (isActive(existing)) throw new ToolError("conflict", `Esa persona ya es miembro activo (id ${existing.id}). Usa update_member_role para cambiar su rol.`);
+        // Un usuario SIN organización (organization_id NULL: alta a medias, registro abandonado) no es de "otra
+        // organización": se puede invitar y al aceptar queda en esta. Number(null) = 0 lo hacía pasar por ajeno.
+        const { data: sameEmail, error: lookupError } = await ctx.supabase.from("users").select("id, organization_id, active").ilike("email", escapeLike(email));
+        if (lookupError) throw lookupError;
+        const withOrg = (sameEmail || []).filter((u: any) => u.organization_id != null);
+        if (withOrg.some((u: any) => Number(u.organization_id) !== ctx.actor.orgId)) {
+            throw new ToolError("conflict", "Ese correo ya tiene una cuenta en otra organización de AI Tickets: pídele que use otro correo.");
         }
+        const member = withOrg.find((u: any) => isActive(u));
+        if (member) throw new ToolError("conflict", `Esa persona ya es miembro activo (id ${member.id}). Usa update_member_role para cambiar su rol.`);
 
         // Una invitación pendiente por correo: la anterior se revoca y se reemplaza
         const now = new Date();
