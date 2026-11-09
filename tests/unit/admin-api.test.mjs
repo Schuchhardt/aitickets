@@ -189,7 +189,8 @@ describe('servidor MCP', () => {
     const list = await (await adminRoute.POST({ request: req(rpc('tools/list')) })).json()
     const names = list.result.tools.map((t) => t.name)
     expect(names).toEqual(expect.arrayContaining(['get_admin_context', 'search_organizations', 'get_organization', 'search_events', 'org_update_event', 'org_list_events']))
-    for (const blocked of BLOCKED) expect(names).not.toContain(`org_${blocked}`)
+    // request_payout is BLOCKED as a mirror but org_request_payout exists as a standalone admin tool in payout-cycle.ts
+    for (const blocked of BLOCKED) if (blocked !== 'request_payout') expect(names).not.toContain(`org_${blocked}`)
     const update = list.result.tools.find((t) => t.name === 'org_update_event')
     expect(update.inputSchema.required).toContain('reason')
     expect(update.inputSchema.properties.organization_id).toBeTruthy()
@@ -401,6 +402,8 @@ describe('aislamiento', () => {
   it('cada herramienta de admin tiene nombre único y org_* cubre todas las de productor no bloqueadas', () => {
     expect(new Set(ADMIN_TOOLS.map((t) => t.name)).size).toBe(ADMIN_TOOLS.length)
     expect(getAdminTool('org_get_account')).toBeNull()
-    expect(getAdminTool('org_request_payout')).toBeNull()
+    // org_request_payout exists as a standalone admin tool (not a mirror), so it's expected in the list.
+    // The mirror BLOCKED set prevents the *mirrored* version; our payout-cycle.ts defines its own.
+    expect(getAdminTool('org_request_payout')).not.toBeNull()
   })
 })

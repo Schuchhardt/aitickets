@@ -207,6 +207,7 @@ export async function loadOrgEvents(supabase: any, orgId: number, eventIds?: num
         return q;
     };
     for (const cols of [
+        "id, name, status, start_date, end_date, cancelled_at, fee_absorbed, reserve_pct, risk_level, held_attested_at, released_early_at",
         "id, name, status, start_date, end_date, cancelled_at, fee_absorbed, reserve_pct, risk_level, held_attested_at",
         "id, name, status, start_date, end_date, cancelled_at, fee_absorbed",
     ]) {
@@ -217,6 +218,12 @@ export async function loadOrgEvents(supabase: any, orgId: number, eventIds?: num
     const { data: legacy, error: legacyError } = await run("id, name, status, start_date, end_date");
     if (legacyError) throw legacyError;
     return legacy || [];
+}
+
+async function loadOrgReleaseHours(supabase: any, orgId: number): Promise<number> {
+    const { data, error } = await supabase.from("organizations").select("release_delay_hours").eq("id", orgId).maybeSingle();
+    if (error && !isMissing(error)) throw error;
+    return data?.release_delay_hours ?? RELEASE_HOURS;
 }
 
 /**
@@ -306,7 +313,7 @@ export async function computeOrgLedger(supabase: any, orgId: number, opts: { eve
         fetchAllRows(() => supabase.from("event_orders").select("id, event_id, status, amount, ticket_qty").in("event_id", ids).in("status", ["paid", "review"])),
         tolerantCols(
             (cols) => supabase.from("event_dates").select(cols).in("event_id", ids),
-            ["id, event_id, date, start_time, end_time, held_attested_at", "id, event_id, date, start_time, end_time"],
+            ["id, event_id, date, start_time, end_time, held_attested_at, released_early_at", "id, event_id, date, start_time, end_time, held_attested_at", "id, event_id, date, start_time, end_time"],
         ),
         tolerant(() => supabase.from("aitickets_refunds").select("order_id, event_id, ticket_amount, status").eq("organization_id", orgId).in("event_id", ids)),
         tolerant(() => supabase.from("event_withdrawals").select("event_id, amount, status").in("event_id", ids)),
@@ -328,7 +335,8 @@ export async function computeOrgLedger(supabase: any, orgId: number, opts: { eve
         set.add(a.event_ticket_id == null ? null : ticketDate.get(String(a.event_ticket_id)) ?? null);
         orderDates.set(key, set);
     }
-    const releaseOf = (end: Date | null) => (end ? new Date(end.getTime() + RELEASE_HOURS * 3600000) : null);
+    const orgReleaseHours = await loadOrgReleaseHours(supabase, orgId);
+    const releaseOf = (end: Date | null) => (end ? new Date(end.getTime() + orgReleaseHours * 3600000) : null);
     const reserveUntilOf = (end: Date | null) => (end ? new Date(end.getTime() + RESERVE_HOLD_DAYS * 86400000) : null);
 
     const paidOrderIds = new Set(orders.filter((o) => o.status === "paid").map((o) => String(o.id)));
@@ -386,7 +394,7 @@ export async function computeOrgLedger(supabase: any, orgId: number, opts: { eve
                 released: false,
                 sales_net: 0,
                 tickets: 0,
-                release_status: cancelled ? "cancelled" : fRelease.getTime() <= now.getTime() ? "released" : "pending",
+                release_status: cancelled ? "cancelled" : (e.released_early_at || d.released_early_at || fRelease.getTime() <= now.getTime()) ? "released" : "pending",
                 hold_reasons: [],
                 checkins: c?.in || 0,
                 checkin_ratio: ratio(c),
