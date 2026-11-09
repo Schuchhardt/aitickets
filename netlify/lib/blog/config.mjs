@@ -1,7 +1,5 @@
 // Configuración del blog automatizado (docs/specs/blog-seo.md). Todo por variables de entorno, con valores por defecto
 // seguros: sin BLOG_ENABLED=true la función programada no hace nada (las corridas manuales del MCP sí funcionan).
-import { DEFAULT_ANTHROPIC_MODEL } from '../assistant-llm.mjs'
-
 const env = (name) => {
   const value = globalThis.process?.env?.[name]
   return typeof value === 'string' ? value.trim() : ''
@@ -23,8 +21,12 @@ export const blogAutopublish = () => env('BLOG_AUTOPUBLISH').toLowerCase() !== '
 /** Artículos nuevos por semana (máx. 1 por día). Calidad antes que volumen: Google castiga el contenido a escala. */
 export const blogPostsPerWeek = () => intEnv('BLOG_POSTS_PER_WEEK', 3, 0, 7)
 
-/** Modelo que investiga y redacta. */
-export const blogModel = () => env('BLOG_MODEL') || env('ANTHROPIC_MODEL') || DEFAULT_ANTHROPIC_MODEL
+/**
+ * Modelo que investiga y redacta. Sonnet por defecto (no ANTHROPIC_MODEL, que es Opus para el resto de la app): un
+ * artículo cuesta ~la mitad y alcanza para contenido informativo con fuentes. BLOG_MODEL lo cambia.
+ */
+export const DEFAULT_BLOG_MODEL = 'claude-sonnet-5-5'
+export const blogModel = () => env('BLOG_MODEL') || DEFAULT_BLOG_MODEL
 
 /** Modelo que clasifica keywords en lote (muchas llamadas cortas). */
 export const blogFastModel = () => env('BLOG_MODEL_FAST') || env('ANTHROPIC_MODEL_FAST') || blogModel()

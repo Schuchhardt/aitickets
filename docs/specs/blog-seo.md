@@ -118,7 +118,8 @@ políticas: solo la service role.
 
 ## Costos aproximados
 
-Por artículo: plan + investigación (≤ 6 búsquedas web) + redacción con Claude Opus 5.5 ≈ US$0,5-2 (queda en
+Por artículo: plan + investigación (≤ 6 búsquedas web) + redacción con Claude Sonnet 5.5 (`BLOG_MODEL`, por defecto) ≈
+US$0,3-1; con Opus 5.5 cerca del doble (queda en
 `list_blog_runs`). Clasificar keywords en lote: centavos por corrida. Search Console y Keyword Planner: gratis.
 
 ## Límites conocidos

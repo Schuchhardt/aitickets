@@ -471,7 +471,7 @@ const runBlogTask: AdminToolDef = {
         "Dispara una tarea en segundo plano (el resultado llega en 1 a 8 minutos a list_blog_runs y a Slack): keywords (descubrir y puntuar con " +
         "Planner, Search Console, autocompletado e IA), metrics (Search Console por artículo), generate (un artículo nuevo: con keyword_id esa " +
         "keyword, con topic_slug la mejor de ese tema; publish=false lo deja en borrador) o refresh (reescribir un artículo que ya rankea; con " +
-        "post_id ese). generate y refresh gastan créditos de IA (≈ US$0,5-2 cada uno): piden confirmación.",
+        "post_id ese). generate y refresh gastan créditos de IA (≈ US$0,3-1 cada uno con Sonnet, el modelo por defecto): piden confirmación.",
     readOnly: false,
     inputSchema: {
         type: "object",
@@ -492,7 +492,7 @@ const runBlogTask: AdminToolDef = {
                 args.task === "generate"
                     ? `Escribir un artículo nuevo${args.keyword_id ? ` para la keyword ${args.keyword_id}` : args.topic_slug ? ` del tema ${args.topic_slug}` : " (la mejor keyword pendiente)"}${args.publish === false ? ", en borrador" : ""}.`
                     : `Refrescar ${args.post_id ? `el artículo ${args.post_id}` : "el artículo con más potencial"} con datos de Search Console.`,
-            details: { costo_estimado_usd: "0,5 - 2", tarea: args.task },
+            details: { costo_estimado_usd: "0,3 - 1", tarea: args.task },
         };
     },
     audit: (args) => ({ summary: `Tarea del blog: ${args.task}${args.keyword_id ? ` keyword ${args.keyword_id}` : ""}${args.post_id ? ` artículo ${args.post_id}` : ""}` }),

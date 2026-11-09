@@ -298,3 +298,15 @@ describe('MCP de admin: analítica y corridas', () => {
     }
   })
 })
+
+describe('modelo del blog', () => {
+  afterEach(() => vi.unstubAllEnvs())
+  it('Sonnet por defecto, aunque ANTHROPIC_MODEL sea Opus; BLOG_MODEL lo cambia', async () => {
+    const { blogModel } = await import('../../netlify/lib/blog/config.mjs')
+    vi.stubEnv('ANTHROPIC_MODEL', 'claude-opus-5-5')
+    vi.stubEnv('BLOG_MODEL', '')
+    expect(blogModel()).toBe('claude-sonnet-5-5')
+    vi.stubEnv('BLOG_MODEL', 'claude-opus-5-5')
+    expect(blogModel()).toBe('claude-opus-5-5')
+  })
+})
