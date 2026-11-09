@@ -1,0 +1,32 @@
+---
+// Vista previa de un artículo en cualquier estado (borrador incluido) con el link firmado que entrega get_blog_post del
+// MCP de admin (netlify/lib/blog/preview-token.mjs). Sin caché y noindex.
+import AppHeader from "../../../components/AppHeader.vue";
+import AppFooter from "../../../components/AppFooter.vue";
+import BlogArticle from "../../../components/blog/BlogArticle.astro";
+import Layout from "../../../layouts/Layout.astro";
+import { getPostById, listTopics } from "../../../lib/blog";
+import { notFound } from "../../../lib/notFound";
+import { verifyBlogPreview } from "../../../../netlify/lib/blog/preview-token.mjs";
+import "../../../styles/global.css";
+
+export const prerender = false;
+
+const id = Number(Astro.params.id);
+const tokenId = verifyBlogPreview(Astro.url.searchParams.get("t") || "");
+if (!Number.isSafeInteger(id) || !tokenId || tokenId !== id) return notFound();
+const post = await getPostById(id);
+if (!post) return notFound();
+const topic = (await listTopics()).find((t) => t.id === post.topic_id) || null;
+Astro.response.headers.set("Cache-Control", "private, no-store");
+Astro.response.headers.set("Netlify-CDN-Cache-Control", "no-store");
+Astro.response.headers.set("X-Robots-Tag", "noindex, nofollow");
+---
+
+<Layout title={`Vista previa: ${post.title}`} description={post.description} canonical={`/blog/${post.slug}`} noindex analytics={false}>
+    <AppHeader client:idle />
+    <main class="font-['Prompt']">
+        <BlogArticle post={post} topic={topic} related={[]} preview />
+    </main>
+    <AppFooter client:idle />
+</Layout>

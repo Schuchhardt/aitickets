@@ -52,6 +52,7 @@ Empieza siempre con `get_admin_context`. Prompts listos: `ayudar_productor`, `re
 | --- | --- |
 | Plataforma | `get_platform_overview`, `get_platform_timeseries`, `rank_producers`, `get_producer_funnel`, `list_platform_activity`, `get_system_health` |
 | Difusión automática | `list_social_series` (todas las series, fallas y ventas por DM), `update_social_series_config` (bandas y horas, escritura con `reason`) y `org_*_social_series`. Métricas en `get_platform_overview` y `get_event_analytics` (`social_series`). Ver [`docs/runbooks/historias-automaticas.md`](../runbooks/historias-automaticas.md) |
+| Blog SEO | `get_blog_overview` (configuración y qué toca hoy), `list_blog_topics` / `upsert_blog_topic` (temas y su cuota), `list_blog_keywords` / `upsert_blog_keywords` (keywords con métricas de Search Console y Keyword Planner), `list_blog_posts` / `get_blog_post` / `update_blog_post` (artículos, vista previa, publicar), `run_blog_task` (keywords, metrics, generate, refresh) y `list_blog_runs`. Ver [`docs/runbooks/blog-seo.md`](../runbooks/blog-seo.md) |
 | Uso del panel | `get_producer_activity` (una productora: sesiones, tiempo por sección, clics, acciones, errores y dónde se trabó; `session_id` para el detalle clic a clic), `list_dashboard_issues` (errores y fricción de todos). Ver [`docs/specs/bitacora-panel.md`](../specs/bitacora-panel.md) |
 | Productores | `search_organizations`, `get_organization`, `search_users`, `list_organization_notes` |
 | Eventos | `search_events`, `get_event_analytics` |

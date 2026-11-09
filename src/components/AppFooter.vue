@@ -97,6 +97,7 @@ const columns = [
   {
     title: "Recursos",
     links: [
+      { href: "/blog", label: "Blog" },
       { href: "/guias", label: "Guías" },
       { href: "/vender-entradas-online", label: "Vender entradas online" },
       { href: "/entradas-con-qr", label: "Entradas con QR" },

@@ -24,6 +24,7 @@ const STATIC_PAGES: { path: string; changefreq: string; priority: string }[] = [
   ...LANDINGS.map((l) => ({ path: `/${l.slug}`, changefreq: "monthly", priority: l.kind === "vertical" ? "0.8" : "0.7" })),
   { path: "/ticketeras-en-chile", changefreq: "monthly", priority: "0.7" },
   { path: "/guias", changefreq: "weekly", priority: "0.6" },
+  { path: "/blog", changefreq: "daily", priority: "0.7" },
   // Comparaciones: solo las que tienen todos sus datos verificados con fuente y fecha (las demás son noindex)
   ...indexableComparisonSlugs().map((slug) => ({ path: `/comparar/${slug}`, changefreq: "monthly", priority: "0.5" })),
 ];
@@ -85,6 +86,37 @@ async function producerSiteEntries(orgsWithUpcoming: Set<number>): Promise<strin
   }
 }
 
+/** Artículos publicados del blog y los hubs de tema que tienen artículos (src/pages/blog). */
+async function blogEntries(): Promise<string[]> {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data: posts, error } = await supabase
+      .from("aitickets_blog_posts")
+      .select("slug, topic_id, published_at, content_updated_at")
+      .eq("status", "published")
+      .order("published_at", { ascending: false })
+      .limit(5000);
+    if (error) return []; // tabla inexistente (preview sin migrar)
+    const topicIds = [...new Set((posts || []).map((p) => p.topic_id).filter((id) => id != null))];
+    const { data: topics } = topicIds.length
+      ? await supabase.from("aitickets_blog_topics").select("id, slug").eq("active", true).in("id", topicIds)
+      : { data: [] as { id: number; slug: string }[] };
+    return [
+      ...(posts || []).map((p) =>
+        urlEntry(`${SITE_URL}/blog/${encodeURIComponent(p.slug)}`, {
+          lastmod: new Date(p.content_updated_at || p.published_at).toISOString(),
+          changefreq: "monthly",
+          priority: "0.6",
+        })
+      ),
+      ...(topics || []).map((t) => urlEntry(`${SITE_URL}/blog/tema/${encodeURIComponent(t.slug)}`, { changefreq: "weekly", priority: "0.5" })),
+    ];
+  } catch (err) {
+    console.error("Error agregando el blog al sitemap:", err);
+    return [];
+  }
+}
+
 export const GET: APIRoute = async () => {
   const entries = STATIC_PAGES.map((p) =>
     urlEntry(`${SITE_URL}${p.path}`, { changefreq: p.changefreq, priority: p.priority })
@@ -97,6 +129,7 @@ export const GET: APIRoute = async () => {
   } catch (err) {
     console.error("Error agregando guías al sitemap:", err);
   }
+  entries.push(...(await blogEntries()));
 
   try {
     const supabase = getSupabaseAdmin();

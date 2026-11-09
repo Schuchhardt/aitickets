@@ -13,11 +13,16 @@
 // Host real no forma parte de la clave del CDN).
 
 export const EVENT_PAGES_TAG = "event-pages";
+/** Páginas del blog: las vacía netlify/lib/blog/publish.mjs (BLOG_CACHE_TAG) al publicar o actualizar un artículo. */
+export const BLOG_PAGES_TAG = "blog-pages";
 
-export function cachePublicPage(headers: Headers, { sMaxAge, staleWhileRevalidate }: { sMaxAge: number; staleWhileRevalidate: number }) {
+export function cachePublicPage(
+  headers: Headers,
+  { sMaxAge, staleWhileRevalidate, tag = EVENT_PAGES_TAG }: { sMaxAge: number; staleWhileRevalidate: number; tag?: string },
+) {
   headers.set("Cache-Control", "public, max-age=0, must-revalidate");
   headers.set("Netlify-CDN-Cache-Control", `public, durable, s-maxage=${sMaxAge}, stale-while-revalidate=${staleWhileRevalidate}`);
-  headers.set("Netlify-Cache-Tag", EVENT_PAGES_TAG);
+  headers.set("Netlify-Cache-Tag", tag);
 }
 
 const PURGE_TIMEOUT_MS = 2500;
