@@ -27,8 +27,9 @@ import { maxPerPurchase, loadTicketChain, waitingOnPrevious, loadPeoplePerTicket
 import { normalizeCheckoutFields } from "./checkoutFields.mjs";
 import { loadEventSeating, loadTicketSections, seatCounts } from "../../netlify/lib/seats.mjs";
 import { totalSeats } from "./seatMap.mjs";
-import { clientIpFrom } from "./sites";
-import { normalizeWebsiteUrl } from "./siteTemplates";
+import { clientIpFrom, siteCanonicalOrigin } from "./sites";
+import { normalizeWebsiteUrl, socialProfileUrl } from "./siteTemplates";
+import { normalizePerformers } from "./eventPerformers.mjs";
 import { computeSalesProgress } from "./salesProgress.mjs";
 
 // Columnas públicas del evento. NUNCA incluir secret_location (C4).
@@ -261,6 +262,8 @@ interface EventPageRows {
   faqs: any[];
   dates: any[];
   org: any;
+  /** Sitio publicado de la organización ({ slug, custom_domain, domain_status }) o null (migración 202611090100). */
+  site: any;
   /** Razón social, RUT, identidad verificada del organizador y autorización del evento (migración 202610260100). */
   trust: any;
   hasSecretLocation: boolean;
@@ -300,6 +303,8 @@ async function loadEventPageRows(
       faqs: data.faqs || [],
       dates: data.dates || [],
       org: data.org || null,
+      // Función anterior a 202611090100 (sin 'site'): sin sitio, organizer.url usa la web o el Instagram
+      site: data.site || null,
       // Función anterior a 202610260100 (sin 'trust'): se consulta aparte
       trust: data.trust !== undefined ? data.trust : await loadTrust(supabase, data.event),
       hasSecretLocation: data.has_secret_location === true,
@@ -351,8 +356,9 @@ async function loadEventPageRowsByQueries(
       : baseQuery.eq("slug", slug!).eq("status", "published")
     ).maybeSingle();
   };
-  let { data: event, error }: { data: any; error: any } = await loadEvent(`${EVENT_PUBLIC_COLUMNS}, cover_settings, fee_absorbed, cover_meta, page_settings, cover_video, gallery_video`);
-  // Deploy previews comparten la BD de producción: tolerar que las migraciones de videos/page_settings/cover_meta/cover_settings/fee_absorbed no estén aplicadas
+  let { data: event, error }: { data: any; error: any } = await loadEvent(`${EVENT_PUBLIC_COLUMNS}, cover_settings, fee_absorbed, cover_meta, page_settings, cover_video, gallery_video, created_at, performers`);
+  // Deploy previews comparten la BD de producción: tolerar que las migraciones de artistas/videos/page_settings/cover_meta/cover_settings/fee_absorbed no estén aplicadas
+  if (error?.code === "42703") ({ data: event, error } = await loadEvent(`${EVENT_PUBLIC_COLUMNS}, cover_settings, fee_absorbed, cover_meta, page_settings, cover_video, gallery_video, created_at`));
   if (error?.code === "42703") ({ data: event, error } = await loadEvent(`${EVENT_PUBLIC_COLUMNS}, cover_settings, fee_absorbed, cover_meta, page_settings`));
   if (error?.code === "42703") ({ data: event, error } = await loadEvent(`${EVENT_PUBLIC_COLUMNS}, cover_settings, fee_absorbed, cover_meta`));
   if (error?.code === "42703") ({ data: event, error } = await loadEvent(`${EVENT_PUBLIC_COLUMNS}, cover_settings, fee_absorbed`));
@@ -367,11 +373,11 @@ async function loadEventPageRowsByQueries(
   if (opts.organizationId !== undefined && Number(event.organization_id) !== Number(opts.organizationId)) return null;
 
   // Datos relacionados (en paralelo)
-  const [categoriesRes, ticketsRes, faqsRes, datesRes, orgRes, secretRes, gallery, availability, ticketChain] = await Promise.all([
+  const [categoriesRes, ticketsRes, faqsRes, datesRes, orgRes, secretRes, gallery, availability, ticketChain, siteRes] = await Promise.all([
     supabase.from("event_tags").select("category_tags(name)").eq("event_id", event.id),
     supabase
       .from("event_tickets")
-      .select("id, ticket_name, price, max_quantity, total_quantity, status, is_gift, init_date, end_date, event_date_id")
+      .select("id, ticket_name, price, max_quantity, total_quantity, status, is_gift, init_date, end_date, event_date_id, created_at")
       .eq("event_id", event.id)
       .eq("is_gift", false)
       .eq("status", "available")
@@ -384,7 +390,7 @@ async function loadEventPageRowsByQueries(
       .order("date", { ascending: true })
       .order("start_time", { ascending: true }),
     event.organization_id
-      ? supabase.from("organizations").select("public_name, website, instagram").eq("id", event.organization_id).maybeSingle()
+      ? supabase.from("organizations").select("public_name, website, instagram, facebook, tiktok, email_verified_at").eq("id", event.organization_id).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
     // Solo saber SI existe dirección secreta, sin leer su valor (C4)
     supabase
@@ -399,6 +405,10 @@ async function loadEventPageRowsByQueries(
     supabase.rpc("aitickets_ticket_availability", { p_event_id: event.id }),
     // Tandas encadenadas: cuál espera a cuál (vacío sin la migración 202610290100)
     loadTicketChain(supabase, event.id),
+    // Sitio publicado de la organización (organizer.url del JSON-LD)
+    event.organization_id
+      ? supabase.from("aitickets_sites").select("slug, custom_domain, domain_status").eq("organization_id", event.organization_id).eq("published", true).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
   ]);
 
   if (categoriesRes.error) console.error("Error al obtener las categorías:", categoriesRes.error);
@@ -413,6 +423,8 @@ async function loadEventPageRowsByQueries(
     faqs: faqsRes.data || [],
     dates: datesRes.data || [],
     org: orgRes.data,
+    // Igual que la función de la BD: solo con el correo de la organización verificado (isSitePublic)
+    site: orgRes.data?.email_verified_at ? siteRes.data || null : null,
     trust: await loadTrust(supabase, event),
     hasSecretLocation: (secretRes.count ?? 0) > 0,
     gallery,
@@ -438,6 +450,9 @@ export function toPublicTicket(t: any, { remaining, feeAbsorbed }: { remaining: 
     max_quantity: remaining === null ? perPurchase : Math.min(perPurchase, remaining),
     init_date: t.init_date,
     end_date: t.end_date,
+    // Desde cuándo se vende (offers[].validFrom del JSON-LD, src/lib/eventJsonLd.ts): la apertura de la tanda o, si
+    // no tiene, cuándo se creó la entrada
+    valid_from: t.init_date || t.created_at || null,
     // R1: null = válida para cualquier función; si no, id de event.dates[]
     event_date_id: t.event_date_id ?? null,
     remaining,
@@ -526,11 +541,24 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
   // Organización
   const orgRow: any = raw.org;
   const trust: any = raw.trust || {};
+  const orgWebsite = orgRow ? normalizeWebsiteUrl(orgRow.website) : null;
+  const orgSiteUrl = orgRow && raw.site?.slug ? siteCanonicalOrigin(raw.site) : null;
+  const orgProfiles = orgRow
+    ? [
+        socialProfileUrl("https://www.instagram.com/", orgRow.instagram),
+        socialProfileUrl("https://www.facebook.com/", orgRow.facebook),
+        socialProfileUrl("https://www.tiktok.com/@", orgRow.tiktok),
+      ].filter((u): u is string => !!u)
+    : [];
+  // organizer.url del JSON-LD: la web de la productora, su sitio en AI Tickets o su primera red social; el resto, sameAs
+  const orgUrl = orgWebsite || orgSiteUrl || orgProfiles[0] || null;
   const organization = orgRow
     ? {
         name: orgRow.public_name,
         // Con esquema siempre: "miproductora.cl" sin https:// era un enlace relativo roto (404)
-        website: normalizeWebsiteUrl(orgRow.website),
+        website: orgWebsite,
+        url: orgUrl,
+        same_as: [...new Set([orgWebsite, orgSiteUrl, ...orgProfiles].filter((u): u is string => !!u && u !== orgUrl))],
         instagram: orgRow.instagram,
         // Identificación del organizador (Ley 19.496) y sello "Productor verificado" (Didit aprobado)
         legal_name: trust.legal_name || null,
@@ -708,7 +736,7 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
     loadCheckoutConfig(supabase, Number(event.id)),
   ]);
 
-  const { cover_meta: _coverMeta, page_settings: rawPageSettings, cover_video: rawCoverVideo, gallery_video: rawGalleryVideo, ...eventRow } = event;
+  const { cover_meta: _coverMeta, page_settings: rawPageSettings, cover_video: rawCoverVideo, gallery_video: rawGalleryVideo, performers: rawPerformers, ...eventRow } = event;
   const eventData = {
     ...eventRow,
     // R3: la descripción se renderiza con v-html => siempre sanitizada
@@ -729,6 +757,8 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
     // Quedan funciones y la productora muestra las reseñas de las pasadas (solo si ya hay alguna)
     reviews_during_run: reviewsDuringRun && Number(reviews?.summary?.count) > 0,
     dates,
+    // Artistas, elenco o expositores ("Participan" y performer del JSON-LD): [{ name, type: person|group }]
+    performers: normalizePerformers(rawPerformers),
     // Agenda por día: [{ key, function_id, title, blocks: [{ start, end, title, speakers, room }] }] ([] = sin sección)
     agenda: agendaGroups(agendaBlocks, dates),
     // Mesa para N: people_per_ticket > 1 (un QR por persona; precio y cupo por mesa)

@@ -13,6 +13,7 @@ import { applyRepeat, applyTicketCopy } from './functionRepeat'
 import FunctionRepeat from './FunctionRepeat.vue'
 import TicketCopyToFunctions from './TicketCopyToFunctions.vue'
 import CheckoutFieldsEditor from './CheckoutFieldsEditor.vue'
+import PerformersEditor from './PerformersEditor.vue'
 import { MAX_PEOPLE_PER_TICKET } from '../../lib/checkoutFields.mjs'
 import { EVENT_CATEGORIES } from '../../lib/eventCategories.mjs'
 import SeatingSettings from './SeatingSettings.vue'
@@ -75,6 +76,8 @@ const form = ref(JSON.parse(JSON.stringify(props.initialFormState)));
 // Diseño de la página pública y organizador visible (events.page_settings)
 form.value.general.pageSettings = normalizePageSettings(form.value.general.pageSettings)
 if (typeof form.value.general.slug !== 'string') form.value.general.slug = ''
+// Artistas, elenco o expositores (events.performers): "Participan" en la página y performer del JSON-LD
+if (!Array.isArray(form.value.general.performers)) form.value.general.performers = []
 // Reseñas: correos "¿Cómo estuvo?" después de cada función (toggle al final del formulario)
 if (!form.value.reviews) form.value.reviews = { enabled: true }
 
@@ -550,6 +553,8 @@ const submitEvent = async ({ exit = false } = {}) => {
             <label class="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
             <RichTextEditor v-model="form.general.description" :aiContext="descriptionAi" />
           </div>
+
+          <PerformersEditor v-model="form.general.performers" />
 
           <!-- Preguntas frecuentes: crear y editar en un modal; se guardan al instante -->
           <div>

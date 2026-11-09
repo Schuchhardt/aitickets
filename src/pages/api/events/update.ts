@@ -3,7 +3,7 @@ import { getSupabaseAdmin, getFriendlyErrorMessage } from "../../../lib/auth-hel
 import { getSessionContext, getOwnedEvent, hasRole, EVENT_MANAGER_ROLES, jsonResponse } from "../../../lib/supabaseServer";
 import { callInternalFunction, notifySlack, siteUrl } from "../_lib/server-utils";
 import { IDENTITY_REQUIRED_MESSAGE, eventRequiresIdentity, identityApproved, loadOrgIdentity, ticketsRequireIdentity } from "../../../lib/producerIdentity";
-import { syncEventCategory, refreshEventDenorm, normalizeTicket, isClientTempId, isValidDateInput, resolveTicketDateId, setEventStatus, EventInputError, saveCoverSettings, savePageSettings, validateFormTicketChain, saveFormTicketChain, saveFormEntryDeadlines, assertFunctionCount, saveCheckoutFields, saveFormTicketPeople, formSeatMaps, assertSeatChangesKeepSold, saveEventSeating } from "../_lib/events";
+import { syncEventCategory, refreshEventDenorm, normalizeTicket, isClientTempId, isValidDateInput, resolveTicketDateId, setEventStatus, EventInputError, saveCoverSettings, savePageSettings, validateFormTicketChain, saveFormTicketChain, saveFormEntryDeadlines, assertFunctionCount, saveCheckoutFields, savePerformers, saveFormTicketPeople, formSeatMaps, assertSeatChangesKeepSold, saveEventSeating } from "../_lib/events";
 import { sanitizeRichText } from "../../../lib/sanitize";
 import { saveSecretLocation } from "../../../../netlify/lib/secret-location.mjs";
 import { listOrgVenues, isVenueAllowed, insertOrgVenue } from "../../../lib/orgVenues";
@@ -178,6 +178,10 @@ export const POST: APIRoute = async (context) => {
         // Datos extra del checkout: asistentes por entrada, empresa y preguntas (idem)
         if (general.checkoutFields !== undefined) {
             await saveCheckoutFields(event.id, dbUser.organization_id, general.checkoutFields);
+        }
+        // Artistas, elenco o expositores: "Participan" y performer del JSON-LD (idem)
+        if (general.performers !== undefined) {
+            await savePerformers(event.id, dbUser.organization_id, general.performers);
         }
         // Reseñas: correo "¿Cómo estuvo?" activado o no (idem)
         if (typeof body?.reviewsEnabled === "boolean") {

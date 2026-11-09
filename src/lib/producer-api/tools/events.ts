@@ -1,5 +1,5 @@
 // Herramientas: cuenta, eventos y lugares.
-import { ToolError, type ToolDef, type ToolContext, channelLabel } from "../registry";
+import { ToolError, type ToolDef, type ToolContext, type JsonSchema, channelLabel } from "../registry";
 import { SCOPE_LABELS } from "../keys";
 import { PERMISSION_LABELS, ROLE_LABELS, ROLE_PERMISSIONS } from "../permissions";
 import {
@@ -18,6 +18,7 @@ import { EVENT_PAGE_BACKGROUNDS, EVENT_PAGE_LAYOUTS, isDefaultPageSettings, norm
 import { normalizeEventVideo } from "../../eventVideo";
 import { notifySlack, dedupeLocation } from "../../../pages/api/_lib/server-utils";
 import { normalizeCheckoutFields, isDefaultCheckoutFields, ATTENDEE_NAME_MODES, HOLDER_MODES, QUESTION_SCOPES, QUESTION_TYPES, MAX_QUESTIONS, MAX_OPTIONS, MAX_LABEL } from "../../checkoutFields.mjs";
+import { MAX_PERFORMERS, MAX_PERFORMER_NAME, PERFORMER_TYPES, normalizePerformers, performersForDb } from "../../eventPerformers.mjs";
 import { loadPeoplePerTicket } from "../../../../netlify/lib/tickets.mjs";
 
 const EVENT_LIST_COLUMNS = "id, name, slug, status, accessibility, start_date, end_date, location, image_url, created_at";
@@ -191,6 +192,7 @@ async function eventDetail(ctx: ToolContext, eventId: number) {
     const previewLinks = await listPreviewLinks(Number(event.id), ctx.actor.orgId, ctx.supabase).catch(() => []);
     const pageSettings = await loadPageSettings(ctx, Number(event.id));
     const videos = await loadEventVideos(ctx, Number(event.id));
+    const performers = await loadPerformers(ctx, Number(event.id));
     const [checkoutFields, people] = await Promise.all([loadCheckoutFields(ctx, Number(event.id)), loadPeoplePerTicket(ctx.supabase, Number(event.id))]);
     const secret = await loadSecretLocation(ctx.supabase, Number(event.id)).catch(() => ({ address: null, revealHours: null }));
     const venueOf = new Map<string, any>();
@@ -222,6 +224,8 @@ async function eventDetail(ctx: ToolContext, eventId: number) {
         page_layout: pageSettings.layout,
         show_organizer: pageSettings.show_organizer,
         page_background: pageSettings.background,
+        // Artistas, elenco o expositores ("Participan" y performer del JSON-LD); update_event los cambia
+        performers,
         // Dirección que solo ven quienes compran (la página muestra el lugar y la comuna, sin la calle)
         private_address: secret.address,
         private_address_reveal_hours: secret.revealHours,
@@ -270,6 +274,31 @@ const ticketInputSchema = {
     },
 };
 
+/** Artistas, elenco o expositores (events.performers): "Participan" en la página y performer del JSON-LD. */
+const performersSchema: JsonSchema = {
+    type: "array",
+    maxItems: MAX_PERFORMERS,
+    description:
+        "Artistas, elenco, bandas o expositores del evento. Se muestran en la página (\"Participan\") y Google los usa en los " +
+        "resultados de eventos (performer). Reemplaza la lista completa; [] = sin artistas. No inventes nombres: solo los que dio el productor.",
+    items: {
+        type: "object",
+        required: ["name"],
+        additionalProperties: false,
+        properties: {
+            name: { type: "string", minLength: 1, maxLength: MAX_PERFORMER_NAME },
+            type: { type: "string", enum: [...PERFORMER_TYPES], default: "person", description: "person = una persona (DJ, comediante, expositora); group = banda, compañía o colectivo." },
+        },
+    },
+};
+
+/** Artistas guardados (get_event). [] sin la migración 202611090100. */
+async function loadPerformers(ctx: ToolContext, eventId: number) {
+    const { data, error } = await ctx.supabase.from("events").select("performers").eq("id", eventId).eq("organization_id", ctx.actor.orgId).maybeSingle();
+    if (error && !["42703", "PGRST204"].includes(String(error.code || ""))) throw error;
+    return normalizePerformers((data as any)?.performers);
+}
+
 const createEvent: ToolDef = {
     name: "create_event",
     title: "Crear evento",
@@ -295,6 +324,7 @@ const createEvent: ToolDef = {
             category: { type: "string", maxLength: 80, description: "Ej: Música, Fiesta, Teatro, Conferencia, Deportes." },
             image_url: { type: "string", maxLength: 1000, pattern: "^https://", description: "Imagen de portada (https). Puedes subir una con upload_image o generate_image." },
             is_private: { type: "boolean", default: false, description: "true = solo accesible con el link." },
+            performers: performersSchema,
             venue_id: { type: "string", maxLength: 64, description: "ID de un lugar existente (list_venues)." },
             new_venue: {
                 type: "object",
@@ -335,7 +365,14 @@ const createEvent: ToolDef = {
             }
         }
         const input: EventGraphInput = {
-            general: { name: args.name, description: args.description, imageUrl: args.image_url || null, isPrivate: args.is_private, category: args.category },
+            general: {
+                name: args.name,
+                description: args.description,
+                imageUrl: args.image_url || null,
+                isPrivate: args.is_private,
+                category: args.category,
+                ...(args.performers !== undefined ? { performers: args.performers } : {}),
+            },
             locations: [{
                 venueId: args.venue_id || null,
                 isNewVenue: !args.venue_id,
@@ -398,6 +435,7 @@ const updateEvent: ToolDef = {
         "completa su nombre y sus respuestas desde el correo de su entrada; el QR sirve igual mientras tanto y list_attendees muestra " +
         "data_pending), company (RUT y razón social opcionales; el comprobante NO es boleta ni factura) y questions (preguntas al " +
         "inscribirse, cada una per order = una vez por compra o per attendee = una vez por persona; reemplaza la lista completa). " +
+        "performers: artistas, elenco o expositores (\"Participan\" en la página y performer para Google); reemplaza la lista completa. " +
         "Solo cambia las claves enviadas.",
     scope: "write",
     audit: (args, result) => ({ summary: `Editó ${((result as any).updated || []).join(", ") || "el evento"}`, target: `event:${args.event_id}` }),
@@ -413,6 +451,7 @@ const updateEvent: ToolDef = {
             category: { type: "string", maxLength: 80 },
             image_url: { type: "string", maxLength: 1000, pattern: "^https://" },
             is_private: { type: "boolean" },
+            performers: performersSchema,
             slug: {
                 type: "string",
                 minLength: SLUG_MIN,
@@ -502,7 +541,8 @@ const updateEvent: ToolDef = {
         const pageChange = args.page_layout !== undefined || args.show_organizer !== undefined || args.page_background !== undefined;
         const secretChange = args.private_address !== undefined || args.private_address_reveal_hours !== undefined;
         const checkoutChange = args.checkout_fields !== undefined && Object.keys(args.checkout_fields || {}).length > 0;
-        if (!Object.keys(patch).length && args.category === undefined && args.slug === undefined && !pageChange && !checkoutChange && !secretChange) throw new ToolError("invalid_input", "No enviaste cambios.");
+        const performersChange = args.performers !== undefined;
+        if (!Object.keys(patch).length && args.category === undefined && args.slug === undefined && !pageChange && !checkoutChange && !secretChange && !performersChange) throw new ToolError("invalid_input", "No enviaste cambios.");
         // Datos extra del checkout: se valida antes de guardar nada (una pregunta de opciones necesita 2 o más)
         let checkoutFields: ReturnType<typeof normalizeCheckoutFields> | null = null;
         if (checkoutChange) {
@@ -555,6 +595,17 @@ const updateEvent: ToolDef = {
             if (error?.code === "42703" || error?.code === "PGRST204") throw new ToolError("unavailable", "Los datos extra del checkout estarán disponibles después del próximo deploy.");
             if (error) throw error;
         }
+        let performers: ReturnType<typeof normalizePerformers> | null = null;
+        if (performersChange) {
+            const { error } = await ctx.supabase
+                .from("events")
+                .update({ performers: performersForDb(args.performers) })
+                .eq("id", event.id)
+                .eq("organization_id", ctx.actor.orgId);
+            if (error?.code === "42703" || error?.code === "PGRST204") throw new ToolError("unavailable", "Los artistas del evento estarán disponibles después del próximo deploy.");
+            if (error) throw error;
+            performers = normalizePerformers(args.performers);
+        }
         let warnings: string[] = [];
         // Dirección privada: después se recalcula events.location (los listados quedan sin la calle)
         let secret: { address: string | null; revealHours: number | null } | null = null;
@@ -586,10 +637,12 @@ const updateEvent: ToolDef = {
                 ...(args.show_organizer !== undefined ? ["show_organizer"] : []),
                 ...(args.page_background !== undefined ? ["page_background"] : []),
                 ...(checkoutFields ? ["checkout_fields"] : []),
+                ...(performers ? ["performers"] : []),
                 ...(args.private_address !== undefined ? ["private_address"] : []),
                 ...(args.private_address_reveal_hours !== undefined ? ["private_address_reveal_hours"] : []),
             ],
             ...(checkoutFields ? { checkout_fields: checkoutFields } : {}),
+            ...(performers ? { performers } : {}),
             ...(secret ? { private_address: secret.address, private_address_reveal_hours: secret.revealHours } : {}),
             ...(pageSettings ? { page_layout: pageSettings.layout, show_organizer: pageSettings.show_organizer, page_background: pageSettings.background } : {}),
             ...eventUrls(ctx, event),

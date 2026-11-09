@@ -137,6 +137,20 @@ const CINEMA = {
 /** layout: diseño elegido por el productor (sin imagen el diseño siempre es compacto). */
 export const SCENARIOS = {
   "poster-una-entrada": { layout: "poster", tickets: [TICKETS.general] },
+  // Artistas ("Participan") y JSON-LD completo: indexable para que la página publique el <script type="application/ld+json">
+  "con-artistas": {
+    layout: "poster",
+    tickets: [TICKETS.general],
+    indexable: true,
+    performers: [{ name: "Ana Tijoux", type: "person" }, { name: "Los Bunkers", type: "group" }],
+    organization: {
+      name: "Productora de Prueba",
+      website: null,
+      url: "https://aitickets.cl/o/productora-de-prueba",
+      same_as: ["https://www.instagram.com/productoradeprueba"],
+      instagram: "productoradeprueba",
+    },
+  },
   "banner-una-entrada": { layout: "banner", tickets: [TICKETS.general] },
   "compacto-una-entrada": { layout: "compact", image: false, tickets: [TICKETS.general] },
   "varias-entradas": { layout: "poster", tickets: [TICKETS.general, TICKETS.vip] },
@@ -222,6 +236,12 @@ const pad = (n) => String(n).padStart(2, "0");
  * (el evento nunca "termina"), salvo los escenarios `ended` (hace 2 días). `toPublicTicket` llega desde la página
  * (src/lib/eventPage.ts).
  */
+/** El escenario publica el JSON-LD (los demás van con noindex, como las vistas previas). */
+export const isIndexableScenario = (name) => SCENARIOS[name]?.indexable === true;
+
+/** Cuándo se crearon el evento y sus entradas en los escenarios (offers[].validFrom del JSON-LD). */
+export const FIXTURE_CREATED_AT = "2026-10-01T12:00:00.000Z";
+
 export function fixtureEvent(name, { toPublicTicket, now = new Date() }) {
   const scenario = SCENARIOS[name];
   if (!scenario) return null;
@@ -277,6 +297,8 @@ export function fixtureEvent(name, { toPublicTicket, now = new Date() }) {
     accessibility: "public",
     cover_settings: { desktop: { height: 480, position_y: 50, fit: "cover" }, mobile: { height: 270, position_y: 50, fit: "cover" } },
     organization_id: 1,
+    created_at: FIXTURE_CREATED_AT,
+    performers: scenario.performers || [],
     timezone: "America/Santiago",
     tags: ["Música"],
     faqs: [
@@ -292,7 +314,7 @@ export function fixtureEvent(name, { toPublicTicket, now = new Date() }) {
       dates,
     ),
     tickets: scenario.tickets.map((t) => ({
-      ...toPublicTicket({ ...t, init_date: null, end_date: null, event_date_id: functionId(t) }, { remaining: t.total_quantity ?? null, feeAbsorbed: false }),
+      ...toPublicTicket({ ...t, init_date: null, end_date: null, event_date_id: functionId(t), created_at: FIXTURE_CREATED_AT }, { remaining: t.total_quantity ?? null, feeAbsorbed: false }),
       people_per_ticket: t.people || 1,
       ...(scenario.seating ? { seat_sections: t.seat_sections ?? null } : {}),
     })),
@@ -313,7 +335,7 @@ export function fixtureEvent(name, { toPublicTicket, now = new Date() }) {
     reviews_during_run: scenario.reviewsDuringRun === true,
     sale_starts_at: scenario.saleStartsInDays ? new Date(now.getTime() + scenario.saleStartsInDays * 24 * 3600 * 1000).toISOString() : null,
     has_secret_location: false,
-    organization: { name: "Productora de Prueba", website: null, instagram: null },
+    organization: scenario.organization || { name: "Productora de Prueba", website: null, instagram: null },
     venue,
     page_settings: { layout: scenario.layout, show_organizer: true, background: "none" },
     is_demo: false,

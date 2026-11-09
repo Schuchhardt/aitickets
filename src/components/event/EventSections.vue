@@ -1,10 +1,10 @@
 <script setup>
-// Contenido de la página del evento bajo el póster (§4.8, §4.9): Sobre el evento, Funciones (si hay más de
-// una, v2 en §4.9b), Agenda (si el productor cargó bloques; por día, src/lib/eventAgenda.mjs), Ubicación, Preguntas
+// Contenido de la página del evento bajo el póster (§4.8, §4.9): Sobre el evento, Participan (artistas, elenco o
+// expositores: events.performers, src/lib/eventPerformers.mjs), Funciones (si hay más de una, v2 en §4.9b), Agenda (si el productor cargó bloques; por día, src/lib/eventAgenda.mjs), Ubicación, Preguntas
 // frecuentes, acceso al asistente y categorías. Sin tabs. Todo va en la columna principal: la card de acción (v2)
 // sigue a la derecha en desktop y la agenda no la empuja.
 import { ref, computed, onMounted, nextTick } from "vue";
-import { Navigation } from "lucide-vue-next";
+import { Navigation, User, Users } from "lucide-vue-next";
 import { categoryIcon } from "./categoryIcons.js";
 import { vReveal } from "./reveal.js";
 import AutoHeight from "./AutoHeight.vue";
@@ -23,6 +23,9 @@ const DESCRIPTION_LIMIT = 600;
 const description = computed(() => props.event.description || "");
 const isLong = computed(() => description.value.replace(/<[^>]+>/g, "").length > DESCRIPTION_LIMIT);
 const expanded = ref(false);
+
+// ---- Participan: artistas, elenco o expositores (también van como performer en el JSON-LD) ----
+const performers = computed(() => (Array.isArray(props.event.performers) ? props.event.performers.filter((p) => p?.name) : []));
 
 // ---- Funciones (§4.9b): por lugar si hay más de uno y por mes si un lugar tiene más de 8 ----
 const functions = computed(() => upcomingFunctions(props.event));
@@ -138,6 +141,16 @@ function toggleFaq(i) {
       <button v-if="isLong" type="button" class="ev-link read-more" :aria-expanded="expanded ? 'true' : 'false'" @click="expanded = !expanded">
         {{ expanded ? "Leer menos" : "Leer más" }}
       </button>
+    </section>
+
+    <section v-if="performers.length" id="participan" v-reveal class="section" aria-labelledby="participan-title" data-testid="event-performers">
+      <h2 id="participan-title" class="section-title">Participan</h2>
+      <ul class="performers">
+        <li v-for="(p, i) in performers" :key="p.name" class="performer" :style="{ '--i': i }" data-testid="event-performer">
+          <component :is="p.type === 'group' ? Users : User" :size="15" class="tag-icon" aria-hidden="true" />
+          {{ p.name }}
+        </li>
+      </ul>
     </section>
 
     <section v-if="fnList.total > 1" id="funciones" v-reveal class="section" aria-labelledby="funciones-title" data-testid="event-functions">
@@ -617,10 +630,26 @@ function toggleFaq(i) {
   cursor: pointer;
   text-align: left;
 }
-.tags {
+.tags,
+.performers {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+.performer {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-1);
+  background: var(--surface-1);
+  border-radius: var(--r-pill);
+  padding: 8px 16px 8px 12px;
+}
+.is-in .performer {
+  animation: ev-fade-up var(--dur-3) var(--ease-out) backwards;
+  animation-delay: calc(var(--i, 0) * 60ms);
 }
 .tag {
   display: inline-flex;

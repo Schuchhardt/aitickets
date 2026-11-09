@@ -11,6 +11,7 @@ import { applyRepeat, applyTicketCopy } from './functionRepeat'
 import FunctionRepeat from './FunctionRepeat.vue'
 import TicketCopyToFunctions from './TicketCopyToFunctions.vue'
 import CheckoutFieldsEditor from './CheckoutFieldsEditor.vue'
+import PerformersEditor from './PerformersEditor.vue'
 import { MAX_PEOPLE_PER_TICKET } from '../../lib/checkoutFields.mjs'
 import { EVENT_CATEGORIES } from '../../lib/eventCategories.mjs'
 import SeatingSettings from './SeatingSettings.vue'
@@ -49,6 +50,8 @@ const form = ref({
     isPrivate: false,
     secretLocation: '',
     secretLocationRevealHours: '',
+    // Artistas, elenco o expositores (events.performers): "Participan" en la página y performer del JSON-LD
+    performers: [],
     // Entradas numeradas: cada ubicación lleva su mapa (locations[].seatMap) y cada entrada sus secciones
     seated: false,
   },
@@ -395,6 +398,8 @@ function restoreLocal() {
     if (!saved?.general) return
     // La copia de este navegador es lo último que escribió el productor (incluso si un guardado falló): manda
     form.value = { ...form.value, ...saved }
+    // Copias guardadas antes de existir los artistas
+    if (!Array.isArray(form.value.general.performers)) form.value.general.performers = []
   } catch { /* datos corruptos: se parte de lo que hay */ }
 }
 function clearLocal() {
@@ -509,6 +514,8 @@ if (form.value.tickets.length === 0) addTicket()
             <label class="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
             <RichTextEditor v-model="form.general.description" :aiContext="descriptionAi" />
           </div>
+
+          <PerformersEditor v-model="form.general.performers" />
 
            <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">Imagen del Evento (Cover)</label>

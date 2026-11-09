@@ -10,6 +10,7 @@ import { identityPublishBlocker } from "../../../lib/producerIdentity";
 import { refreshEventRisk } from "../../../lib/eventRisk";
 import { chainError } from "../../../../netlify/lib/tickets.mjs";
 import { normalizeCheckoutFields, isDefaultCheckoutFields, normalizePeoplePerTicket } from "../../../lib/checkoutFields.mjs";
+import { performersForDb } from "../../../lib/eventPerformers.mjs";
 import { normalizeEntryUntil } from "../../../lib/entryDeadline.mjs";
 import { hasSecretLocation, saveSecretLocation, SECRET_PLACE_NAME } from "../../../../netlify/lib/secret-location.mjs";
 import { normalizeSeatMap, normalizeSeatSections, seatedTicketCapacity, missingSeats } from "../../../lib/seatMap.mjs";
@@ -218,6 +219,20 @@ export async function saveCheckoutFields(eventId: number, orgId: number, raw: un
     if (error) console.warn("checkout_fields no disponible todavía:", error.message);
 }
 
+/**
+ * Artistas, elenco o expositores (events.performers, src/lib/eventPerformers.mjs): "Participan" en la página y
+ * performer en el JSON-LD. Reemplaza la lista completa. Tolera que la migración 202611090100 aún no esté aplicada.
+ */
+export async function savePerformers(eventId: number, orgId: number, raw: unknown): Promise<void> {
+    const { error } = await getSupabaseAdmin()
+        .from("events")
+        .update({ performers: performersForDb(raw) })
+        .eq("id", eventId)
+        .eq("organization_id", orgId);
+    if (error && error.code !== "42703" && error.code !== "PGRST204") throw error;
+    if (error) console.warn("performers no disponible todavía:", error.message);
+}
+
 /** true si el id viene del cliente (Date.now()) y no de la base de datos. */
 export const isClientTempId = (id: unknown) => id === undefined || id === null || id === "" || (typeof id === "number" && id > 1000000000000);
 
@@ -294,6 +309,8 @@ export type EventGraphInput = {
         coverSettings?: unknown;
         /** Datos extra del checkout (src/lib/checkoutFields.mjs). */
         checkoutFields?: unknown;
+        /** Artistas, elenco o expositores: [{ name, type: person|group }] (src/lib/eventPerformers.mjs). */
+        performers?: unknown;
         /** Dirección que solo ven quienes compran (events.secret_location). ""/null = sin dirección privada. */
         secretLocation?: string | null;
         /** Horas antes de la función en que se revela (null = apenas compran). */
@@ -398,6 +415,7 @@ export async function createEventGraph(
     }
     if (general.coverSettings) await saveCoverSettings(eventId, actor.orgId, general.coverSettings);
     if (general.checkoutFields) await saveCheckoutFields(eventId, actor.orgId, general.checkoutFields);
+    if (general.performers !== undefined) await savePerformers(eventId, actor.orgId, general.performers);
 
     // 2. Ubicaciones y funciones (antes que las entradas, para mapear la función de cada entrada — R1)
     const dateIdMap = new Map<string, number>();

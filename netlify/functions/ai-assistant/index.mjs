@@ -12,6 +12,7 @@ import { TICKET_COLUMNS, isTicketOnSale, maxPerPurchase, getSoldCounts, ticketsW
 import { IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL, computeBuyerTotal } from '../../lib/fees.mjs'
 import { isDemoEventSlug, getDemoFunctionDate } from '../../../src/lib/demoEvent.mjs'
 import { agendaGroups, agendaText, loadAgenda } from '../../../src/lib/eventAgenda.mjs'
+import { normalizePerformers } from '../../../src/lib/eventPerformers.mjs'
 import { EVENT_DATE_COLUMNS, todayInTimeZone, formatDateOnlyLong, formatTimeShort, formatEventLocation } from '../../lib/dates.mjs'
 import { rateLimit } from '../../lib/rate-limit.mjs'
 import { hasSecretLocation as eventHasSecretLocation, publicPlace } from '../../lib/secret-location.mjs'
@@ -92,14 +93,17 @@ async function loadEventContext(supabase, eventId) {
   if (!event) return null
   const isDemo = isDemoEventSlug(event.slug)
 
-  const [{ data: dates }, { data: tickets }, { data: faqs }, agendaBlocks, hasSecretLocation] = await Promise.all([
+  const [{ data: dates }, { data: tickets }, { data: faqs }, agendaBlocks, hasSecretLocation, performersRes] = await Promise.all([
     supabase.from('event_dates').select(EVENT_DATE_COLUMNS).eq('event_id', eventId).order('date', { ascending: true }).order('start_time', { ascending: true }).limit(20),
     supabase.from('event_tickets').select(TICKET_COLUMNS).eq('event_id', eventId).order('price', { ascending: true }),
     supabase.from('event_faqs').select('question, answer').eq('event_id', eventId).limit(30),
     // Agenda con expositores y salas (vacía sin la tabla aitickets_event_agenda)
     loadAgenda(supabase, eventId).catch(() => []),
     eventHasSecretLocation(supabase, eventId),
+    // Artistas, elenco o expositores (events.performers, migración 202611090100; [] sin ella)
+    supabase.from('events').select('performers').eq('id', eventId).maybeSingle(),
   ])
+  const performers = performersRes?.error ? [] : normalizePerformers(performersRes?.data?.performers)
 
   const now = new Date()
   // Tandas encadenadas que esperan a la anterior no se ofrecen todavía
@@ -122,14 +126,14 @@ async function loadEventContext(supabase, eventId) {
 
   // Evento demo: fecha dinámica (misma fecha que muestra la página)
   const eventDates = (dates || []).map(d => (isDemo ? { ...d, date: getDemoFunctionDate(d.date, now, event.slug) } : d))
-  return { event, isDemo, feeAbsorbed, hasSecretLocation, dates: eventDates, tickets: saleTickets, faqs: faqs || [], agenda: agendaText(agendaGroups(agendaBlocks, dates || [])) }
+  return { event, isDemo, feeAbsorbed, hasSecretLocation, dates: eventDates, tickets: saleTickets, faqs: faqs || [], agenda: agendaText(agendaGroups(agendaBlocks, dates || [])), performers }
 }
 
 function paymentMethodsLine() {
   return 'El pago se hace con Webpay.'
 }
 
-export function buildSystemPrompt({ event, isDemo, feeAbsorbed = false, hasSecretLocation = false, dates, tickets, faqs, agenda = '' }) {
+export function buildSystemPrompt({ event, isDemo, feeAbsorbed = false, hasSecretLocation = false, dates, tickets, faqs, agenda = '', performers = [] }) {
   const today = todayInTimeZone()
   const upcoming = dates.filter(d => d.date >= today)
   const dateLines = (upcoming.length ? upcoming : dates).map(d => {
@@ -157,7 +161,7 @@ Reglas:
 
 Información del evento (ID ${event.id}):
 Nombre: ${event.name}
-Descripción: ${stripHtml(event.description).slice(0, 3000) || 'Sin descripción'}
+Descripción: ${stripHtml(event.description).slice(0, 3000) || 'Sin descripción'}${performers.length ? `\nParticipan (artistas, elenco o expositores): ${performers.map(p => p.name).join(', ').slice(0, 1500)}` : ''}
 Fechas y lugar:
 ${dateLines.join('\n') || '- Por confirmar'}${hasSecretLocation ? '\nLa dirección exacta solo la reciben quienes compran (en su orden y por correo). No la conoces: si la piden, explica eso.' : ''}${agenda ? `\nAgenda (hora, título, expositores y sala):\n${String(agenda).slice(0, 4000)}` : ''}
 Entradas a la venta:

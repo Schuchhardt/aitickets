@@ -412,7 +412,8 @@ export function normalizeWebsiteUrl(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
   const value = raw.trim();
   if (!value || value.length > 500 || /\s/.test(value)) return null;
-  if (isSafeHttpUrl(value)) return value;
+  // String(): isSafeHttpUrl es un type guard y, si no, TypeScript deja `value` como never en el resto
+  if (isSafeHttpUrl(String(value))) return value;
   // Otro esquema (javascript:, mailto:…); "dominio.cl:8080/x" no es un esquema
   if (/^[a-z][a-z0-9+.-]*:/i.test(value) && !/^[^:/]+:\d+(\/|$)/.test(value)) return null;
   try {
@@ -421,6 +422,17 @@ export function normalizeWebsiteUrl(raw: unknown): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Perfil de una red social a partir de lo que guardó el productor: una URL http(s) o el usuario ("@productora").
+ * base = "https://www.instagram.com/", "https://www.facebook.com/" o "https://www.tiktok.com/@".
+ */
+export function socialProfileUrl(base: string, value: string | null | undefined): string | undefined {
+  if (!value) return undefined;
+  if (isSafeHttpUrl(String(value))) return value;
+  const handle = String(value).replace(/^@/, "").trim();
+  return /^[A-Za-z0-9._-]{1,60}$/.test(handle) ? `${base}${handle}` : undefined;
 }
 
 /** Tema final (valores del productor validados + defaults de la plantilla). */

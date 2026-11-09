@@ -916,6 +916,7 @@ column:events.name	text notnull=false default=-
 column:events.organization_id	bigint notnull=false default=-
 column:events.page_settings	jsonb notnull=false default=-
 column:events.panel_modules	jsonb notnull=false default=-
+column:events.performers	jsonb notnull=false default=-
 column:events.permit_status	text notnull=true default='none'::text
 column:events.requires_documents	boolean notnull=true default=false
 column:events.reserve_pct	integer notnull=true default=0
@@ -1473,6 +1474,7 @@ constraint:event_withdrawals.event_withdrawals_payout_id_fkey	FOREIGN KEY (payou
 constraint:event_withdrawals.event_withdrawals_pkey	PRIMARY KEY (id)
 constraint:event_withdrawals.event_withdrawals_user_id_fkey	FOREIGN KEY (user_id) REFERENCES users(id)
 constraint:events.events_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id)
+constraint:events.events_performers_is_array	CHECK (((performers IS NULL) OR ((jsonb_typeof(performers) = 'array'::text) AND (jsonb_array_length(performers) <= 30))))
 constraint:events.events_permit_status_check	CHECK ((permit_status = ANY (ARRAY['none'::text, 'pending'::text, 'approved'::text, 'rejected'::text])))
 constraint:events.events_pkey	PRIMARY KEY (id)
 constraint:events.events_reserve_pct_check	CHECK (((reserve_pct >= 0) AND (reserve_pct <= 100)))
@@ -1518,7 +1520,7 @@ function:aitickets_outreach_bump_counter(p_key text, p_delta bigint)	md5=3c1cfab
 function:aitickets_payout_account_changed()	md5=bb748cde7981edd1c492ed98febbbecc lang=plpgsql secdef=false returns=trigger config=search_path=public
 function:aitickets_payout_sync_withdrawals()	md5=420e3181144b44f59e6ba60c9eb07700 lang=plpgsql secdef=true returns=trigger config=search_path=public
 function:aitickets_payout_touch()	md5=5492f1791d9571e8e4bed2321c9f36f7 lang=plpgsql secdef=false returns=trigger config=search_path=public
-function:aitickets_public_event_page(p_slug text, p_event_id bigint)	md5=c90de63c75d000ef0b2e291242687bbc lang=sql secdef=true returns=jsonb config=search_path=public
+function:aitickets_public_event_page(p_slug text, p_event_id bigint)	md5=7bd428b3f2629ca5c4388fbc855f1b29 lang=sql secdef=true returns=jsonb config=search_path=public
 function:aitickets_purge_producer_activity(p_keep_days integer, p_batch integer)	md5=e25fca9c9cbcd6ce61389df471193bb1 lang=plpgsql secdef=true returns=integer config=search_path=public
 function:aitickets_rate_limit_hit(p_bucket text, p_key_hash text, p_window_seconds integer, p_max integer)	md5=92624dd79140e02c60b8044ab507acea lang=plpgsql secdef=true returns=boolean config=search_path=public
 function:aitickets_reserve_order(p_event_id bigint, p_lines jsonb, p_order jsonb, p_hold_minutes integer)	md5=e9cd3d0a3dbd7ab4e260f214194412cd lang=plpgsql secdef=true returns=uuid config=search_path=public

@@ -4,7 +4,7 @@
 // solo en `astro dev` con E2E_FIXTURES=1, así que nunca llega al build de producción.
 import EventPage from "../../../src/components/EventPage.astro";
 import { toPublicTicket } from "../../../src/lib/eventPage";
-import { fixtureEvent } from "./event-scenarios.mjs";
+import { fixtureEvent, isIndexableScenario } from "./event-scenarios.mjs";
 
 export const prerender = false;
 
@@ -15,7 +15,8 @@ const seo = {
   title: `${eventData.name} | AI Tickets`,
   description: "Página de prueba (e2e).",
   canonicalPath: `/eventos/${eventData.slug}`,
-  noindex: true,
+  // Solo los escenarios marcados publican el JSON-LD (EventMetaTags lo omite con noindex)
+  noindex: !isIndexableScenario(Astro.params.escenario || ""),
   pageUrl: `${Astro.url.origin}/eventos/${eventData.slug}`,
 };
 ---

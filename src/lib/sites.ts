@@ -16,7 +16,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { getSupabaseAdmin } from "./auth-helpers";
 import { DEMO_EVENT_SLUGS, getDemoFunctionDate } from "./demoEvent.mjs";
 import { getZonedParts, zonedDateTimeToDate } from "../utils/dateHelpers.js";
-import { SITE_TEMPLATES, isSafeHttpUrl, normalizeWebsiteUrl, resolveThemeFor, type SiteTemplate } from "./siteTemplates";
+import { SITE_TEMPLATES, isSafeHttpUrl, normalizeWebsiteUrl, resolveThemeFor, socialProfileUrl, type SiteTemplate } from "./siteTemplates";
 
 export {
   SITE_FONTS,
@@ -593,12 +593,7 @@ function cleanSocials(site: SiteRecord): SiteSocials {
   const fromContent = (site.content?.socials || {}) as SiteSocials;
   const org = site.org;
   const pick = (v: unknown, fallback?: string | null) => (isSafeHttpUrl(v) ? (v as string) : isSafeHttpUrl(fallback) ? (fallback as string) : undefined);
-  const handleUrl = (base: string, v: string | null | undefined) => {
-    if (!v) return undefined;
-    if (isSafeHttpUrl(v)) return v;
-    const handle = String(v).replace(/^@/, "").trim();
-    return /^[A-Za-z0-9._-]{1,60}$/.test(handle) ? `${base}${handle}` : undefined;
-  };
+  const handleUrl = socialProfileUrl;
   const socials: SiteSocials = {
     instagram: pick(fromContent.instagram) || handleUrl("https://www.instagram.com/", org?.instagram),
     facebook: pick(fromContent.facebook) || handleUrl("https://www.facebook.com/", org?.facebook),

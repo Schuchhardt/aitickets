@@ -14,6 +14,7 @@ import { normalizeReviewSettings } from "../../../../../netlify/lib/reviews.mjs"
 import { siteUrl as siteUrlFromEnv } from "../../../api/_lib/server-utils";
 import { loadTicketChain, loadPeoplePerTicket } from "../../../../../netlify/lib/tickets.mjs";
 import { normalizeCheckoutFields } from "../../../../lib/checkoutFields.mjs";
+import { normalizePerformers } from "../../../../lib/eventPerformers.mjs";
 import { loadEntryDeadlines } from "../../../../../netlify/lib/checkin.mjs";
 import { loadSecretLocation } from "../../../../../netlify/lib/secret-location.mjs";
 
@@ -80,6 +81,9 @@ const [peoplePerTicket, checkoutFieldsRes] = await Promise.all([
     supabaseAdmin.from("events").select("checkout_fields").eq("id", event.id).maybeSingle(),
 ]);
 const checkoutFields = normalizeCheckoutFields(checkoutFieldsRes.error ? null : (checkoutFieldsRes.data as any)?.checkout_fields);
+// Artistas, elenco o expositores ([] si la migración 202611090100 aún no está aplicada)
+const performersRes = await supabaseAdmin.from("events").select("performers").eq("id", event.id).maybeSingle();
+const performers = normalizePerformers(performersRes.error ? null : (performersRes.data as any)?.performers);
 // Hora límite de ingreso por entrada (vacío si la migración 202610300300 aún no está aplicada)
 const entryDeadlines = await loadEntryDeadlines(supabaseAdmin, event.id);
 // Dirección que solo ven quienes compran (secret_location) y cuándo se revela
@@ -103,6 +107,7 @@ const initialFormState = {
         category: (event as any).event_tags?.[0]?.category_tags?.name || "",
         isPrivate: event.accessibility === "private",
         checkoutFields,
+        performers,
         secretLocation: secretLocation.address || "",
         secretLocationRevealHours: secretLocation.revealHours ?? "",
         seated: seating.maps.size > 0,
