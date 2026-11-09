@@ -13,6 +13,18 @@
     "netlify/functions/**/node_modules/**"
   ]
 
+# Reel de respaldo (netlify/lib/reel-video.mjs): ffmpeg-static queda fuera del bundle de esbuild y su binario (Linux,
+# lo baja el postinstall de npm ci en el build) se incluye a mano. Repite los included_files globales.
+[functions."social-series-reel-background"]
+  external_node_modules = ["ffmpeg-static"]
+  included_files = [
+    "netlify/functions/**/package.json",
+    "netlify/functions/**/node_modules/**",
+    "node_modules/ffmpeg-static/ffmpeg",
+    "node_modules/ffmpeg-static/package.json",
+    "node_modules/ffmpeg-static/index.js"
+  ]
+
 # Migraciones automáticas de BD (plugins/db-migrate + scripts/migrate.mjs).
 # Corre en onPostBuild SOLO con CONTEXT=production: si una migración falla, el deploy no ocurre.
 # Deploy previews y branch deploys nunca migran (comparten la BD de producción y son código no confiable).

@@ -124,19 +124,20 @@ describe('funciones programadas', () => {
     .filter((name) => existsSync(join(dir, name, 'index.mjs')))
     .filter((name) => /^\s*schedule:/m.test(readFileSync(join(dir, name, 'index.mjs'), 'utf8')))
   const healthSource = readFileSync('src/lib/admin-api/tools/health.ts', 'utf8')
-  // El dispatcher de la difusión queda fuera mientras no se pueda desplegar: se agrega junto con sus cambios (ver PR #71)
-  const PENDING = ['social-series-dispatch']
 
   it('todas registran su latido con su propio nombre y salen en get_system_health', () => {
     expect(scheduled.length).toBeGreaterThan(10)
-    for (const name of scheduled.filter((n) => !PENDING.includes(n))) {
+    for (const name of scheduled) {
       const src = readFileSync(join(dir, name, 'index.mjs'), 'utf8')
       expect(src, name).toContain(`export default withHeartbeat('${name}', `)
       expect(healthSource, name).toContain(`job: "${name}"`)
     }
   })
 
-  it('el dispatcher de la difusión no cambió', () => {
-    expect(readFileSync(join(dir, 'social-series-dispatch', 'index.mjs'), 'utf8')).not.toContain('withHeartbeat')
+  it('el dispatcher de la difusión también, y un fallo de /api/social-series/run queda como error', async () => {
+    expect(scheduled).toContain('social-series-dispatch')
+    const failed = await summarizeResponse(new Response(JSON.stringify({ error: 'Error interno' }), { status: 502 }))
+    expect(failed.ok).toBe(false)
+    expect(failed.error).toContain('HTTP 502')
   })
 })

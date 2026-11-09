@@ -6,6 +6,7 @@ import { ACTIVE_REFUND_STATUSES } from "../../producer-api/ledger";
 import { addDays } from "../../../../netlify/lib/dates.mjs";
 import type { AdminToolDef } from "../registry";
 import { platformSeriesStats } from "../../socialSeries";
+import { fetchHumanVisits } from "../../eventAnalytics";
 import {
     SEGMENTS,
     SEGMENT_LABELS,
@@ -64,23 +65,25 @@ const MAX_PERIOD_VISITS = 300000;
 /** Visitas creadas en el período, solo de los eventos indicados (no demo). Con orgFilter se consulta por evento. */
 export async function loadVisitsInPeriod(supabase: any, period: Pick<Period, "fromIso" | "toIso">, eventIds: number[], { byEvent = false } = {}) {
     const set = new Set(eventIds);
+    // Solo personas (sin bots ni desarrollo: event_visits.is_bot); sin la tabla, vacío
+    const tolerantHumanVisits = (scope: (q: any) => any) =>
+        fetchHumanVisits<any>(supabase, "event_id, ip_hash, created_at", scope, { max: MAX_PERIOD_VISITS }).catch((err: any) => {
+            if (isMissing(err)) return [] as any[];
+            throw err;
+        });
     if (byEvent) {
         const out: any[] = [];
         for (let i = 0; i < eventIds.length; i += 150) {
             const chunk = eventIds.slice(i, i + 150);
             out.push(
-                ...(await tolerantAll<any>(
-                    () => supabase.from("event_visits").select("event_id, ip_hash, created_at").in("event_id", chunk).gte("created_at", period.fromIso).lt("created_at", period.toIso).order("id", { ascending: true }),
-                    { max: MAX_PERIOD_VISITS },
+                ...(await tolerantHumanVisits(
+                    (q) => q.in("event_id", chunk).gte("created_at", period.fromIso).lt("created_at", period.toIso).order("id", { ascending: true }),
                 )),
             );
         }
         return out;
     }
-    const rows = await tolerantAll<any>(
-        () => supabase.from("event_visits").select("event_id, ip_hash, created_at").gte("created_at", period.fromIso).lt("created_at", period.toIso).order("id", { ascending: true }),
-        { max: MAX_PERIOD_VISITS },
-    );
+    const rows = await tolerantHumanVisits((q) => q.gte("created_at", period.fromIso).lt("created_at", period.toIso).order("id", { ascending: true }));
     return rows.filter((v) => set.has(Number(v.event_id)));
 }
 

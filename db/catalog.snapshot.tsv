@@ -865,6 +865,7 @@ column:event_tickets.seat_sections	text[] notnull=false default=-
 column:event_tickets.status	text notnull=false default='available'::text
 column:event_tickets.ticket_name	text notnull=true default=-
 column:event_tickets.total_quantity	integer notnull=false default=-
+column:event_visits.bot_reason	text notnull=false default=-
 column:event_visits.city	text notnull=false default=-
 column:event_visits.country	text notnull=false default=-
 column:event_visits.created_at	timestamp with time zone notnull=true default=now()
@@ -872,6 +873,7 @@ column:event_visits.event_id	bigint notnull=true default=-
 column:event_visits.id	bigint notnull=true default=- identity=a
 column:event_visits.ip_hash	text notnull=true default=-
 column:event_visits.ip_raw	text notnull=false default=-
+column:event_visits.is_bot	boolean notnull=true default=false
 column:event_visits.ref	text notnull=false default=-
 column:event_visits.referrer	text notnull=false default=-
 column:event_visits.user_agent	text notnull=false default=-
@@ -1507,7 +1509,7 @@ function:aitickets_claim_outreach_batch(p_limit integer)	md5=2b5a5b7c8faae97e103
 function:aitickets_discount_code_stats(p_code_ids uuid[])	md5=4635931b79c257a658cdcf3d11cf1edb lang=sql secdef=true returns=TABLE(code_id uuid, uses integer, paid_orders integer, discount_total bigint, revenue bigint) config=search_path=public
 function:aitickets_discount_code_usage(p_code_id uuid, p_email text)	md5=76965d4f810237c3e105a9043f32eecf lang=sql secdef=true returns=TABLE(uses integer, buyer_uses integer) config=search_path=public
 function:aitickets_event_orders_normalize_names()	md5=83fa1180867758ffc4eb2c0ca7c0edea lang=plpgsql secdef=false returns=trigger config=search_path=public
-function:aitickets_event_visit_counts(p_event_id bigint)	md5=d4a3fdf3e24709e2c5073dff448b6d80 lang=sql secdef=true returns=TABLE(visits bigint, unique_visitors bigint) config=search_path=public
+function:aitickets_event_visit_counts(p_event_id bigint)	md5=79c4255f9136909681cda051964dad84 lang=sql secdef=true returns=TABLE(visits bigint, unique_visitors bigint, bot_visits bigint) config=search_path=public
 function:aitickets_guests_normalize_name()	md5=cbc3cbad2726b56af3934a780e68aa91 lang=plpgsql secdef=false returns=trigger config=search_path=public
 function:aitickets_hold_seats(p_order_id uuid, p_event_date_id bigint, p_keys text[], p_expires_at timestamp with time zone)	md5=82d1ed67e1b1faa4ccc7e2fed30acc99 lang=plpgsql secdef=true returns=text[] config=search_path=public
 function:aitickets_mask_account_number(v text)	md5=17cf3f6040cc53e1593fae6cfc595ecf lang=sql secdef=false returns=text config=search_path=public

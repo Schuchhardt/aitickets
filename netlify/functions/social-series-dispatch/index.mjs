@@ -2,8 +2,9 @@
 // La lógica (render de las piezas con Satori, cortes y llamadas a Zernio) vive en el servidor de Astro
 // (src/lib/socialSeries.ts, POST /api/social-series/run): esta función solo la dispara con x-internal-secret.
 import { SITE_URL } from '../../lib/mailer.mjs'
+import { withHeartbeat } from '../../lib/job-heartbeat.mjs'
 
-export default async function handler() {
+export default withHeartbeat('social-series-dispatch', async function handler() {
   const secret = process.env.INTERNAL_API_SECRET
   if (!secret) {
     console.error('social-series-dispatch: falta INTERNAL_API_SECRET')
@@ -26,7 +27,7 @@ export default async function handler() {
     console.error('Error en social-series-dispatch:', error?.message)
     return new Response(JSON.stringify({ error: 'Error interno' }), { status: 500 })
   }
-}
+})
 
 export const config = {
   schedule: '*/15 * * * *',

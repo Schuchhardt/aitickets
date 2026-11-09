@@ -115,6 +115,8 @@ export async function seriesView(ctx: ToolContext, eventId: number, { refreshSta
         S.activationBlockers(supabase, event, ctx.actor.orgId, new Date(), live?.status === "draft" ? live : null),
     ]);
     const reelVideo = S.reelVideoFor(event);
+    // Reel: con el video del evento o, si el flag está activo y hay fotos, con el reel de respaldo
+    const reelSource = await S.reelSource(ctx.supabase, { ...(live || {}), reel_enabled: true }, event);
     const states = S.networkStates(live || series);
     const config = series && series.status !== "draft" ? normalizeCadence(series.cadence_config) : await S.loadCadenceConfig(supabase);
     const draftLike = !series || series.status === "draft" || series.status === "cancelled" || series.status === "completed";
@@ -125,7 +127,7 @@ export async function seriesView(ctx: ToolContext, eventId: number, { refreshSta
         const labels = p.anchorStart ? S.eventLabels(event, p.anchorStart) : null;
         // Piezas por red si se aprueba ahora: Facebook y TikTok solo si están activadas y conectadas
         const platforms: SeriesPlatform[] = ["instagram", ...(states.facebook.enabled && fb ? ["facebook" as const] : []), ...(states.tiktok.enabled && tt ? ["tiktok" as const] : [])];
-        const expanded = expandNetworkSlots(p.slots, { platforms, reel: Boolean(reelVideo) && (live?.reel_enabled ?? true), config });
+        const expanded = expandNetworkSlots(p.slots, { platforms, reel: Boolean(reelSource) && (live?.reel_enabled ?? true), config });
         const per = (platform: string) => expanded.filter((x) => x.platform === platform && x.kind !== "reel").length;
         plan = {
             anchor_starts_at: p.anchorStart?.toISOString() || null,
@@ -166,6 +168,18 @@ export async function seriesView(ctx: ToolContext, eventId: number, { refreshSta
     const anchor = series?.anchor_starts_at ? new Date(series.anchor_starts_at) : S.anchorFor(event);
     const storyLink = S.dmTrackingUrl(ctx.origin, event.slug || "", S.DM_REFS.story);
     const baseImage = S.baseImageUrlFor(live, event);
+    // Avisos no bloqueantes (no impiden activar ni frenan la serie): el reel activado sin video
+    const reelNotice = S.reelNoticeFor({ series: live, event, slots, uploadUrl: `${eventDashboardUrl(ctx, Number(event.id))}#pagina`, fallback: reelSource === "fallback" });
+    // Sugerencia de conectar una red con tráfico: solo si aplica, y si la lectura falla la vista sale igual
+    const trafficNotices =
+        live?.status === "active" && (!fb || !tt)
+            ? S.networkTrafficNotices({
+                  series: live,
+                  connected: { facebook: Boolean(fb), tiktok: Boolean(tt) },
+                  traffic: await S.loadNetworkTraffic(supabase, Number(event.id)).catch(() => ({})),
+                  connectUrl: `${ctx.origin}/dashboard/promote`,
+              })
+            : [];
     // Una pieza por publicar aún no tiene image_url: se le da un link para verla con los datos de ahora
     const present = (s: any) => presentSlot(s, !s.image_url && ["planned", "rendering", "queued"].includes(s.status) ? previewLink(ctx.origin, Number(event.id), s) : null);
 
@@ -180,15 +194,19 @@ export async function seriesView(ctx: ToolContext, eventId: number, { refreshSta
             }),
         ),
         reel: {
-            available: Boolean(reelVideo),
+            available: Boolean(reelSource),
             enabled: (live || series)?.reel_enabled !== false,
+            source: reelSource,
             video_url: reelVideo?.url || null,
             note: reelVideo
                 ? `Reel con el video del evento (${reelVideo.duration} s), unos días antes de la función.`
-                : "Para el reel, sube un video vertical de 3 a 60 segundos como video de portada o de galería del evento.",
+                : reelSource === "fallback"
+                  ? "Sin video del evento: armamos el reel con la portada y las fotos de la galería. Si subes un video vertical de 3 a 60 s, usamos ese."
+                  : "Para el reel, sube un video vertical de 3 a 60 segundos como video de portada o de galería del evento.",
         },
         can_activate: blockers.length === 0 && (!live || live.status === "draft"),
         blockers,
+        notices: [...(reelNotice ? [reelNotice] : []), ...trafficNotices],
         series: series ? presentSeries(series) : null,
         plan,
         slots: shown.map(present),
@@ -234,7 +252,10 @@ const getSocialSeries: ToolDef = {
         "del DM (Zernio) frente a visitas a la página que llegaron por DM (dms.dm_visits), hora de la lectura (dms.as_of), respuestas a historias " +
         "que no recibieron el link (dms.unmatched_replies), el texto del DM (dm_preview; el link va en el botón «Comprar entradas», dm_link) y " +
         "ventas atribuidas a los DM (ref ig-story-dm / ig-post-dm). Cada pieza por publicar trae preview_url, un link de 24 h para abrir su imagen con los datos de ahora: entrégaselo " +
-        "al productor (ver preview_note); image_url queda vacío hasta que se genera la final, unas 2 h antes. Responde \"¿cómo va mi difusión?\", \"¿por qué no llegan DMs?\" y \"¿cómo se va a ver?\".",
+        "al productor (ver preview_note); image_url queda vacío hasta que se genera la final, unas 2 h antes. Responde \"¿cómo va mi difusión?\", \"¿por qué no llegan DMs?\" y \"¿cómo se va a ver?\". " +
+        "blockers impiden activar; notices son avisos que no bloquean (p. ej. reel_without_video: el reel está activado pero el evento no tiene " +
+        "video vertical de 3 a 60 s, así que no saldrá reel; reel_video_missing: hay un reel programado sin video que sirva; reel_fallback: sin video, se arma un reel con la portada y las fotos de la galería; reel_pending: la difusión activa no tenía reel y se agrega en minutos; network_traffic_facebook / network_traffic_tiktok: la difusión activa recibe visitas desde una red que no está conectada; conectarla sirve para las próximas difusiones, la activa no cambia). reel.source dice de dónde sale el reel (video, fallback o null). Cada aviso trae " +
+        "cta.url (subir el video en el panel del evento, o conectar la red en Promocionar): díselo al productor.",
     scope: "read",
     annotations: { readOnlyHint: true },
     inputSchema: { type: "object", required: ["event_id"], additionalProperties: false, properties: { event_id: eventIdSchema } },
@@ -252,7 +273,7 @@ const prepareSocialSeries: ToolDef = {
         "última semana y el día del evento), publicaciones en el feed la última semana (feed_posts_enabled), palabra clave del DM (ENTRADAS por defecto), " +
         "mensaje del DM ({link} = link con seguimiento), foto base (por defecto la portada), si publica también en la página de Facebook " +
         "(facebook_enabled) y en TikTok (tiktok_enabled; foto vertical cada día de la última semana), y el reel con el video vertical del " +
-        "evento (reel_enabled; 3 a 60 s). Devuelve el calendario para que el productor lo " +
+        "evento (reel_enabled; 3 a 60 s; sin video, reel armado con las fotos si está habilitado, o sin reel: la respuesta lo avisa en notices). Devuelve el calendario para que el productor lo " +
         "revise; se activa con approve_social_series. Se puede llamar varias veces para ajustar el borrador.",
     scope: "write",
     audit: (args) => ({ summary: "Preparó la difusión automática (borrador)", target: `event:${args.event_id}` }),
@@ -319,7 +340,8 @@ const approveSocialSeries: ToolDef = {
     description:
         "Aprueba la serie (aprobación única): desde aquí AI Tickets publica sola las historias (y las publicaciones en el feed) en el Instagram de la " +
         "organización (y en Facebook y TikTok si se activaron) hasta el día del evento y responde por DM con el link a quien responda una historia de la serie " +
-        "(cualquier mensaje o reacción, una vez cada 12 h por persona) o comente la palabra clave en una publicación. Acción pública: el " +
+        "(cualquier mensaje o reacción, una vez cada 12 h por persona) o comente la palabra clave en una publicación. El reel sale con el video del evento o, si no hay, con un reel armado con sus fotos (si está habilitado); " +
+        "sin ninguno va en warnings. Si se sube el video después, se agrega a la difusión activa mientras quede un día antes del evento. Acción pública: el " +
         "servidor devuelve primero el resumen y solo activa al repetir la llamada con confirmation_token.",
     scope: "publish",
     async confirm(args, ctx) {
@@ -333,7 +355,7 @@ const approveSocialSeries: ToolDef = {
             const extra = [
                 plan.facebook_posts ? `Facebook (${view.networks.facebook.account || "página conectada"}): ${plan.facebook_posts} pieza(s)` : null,
                 plan.tiktok_posts ? `TikTok (${view.networks.tiktok.account || "cuenta conectada"}): ${plan.tiktok_posts} publicación(es) con foto` : null,
-                plan.reels.length ? `reel con el video del evento el ${plan.reels[0].publish_local?.replace("T", " ")} en ${plan.reels.map((r: any) => S.NETWORK_NAMES[r.platform]).join(", ")}` : null,
+                plan.reels.length ? `reel ${view.reel.source === "fallback" ? "armado con las fotos del evento" : "con el video del evento"} el ${plan.reels[0].publish_local?.replace("T", " ")} en ${plan.reels.map((r: any) => S.NETWORK_NAMES[r.platform]).join(", ")}` : null,
             ].filter(Boolean);
             return {
                 message:
@@ -349,6 +371,7 @@ const approveSocialSeries: ToolDef = {
                     dm_preview: view.dm_preview,
                 },
                 warnings: [
+                    ...view.notices.map((n) => n.message),
                     !view.base_image.url ? "El evento no tiene portada ni foto base: las piezas usarán un fondo liso. Sube una foto para que se vean mejor." : null,
                     "Instagram no permite stickers de link por API: el link va por DM a quien responda la historia.",
                     plan.tiktok_posts ? "En TikTok se publica como contenido de tu marca, público y con comentarios activos; el link va en la descripción (TikTok no lo hace clickeable)." : null,
