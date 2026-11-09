@@ -113,6 +113,15 @@ REVOKE ALL ON TABLE public.aitickets_blog_topics FROM PUBLIC, anon, authenticate
 REVOKE ALL ON TABLE public.aitickets_blog_posts FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.aitickets_blog_keywords FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.aitickets_blog_runs FROM PUBLIC, anon, authenticated;
+-- Supabase otorga ALL sobre secuencias nuevas a anon/authenticated (default privileges): se quitan las de las identity
+REVOKE ALL ON SEQUENCE public.aitickets_blog_topics_id_seq FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON SEQUENCE public.aitickets_blog_posts_id_seq FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON SEQUENCE public.aitickets_blog_keywords_id_seq FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON SEQUENCE public.aitickets_blog_runs_id_seq FROM PUBLIC, anon, authenticated;
+GRANT USAGE, SELECT ON SEQUENCE public.aitickets_blog_topics_id_seq TO service_role;
+GRANT USAGE, SELECT ON SEQUENCE public.aitickets_blog_posts_id_seq TO service_role;
+GRANT USAGE, SELECT ON SEQUENCE public.aitickets_blog_keywords_id_seq TO service_role;
+GRANT USAGE, SELECT ON SEQUENCE public.aitickets_blog_runs_id_seq TO service_role;
 
 -- Temas iniciales: un nicho por landing vertical y las funcionalidades que la gente busca antes de elegir ticketera.
 -- Las semillas son búsquedas informativas (cómo, cuánto, qué): las transaccionales ("ticketera para teatro") ya las
