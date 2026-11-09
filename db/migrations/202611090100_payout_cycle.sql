@@ -31,3 +31,7 @@ create table if not exists aitickets_payout_receipts (
 );
 
 create unique index if not exists idx_payout_receipts_payout on aitickets_payout_receipts(payout_id);
+
+-- Security: service_role only (same pattern as all aitickets_* tables)
+REVOKE ALL ON TABLE public.aitickets_payout_receipts FROM PUBLIC, anon, authenticated;
+ALTER TABLE public.aitickets_payout_receipts ENABLE ROW LEVEL SECURITY;
