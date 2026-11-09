@@ -32,6 +32,7 @@
 // Tolera tablas/columnas que aún no existen (deploy preview sin migrar): esas partes cuentan como 0.
 import { zonedDateTimeToUtc } from "../../../netlify/lib/dates.mjs";
 import { PAYOUT_RELEASE_HOURS } from "../../../netlify/lib/legal.mjs";
+import { orgExceedsFreeSoldTickets } from "../producerIdentity";
 
 export const RELEASE_HOURS = PAYOUT_RELEASE_HOURS;
 export const WITHDRAWN_STATUSES = ["requested", "processing", "paid"];
@@ -219,14 +220,19 @@ export async function loadOrgEvents(supabase: any, orgId: number, eventIds?: num
 }
 
 /**
- * Condiciones de la organización para liberar fondos: identidad aprobada (Didit) y cuenta bancaria verificada a nombre
- * de la misma persona o empresa (holder_match_status = 'match'). Si las columnas aún no existen (deploy sin migrar), no se exigen.
+ * Condiciones de la organización para liberar fondos: cuenta bancaria verificada y, si la org supera el umbral de
+ * entradas vendidas (IDENTITY_FREE_SOLD_TICKETS), identidad aprobada (Didit) y holder_match_status = 'match'.
+ * Si las columnas aún no existen (deploy sin migrar), no se exigen.
  */
 export async function loadOrgReleaseGate(supabase: any, orgId: number): Promise<HoldReason[]> {
     const reasons: HoldReason[] = [];
-    const { data: org, error: orgError } = await supabase.from("organizations").select("id, identity_status, identity_verified_at").eq("id", orgId).maybeSingle();
-    if (orgError && !isMissing(orgError)) throw orgError;
-    if (!orgError && !(org?.identity_status === "approved" && org?.identity_verified_at)) reasons.push(holdReason("identity_pending"));
+
+    const identityRequired = await orgExceedsThreshold(supabase, orgId);
+    if (identityRequired) {
+        const { data: org, error: orgError } = await supabase.from("organizations").select("id, identity_status, identity_verified_at").eq("id", orgId).maybeSingle();
+        if (orgError && !isMissing(orgError)) throw orgError;
+        if (!orgError && !(org?.identity_status === "approved" && org?.identity_verified_at)) reasons.push(holdReason("identity_pending"));
+    }
 
     const { data: acc, error: accError } = await supabase
         .from("organization_payout_accounts")
@@ -236,10 +242,19 @@ export async function loadOrgReleaseGate(supabase: any, orgId: number): Promise<
     if (accError && !isMissing(accError)) throw accError;
     if (!accError) {
         if (!acc?.verified_at || acc?.removed_at) reasons.push(holdReason("bank_unverified"));
-        else if (acc.holder_match_status === "mismatch") reasons.push(holdReason("holder_mismatch"));
-        else if (acc.holder_match_status !== "match") reasons.push(holdReason("holder_unchecked"));
+        else if (identityRequired && acc.holder_match_status === "mismatch") reasons.push(holdReason("holder_mismatch"));
+        else if (identityRequired && acc.holder_match_status !== "match") reasons.push(holdReason("holder_unchecked"));
     }
     return reasons;
+}
+
+/** true si la organización lleva más de IDENTITY_FREE_SOLD_TICKETS entradas vendidas. */
+async function orgExceedsThreshold(supabase: any, orgId: number): Promise<boolean> {
+    try {
+        return await orgExceedsFreeSoldTickets(supabase, orgId);
+    } catch {
+        return true;
+    }
 }
 
 /** Fin de una función: fecha + hora de término (o 23:59) en hora de Chile; si termina antes de empezar, cruza la medianoche. */

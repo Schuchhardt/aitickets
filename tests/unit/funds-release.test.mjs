@@ -54,21 +54,34 @@ describe('liberación condicionada', () => {
     expect(l.hold_reasons).toEqual([])
   })
 
-  it('identidad sin aprobar retiene todo con motivo visible', async () => {
+  it('identidad sin aprobar no retiene si hay ≤10 ventas', async () => {
     seed({ org: { identity_status: 'pending', identity_verified_at: null } })
     const l = await computeOrgLedger(db, 7)
-    expect(l.events[0]).toMatchObject({ available: 0, held: 20000, retained: 20000 })
+    expect(l.events[0]).toMatchObject({ available: 20000, held: 0 })
+    expect(l.hold_reasons).toEqual([])
+  })
+
+  it('identidad sin aprobar retiene todo cuando hay >10 ventas', async () => {
+    const manyAttendees = Array.from({ length: 11 }, (_, i) => ({ event_id: 40, event_order_id: 'a', event_ticket_id: 1, status: 'validated', validated_at: iso(-4 * DAY) }))
+    seed({ org: { identity_status: 'pending', identity_verified_at: null }, attendees: manyAttendees })
+    const l = await computeOrgLedger(db, 7)
     expect(l.hold_reasons.map((r) => r.code)).toEqual(['identity_pending'])
     expect(l.events[0].functions[0].release_status).toBe('held')
   })
 
-  it('cuenta sin verificar o titular distinto retienen', async () => {
+  it('cuenta sin verificar o titular distinto no retienen con ≤10 ventas', async () => {
     seed({ account: { verified_at: null } })
     expect((await computeOrgLedger(db, 7)).hold_reasons.map((r) => r.code)).toEqual(['bank_unverified'])
     seed({ account: { holder_match_status: 'mismatch' } })
-    expect((await computeOrgLedger(db, 7)).hold_reasons.map((r) => r.code)).toEqual(['holder_mismatch'])
+    expect((await computeOrgLedger(db, 7)).hold_reasons).toEqual([])
     seed({ account: { holder_match_status: null } })
-    expect((await computeOrgLedger(db, 7)).hold_reasons.map((r) => r.code)).toEqual(['holder_unchecked'])
+    expect((await computeOrgLedger(db, 7)).hold_reasons).toEqual([])
+  })
+
+  it('titular distinto retiene cuando hay >10 ventas', async () => {
+    const manyAttendees = Array.from({ length: 11 }, (_, i) => ({ event_id: 40, event_order_id: 'a', event_ticket_id: 1, status: 'validated', validated_at: iso(-4 * DAY) }))
+    seed({ account: { holder_match_status: 'mismatch' }, attendees: manyAttendees })
+    expect((await computeOrgLedger(db, 7)).hold_reasons.map((r) => r.code)).toEqual(['holder_mismatch'])
   })
 
   it(`check-ins bajo ${CHECKIN_RELEASE_THRESHOLD * 100}% retienen hasta que el productor acredite la función`, async () => {
