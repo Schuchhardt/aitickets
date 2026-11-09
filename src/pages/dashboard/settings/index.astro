@@ -3,6 +3,7 @@ import DashboardLayout from "../../../layouts/DashboardLayout.astro";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { ORG_ADMIN_ROLES, hasRole } from "../../../lib/supabaseServer";
 import { requireDashboardSession } from "../_lib/guard";
+import { roleAllows } from "../../../lib/producer-api/permissions";
 import { IDENTITY_STATUS_LABELS, loadOrgIdentity, syncIdentityFromDidit } from "../../../lib/producerIdentity";
 import { BIOMETRIC_CONSENT_TEXT, IDENTITY_WHY_TEXT } from "../../../../netlify/lib/identity.mjs";
 
@@ -11,6 +12,8 @@ const guard = await requireDashboardSession(Astro, [...ORG_ADMIN_ROLES, "finance
 if (!guard.ok) return guard.response;
 const { dbUser } = guard.session;
 const canEditOrg = hasRole(dbUser, ORG_ADMIN_ROLES);
+// Datos para pagos: solo el dueño y finanzas (finance.manage); un administrador los ve pero no los cambia
+const canEditPayout = roleAllows(dbUser.role, "finance.manage");
 const BANK_CHANGE_HOLD_HOURS = 72;
 const supabaseAdmin = getSupabaseAdmin();
 
@@ -258,9 +261,15 @@ const ACCOUNT_TYPES = ["Cuenta Corriente", "Cuenta Vista / CuentaRUT", "Cuenta d
                 </div>
             </div>
 
-            <button id="saveBankBtn" class="order-2 sm:order-none w-full sm:w-auto sm:absolute sm:top-6 sm:right-0 px-4 py-2 text-sm bg-black text-white rounded-lg hover:bg-gray-800">
-                Guardar Datos
-            </button>
+            {canEditPayout ? (
+                <button id="saveBankBtn" class="order-2 sm:order-none w-full sm:w-auto sm:absolute sm:top-6 sm:right-0 px-4 py-2 text-sm bg-black text-white rounded-lg hover:bg-gray-800">
+                    Guardar Datos
+                </button>
+            ) : (
+                <p class="order-2 sm:order-none text-sm text-gray-500" data-testid="bank-readonly-note">
+                    Solo el dueño de la cuenta o una persona de finanzas pueden cambiar los datos para pagos.
+                </p>
+            )}
         </section>
 
         <!-- La contraseña se cambia desde Mi Perfil (disponible para todos los roles) -->
@@ -345,6 +354,10 @@ const ACCOUNT_TYPES = ["Cuenta Corriente", "Cuenta Vista / CuentaRUT", "Cuenta d
 
   // Bank data save
   const saveBankBtn = document.getElementById('saveBankBtn');
+  // Sin permiso para cambiarlos (administrador): los datos para pagos quedan de solo lectura
+  if (!saveBankBtn) {
+    document.querySelectorAll('#datos-bancarios input, #datos-bancarios select').forEach((el) => { (el as HTMLInputElement).disabled = true; });
+  }
   const bankMsg = document.getElementById('bankMsg');
   const val = (id: string) => (document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null)?.value ?? '';
 

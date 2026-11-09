@@ -80,14 +80,8 @@ jobs:
       - run: npm ci
       - name: Lint de migraciones (solo objetos de AI Tickets)
         run: npm run db:lint
-      - name: Stubs de Supabase + esquema de referencia
-        run: |
-          psql -v ON_ERROR_STOP=1 -q -f db/ci/stubs.sql
-          psql -v ON_ERROR_STOP=1 -q -f db/schema.sql
-      - name: Organización 1 (AI Tickets), para que corran los seeds de eventos demo
-        run: psql -v ON_ERROR_STOP=1 -q -c "INSERT INTO public.organizations (id, public_name) OVERRIDING SYSTEM VALUE VALUES (1, 'AI Tickets')"
-      - name: Aplicar migraciones (primera pasada)
-        run: node scripts/migrate.mjs --no-baseline
+      - name: Base desde el repo (stubs de Supabase + db/schema.sql + organización 1 + migraciones, primera pasada)
+        run: scripts/db-ci-setup.sh
       - name: Aplicar migraciones (segunda pasada, debe aplicar 0)
         run: |
           node scripts/migrate.mjs --no-baseline | tee second-run.log
@@ -116,8 +110,17 @@ jobs:
                 RAISE EXCEPTION 'Los eventos demo deben mostrar los 3 diseños de página (póster, portada ancha y compacto)';
               END IF;
             END \$\$;"
-      - name: Permisos (anon/authenticated sin acceso; RLS activo)
-        run: psql -v ON_ERROR_STOP=1 -f db/ci/assert-grants.sql
+      # Cada db/ci/assert-*.sql (permisos, handle_new_user, triggers, reglas de borrado). Un archivo nuevo se corre solo.
+      - name: Aserciones SQL (db/ci/assert-*.sql)
+        run: |
+          for f in db/ci/assert-*.sql; do
+            echo "== $f"
+            psql -v ON_ERROR_STOP=1 -q -f "$f"
+          done
+      # El catálogo de la base armada debe ser igual a db/catalog.snapshot.tsv (si una migración cambia el esquema,
+      # npm run db:snapshot lo regenera). El mismo snapshot se compara con producción en cada deploy (plugins/db-migrate).
+      - name: Catálogo de la base = db/catalog.snapshot.tsv
+        run: node scripts/db-drift.mjs --check
       - name: Rechazo del transaction pooler (6543)
         run: |
           if SUPABASE_DB_URL=postgresql://u:p@localhost:6543/postgres node scripts/migrate.mjs --status; then
@@ -174,3 +177,66 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 7
+
+  # E2E con base de datos REAL pero local: stack de Supabase en Docker (Postgres 15.8 + Auth + PostgREST, mismas
+  # imágenes que el CLI de Supabase) con db/schema.sql + TODAS las migraciones. Registro, verificación, onboarding,
+  # invitaciones al equipo y la matriz de roles × páginas del panel (tests/e2e/stack). Sin secretos: claves locales y
+  # correos a un buzón en disco (MAIL_OUTBOX_DIR). Nunca contra producción (playwright.stack.config.ts lo verifica).
+  e2e-stack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Versión de Playwright (clave de caché)
+        id: pw
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Caché de navegadores de Playwright
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}-chromium
+      - name: Instalar Chromium
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+      - name: Dependencias del sistema para Chromium (caché)
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+      # Las imágenes del stack (Postgres de Supabase pesa 3 GB) se guardan en la caché: los registros públicos limitan las
+      # descargas anónimas desde los runners ("toomanyrequests"). setup.mjs descarga solo las que falten, con reintentos.
+      - name: Caché de imágenes del stack
+        id: stack-images
+        uses: actions/cache@v4
+        with:
+          path: /tmp/e2e-stack-images.tar.zst
+          key: e2e-stack-images-${{ hashFiles('tests/e2e/stack/docker-compose.yml') }}
+      - name: Cargar imágenes desde la caché
+        if: steps.stack-images.outputs.cache-hit == 'true'
+        run: zstd -d -c /tmp/e2e-stack-images.tar.zst | docker load
+      - name: Stack de Supabase local + esquema + migraciones
+        run: node tests/e2e/stack/setup.mjs
+      - name: Guardar imágenes para la caché
+        if: steps.stack-images.outputs.cache-hit != 'true'
+        run: |
+          images=$(E2E_DB_PASSWORD=x E2E_JWT_SECRET=x docker compose -f tests/e2e/stack/docker-compose.yml config --images)
+          docker save $images | zstd -T0 -3 -o /tmp/e2e-stack-images.tar.zst
+      - name: Playwright con base real local
+        run: npx playwright test -c playwright.stack.config.ts --trace off
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-stack
+          path: |
+            playwright-report-stack/
+            test-results/
+          retention-days: 7
+      - name: Bajar el stack
+        if: always()
+        run: node tests/e2e/stack/setup.mjs --down

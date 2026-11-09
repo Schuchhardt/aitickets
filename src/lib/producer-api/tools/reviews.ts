@@ -1,6 +1,6 @@
 // Herramientas: reseñas de asistentes e invitación al próximo evento (migración 202610220100).
-// - list_event_reviews: calificaciones, comentarios públicos y privados, fotos y estadísticas de un evento.
-// - update_review_settings: correo de 24 h, premio por calificar y moderación de fotos.
+// - list_event_reviews: calificaciones, comentarios públicos y privados, fotos, videos y estadísticas de un evento.
+// - update_review_settings: correos para calificar (el primero y dos recordatorios), premio por calificar y moderación de fotos.
 // - invite_past_attendees: invitación masiva a los asistentes de un evento para uno próximo (con confirmación;
 //   la envía la cola de mensajes, src/lib/invitations.ts).
 import { ToolError, type ToolDef } from "../registry";
@@ -33,7 +33,7 @@ const listEventReviews: ToolDef = {
   title: "Ver reseñas del evento",
   description:
     "Calificaciones (1 a 5) de quienes asistieron a un evento: promedio, distribución, comentarios públicos (los que se ven en la página " +
-    "del evento terminado) y mensajes PRIVADOS para la productora, fotos subidas a la galería y premios entregados. Contiene datos " +
+    "del evento terminado) y mensajes PRIVADOS para la productora, fotos y videos subidos a la galería y premios entregados. Contiene datos " +
     "personales (emails). Úsala para resumir el feedback y proponer mejoras concretas para el próximo evento.",
   scope: "attendees",
   permission: "attendees.read",
@@ -60,7 +60,7 @@ const listEventReviews: ToolDef = {
         .eq("event_id", event.id)
         .order("created_at", { ascending: false })
         .limit(5000),
-      ctx.supabase.from(REVIEW_PHOTOS_TABLE).select("id, status").eq("event_id", event.id).limit(5000),
+      ctx.supabase.from(REVIEW_PHOTOS_TABLE).select("id, status, media_type").eq("event_id", event.id).limit(5000),
       ctx.supabase.from("notification_log").select("id", { count: "exact", head: true }).eq("event_id", event.id).eq("type", REVIEW_REQUEST_TYPE),
     ]);
     for (const r of [reviewsRes, photosRes]) {
@@ -73,7 +73,9 @@ const listEventReviews: ToolDef = {
     let rows = all;
     if (args.max_rating) rows = rows.filter((r) => r.rating <= args.max_rating);
     if (args.only_with_comments) rows = rows.filter((r) => r.public_comment || r.private_comment);
-    const photos = (photosRes.data || []) as any[];
+    const media = (photosRes.data || []) as any[];
+    const photos = media.filter((p) => p.media_type !== "video");
+    const videos = media.filter((p) => p.media_type === "video");
     return {
       event_id: Number(event.id),
       event_name: event.name,
@@ -85,6 +87,11 @@ const listEventReviews: ToolDef = {
         total: photos.length,
         visible: photos.filter((p) => p.status === "visible").length,
         pending_review: photos.filter((p) => p.status === "pending").length,
+      },
+      videos: {
+        total: videos.length,
+        visible: videos.filter((p) => p.status === "visible").length,
+        pending_review: videos.filter((p) => p.status === "pending").length,
       },
       rewards_granted: all.filter((r) => r.reward_code).length,
       total: rows.length,
@@ -106,7 +113,9 @@ const updateReviewSettings: ToolDef = {
   name: "update_review_settings",
   title: "Configurar reseñas",
   description:
-    "Configura las reseñas de un evento: si se envía el correo \"¿Cómo estuvo?\" 24 h después de cada función, el premio por calificar " +
+    "Configura las reseñas de un evento: si se envían los correos \"¿Cómo estuvo?\" (hasta 3 por persona: el primero 4 h después del término " +
+    "de cada función si termina de día u 8 h si termina de noche, siempre entre las 10:00 y las 23:00, y dos recordatorios a los 2 y 5 días; " +
+    "nunca a quien ya calificó), el premio por calificar " +
     `(un código de descuento de un solo uso, ${REWARD_LIMITS.minValue}-${REWARD_LIMITS.maxValue}%, para cualquier evento de la organización; reward_percent=0 lo quita) ` +
     "si las fotos de los asistentes esperan revisión antes de publicarse y si la página muestra las reseñas de las funciones pasadas " +
     "mientras quedan funciones a la venta (show_while_on_sale: una obra en cartelera, un taller con fechas; sin esto, solo cuando el evento terminó).",
@@ -119,7 +128,7 @@ const updateReviewSettings: ToolDef = {
     additionalProperties: false,
     properties: {
       event_id: eventIdSchema,
-      send_request_email: { type: "boolean", description: "Enviar el correo de reseña 24 h después de cada función." },
+      send_request_email: { type: "boolean", description: "Enviar los correos para calificar (el primero y dos recordatorios) después de cada función." },
       reward_percent: { type: "integer", minimum: 0, maximum: REWARD_LIMITS.maxValue, description: `Descuento del premio (${REWARD_LIMITS.minValue}-${REWARD_LIMITS.maxValue}). 0 = sin premio.` },
       reward_valid_days: { type: "integer", minimum: REWARD_LIMITS.minDays, maximum: REWARD_LIMITS.maxDays, description: `Días de vigencia del código (por defecto ${REWARD_LIMITS.defaultDays}).` },
       moderate_photos: { type: "boolean", description: "true = las fotos esperan tu aprobación antes de verse en la página." },

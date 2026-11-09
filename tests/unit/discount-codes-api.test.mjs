@@ -11,7 +11,12 @@ vi.mock('../../src/lib/supabaseServer', () => ({
   getSessionContext: async () => session,
   hasRole: (u, roles) => roles.includes(u?.role),
   jsonResponse: (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }),
-  getOwnedEvent: async (eventId, orgId) => (db.tables.events || []).find((e) => String(e.id) === String(eventId) && e.organization_id === orgId) || null,
+  // Como el real: organización + acceso por evento (un miembro con filas en aitickets_event_staff solo ve esos eventos)
+  getOwnedEvent: async (eventId, orgId, _cols, userId) => {
+    const event = (db.tables.events || []).find((e) => String(e.id) === String(eventId) && e.organization_id === orgId)
+    const staff = (db.tables.aitickets_event_staff || []).filter((r) => userId != null && r.user_id === userId).map((r) => r.event_id)
+    return event && (!staff.length || staff.includes(Number(event.id))) ? event : null
+  },
 }))
 
 const api = await import('../../src/pages/api/discount-codes/index.ts')
@@ -81,5 +86,37 @@ describe('/api/discount-codes', () => {
     const ok = await api.PATCH(ctx('PATCH', { id: '00000000-0000-0000-0000-000000000002', active: false }))
     expect(ok.status).toBe(200)
     expect((await ok.json()).code).toMatchObject({ code: 'EV3', active: false })
+  })
+
+  describe('miembro con acceso limitado a ciertos eventos (aitickets_event_staff)', () => {
+    const limited = () => {
+      setup('editor')
+      db.tables.events.push({ id: 4, name: 'Otro mío', organization_id: 7 })
+      db.tables.aitickets_discount_codes.push({ id: '00000000-0000-0000-0000-000000000005', organization_id: 7, event_id: 4, code: 'EV4', kind: 'fixed', value: 1000, active: true, created_at: '2026-10-05' })
+      db.tables.aitickets_event_staff = [{ user_id: 1, event_id: 3 }]
+    }
+
+    it('GET sin evento: los de sus eventos y los de toda la organización, no los de otros eventos', async () => {
+      limited()
+      const { codes } = await (await api.GET(ctx('GET'))).json()
+      expect(codes.map((c) => c.code).sort()).toEqual(['EV3', 'TODOS'])
+      expect((await api.GET(ctx('GET', null, '?event_id=4'))).status).toBe(404)
+    })
+
+    it('POST: solo para sus eventos; nunca un código de toda la organización', async () => {
+      limited()
+      expect((await api.POST(ctx('POST', { code: 'GLOBAL', kind: 'percent', value: 10 }))).status).toBe(403)
+      expect((await api.POST(ctx('POST', { code: 'OTRO', kind: 'percent', value: 10, eventId: 4 }))).status).toBe(404)
+      expect((await api.POST(ctx('POST', { code: 'PROPIO', kind: 'percent', value: 10, eventId: 3 }))).status).toBe(201)
+      expect(db.tables.aitickets_discount_codes.map((c) => c.code)).not.toContain('GLOBAL')
+    })
+
+    it('PATCH: no cambia códigos de otros eventos ni los de toda la organización', async () => {
+      limited()
+      expect((await api.PATCH(ctx('PATCH', { id: '00000000-0000-0000-0000-000000000005', active: false }))).status).toBe(404)
+      expect((await api.PATCH(ctx('PATCH', { id: '00000000-0000-0000-0000-000000000001', active: false }))).status).toBe(403)
+      expect(db.tables.aitickets_discount_codes.filter((c) => c.active === false)).toEqual([])
+      expect((await api.PATCH(ctx('PATCH', { id: '00000000-0000-0000-0000-000000000002', active: false }))).status).toBe(200)
+    })
   })
 })

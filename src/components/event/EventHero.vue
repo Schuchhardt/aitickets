@@ -15,7 +15,7 @@ import {
 
 const props = defineProps({
   event: { type: Object, required: true },
-  // [{ label, tone: 'lime'|'warning'|'neutral', pulse? }]
+  // [{ label, tone: 'lime'|'warning'|'neutral', pulse?, dot? }] (dot: el punto sin el pulso)
   badges: { type: Array, default: () => [] },
   // "Organiza <productora>" (events.page_settings.show_organizer)
   showOrganizer: { type: Boolean, default: true },
@@ -61,7 +61,7 @@ const organizerUrl = computed(() => props.event.organization?.website || "");
   <div class="hero">
     <div v-if="badges.length" class="badges hero-in" style="--i: 0">
       <span v-for="b in badges" :key="b.label" class="badge" :class="`badge-${b.tone}`">
-        <span v-if="b.pulse" class="dot" aria-hidden="true"><span class="dot-pulse"></span></span>
+        <span v-if="b.pulse || b.dot" class="dot" aria-hidden="true"><span v-if="b.pulse" class="dot-pulse"></span></span>
         {{ b.label }}
       </span>
     </div>

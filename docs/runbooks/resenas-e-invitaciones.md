@@ -4,12 +4,28 @@ Migración `db/migrations/202610220100_event_reviews.sql`. Reglas en `netlify/li
 
 ## Flujo
 
-1. **Correo "¿Cómo estuvo?"** — `netlify/functions/send-review-requests` (cada hora, a los :20). Por cada
-   función que terminó hace entre 24 y 72 h escribe a quienes tenían entradas vigentes de esa función; las
-   entradas "cualquier función" reciben el correo después de la última función. Un correo por persona y evento
-   (`notification_log.type = 'review_request'`), nunca a quien ya calificó. Cada estrella del correo es un link
-   (`/eventos/<slug>#resena=<token>&nota=N`): el token va en el fragmento (`#`), así no llega a los logs, al CDN
-   ni a Google Analytics, y la página lo borra de la URL al abrirla.
+1. **Correos "¿Cómo estuvo?"** — `netlify/functions/send-review-requests` (cada hora, a los :20; lógica en
+   `netlify/lib/review-requests.mjs`, reglas de horario en `netlify/lib/reviews.mjs`). Hasta **3 correos por persona y
+   evento**, solo a quienes aún no califican:
+   - **A quién:** por cada entrada vigente de la función, el correo del titular (`attendees.email`), el de quien compró
+     (`event_orders.buyer_email`) y el del asistente de ese QR (`event_attendees.holder_email`). Un envío por email.
+     Las entradas "cualquier función" lo reciben después de la última función.
+   - **1º correo:** 4 h después del término si la función termina de día, 8 h si termina de noche (21:00–08:00), corrido
+     a la ventana **10:00–23:00** de Chile para que estén despiertos (`firstReviewRequestAt`). Ejemplos: termina 13:00 →
+     17:00 · 18:00 → 22:00 · 20:00 o 23:00 → 10:00 del día siguiente · 02:00 → 10:00 · 05:00 → 13:00. Se manda hasta
+     72 h después del término.
+   - **2º correo** (fotos) 2 días después del 1º y **3º** (último) 3 días después del 2º (`nextReviewReminderAt`), hasta
+     10 días después del 1º y solo si la persona sigue con una entrada vigente. No van a quien se dio de baja de la
+     productora (`aitickets_org_email_optouts`).
+   - **Fuera de 10:00–23:00 no sale nada**, ni lo atrasado: si la función programada estuvo caída, espera a la mañana.
+   - **Registro:** cada envío es una fila de `notification_log` (`type = 'review_request'`, `email`, `attendee_id`); las
+     filas de un email dicen en qué paso va. Las filas anteriores a la columna `email` (migración
+     `202611080300_review_request_email.sql`) se asocian por `attendee_id`.
+   - **Baja:** cada correo trae "No quiero más recordatorios de este evento" (página `/resenas/baja`, one-click
+     `List-Unsubscribe` en `/api/resenas/baja`, token `ro` sin vencimiento). Queda como `notification_log.type =
+     'review_request_optout'` con el email.
+   - Cada estrella del correo es un link (`/eventos/<slug>#resena=<token>&nota=N`): el token va en el fragmento (`#`),
+     así no llega a los logs, al CDN ni a Google Analytics, y la página lo borra de la URL al abrirla.
    - La nota del correo solo **preselecciona** las estrellas: hay que tocar "Enviar". Así un escáner de enlaces
      (Safe Links, antivirus) que abre los 5 links no registra calificaciones falsas.
 2. **Página del evento terminado** (`src/components/event/EventReviews.vue`): resumen, comentarios públicos,
@@ -28,6 +44,14 @@ Migración `db/migrations/202610220100_event_reviews.sql`. Reglas en `netlify/li
    panel/API ni cuentan para el máximo de 500.
 5. **Fotos** (`/api/reviews/photos`): hasta 6 por persona, optimizadas en `event-attendee-photos/<evento>/`.
    Visibles al tiro o "pendientes" si la productora activó la revisión previa.
+   **Videos** (`/api/reviews/videos`, migración `202611080400_review_videos.sql`): hasta 2 por persona, de 50 MB y 60 s
+   como máximo (la duración la mide el navegador; el peso lo verifica el servidor). No pasan por las funciones de
+   Netlify: el navegador pide una URL firmada (`upload_url`), sube directo al bucket `aitickets-event-videos`
+   (`event-attendee-videos/<evento>/video-*.mp4|webm|mov`) y confirma (`set`, con un cuadro del video como póster en
+   `event-attendee-photos/<evento>/poster-*`). Comparten tabla y moderación con las fotos
+   (`aitickets_event_review_photos.media_type = 'video'`) y se muestran en "Videos de los asistentes". Borrar un video
+   (quien lo subió o la productora) borra también el archivo. Un archivo subido sin confirmar queda huérfano en Storage
+   (igual que con el video de portada).
 6. **Panel** (`EventReviewsManager.vue`, en la ficha del evento): promedio y distribución, configuración,
    comentarios con filtro y CSV, mensajes privados, moderación de fotos e invitación al próximo evento.
    Ocultar un comentario lo saca de la página pero **su nota sigue contando en el promedio**.
@@ -48,9 +72,13 @@ Migración `db/migrations/202610220100_event_reviews.sql`. Reglas en `netlify/li
 ## Operación
 
 - ¿Por qué alguien no recibió el correo de reseña? Revisar que el evento esté publicado y no cancelado, que
-  `review_settings.enabled` no sea `false`, que su entrada siga vigente y si ya tiene un `review_request` en
-  `notification_log` para ese evento.
-- Contenido ofensivo: la productora lo oculta desde el panel. Para borrarlo a mano:
+  `review_settings.enabled` no sea `false`, que su entrada siga vigente, cuántos `review_request` tiene en
+  `notification_log` para ese evento (máximo 3) y si tiene un `review_request_optout`. Recordar que nada sale entre las
+  23:00 y las 10:00, y que el primer correo de una función que termina de noche sale a las 10:00 o más tarde.
+- ¿Cuántos correos lleva cada persona?
+  `SELECT email, count(*), min(created_at), max(created_at) FROM notification_log WHERE event_id = <id> AND type = 'review_request' GROUP BY email;`
+- Contenido ofensivo (también videos): la productora lo oculta desde el panel, o el MCP de administración con
+  `moderate_review` y `photo_id`. Para borrarlo a mano:
   `DELETE FROM aitickets_event_review_photos WHERE id = '<uuid>';` o
   `UPDATE aitickets_event_reviews SET public_status = 'hidden' WHERE id = '<uuid>';`.
 - Una invitación quedó `sending` más de 30 min: la función `send-scheduled-messages` la marca `failed` y avisa por

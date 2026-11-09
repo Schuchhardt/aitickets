@@ -43,6 +43,20 @@ function present(row: any, stats?: any) {
     };
 }
 
+/**
+ * Acceso por evento a un código: el de un evento exige ese evento (loadOwnedEvent: organización + acceso del miembro);
+ * el de toda la organización, un acceso sin restricción (como los links de promotor de toda la organización).
+ */
+async function assertCodeAccess(ctx: ToolContext, eventId: number | string | null | undefined) {
+    if (eventId != null) {
+        await loadOwnedEvent(ctx, Number(eventId), "id");
+        return;
+    }
+    if (ctx.actor.eventIds) {
+        throw new ToolError("forbidden", "Tu acceso está limitado a ciertos eventos: no puedes crear ni cambiar códigos que aplican a todos los eventos.");
+    }
+}
+
 const listCodes: ToolDef = {
     name: "list_discount_codes",
     title: "Listar códigos de descuento",
@@ -64,7 +78,10 @@ const listCodes: ToolDef = {
             if (isMissingDiscountSchema(error)) throw new ToolError("unavailable", UNAVAILABLE);
             throw error;
         }
-        const rows = (data || []).filter((r: any) => !args.event_id || r.event_id == null || Number(r.event_id) === args.event_id);
+        // Con event_id: los del evento + los de toda la organización. Un miembro limitado, sin event_id, ve lo mismo para
+        // sus eventos (nunca los códigos de eventos que no tiene asignados)
+        const allowed = args.event_id ? [Number(args.event_id)] : ctx.actor.eventIds;
+        const rows = (data || []).filter((r: any) => !allowed || r.event_id == null || allowed.includes(Number(r.event_id)));
         const stats = await statsFor(ctx, rows.map((r: any) => String(r.id)));
         return { count: rows.length, codes: rows.map((r: any) => present(r, stats.get(String(r.id)))) };
     },
@@ -106,7 +123,7 @@ const createCode: ToolDef = {
         });
         if ("error" in parsed) throw new ToolError("invalid_input", parsed.error);
         const values = parsed.values;
-        if (values.event_id != null) await loadOwnedEvent(ctx, values.event_id, "id");
+        await assertCodeAccess(ctx, values.event_id);
 
         const { count, error: countError } = await withoutRewardCodes((filter: (q: any) => any) =>
             filter(ctx.supabase.from("aitickets_discount_codes").select("id", { count: "exact", head: true }).eq("organization_id", ctx.actor.orgId)),
@@ -169,6 +186,7 @@ const updateCode: ToolDef = {
             .maybeSingle();
         if (loadError && isMissingDiscountSchema(loadError)) throw new ToolError("unavailable", UNAVAILABLE);
         if (!existing) throw new ToolError("not_found", "Código no encontrado en tu organización.");
+        await assertCodeAccess(ctx, existing.event_id);
 
         const startsAt = values.starts_at !== undefined ? values.starts_at : existing.starts_at;
         const endsAt = values.ends_at !== undefined ? values.ends_at : existing.ends_at;
@@ -213,7 +231,7 @@ const deleteCode: ToolDef = {
             .maybeSingle();
         if (loadError && isMissingDiscountSchema(loadError)) throw new ToolError("unavailable", UNAVAILABLE);
         if (!existing) throw new ToolError("not_found", "Código no encontrado en tu organización.");
-        if (existing.event_id != null) await loadOwnedEvent(ctx, Number(existing.event_id), "id");
+        await assertCodeAccess(ctx, existing.event_id);
         // La FK de event_orders es ON DELETE SET NULL: borrar un código usado perdería de qué código vino la orden
         const { count, error: countError } = await ctx.supabase
             .from("event_orders")

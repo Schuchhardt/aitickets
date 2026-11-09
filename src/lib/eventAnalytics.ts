@@ -37,7 +37,7 @@ export const BOT_VISITS_NOTE =
 
 /**
  * Lee event_visits paginando, solo personas (is_bot = false). Si la columna aún no existe (deploy preview sin la
- * migración 202611040100), lee todas. scope agrega filtros y orden.
+ * migración 202611090100), lee todas. scope agrega filtros y orden.
  */
 export async function fetchHumanVisits<T>(supabase: any, cols: string, scope: (q: any) => any, opts: { max?: number } = {}): Promise<T[]> {
     const run = (human: boolean) =>

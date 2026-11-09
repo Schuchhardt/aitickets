@@ -227,7 +227,7 @@ async function loadWeekAdsUnsafe(supabase, organizationId, eventIds, week) {
 
 /**
  * Visitas de las 2 últimas semanas, solo personas (event_visits.is_bot = false: sin bots, escáneres de links ni visitas
- * de desarrollo). Sin la columna (migración 202611040100 pendiente), todas.
+ * de desarrollo). Sin la columna (migración 202611090100 pendiente), todas.
  */
 async function loadHumanVisits(supabase, eventId, week) {
   const query = (human) =>

@@ -4,7 +4,7 @@
 // (netlify/lib/reviews.mjs) y muro de asistentes (netlify/lib/attendee-community.mjs). Va en un archivo aparte para que
 // las islas que solo importan TERMS_NOTE de producerFaq.ts no carguen estos módulos.
 import { PRODUCER_FAQ, type FaqItem } from "./producerFaq";
-import { MAX_PHOTOS_PER_PERSON, REVIEW_REQUEST_DELAY_HOURS, REVIEW_REQUEST_WINDOW_HOURS } from "../../netlify/lib/reviews.mjs";
+import { MAX_PHOTOS_PER_PERSON, MAX_VIDEOS_PER_PERSON, ATTENDEE_VIDEO_MAX_SECONDS, REVIEW_FIRST_DELAY_HOURS, REVIEW_REQUEST_STEPS } from "../../netlify/lib/reviews.mjs";
 import { FEED_MESSAGE_MAX } from "../../netlify/lib/attendee-community.mjs";
 import { EVENT_VIDEO_MAX_BYTES } from "../lib/eventVideo";
 
@@ -35,7 +35,7 @@ export const ORGANIZADORES_FAQ: FaqItem[] = [
     },
     {
         q: "¿Cómo funcionan las reseñas?",
-        a: `Entre ${REVIEW_REQUEST_DELAY_HOURS} y ${REVIEW_REQUEST_WINDOW_HOURS} horas después de cada función, los asistentes reciben un correo para calificar con estrellas, dejar un comentario y subir hasta ${MAX_PHOTOS_PER_PERSON} fotos. Ves todo en el panel, puedes ocultar comentarios y, si quieres, premiar a quien califica con un código de descuento para tus próximos eventos, sin importar la nota.`,
+        a: `${REVIEW_FIRST_DELAY_HOURS.day} horas después de que termina cada función (${REVIEW_FIRST_DELAY_HOURS.night} si termina de noche, para que estén despiertos), quienes compraron y quienes asistieron reciben un correo para calificar con estrellas, dejar un comentario y subir hasta ${MAX_PHOTOS_PER_PERSON} fotos y ${MAX_VIDEOS_PER_PERSON} videos de hasta ${ATTENDEE_VIDEO_MAX_SECONDS} segundos. A quienes no califican les mandamos hasta ${REVIEW_REQUEST_STEPS - 1} recordatorios. Ves todo en el panel, puedes ocultar comentarios y, si quieres, premiar a quien califica con un código de descuento para tus próximos eventos, sin importar la nota.`,
     },
     {
         q: "¿Qué es el muro de asistentes?",

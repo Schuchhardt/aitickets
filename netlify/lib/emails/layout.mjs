@@ -271,9 +271,10 @@ export function Divider() {
 
 /**
  * Pie mínimo: "AI Tickets". Solo agrega el enlace de baja cuando el correo lo requiere
- * (unsubscribeUrl); `reason` se acepta por compatibilidad pero ya no se muestra.
+ * (unsubscribeUrl, con el texto unsubscribeLabel o "Darme de baja"); `reason` se acepta por compatibilidad pero ya
+ * no se muestra.
  */
-export function LegalFooter({ unsubscribeUrl } = {}) {
+export function LegalFooter({ unsubscribeUrl, unsubscribeLabel } = {}) {
   const unsub = unsubscribeUrl ? safeHref(unsubscribeUrl) : ''
   const line = { fontFamily: FONT_FAMILY, fontSize: '11px', lineHeight: '16px', color: COLORS.muted, textAlign: 'center', margin: 0 }
   const link = { color: COLORS.muted, textDecoration: 'underline' }
@@ -285,7 +286,7 @@ export function LegalFooter({ unsubscribeUrl } = {}) {
       { style: line },
       LEGAL.brand,
       unsub ? ' · ' : null,
-      unsub ? h(Link, { href: unsub, style: link }, 'Darme de baja') : null
+      unsub ? h(Link, { href: unsub, style: link }, str(unsubscribeLabel).trim() || 'Darme de baja') : null
     )
   )
 }
@@ -293,7 +294,7 @@ export function LegalFooter({ unsubscribeUrl } = {}) {
 // ---------- Layout ----------
 
 /**
- * @param {{ preview?: string, footer?: { reason?: string, unsubscribeUrl?: string }, children?: any }} props
+ * @param {{ preview?: string, footer?: { reason?: string, unsubscribeUrl?: string, unsubscribeLabel?: string }, children?: any }} props
  */
 export function EmailLayout({ preview, footer = {}, children }) {
   return h(

@@ -12,6 +12,8 @@
     "db:status": "node scripts/migrate.mjs --status",
     "db:baseline": "node scripts/migrate.mjs --baseline-only",
     "db:lint": "node scripts/lint-migrations.mjs",
+    "db:drift": "node scripts/db-drift.mjs --check",
+    "db:snapshot": "scripts/db-ci-setup.sh --docker && SUPABASE_DB_URL=postgresql://postgres@127.0.0.1:55433/postgres node scripts/db-drift.mjs --write; docker rm -f aitickets-ci-db >/dev/null",
     "test": "vitest run --passWithNoTests",
     "test:unit": "vitest run --passWithNoTests",
     "test:e2e": "playwright test",

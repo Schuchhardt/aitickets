@@ -256,6 +256,19 @@ describe('fondo: la portada o una versión de ella', () => {
 })
 
 describe('preparar y aprobar', () => {
+  it('el borrador trae un link de vista previa por pieza, también para el MCP de admin', async () => {
+    process.env.INTERNAL_API_SECRET = 'secreto-de-prueba'
+    try {
+      setNow(ACTIVATION)
+      const view = await call('get_social_series', { event_id: 2296 })
+      expect(view.plan.slots.length).toBeGreaterThan(0)
+      for (const s of view.plan.slots) expect(s.preview_url).toContain('/api/events/social-series-preview?token=')
+      expect(getAdminTool('org_get_social_series').description).toMatch(/preview_url/)
+    } finally {
+      delete process.env.INTERNAL_API_SECRET
+    }
+  })
+
   it('sin Instagram conectado no se puede activar y la vista dice qué falta', async () => {
     db.tables.social_accounts = []
     setNow(ACTIVATION)
@@ -500,6 +513,33 @@ describe('pausar, reanudar y cancelar', () => {
     // Sin series vivas en la cuenta, se borra la automatización de historias
     expect(zernioCalls.filter((c) => c.method === 'DELETE' && c.path.startsWith('/comment-automations/')).length).toBeGreaterThan(0)
     expect(series().zernio_story_automation_id).toBeNull()
+  })
+
+  it('get_social_series: link de vista previa solo en piezas pendientes con imagen por generar', async () => {
+    process.env.INTERNAL_API_SECRET = 'secreto-de-prueba'
+    try {
+      await activate()
+      const slots = db.tables.aitickets_social_series_slots
+      Object.assign(slots[0], { status: 'published', image_url: 'https://proj.supabase.co/final-1.jpg', published_at: new Date().toISOString() })
+      Object.assign(slots[1], { status: 'queued', image_url: 'https://proj.supabase.co/final-2.jpg' })
+      slots.push({ ...slots[2], id: 9001, kind: 'reel', status: 'planned', image_url: null, video_url: 'https://proj.supabase.co/v.mp4' })
+      const before = JSON.stringify(slots)
+      const view = await call('get_social_series', { event_id: 2296 })
+      const byId = new Map(view.slots.map((s) => [s.id, s]))
+      expect(byId.get(Number(slots[0].id))).toMatchObject({ image_url: 'https://proj.supabase.co/final-1.jpg', preview_url: null })
+      expect(byId.get(Number(slots[1].id))).toMatchObject({ image_url: 'https://proj.supabase.co/final-2.jpg', preview_url: null })
+      expect(byId.get(9001)).toMatchObject({ image_url: null, preview_url: null, video_url: 'https://proj.supabase.co/v.mp4' })
+      const pending = byId.get(Number(slots[2].id))
+      expect(pending.image_url).toBeNull()
+      expect(pending.preview_url).toContain(`${SITE}/api/events/social-series-preview?token=`)
+      expect(view.next_slot).toMatchObject({ id: Number(slots[1].id), preview_url: null })
+      expect(view.preview_note).toMatch(/datos de ahora/)
+      expect(JSON.stringify(slots)).toBe(before)
+      slots[1].status = 'published'
+      expect((await call('get_social_series', { event_id: 2296 })).next_slot.preview_url).toContain('token=')
+    } finally {
+      delete process.env.INTERNAL_API_SECRET
+    }
   })
 
   it('get_social_series: DMs desde Zernio, próxima pieza y ventas atribuidas al DM', async () => {

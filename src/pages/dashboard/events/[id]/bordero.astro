@@ -6,14 +6,15 @@
 // analítica.
 import DashboardLayout from "../../../../layouts/DashboardLayout.astro";
 import { getSupabaseAdmin } from "../../../../lib/auth-helpers";
-import { EVENT_MANAGER_ROLES } from "../../../../lib/supabaseServer";
+import { ORG_ADMIN_ROLES } from "../../../../lib/supabaseServer";
 import { requireDashboardSession } from "../../_lib/guard";
 import { canAccessEventByStaff } from "../../../../../netlify/lib/event-staff.mjs";
 import { loadEventFunctions } from "../../../../lib/eventAnalytics";
 import { functionSettlement, settlementClp as clp } from "../../../../lib/functionSettlement";
 
 const { id } = Astro.params;
-const guard = await requireDashboardSession(Astro, EVENT_MANAGER_ROLES);
+// Borderó: liquidación con la sala, con el neto al productor => permiso finance.read (dueño, administración y finanzas)
+const guard = await requireDashboardSession(Astro, [...ORG_ADMIN_ROLES, "finance"]);
 if (!guard.ok) return guard.response;
 const { dbUser } = guard.session;
 if (!(await canAccessEventByStaff(getSupabaseAdmin(), dbUser.id, id))) return Astro.redirect("/dashboard/events");

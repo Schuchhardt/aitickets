@@ -1,0 +1,135 @@
+---
+// Validador de entradas: los eventos que esta persona puede validar (de su organización y, si tiene eventos
+// asignados en aitickets_event_staff, solo esos). El rol Puerta aterriza aquí al iniciar sesión.
+import ValidatorLayout from "../../layouts/ValidatorLayout.astro";
+import { getSupabaseAdmin } from "../../lib/auth-helpers";
+import { getStaffEventIds } from "../../../netlify/lib/event-staff.mjs";
+import { requireCheckinSession, splitValidatorEvents, validatorEventPath, type ValidatorEventRow } from "../../lib/validatorApp";
+
+export const prerender = false;
+
+// Datos de asistentes: nunca en cachés intermedias (la copia sin conexión la guarda solo public/validador-sw.js)
+Astro.response.headers.set("Cache-Control", "no-store");
+Astro.response.headers.set("Referrer-Policy", "no-referrer");
+
+const guard = await requireCheckinSession(Astro);
+if (!guard.ok) return guard.response;
+const { dbUser } = guard.session;
+const supabase = getSupabaseAdmin();
+
+let rows: any[] = [];
+{
+    // archived_at (202610090200): sin la columna (preview sin migrar) se lista sin ella
+    const load = (cols: string) =>
+        supabase.from("events").select(cols).eq("organization_id", dbUser.organization_id).eq("status", "published").order("start_date", { ascending: true }).limit(500);
+    let { data, error } = await load("id, name, slug, start_date, end_date, location, archived_at");
+    if (error) ({ data } = await load("id, name, slug, start_date, end_date, location"));
+    rows = (data || []).filter((e: any) => !e.archived_at);
+}
+const staffEventIds = await getStaffEventIds(supabase, dbUser.id);
+if (staffEventIds) rows = rows.filter((e) => staffEventIds.includes(Number(e.id)));
+const { upcoming, past } = splitValidatorEvents(rows as ValidatorEventRow[]);
+
+const dateLabel = (iso: string | null) =>
+    iso
+        ? new Date(iso).toLocaleString("es-CL", { timeZone: "America/Santiago", weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+        : "Sin fecha";
+const firstName = String(dbUser.name || "").trim().split(/\s+/)[0] || "";
+---
+
+<ValidatorLayout title="Validador de entradas | AI Tickets" userName={dbUser.name} role={dbUser.role}>
+    <h1 class="text-2xl sm:text-3xl font-bold font-[Unbounded] mb-1">Validar entradas</h1>
+    <p class="text-sm text-gray-600 mb-5">
+        {firstName ? `Hola ${firstName}. ` : ""}Elige el evento. La lista de asistentes se guarda en este teléfono: puedes escanear y buscar sin conexión y sincronizar cuando vuelva internet.
+    </p>
+
+    {upcoming.length === 0 && past.length === 0 ? (
+        <div class="bg-white rounded-xl border border-gray-200 p-6 text-center" data-testid="validator-empty">
+            <p class="font-semibold mb-1">No hay eventos para validar</p>
+            <p class="text-sm text-gray-500">Cuando el organizador publique un evento (o te asigne uno), aparecerá aquí.</p>
+        </div>
+    ) : (
+        <>
+            {upcoming.length > 0 && (
+                <section class="mb-6">
+                    <h2 class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Hoy y próximos</h2>
+                    <ul class="space-y-3">
+                        {upcoming.map((e) => (
+                            <li>
+                                <a
+                                    href={validatorEventPath(e.slug)}
+                                    class="flex items-center gap-3 bg-white rounded-xl border border-gray-200 p-4 hover:border-gray-400 transition"
+                                    data-validator-event={e.slug}
+                                >
+                                    <div class="min-w-0 flex-1">
+                                        <p class="font-semibold truncate">{e.name}</p>
+                                        <p class="text-sm text-gray-600 capitalize">{dateLabel(e.start_date)}</p>
+                                        {e.location && <p class="text-xs text-gray-500 truncate">{e.location}</p>}
+                                        <p class="text-xs text-green-700 mt-1 hidden" data-offline-status></p>
+                                    </div>
+                                    <span class="shrink-0 px-3 py-2 rounded-lg bg-black text-white text-sm font-medium">Validar</span>
+                                </a>
+                            </li>
+                        ))}
+                    </ul>
+                </section>
+            )}
+            {past.length > 0 && (
+                <details class="mb-6" open={upcoming.length === 0}>
+                    <summary class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2 cursor-pointer">Anteriores</summary>
+                    <ul class="space-y-2 mt-2">
+                        {past.map((e) => (
+                            <li>
+                                <a
+                                    href={validatorEventPath(e.slug)}
+                                    class="flex items-center gap-3 bg-white rounded-lg border border-gray-200 px-4 py-3 hover:border-gray-400 transition"
+                                    data-validator-event={e.slug}
+                                >
+                                    <div class="min-w-0 flex-1">
+                                        <p class="font-medium truncate">{e.name}</p>
+                                        <p class="text-xs text-gray-500 capitalize">{dateLabel(e.start_date)}</p>
+                                        <p class="text-xs text-green-700 mt-1 hidden" data-offline-status></p>
+                                    </div>
+                                    <span class="shrink-0 text-sm text-gray-700">Abrir</span>
+                                </a>
+                            </li>
+                        ))}
+                    </ul>
+                </details>
+            )}
+        </>
+    )}
+
+    <p class="text-xs text-gray-400 mt-8">
+        ¿Cambiar tu contraseña? <a href="/dashboard/profile" class="underline">Mi perfil</a>
+    </p>
+</ValidatorLayout>
+
+<script>
+    // Qué eventos ya tienen la lista descargada en este teléfono (ValidateQR.vue: event_<slug>, pending_validations_<slug>)
+    const readJson = (key: string) => {
+        try {
+            const raw = localStorage.getItem(key);
+            return raw ? JSON.parse(raw) : null;
+        } catch {
+            return null;
+        }
+    };
+    document.querySelectorAll<HTMLAnchorElement>("[data-validator-event]").forEach((link) => {
+        const slug = link.dataset.validatorEvent || "";
+        const cached = readJson(`event_${slug}`);
+        const pending = readJson(`pending_validations_${slug}`);
+        const status = link.querySelector<HTMLElement>("[data-offline-status]");
+        if (!status || !cached || !Array.isArray(cached.attendees)) return;
+        const parts = [`Lista descargada (${cached.attendees.length} entradas)`];
+        if (cached.last_sync) {
+            parts.push(`sincronizada ${new Date(cached.last_sync).toLocaleString("es-CL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`);
+        }
+        if (Array.isArray(pending) && pending.length) {
+            parts.push(`${pending.length} pendiente(s) de sincronizar`);
+            status.classList.replace("text-green-700", "text-amber-700");
+        }
+        status.textContent = parts.join(" · ");
+        status.classList.remove("hidden");
+    });
+</script>

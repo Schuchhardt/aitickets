@@ -9,6 +9,7 @@ import { onMounted, ref } from 'vue'
 import SkeletonRows from './SkeletonRows.vue'
 import { Film, Trash2 } from 'lucide-vue-next'
 import { CANVA_REEL_URL } from '../../lib/socialPlatforms'
+import { VIDEO_TYPES, VIDEO_FORMAT_ERROR, formatMb as mb, readVideoMeta, uploadToSignedUrl } from '../../lib/clientVideo.js'
 
 const props = defineProps({
   eventId: { type: Number, required: true },
@@ -18,7 +19,6 @@ const props = defineProps({
 })
 const emit = defineEmits(['change'])
 
-const VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime']
 const loading = ref(true)
 const video = ref(null)
 const available = ref(true)
@@ -28,7 +28,6 @@ const progress = ref(0)
 const error = ref('')
 const notice = ref('')
 const input = ref(null)
-const mb = (bytes) => `${Math.round(bytes / (1024 * 1024))} MB`
 
 const api = async (body) => {
   const res = await fetch('/api/events/video', {
@@ -57,78 +56,6 @@ async function load() {
   }
 }
 
-/** Ancho, alto, duración y un cuadro como póster (JPEG). Si el navegador no puede leer el video, todo null. */
-function readVideoMeta(file) {
-  return new Promise((resolve) => {
-    const src = URL.createObjectURL(file)
-    const v = document.createElement('video')
-    let done = false
-    const finish = (poster) => {
-      if (done) return
-      done = true
-      clearTimeout(timer)
-      const meta = {
-        width: v.videoWidth || null,
-        height: v.videoHeight || null,
-        duration: Number.isFinite(v.duration) ? Math.round(v.duration) : null,
-        poster: poster || null,
-      }
-      v.removeAttribute('src')
-      URL.revokeObjectURL(src)
-      resolve(meta)
-    }
-    const timer = setTimeout(() => finish(null), 10000)
-    v.muted = true
-    v.playsInline = true
-    v.preload = 'auto'
-    v.onerror = () => finish(null)
-    v.onloadeddata = () => {
-      try { v.currentTime = Math.min(1, (v.duration || 2) / 4) } catch { finish(null) }
-    }
-    v.onseeked = () => {
-      try {
-        const scale = Math.min(1, 1280 / (v.videoWidth || 1280))
-        const canvas = document.createElement('canvas')
-        canvas.width = Math.max(1, Math.round(v.videoWidth * scale))
-        canvas.height = Math.max(1, Math.round(v.videoHeight * scale))
-        canvas.getContext('2d').drawImage(v, 0, 0, canvas.width, canvas.height)
-        canvas.toBlob((blob) => finish(blob), 'image/jpeg', 0.85)
-      } catch {
-        finish(null)
-      }
-    }
-    v.src = src
-  })
-}
-
-/** Mensaje claro a partir de la respuesta de Supabase Storage. */
-function storageError(status, text) {
-  let body = {}
-  try { body = JSON.parse(text || '{}') } catch { /* sin JSON */ }
-  const msg = String(body.message || body.error || '')
-  if (status === 413 || /maximum allowed size|too large/i.test(msg)) return `El video supera el máximo permitido (${mb(maxBytes.value)}).`
-  if (/mime type|invalid_mime/i.test(msg)) return 'Formato no soportado: usa MP4 (recomendado), WEBM o MOV.'
-  return `No se pudo subir el video${msg ? `: ${msg}` : ''}. Intenta de nuevo.`
-}
-
-/** PUT a la URL firmada con progreso (fetch no informa el avance de la subida). Mismo formato que supabase-js. */
-function uploadToSignedUrl(url, file) {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest()
-    xhr.open('PUT', url)
-    xhr.setRequestHeader('x-upsert', 'false')
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) progress.value = Math.min(99, Math.round((e.loaded / e.total) * 100))
-    }
-    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(storageError(xhr.status, xhr.responseText))))
-    xhr.onerror = () => reject(new Error('Se cortó la conexión mientras subía el video. Intenta de nuevo.'))
-    const body = new FormData()
-    body.append('cacheControl', '31536000')
-    body.append('', file)
-    xhr.send(body)
-  })
-}
-
 async function uploadPoster(blob) {
   if (!blob) return null
   try {
@@ -148,7 +75,7 @@ async function upload(file) {
   notice.value = ''
   if (!file) return
   if (!VIDEO_TYPES.includes(file.type)) {
-    error.value = 'Formato no soportado: usa MP4 (recomendado), WEBM o MOV.'
+    error.value = VIDEO_FORMAT_ERROR
     return
   }
   if (file.size > maxBytes.value) {
@@ -160,7 +87,7 @@ async function upload(file) {
   try {
     const meta = await readVideoMeta(file)
     const { uploadUrl, publicUrl } = await api({ action: 'upload_url', contentType: file.type, size: file.size })
-    await uploadToSignedUrl(uploadUrl, file)
+    await uploadToSignedUrl(uploadUrl, file, { onProgress: (p) => (progress.value = p), maxBytes: maxBytes.value })
     progress.value = 100
     const posterUrl = await uploadPoster(meta.poster)
     const data = await api({ action: 'set', url: publicUrl, poster_url: posterUrl, width: meta.width, height: meta.height, duration: meta.duration })

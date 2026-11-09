@@ -38,6 +38,37 @@ export function roleDescription(role: string): string {
 
 export const roleLabel = (role: string) => ROLE_LABELS[role] || role;
 
+/**
+ * Cuenta de Auth que creó AI Tickets y que nadie ha usado nunca (sin ningún inicio de sesión, ni con contraseña ni
+ * con Google ni desde otra app del proyecto compartido). Es el caso de un "agregar miembro" que falló a medias: la
+ * contraseña temporal nunca se mostró, así que nadie la conoce y se le puede poner otra sin quitarle nada a nadie.
+ * Cualquier cuenta que no cumpla esto es de alguien: solo se vincula con SU contraseña.
+ */
+export function isUnclaimedAuthUser(user: any): boolean {
+    if (!user) return false;
+    return (user.app_metadata as any)?.app === "aitickets" && !user.last_sign_in_at;
+}
+
+/**
+ * ¿Al aceptar la invitación hay que pedir la contraseña de una cuenta existente? false = se crea una contraseña
+ * nueva: correo sin cuenta, o una cuenta que nadie ha usado (huérfano de un alta a medias, o un miembro al que se
+ * le "reenvía el acceso" porque nunca entró). Debe coincidir con acceptTeamInvitation (src/lib/team-accept.ts).
+ */
+export async function invitationNeedsExistingPassword(supabase: any, email: string): Promise<boolean> {
+    const { data: user } = await supabase
+        .from("users")
+        .select("id, auth_user_id, organization_id")
+        .ilike("email", String(email).trim().toLowerCase().replace(/[\\%_]/g, (c: string) => `\\${c}`))
+        .maybeSingle();
+    if (!user?.auth_user_id) return false;
+    try {
+        const { data } = await supabase.auth.admin.getUserById(user.auth_user_id);
+        return !isUnclaimedAuthUser(data?.user);
+    } catch {
+        return true;
+    }
+}
+
 /** Carga una invitación por su token (o null si el token no tiene formato válido o no existe). */
 export async function loadInvitationByToken(supabase: any, token: unknown) {
     if (!isInvitationToken(token)) return null;

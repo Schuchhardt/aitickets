@@ -1,9 +1,11 @@
 // GET /api/events/function-settlement?event_id=&event_date_id=<id|all>&format=csv|json — borderó de una función
 // (src/lib/functionSettlement.ts) para liquidar con la sala. event_date_id=all: las entradas válidas para cualquier
-// función. csv (por defecto) descarga la planilla; json devuelve los datos. Mismos permisos que el CSV de órdenes.
+// función. csv (por defecto) descarga la planilla; json devuelve los datos. Permiso finance.read (dueño, administración y
+// finanzas), el mismo de get_function_settlement, que entrega este link: el borderó trae el neto al productor.
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
-import { getSessionContext, getOwnedEvent, hasRole, EVENT_MANAGER_ROLES, jsonResponse } from "../../../lib/supabaseServer";
+import { getSessionContext, getOwnedEvent, jsonResponse } from "../../../lib/supabaseServer";
+import { roleAllows } from "../../../lib/producer-api/permissions";
 import { slugify } from "../_lib/server-utils";
 import { functionSettlement, settlementCsv, SettlementError } from "../../../lib/functionSettlement";
 
@@ -13,7 +15,7 @@ export const GET: APIRoute = async (context) => {
     const session = await getSessionContext(context);
     if (!session) return jsonResponse({ error: "Unauthorized" }, 401);
     const { dbUser } = session;
-    if (!hasRole(dbUser, EVENT_MANAGER_ROLES)) return jsonResponse({ message: "No tienes permisos para ver el borderó" }, 403);
+    if (!roleAllows(dbUser.role, "finance.read")) return jsonResponse({ message: "No tienes permisos para ver el borderó" }, 403);
 
     const eventId = context.url.searchParams.get("event_id");
     if (!eventId) return jsonResponse({ message: "event_id es obligatorio" }, 400);

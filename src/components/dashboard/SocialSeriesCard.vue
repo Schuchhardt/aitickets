@@ -57,6 +57,9 @@ const fmt = (local) => {
 const clp = (n) => `$${Math.round(Number(n) || 0).toLocaleString('es-CL')}`
 const previewUrl = (s) =>
   `/api/events/social-series-preview?event_id=${props.eventId}&kind=${s.kind}&days=${s.days_to_event}${s.variant === 'sold_out' ? '&variant=sold_out' : ''}${s.platform && s.platform !== 'instagram' ? `&platform=${s.platform}` : ''}&v=${previewVersion.value}`
+// La imagen de una pieza: la ya generada o la vista previa con los datos de ahora. Un reel es su video: sin imagen.
+const slotImage = (s) => s.image_url || (s.kind === 'reel' ? null : previewUrl(s))
+const slotAspect = (s) => (s.kind === 'feed_post' && s.platform !== 'tiktok' ? 'aspect-[4/5]' : 'aspect-[9/16]')
 const track = (name, data) => { try { window.aitTrack?.(name, data) } catch { /* bitácora opcional */ } }
 
 const api = async (method, body) => {
@@ -467,13 +470,15 @@ const done = computed(() => (view.value?.slots || []).filter((s) => ['published'
 
           <div v-if="view.next_slot && status === 'active'" class="flex items-center gap-3 p-3 rounded-lg border border-gray-200">
             <button
+              v-if="slotImage(view.next_slot)"
               type="button"
               class="shrink-0 rounded cursor-zoom-in focus:outline-none focus-visible:ring-2 focus-visible:ring-black"
               aria-label="Ampliar la próxima publicación"
-              @click="openZoom([slotZoomItem(view.next_slot, view.next_slot.image_url || previewUrl(view.next_slot))])"
+              @click="openZoom([slotZoomItem(view.next_slot, slotImage(view.next_slot))])"
             >
-              <img :src="view.next_slot.image_url || previewUrl(view.next_slot)" alt="Próxima publicación" class="w-14 rounded border border-gray-200 hover:opacity-90 transition" :class="view.next_slot.kind === 'story' ? 'aspect-[9/16]' : 'aspect-[4/5]'" />
+              <img :src="slotImage(view.next_slot)" alt="Próxima publicación" class="w-14 rounded border border-gray-200 hover:opacity-90 transition" :class="slotAspect(view.next_slot)" />
             </button>
+            <span v-else class="shrink-0 w-14 aspect-[9/16] rounded border border-gray-200 bg-gray-100 flex items-center justify-center text-gray-500" aria-hidden="true"><Clapperboard :size="18" /></span>
             <div class="text-sm">
               <p class="font-semibold">Próxima: {{ view.next_slot.kind_label }} en {{ view.next_slot.platform_label }} · {{ view.next_slot.stage }}</p>
               <p class="text-gray-500">{{ fmt(view.next_slot.publish_local) }} · {{ view.next_slot.status_label }}</p>
@@ -484,7 +489,17 @@ const done = computed(() => (view.value?.slots || []).filter((s) => ['published'
             <summary class="cursor-pointer font-medium">Calendario ({{ view.slots.length }} piezas)</summary>
             <ul class="mt-2 divide-y divide-gray-100">
               <li v-for="s in [...done, ...upcoming]" :key="s.id" class="py-2 flex items-center justify-between gap-2">
-                <div class="min-w-0">
+                <button
+                  v-if="slotImage(s)"
+                  type="button"
+                  class="shrink-0 rounded cursor-zoom-in focus:outline-none focus-visible:ring-2 focus-visible:ring-black"
+                  :aria-label="`Ampliar ${s.kind_label} ${s.stage}`"
+                  @click="openZoom([slotZoomItem(s, slotImage(s))])"
+                >
+                  <img :src="slotImage(s)" :alt="`${s.kind_label} ${s.stage}`" loading="lazy" class="w-9 rounded border border-gray-200 bg-gray-100 hover:opacity-90 transition" :class="slotAspect(s)" />
+                </button>
+                <span v-else class="shrink-0 w-9 aspect-[9/16] rounded border border-gray-200 bg-gray-100 flex items-center justify-center text-gray-500" aria-hidden="true"><Clapperboard :size="14" /></span>
+                <div class="min-w-0 flex-1">
                   <p class="font-medium text-gray-800 flex items-center gap-1"><component :is="PLATFORM_ICON[s.platform || 'instagram']" :size="14" class="shrink-0" /> {{ s.kind_label }} · {{ s.stage }}</p>
                   <p class="text-xs text-gray-500">{{ fmt(s.publish_local) }}<template v-if="s.error"> · <span class="text-red-600">{{ s.error }}</span></template></p>
                 </div>

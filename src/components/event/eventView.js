@@ -4,6 +4,7 @@
 // totales se calculan con Reservation/pricing.js (misma regla que /api/purchase-ticket).
 
 import { greetingName } from "../../../netlify/lib/buyer-name.mjs";
+import { FEW_REMAINING, SOLD_PERCENT_LAST, SOLD_PERCENT_VISIBLE } from "../../lib/salesProgress.mjs";
 
 const WEEKDAYS_LONG = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 const WEEKDAYS_SHORT = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
@@ -167,17 +168,43 @@ export function isEventEnded(event, now = new Date()) {
 }
 
 /**
- * Cupos/entradas restantes si todas las entradas a la venta tienen stock limitado:
- * { remaining, total, few } (few = ≤ 10 o ≤ 15 % del total). null si alguna es ilimitada.
+ * Avance de la venta: { remaining, soldPercent, few }. null si no hay entradas a la venta o alguna es ilimitada.
+ * - remaining: entradas/cupos que quedan por vender.
+ * - soldPercent: % vendido (entero, hacia abajo) o null si no se sabe o es menor al 50 % (no se muestra).
+ * - few: "Últimas entradas" / "Quedan N cupos": vendido ≥ 80 % o quedan 10 o menos.
+ * Con event.sales_progress (src/lib/eventPage.ts, src/lib/salesProgress.mjs) es el de TODO el evento: también las
+ * tandas agotadas, por abrir o encadenadas. Sin él (landings, eventos sintéticos) se calcula con las entradas a la venta.
  */
 export function stockSummary(event) {
   const tickets = event?.tickets || [];
-  if (!tickets.length || tickets.some((t) => t.remaining === null || t.remaining === undefined)) return null;
-  const remaining = tickets.reduce((s, t) => s + Math.max(0, Number(t.remaining) || 0), 0);
-  const totals = tickets.map((t) => Number(t.total_quantity));
-  const total = totals.every((n) => Number.isFinite(n) && n > 0) ? totals.reduce((a, b) => a + b, 0) : null;
-  const few = remaining > 0 && (remaining <= 10 || (total !== null && remaining <= total * 0.15));
-  return { remaining, total, few };
+  if (!tickets.length) return null;
+  let remaining;
+  let soldPercent = null;
+  if (event.sales_progress !== undefined) {
+    const progress = event.sales_progress;
+    if (!progress) return null;
+    remaining = Math.max(0, Number(progress.remaining) || 0);
+    const pct = Number(progress.sold_percent);
+    soldPercent = progress.sold_percent !== null && progress.sold_percent !== undefined && Number.isFinite(pct) ? pct : null;
+  } else {
+    if (tickets.some((t) => t.remaining === null || t.remaining === undefined)) return null;
+    remaining = tickets.reduce((s, t) => s + Math.max(0, Number(t.remaining) || 0), 0);
+    const totals = tickets.map((t) => Number(t.total_quantity));
+    const total = totals.every((n) => Number.isFinite(n) && n > 0) ? totals.reduce((a, b) => a + b, 0) : null;
+    if (total !== null) soldPercent = Math.min(100, Math.max(0, Math.floor(((total - remaining) * 100) / total)));
+  }
+  if (soldPercent !== null && soldPercent < SOLD_PERCENT_VISIBLE) soldPercent = null;
+  const few = remaining > 0 && (remaining <= FEW_REMAINING || (soldPercent !== null && soldPercent >= SOLD_PERCENT_LAST));
+  return { remaining, soldPercent, few };
+}
+
+/**
+ * "60% de entradas vendidas" (pagados) o "60% de cupos reservados" (gratis) cuando se vendió la mitad o más y aún no
+ * son las últimas (ahí manda "Últimas entradas" / "Quedan N cupos"). "" si no corresponde.
+ */
+export function soldPercentLabel(stock, { free = false } = {}) {
+  if (!stock || stock.few || stock.soldPercent === null || stock.soldPercent === undefined) return "";
+  return `${stock.soldPercent}% de ${free ? "cupos reservados" : "entradas vendidas"}`;
 }
 
 /** Precio final más bajo entre las entradas a la venta. */
@@ -223,10 +250,15 @@ export function cardLabel(event, state, { rsvpStatus = "idle", now = new Date() 
     if (rsvpStatus === "already") return neutral("Ya estás inscrito");
     if (state === "free_full" || rsvpStatus === "full" || rsvpStatus === "waitlist_ok") return neutral("Gratis · Cupos llenos");
     if (stock?.few) return { text: `Gratis · ${stock.remaining === 1 ? "Queda 1 cupo" : `Quedan ${stock.remaining} cupos`}`, tone: "warning" };
+    const soldFree = soldPercentLabel(stock, { free: true });
+    if (soldFree) return { text: `Gratis · ${soldFree}`, tone: "warning" };
     return neutral("Gratis");
   }
   if (state === "paid_simple" || state === "paid_multi") {
     if (stock?.few) return { text: "Últimas entradas", tone: "warning" };
+    // Desde la mitad vendida, el % (también por sobre "N funciones": los chips ya muestran las funciones)
+    const soldPaid = soldPercentLabel(stock);
+    if (soldPaid) return { text: soldPaid, tone: "warning" };
     if (state === "paid_simple") return null;
     const functions = upcomingFunctions(event, now);
     if (functions.length < 2) return null;

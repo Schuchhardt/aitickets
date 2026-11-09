@@ -8,12 +8,12 @@ export const ONBOARDING_PLACEHOLDER_NAME = "Mi productora";
 export const ONBOARDING_PATH = "/organizadores/bienvenida";
 
 /**
- * Destino interno seguro tras registrarse / iniciar sesión: solo rutas del panel o de autorización OAuth.
- * Nunca otro sitio (evita redirecciones abiertas). null si no es válido.
+ * Destino interno seguro tras registrarse / iniciar sesión: solo rutas del panel, del validador de entradas
+ * (/validador) o de autorización OAuth. Nunca otro sitio (evita redirecciones abiertas). null si no es válido.
  */
 export function safeNextPath(raw: unknown): string | null {
     if (typeof raw !== "string" || !raw || raw.length > 2000) return null;
-    if (!/^\/(dashboard(\/|\?|$)|oauth\/)/.test(raw)) return null;
+    if (!/^\/(dashboard(\/|\?|$)|validador(\/|\?|$)|oauth\/)/.test(raw)) return null;
     if (raw.startsWith("//") || raw.includes("\\") || /[\r\n]/.test(raw)) return null;
     return raw;
 }

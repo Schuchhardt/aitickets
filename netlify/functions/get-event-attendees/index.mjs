@@ -58,7 +58,8 @@ export default async function handler(req) {
     attendees = await attachSessionCheckins(supabase, eventId, attendees, dates || [])
     // Hora límite de ingreso por tipo de entrada (fuera de horario también sin conexión)
     attendees = await attachEntryDeadlines(supabase, eventId, attendees)
-    return respond({ attendees, dates: dates || [] }, 200)
+    // rendered_at: hora del servidor de esta lista (ValidateQR.vue la guarda como última sincronización)
+    return respond({ attendees, dates: dates || [], rendered_at: new Date().toISOString() }, 200)
   } catch (err) {
     console.error('Error en get-event-attendees:', err?.message)
     return respond({ message: 'Error interno del servidor' }, 500)

@@ -7,7 +7,7 @@ import AppHeader from "../../components/AppHeader.vue";
 import AppFooter from "../../components/AppFooter.vue";
 import GradientBackground from "../../components/Hero/GradientBackground.vue";
 import { getSupabaseAdmin } from "../../lib/auth-helpers";
-import { loadInvitationByToken, invitationStatus, roleLabel, roleDescription } from "../../lib/team-invitations";
+import { loadInvitationByToken, invitationNeedsExistingPassword, invitationStatus, roleLabel, roleDescription } from "../../lib/team-invitations";
 import "../../styles/global.css";
 
 export const prerender = false;
@@ -26,12 +26,7 @@ let hasAccount = false;
 if (invitation && status === "pending") {
     const { data: org } = await supabase.from("organizations").select("public_name").eq("id", invitation.organization_id).maybeSingle();
     orgName = org?.public_name || "";
-    const { data: user } = await supabase
-        .from("users")
-        .select("id, auth_user_id")
-        .ilike("email", String(invitation.email).replace(/[\\%_]/g, (c: string) => `\\${c}`))
-        .maybeSingle();
-    hasAccount = Boolean(user?.auth_user_id);
+    hasAccount = await invitationNeedsExistingPassword(supabase, invitation.email);
 }
 
 const STATUS_MESSAGES: Record<string, string> = {

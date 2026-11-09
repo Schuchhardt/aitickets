@@ -235,7 +235,7 @@ export function presaleCounter(frame, result) {
  * agotada "Agotada", la que está a la venta con su precio y las que abren después "Disponible desde el {fecha}". Una
  * etapa que cerró con cupo al abrir la siguiente ya no se muestra (eventPage.ts solo atenúa agotadas y por abrir).
  * label = rótulo de la card (cardLabel): "Últimas entradas" con el mismo criterio de poco stock que la página del evento
- * (stockSummary de eventView.js sobre las entradas a la venta: quedan 10 o menos, o el 15% o menos), "Agotado" si se
+ * (stockSummary de eventView.js sobre las entradas a la venta: quedan 10 o menos, o se vendió el 80% o más), "Agotado" si se
  * agotó todo. La spec §4.3 decía "menos del 30%": manda el producto.
  */
 export function buyerRows(stages, frame) {

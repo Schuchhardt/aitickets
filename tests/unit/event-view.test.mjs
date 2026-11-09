@@ -10,6 +10,7 @@ import {
   miniCalendar,
   cardState,
   stockSummary,
+  soldPercentLabel,
   checkoutFunctions,
   ticketRowsFor,
   readCheckoutParams,
@@ -80,11 +81,38 @@ describe('estado de la card de acción', () => {
     expect(cardState({ dates: [{ ...future('2026-10-01', 1), end_iso: '2026-10-01T23:00:00-03:00' }], sale_state: 'closed', tickets: [] }, NOW)).toBe('ended')
     expect(cardState({ ...base, is_preview: true, status: 'draft', sale_state: 'on_sale', tickets: [{ id: 1, price: 0 }] }, NOW)).toBe('preview')
   })
-  it('"Quedan N" con ≤ 10 o ≤ 15 % del total', () => {
-    expect(stockSummary({ tickets: [{ remaining: 8, total_quantity: 200 }] })).toEqual({ remaining: 8, total: 200, few: true })
-    expect(stockSummary({ tickets: [{ remaining: 14, total_quantity: 100 }] }).few).toBe(true)
-    expect(stockSummary({ tickets: [{ remaining: 40, total_quantity: 100 }] }).few).toBe(false)
+  it('"Quedan N" / "Últimas entradas" con ≤ 10 o ≥ 80 % vendido; el % desde la mitad', () => {
+    expect(stockSummary({ tickets: [{ remaining: 8, total_quantity: 200 }] })).toEqual({ remaining: 8, soldPercent: 96, few: true })
+    expect(stockSummary({ tickets: [{ remaining: 20, total_quantity: 100 }] }).few).toBe(true)
+    expect(stockSummary({ tickets: [{ remaining: 21, total_quantity: 100 }] })).toEqual({ remaining: 21, soldPercent: 79, few: false })
+    expect(stockSummary({ tickets: [{ remaining: 40, total_quantity: 100 }] })).toEqual({ remaining: 40, soldPercent: 60, few: false })
+    // Bajo la mitad no hay % (la página no lo muestra)
+    expect(stockSummary({ tickets: [{ remaining: 51, total_quantity: 100 }] })).toEqual({ remaining: 51, soldPercent: null, few: false })
+    expect(stockSummary({ tickets: [{ remaining: 50, total_quantity: 100 }] }).soldPercent).toBe(50)
+    // Varias entradas a la venta: el % es del total
+    expect(stockSummary({ tickets: [{ remaining: 30, total_quantity: 100 }, { remaining: 90, total_quantity: 100 }] }).soldPercent).toBe(null)
+    expect(stockSummary({ tickets: [{ remaining: 30, total_quantity: 100 }, { remaining: 50, total_quantity: 100 }] }).soldPercent).toBe(60)
     expect(stockSummary({ tickets: [{ remaining: null }] })).toBeNull()
+  })
+
+  it('con sales_progress del servidor manda el avance de todo el evento (tandas agotadas, por abrir)', () => {
+    // La preventa a la venta tiene 5, pero viene la general: no son las últimas
+    const tickets = [{ remaining: 5, total_quantity: 100 }]
+    expect(stockSummary({ tickets, sales_progress: { sold_percent: 63, remaining: 75 } })).toEqual({ remaining: 75, soldPercent: 63, few: false })
+    expect(stockSummary({ tickets, sales_progress: { sold_percent: null, remaining: 300 } })).toEqual({ remaining: 300, soldPercent: null, few: false })
+    expect(stockSummary({ tickets, sales_progress: { sold_percent: 85, remaining: 45 } }).few).toBe(true)
+    // Alguna entrada (aunque no esté a la venta todavía) es ilimitada: sin % ni "Últimas"
+    expect(stockSummary({ tickets, sales_progress: null })).toBeNull()
+    // Sin entradas a la venta no hay nada que mostrar
+    expect(stockSummary({ tickets: [], sales_progress: { sold_percent: 90, remaining: 10 } })).toBeNull()
+  })
+
+  it('rótulo del %: "N% de entradas vendidas" / "N% de cupos reservados", nunca junto a "Últimas"', () => {
+    expect(soldPercentLabel({ remaining: 40, soldPercent: 60, few: false })).toBe('60% de entradas vendidas')
+    expect(soldPercentLabel({ remaining: 40, soldPercent: 60, few: false }, { free: true })).toBe('60% de cupos reservados')
+    expect(soldPercentLabel({ remaining: 15, soldPercent: 85, few: true })).toBe('')
+    expect(soldPercentLabel({ remaining: 60, soldPercent: null, few: false })).toBe('')
+    expect(soldPercentLabel(null)).toBe('')
   })
 })
 
@@ -99,6 +127,7 @@ describe('card de acción v2: rótulo de estado (§4.4b)', () => {
     const few = { ...free, tickets: [{ id: 1, price: 0, remaining: 8, total_quantity: 100 }] }
     expect(label(few, 'free')).toEqual({ text: 'Gratis · Quedan 8 cupos', tone: 'warning' })
     expect(label({ ...free, tickets: [{ id: 1, price: 0, remaining: 1, total_quantity: 100 }] }, 'free').text).toBe('Gratis · Queda 1 cupo')
+    expect(label({ ...free, tickets: [{ id: 1, price: 0, remaining: 30, total_quantity: 100 }] }, 'free')).toEqual({ text: 'Gratis · 70% de cupos reservados', tone: 'warning' })
     expect(label(free, 'free', { rsvpStatus: 'confirmed' })).toEqual({ text: 'Asistencia confirmada', tone: 'positive' })
     expect(label(free, 'free', { rsvpStatus: 'success' })).toEqual({ text: 'Asistencia confirmada', tone: 'positive' })
     expect(label(free, 'free', { rsvpStatus: 'already' })).toEqual({ text: 'Ya estás inscrito', tone: 'neutral' })
@@ -113,6 +142,10 @@ describe('card de acción v2: rótulo de estado (§4.4b)', () => {
     expect(label(multiTypes, 'paid_multi')).toBeNull()
     const lastOnes = { ...paid, tickets: [{ id: 1, price: 4000, remaining: 5, total_quantity: 100 }] }
     expect(label(lastOnes, 'paid_simple')).toEqual({ text: 'Últimas entradas', tone: 'warning' })
+    const half = { ...paid, tickets: [{ id: 1, price: 4000, remaining: 35, total_quantity: 100 }] }
+    expect(label(half, 'paid_simple')).toEqual({ text: '65% de entradas vendidas', tone: 'warning' })
+    expect(label({ ...paid, tickets: [{ id: 1, price: 4000, remaining: 15, total_quantity: 100 }] }, 'paid_simple').text).toBe('Últimas entradas')
+    expect(label({ ...paid, tickets: [{ id: 1, price: 4000, remaining: 60, total_quantity: 100 }] }, 'paid_simple')).toBeNull()
     const nunoa = { name: 'Teatro Ñuñoa', city: 'Ñuñoa' }
     const tour = { ...multiTypes, dates: [future('2026-10-24', 1), future('2026-10-25', 2), future('2026-11-01', 3, nunoa)] }
     expect(label(tour, 'paid_multi')).toEqual({ text: '3 funciones · 2 lugares', tone: 'neutral' })

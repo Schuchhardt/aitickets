@@ -27,3 +27,7 @@ playwright-report/
 
 # Leads exportados (datos de contacto; nunca al repo)
 /leads/
+
+# E2E con base real local (tests/e2e/stack)
+tests/e2e/stack/.stack.env
+playwright-report-stack/

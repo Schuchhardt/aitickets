@@ -1,5 +1,5 @@
 // Correos de reseñas e invitaciones (migración 202610220100, netlify/lib/reviews.mjs).
-// - renderReviewRequestEmail: "¿Cómo estuvo?" 24 h después de la función (masivo, con recipientVariables).
+// - renderReviewRequestEmail: "¿Cómo estuvo?" y sus dos recordatorios (masivo, con recipientVariables y enlace de baja).
 // - renderReviewLinkEmail: link para calificar pedido desde la página del evento (un destinatario).
 // - renderReviewThanksEmail: gracias + código de descuento de premio (un destinatario).
 // - renderNextEventInvitationEmail: invitación de la productora a su próximo evento (masivo, con enlace de baja).
@@ -7,6 +7,7 @@
 import { Link, Img } from '@react-email/components'
 import { h, str, multiline, safeHref, COLORS, FONT_FAMILY, EmailLayout, TABLE_PROPS, Title, Subtitle, Paragraph, Badge, PrimaryButton, Panel, KeyValueTable, FallbackLink, renderEmail } from './layout.mjs'
 import { NAME_PLACEHOLDER } from './attendees.mjs'
+import { MAX_PHOTOS_PER_PERSON, MAX_VIDEOS_PER_PERSON } from '../reviews.mjs'
 
 export const REVIEW_URL_PLACEHOLDER = '%recipient.review_url%'
 export const UNSUBSCRIBE_PLACEHOLDER = '%recipient.unsubscribe_url%'
@@ -42,32 +43,66 @@ function StarRow({ hrefs }) {
   )
 }
 
+/** Texto del enlace de baja de los correos de reseña (List-Unsubscribe va en los encabezados). */
+export const REVIEW_OPTOUT_LABEL = 'No quiero más recordatorios de este evento'
+
 /**
- * "¿Cómo estuvo?" a quienes asistieron. Marcadores: %recipient.name%, %recipient.review_url% y %recipient.star1..5%.
- * @param {{ eventName?: string, organizerName?: string, rewardLabel?: string }} opts
+ * "¿Cómo estuvo?" a quienes asistieron: el primer correo (step 1) y dos recordatorios (2: fotos; 3: el último).
+ * Marcadores: %recipient.name%, %recipient.review_url%, %recipient.star1..5% y %recipient.unsubscribe_url%.
+ * @param {{ eventName?: string, organizerName?: string, rewardLabel?: string, step?: number }} opts
  */
-export async function renderReviewRequestEmail({ eventName, organizerName, rewardLabel } = {}) {
+export async function renderReviewRequestEmail({ eventName, organizerName, rewardLabel, step = 1 } = {}) {
   const name = str(eventName).trim() || 'el evento'
   const from = str(organizerName).trim()
   const reward = str(rewardLabel).trim()
-  const subject = `⭐ ¿Cómo estuvo ${name}?`
+  const n = [1, 2, 3].includes(Number(step)) ? Number(step) : 1
+  const reads = from ? `${from} lee cada opinión` : 'La productora lee cada opinión'
+  const copy = {
+    1: {
+      subject: `⭐ ¿Cómo estuvo ${name}?`,
+      preview: reward ? `Califícalo en 10 segundos y recibe ${reward} para tu próximo evento.` : 'Cuéntanos cómo lo pasaste: califícalo en 10 segundos y sube tus fotos y videos.',
+      badge: 'Tu opinión',
+      title: `${NAME_PLACEHOLDER}, ¿cómo estuvo?`,
+      body: `Toca las estrellas para calificarlo de 1 a 5. ${reads} y puedes dejar un comentario público o uno privado solo para ellos.`,
+      button: 'Calificar y subir fotos',
+      hint: `También puedes subir hasta ${MAX_PHOTOS_PER_PERSON} fotos y ${MAX_VIDEOS_PER_PERSON} videos a la galería del evento.`,
+    },
+    2: {
+      subject: `📸 ¿Tienes fotos o videos de ${name}?`,
+      preview: 'Súbelos a la galería del evento y cuéntanos cómo lo pasaste.',
+      badge: 'Fotos y videos del evento',
+      title: `${NAME_PLACEHOLDER}, ¿nos compartes tus fotos y videos?`,
+      body: `Arma con los demás asistentes la galería de ${name}: sube hasta ${MAX_PHOTOS_PER_PERSON} fotos y ${MAX_VIDEOS_PER_PERSON} videos y califícalo de 1 a 5 estrellas. ${reads}.`,
+      button: 'Subir fotos o videos',
+      hint: 'Toma 10 segundos y no necesitas crear una cuenta.',
+    },
+    3: {
+      subject: `⏳ Último recordatorio: ¿cómo estuvo ${name}?`,
+      preview: reward ? `Es el último correo: califícalo y recibe ${reward}.` : 'Es el último correo que te mandamos sobre este evento.',
+      badge: 'Último recordatorio',
+      title: `${NAME_PLACEHOLDER}, tu opinión cuenta`,
+      body: `Es el último correo que te mandamos sobre ${name}. Califícalo en 10 segundos y, si tienes fotos o videos, súbelos a la galería del evento. ${reads}.`,
+      button: 'Calificar ahora',
+      hint: 'Después de este correo no te escribiremos más sobre este evento.',
+    },
+  }[n]
   const element = h(
     EmailLayout,
     {
-      preview: reward ? `Califícalo en 10 segundos y recibe ${reward} para tu próximo evento.` : `Cuéntanos cómo lo pasaste: califícalo en 10 segundos.`,
-      footer: { reason: 'Recibiste este correo porque tenías entradas para este evento.' },
+      preview: copy.preview,
+      footer: { unsubscribeUrl: UNSUBSCRIBE_PLACEHOLDER, unsubscribeLabel: REVIEW_OPTOUT_LABEL },
     },
-    h(Badge, null, 'Tu opinión'),
-    h(Title, null, `${NAME_PLACEHOLDER}, ¿cómo estuvo?`),
+    h(Badge, null, copy.badge),
+    h(Title, null, copy.title),
     h(Subtitle, null, name),
-    h(Paragraph, { align: 'center', muted: true }, `Toca las estrellas para calificarlo de 1 a 5. ${from ? `${from} lee cada opinión` : 'La productora lee cada opinión'} y puedes dejar un comentario público o uno privado solo para ellos.`),
+    h(Paragraph, { align: 'center', muted: true }, copy.body),
     h(StarRow, { hrefs: STAR_PLACEHOLDERS }),
     reward
       ? h(Panel, { tone: 'lime', label: 'Premio por calificar' }, h(Paragraph, { style: { margin: 0 } }, `Al calificar recibes un código de ${reward} para tu próximo evento${from ? ` de ${from}` : ''}.`))
       : null,
-    h(PrimaryButton, { href: REVIEW_URL_PLACEHOLDER, hint: 'También puedes subir tus fotos a la galería del evento.' }, 'Calificar y subir fotos')
+    h(PrimaryButton, { href: REVIEW_URL_PLACEHOLDER, hint: copy.hint }, copy.button)
   )
-  return renderEmail(subject, element)
+  return renderEmail(copy.subject, element)
 }
 
 /**

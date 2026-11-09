@@ -2,7 +2,7 @@
 // 4 · Acto II · La temporada (SPEC_landing_teatro §4.4, ancla #temporada, firma de la página): encabezado y la isla
 // de la cartelera con el fader (SeasonBoard + LightFader). Los textos de cada momento se arman aquí con las constantes
 // del código y llegan por props (no se cargan esos módulos en el navegador):
-//   reseñas → REVIEW_REQUEST_DELAY_HOURS (netlify/lib/reviews.mjs); en la página pública, mientras la obra sigue en
+//   reseñas → REVIEW_FIRST_DELAY_HOURS (netlify/lib/reviews.mjs); en la página pública, mientras la obra sigue en
 //             cartelera si la productora lo activa (review_settings.show_while_on_sale, EventDetail.vue showReviews)
 //   cobro → PAYOUT_SHORT_TEXT (legal.mjs) con el asterisco de TERMS_NOTE (reserva por riesgo, Preguntas abiertas 1)
 //   Instagram → DEFAULT_KEYWORD (socialSeriesCadence.ts): con funciones cada semana la próxima siempre está a menos de
@@ -17,7 +17,7 @@ import SeasonBoard from "./SeasonBoard.vue";
 import { INVITE_AUDIENCE_TEXT } from "../../../data/teatroFaq";
 import { TERMS_NOTE } from "../../../data/producerFaq";
 import { PAYOUT_SHORT_TEXT } from "../../../../netlify/lib/legal.mjs";
-import { REVIEW_REQUEST_DELAY_HOURS } from "../../../../netlify/lib/reviews.mjs";
+import { REVIEW_FIRST_DELAY_HOURS } from "../../../../netlify/lib/reviews.mjs";
 import { DEFAULT_KEYWORD } from "../../../lib/socialSeriesCadence";
 import { SEASON_STEPS } from "./teatroLanding.js";
 
@@ -31,7 +31,7 @@ const items = [
     {
       icon: "star",
       title: "El público opina.",
-      text: `${REVIEW_REQUEST_DELAY_HOURS} h después de cada función les llega un correo para calificar con estrellas, comentar y subir fotos. Tú lo ves en el panel.`,
+      text: `${REVIEW_FIRST_DELAY_HOURS.day} h después de cada función (${REVIEW_FIRST_DELAY_HOURS.night} h si termina de noche) les llega un correo para calificar con estrellas, comentar y subir fotos. Tú lo ves en el panel.`,
     },
     { icon: "wallet", title: "Lo de la semana 1, disponible.", text: `${PAYOUT_SHORT_TEXT}.*` },
     { icon: "quote", title: "Las reseñas, ya en cartelera.", text: "Si lo activas, la página las muestra junto al botón de compra." },

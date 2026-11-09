@@ -131,17 +131,21 @@ const mergeWithLocalState = (serverAttendees, dates) => {
   })
 }
 
-const applyServerList = (attendees, dates) => {
-  const now = new Date().toISOString()
+/**
+ * Guarda la lista del servidor (combinada con lo local). renderedAt = hora del servidor en que se armó esa lista
+ * (rendered_at de la página o de la API); queda como última sincronización para compararla con la de otra copia.
+ */
+const applyServerList = (attendees, dates, renderedAt = null) => {
+  const syncedAt = renderedAt && Number.isFinite(Date.parse(renderedAt)) ? renderedAt : new Date().toISOString()
   const eventDates = dates || localEvent.value?.dates || props.event.dates || []
   setLocalEvent({
     ...props.event,
     ...(localEvent.value?.id === props.event.id ? localEvent.value : {}),
     dates: eventDates,
     attendees: mergeWithLocalState(attendees, eventDates),
-    last_sync: now
+    last_sync: syncedAt
   })
-  lastSyncDate.value = now
+  lastSyncDate.value = syncedAt
 }
 
 /** Descarga la lista completa del servidor (paginada en la API) y la combina con el estado local. */
@@ -150,7 +154,19 @@ const refreshFromServer = async () => {
   if (response.status === 401) throw new Error(doorMode ? sessionExpiredMessage : 'Tu sesión expiró. Vuelve a iniciar sesión para sincronizar.')
   if (!response.ok) throw new Error('Error al obtener datos del servidor')
   const data = await response.json()
-  applyServerList(data.attendees || [], data.dates)
+  applyServerList(data.attendees || [], data.dates, data.rendered_at)
+}
+
+/**
+ * ¿La lista que trae la página es más vieja que la guardada en el teléfono? Pasa cuando la página se abre sin
+ * conexión desde la copia del service worker (public/validador-sw.js): aplicarla haría volver a "Pendiente"
+ * entradas que ya entraron y se sincronizaron después.
+ */
+const pageListIsOlderThanLocal = () => {
+  if (localEvent.value?.id !== props.event.id) return false
+  const renderedAt = Date.parse(props.event.rendered_at || '')
+  const localSync = Date.parse(localEvent.value?.last_sync || '')
+  return Number.isFinite(renderedAt) && Number.isFinite(localSync) && localSync > renderedAt
 }
 
 // Inicializar datos locales
@@ -164,14 +180,22 @@ onMounted(() => {
   isOnline.value = navigator.onLine
 
   const hasCache = localEvent.value && localEvent.value.id === props.event.id
-  if (isOnline.value || !hasCache) {
+  if (hasCache && pageListIsOlderThanLocal()) {
+    // Página guardada (abierta sin conexión o con la red lenta): manda la lista del teléfono.
+    // Con conexión se pide la lista actual en segundo plano.
+    lastSyncDate.value = localEvent.value.last_sync || null
+    if (isOnline.value && !pendingValidations.value.length) refreshFromServer().catch(err => console.warn('No se pudo actualizar la lista:', err?.message))
+  } else if (isOnline.value || !hasCache) {
     // La página se acaba de renderizar en el servidor: su lista es la más fresca.
     // Se combina con las validaciones locales pendientes en vez de conservar un caché viejo.
-    applyServerList(props.event.attendees || [], props.event.dates || [])
+    applyServerList(props.event.attendees || [], props.event.dates || [], props.event.rendered_at)
   } else {
     // Offline con caché de este evento: conservarlo
     lastSyncDate.value = localEvent.value.last_sync || null
   }
+
+  // Validaciones hechas sin conexión que quedaron en el teléfono (p. ej. se cerró la pestaña): con conexión se suben ya
+  if (isOnline.value && pendingValidations.value.length) syncWithServer()
 
   // Escuchar cambios de conexión (al volver la conexión se sincroniza lo pendiente)
   window.addEventListener('online', () => {
@@ -655,7 +679,7 @@ const resendTickets = async (attendee) => {
     <div class="mb-3 sm:mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0">
       <div class="flex items-center gap-2">
         <span :class="isOnline ? 'bg-green-500' : 'bg-red-500'" class="w-3 h-3 rounded-full flex-shrink-0"></span>
-        <span class="text-xs sm:text-sm">{{ isOnline ? 'Online' : 'Offline' }}</span>
+        <span class="text-xs sm:text-sm" data-testid="connection-status">{{ isOnline ? 'Online' : 'Offline' }}</span>
       </div>
       
       <button
@@ -668,7 +692,7 @@ const resendTickets = async (attendee) => {
     </div>
 
     <!-- Indicador de validaciones pendientes -->
-    <div v-if="pendingValidations.length > 0" class="mb-3 sm:mb-4 p-2 bg-yellow-100 border border-yellow-400 rounded text-xs sm:text-sm">
+    <div v-if="pendingValidations.length > 0" class="mb-3 sm:mb-4 p-2 bg-yellow-100 border border-yellow-400 rounded text-xs sm:text-sm" data-testid="pending-sync">
       ⚠️ {{ pendingValidations.length }} validación(es) pendiente(s) de sincronizar
     </div>
 
@@ -754,7 +778,7 @@ const resendTickets = async (attendee) => {
     </div>
 
     <!-- Mensaje resultado -->
-    <p v-if="resultMessage" class="mt-4 text-xs sm:text-sm font-semibold p-3 rounded break-words" :class="{
+    <p v-if="resultMessage" data-testid="scan-result" class="mt-4 text-xs sm:text-sm font-semibold p-3 rounded break-words" :class="{
       'text-green-700 bg-green-100': resultMessage.startsWith('✅'),
       'text-red-700 bg-red-100': resultMessage.startsWith('❌'),
       'text-blue-700 bg-blue-100': resultMessage.startsWith('🔄'),
@@ -809,6 +833,7 @@ const resendTickets = async (attendee) => {
         <div
           v-for="attendee in filteredAttendees"
           :key="attendee.id"
+          data-testid="attendee-row"
           class="border rounded-lg p-3 sm:p-4 hover:bg-gray-50 transition-colors"
           :class="{
             'border-green-300 bg-green-50': attendee.status === 'validated',

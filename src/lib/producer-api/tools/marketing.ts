@@ -8,7 +8,6 @@ import {
     storeImage, sniffImageType, MAX_IMAGE_BYTES, MAX_REFERENCE_IMAGES, REFERENCE_IMAGE_TYPES, type ReferenceImage,
 } from "../../marketing";
 import { rateLimit } from "../../../../netlify/lib/rate-limit.mjs";
-import { serverEnv } from "../../../pages/api/_lib/server-utils";
 import { fetchPublic, isPublicIp, SafeFetchError } from "../../safe-fetch";
 import { EVENT_VIDEO_MAX_BYTES } from "../../eventVideo";
 import { clearEventVideo, EventVideoUnavailableError, loadEventVideoState, saveEventVideo } from "../../eventVideoStore";
@@ -16,6 +15,7 @@ import { readMp4Meta, sniffVideoType } from "../../videoProbe";
 import { createPromoterLink, listPromoterLinks, revokePromoterLink, promoterRef, PROMOTER_REF_RE } from "../../promoterLinks";
 import { storeVideoBuffer, VideoStorageError } from "../../videoStorage";
 import { SOCIAL_PLATFORMS, platformName, postMediaProblem } from "../../socialPlatforms";
+import { checkSocialPostInput } from "../../socialPostInput";
 
 const IMAGE_GENERATIONS_PER_DAY = 20;
 const VIDEO_UPLOADS_PER_HOUR = 20;
@@ -406,16 +406,15 @@ const createSocialPost: ToolDef = {
         const images: string[] = args.image_urls || [];
         const problem = postMediaProblem(platforms, images.length, String(args.content).length);
         if (problem) throw new ToolError("invalid_input", `${problem}${/imagen/.test(problem) ? " (image_urls)" : ""}`);
-        const storageBase = serverEnv("SUPABASE_URL")?.replace(/\/+$/, "");
-        if (storageBase && images.some((u) => !u.startsWith(`${storageBase}/storage/v1/object/public/`))) {
-            throw new ToolError("invalid_input", "Las imágenes deben estar alojadas en AI Tickets: súbelas antes con upload_image.");
+        // Mismas reglas que el panel (src/lib/socialPostInput.ts)
+        const input = checkSocialPostInput({ imageUrls: images, scheduledFor: args.scheduled_for });
+        if (!input.ok) {
+            throw new ToolError(
+                "invalid_input",
+                input.field === "image_urls" ? "Las imágenes deben estar alojadas en AI Tickets: súbelas antes con upload_image." : `scheduled_for: ${input.message}`,
+            );
         }
-        let scheduledFor: string | null = null;
-        if (args.scheduled_for) {
-            const when = new Date(args.scheduled_for);
-            if (when.getTime() < Date.now() + 5 * 60 * 1000) throw new ToolError("invalid_input", "scheduled_for debe ser al menos 5 minutos en el futuro.");
-            scheduledFor = when.toISOString();
-        }
+        const scheduledFor = input.scheduledFor;
         const { data, error } = await ctx.supabase
             .from("social_posts")
             .insert({
@@ -455,7 +454,13 @@ const listSocialPosts: ToolDef = {
     },
     async handler(args, ctx) {
         let query = ctx.supabase.from("social_posts").select("*").eq("organization_id", ctx.actor.orgId).order("created_at", { ascending: false }).limit(args.limit);
-        if (args.event_id) query = query.eq("event_id", args.event_id);
+        // Un evento ajeno (u otra organización) es not_found; sin event_id, un miembro limitado solo ve sus eventos
+        if (args.event_id) {
+            await loadOwnedEvent(ctx, Number(args.event_id), "id");
+            query = query.eq("event_id", args.event_id);
+        } else if (ctx.actor.eventIds) {
+            query = query.in("event_id", ctx.actor.eventIds.length ? ctx.actor.eventIds : [-1]);
+        }
         if (args.status !== "all") query = query.eq("status", args.status);
         const { data, error } = await query;
         if (error) throw error;
@@ -463,8 +468,12 @@ const listSocialPosts: ToolDef = {
     },
 };
 
-/** Lo que impide hacer una publicación: sin cuentas conectadas, evento en borrador/cancelado, o texto o imágenes que alguna red no acepta. */
-async function checkPublishable(ctx: ToolContext, post: any) {
+/**
+ * Lo que impide hacer una publicación: evento ajeno o fuera del acceso del miembro, sin cuentas conectadas, evento en
+ * borrador/cancelado, o texto o imágenes que alguna red no acepta. Lo usan publish_social_post y el panel
+ * (/api/promote/posts/publish), para que las dos vías apliquen las mismas reglas.
+ */
+export async function checkPublishable(ctx: ToolContext, post: any) {
     const platforms: string[] = Array.isArray(post.platforms) ? post.platforms : [];
     const event = await loadOwnedEvent<any>(ctx, Number(post.event_id), "id, name, slug, status, cancelled_at");
     if (event.cancelled_at) throw new ToolError("conflict", "El evento está cancelado: no hagas publicaciones de él.");

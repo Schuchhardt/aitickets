@@ -3,7 +3,8 @@ import DashboardLayout from "../../../layouts/DashboardLayout.astro";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { ORG_ADMIN_ROLES, hasRole } from "../../../lib/supabaseServer";
 import { requireDashboardSession } from "../_lib/guard";
-import { Users, UserPlus, Shield, Edit3, Ticket, Crown, X, Pencil, UserX, UserCheck, AlertTriangle, DollarSign, Eye } from "lucide-vue-next";
+import { INVITATION_COLUMNS, invitationStatus } from "../../../lib/team-invitations";
+import { Users, UserPlus, Edit3, Ticket, Crown, X, Pencil, UserX, UserCheck, DollarSign, Eye, Mail, Send } from "lucide-vue-next";
 
 const guard = await requireDashboardSession(Astro, ORG_ADMIN_ROLES);
 if (!guard.ok) return guard.response;
@@ -25,7 +26,22 @@ const { data: organization } = await supabaseAdmin
 
 // Productores (dueños de la cuenta) y administradores gestionan el equipo
 const isAdmin = hasRole(dbUser, ORG_ADMIN_ROLES);
+const isOwner = dbUser.role === "producer";
 const members = teamMembers || [];
+
+// Invitaciones pendientes (se suman al equipo al aceptar el link del correo: /invitacion/<token>)
+const { data: invitationRows } = isAdmin
+    ? await supabaseAdmin
+          .from("aitickets_team_invitations")
+          .select(INVITATION_COLUMNS)
+          .eq("organization_id", dbUser.organization_id)
+          .order("created_at", { ascending: false })
+          .limit(100)
+    : { data: [] };
+const pendingInvitations = (invitationRows || []).filter((r: any) => invitationStatus(r) === "pending");
+const shortDate = (iso: string) => new Date(iso).toLocaleDateString("es-CL", { day: "numeric", month: "short" });
+// Solo el dueño invita (o reenvía el acceso a) administradores y finanzas, igual que invite_member
+const canInviteRole = (role: string) => isOwner || !["admin", "finance"].includes(role);
 
 // Role display config
 const roleConfig: Record<string, { label: string; color: string; icon: string }> = {
@@ -229,6 +245,18 @@ const roleConfig: Record<string, { label: string; color: string; icon: string }>
                                         {isAdmin && (
                                             <td class="px-4 md:px-6 py-3 md:py-4 text-right">
                                                 <div class="flex items-center justify-end gap-1">
+                                                    {/* Nunca entró (p. ej. un alta antigua cuya contraseña temporal se perdió): se le reenvía el acceso por correo */}
+                                                    {!isCurrentUser && member.role !== "producer" && member.active !== false && !member.last_access_at && member.email && canInviteRole(member.role) && (
+                                                        <button
+                                                            class="resend-access-btn p-2 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+                                                            data-member-name={member.name || ""}
+                                                            data-member-email={member.email}
+                                                            data-member-role={member.role}
+                                                            title="Enviar acceso por correo (nunca ha ingresado)"
+                                                        >
+                                                            <Send size={18} />
+                                                        </button>
+                                                    )}
                                                     {canModify && <button
                                                         class="edit-member-btn p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
                                                         data-member-id={member.id}
@@ -262,6 +290,48 @@ const roleConfig: Record<string, { label: string; color: string; icon: string }>
                 </div>
             </div>
         )}
+
+        <!-- Invitaciones pendientes -->
+        {isAdmin && pendingInvitations.length > 0 && (
+            <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden" data-testid="pending-invitations">
+                <div class="px-4 md:px-6 py-3 border-b border-gray-100 flex items-center gap-2">
+                    <Mail size={16} class="text-gray-500" />
+                    <h2 class="text-sm font-semibold text-gray-700">Invitaciones pendientes ({pendingInvitations.length})</h2>
+                </div>
+                <ul class="divide-y divide-gray-100">
+                    {pendingInvitations.map((inv: any) => (
+                        <li class="px-4 md:px-6 py-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm font-medium text-gray-900 truncate">{inv.name || inv.email}</p>
+                                <p class="text-xs text-gray-500 truncate">
+                                    {inv.name ? `${inv.email} · ` : ""}{roleConfig[inv.role]?.label || inv.role} · vence el {shortDate(inv.expires_at)}
+                                    {!inv.email_sent_at && <span class="text-amber-600"> · el correo no salió</span>}
+                                </p>
+                            </div>
+                            {canInviteRole(inv.role) && (
+                                <div class="flex gap-2">
+                                    <button
+                                        class="resend-invitation-btn px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg hover:bg-gray-50"
+                                        data-member-name={inv.name || ""}
+                                        data-member-email={inv.email}
+                                        data-member-role={inv.role}
+                                    >
+                                        Reenviar
+                                    </button>
+                                    <button
+                                        class="revoke-invitation-btn px-3 py-1.5 text-xs font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50"
+                                        data-invitation-id={inv.id}
+                                        data-invitation-email={inv.email}
+                                    >
+                                        Anular
+                                    </button>
+                                </div>
+                            )}
+                        </li>
+                    ))}
+                </ul>
+            </div>
+        )}
     </div>
 
     <!-- Modal for adding new member -->
@@ -277,7 +347,7 @@ const roleConfig: Record<string, { label: string; color: string; icon: string }>
                     <div class="flex items-center justify-between p-4 sm:p-6 border-b border-gray-100">
                         <div>
                             <h2 class="text-xl font-bold text-gray-900 font-[Unbounded]">Invitar Miembro</h2>
-                            <p class="text-sm text-gray-500 mt-1">Agrega un nuevo miembro a tu equipo</p>
+                            <p class="text-sm text-gray-500 mt-1">Le llegará un correo con un link para crear su contraseña y unirse (vence en 7 días).</p>
                         </div>
                         <button id="closeModalBtn" class="p-2 hover:bg-gray-100 rounded-lg transition-colors">
                             <X size={20} class="text-gray-500" />
@@ -285,7 +355,7 @@ const roleConfig: Record<string, { label: string; color: string; icon: string }>
                     </div>
 
                     <!-- Form -->
-                    <form id="addMemberForm" class="p-4 sm:p-6 space-y-5">
+                    <form id="addMemberForm" class="p-4 sm:p-6 space-y-5" data-org-name={organization?.public_name || ""}>
                         <div id="formMessage" class="hidden p-4 rounded-lg text-sm"></div>
 
                         <div>
@@ -324,14 +394,15 @@ const roleConfig: Record<string, { label: string; color: string; icon: string }>
                                 class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black focus:border-black outline-none transition-all bg-white"
                             >
                                 <option value="">Selecciona un rol</option>
-                                <option value="admin">Administrador - Acceso total</option>
-                                {dbUser.role === "producer" && <option value="finance">Finanzas - Ingresos, retiros y reembolsos</option>}
+                                {isOwner && <option value="admin">Administrador - Acceso total</option>}
+                                {isOwner && <option value="finance">Finanzas - Ingresos, retiros y reembolsos</option>}
                                 <option value="editor">Marketing (editor) - Gestionar eventos</option>
-                                <option value="validator">Puerta (validador) - Solo validar entradas</option>
+                                <option value="validator">Puerta (validador) - Solo el validador de entradas</option>
                                 <option value="viewer">Solo lectura - Ver eventos y estadísticas</option>
                             </select>
                             <p class="mt-2 text-xs text-gray-500">
-                                Los administradores gestionan el equipo; finanzas ve ingresos y gestiona retiros y reembolsos; marketing crea y edita eventos; puerta solo valida entradas; solo lectura ve eventos y estadísticas.
+                                Los administradores gestionan el equipo; finanzas ve ingresos y gestiona retiros y reembolsos; marketing crea y edita eventos; puerta solo ve el validador de entradas (aitickets.cl/validador: escanear QR y buscar en la lista, también sin conexión); solo lectura ve eventos y estadísticas.
+                                {!isOwner && " Solo el dueño de la cuenta puede invitar administradores y finanzas."}
                             </p>
                         </div>
 
@@ -425,14 +496,14 @@ const roleConfig: Record<string, { label: string; color: string; icon: string }>
                                 <option value="admin">Administrador - Acceso total</option>
                                 <option value="finance">Finanzas - Ingresos, retiros y reembolsos</option>
                                 <option value="editor">Marketing (editor) - Gestionar eventos</option>
-                                <option value="validator">Puerta (validador) - Solo validar entradas</option>
+                                <option value="validator">Puerta (validador) - Solo el validador de entradas</option>
                                 <option value="viewer">Solo lectura - Ver eventos y estadísticas</option>
                             </select>
                             <p id="editRoleWarning" class="mt-2 text-xs text-amber-600 hidden">
                                 ⚠️ No puedes remover tu propio rol de administrador.
                             </p>
                             <p class="mt-2 text-xs text-gray-500">
-                                Los administradores gestionan el equipo; finanzas ve ingresos y gestiona retiros y reembolsos; marketing crea y edita eventos; puerta solo valida entradas; solo lectura ve eventos y estadísticas.
+                                Los administradores gestionan el equipo; finanzas ve ingresos y gestiona retiros y reembolsos; marketing crea y edita eventos; puerta solo ve el validador de entradas (aitickets.cl/validador: escanear QR y buscar en la lista, también sin conexión); solo lectura ve eventos y estadísticas.
                             </p>
                         </div>
 
@@ -597,7 +668,78 @@ const roleConfig: Record<string, { label: string; color: string; icon: string }>
         }
     }
 
+    let memberAdded = false;
+
+    type InviteInput = { name: string; email: string; role: string };
+    type InviteResult = { ok: true; emailSent: boolean } | { ok: false; message: string };
+
+    /**
+     * Invitación al equipo (invite_member, vía /api/team/invitations). Reenviar a un correo con una invitación
+     * pendiente la reemplaza (el link anterior deja de servir); a un miembro que nunca entró le reenvía el acceso.
+     */
+    async function sendInvitation(m: InviteInput): Promise<InviteResult> {
+        try {
+            const response = await fetch('/api/team/invitations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(m),
+            });
+            const result = await response.json().catch(() => null);
+            if (!response.ok || !result?.ok) {
+                return { ok: false, message: result?.error?.message || 'No pudimos enviar la invitación. Intenta de nuevo.' };
+            }
+            return { ok: true, emailSent: Boolean(result.data?.email_sent) };
+        } catch {
+            return { ok: false, message: 'No pudimos conectar. Revisa tu conexión e intenta de nuevo.' };
+        }
+    }
+
+    /** Aviso para copiar o mandar por WhatsApp. Sin link ni contraseña: el link va solo a su correo. Puerta usa /validador. */
+    function appendShareNotice(container: HTMLElement, m: InviteInput) {
+        const isDoor = m.role === 'validator';
+        const org = (form?.dataset.orgName || '').trim();
+        const firstName = m.name.trim().split(/\s+/)[0] || '';
+        const text =
+            `Hola${firstName ? ` ${firstName}` : ''}, te invité al equipo${isDoor ? ' de puerta' : ''}${org ? ` de ${org}` : ''} en AI Tickets. ` +
+            `Te llegó un correo a ${m.email} con un link para crear tu contraseña (vence en 7 días; revisa también spam).` +
+            (isDoor ? ` Después, para validar entradas, abre en tu teléfono ${window.location.origin}/validador.` : '');
+
+        const box = document.createElement('div');
+        box.className = 'mt-3 pt-3 border-t border-green-200 space-y-2';
+        const preview = document.createElement('p');
+        preview.className = 'text-xs bg-white/70 border border-green-200 rounded p-2 whitespace-pre-wrap break-words';
+        preview.textContent = text;
+        preview.dataset.testid = 'share-invite-text';
+        const actions = document.createElement('div');
+        actions.className = 'flex flex-wrap gap-2';
+        const copyBtn = document.createElement('button');
+        copyBtn.type = 'button';
+        copyBtn.className = 'px-3 py-1.5 rounded-lg bg-green-700 text-white text-xs font-medium hover:bg-green-800';
+        copyBtn.textContent = 'Copiar aviso';
+        copyBtn.addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(text);
+                copyBtn.textContent = '¡Copiado!';
+            } catch {
+                copyBtn.textContent = 'Selecciona y copia el texto';
+            }
+        });
+        const waLink = document.createElement('a');
+        waLink.href = `https://wa.me/?text=${encodeURIComponent(text)}`;
+        waLink.target = '_blank';
+        waLink.rel = 'noopener noreferrer';
+        waLink.className = 'px-3 py-1.5 rounded-lg border border-green-700 text-green-800 text-xs font-medium hover:bg-green-100';
+        waLink.textContent = 'Avisar por WhatsApp';
+        actions.append(copyBtn, waLink);
+        box.append(preview, actions);
+        container.append(box);
+    }
+
     function closeModal() {
+        if (memberAdded) {
+            window.location.reload();
+            return;
+        }
         if (modal) {
             modal.classList.add('hidden');
             document.body.style.overflow = '';
@@ -617,12 +759,11 @@ const roleConfig: Record<string, { label: string; color: string; icon: string }>
     if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
     if (backdrop) backdrop.addEventListener('click', closeModal);
 
-    // Form submission for adding member
+    // Invitar: le llega un correo con el link para crear su contraseña (/invitacion/<token>)
     if (form) {
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            // Reset state
             if (formMessage) {
                 formMessage.classList.add('hidden');
                 formMessage.className = 'hidden p-4 rounded-lg text-sm';
@@ -632,62 +773,85 @@ const roleConfig: Record<string, { label: string; color: string; icon: string }>
             if (submitText) submitText.textContent = 'Invitando...';
 
             const formData = new FormData(form);
-            const data = {
-                name: formData.get('name'),
-                email: formData.get('email'),
-                role: formData.get('role'),
+            const data: InviteInput = {
+                name: String(formData.get('name') || '').trim(),
+                email: String(formData.get('email') || '').trim().toLowerCase(),
+                role: String(formData.get('role') || ''),
             };
 
-            try {
-                const response = await fetch('/api/team/add', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(data),
-                });
-
-                const result = await response.json();
-
-                if (formMessage) {
-                    formMessage.classList.remove('hidden');
-                }
-
-                if (response.ok) {
-                    if (formMessage) {
+            const result = await sendInvitation(data);
+            if (formMessage) {
+                formMessage.classList.remove('hidden');
+                if (result.ok) {
+                    const title = document.createElement('strong');
+                    const note = document.createElement('span');
+                    note.className = 'text-xs';
+                    if (result.emailSent) {
                         formMessage.classList.add('bg-green-50', 'text-green-800', 'border', 'border-green-200');
-                        const title = document.createElement('strong');
-                        title.textContent = '¡Miembro agregado exitosamente!';
-                        const pwLine = document.createElement('span');
-                        pwLine.className = 'text-xs';
-                        const code = document.createElement('code');
-                        code.className = 'bg-green-100 px-1 rounded';
-                        code.textContent = String(result.tempPassword ?? '');
-                        pwLine.append('Contraseña temporal: ', code);
-                        const hint = document.createElement('span');
-                        hint.className = 'text-xs text-green-600';
-                        hint.textContent = 'Comparte esta contraseña con el nuevo miembro.';
-                        formMessage.replaceChildren(title, document.createElement('br'), pwLine, document.createElement('br'), hint);
+                        title.textContent = '¡Invitación enviada!';
+                        note.textContent = `Le enviamos un correo a ${data.email} con el link para unirse (vence en 7 días). Aparecerá en el equipo cuando la acepte.`;
+                    } else {
+                        formMessage.classList.add('bg-amber-50', 'text-amber-800', 'border', 'border-amber-200');
+                        title.textContent = 'La invitación quedó creada, pero el correo no salió.';
+                        note.textContent = 'Usa «Reenviar» en Invitaciones pendientes en unos minutos.';
                     }
-                    // Reload page after 3 seconds
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 3000);
+                    formMessage.replaceChildren(title, document.createElement('br'), note);
+                    if (result.emailSent) appendShareNotice(formMessage, data);
+                    // La página se recarga al cerrar ("Listo") para mostrar la invitación pendiente
+                    memberAdded = true;
+                    if (submitBtn) submitBtn.classList.add('hidden');
+                    if (cancelBtn) cancelBtn.textContent = 'Listo';
                 } else {
-                    throw new Error(result.error || 'Error al agregar miembro');
-                }
-            } catch (error: any) {
-                if (formMessage) {
                     formMessage.classList.add('bg-red-50', 'text-red-800', 'border', 'border-red-200');
-                    formMessage.textContent = error.message;
+                    formMessage.textContent = result.message;
                 }
-            } finally {
-                if (submitBtn) submitBtn.disabled = false;
-                if (spinner) spinner.classList.add('hidden');
-                if (submitText) submitText.textContent = 'Invitar';
             }
+            if (submitBtn) submitBtn.disabled = false;
+            if (spinner) spinner.classList.add('hidden');
+            if (submitText) submitText.textContent = 'Invitar';
         });
     }
+
+    // Reenviar una invitación pendiente, o el acceso a un miembro que nunca pudo entrar
+    document.querySelectorAll<HTMLButtonElement>('.resend-invitation-btn, .resend-access-btn').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+            const m: InviteInput = { name: btn.dataset.memberName || '', email: btn.dataset.memberEmail || '', role: btn.dataset.memberRole || '' };
+            const question = btn.classList.contains('resend-access-btn')
+                ? `¿Enviar a ${m.email} un correo con un link para crear su contraseña? Sirve si nunca pudo entrar.`
+                : `¿Reenviar la invitación a ${m.email}? El link anterior deja de funcionar.`;
+            if (!confirm(question)) return;
+            btn.disabled = true;
+            const result = await sendInvitation(m);
+            btn.disabled = false;
+            if (!result.ok) {
+                alert(result.message);
+                return;
+            }
+            alert(result.emailSent ? `Listo: le enviamos el correo a ${m.email}.` : 'La invitación quedó creada, pero el correo no salió. Intenta de nuevo en unos minutos.');
+            window.location.reload();
+        });
+    });
+
+    // Anular una invitación pendiente: su link deja de funcionar
+    document.querySelectorAll<HTMLButtonElement>('.revoke-invitation-btn').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+            if (!confirm(`¿Anular la invitación a ${btn.dataset.invitationEmail}? Su link dejará de funcionar.`)) return;
+            btn.disabled = true;
+            try {
+                const response = await fetch('/api/team/invitations', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ invitation_id: btn.dataset.invitationId }),
+                });
+                const result = await response.json().catch(() => null);
+                if (!response.ok || !result?.ok) throw new Error(result?.error?.message || 'No pudimos anular la invitación.');
+                window.location.reload();
+            } catch (err: any) {
+                btn.disabled = false;
+                alert(err?.message || 'Error de conexión');
+            }
+        });
+    });
 
     // ============================================
     // EDIT MEMBER MODAL

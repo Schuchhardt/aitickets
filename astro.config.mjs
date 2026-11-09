@@ -7,7 +7,7 @@ import svgLoader from 'vite-svg-loader';
 
 import sentry from '@sentry/astro';
 
-// Páginas con datos fijos para los e2e sin BD (tests/e2e/fixtures/event-fixture-page.astro): solo en
+// Páginas con datos fijos para los e2e sin BD (tests/e2e/fixtures/*-fixture-page.astro): solo en
 // `astro dev` con E2E_FIXTURES=1 (playwright.config.ts). Nunca en el build de producción.
 const e2eFixtures = {
   name: 'aitickets-e2e-fixtures',
@@ -15,6 +15,8 @@ const e2eFixtures = {
     'astro:config:setup': ({ command, injectRoute }) => {
       if (command !== 'dev' || process.env.E2E_FIXTURES !== '1') return;
       injectRoute({ pattern: '/__e2e/eventos/[escenario]', entrypoint: './tests/e2e/fixtures/event-fixture-page.astro', prerender: false });
+      // Bajo /validador para que lo controle el service worker del validador (scope /validador)
+      injectRoute({ pattern: '/validador/__e2e/[escenario]', entrypoint: './tests/e2e/fixtures/validator-fixture-page.astro', prerender: false });
     },
   },
 };

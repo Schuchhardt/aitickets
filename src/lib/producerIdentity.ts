@@ -2,9 +2,9 @@
 // La lógica pura (RUT, comparación, firma, mapeo de estados) vive en netlify/lib/identity.mjs.
 //
 // Reglas (Términos para productores §2 bis):
-//   * Publicar un evento pagado para más de 10 personas exige identidad aprobada (identityApproved).
-//     Cupos pagados = suma de total_quantity de las entradas con precio (sin cortesías); sin límite cuenta como más de 10.
-//   * Los retiros exigen identidad aprobada y holder_match_status = 'match' (titular = identidad verificada).
+//   * Publicar y vender: siempre permitido, sin verificación de identidad.
+//   * Los retiros exigen identidad aprobada cuando la organización lleva más de IDENTITY_FREE_SOLD_TICKETS
+//     entradas pagadas vendidas en total (holder_match_status = 'match' sigue siendo necesario).
 //   * holder_match_status se recalcula al guardar la cuenta bancaria y al aprobarse la identidad;
 //     un 'mismatch' avisa a Slack para revisión manual.
 // Tolera columnas que aún no existen (deploy preview sin migrar): se comporta como "sin verificar".
@@ -59,8 +59,11 @@ export async function loadOrgIdentity(supabase: any, orgId: number): Promise<Org
 
 export const identityApproved = (org: Pick<OrgIdentity, "identity_status"> | null | undefined) => org?.identity_status === "approved";
 
-/** Hasta este número de cupos pagados se puede publicar sin verificar identidad (eventos chicos). */
-export const IDENTITY_FREE_PAID_CAPACITY = 10;
+/** Hasta este número de entradas pagadas vendidas (en toda la organización) se puede retirar sin verificar identidad. */
+export const IDENTITY_FREE_SOLD_TICKETS = 10;
+
+/** @deprecated Se mantiene por compatibilidad; la publicación ya no se bloquea. */
+export const IDENTITY_FREE_PAID_CAPACITY = IDENTITY_FREE_SOLD_TICKETS;
 
 type TicketCapacity = { price?: unknown; total_quantity?: unknown; is_gift?: unknown };
 
@@ -75,41 +78,67 @@ export function paidCapacity(tickets: TicketCapacity[]): number | null {
     return total;
 }
 
-/** true si las entradas exigen identidad verificada: más de IDENTITY_FREE_PAID_CAPACITY cupos pagados (o sin límite). */
+/** @deprecated La publicación ya no exige identidad. Usar orgExceedsFreeSoldTickets para el check de retiros. */
 export function ticketsRequireIdentity(tickets: TicketCapacity[]): boolean {
     const capacity = paidCapacity(tickets);
-    return capacity === null || capacity > IDENTITY_FREE_PAID_CAPACITY;
+    return capacity === null || capacity > IDENTITY_FREE_SOLD_TICKETS;
 }
 
-/** Entradas del evento que cuentan para la regla de identidad. */
+/** @deprecated La publicación ya no exige identidad. */
 export async function loadCapacityTickets(supabase: any, eventId: number): Promise<(TicketCapacity & { id: number })[]> {
     const { data, error } = await supabase.from("event_tickets").select("id, price, is_gift, total_quantity").eq("event_id", eventId);
     if (error) throw error;
     return data || [];
 }
 
+/** @deprecated La publicación ya no exige identidad. */
 export async function eventRequiresIdentity(supabase: any, eventId: number): Promise<boolean> {
     return ticketsRequireIdentity(await loadCapacityTickets(supabase, eventId));
 }
 
-export const IDENTITY_REQUIRED_MESSAGE =
-    `Para publicar eventos pagados para más de ${IDENTITY_FREE_PAID_CAPACITY} personas debes verificar tu identidad. Hazlo en Configuración > Verificación de identidad (/dashboard/settings#identidad). Los eventos gratuitos y los pagados de hasta ${IDENTITY_FREE_PAID_CAPACITY} cupos no lo requieren; para retirar dinero siempre se exige.`;
+/**
+ * Entradas pagadas vendidas por la organización (órdenes 'paid' con precio > 0, sin cortesías ni transferencias).
+ * Se usa para determinar si la organización necesita verificar identidad para retirar dinero.
+ */
+export async function orgPaidTicketsSold(supabase: any, orgId: number): Promise<number> {
+    const { data: events, error: evError } = await supabase
+        .from("events")
+        .select("id")
+        .eq("organization_id", orgId);
+    if (evError) throw evError;
+    const eventIds = (events || []).map((e: any) => Number(e.id));
+    if (!eventIds.length) return 0;
+    const { count, error } = await supabase
+        .from("event_attendees")
+        .select("id", { count: "exact", head: true })
+        .in("event_id", eventIds)
+        .not("event_order_id", "is", null);
+    if (error) throw error;
+    return count || 0;
+}
+
+/** true si la organización superó el umbral gratuito de entradas vendidas y debe verificar identidad para retirar. */
+export async function orgExceedsFreeSoldTickets(supabase: any, orgId: number): Promise<boolean> {
+    return (await orgPaidTicketsSold(supabase, orgId)) > IDENTITY_FREE_SOLD_TICKETS;
+}
+
+export const IDENTITY_REQUIRED_FOR_PAYOUT_MESSAGE =
+    `Llevas más de ${IDENTITY_FREE_SOLD_TICKETS} entradas vendidas: para retirar dinero debes verificar tu identidad. Hazlo en Configuración > Verificación de identidad (/dashboard/settings#identidad).`;
+
+/** @deprecated Usar IDENTITY_REQUIRED_FOR_PAYOUT_MESSAGE. */
+export const IDENTITY_REQUIRED_MESSAGE = IDENTITY_REQUIRED_FOR_PAYOUT_MESSAGE;
 
 /**
- * true si la organización tiene eventos publicados con entradas pagadas y aún no verifica su identidad.
- * Esos eventos siguen a la venta (no se pausan); solo se le pide verificar para poder retirar.
+ * true si la organización lleva más de IDENTITY_FREE_SOLD_TICKETS entradas vendidas y aún no verifica su identidad.
+ * Sus eventos siguen a la venta (no se pausan); solo se le pide verificar para poder retirar.
  */
 export async function needsIdentityForPublishedEvents(supabase: any, orgId: number): Promise<boolean> {
     if (identityApproved(await loadOrgIdentity(supabase, orgId))) return false;
-    const { data, error } = await supabase
-        .from("events")
-        .select("id, event_tickets!inner(id)")
-        .eq("organization_id", orgId)
-        .eq("status", "published")
-        .gt("event_tickets.price", 0)
-        .limit(1);
-    if (error) return false;
-    return (data || []).length > 0;
+    try {
+        return await orgExceedsFreeSoldTickets(supabase, orgId);
+    } catch {
+        return false;
+    }
 }
 
 // Aviso del layout del panel (DashboardLayout): se calcula a lo más una vez por minuto y organización en este
@@ -127,11 +156,9 @@ export async function needsIdentityNotice(supabase: any, orgId: number): Promise
     return value;
 }
 
-/** Mensaje de bloqueo si el evento no se puede publicar por falta de identidad verificada; null si puede. */
-export async function identityPublishBlocker(supabase: any, orgId: number, eventId: number): Promise<string | null> {
-    if (!(await eventRequiresIdentity(supabase, eventId))) return null;
-    const org = await loadOrgIdentity(supabase, orgId);
-    return identityApproved(org) ? null : IDENTITY_REQUIRED_MESSAGE;
+/** @deprecated La publicación ya no se bloquea por identidad. Siempre devuelve null. */
+export async function identityPublishBlocker(_supabase: any, _orgId: number, _eventId: number): Promise<string | null> {
+    return null;
 }
 
 /**

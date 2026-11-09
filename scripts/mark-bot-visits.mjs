@@ -5,7 +5,7 @@
 // Uso:
 //   node --env-file=.env scripts/mark-bot-visits.mjs                 dry run: cuántas se marcarían, por evento y razón
 //   node --env-file=.env scripts/mark-bot-visits.mjs --event 134     solo ese evento (dry run)
-//   node --env-file=.env scripts/mark-bot-visits.mjs --apply         marca (requiere la migración 202611040100)
+//   node --env-file=.env scripts/mark-bot-visits.mjs --apply         marca (requiere la migración 202611090100)
 //   --json                                                          salida en JSON (para revisar o guardar)
 //
 // Solo marca (nunca desmarca): una visita ya marcada a mano o por la ingesta queda como está.
@@ -44,7 +44,7 @@ async function hasIsBotColumn() {
 
 const withColumn = await hasIsBotColumn()
 if (apply && !withColumn) {
-  console.error('event_visits.is_bot no existe todavía: aplica la migración 202611040100_event_visits_bots.sql antes de --apply.')
+  console.error('event_visits.is_bot no existe todavía: aplica la migración 202611090100_event_visits_bots.sql antes de --apply.')
   process.exit(1)
 }
 

@@ -2,7 +2,7 @@
 // 9 · Después (SPEC_landing_seminarios §4.9, papel-2, SALA 6 · DESPUÉS →): a la izquierda los resultados de la encuesta
 // dentro de una lámina (11 / 12): barras con RATING_LABELS (reviews.mjs), el promedio con formatRating (eventView.js), un
 // comentario público y un mensaje privado con la etiqueta real "Privado" (EventReviewsManager.vue). A la derecha, cinco
-// ítems. Verificado: encuesta entre REVIEW_REQUEST_DELAY_HOURS y REVIEW_REQUEST_WINDOW_HOURS h después de cada función,
+// ítems. Verificado: encuesta REVIEW_FIRST_DELAY_HOURS después de cada función,
 // con hasta MAX_PHOTOS_PER_PERSON fotos y mensaje privado (reviews.mjs, EventReviews.vue); mensajes a los inscritos desde
 // el asistente de IA (send_attendee_message); invitar a la próxima edición con INVITE_AUDIENCES (inviteAudience.ts) y
 // código de premio (REWARD_CODE_PREFIX); duplicar (eventDuplicate.ts), galería y reporte semanal del domingo
@@ -19,7 +19,7 @@ import WayfindingSign from "./WayfindingSign.astro";
 import { SURVEY_DISTRIBUTION, surveyAverage } from "./seminariosLanding.js";
 import { formatRating } from "../../event/eventView.js";
 import { INVITE_AUDIENCE_TEXT } from "../../../data/inviteAudience";
-import { MAX_PHOTOS_PER_PERSON, RATING_LABELS, REVIEW_REQUEST_DELAY_HOURS, REVIEW_REQUEST_WINDOW_HOURS } from "../../../../netlify/lib/reviews.mjs";
+import { MAX_PHOTOS_PER_PERSON, RATING_LABELS, REVIEW_FIRST_DELAY_HOURS } from "../../../../netlify/lib/reviews.mjs";
 
 const bars = [5, 4, 3, 2, 1].map((stars) => ({ stars, label: RATING_LABELS[stars as 1 | 2 | 3 | 4 | 5], pct: SURVEY_DISTRIBUTION[stars as 1 | 2 | 3 | 4 | 5] }));
 const average = formatRating(surveyAverage());
@@ -28,7 +28,7 @@ const averageValue = Math.round(surveyAverage() * 10) / 10;
 const items = [
   {
     title: "Una encuesta por correo.",
-    text: `Entre ${REVIEW_REQUEST_DELAY_HOURS} y ${REVIEW_REQUEST_WINDOW_HOURS} h después de cada jornada les llega un correo para calificar con estrellas, comentar, subir hasta ${MAX_PHOTOS_PER_PERSON} fotos y dejarte un mensaje privado. Lo ves y lo exportas desde tu panel.`,
+    text: `${REVIEW_FIRST_DELAY_HOURS.day} h después de cada jornada les llega un correo para calificar con estrellas, comentar, subir hasta ${MAX_PHOTOS_PER_PERSON} fotos y dejarte un mensaje privado. Lo ves y lo exportas desde tu panel.`,
   },
   { title: "Las presentaciones, por correo.", text: "Mandas el link a todos los inscritos desde tu asistente de IA." },
   {

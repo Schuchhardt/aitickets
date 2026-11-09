@@ -18,7 +18,7 @@ import { vReveal } from "./event/reveal.js";
 import IridescenceBg from "./event/IridescenceBg.vue";
 import { normalizePageSettings, pageBackgroundPreset } from "../lib/eventPageSettings";
 import PurchasedTicketsModal from "./PurchasedTicketsModal.vue";
-import { cardState, stockSummary, minFinalPrice, formatCLP, formatSaleStart, readCheckoutParams, upcomingFunctions, formatFunctionShort, readReviewHash, formatRating, reviewsCountLabel, cardFunctionChips, attendeeFeedUrl } from "./event/eventView.js";
+import { cardState, stockSummary, soldPercentLabel, minFinalPrice, formatCLP, formatSaleStart, readCheckoutParams, upcomingFunctions, formatFunctionShort, readReviewHash, formatRating, reviewsCountLabel, cardFunctionChips, attendeeFeedUrl } from "./event/eventView.js";
 import { addToCalendar } from "./event/shareActions.js";
 import { cdnImage, cdnSrcset, EVENT_COVER_SIZES } from "../lib/imageCdn.js";
 import { storedOrders, trackFunnel } from "./event/checkoutApi.js";
@@ -125,6 +125,9 @@ const badges = computed(() => {
   if ((s === "ended" || props.event.reviews_during_run) && reviewSummary?.count) list.push({ label: `★ ${formatRating(reviewSummary.average)} · ${reviewsCountLabel(reviewSummary.count)}`, tone: "neutral" });
   if (s === "free" && stock.value?.few) list.push({ label: `Quedan ${stock.value.remaining} ${stock.value.remaining === 1 ? "cupo" : "cupos"}`, tone: "warning", pulse: true });
   if (isPaidOnSale.value && stock.value?.few) list.push({ label: "Últimas entradas", tone: "warning", pulse: true });
+  // Desde la mitad vendida (src/lib/salesProgress.mjs): "60% de entradas vendidas", con el punto pero sin el pulso
+  const soldLabel = s === "free" || isPaidOnSale.value ? soldPercentLabel(stock.value, { free: s === "free" }) : "";
+  if (soldLabel) list.push({ label: soldLabel, tone: "warning", dot: true });
   if (isPrivate.value) list.push({ label: "Evento privado", tone: "neutral" });
   return list;
 });
@@ -200,7 +203,9 @@ const priceNote = computed(() => {
 const bar = computed(() => {
   if (state.value === "paid_simple") return { price: formatCLP(fromPrice.value), note: priceNote.value, cta: "Comprar" };
   if (state.value === "paid_multi") return { price: `Desde ${formatCLP(fromPrice.value)}`, note: priceNote.value, cta: "Elegir entradas" };
-  return { price: "Gratis", note: stock.value?.few ? `Quedan ${stock.value.remaining} cupos` : "", warning: Boolean(stock.value?.few), cta: "Confirmar asistencia" };
+  const soldNote = soldPercentLabel(stock.value, { free: true });
+  const note = stock.value?.few ? `Quedan ${stock.value.remaining} cupos` : soldNote;
+  return { price: "Gratis", note, warning: Boolean(stock.value?.few || soldNote), cta: "Confirmar asistencia" };
 });
 function onBarAction() {
   if (isPaidOnSale.value) openCheckout({ entry: "sticky", step: state.value === "paid_simple" ? 2 : 1 });

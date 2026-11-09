@@ -8,6 +8,9 @@
 //
 // La API de productores (set_event_video) descarga el video desde una URL y lo sube con storeVideoBuffer.
 //
+// Los videos de los asistentes (galería de reseñas, /api/reviews/videos) usan las mismas piezas con otra carpeta:
+// event-attendee-videos/<evento>/video-<aleatorio>.<ext> (attendeeVideoPathPrefix), sin datos personales en la ruta.
+//
 // Bucket propio "aitickets-event-videos" (público, máx. 50 MB, solo video; migración 202610240100). Si todavía no
 // existe (deploy preview o la migración no pudo crearlo) se usa el bucket de imágenes "Events".
 import { getSupabaseAdmin } from "./auth-helpers";
@@ -29,15 +32,22 @@ const isMissingBucket = (error: any) =>
     /bucket not found/i.test(String(error?.message || "")) || String(error?.statusCode || error?.status || "") === "404";
 
 export const videoPathPrefix = (organizationId: number, eventId: number) => `${VIDEO_FOLDER}/${organizationId}/${eventId}-`;
+export const ATTENDEE_VIDEO_FOLDER = "event-attendee-videos";
+export const attendeeVideoPathPrefix = (eventId: number) => `${ATTENDEE_VIDEO_FOLDER}/${eventId}/video-`;
 
 const publicBase = (bucket: string) =>
     getSupabaseAdmin().storage.from(bucket).getPublicUrl("").data.publicUrl.replace(/\/?$/, "/");
 
 /** URL firmada para subir un video del evento (válida 2 h, una sola ruta) y su URL pública. */
-export async function createVideoUpload(organizationId: number, eventId: number, contentType: string) {
+export function createVideoUpload(organizationId: number, eventId: number, contentType: string) {
+    return createVideoUploadAt(videoPathPrefix(organizationId, eventId), contentType);
+}
+
+/** URL firmada para subir un video bajo `pathPrefix` (p. ej. attendeeVideoPathPrefix) y su URL pública. */
+export async function createVideoUploadAt(pathPrefix: string, contentType: string) {
     const ext = EVENT_VIDEO_TYPES[contentType];
     if (!ext) throw new VideoStorageError(400, "Formato no soportado: usa MP4 (recomendado), WEBM o MOV.");
-    const path = `${videoPathPrefix(organizationId, eventId)}${randomSuffix()}.${ext}`;
+    const path = `${pathPrefix}${randomSuffix()}.${ext}`;
     const storage = getSupabaseAdmin().storage;
     for (const bucket of BUCKETS) {
         const { data, error } = await storage.from(bucket).createSignedUploadUrl(path);
@@ -69,8 +79,12 @@ export async function storeVideoBuffer(organizationId: number, eventId: number, 
 
 /** Bucket y ruta de una URL pública de video de ESTE evento y organización, o null. */
 export function ownVideoLocation(url: unknown, organizationId: number, eventId: number): { bucket: string; path: string } | null {
+    return ownVideoLocationAt(url, videoPathPrefix(organizationId, eventId));
+}
+
+/** Bucket y ruta de una URL pública de video bajo `prefix` (nuestros buckets, extensión de video), o null. */
+export function ownVideoLocationAt(url: unknown, prefix: string): { bucket: string; path: string } | null {
     if (typeof url !== "string" || url.length > 1000 || url.includes("..")) return null;
-    const prefix = videoPathPrefix(organizationId, eventId);
     const extensions = new Set(Object.values(EVENT_VIDEO_TYPES));
     for (const bucket of BUCKETS) {
         const base = publicBase(bucket);
@@ -82,28 +96,38 @@ export function ownVideoLocation(url: unknown, organizationId: number, eventId: 
     return null;
 }
 
-/** Confirma que el archivo subido existe, es un video y no supera el máximo; si no, lo borra. */
-export async function verifyUploadedVideo(location: { bucket: string; path: string }): Promise<{ mime: string; bytes: number | null }> {
+/** Confirma que el archivo subido existe, es un video y no supera `maxBytes`; si no, lo borra. */
+export async function verifyUploadedVideo(
+    location: { bucket: string; path: string },
+    { maxBytes = EVENT_VIDEO_MAX_BYTES }: { maxBytes?: number } = {},
+): Promise<{ mime: string; bytes: number | null }> {
     const file = getSupabaseAdmin().storage.from(location.bucket);
     const { data, error } = await file.info(location.path);
     if (error || !data) throw new VideoStorageError(400, "No encontramos el video subido. Vuelve a subirlo.");
     const mime = String((data as any).contentType || "").split(";")[0].trim().toLowerCase();
     const bytes = Number((data as any).size) || null;
-    if (!EVENT_VIDEO_TYPES[mime] || (bytes !== null && bytes > EVENT_VIDEO_MAX_BYTES)) {
+    if (!EVENT_VIDEO_TYPES[mime] || (bytes !== null && bytes > maxBytes)) {
         await file.remove([location.path]).catch(() => {});
-        throw new VideoStorageError(400, EVENT_VIDEO_TYPES[mime] ? "El video supera los 50 MB." : "El archivo subido no es un video MP4, WEBM o MOV.");
+        throw new VideoStorageError(
+            400,
+            EVENT_VIDEO_TYPES[mime] ? `El video supera los ${Math.round(maxBytes / (1024 * 1024))} MB.` : "El archivo subido no es un video MP4, WEBM o MOV.",
+        );
     }
     return { mime, bytes };
 }
 
-/** Borra un video anterior del evento (no se usa en otro lugar). Nunca lanza. */
-export async function removeStoredVideo(url: unknown, organizationId: number, eventId: number): Promise<void> {
-    const location = ownVideoLocation(url, organizationId, eventId);
+/** Borra un video de nuestros buckets (ruta ya validada con ownVideoLocation*). Nunca lanza. */
+export async function removeVideoAt(location: { bucket: string; path: string } | null): Promise<void> {
     if (!location) return;
     try {
         const { error } = await getSupabaseAdmin().storage.from(location.bucket).remove([location.path]);
-        if (error) console.error("removeStoredVideo:", error.message);
+        if (error) console.error("removeVideoAt:", error.message);
     } catch (err: any) {
-        console.error("removeStoredVideo:", err?.message || err);
+        console.error("removeVideoAt:", err?.message || err);
     }
+}
+
+/** Borra un video anterior del evento (no se usa en otro lugar). Nunca lanza. */
+export async function removeStoredVideo(url: unknown, organizationId: number, eventId: number): Promise<void> {
+    await removeVideoAt(ownVideoLocation(url, organizationId, eventId));
 }
