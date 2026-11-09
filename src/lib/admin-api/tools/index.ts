@@ -11,6 +11,7 @@ import { dashboardActivityTools } from "./dashboardActivity";
 import { socialSeriesAdminTools } from "./socialSeries";
 import { financeTools } from "./finance";
 import { operationTools } from "./operations";
+import { payoutCycleTools } from "./payout-cycle";
 import { healthTools } from "./health";
 import { mirrorTools } from "../mirror";
 
@@ -25,6 +26,7 @@ export const ADMIN_TOOLS: AdminToolDef[] = [
     ...socialSeriesAdminTools,
     ...financeTools,
     ...operationTools,
+    ...payoutCycleTools,
     ...healthTools,
     ...mirrorTools,
 ];
