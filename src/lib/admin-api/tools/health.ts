@@ -183,6 +183,7 @@ const listPendingOperations: AdminToolDef = {
 const SCHEDULED_JOBS: { job: string; label: string; everyHours: number; note: string }[] = [
     { job: "send-event-reminders", label: "send-event-reminders (recordatorio 24 h)", everyHours: 24, note: "Corre a diario (13:00 UTC); envía si hay funciones al día siguiente." },
     { job: "send-review-requests", label: "send-review-requests (pedir reseñas)", everyHours: 1, note: "Corre cada hora; hasta 3 correos por persona después de cada función, solo entre 10:00 y 23:00 (de noche no envía)." },
+    { job: "social-series-dispatch", label: "social-series-dispatch (historias automáticas)", everyHours: 1 / 4, note: "Corre cada 15 min; publica lo que sale en las próximas 2 h. last_activity_at es la última pieza programada: quieta no es falla." },
     { job: "send-scheduled-messages", label: "send-scheduled-messages", everyHours: 1 / 6, note: "Corre cada 10 min; envía si hay mensajes programados." },
     { job: "check-custom-domains", label: "check-custom-domains", everyHours: 1 / 4, note: "Corre cada 15 min; revisa dominios pendientes y, cada ~6 h, los activos." },
     { job: "passline-watch", label: "passline-watch (leads)", everyHours: 24, note: "Corre a diario (11:00 UTC). Solo busca si LEADS_PASSLINE_ENABLED=true y hay FIRECRAWL_API_KEY: si no, last_note dice skipped." },
@@ -290,11 +291,13 @@ const getSystemHealth: AdminToolDef = {
             "check-custom-domains": domainCheck,
             "passline-watch": { at: passlineRow?.last_run_at ?? null },
             "outreach-tick": outreachEvent,
+            "social-series-dispatch": seriesQueued,
         };
         const EXTRA: Record<string, Record<string, unknown>> = {
             "send-scheduled-messages": { overdue_scheduled: schedOverdue, stuck_sending: schedStuck },
             "passline-watch": { enabled: passlineRow?.enabled ?? null, last_result: passlineRow?.last_result ?? null },
             "outreach-tick": { paused: pausedValue?.paused ?? false },
+            "social-series-dispatch": { overdue_planned: seriesOverdue },
             "expire-pending-orders": { pending_overdue: pendingOverdue, processing_stuck: processingStuck },
         };
         const jobs = SCHEDULED_JOBS.map((j) => {
@@ -329,10 +332,6 @@ const getSystemHealth: AdminToolDef = {
                     const activity = LAST_ACTIVITY[j.job];
                     return { process: j.label, ...j.health, ...(activity ? { last_activity_at: activity.at } : {}), ...(j.extra || {}), note: heartbeats.missing ? `${j.note} (latidos: falta la migración)` : j.heartbeat ? j.note : `${j.note} Todavía sin latido.` };
                 }),
-                {
-                    ...proc("social-series-dispatch (historias automáticas)", seriesQueued.at, 24, "Corre cada 15 min; solo escribe cuando hay historias o publicaciones por salir en las próximas 2 h. Todavía sin latido: se infiere de sus piezas.", seriesQueued.missing),
-                    overdue_planned: seriesOverdue,
-                },
                 {
                     ...proc("bitácora del panel (rastreador del navegador)", panelClient.at, 24, "Datos de uso del panel que manda el navegador; solo escribe si algún productor usa el panel.", panelClient.missing),
                     last_page_view_at: panelViews.at,

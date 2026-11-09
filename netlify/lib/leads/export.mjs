@@ -101,7 +101,7 @@ function leadContactKeys(lead) {
  *   - su dominio o correo está en aitickets_suppressions (`suppressions`: filas {email, domain});
  *   - otro lead (`otherLeads`: filas {id, name_key, domain, email, status}) con status distinto de 'invalid' ya
  *     tiene ese dominio o correo (está en outreach automático, contactado, perdido o convertido).
- * Devuelve {leads, skipped: [{org_name, reason}]}.
+ * Devuelve {leads, skipped: [{id, org_name, reason}]}.
  */
 export function filterExportableLeads(leads, { suppressions = [], otherLeads = [] } = {}) {
   const supEmails = new Set()
@@ -134,7 +134,7 @@ export function filterExportableLeads(leads, { suppressions = [], otherLeads = [
       const dup = (domain && (byDomain.get(domain) || []).find(isOther(lead))) || (email && (byEmail.get(email) || []).find(isOther(lead)))
       if (dup) reason = `ya existe otro lead con ese dominio/correo (${dup.status})`
     }
-    if (reason) skipped.push({ org_name: lead.org_name || '', reason })
+    if (reason) skipped.push({ id: lead.id, org_name: lead.org_name || '', reason })
     else out.push(lead)
   }
   return { leads: out, skipped }

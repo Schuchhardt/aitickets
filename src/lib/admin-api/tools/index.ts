@@ -13,6 +13,7 @@ import { financeTools } from "./finance";
 import { operationTools } from "./operations";
 import { healthTools } from "./health";
 import { blogAdminTools } from "./blog";
+import { leadTools } from "./leads";
 import { mirrorTools } from "../mirror";
 
 export const ADMIN_TOOLS: AdminToolDef[] = [
@@ -28,6 +29,7 @@ export const ADMIN_TOOLS: AdminToolDef[] = [
     ...operationTools,
     ...healthTools,
     ...blogAdminTools,
+    ...leadTools,
     ...mirrorTools,
 ];
 

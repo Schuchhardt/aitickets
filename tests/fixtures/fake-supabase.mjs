@@ -59,8 +59,23 @@ function matches(row, f) {
   }
 }
 
+/**
+ * Columnas NOT NULL DEFAULT de la BD real que el código filtra (p. ej. .eq('is_bot', false)): se aplican a las filas
+ * sembradas y a las insertadas, así una fila de prueba sin la columna se comporta como en Postgres.
+ */
+const SCHEMA_DEFAULTS = {
+  event_visits: { is_bot: false },
+}
+const withSchemaDefaults = (table, row) => {
+  const d = SCHEMA_DEFAULTS[table]
+  if (!d) return row
+  const out = { ...row }
+  for (const [k, v] of Object.entries(d)) if (out[k] === undefined) out[k] = v
+  return out
+}
+
 export function createFakeSupabase({ tables = {}, rpc = {}, unique = {}, defaults = {} } = {}) {
-  const state = Object.fromEntries(Object.entries(tables).map(([k, rows]) => [k, rows.map((r) => ({ ...r }))]))
+  const state = Object.fromEntries(Object.entries(tables).map(([k, rows]) => [k, rows.map((r) => withSchemaDefaults(k, { ...r }))]))
   const calls = []
   const failures = []
   let nextId = 1000
@@ -120,7 +135,8 @@ export function createFakeSupabase({ tables = {}, rpc = {}, unique = {}, default
     const error = failureFor(q.table, q.op)
     if (error) return { data: null, error, count: null }
     const rows = (state[q.table] ||= [])
-    const filtered = () => rows.filter((r) => q.filters.every((f) => matches(r, f)))
+    // El default de columna vale también para filas que un test empujó directo a db.tables
+    const filtered = () => rows.filter((r) => q.filters.every((f) => matches(withSchemaDefaults(q.table, r), f)))
 
     let data
     if (q.op === 'select') {
@@ -151,7 +167,7 @@ export function createFakeSupabase({ tables = {}, rpc = {}, unique = {}, default
           Object.assign(existing, v)
           out.push({ ...existing })
         } else {
-          const row = { ...(defaults[q.table] || {}), ...v }
+          const row = withSchemaDefaults(q.table, { ...(defaults[q.table] || {}), ...v })
           rows.push(row)
           out.push({ ...row })
         }

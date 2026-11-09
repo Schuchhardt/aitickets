@@ -180,16 +180,14 @@ describe('decisión de Didit en la organización', () => {
   })
 })
 
-describe('publicar exige identidad verificada si hay entradas pagadas', () => {
+describe('publicar ya no exige identidad (se exige al retirar)', () => {
   const ev = { id: 10, status: 'draft', accessibility: 'public', start_date: '2026-12-01T22:00:00Z' }
-  it('bloquea evento pagado sin identidad', async () => {
+  it('identityPublishBlocker siempre retorna null', async () => {
     seed()
-    expect(await identityPublishBlocker(db, 7, 10)).toMatch(/verificar tu identidad/)
-    await expect(setEventStatus(ev, 7, 'published')).rejects.toBeInstanceOf(EventInputError)
-    expect(db.tables.events[0].status).toBe('draft')
+    expect(await identityPublishBlocker(db, 7, 10)).toBeNull()
   })
-  it('evento pagado de hasta 10 cupos se publica sin identidad', async () => {
-    seed({ tickets: [{ id: 1, event_id: 10, price: 5000, is_gift: false, total_quantity: 10 }] })
+  it('evento pagado sin identidad se publica sin problemas', async () => {
+    seed()
     await setEventStatus(ev, 7, 'published')
     expect(db.tables.events[0].status).toBe('published')
   })

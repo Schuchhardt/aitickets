@@ -97,7 +97,7 @@ internos o 3 preguntas, enlaces quitados, meta título largo.
 
 ## Datos
 
-Migración `db/migrations/202611090100_blog.sql`: `aitickets_blog_topics` (14 temas iniciales: 8 nichos y 6
+Migración `db/migrations/202611090200_blog.sql`: `aitickets_blog_topics` (14 temas iniciales: 8 nichos y 6
 funcionalidades, con semillas y peso), `aitickets_blog_keywords`, `aitickets_blog_posts`, `aitickets_blog_runs`. RLS sin
 políticas: solo la service role.
 

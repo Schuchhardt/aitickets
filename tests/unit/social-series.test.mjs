@@ -731,6 +731,8 @@ describe('MCP de admin', () => {
     await activate()
     const list = await run('list_social_series')
     expect(list.series[0]).toMatchObject({ status: 'active', organization: { id: 7, name: 'Escuela de Música del Dire' }, event: { id: 2296, name: 'Concierto de Primavera' }, pieces: { pending: 17 } })
+    // Como la serie 2: reel activado (por defecto) sin video → aviso no bloqueante con el link al panel del evento
+    expect(list.series[0].notices).toEqual([expect.objectContaining({ code: 'reel_without_video', level: 'info', blocking: false, cta: expect.objectContaining({ url: expect.stringMatching(/\/dashboard\/events\/2296#pagina$/) }) })])
     expect(getAdminTool('org_get_social_series')).toBeTruthy()
     expect(getAdminTool('org_approve_social_series')).toBeTruthy()
   })
@@ -766,6 +768,8 @@ describe('MCP de admin', () => {
         { id: 2, event_id: 2296, ref: 'ig-post-dm', ip_hash: 'a', created_at: new Date().toISOString() },
         { id: 3, event_id: 2296, ref: 'ig-story-dm', ip_hash: 'b', created_at: new Date().toISOString() },
         { id: 4, event_id: 2296, ref: 'whatsapp', ip_hash: 'c', created_at: new Date().toISOString() },
+        // El escáner de links de Meta abrió el link del DM: no cuenta como visita
+        { id: 5, event_id: 2296, ref: 'ig-post-dm', ip_hash: 'z', created_at: new Date().toISOString(), is_bot: true, bot_reason: 'geo:meta-datacenter' },
       )
       const view = await call('get_social_series', { event_id: 2296 })
       expect(view.dms).toMatchObject({

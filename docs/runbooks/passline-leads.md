@@ -95,6 +95,19 @@ Supresión y duplicados: si el dominio o el correo encontrado está en `aiticket
 dominio o correo, el lead de Passline se funde en él (eventos, `source_refs`, último evento) sin tocar su status
 y queda `invalid` con `invalid_reason = 'duplicate_of:<id>'`.
 
+## Gestionar los leads desde el MCP de admin
+
+Los leads quedan en `aitickets_leads`, sus eventos en `aitickets_competitor_events` y las bajas en `aitickets_suppressions`.
+Ninguna herramienta envía mensajes.
+
+| Herramienta | Para qué |
+|---|---|
+| `list_leads` | A quién escribir: por prioridad, con filtros, `contactable` y `blocked_reason` |
+| `get_lead` | De dónde salió cada contacto y qué eventos se vieron |
+| `update_lead` | Registrar `contacted`, `replied`, `interested`, `converted`, `lost` o `invalid`, y agregar notas |
+| `add_suppression` | Registrar un "no me escriban más". Pide confirmación y no se deshace desde el MCP |
+| `export_leads` | El CSV en la respuesta, con la llave completa |
+
 ## Exportar el CSV de leads
 
 ```bash
@@ -115,7 +128,7 @@ Prioridad (0-100) = recencia (evento en los próximos 60 días: 40) + frecuencia
 categoría (stand-up/comedia/teatro: 30; música en vivo: 15; otras: 5).
 
 Al escribir desde Gmail: identificarse, decir de dónde salió el dato (su sitio o Instagram público), ofrecer
-darse de baja, y registrar en la BD cualquier "no me escriban más" como supresión.
+darse de baja, y registrar cualquier "no me escriban más" con `add_suppression` en el MCP de admin.
 
 ## Diferenciador para productores que ya venden en Passline
 

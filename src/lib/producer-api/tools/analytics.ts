@@ -11,6 +11,7 @@ import {
     functionOccupancy,
     loadEventFunctions,
     loadEventVisits,
+    BOT_VISITS_NOTE,
     loadOrderCheckins,
     loadPaidOrders,
     salesByFunction,
@@ -33,7 +34,7 @@ export async function eventPerformance(ctx: ToolContext, eventId: number, days: 
     const event = await loadOwnedEvent<any>(ctx, eventId, "id, name, slug, status, start_date, end_date");
     const now = new Date();
 
-    const [orders, { visits, truncated, refTracked }, { count: refunded }, capacity, { functions, ticketFunction }] = await Promise.all([
+    const [orders, { visits, truncated, refTracked, botVisits }, { count: refunded }, capacity, { functions, ticketFunction }] = await Promise.all([
         loadPaidOrders(ctx.supabase, event.id),
         loadEventVisits(ctx.supabase, event.id),
         ctx.supabase.from("event_orders").select("id", { count: "exact", head: true }).eq("event_id", event.id).eq("status", "refunded"),
@@ -95,6 +96,8 @@ export async function eventPerformance(ctx: ToolContext, eventId: number, days: 
             unique_visitors: traffic.uniqueVisitors,
             conversion_pct: pct(paidOrders, traffic.uniqueVisitors),
             truncated,
+            bot_visits_excluded: botVisits,
+            note: BOT_VISITS_NOTE,
             top_sources: traffic.sources,
             top_locations: traffic.locations.map(({ location, visits: n, percentage }) => ({ location, visits: n, percentage })),
             peak_hours_local: traffic.peakHours.map((n, hour) => ({ hour, visits: n })).filter((h) => h.visits > 0).sort((a, b) => b.visits - a.visits).slice(0, 5),
@@ -123,7 +126,8 @@ const getEventPerformance: ToolDef = {
     description:
         "¿Cómo le va al evento? Ventas, ingresos, capacidad vendida, ritmo de venta (últimos 7 días vs anteriores y proyección), " +
         "ventas y ocupación por función (si tiene varias), visitas, conversión, fuentes de tráfico, ubicación de visitantes, horas pico, canales de venta (ref/UTM) con su conversión y cuántas de sus entradas ya ingresaron (checked_in), " +
-            "medios de pago, códigos usados y serie diaria. " +
+            "medios de pago, códigos usados y serie diaria. Las visitas no cuentan bots, escáneres de links (vistas previas de Instagram, " +
+        "Facebook y WhatsApp) ni visitas de desarrollo (traffic.bot_visits_excluded). " +
         "Ideal para diagnosticar y recomendar acciones (subir precio, crear descuento, reforzar un canal).",
     scope: "read",
     annotations: { readOnlyHint: true },

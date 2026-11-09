@@ -26,7 +26,7 @@ const previewUrl = (origin: string, id: number) => {
 
 async function topicsBySlug(supabase: any) {
     const { data, error } = await supabase.from(TOPICS_TABLE).select("*").order("id");
-    if (error) throw new ToolError("unavailable", `El blog no está instalado en esta base (${error.message}): falta aplicar 202611090100_blog.sql.`);
+    if (error) throw new ToolError("unavailable", `El blog no está instalado en esta base (${error.message}): falta aplicar 202611090200_blog.sql.`);
     return new Map<string, any>((data || []).map((t: any) => [t.slug, t]));
 }
 

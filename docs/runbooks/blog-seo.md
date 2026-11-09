@@ -5,7 +5,7 @@ Diseño y reglas: [`docs/specs/blog-seo.md`](../specs/blog-seo.md). Todo se mane
 
 ## 1. Puesta en marcha
 
-1. **Migración.** `202611090100_blog.sql` se aplica sola en el deploy de producción (crea las tablas y 14 temas).
+1. **Migración.** `202611090200_blog.sql` se aplica sola en el deploy de producción (crea las tablas y 14 temas).
 2. **Claude.** Ya está `ANTHROPIC_API_KEY`. Nada más que hacer.
 3. **Search Console + Google Ads (un solo OAuth).**
    1. En Google Cloud (cualquier proyecto): habilita **Google Search Console API** y **Google Ads API**.

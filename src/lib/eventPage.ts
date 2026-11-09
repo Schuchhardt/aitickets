@@ -28,13 +28,13 @@ import { normalizeCheckoutFields } from "./checkoutFields.mjs";
 import { loadEventSeating, loadTicketSections, seatCounts } from "../../netlify/lib/seats.mjs";
 import { totalSeats } from "./seatMap.mjs";
 import { clientIpFrom } from "./sites";
+import { botReason } from "../../netlify/lib/visit-bots.mjs";
 import { computeSalesProgress } from "./salesProgress.mjs";
 
 // Columnas públicas del evento. NUNCA incluir secret_location (C4).
 export const EVENT_PUBLIC_COLUMNS =
   "id, slug, name, title, description, image_url, location, capacity, status, accessibility, start_date, end_date, organization_id";
 
-const BOT_PATTERNS = /bot|crawl|spider|slurp|bingpreview|mediapartners|facebookexternalhit|bytespider|gptbot|lighthouse|headless/i;
 
 const DATE_COLUMNS = `
   id, date, start_time, end_time, event_location_id,
@@ -83,6 +83,8 @@ export interface PublicEventResult {
  * Registra una visita a la página pública (event_visits). La llama /api/events/visit desde el navegador:
  * la página se sirve desde el CDN (src/lib/cdnCache.ts) y el servidor no ve cada visita. Solo se guarda el
  * hash de la IP. `referrer` y `utm` son los de la página (document.referrer y su query string).
+ * Bots, escáneres y visitas de desarrollo (local o deploy preview, que comparten la BD) se guardan marcadas
+ * (is_bot + bot_reason, netlify/lib/visit-bots.mjs) y la analítica las excluye.
  */
 export async function recordEventVisit(
   eventId: number,
@@ -92,7 +94,6 @@ export async function recordEventVisit(
 ) {
   const supabase = getSupabaseAdmin();
   const ua = request.headers.get("user-agent") || "";
-  if (BOT_PATTERNS.test(ua)) return;
   const ip = clientIpFrom(request);
   const hashBuffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(ip));
   const ipHash = Array.from(new Uint8Array(hashBuffer)).map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -115,6 +116,13 @@ export async function recordEventVisit(
   const clip = (v: unknown, n: number) => (typeof v === "string" && v.trim() ? v.trim().slice(0, n) : null);
   const country = clip(geo?.country?.code, 8) || clip(request.headers.get("x-country"), 8);
   const city = clip(geo?.city, 128);
+  let host: string | null = null;
+  try {
+    host = new URL(request.url).host;
+  } catch {
+    /* sin URL: no se mira el host */
+  }
+  const reason = botReason({ user_agent: ua, city, country, referrer: page.referrer, host });
 
   const row: Record<string, unknown> = {
     event_id: eventId,
@@ -130,9 +138,16 @@ export async function recordEventVisit(
   // ?ref= del link de seguimiento (mismo largo que guarda la atribución del checkout)
   const ref = clip(page.ref, 128);
   if (ref) row.ref = ref;
+  if (reason) {
+    row.is_bot = true;
+    row.bot_reason = reason;
+  }
+  const missingColumn = (e: any) => ["42703", "PGRST204"].includes(String(e?.code || ""));
   let { error: visitError } = await supabase.from("event_visits").insert(row);
+  // Sin la migración 202611090100 (sin is_bot): un bot no se guarda, como antes; una persona, sin esas columnas
+  if (visitError && reason && missingColumn(visitError)) return;
   // Deploy preview sin la migración 202610270200 (sin columna ref): se guarda la visita sin ref
-  if (visitError && "ref" in row && ["42703", "PGRST204"].includes(String(visitError.code || ""))) {
+  if (visitError && "ref" in row && missingColumn(visitError)) {
     delete row.ref;
     ({ error: visitError } = await supabase.from("event_visits").insert(row));
   }
