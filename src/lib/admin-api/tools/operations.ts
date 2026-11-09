@@ -12,6 +12,7 @@ import { sendEmail, formatRecipient, isValidEmail } from "../../../../netlify/li
 import { renderPayoutPaidEmail, renderPayoutFailedEmail } from "../../../../netlify/lib/emails/index.mjs";
 import { sendVerificationEmail, getOrgVerification } from "../../email-verification";
 import { sendMagicLinkEmail, reserveAuthLinkSend, isAiticketsIdentity } from "../../magic-link";
+import { recomputeHolderMatch } from "../../producerIdentity";
 import { loadOrganization, type AdminContext } from "../context";
 import { rpcResult, type AdminToolDef } from "../registry";
 import { loadPayout, loadPayoutAccountRow, orgNames, payoutIdSchema, payoutWarnings, refundIdSchema } from "./finance";
@@ -72,6 +73,7 @@ const verifyPayoutAccount: AdminToolDef = {
             decision: { type: "string", enum: ["approve", "reject"] },
             notes: { type: "string", maxLength: 500, description: "Obligatorio al rechazar: qué debe corregir el productor (lo ve en el panel)." },
             expected_last4: { type: "string", pattern: "^\\d{4}$", description: "Últimos 4 dígitos que revisaste." },
+            match_legal_id: { type: "boolean", description: "Si true y se aprueba, recalcula el match entre el RUT del titular de la cuenta y la identidad verificada (holder_match_status)." },
         },
     },
     async confirm(args, actx) {
@@ -103,8 +105,13 @@ const verifyPayoutAccount: AdminToolDef = {
                 p_expected_last4: args.expected_last4 ?? null,
             }),
         );
+        let holderMatch: { status: string; reason: string } | null = null;
+        if (args.decision === "approve" && args.match_legal_id) {
+            holderMatch = await recomputeHolderMatch(actx.supabase, args.organization_id);
+        }
         return {
             ...(result || {}),
+            ...(holderMatch ? { holder_match_status: holderMatch.status, holder_match_reason: holderMatch.reason } : {}),
             next_step:
                 args.decision === "approve"
                     ? "Listo: el productor puede pedir retiros (respetando la espera de 72 h desde el último cambio de cuenta, ver payouts_enabled_from)."

@@ -30,4 +30,4 @@ create table if not exists aitickets_payout_receipts (
     created_at timestamptz not null default now()
 );
 
-create index if not exists idx_payout_receipts_payout on aitickets_payout_receipts(payout_id);
+create unique index if not exists idx_payout_receipts_payout on aitickets_payout_receipts(payout_id);

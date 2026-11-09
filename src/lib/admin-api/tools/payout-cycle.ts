@@ -560,17 +560,26 @@ const uploadPayoutReceipt: AdminToolDef = {
         });
         if (upErr) throw new ToolError("unavailable", `Error al subir el comprobante: ${upErr.message}. Verifica que el bucket "${RECEIPT_BUCKET}" exista.`);
 
-        const { error: updErr } = await actx.supabase
-            .from("aitickets_payouts")
-            .update({ receipt_key: path, receipt_hash: fileHash })
-            .eq("id", args.payout_id);
-        if (updErr && !isMissing(updErr)) throw updErr;
+        const { error: insErr } = await actx.supabase
+            .from("aitickets_payout_receipts")
+            .upsert({
+                payout_id: args.payout_id,
+                organization_id: orgId,
+                storage_path: path,
+                content_type: args.content_type,
+                file_size: buffer.length,
+                file_hash: fileHash,
+                uploaded_by: actorOf(actx),
+            }, { onConflict: "payout_id" })
+            .select("id")
+            .single();
+        if (insErr && !isMissing(insErr)) throw insErr;
 
         return {
             payout_id: args.payout_id,
             organization_id: orgId,
-            receipt_key: path,
-            receipt_hash: fileHash,
+            storage_path: path,
+            file_hash: fileHash,
             size_bytes: buffer.length,
             content_type: args.content_type,
         };
@@ -590,22 +599,28 @@ const getPayoutReceipt: AdminToolDef = {
         properties: { payout_id: payoutIdSchema },
     },
     async handler(args, actx) {
-        const payout = await loadPayout(actx.supabase, args.payout_id);
-
-        const receiptKey = payout.receipt_key;
-        if (!receiptKey) {
+        const { data: receipt, error: rErr } = await actx.supabase
+            .from("aitickets_payout_receipts")
+            .select("id, payout_id, organization_id, storage_path, content_type, file_hash")
+            .eq("payout_id", args.payout_id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+        if (rErr && !isMissing(rErr)) throw rErr;
+        if (!receipt) {
             throw new ToolError("not_found", `El retiro ${shortId(args.payout_id)} no tiene comprobante. Usa upload_payout_receipt para subirlo.`);
         }
 
-        const { data, error } = await actx.supabase.storage.from(RECEIPT_BUCKET).createSignedUrl(receiptKey, 900); // 15 min
+        const { data, error } = await actx.supabase.storage.from(RECEIPT_BUCKET).createSignedUrl(receipt.storage_path, 900);
         if (error) throw new ToolError("unavailable", `Error al generar la URL firmada: ${error.message}`);
 
         return {
             payout_id: args.payout_id,
-            organization_id: Number(payout.organization_id),
+            organization_id: Number(receipt.organization_id),
             signed_url: data.signedUrl,
             expires_in_seconds: 900,
-            receipt_hash: payout.receipt_hash || null,
+            file_hash: receipt.file_hash || null,
+            content_type: receipt.content_type,
         };
     },
 };
