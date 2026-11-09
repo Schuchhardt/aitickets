@@ -28,6 +28,7 @@ import { normalizeCheckoutFields } from "./checkoutFields.mjs";
 import { loadEventSeating, loadTicketSections, seatCounts } from "../../netlify/lib/seats.mjs";
 import { totalSeats } from "./seatMap.mjs";
 import { clientIpFrom } from "./sites";
+import { normalizeWebsiteUrl } from "./siteTemplates";
 import { computeSalesProgress } from "./salesProgress.mjs";
 
 // Columnas públicas del evento. NUNCA incluir secret_location (C4).
@@ -528,7 +529,8 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
   const organization = orgRow
     ? {
         name: orgRow.public_name,
-        website: orgRow.website,
+        // Con esquema siempre: "miproductora.cl" sin https:// era un enlace relativo roto (404)
+        website: normalizeWebsiteUrl(orgRow.website),
         instagram: orgRow.instagram,
         // Identificación del organizador (Ley 19.496) y sello "Productor verificado" (Didit aprobado)
         legal_name: trust.legal_name || null,

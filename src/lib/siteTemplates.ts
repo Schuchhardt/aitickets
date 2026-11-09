@@ -402,6 +402,27 @@ export function isSafeHttpUrl(url: unknown): url is string {
   }
 }
 
+/**
+ * Web que el productor escribió a mano ("miproductora.cl", "www.x.cl/eventos", "https://x.cl") como URL absoluta
+ * http(s), o null. Sin el esquema, "aitickets.cl" quedaba como enlace relativo en la página del evento
+ * (/eventos/aitickets.cl, un 404 que Google rastreaba) y como URL inválida en el JSON-LD. Descarta otros esquemas
+ * (javascript:, data:, mailto:) y textos que no son un dominio.
+ */
+export function normalizeWebsiteUrl(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const value = raw.trim();
+  if (!value || value.length > 500 || /\s/.test(value)) return null;
+  if (isSafeHttpUrl(value)) return value;
+  // Otro esquema (javascript:, mailto:…); "dominio.cl:8080/x" no es un esquema
+  if (/^[a-z][a-z0-9+.-]*:/i.test(value) && !/^[^:/]+:\d+(\/|$)/.test(value)) return null;
+  try {
+    const url = new URL(`https://${value.replace(/^\/+/, "")}`);
+    return /\.(?:[a-z]{2,63}|xn--[a-z0-9-]+)$/i.test(url.hostname) ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Tema final (valores del productor validados + defaults de la plantilla). */
 export function resolveThemeFor(template: SiteTemplate, theme: SiteThemeInput | null | undefined): SiteThemeInput & { dark: boolean } {
   const defaults = TEMPLATE_DEFAULTS[template] || TEMPLATE_DEFAULTS.clasico;

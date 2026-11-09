@@ -230,7 +230,7 @@ onBeforeUnmount(() => {
       </p>
       <div class="empty-actions">
         <button v-if="hasDemo" type="button" class="ev-btn ev-btn-secondary" @click="hideDemo = false">Ver eventos de ejemplo</button>
-        <a href="/organizadores?utm_source=aitickets&utm_medium=eventos_empty&utm_campaign=listado" class="ev-btn ev-btn-primary">Publica tu evento gratis</a>
+        <a href="/organizadores" class="ev-btn ev-btn-primary">Publica tu evento gratis</a>
       </div>
     </div>
 

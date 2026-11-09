@@ -5,7 +5,8 @@
 // L13: al entrar el chat, los mensajes aparecen en secuencia (como en el prototipo: 0,2 / 1,2 / 1,9 / 2,9 s) y antes de
 // cada respuesta se ve "escribiendo…" durante 500 ms. Una sola vez. Los mensajes siempre ocupan su lugar (solo cambia la
 // opacidad), así la card no salta; sin html.lp-motion se ven todos de una.
-const signupUrl = "/organizadores/registro?next=%2Fdashboard%2Fia&utm_source=aitickets&utm_medium=landing&utm_campaign=organizadores_ia";
+import { connectAiUrl } from "../links.js";
+const signupUrl = connectAiUrl("organizadores_ia");
 const clients = ["Claude", "ChatGPT", "Claude Code", "Cursor", "n8n / Zapier"];
 const steps = ["Crea tu cuenta", "Copia la URL del conector", "Pégala en Claude o ChatGPT"];
 ---

@@ -8,6 +8,7 @@ import AppFooter from "../../components/AppFooter.vue";
 import Layout from "../../layouts/Layout.astro";
 import { COMPARISONS, isComparisonVerified, isRowReported, isRowVerified, type Comparison } from "../../data/comparisons";
 import { LEGAL, formatLegalDate } from "../../lib/legal";
+import { signupUrl } from "../../components/landing/links.js";
 import "../../styles/global.css";
 
 export function getStaticPaths() {
@@ -133,7 +134,7 @@ const reviewed = formatLegalDate(comparison.reviewedAt);
           0% de comisión para el productor, web de eventos gratis y check-in desde el celular.
         </p>
         <div class="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <a href={`/organizadores/registro?utm_source=comparar&utm_campaign=${comparison.slug}`} class="rounded-xl bg-lime-400 px-6 py-3 font-semibold text-gray-900 hover:bg-lime-300">Crear cuenta gratis</a>
+          <a href={signupUrl({ source: "comparar", medium: "", campaign: comparison.slug })} class="rounded-xl bg-lime-400 px-6 py-3 font-semibold text-gray-900 hover:bg-lime-300">Crear cuenta gratis</a>
           <a href="/precios" class="rounded-xl border border-white/30 px-6 py-3 font-semibold text-white hover:bg-white/10">Ver precios</a>
         </div>
       </div>

@@ -26,7 +26,7 @@ test("carga con su H1, el CTA del hero y sin errores en la consola", async ({ pa
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Que suba el telón.");
   const publish = page.locator('[data-cta="publish"][data-section="hero"]');
   await expect(publish).toBeVisible();
-  await expect(publish).toHaveAttribute("href", /^\/organizadores\/registro\?next=.*utm_campaign=teatro_hero/);
+  await expect(publish).toHaveAttribute("href", /^\/organizadores\/registro#next=.*utm_campaign=teatro_hero/);
   await expect(page.locator('[data-cta="demo"][data-section="hero"]')).toHaveAttribute("href", "/eventos/evento-demo-teatro");
   await page.waitForLoadState("networkidle");
   expect(errors.filter((text) => !/google-analytics|googletagmanager|partytown|ERR_FAILED|Failed to fetch/.test(text))).toEqual([]);

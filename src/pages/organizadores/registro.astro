@@ -12,7 +12,20 @@ import "../../styles/global.css";
 export const prerender = false;
 
 // Ya tiene cuenta y sesión: al panel en vez de registrarse de nuevo
-if (await getSessionContext(Astro)) return Astro.redirect(safeNextPath(Astro.url.searchParams.get("next")) || "/dashboard");
+if (await getSessionContext(Astro)) {
+	const queryNext = safeNextPath(Astro.url.searchParams.get("next"));
+	if (queryNext) return Astro.redirect(queryNext);
+	// Los enlaces internos mandan ?next en el fragmento (#next=…, signupUrl en src/components/landing/links.js) y el
+	// servidor no lo ve: lo resuelve el navegador con la misma regla que safeNextPath (src/lib/onboarding.ts).
+	return new Response(
+		`<!doctype html><html lang="es-CL"><head><meta charset="utf-8"><meta name="robots" content="noindex"><title>AI Tickets</title>` +
+			`<noscript><meta http-equiv="refresh" content="0;url=/dashboard"></noscript>` +
+			`<script>(function(){var n="";try{n=new URLSearchParams(location.hash.slice(1)).get("next")||""}catch(e){}` +
+			`var ok=n.length<=2000&&/^\\/(dashboard(\\/|\\?|$)|validador(\\/|\\?|$)|oauth\\/)/.test(n)&&n.indexOf("//")!==0&&n.indexOf("\\\\")<0&&!/[\\r\\n]/.test(n);` +
+			`location.replace(ok?n:"/dashboard")})()</script></head><body><a href="/dashboard">Ir a mi panel</a></body></html>`,
+		{ headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, no-store", "X-Robots-Tag": "noindex" } }
+	);
+}
 
 const turnstileSiteKey = import.meta.env.TURNSTILE_SITE_KEY;
 const googleEnabled = isGoogleAuthEnabled();

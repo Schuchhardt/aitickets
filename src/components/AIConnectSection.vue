@@ -134,9 +134,10 @@
 import { ArrowRight, Bot, Sparkles, CalendarPlus, Tag, LineChart, Megaphone } from 'lucide-vue-next'
 import FadeInSection from './Hero/FadeInSection.vue'
 import AiBrandIcon from './ai/AiBrandIcon.vue'
+import { connectAiUrl } from './landing/links.js'
 
 // Funnel: registro → verificar correo → nombre de la productora → /dashboard/ia (paso a paso para conectar).
-const signupUrl = '/organizadores/registro?next=%2Fdashboard%2Fia&utm_source=aitickets&utm_medium=landing&utm_campaign=ia'
+const signupUrl = connectAiUrl('ia')
 const loginUrl = '/organizadores/login?next=%2Fdashboard%2Fia'
 
 const brands = [

@@ -6,6 +6,7 @@ import AppHeader from "../components/AppHeader.vue";
 import AppFooter from "../components/AppFooter.vue";
 import Layout from "../layouts/Layout.astro";
 import { LEGAL } from "../lib/legal";
+import { signupUrl } from "../components/landing/links.js";
 import "../styles/global.css";
 
 export const prerender = false;
@@ -62,7 +63,7 @@ const faqs = [
           <p class="mt-1 text-sm text-gray-600">Déjanos tus datos, confirma tu correo y sigue al registro con todo prellenado.</p>
           <div id="wg-success" class="mt-6 hidden rounded-lg bg-green-50 px-4 py-3 text-sm text-green-800" role="status">
             <p id="wg-success-msg" class="font-medium"></p>
-            <p class="mt-2">¿Prefieres no esperar? <a id="wg-register-link" href="/organizadores/registro?utm_source=web-gratis" class="underline">Regístrate ahora</a> (sin prellenado).</p>
+            <p class="mt-2">¿Prefieres no esperar? <a id="wg-register-link" href={signupUrl({ source: "web-gratis", medium: "" })} class="underline">Regístrate ahora</a> (sin prellenado).</p>
           </div>
           <form id="web-gratis-form" class="mt-6 space-y-4" novalidate>
             <div>

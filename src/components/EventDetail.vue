@@ -5,6 +5,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from "vue";
 import { trackViewItem } from "../composables/useGoogleAnalytics.js";
 import { eventBus } from "../utils/eventbus.js";
+import { signupUrl } from "./landing/links.js";
 import EventHero from "./event/EventHero.vue";
 import EventActionCard from "./event/EventActionCard.vue";
 import EventSections from "./event/EventSections.vue";
@@ -246,7 +247,10 @@ function onAssistantOpenCheckout() {
   } else if (state.value === "free") goToCard();
 }
 
-const producerBannerUrl = computed(() => `/organizadores?utm_source=aitickets&utm_medium=event_footer&utm_campaign=${encodeURIComponent(props.event?.slug || "evento")}`);
+// Sin utm_* en la query: serían una URL distinta de /organizadores por cada evento ("Página alternativa con etiqueta
+// canónica" en Search Console) y pisarían en GA4 la fuente real de la visita. Ver withFragmentParams en landing/links.js.
+const producerBannerUrl = "/organizadores";
+const demoSignupUrl = signupUrl({ medium: "demo_event", campaign: "banner" });
 
 onMounted(() => {
   const prices = (props.event.tickets || []).map((t) => Number(t.price) || 0);
@@ -270,14 +274,16 @@ onMounted(() => {
     reviewsFromLink.value = Boolean(readReviewHash(window.location.hash));
   }
 
-  // Deep links: ?checkout=1 (o ?comprar=1 de los sitios con dominio propio), ?funcion, ?entrada, ?code
+  // Deep links: ?checkout=1 (o #comprar de los sitios con dominio propio, purchaseUrlFor; ?comprar=1 en enlaces
+  // antiguos), ?funcion, ?entrada, ?code
   try {
     const url = new URL(window.location.href);
     const params = readCheckoutParams(url.searchParams);
     urlParams = params;
-    const legacy = url.searchParams.get("comprar") === "1";
+    const legacy = url.searchParams.get("comprar") === "1" || url.hash === "#comprar";
     if (legacy) {
       url.searchParams.delete("comprar");
+      if (url.hash === "#comprar") url.hash = "";
       window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
     }
     if (params.open || legacy) {
@@ -344,7 +350,7 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value && !cardHasChips.va
       <p v-if="event.is_demo" class="banner banner-demo" role="note">
         <span class="demo-dot" aria-hidden="true"></span>
         <span class="demo-text">Evento de demostración: puedes recorrer el flujo completo, no se cobra nada.</span>
-        <a href="/organizadores/registro?utm_source=aitickets&utm_medium=demo_event&utm_campaign=banner" class="ev-link">Crea tu evento gratis →</a>
+        <a :href="demoSignupUrl" class="ev-link">Crea tu evento gratis →</a>
       </p>
       <div
         v-if="event.is_preview"

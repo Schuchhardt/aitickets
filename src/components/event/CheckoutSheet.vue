@@ -19,7 +19,11 @@ import {
   FEE_INCLUDED_NOTE,
 } from "../Reservation/pricing.js";
 import { eventBus } from "../../utils/eventbus.js";
+import { signupUrl } from "../landing/links.js";
 import { fireConfetti } from "./confetti.js";
+
+// Evento demo: registro con el origen en el fragmento, no en la query (withFragmentParams en landing/links.js)
+const demoSignupUrl = signupUrl({ medium: "demo_event", campaign: "checkout" });
 
 const props = defineProps({
   event: { type: Object, required: true },
@@ -441,7 +445,7 @@ onBeforeUnmount(() => {
                 <li><strong>Para el productor:</strong> ve la venta al instante en su panel, con el canal que la trajo.</li>
               </ol>
               <p class="demo-note">Esto es una demostración: no se creó ninguna orden ni se realizó ningún cobro.</p>
-              <a href="/organizadores/registro?utm_source=aitickets&utm_medium=demo_event&utm_campaign=checkout" class="ev-btn ev-btn-primary w-full">Quiero vender entradas así</a>
+              <a :href="demoSignupUrl" class="ev-btn ev-btn-primary w-full">Quiero vender entradas así</a>
               <button type="button" class="ev-link demo-back" @click="demoResult = null">Volver</button>
             </div>
             <div v-else class="steps-stage">

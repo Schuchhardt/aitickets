@@ -2,7 +2,8 @@
 // 9 · IA, opcional (SPEC_landing_standup §4.9): card con borde, link a conectar la IA (registro → /dashboard/ia, como
 // AiSection de /organizadores) y tres burbujas de ejemplo. Las acciones nombradas existen en la API de productores
 // (src/lib/producer-api/tools); publicar, cobrar o enviar mensajes siempre piden confirmación.
-const signupUrl = "/organizadores/registro?next=%2Fdashboard%2Fia&utm_source=aitickets&utm_medium=landing&utm_campaign=standup_ia";
+import { connectAiUrl } from "../links.js";
+const signupUrl = connectAiUrl("standup_ia");
 ---
 
 <section class="su-wrap ai" aria-labelledby="su-ai-title" data-su-section="ai">

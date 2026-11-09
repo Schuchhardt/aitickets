@@ -31,7 +31,7 @@ test("carga con su H1, el CTA del hero y sin errores en la consola", async ({ pa
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Tú haz el show.");
   const publish = page.locator('[data-cta="publish"][data-section="hero"]');
   await expect(publish).toBeVisible();
-  await expect(publish).toHaveAttribute("href", /^\/organizadores\/registro\?next=/);
+  await expect(publish).toHaveAttribute("href", /^\/organizadores\/registro#next=/);
   await page.waitForLoadState("networkidle");
   // GA4 queda bloqueado en open(): su request abortado y lo que falla en el worker de Partytown al no poder cargarlo
   // no son errores de la página

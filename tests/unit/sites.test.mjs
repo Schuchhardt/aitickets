@@ -183,8 +183,8 @@ describe('URLs del sitio', () => {
     expect(siteBasePath(base, null)).toBe('/o/teatro-del-puente')
   })
 
-  it('purchaseUrlFor lleva al checkout en aitickets.cl con ?comprar=1', () => {
-    expect(purchaseUrlFor(base, 'obra uno')).toBe('https://aitickets.cl/o/teatro-del-puente/eventos/obra%20uno?comprar=1')
+  it('purchaseUrlFor lleva al checkout en aitickets.cl con #comprar (fragmento: no crea otra URL para Google)', () => {
+    expect(purchaseUrlFor(base, 'obra uno')).toBe('https://aitickets.cl/o/teatro-del-puente/eventos/obra%20uno#comprar')
   })
 })
 

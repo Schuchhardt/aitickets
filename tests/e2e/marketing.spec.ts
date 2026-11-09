@@ -39,10 +39,34 @@ for (const { path, h1, competitorPayout } of PAGES) {
   });
 }
 
+// Search Console: "Bloqueada por robots.txt" (enlaces a rutas con Disallow) y "Página alternativa con etiqueta
+// canónica adecuada" (enlaces internos con ?utm_*/next en la query, otra URL por cada botón). Los enlaces internos
+// llevan esos parámetros en el fragmento (#, src/components/landing/links.js) y nunca apuntan a rutas bloqueadas.
+const ROBOTS_DISALLOWED = ["/dashboard/", "/api/", "/order/", "/ticket/", "/qr/", "/pago/", "/payment-confirmation", "/o/_host/"];
+for (const path of [...PAGES.map((p) => p.path), "/organizadores/registro", "/precios", "/web-gratis", "/eventos"]) {
+  test(`${path}: enlaces internos sin parámetros de seguimiento en la query ni rutas bloqueadas por robots.txt`, async ({ page, baseURL }) => {
+    await page.goto(path);
+    const origin = new URL(baseURL!).origin;
+    const hrefs = await page.locator("a[href]").evaluateAll((els) => els.map((a) => (a as HTMLAnchorElement).href));
+    const internal = hrefs.map((h) => new URL(h)).filter((u) => u.origin === origin);
+    expect(internal.filter((u) => /(^|&)(utm_[a-z]+|next)=/.test(u.search.slice(1))).map((u) => u.href)).toEqual([]);
+    expect(internal.filter((u) => ROBOTS_DISALLOWED.some((p) => u.pathname.startsWith(p))).map((u) => u.href)).toEqual([]);
+  });
+}
+
+test("robots.txt bloquea solo rutas privadas y declara el sitemap", async ({ request }) => {
+  const res = await request.get("/robots.txt");
+  expect(res.status()).toBe(200);
+  const body = await res.text();
+  const disallowed = [...body.matchAll(/^Disallow:\s*(\S+)/gm)].map((m) => m[1]);
+  expect(disallowed.sort()).toEqual([...ROBOTS_DISALLOWED].sort());
+  expect(body).toMatch(/^Sitemap: https:\/\/aitickets\.cl\/sitemap\.xml$/m);
+});
+
 test("los CTA de la portada llevan a crear cuenta y quedan marcados para GA4", async ({ page }) => {
   await page.goto("/");
   const publish = page.locator('[data-cta="publish"][data-section="hero"]');
-  await expect(publish).toHaveAttribute("href", /^\/organizadores\/registro\?next=/);
+  await expect(publish).toHaveAttribute("href", /^\/organizadores\/registro#next=/);
   await expect(page.locator('[data-cta="whatsapp"]').first()).toHaveAttribute("href", /wa\.me/);
 });
 

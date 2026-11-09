@@ -16,7 +16,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { getSupabaseAdmin } from "./auth-helpers";
 import { DEMO_EVENT_SLUGS, getDemoFunctionDate } from "./demoEvent.mjs";
 import { getZonedParts, zonedDateTimeToDate } from "../utils/dateHelpers.js";
-import { SITE_TEMPLATES, isSafeHttpUrl, resolveThemeFor, type SiteTemplate } from "./siteTemplates";
+import { SITE_TEMPLATES, isSafeHttpUrl, normalizeWebsiteUrl, resolveThemeFor, type SiteTemplate } from "./siteTemplates";
 
 export {
   SITE_FONTS,
@@ -569,10 +569,11 @@ export function siteBasePath(site: Pick<SiteRecord, "slug">, effectiveHost?: str
 
 /**
  * URL de compra en aitickets.cl (el checkout, Turnstile y las cookies viven ahí). Abre el modal de
- * compra automáticamente con ?comprar=1.
+ * compra automáticamente con #comprar (en el fragmento: con ?comprar=1 Google rastreaba otra URL más del evento,
+ * una "Página alternativa con etiqueta canónica"). EventDetail.vue sigue aceptando ?comprar=1 de enlaces antiguos.
  */
 export function purchaseUrlFor(site: Pick<SiteRecord, "slug">, eventSlug: string): string {
-  return `${mainOrigin()}/o/${site.slug}/eventos/${encodeURIComponent(eventSlug)}?comprar=1`;
+  return `${mainOrigin()}/o/${site.slug}/eventos/${encodeURIComponent(eventSlug)}#comprar`;
 }
 
 // ---------------------------------------------------------------------------
@@ -604,7 +605,7 @@ function cleanSocials(site: SiteRecord): SiteSocials {
     tiktok: pick(fromContent.tiktok) || handleUrl("https://www.tiktok.com/@", org?.tiktok),
     x: pick(fromContent.x),
     youtube: pick(fromContent.youtube),
-    website: pick(fromContent.website, org?.website),
+    website: pick(fromContent.website) || normalizeWebsiteUrl(org?.website) || undefined,
   };
   const wa = String(fromContent.whatsapp || "").replace(/[^\d]/g, "");
   if (wa.length >= 8 && wa.length <= 15) socials.whatsapp = `https://wa.me/${wa}`;

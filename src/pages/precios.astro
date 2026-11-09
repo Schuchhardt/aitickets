@@ -8,12 +8,15 @@ import AppFooter from "../components/AppFooter.vue";
 import FeeCalculator from "../components/pricing/FeeCalculator.vue";
 import Layout from "../layouts/Layout.astro";
 import { LEGAL } from "../lib/legal";
+import { signupUrl } from "../components/landing/links.js";
 import { PAYOUT_SCHEDULE_TEXT } from "../../netlify/lib/legal.mjs";
 import { TERMS_NOTE, type FaqItem } from "../data/producerFaq";
 import { IVA_PERCENT_LABEL, SERVICE_FEE_PERCENT_LABEL, computeBuyerTotal } from "../components/Reservation/pricing.js";
 import "../styles/global.css";
 
 const SITE_URL = (import.meta.env.SITE_URL || "https://aitickets.cl").replace(/\/$/, "");
+// Origen del registro en el fragmento (no en la query): ver withFragmentParams en src/components/landing/links.js
+const signupHref = signupUrl({ source: "precios", medium: "" });
 const feePercent = `${SERVICE_FEE_PERCENT_LABEL} + IVA`;
 const feeText = `cargo por servicio de ${SERVICE_FEE_PERCENT_LABEL} más IVA (${IVA_PERCENT_LABEL} sobre el cargo)`;
 const fmt = (n: number) => `$${n.toLocaleString("es-CL")}`;
@@ -128,7 +131,7 @@ const jsonLd = [
               </li>
             ))}
           </ul>
-          <a href="/organizadores/registro?utm_source=precios" class="mt-8 inline-block rounded-xl bg-gray-900 px-6 py-3 font-semibold text-white hover:bg-gray-800">
+          <a href={signupHref} class="mt-8 inline-block rounded-xl bg-gray-900 px-6 py-3 font-semibold text-white hover:bg-gray-800">
             Crea tu cuenta y tu web gratis
           </a>
         </div>
@@ -214,7 +217,7 @@ const jsonLd = [
           Al crear tu cuenta te damos una web para tu productora con tu cartelera y venta de entradas integrada.
         </p>
         <div class="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <a href="/organizadores/registro?utm_source=precios" class="rounded-xl bg-lime-400 px-6 py-3 font-semibold text-gray-900 hover:bg-lime-300">Crear cuenta gratis</a>
+          <a href={signupHref} class="rounded-xl bg-lime-400 px-6 py-3 font-semibold text-gray-900 hover:bg-lime-300">Crear cuenta gratis</a>
           <a href="/web-gratis" class="rounded-xl border border-white/30 px-6 py-3 font-semibold text-white hover:bg-white/10">Ver la web gratis</a>
         </div>
       </div>

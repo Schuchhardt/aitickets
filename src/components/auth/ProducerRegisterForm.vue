@@ -18,6 +18,15 @@ const props = defineProps({
 const SIGNUP_ATTRIBUTION_KEY = 'aitickets_signup_attribution'
 const attribution = ref({})
 
+// Parámetros del enlace: los de la query (?…) y los del fragmento (#…). Los enlaces internos (landings, eventos)
+// mandan next y utm_* en el fragmento (signupUrl en src/components/landing/links.js): Google ignora el fragmento, así
+// que no crea una URL distinta por cada botón. Los enlaces externos (correos, anuncios) siguen usando la query, que gana.
+const linkParams = () => {
+  const merged = new URLSearchParams((window.location.hash || '').replace(/^#/, ''))
+  for (const [key, value] of new URLSearchParams(window.location.search)) merged.set(key, value)
+  return merged
+}
+
 const loadAttribution = () => {
   let stored = {}
   try {
@@ -25,12 +34,20 @@ const loadAttribution = () => {
   } catch (e) {
     stored = {}
   }
-  const params = new URLSearchParams(window.location.search)
-  const fromUrl = {}
-  for (const key of ['utm_source', 'utm_medium', 'utm_campaign', 'ref']) {
-    const value = params.get(key)
-    if (value) fromUrl[key] = value.slice(0, 200)
+  // La atribución viene completa de una sola fuente (la query si trae alguna clave; si no, el fragmento): nunca
+  // mezcla utm_source de un enlace con utm_campaign de otro
+  const pickAttribution = (params) => {
+    const out = {}
+    for (const key of ['utm_source', 'utm_medium', 'utm_campaign', 'ref']) {
+      const value = params.get(key)
+      if (value) out[key] = value.slice(0, 200)
+    }
+    return out
   }
+  const fromQuery = pickAttribution(new URLSearchParams(window.location.search))
+  const fromUrl = Object.keys(fromQuery).length
+    ? fromQuery
+    : pickAttribution(new URLSearchParams((window.location.hash || '').replace(/^#/, '')))
   let referrer = stored.referrer || ''
   try {
     if (!referrer && document.referrer && new URL(document.referrer).host !== window.location.host) {
@@ -86,6 +103,7 @@ const googleHref = computed(() => {
   const qs = p.toString()
   return `/api/auth/google${qs ? `?${qs}` : ''}`
 })
+const goToGoogle = () => { window.location.href = googleHref.value }
 const loginHref = computed(() => (next.value ? `/organizadores/login?next=${encodeURIComponent(next.value)}` : '/organizadores/login'))
 
 const loadLeadPrefill = async () => {
@@ -112,7 +130,7 @@ onMounted(() => {
   loadAttribution()
   loadLeadPrefill()
   try {
-    const params = new URLSearchParams(window.location.search)
+    const params = linkParams()
     next.value = safeNext(params.get('next'))
     const err = params.get('error')
     if (err && GOOGLE_ERRORS[err]) errorMsg.value = GOOGLE_ERRORS[err]
@@ -284,14 +302,17 @@ const inputClass = (field) => [
       </p>
 
       <template v-if="googleEnabled">
-        <a
-          :href="googleHref"
+        <!-- Botón (no <a href>): /api/ está bloqueado en robots.txt y un enlace hacía que Google lo reportara como
+             "Bloqueada por robots.txt" desde cada página que enlaza al registro. -->
+        <button
+          type="button"
           data-testid="register-google"
           class="w-full flex items-center justify-center gap-3 bg-white text-gray-900 rounded-lg py-3 px-4 hover:bg-white/90 transition font-medium"
+          @click="goToGoogle"
         >
           <svg viewBox="0 0 24 24" class="w-5 h-5" aria-hidden="true"><path fill="#4285F4" d="M23.52 12.27c0-.85-.08-1.67-.22-2.45H12v4.64h6.46a5.52 5.52 0 0 1-2.4 3.62v3h3.88c2.27-2.09 3.58-5.17 3.58-8.81z"/><path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.94-2.91l-3.88-3c-1.08.72-2.45 1.15-4.06 1.15-3.12 0-5.77-2.11-6.71-4.95H1.28v3.1A12 12 0 0 0 12 24z"/><path fill="#FBBC05" d="M5.29 14.29A7.2 7.2 0 0 1 4.91 12c0-.79.14-1.56.38-2.29v-3.1H1.28a12 12 0 0 0 0 10.78l4.01-3.1z"/><path fill="#EA4335" d="M12 4.75c1.76 0 3.34.61 4.59 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0A12 12 0 0 0 1.28 6.61l4.01 3.1C6.23 6.86 8.88 4.75 12 4.75z"/></svg>
           Continuar con Google
-        </a>
+        </button>
         <p class="text-[11px] text-white/50 text-center mt-2">
           Al continuar con Google aceptas los <a href="/terminos-productores" target="_blank" rel="noopener" class="underline">Términos para productores</a> y la <a href="/privacy" target="_blank" rel="noopener" class="underline">Política de Privacidad</a>.
         </p>
