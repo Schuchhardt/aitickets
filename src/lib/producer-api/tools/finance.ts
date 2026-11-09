@@ -12,7 +12,7 @@ import { computeDiscountAmount } from "../../../../netlify/lib/discounts.mjs";
 import { notifySlack } from "../../../pages/api/_lib/server-utils";
 import { isTransferOrder } from "../../orderKinds";
 import { functionSettlement, SettlementError } from "../../functionSettlement";
-import { identityApproved, loadOrgIdentity, recomputeHolderMatch } from "../../producerIdentity";
+import { identityApproved, loadOrgIdentity, recomputeHolderMatch, orgExceedsFreeSoldTickets, IDENTITY_REQUIRED_FOR_PAYOUT_MESSAGE } from "../../producerIdentity";
 
 export const BANK_CHANGE_HOLD_HOURS = 72;
 const PAYOUT_BUSINESS_DAYS = LEGAL_PAYOUT_BUSINESS_DAYS;
@@ -141,7 +141,7 @@ const createPayoutAccountLink: ToolDef = {
 const getVerificationStatus: ToolDef = {
     name: "get_verification_status",
     title: "Estado de verificación para retiros",
-    description: "Indica qué falta para poder retirar dinero: correo verificado, términos aceptados, identidad verificada (Didit), datos bancarios completos y a nombre de la identidad verificada, verificación de AI Tickets y espera tras cambios.",
+    description: "Indica qué falta para poder retirar dinero: correo verificado, términos aceptados, datos bancarios completos, verificación de AI Tickets y espera tras cambios. La identidad (Didit) se exige solo a partir de 10 entradas vendidas.",
     scope: "finance",
     permission: "finance.read",
     annotations: { readOnlyHint: true },
@@ -153,6 +153,8 @@ const getVerificationStatus: ToolDef = {
         const acc = await loadPayoutAccount(ctx);
         const state = payoutAccountState(acc);
         const holder = await holderMatchStatus(ctx, acc, identity);
+        const exceedsThreshold = await orgExceedsFreeSoldTickets(ctx.supabase, ctx.actor.orgId);
+        const identityRequired = exceedsThreshold;
         const checks = [
             { item: "email_verified", label: "Correo de la organización verificado", ok: Boolean(org?.email_verified_at), required: true },
             { item: "terms_accepted", label: "Términos para productores aceptados", ok: Boolean(org?.terms_accepted_at), required: false },
@@ -170,16 +172,18 @@ const getVerificationStatus: ToolDef = {
                 : { item: "bank_verified", label: "Cuenta verificada por AI Tickets", ok: state.status === "verified", required: true },
             {
                 item: "identity_verified",
-                label: "Identidad del productor (o del representante legal) verificada con Didit",
+                label: identityRequired
+                    ? "Identidad del productor verificada con Didit (requerida: llevas más de 10 entradas vendidas)"
+                    : "Identidad del productor verificada con Didit (se exigirá a partir de 10 entradas vendidas)",
                 ok: identityApproved(identity),
-                required: true,
+                required: identityRequired,
                 status: identity?.identity_status ?? "not_started",
             },
             {
                 item: "holder_matches_identity",
                 label: "Cuenta bancaria a nombre de la persona o empresa verificada (no se transfiere a terceros)",
                 ok: holder === "match",
-                required: true,
+                required: identityRequired,
                 status: holder,
             },
             {
@@ -614,20 +618,22 @@ async function planPayout(args: any, ctx: ToolContext) {
     const acc = await loadPayoutAccount(ctx);
     const state = payoutAccountState(acc);
     const identity = await loadOrgIdentity(ctx.supabase, ctx.actor.orgId);
-    if (!identityApproved(identity)) {
-        throw new ToolError("conflict", `Para recibir transferencias debes verificar tu identidad (Didit) en ${ctx.origin}/dashboard/settings#identidad. Revisa get_verification_status.`);
+    if (!identityApproved(identity) && (await orgExceedsFreeSoldTickets(ctx.supabase, ctx.actor.orgId))) {
+        throw new ToolError("conflict", `${IDENTITY_REQUIRED_FOR_PAYOUT_MESSAGE} Hazlo en ${ctx.origin}/dashboard/settings#identidad. Revisa get_verification_status.`);
     }
     if (!state.complete) throw new ToolError("conflict", `No hay una cuenta bancaria registrada. Regístrala en ${settingsUrl(ctx)} (create_payout_account_link).`);
     if (state.status === "rejected") {
         throw new ToolError("conflict", `AI Tickets rechazó la cuenta bancaria: ${acc.verification_notes || "revisa los datos"}. Corrígela en ${settingsUrl(ctx)} y vuelve a guardarla.`);
     }
     if (state.status !== "verified") throw new ToolError("conflict", "La cuenta bancaria aún no está verificada por AI Tickets. Revisa get_verification_status.");
-    const holder = await holderMatchStatus(ctx, acc, identity);
-    if (holder !== "match") {
-        throw new ToolError(
-            "conflict",
-            "La cuenta bancaria debe estar a nombre de la persona o empresa verificada: no transferimos a cuentas de terceros. AI Tickets la revisará; si la cuenta es correcta, escríbenos a soporte.",
-        );
+    if (identityApproved(identity)) {
+        const holder = await holderMatchStatus(ctx, acc, identity);
+        if (holder !== "match") {
+            throw new ToolError(
+                "conflict",
+                "La cuenta bancaria debe estar a nombre de la persona o empresa verificada: no transferimos a cuentas de terceros. AI Tickets la revisará; si la cuenta es correcta, escríbenos a soporte.",
+            );
+        }
     }
     if (state.coolingActive) {
         throw new ToolError("conflict", `La cuenta bancaria cambió hace poco: por seguridad los retiros quedan habilitados desde ${state.holdUntil!.toISOString()}.`);

@@ -6,22 +6,14 @@ import { loadEntryDeadlines } from "../../../../netlify/lib/checkin.mjs";
 import { normalizeEntryUntil } from "../../entryDeadline.mjs";
 import { normalizeTicket } from "../../../pages/api/_lib/events";
 import { isTransferOrder } from "../../orderKinds";
-import { IDENTITY_REQUIRED_MESSAGE, identityApproved, loadCapacityTickets, loadOrgIdentity, ticketsRequireIdentity } from "../../producerIdentity";
 import { formatRut, MAX_PEOPLE_PER_TICKET } from "../../checkoutFields.mjs";
 
 /**
- * Evento publicado que con este cambio pasa a vender más de 10 cupos pagados: exige identidad verificada (igual que al publicar).
- * Los eventos que ya superaban el umbral antes de esta regla se pueden seguir editando.
+ * @deprecated La edición de entradas ya no exige identidad verificada.
+ * La verificación se exige al solicitar un retiro cuando la org supera el umbral de entradas vendidas.
  */
-async function assertCanSellPaid(ctx: any, event: any, change: { id?: number; price?: number; total_quantity?: number | null }) {
-    if (event.status !== "published") return;
-    const current = await loadCapacityTickets(ctx.supabase, Number(event.id));
-    if (ticketsRequireIdentity(current)) return;
-    const next = change.id
-        ? current.map((t) => (Number(t.id) === Number(change.id) ? { ...t, ...change } : t))
-        : [...current, { ...change, is_gift: false }];
-    if (!ticketsRequireIdentity(next)) return;
-    if (!identityApproved(await loadOrgIdentity(ctx.supabase, ctx.actor.orgId))) throw new ToolError("conflict", IDENTITY_REQUIRED_MESSAGE);
+async function assertCanSellPaid(_ctx: any, _event: any, _change: { id?: number; price?: number; total_quantity?: number | null }) {
+    // No-op: la publicación y edición de entradas ya no requieren identidad verificada.
 }
 
 const ticketIdSchema = { type: "integer" as const, minimum: 1, description: "ID del tipo de entrada (ver get_event → ticket_types)." };
