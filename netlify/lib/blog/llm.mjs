@@ -2,7 +2,7 @@
 //
 // - Streaming + finalMessage(): los artículos son largos y así no hay timeout HTTP.
 // - Fallback del servidor ("default") en los modelos que lo aceptan: si el modelo declina, otro termina la respuesta.
-// - Búsqueda web (web_search_20260209) con ubicación Santiago de Chile y passline.com bloqueado (regla dura del
+// - Búsqueda web (web_search_20250305: la 20260209 usa code execution, que la org HIPAA no permite) con ubicación Santiago de Chile y passline.com bloqueado (regla dura del
 //   repo: nunca se visita; ver netlify/lib/outreach/domains.mjs).
 // - Medidor de costo: tokens y búsquedas de cada corrida, en USD estimados (queda en aitickets_blog_runs.details).
 import Anthropic from '@anthropic-ai/sdk'
@@ -118,7 +118,7 @@ export function isCitableSource(url) {
 export async function research({ system, user, model, maxSearches = 6, effort = 'low', meter }) {
   const tools = [
     {
-      type: 'web_search_20260209',
+      type: 'web_search_20250305',
       name: 'web_search',
       max_uses: maxSearches,
       blocked_domains: NEVER_FETCH_HOSTS,

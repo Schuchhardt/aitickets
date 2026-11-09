@@ -312,7 +312,7 @@ describe('Claude: investigación y JSON', () => {
     const out = await research({ system: 's', user: 'u', model: 'claude-opus-5-5', meter })
     expect(out.sources.map((s) => s.url)).toEqual(['https://www.bcn.cl/ley', 'https://www.sii.cl/a'])
     expect(client.params).toHaveLength(2)
-    expect(client.params[0].tools[0]).toMatchObject({ type: 'web_search_20260209', blocked_domains: ['passline.com'], user_location: { country: 'CL' } })
+    expect(client.params[0].tools[0]).toMatchObject({ type: 'web_search_20250305', blocked_domains: ['passline.com'], user_location: { country: 'CL' } })
     expect(client.params[0]).toMatchObject({ fallbacks: 'default', betas: ['server-side-fallback-2026-07-01'] })
     expect(client.params[1].messages.at(-1).role).toBe('assistant')
     expect(meter).toMatchObject({ calls: 2, web_searches: 3, input_tokens: 3000, output_tokens: 600 })
