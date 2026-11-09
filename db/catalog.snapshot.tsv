@@ -504,6 +504,15 @@ column:aitickets_payment_events.payload	jsonb notnull=false default=-
 column:aitickets_payment_events.provider	text notnull=true default=-
 column:aitickets_payment_events.received_at	timestamp with time zone notnull=true default=now()
 column:aitickets_payment_events.type	text notnull=true default=-
+column:aitickets_payout_receipts.content_type	text notnull=true default=-
+column:aitickets_payout_receipts.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_payout_receipts.file_hash	text notnull=true default=-
+column:aitickets_payout_receipts.file_size	integer notnull=true default=-
+column:aitickets_payout_receipts.id	uuid notnull=true default=gen_random_uuid()
+column:aitickets_payout_receipts.organization_id	integer notnull=true default=-
+column:aitickets_payout_receipts.payout_id	uuid notnull=true default=-
+column:aitickets_payout_receipts.storage_path	text notnull=true default=-
+column:aitickets_payout_receipts.uploaded_by	text notnull=true default=-
 column:aitickets_payouts.amount	bigint notnull=true default=-
 column:aitickets_payouts.bank_account_last4	text notnull=false default=-
 column:aitickets_payouts.bank_account_type	text notnull=false default=-
@@ -519,6 +528,8 @@ column:aitickets_payouts.paid_at	timestamp with time zone notnull=false default=
 column:aitickets_payouts.processed_by	text notnull=false default=-
 column:aitickets_payouts.reference	text notnull=false default=-
 column:aitickets_payouts.requested_by	bigint notnull=false default=-
+column:aitickets_payouts.requested_by_actor	text notnull=false default=-
+column:aitickets_payouts.requested_by_user_id	integer notnull=false default=-
 column:aitickets_payouts.requested_via	text notnull=true default='mcp'::text
 column:aitickets_payouts.status	text notnull=true default='requested'::text
 column:aitickets_payouts.updated_at	timestamp with time zone notnull=true default=now()
@@ -775,6 +786,8 @@ column:event_dates.held_attested_at	timestamp with time zone notnull=false defau
 column:event_dates.held_attested_by	bigint notnull=false default=-
 column:event_dates.held_attested_note	text notnull=false default=-
 column:event_dates.id	bigint notnull=true default=- identity=d
+column:event_dates.released_early_at	timestamp with time zone notnull=false default=-
+column:event_dates.released_early_by	text notnull=false default=-
 column:event_dates.start_time	time without time zone notnull=true default=-
 column:event_faqs.answer	text notnull=true default=-
 column:event_faqs.created_at	timestamp with time zone notnull=true default=now()
@@ -917,6 +930,8 @@ column:events.organization_id	bigint notnull=false default=-
 column:events.page_settings	jsonb notnull=false default=-
 column:events.panel_modules	jsonb notnull=false default=-
 column:events.permit_status	text notnull=true default='none'::text
+column:events.released_early_at	timestamp with time zone notnull=false default=-
+column:events.released_early_by	text notnull=false default=-
 column:events.requires_documents	boolean notnull=true default=false
 column:events.reserve_pct	integer notnull=true default=0
 column:events.review_settings	jsonb notnull=false default=-
@@ -988,6 +1003,8 @@ column:organizations.linkedin	text notnull=false default=-
 column:organizations.onboarding_pending	boolean notnull=true default=false
 column:organizations.phone	text notnull=false default=-
 column:organizations.public_name	text notnull=true default=-
+column:organizations.release_delay_hours	smallint notnull=false default=-
+column:organizations.release_on_flow_settlement	boolean notnull=true default=false
 column:organizations.signup_ref	text notnull=false default=-
 column:organizations.signup_referrer	text notnull=false default=-
 column:organizations.signup_utm_campaign	text notnull=false default=-
@@ -1312,6 +1329,8 @@ constraint:aitickets_outreach_messages.aitickets_outreach_messages_pkey	PRIMARY 
 constraint:aitickets_outreach_messages.aitickets_outreach_messages_status_check	CHECK ((status = ANY (ARRAY['draft'::text, 'sending'::text, 'scheduled'::text, 'sent'::text, 'failed'::text, 'received'::text, 'approved'::text, 'rejected'::text])))
 constraint:aitickets_outreach_state.aitickets_outreach_state_pkey	PRIMARY KEY (key)
 constraint:aitickets_payment_events.aitickets_payment_events_pkey	PRIMARY KEY (id)
+constraint:aitickets_payout_receipts.aitickets_payout_receipts_payout_id_fkey	FOREIGN KEY (payout_id) REFERENCES aitickets_payouts(id)
+constraint:aitickets_payout_receipts.aitickets_payout_receipts_pkey	PRIMARY KEY (id)
 constraint:aitickets_payouts.aitickets_payouts_amount_check	CHECK ((amount > 0))
 constraint:aitickets_payouts.aitickets_payouts_cancelled_by_fkey	FOREIGN KEY (cancelled_by) REFERENCES users(id) ON DELETE SET NULL
 constraint:aitickets_payouts.aitickets_payouts_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
@@ -1606,6 +1625,7 @@ grant:aitickets_outreach_events	-
 grant:aitickets_outreach_messages	-
 grant:aitickets_outreach_state	-
 grant:aitickets_payment_events	-
+grant:aitickets_payout_receipts	-
 grant:aitickets_payouts	-
 grant:aitickets_platform_settings	-
 grant:aitickets_producer_activity	-
@@ -1710,6 +1730,7 @@ index:aitickets_outreach_messages.aitickets_outreach_messages_lead_idx	CREATE IN
 index:aitickets_outreach_messages.aitickets_outreach_messages_provider_idx	CREATE INDEX aitickets_outreach_messages_provider_idx ON aitickets_outreach_messages USING btree (provider_message_id) WHERE (provider_message_id IS NOT NULL)
 index:aitickets_outreach_messages.aitickets_outreach_messages_status_idx	CREATE INDEX aitickets_outreach_messages_status_idx ON aitickets_outreach_messages USING btree (direction, status, sent_at)
 index:aitickets_payment_events.idx_aitickets_payment_events_order	CREATE INDEX idx_aitickets_payment_events_order ON aitickets_payment_events USING btree (order_id)
+index:aitickets_payout_receipts.idx_payout_receipts_payout	CREATE UNIQUE INDEX idx_payout_receipts_payout ON aitickets_payout_receipts USING btree (payout_id)
 index:aitickets_payouts.aitickets_payouts_org_idx	CREATE INDEX aitickets_payouts_org_idx ON aitickets_payouts USING btree (organization_id, created_at DESC)
 index:aitickets_payouts.aitickets_payouts_status_created_idx	CREATE INDEX aitickets_payouts_status_created_idx ON aitickets_payouts USING btree (status, created_at)
 index:aitickets_producer_activity.aitickets_producer_activity_occurred_idx	CREATE INDEX aitickets_producer_activity_occurred_idx ON aitickets_producer_activity USING btree (occurred_at DESC)
@@ -1820,6 +1841,7 @@ table:aitickets_outreach_events	rls=true force=false
 table:aitickets_outreach_messages	rls=true force=false
 table:aitickets_outreach_state	rls=true force=false
 table:aitickets_payment_events	rls=true force=false
+table:aitickets_payout_receipts	rls=true force=false
 table:aitickets_payouts	rls=true force=false
 table:aitickets_platform_settings	rls=true force=false
 table:aitickets_producer_activity	rls=true force=false
