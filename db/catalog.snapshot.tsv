@@ -237,6 +237,22 @@ column:aitickets_blog_topics.seed_keywords	text[] notnull=true default='{}'::tex
 column:aitickets_blog_topics.slug	text notnull=true default=-
 column:aitickets_blog_topics.updated_at	timestamp with time zone notnull=true default=now()
 column:aitickets_blog_topics.weight	integer notnull=true default=5
+column:aitickets_blog_visits.bot_reason	text notnull=false default=-
+column:aitickets_blog_visits.city	text notnull=false default=-
+column:aitickets_blog_visits.country	text notnull=false default=-
+column:aitickets_blog_visits.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_blog_visits.cta_path	text notnull=false default=-
+column:aitickets_blog_visits.id	bigint notnull=true default=- identity=a
+column:aitickets_blog_visits.ip_hash	text notnull=true default=-
+column:aitickets_blog_visits.is_bot	boolean notnull=true default=false
+column:aitickets_blog_visits.kind	text notnull=true default='view'::text
+column:aitickets_blog_visits.post_id	bigint notnull=true default=-
+column:aitickets_blog_visits.referrer	text notnull=false default=-
+column:aitickets_blog_visits.source	text notnull=true default='direct'::text
+column:aitickets_blog_visits.user_agent	text notnull=false default=-
+column:aitickets_blog_visits.utm_campaign	text notnull=false default=-
+column:aitickets_blog_visits.utm_medium	text notnull=false default=-
+column:aitickets_blog_visits.utm_source	text notnull=false default=-
 column:aitickets_certificate_sends.created_at	timestamp with time zone notnull=true default=now()
 column:aitickets_certificate_sends.created_by	bigint notnull=false default=-
 column:aitickets_certificate_sends.event_id	bigint notnull=true default=-
@@ -1237,6 +1253,16 @@ constraint:aitickets_blog_topics.aitickets_blog_topics_pkey	PRIMARY KEY (id)
 constraint:aitickets_blog_topics.aitickets_blog_topics_slug_check	CHECK (((slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::text) AND (char_length(slug) <= 60)))
 constraint:aitickets_blog_topics.aitickets_blog_topics_slug_key	UNIQUE (slug)
 constraint:aitickets_blog_topics.aitickets_blog_topics_weight_check	CHECK (((weight >= 0) AND (weight <= 100)))
+constraint:aitickets_blog_visits.aitickets_blog_visits_cta_path_check	CHECK (((cta_path IS NULL) OR (char_length(cta_path) <= 200)))
+constraint:aitickets_blog_visits.aitickets_blog_visits_kind_check	CHECK ((kind = ANY (ARRAY['view'::text, 'cta'::text])))
+constraint:aitickets_blog_visits.aitickets_blog_visits_pkey	PRIMARY KEY (id)
+constraint:aitickets_blog_visits.aitickets_blog_visits_post_id_fkey	FOREIGN KEY (post_id) REFERENCES aitickets_blog_posts(id) ON DELETE CASCADE
+constraint:aitickets_blog_visits.aitickets_blog_visits_referrer_check	CHECK (((referrer IS NULL) OR (char_length(referrer) <= 1024)))
+constraint:aitickets_blog_visits.aitickets_blog_visits_source_check	CHECK ((source = ANY (ARRAY['search'::text, 'ai'::text, 'social'::text, 'campaign'::text, 'internal'::text, 'referral'::text, 'direct'::text])))
+constraint:aitickets_blog_visits.aitickets_blog_visits_user_agent_check	CHECK (((user_agent IS NULL) OR (char_length(user_agent) <= 512)))
+constraint:aitickets_blog_visits.aitickets_blog_visits_utm_campaign_check	CHECK (((utm_campaign IS NULL) OR (char_length(utm_campaign) <= 256)))
+constraint:aitickets_blog_visits.aitickets_blog_visits_utm_medium_check	CHECK (((utm_medium IS NULL) OR (char_length(utm_medium) <= 256)))
+constraint:aitickets_blog_visits.aitickets_blog_visits_utm_source_check	CHECK (((utm_source IS NULL) OR (char_length(utm_source) <= 256)))
 constraint:aitickets_certificate_sends.aitickets_certificate_sends_created_by_fkey	FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 constraint:aitickets_certificate_sends.aitickets_certificate_sends_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
 constraint:aitickets_certificate_sends.aitickets_certificate_sends_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
@@ -1610,6 +1636,8 @@ constraint:venues.venues_organization_id_fkey	FOREIGN KEY (organization_id) REFE
 constraint:venues.venues_pkey	PRIMARY KEY (id)
 function:aitickets_admin_visit_counts(p_from timestamp with time zone, p_to timestamp with time zone, p_event_ids bigint[], p_group text)	md5=7eb78367d3784ae5a3314c44a25e4329 lang=sql secdef=true returns=TABLE(bucket text, visits bigint, unique_visitors bigint) config=search_path=public
 function:aitickets_attendees_normalize_names()	md5=c9c7375c9a0291c787dac42269c69896 lang=plpgsql secdef=false returns=trigger config=search_path=public
+function:aitickets_blog_daily(p_from timestamp with time zone, p_to timestamp with time zone, p_post_id bigint)	md5=6571c1d6ff0535d1e6215217501306a9 lang=sql secdef=true returns=TABLE(day text, views bigint, visitors bigint, cta_clicks bigint) config=search_path=public
+function:aitickets_blog_post_stats(p_from timestamp with time zone, p_to timestamp with time zone)	md5=3c2a6512d4dc162f62629f07d15dee31 lang=sql secdef=true returns=TABLE(post_id bigint, views bigint, visitors bigint, cta_clicks bigint, cta_visitors bigint, search_visitors bigint, ai_visitors bigint, social_visitors bigint, campaign_visitors bigint, internal_visitors bigint, referral_visitors bigint, direct_visitors bigint, signups bigint) config=search_path=public
 function:aitickets_claim_outreach_batch(p_limit integer)	md5=2b5a5b7c8faae97e1038896cc4fd5a97 lang=plpgsql secdef=true returns=SETOF aitickets_leads config=search_path=public
 function:aitickets_discount_code_stats(p_code_ids uuid[])	md5=4635931b79c257a658cdcf3d11cf1edb lang=sql secdef=true returns=TABLE(code_id uuid, uses integer, paid_orders integer, discount_total bigint, revenue bigint) config=search_path=public
 function:aitickets_discount_code_usage(p_code_id uuid, p_email text)	md5=76965d4f810237c3e105a9043f32eecf lang=sql secdef=true returns=TABLE(uses integer, buyer_uses integer) config=search_path=public
@@ -1641,6 +1669,8 @@ function:aitickets_verify_payout_account(p_organization_id bigint, p_decision te
 function:handle_new_user()	md5=5549f89372e87c73b30b08cd1f39aa20 lang=plpgsql secdef=true returns=trigger config=search_path=public
 function_grant:aitickets_admin_visit_counts(p_from timestamp with time zone, p_to timestamp with time zone, p_event_ids bigint[], p_group text)	service_role
 function_grant:aitickets_attendees_normalize_names()	service_role
+function_grant:aitickets_blog_daily(p_from timestamp with time zone, p_to timestamp with time zone, p_post_id bigint)	service_role
+function_grant:aitickets_blog_post_stats(p_from timestamp with time zone, p_to timestamp with time zone)	service_role
 function_grant:aitickets_claim_outreach_batch(p_limit integer)	service_role
 function_grant:aitickets_discount_code_stats(p_code_ids uuid[])	service_role
 function_grant:aitickets_discount_code_usage(p_code_id uuid, p_email text)	service_role
@@ -1688,6 +1718,7 @@ grant:aitickets_blog_keywords	-
 grant:aitickets_blog_posts	-
 grant:aitickets_blog_runs	-
 grant:aitickets_blog_topics	-
+grant:aitickets_blog_visits	-
 grant:aitickets_certificate_sends	-
 grant:aitickets_checkin_links	-
 grant:aitickets_competitor_events	-
@@ -1783,6 +1814,8 @@ index:aitickets_blog_keywords.aitickets_blog_keywords_topic_idx	CREATE INDEX ait
 index:aitickets_blog_posts.aitickets_blog_posts_published_idx	CREATE INDEX aitickets_blog_posts_published_idx ON aitickets_blog_posts USING btree (published_at DESC) WHERE (status = 'published'::text)
 index:aitickets_blog_posts.aitickets_blog_posts_topic_idx	CREATE INDEX aitickets_blog_posts_topic_idx ON aitickets_blog_posts USING btree (topic_id, status)
 index:aitickets_blog_runs.aitickets_blog_runs_task_idx	CREATE INDEX aitickets_blog_runs_task_idx ON aitickets_blog_runs USING btree (task, started_at DESC)
+index:aitickets_blog_visits.aitickets_blog_visits_created_idx	CREATE INDEX aitickets_blog_visits_created_idx ON aitickets_blog_visits USING btree (created_at)
+index:aitickets_blog_visits.aitickets_blog_visits_post_idx	CREATE INDEX aitickets_blog_visits_post_idx ON aitickets_blog_visits USING btree (post_id, created_at)
 index:aitickets_certificate_sends.aitickets_certificate_sends_event_idx	CREATE INDEX aitickets_certificate_sends_event_idx ON aitickets_certificate_sends USING btree (event_id, created_at DESC)
 index:aitickets_checkin_links.aitickets_checkin_links_event_idx	CREATE INDEX aitickets_checkin_links_event_idx ON aitickets_checkin_links USING btree (event_id)
 index:aitickets_competitor_events.aitickets_competitor_events_event_date_idx	CREATE INDEX aitickets_competitor_events_event_date_idx ON aitickets_competitor_events USING btree (event_date)
@@ -1911,6 +1944,7 @@ table:aitickets_blog_keywords	rls=true force=false
 table:aitickets_blog_posts	rls=true force=false
 table:aitickets_blog_runs	rls=true force=false
 table:aitickets_blog_topics	rls=true force=false
+table:aitickets_blog_visits	rls=true force=false
 table:aitickets_certificate_sends	rls=true force=false
 table:aitickets_checkin_links	rls=true force=false
 table:aitickets_competitor_events	rls=true force=false

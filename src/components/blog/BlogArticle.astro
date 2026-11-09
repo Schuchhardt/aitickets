@@ -25,7 +25,53 @@ const hostOf = (url: string) => {
     }
 };
 const landing = topic?.landing_path || "/organizadores";
+// Analítica propia (/api/blog/visit): solo en artículos publicados, nunca en la vista previa de un borrador
+const trackPostId = preview ? null : post.id;
+const signupRef = `blog_${post.slug}`;
 ---
+
+{trackPostId && (
+    <script is:inline define:vars={{ trackPostId, signupRef }}>
+        (function () {
+            // Lectura + clics hacia AI Tickets (cualquier link interno fuera del blog: landing del tema, registro…).
+            // La página viene del CDN: lo avisa el navegador, igual que las visitas de eventos.
+            var qs = new URLSearchParams(location.search);
+            var utm = { utm_source: qs.get('utm_source'), utm_medium: qs.get('utm_medium'), utm_campaign: qs.get('utm_campaign') };
+            // Con el mismo host cuenta como "internal" (vino desde otra página de AI Tickets)
+            var referrer = document.referrer || '';
+            function send(body) {
+                try {
+                    fetch('/api/blog/visit', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(Object.assign({ post_id: trackPostId, referrer: referrer }, utm, body)),
+                        keepalive: true,
+                    }).catch(function () {});
+                } catch (e) {}
+            }
+            send({ kind: 'view' });
+            // Atribución del registro de productores (ProducerRegisterForm.vue): el artículo queda como origen si el
+            // lector no traía uno (primer contacto). organizations.signup_ref = 'blog_<slug>'.
+            try {
+                var key = 'aitickets_signup_attribution';
+                var stored = JSON.parse(sessionStorage.getItem(key) || '{}') || {};
+                if (!stored.ref && !stored.utm_source) {
+                    stored.ref = signupRef;
+                    if (referrer && !stored.referrer && new URL(referrer).host !== location.host) stored.referrer = referrer.slice(0, 500);
+                    sessionStorage.setItem(key, JSON.stringify(stored));
+                }
+            } catch (e) {}
+            document.addEventListener('click', function (e) {
+                var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+                if (!a) return;
+                var url;
+                try { url = new URL(a.getAttribute('href'), location.href); } catch (err) { return; }
+                if (url.host !== location.host || /^\/blog(\/|$)/.test(url.pathname)) return;
+                send({ kind: 'cta', cta_path: (url.pathname + url.search).slice(0, 200) });
+            }, { capture: true });
+        })();
+    </script>
+)}
 
 <article class="px-4 pt-32 pb-16 bg-white">
     <div class="mx-auto max-w-3xl">

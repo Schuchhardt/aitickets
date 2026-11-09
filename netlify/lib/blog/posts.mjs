@@ -5,6 +5,7 @@ import { gscWindow, searchAnalytics } from './google.mjs'
 import { KEYWORDS_TABLE, TOPICS_TABLE } from './keywords.mjs'
 import { INTERNAL_PAGES } from './product-facts.mjs'
 import { afterBlogChange } from './publish.mjs'
+import { loadPostStats, topicPerformanceMultipliers } from './analytics.mjs'
 import { MIN_AUTO_SCORE, topicByDeficit } from './scoring.mjs'
 import { normalizeKeyword } from './text.mjs'
 import { finalizeArticle, planArticle, researchArticle, writeArticle } from './writer.mjs'
@@ -79,9 +80,23 @@ export async function pickKeyword(supabase, { keywordId = null, topicSlug = null
   const { data: recent } = await supabase.from(POSTS_TABLE).select('topic_id').gte('created_at', daysAgo(RECENT_DAYS_FOR_QUOTAS)).neq('status', 'archived')
   const counts = new Map()
   for (const p of recent || []) counts.set(Number(p.topic_id), (counts.get(Number(p.topic_id)) || 0) + 1)
-  const eligible = topics.filter((t) => t.active && bestByTopic.has(Number(t.id)))
+  // Los temas que mejor funcionan (lectores, clics al CTA y registros) reciben más cuota (analytics.mjs)
+  const multipliers = forcedTopic ? new Map() : await performanceMultipliers(supabase)
+  const eligible = topics
+    .filter((t) => t.active && bestByTopic.has(Number(t.id)))
+    .map((t) => ({ ...t, weight: t.weight * (multipliers.get(Number(t.id)) ?? 1) }))
   const topic = forcedTopic || topicByDeficit(eligible, counts)
   return withTopic(topic ? bestByTopic.get(Number(topic.id)) : pool[0])
+}
+
+/** Multiplicador de cuota por tema según su rendimiento. Sin analítica (o si falla) todos quedan en 1. */
+async function performanceMultipliers(supabase) {
+  try {
+    const { posts } = await loadPostStats(supabase, { days: 90 })
+    return topicPerformanceMultipliers(posts)
+  } catch {
+    return new Map()
+  }
 }
 
 async function markKeywords(supabase, ids, patch) {
@@ -202,7 +217,9 @@ export async function generatePost(supabase, { meter, keywordId = null, topicSlu
       post_id: Number(post.id),
       slug: post.slug,
       status: post.status,
+      title: article.title,
       keyword: keyword.keyword,
+      sources: researchResult.sources.length,
       topic: topic?.slug || null,
       words: article.word_count,
       issues,
@@ -351,7 +368,8 @@ export async function refreshPost(supabase, { meter, postId = null, model = blog
     sources: [...(post.sources || []).map((s) => ({ url: s.url, title: s.title })), ...researchResult.sources],
     fixedSlug: post.slug,
   })
-  if (!ok) return { post_id: Number(post.id), slug: post.slug, refreshed: false, issues }
+  const before = { impressions: post.gsc_impressions, clicks: post.gsc_clicks, position: post.gsc_position, ctr: post.gsc_ctr }
+  if (!ok) return { post_id: Number(post.id), slug: post.slug, refreshed: false, issues, before }
 
   const now = new Date().toISOString()
   const history = Array.isArray(post.generation?.refreshes) ? post.generation.refreshes : []
@@ -377,5 +395,5 @@ export async function refreshPost(supabase, { meter, postId = null, model = blog
     .eq('id', post.id)
   if (error) throw new Error(error.message)
   const effects = await afterBlogChange([`/blog/${post.slug}`])
-  return { post_id: Number(post.id), slug: post.slug, refreshed: true, words: article.word_count, issues, effects }
+  return { post_id: Number(post.id), slug: post.slug, refreshed: true, words: article.word_count, issues, effects, before }
 }

@@ -1,11 +1,12 @@
 // Orquestador de corridas del blog: cada tarea queda en aitickets_blog_runs con su resultado y costo.
 //
 //   keywords  descubrir y puntuar keywords (Planner + Search Console + autocompletado + IA)   semanal
-//   metrics   métricas de Search Console de cada artículo                                     semanal
+//   metrics   Search Console por artículo + resumen de rendimiento (lectores, CTA, registros)  semanal
 //   generate  escribir un artículo nuevo                                                       BLOG_POSTS_PER_WEEK
 //   refresh   reescribir un artículo que ya rankea entre la 3 y la 30                          semanal
 //   auto      lo que toque hoy, en ese orden (lo usa la función programada blog-tick, a diario)
 import { blogPostsPerWeek, isSearchConsoleConfigured } from './config.mjs'
+import { performanceDigest } from './analytics.mjs'
 import { discoverKeywords } from './keywords.mjs'
 import { createCostMeter } from './llm.mjs'
 import { generatePost, POSTS_TABLE, refreshPost, syncPostMetrics } from './posts.mjs'
@@ -24,6 +25,7 @@ async function lastRun(supabase, task, statuses = ['ok']) {
 export async function runBlogTask(supabase, { task, trigger = 'schedule', deadline = Date.now() + 13 * 60_000, ...opts }) {
   if (!BLOG_TASKS.includes(task)) throw new Error(`Tarea desconocida: ${task}`)
   const meter = createCostMeter()
+  const startedAt = new Date().toISOString()
   const { data: run, error } = await supabase.from(RUNS_TABLE).insert({ task, trigger, status: 'running', details: { opts } }).select('id').single()
   if (error) throw new Error(error.message)
   let status = 'ok'
@@ -31,7 +33,7 @@ export async function runBlogTask(supabase, { task, trigger = 'schedule', deadli
   let errorText = null
   try {
     if (task === 'keywords') details = await discoverKeywords(supabase, { meter, deadline, topicSlug: opts.topicSlug || null })
-    else if (task === 'metrics') details = await syncPostMetrics(supabase)
+    else if (task === 'metrics') details = await runMetrics(supabase)
     else if (task === 'generate') details = await generatePost(supabase, { meter, keywordId: opts.keywordId || null, topicSlug: opts.topicSlug || null, ...(opts.publish != null ? { publish: opts.publish } : {}) })
     else if (task === 'refresh') details = await refreshPost(supabase, { meter, postId: opts.postId || null })
     if (details?.skipped) status = 'skipped'
@@ -41,18 +43,39 @@ export async function runBlogTask(supabase, { task, trigger = 'schedule', deadli
     console.error(`[blog:${task}]`, err)
   }
   const postId = Number(details?.post_id) || null
+  const finishedAt = new Date().toISOString()
   await supabase
     .from(RUNS_TABLE)
-    .update({ status, details: { ...details, opts, cost: meter }, error: errorText, post_id: postId, finished_at: new Date().toISOString() })
+    .update({ status, details: { ...details, opts, cost: meter }, error: errorText, post_id: postId, finished_at: finishedAt })
     .eq('id', run.id)
-  return { run_id: Number(run.id), task, status, ...(errorText ? { error: errorText } : {}), details, cost_usd: meter.usd }
+  return {
+    run_id: Number(run.id),
+    task,
+    trigger,
+    status,
+    ...(errorText ? { error: errorText } : {}),
+    details: { ...details, cost: { ...meter } },
+    post_id: postId,
+    started_at: startedAt,
+    finished_at: finishedAt,
+    cost_usd: meter.usd,
+  }
+}
+
+/** Tarea metrics: Search Console (si está configurado) y el resumen de rendimiento con la analítica propia. */
+async function runMetrics(supabase) {
+  const searchConsole = isSearchConsoleConfigured() ? await syncPostMetrics(supabase) : 'sin configurar (GOOGLE_OAUTH_* y GSC_SITE_URL)'
+  const performance = await performanceDigest(supabase, { days: 28 })
+  return { search_console: searchConsole, performance }
 }
 
 /** Qué toca hoy (sin ejecutar nada): para la corrida automática y para get_blog_overview. */
 export async function plannedTasks(supabase, now = Date.now()) {
   const tasks = []
   if (now - (await lastRun(supabase, 'keywords', ['ok', 'skipped'])) > 6.5 * DAY) tasks.push('keywords')
-  if (isSearchConsoleConfigured() && now - (await lastRun(supabase, 'metrics')) > 6.5 * DAY) tasks.push('metrics')
+  // Semanal aunque no haya Search Console (el resumen de rendimiento usa la analítica propia), si hay algo que medir
+  const { count: published } = await supabase.from(POSTS_TABLE).select('id', { count: 'exact', head: true }).eq('status', 'published')
+  if ((published || 0) > 0 && now - (await lastRun(supabase, 'metrics')) > 6.5 * DAY) tasks.push('metrics')
 
   const perWeek = blogPostsPerWeek()
   if (perWeek > 0) {

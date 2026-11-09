@@ -310,6 +310,12 @@ export async function discoverKeywords(supabase, { meter, deadline = Date.now() 
     saved: rows.length,
     rejected,
     sources: { planner: summary.planner, search_console: summary.search_console, autocomplete: summary.autocomplete },
+    // Las mejores pendientes después de esta corrida (para el resumen de Slack y get_blog_run)
+    top: rows
+      .filter((r) => r.status === 'new' || r.status === 'queued')
+      .sort((x, y) => Number(y.score) - Number(x.score))
+      .slice(0, 8)
+      .map((r) => ({ keyword: r.keyword, score: Number(r.score), status: r.status })),
     ...(summary.errors.length ? { warnings: summary.errors.slice(0, 10) } : {}),
   }
 }

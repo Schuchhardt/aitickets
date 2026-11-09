@@ -47,7 +47,10 @@ Todo queda en `aitickets_blog_runs` con resultado y costo estimado en USD.
 1. La pedida (`run_blog_task` con `keyword_id`).
 2. La mejor `queued` (priorizada a mano con `upsert_blog_keywords`).
 3. Si no, la mejor `new` con score ≥ 25 del **tema con más déficit de cuota**: peso del tema (normalizado entre los
-   activos) menos su parte de los artículos de los últimos 90 días.
+   activos) menos su parte de los artículos de los últimos 90 días. El peso se multiplica por el **rendimiento del
+   tema** (`analytics.mjs`, 0,6×-1,6×): valor medio por artículo del tema contra el del blog, en raíz cuadrada, con
+   valor = lectores + 10 × lectores que hicieron clic al CTA + 50 × productores registrados (90 días). Solo cuentan
+   temas con 2+ artículos de 14+ días; los demás quedan en 1×.
 
 **Score** (`scoring.mjs`): `100 × √demanda × competencia × intención × relevancia × empuje`. Demanda en escala log de
 las búsquedas mensuales de Planner (o impresiones de Search Console, o señal del autocompletado); competencia de Ads
@@ -100,6 +103,18 @@ internos o 3 preguntas, enlaces quitados, meta título largo.
 Migración `db/migrations/202611090200_blog.sql`: `aitickets_blog_topics` (14 temas iniciales: 8 nichos y 6
 funcionalidades, con semillas y peso), `aitickets_blog_keywords`, `aitickets_blog_posts`, `aitickets_blog_runs`. RLS sin
 políticas: solo la service role.
+
+## Medición (`analytics.mjs`, `traffic.mjs`, `summary.mjs`)
+
+- **Analítica propia** (`202611090300_blog_analytics.sql`): el artículo avisa por el navegador (`/api/blog/visit`)
+  cada lectura (`kind = view`) y cada clic a un link interno fuera del blog (`kind = cta`, con la ruta). Bots marcados
+  con `visit-bots.mjs` (`is_bot`) y excluidos de los totales. Fuente: search, ai (ChatGPT, Perplexity, Gemini…),
+  social, campaign (utm), internal, referral, direct.
+- **Registros**: el artículo deja `ref = blog_<slug>` en la atribución del registro de productores
+  (`sessionStorage.aitickets_signup_attribution`, solo si no había otro origen) → `organizations.signup_ref`.
+- `aitickets_blog_post_stats(from, to)` y `aitickets_blog_daily(from, to, post_id)` cuentan en la base.
+- **Search Console** (impresiones, clics, posición, consultas) sigue llegando con la tarea `metrics`.
+- **Resumen de corridas**: `runSummary()` arma el texto de Slack y de `get_blog_run`.
 
 ## Costos aproximados
 

@@ -37,12 +37,19 @@ Diseño y reglas: [`docs/specs/blog-seo.md`](../specs/blog-seo.md). Todo se mane
 
 ## 2. Operación diaria
 
-- **Slack** avisa cada artículo publicado o borrador, cada refresco y cada corrida de keywords (con advertencias).
+- **Slack** recibe el resumen de cada corrida (`netlify/lib/blog/summary.mjs`): el artículo (o la vista previa del
+  borrador), la keyword y el tema, las keywords saltadas, los avisos de calidad, la duración y el costo desglosado. La
+  corrida `metrics` (semanal) manda el rendimiento: lectores, clics hacia AI Tickets, registros, fuentes, los artículos
+  que mejor funcionan, la cuota por tema y sugerencias. Las corridas automáticas que no hicieron nada no avisan.
+  `get_blog_run` muestra el mismo resumen con el detalle completo; `send_blog_report_to_slack` lo reenvía o manda el
+  rendimiento cuando quieras.
 - **Ajustar el mix de temas:** `upsert_blog_topic` cambia `weight` (cuota relativa), semillas o la landing del cierre;
   `weight: 0` o `active: false` deja de escribir sobre ese tema. Nuevo nicho: `upsert_blog_topic` con `slug`, `kind`,
   `name`, `description`, `landing_path` y 5 semillas informativas ("cómo…", "cuánto…", "qué es…").
-- **Qué está funcionando:** `list_blog_posts` con `sort: clicks` y `get_blog_post` (consultas de Search Console que
-  traen cada artículo). Las keywords que ya aparecen entre la 4 y la 30 sin artículo propio:
+- **Qué está funcionando:** `get_blog_analytics` (ranking de artículos y temas por lectores, clics hacia AI Tickets y
+  productores registrados, fuentes, serie diaria y sugerencias), `list_blog_posts` con `sort: visitors | cta | signups |
+  value | clicks` y `get_blog_post` (lectores por día y fuente, destinos del CTA y consultas de Search Console). El
+  generador ya usa estos datos: los temas que rinden más reciben más artículos nuevos. Las keywords que ya aparecen entre la 4 y la 30 sin artículo propio:
   `list_blog_keywords` con `striking_distance: true` → priorízalas (`queued`).
 - **Refrescar uno puntual:** `run_blog_task` `refresh` con `post_id`.
 - **Corregir un artículo:** `update_blog_post` (título, meta, extracto o el Markdown completo). `draft` lo despublica.

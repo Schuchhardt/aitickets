@@ -12,11 +12,27 @@ import { afterBlogChange } from "../../../../netlify/lib/blog/publish.mjs";
 import { signBlogPreview } from "../../../../netlify/lib/blog/preview-token.mjs";
 import { countWords, normalizeKeyword } from "../../../../netlify/lib/blog/text.mjs";
 import { functionsOrigin, triggerBackground } from "../../../../netlify/lib/outreach/background.mjs";
+import { loadPostStats, performanceDigest, windowFor } from "../../../../netlify/lib/blog/analytics.mjs";
+import { digestLines, runSummary } from "../../../../netlify/lib/blog/summary.mjs";
+import { notifySlack } from "../../../../netlify/lib/slack.mjs";
 
 const POST_STATUSES = ["draft", "published", "archived"] as const;
 const KEYWORD_STATUSES = ["new", "queued", "used", "rejected"] as const;
 const slugSchema: JsonSchema = { type: "string", pattern: "^[a-z0-9]+(-[a-z0-9]+)*$", maxLength: 60, description: "slug del tema (list_blog_topics)." };
 const n = (v: unknown) => (v == null ? null : Number(v));
+const daysSchema: JsonSchema = { type: "integer", minimum: 1, maximum: 180, default: 28, description: "Ventana en días (analítica propia; Search Console siempre es de 28 días)." };
+const SITE_SORTS = ["visitors", "cta", "signups", "value"] as const;
+
+/** Estadísticas propias por artículo (lectores, CTA, registros, fuentes), indexadas por id. */
+async function siteStatsById(supabase: any, days: number) {
+    const stats = await loadPostStats(supabase, { days });
+    return { window: stats.window, available: stats.available, byId: new Map<number, any>(stats.posts.map((p: any) => [p.id, p])) };
+}
+
+const presentSite = (s: any) =>
+    s
+        ? { views: s.views, visitors: s.visitors, cta_clicks: s.cta_clicks, cta_visitors: s.cta_visitors, cta_rate: s.cta_rate, signups: s.signups, sources: s.sources, value: s.value }
+        : { views: 0, visitors: 0, cta_clicks: 0, cta_visitors: 0, cta_rate: null, signups: 0, sources: null, value: 0 };
 
 const postUrl = (origin: string, slug: string) => `${origin}/blog/${slug}`;
 const previewUrl = (origin: string, id: number) => {
@@ -52,7 +68,8 @@ const getBlogOverview: AdminToolDef = {
     description:
         "Estado del blog automatizado: qué integraciones están configuradas (Claude, Search Console, Keyword Planner, IndexNow) y qué falta, " +
         "si la función diaria está activa (BLOG_ENABLED), cuántos artículos y keywords hay por estado, la última corrida de cada tarea, " +
-        "qué haría hoy la corrida automática, las mejores keywords pendientes y los artículos con más clics. Empieza por aquí.",
+        "qué haría hoy la corrida automática, las mejores keywords pendientes, los artículos con más clics en Google y el rendimiento de 28 días " +
+        "(lectores, clics hacia AI Tickets y productores registrados). Empieza por aquí; el detalle de rendimiento está en get_blog_analytics.",
     readOnly: true,
     inputSchema: { type: "object", additionalProperties: false, properties: {} },
     async handler(_args, actx) {
@@ -71,6 +88,7 @@ const getBlogOverview: AdminToolDef = {
         }
         const { data: topKeywords } = await supabase.from(KEYWORDS_TABLE).select("id, keyword, score, status, planner_searches, gsc_impressions, gsc_position").in("status", ["queued", "new"]).order("status", { ascending: false }).order("score", { ascending: false }).limit(10);
         const { data: topPosts } = await supabase.from(POSTS_TABLE).select("id, slug, title, gsc_clicks, gsc_impressions, gsc_position").eq("status", "published").order("gsc_clicks", { ascending: false, nullsFirst: false }).limit(5);
+        const perf = await performanceDigest(supabase, { days: 28, top: 5 }).catch(() => null);
         return {
             setup: blogSetup(),
             posts,
@@ -79,6 +97,9 @@ const getBlogOverview: AdminToolDef = {
             planned_today: planned,
             next_keywords: (topKeywords || []).map((k: any) => ({ ...k, id: Number(k.id), score: n(k.score), gsc_position: n(k.gsc_position) })),
             top_posts: (topPosts || []).map((p: any) => ({ id: Number(p.id), title: p.title, url: postUrl(origin, p.slug), clicks_28d: p.gsc_clicks, impressions_28d: p.gsc_impressions, position: n(p.gsc_position) })),
+            performance_28d: perf
+                ? { totals: perf.totals, best_posts: perf.top_posts.map((p: any) => ({ ...p, url: postUrl(origin, p.slug) })), more: "get_blog_analytics" }
+                : null,
         };
     },
 };
@@ -298,7 +319,9 @@ const listBlogPosts: AdminToolDef = {
     title: "Blog SEO: artículos",
     description:
         "Artículos del blog con URL (o link de vista previa firmado si es borrador), keyword principal, calidad (errores que impidieron publicarlo " +
-        "solo) y métricas de Search Console de los últimos 28 días: impresiones, clics, CTR y posición.",
+        "solo), métricas de Search Console de los últimos 28 días (impresiones, clics, CTR y posición) y la analítica propia de la ventana " +
+        "(days): lectores, clics hacia AI Tickets (CTA), tasa de CTA, productores registrados desde el artículo y lectores por fuente. " +
+        "sort: recent, clicks/impressions (Google) o visitors/cta/signups/value (sitio; value = lectores + 10×CTA + 50×registros).",
     readOnly: true,
     inputSchema: {
         type: "object",
@@ -306,22 +329,33 @@ const listBlogPosts: AdminToolDef = {
         properties: {
             statuses: { type: "array", items: { type: "string", enum: POST_STATUSES }, minItems: 1, maxItems: 3 },
             topic_slug: slugSchema,
-            sort: { type: "string", enum: ["recent", "clicks", "impressions"], default: "recent" },
+            sort: { type: "string", enum: ["recent", "clicks", "impressions", ...SITE_SORTS], default: "recent" },
+            days: daysSchema,
             limit: { type: "integer", minimum: 1, maximum: 100, default: 30 },
         },
     },
     async handler(args, actx) {
         const { supabase, origin } = actx;
         const topics = await topicSlugsById(supabase);
+        const site = await siteStatsById(supabase, args.days || 28);
+        const siteSort = (SITE_SORTS as readonly string[]).includes(args.sort);
         let q = supabase
             .from(POSTS_TABLE)
             .select("id, slug, status, title, topic_id, primary_keyword, word_count, published_at, content_updated_at, refresh_count, quality, gsc_impressions, gsc_clicks, gsc_ctr, gsc_position, gsc_updated_at");
         if (args.statuses?.length) q = q.in("status", args.statuses);
         if (args.topic_slug) q = q.eq("topic_id", await topicIdFor(supabase, args.topic_slug));
         const col = args.sort === "clicks" ? "gsc_clicks" : args.sort === "impressions" ? "gsc_impressions" : "created_at";
-        const { data, error } = await q.order(col, { ascending: false, nullsFirst: false }).limit(args.limit || 30);
+        // Orden por analítica propia: se ordena en memoria (son cientos de artículos como mucho)
+        const { data, error } = await q.order(col, { ascending: false, nullsFirst: false }).limit(siteSort ? 500 : args.limit || 30);
         if (error) throw new ToolError("internal", error.message);
-        return { posts: (data || []).map((p: any) => presentPost(p, origin, topics)) };
+        const key = args.sort === "cta" ? "cta_visitors" : args.sort;
+        const rows = (data || []).map((p: any) => ({ ...presentPost(p, origin, topics), site: presentSite(site.byId.get(Number(p.id))) }));
+        if (siteSort) rows.sort((a: any, b: any) => (b.site[key] || 0) - (a.site[key] || 0));
+        return {
+            window: { days: site.window.days, from: site.window.from, to: site.window.to },
+            site_analytics: site.available,
+            posts: rows.slice(0, args.limit || 30),
+        };
     },
 };
 
@@ -332,9 +366,10 @@ const getBlogPost: AdminToolDef = {
     title: "Blog SEO: detalle de un artículo",
     description:
         "Un artículo completo: Markdown, preguntas frecuentes, fuentes, keywords, el detalle de calidad, el plan con que se escribió y su costo, " +
-        "los refrescos, y las consultas de Search Console que lo traen (para decidir qué mejorar). Incluye el link de vista previa si no está publicado.",
+        "los refrescos, las consultas de Search Console que lo traen y la analítica propia de la ventana (days): lectores por día y por fuente, " +
+        "clics hacia AI Tickets por destino y productores registrados desde el artículo. Incluye el link de vista previa si no está publicado.",
     readOnly: true,
-    inputSchema: { type: "object", additionalProperties: false, required: ["post_id"], properties: { post_id: postIdSchema } },
+    inputSchema: { type: "object", additionalProperties: false, required: ["post_id"], properties: { post_id: postIdSchema, days: daysSchema } },
     async handler(args, actx) {
         const { supabase, origin } = actx;
         const { data: p, error } = await supabase.from(POSTS_TABLE).select("*").eq("id", args.post_id).maybeSingle();
@@ -342,8 +377,23 @@ const getBlogPost: AdminToolDef = {
         if (!p) throw new ToolError("not_found", `No existe el artículo ${args.post_id}.`);
         const topics = await topicSlugsById(supabase);
         const { data: keywords } = await supabase.from(KEYWORDS_TABLE).select("id, keyword, score").eq("post_id", p.id).limit(50);
+        const days = args.days || 28;
+        const site = await siteStatsById(supabase, days);
+        const w = windowFor(days);
+        const { data: daily } = await supabase.rpc("aitickets_blog_daily", { p_from: w.from, p_to: w.to, p_post_id: p.id });
+        const { data: ctaRows } = await supabase
+            .from("aitickets_blog_visits")
+            .select("cta_path")
+            .eq("post_id", p.id)
+            .eq("kind", "cta")
+            .eq("is_bot", false)
+            .gte("created_at", w.from)
+            .limit(2000);
+        const ctaTargets: Record<string, number> = {};
+        for (const r of ctaRows || []) ctaTargets[r.cta_path] = (ctaTargets[r.cta_path] || 0) + 1;
         return {
             ...presentPost(p, origin, topics),
+            site: { days, ...presentSite(site.byId.get(Number(p.id))), cta_targets: ctaTargets, daily: daily || [] },
             meta_title: p.meta_title,
             description: p.description,
             excerpt: p.excerpt,
@@ -457,14 +507,16 @@ const runBlogTask: AdminToolDef = {
             ...(typeof args.publish === "boolean" ? { publish: args.publish } : {}),
         });
         if ((result as any).error) throw new ToolError("unavailable", `No se pudo disparar la tarea: ${(result as any).error}`);
-        return { started: true, task: args.task, note: "Corre en segundo plano: revisa list_blog_runs en unos minutos." };
+        return { started: true, task: args.task, note: "Corre en segundo plano: el resumen llega a Slack al terminar; revisa list_blog_runs / get_blog_run en unos minutos." };
     },
 };
 
 const listBlogRuns: AdminToolDef = {
     name: "list_blog_runs",
     title: "Blog SEO: corridas",
-    description: "Bitácora de las corridas del blog (automáticas y manuales): tarea, estado, resultado (artículo creado, keywords, errores) y costo estimado en USD.",
+    description:
+        "Bitácora de las corridas del blog (automáticas y manuales): tarea, estado, resultado (artículo creado, keywords, errores), costo " +
+        "estimado en USD y un resumen de una línea. El detalle completo y el texto que va a Slack: get_blog_run.",
     readOnly: true,
     inputSchema: {
         type: "object",
@@ -494,10 +546,114 @@ const listBlogRuns: AdminToolDef = {
                     web_searches: cost?.web_searches ?? null,
                     error: r.error,
                     options: opts || null,
+                    headline: runSummary({ ...r, id: Number(r.id) }, { siteUrl: actx.origin }).split("\n").slice(0, 2).join(" · "),
                     result: details,
                 };
             }),
         };
+    },
+};
+
+const getBlogAnalytics: AdminToolDef = {
+    name: "get_blog_analytics",
+    title: "Blog SEO: qué está funcionando",
+    description:
+        "Rendimiento del blog en la ventana (days, por defecto 28): totales (lectores, clics hacia AI Tickets, tasa de CTA, productores " +
+        "registrados desde un artículo, clics e impresiones de Google), lectores por fuente (search, ai, social, campaign, internal, " +
+        "referral, direct), serie diaria, ranking de artículos por valor (lectores + 10×CTA + 50×registros), rendimiento por tema con el " +
+        "multiplicador de cuota que aplica el generador (los temas que rinden más reciben más artículos nuevos, 0,6×-1,6×) y sugerencias " +
+        "concretas (títulos con CTR bajo, artículos sin clics al CTA, temas fuertes o débiles). Bots excluidos.",
+    readOnly: true,
+    inputSchema: {
+        type: "object",
+        additionalProperties: false,
+        properties: { days: daysSchema, top: { type: "integer", minimum: 1, maximum: 50, default: 10 } },
+    },
+    async handler(args, actx) {
+        const { supabase, origin } = actx;
+        const days = args.days || 28;
+        const digest = await performanceDigest(supabase, { days, top: args.top || 10 });
+        const w = windowFor(days);
+        const { data: daily } = await supabase.rpc("aitickets_blog_daily", { p_from: w.from, p_to: w.to, p_post_id: null });
+        return {
+            ...digest,
+            top_posts: digest.top_posts.map((p: any) => ({ ...p, url: postUrl(origin, p.slug) })),
+            daily: daily || [],
+            notes: [
+                "Lectores y CTA: analítica propia del sitio (/api/blog/visit). Registros: organizations.signup_ref = blog_<slug> (primer contacto).",
+                "Google (gsc_*): Search Console, últimos 28 días, se actualiza con la tarea metrics (semanal).",
+            ],
+        };
+    },
+};
+
+const getBlogRun: AdminToolDef = {
+    name: "get_blog_run",
+    title: "Blog SEO: detalle de una corrida",
+    description:
+        "Una corrida del blog completa (list_blog_runs da los ids): qué pidió, qué hizo, duración, costo desglosado (llamadas a Claude, " +
+        "tokens, búsquedas web) y el resultado (artículo y su vista previa, keywords probadas y saltadas, avisos de calidad, difusión; en " +
+        "keywords las candidatas por fuente y las mejores pendientes; en metrics el resumen de rendimiento). summary_text es el mismo " +
+        "resumen que se manda a Slack; send_blog_report_to_slack lo reenvía.",
+    readOnly: true,
+    inputSchema: { type: "object", additionalProperties: false, required: ["run_id"], properties: { run_id: { type: "integer", minimum: 1 } } },
+    async handler(args, actx) {
+        const { supabase, origin } = actx;
+        const { data: r, error } = await supabase.from(RUNS_TABLE).select("*").eq("id", args.run_id).maybeSingle();
+        if (error) throw new ToolError("unavailable", error.message);
+        if (!r) throw new ToolError("not_found", `No existe la corrida ${args.run_id}.`);
+        const d = r.details || {};
+        const draftId = r.task === "generate" && d.post_id && d.status !== "published" ? Number(d.post_id) : null;
+        const preview = draftId ? previewUrl(origin, draftId) : null;
+        const { cost, opts, ...result } = d;
+        return {
+            run_id: Number(r.id),
+            task: r.task,
+            trigger: r.trigger,
+            status: r.status,
+            started_at: r.started_at,
+            finished_at: r.finished_at,
+            duration_seconds: r.finished_at ? Math.round((new Date(r.finished_at).getTime() - new Date(r.started_at).getTime()) / 1000) : null,
+            options: opts || null,
+            error: r.error,
+            post: d.post_id ? { id: Number(d.post_id), url: d.status === "published" ? postUrl(origin, d.slug) : null, preview_url: preview } : null,
+            cost: cost || null,
+            result,
+            summary_text: runSummary({ ...r, id: Number(r.id) }, { siteUrl: origin, previewUrl: preview }),
+        };
+    },
+};
+
+const sendBlogReportToSlack: AdminToolDef = {
+    name: "send_blog_report_to_slack",
+    title: "Blog SEO: mandar un resumen a Slack",
+    description:
+        "Publica en el canal de Slack de AI Tickets (SLACK_WEBHOOK_URL) el resumen de una corrida (run_id, el mismo de get_blog_run) o, " +
+        "sin run_id, el resumen de rendimiento del blog de la ventana (days): totales, fuentes, los artículos que mejor funcionan, la cuota " +
+        "por tema y las sugerencias. Las corridas ya avisan solas al terminar; esto sirve para reenviar o compartir el rendimiento.",
+    readOnly: false,
+    inputSchema: {
+        type: "object",
+        additionalProperties: false,
+        properties: { run_id: { type: "integer", minimum: 1 }, days: daysSchema },
+    },
+    audit: (args) => ({ summary: args.run_id ? `Resumen de la corrida del blog ${args.run_id} a Slack` : `Rendimiento del blog (${args.days || 28} días) a Slack` }),
+    async handler(args, actx) {
+        const { supabase, origin } = actx;
+        if (!process.env.SLACK_WEBHOOK_URL) throw new ToolError("unavailable", "SLACK_WEBHOOK_URL no está configurado.");
+        let text: string;
+        if (args.run_id) {
+            const { data: r } = await supabase.from(RUNS_TABLE).select("*").eq("id", args.run_id).maybeSingle();
+            if (!r) throw new ToolError("not_found", `No existe la corrida ${args.run_id}.`);
+            const d = r.details || {};
+            const preview = r.task === "generate" && d.post_id && d.status !== "published" ? previewUrl(origin, Number(d.post_id)) : null;
+            text = runSummary({ ...r, id: Number(r.id) }, { siteUrl: origin, previewUrl: preview });
+        } else {
+            const digest = await performanceDigest(supabase, { days: args.days || 28 });
+            text = ["📊 *Blog AI Tickets*", ...digestLines(digest, { siteUrl: origin })].join("\n");
+        }
+        await notifySlack(text);
+        return { sent: true, text };
     },
 };
 
@@ -512,4 +668,7 @@ export const blogAdminTools: AdminToolDef[] = [
     updateBlogPost,
     runBlogTask,
     listBlogRuns,
+    getBlogRun,
+    getBlogAnalytics,
+    sendBlogReportToSlack,
 ];
