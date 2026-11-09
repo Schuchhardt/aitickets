@@ -1,0 +1,167 @@
+---
+// Artículo del blog (src/pages/blog/[slug].astro y la vista previa de borradores). El cuerpo ya viene sanitizado
+// (src/lib/blog.ts → renderArticle); las preguntas frecuentes y las fuentes son texto plano.
+import type { BlogPost, BlogPostCard, BlogTopic } from "../../lib/blog";
+import { readingMinutes, renderArticle } from "../../lib/blog";
+
+interface Props {
+    post: BlogPost;
+    topic: BlogTopic | null;
+    related: BlogPostCard[];
+    preview?: boolean;
+}
+
+const { post, topic, related, preview = false } = Astro.props;
+const { html, toc } = renderArticle(post.body_md);
+const dateFmt = new Intl.DateTimeFormat("es-CL", { day: "numeric", month: "long", year: "numeric", timeZone: "America/Santiago" });
+const shownDate = post.content_updated_at || post.published_at || post.created_at;
+const cited = post.sources.filter((s) => s.cited);
+const sources = (cited.length ? [...cited, ...post.sources.filter((s) => !s.cited)] : post.sources).slice(0, 8);
+const hostOf = (url: string) => {
+    try {
+        return new URL(url).hostname.replace(/^www\./, "");
+    } catch {
+        return url;
+    }
+};
+const landing = topic?.landing_path || "/organizadores";
+// Analítica propia (/api/blog/visit): solo en artículos publicados, nunca en la vista previa de un borrador
+const trackPostId = preview ? null : post.id;
+const signupRef = `blog_${post.slug}`;
+---
+
+{trackPostId && (
+    <script is:inline define:vars={{ trackPostId, signupRef }}>
+        (function () {
+            // Lectura + clics hacia AI Tickets (cualquier link interno fuera del blog: landing del tema, registro…).
+            // La página viene del CDN: lo avisa el navegador, igual que las visitas de eventos.
+            var qs = new URLSearchParams(location.search);
+            var utm = { utm_source: qs.get('utm_source'), utm_medium: qs.get('utm_medium'), utm_campaign: qs.get('utm_campaign') };
+            // Con el mismo host cuenta como "internal" (vino desde otra página de AI Tickets)
+            var referrer = document.referrer || '';
+            function send(body) {
+                try {
+                    fetch('/api/blog/visit', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(Object.assign({ post_id: trackPostId, referrer: referrer }, utm, body)),
+                        keepalive: true,
+                    }).catch(function () {});
+                } catch (e) {}
+            }
+            send({ kind: 'view' });
+            // Atribución del registro de productores (ProducerRegisterForm.vue): el artículo queda como origen si el
+            // lector no traía uno (primer contacto). organizations.signup_ref = 'blog_<slug>'.
+            try {
+                var key = 'aitickets_signup_attribution';
+                var stored = JSON.parse(sessionStorage.getItem(key) || '{}') || {};
+                if (!stored.ref && !stored.utm_source) {
+                    stored.ref = signupRef;
+                    if (referrer && !stored.referrer && new URL(referrer).host !== location.host) stored.referrer = referrer.slice(0, 500);
+                    sessionStorage.setItem(key, JSON.stringify(stored));
+                }
+            } catch (e) {}
+            document.addEventListener('click', function (e) {
+                var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+                if (!a) return;
+                var url;
+                try { url = new URL(a.getAttribute('href'), location.href); } catch (err) { return; }
+                if (url.host !== location.host || /^\/blog(\/|$)/.test(url.pathname)) return;
+                send({ kind: 'cta', cta_path: (url.pathname + url.search).slice(0, 200) });
+            }, { capture: true });
+        })();
+    </script>
+)}
+
+<article class="px-4 pt-32 pb-16 bg-white">
+    <div class="mx-auto max-w-3xl">
+        {preview && <p class="mb-6 rounded-lg bg-amber-100 text-amber-900 text-sm px-4 py-2">Vista previa · Artículo en estado "{post.status}", no publicado.</p>}
+        <nav class="text-xs text-gray-500 mb-6" aria-label="Ruta">
+            <a href="/blog" class="hover:underline">Blog</a>
+            {topic && <> / <a href={`/blog/tema/${topic.slug}`} class="hover:underline">{topic.name}</a></>}
+        </nav>
+        <h1 class="text-3xl md:text-4xl font-bold font-['Unbounded'] leading-tight">{post.title}</h1>
+        <p class="mt-4 text-sm text-gray-500">
+            Actualizado el <time datetime={shownDate}>{dateFmt.format(new Date(shownDate))}</time> · {readingMinutes(post.word_count)} min de lectura · Equipo AI Tickets
+        </p>
+        {toc.length >= 4 && (
+            <nav class="mt-8 p-5 rounded-xl bg-slate-50 border border-slate-200" aria-label="En este artículo">
+                <p class="font-semibold text-sm mb-2">En este artículo</p>
+                <ol class="list-decimal pl-5 space-y-1 text-sm text-gray-700">
+                    {toc.map((h) => <li><a href={`#${h.id}`} class="hover:underline">{h.text}</a></li>)}
+                </ol>
+            </nav>
+        )}
+        <div class="blog-body mt-10" set:html={html} />
+
+        {post.faq.length > 0 && (
+            <section class="mt-14" aria-labelledby="preguntas-frecuentes">
+                <h2 id="preguntas-frecuentes" class="text-2xl font-bold font-['Unbounded'] mb-4">Preguntas frecuentes</h2>
+                <div class="divide-y divide-gray-200 border-y border-gray-200">
+                    {post.faq.map((f) => (
+                        <details class="py-4 group">
+                            <summary class="cursor-pointer font-semibold list-none flex justify-between gap-4">
+                                {f.question}
+                                <span class="text-gray-400 group-open:rotate-45 transition">+</span>
+                            </summary>
+                            <p class="mt-3 text-gray-700 leading-relaxed">{f.answer}</p>
+                        </details>
+                    ))}
+                </div>
+            </section>
+        )}
+
+        {sources.length > 0 && (
+            <section class="mt-12" aria-labelledby="fuentes">
+                <h2 id="fuentes" class="text-lg font-semibold mb-3">Fuentes consultadas</h2>
+                <ul class="space-y-1 text-sm text-gray-600 list-disc pl-5">
+                    {sources.map((s) => (
+                        <li>
+                            <a href={s.url} target="_blank" rel="noopener" class="hover:underline">{s.title && s.title !== s.url ? s.title : hostOf(s.url)}</a>
+                            <span class="text-gray-400"> · {hostOf(s.url)}</span>
+                        </li>
+                    ))}
+                </ul>
+            </section>
+        )}
+
+        <aside class="mt-12 p-6 rounded-xl bg-black text-white">
+            <p class="font-semibold font-['Unbounded']">{topic ? `${topic.name} con AI Tickets` : "Organiza tu próximo evento con AI Tickets"}</p>
+            <p class="mt-2 text-white/70 text-sm">Publicar es gratis y sin mensualidad, con 0% de comisión para ti. Entradas con QR, links por promotor y métricas por canal.</p>
+            <a href={landing} data-cta="blog_aside" data-section="blog_article" class="inline-block mt-4 text-lime-400 font-semibold hover:underline">Ver cómo funciona →</a>
+        </aside>
+    </div>
+</article>
+
+{related.length > 0 && (
+    <section class="px-4 py-16 bg-slate-100">
+        <div class="mx-auto max-w-5xl">
+            <h2 class="text-2xl font-bold font-['Unbounded'] mb-6">Sigue leyendo</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {related.map((r) => (
+                    <a href={`/blog/${r.slug}`} class="block p-6 rounded-xl bg-white border border-gray-200 hover:border-black transition">
+                        <p class="font-semibold font-['Unbounded']">{r.title}</p>
+                        <p class="text-sm text-gray-600 mt-2">{r.excerpt || r.description}</p>
+                    </a>
+                ))}
+            </div>
+        </div>
+    </section>
+)}
+
+<style>
+    .blog-body :global(h2) { font-family: "Unbounded", sans-serif; font-weight: 700; font-size: 1.5rem; margin: 2.5rem 0 1rem; scroll-margin-top: 6rem; }
+    .blog-body :global(h3) { font-weight: 700; font-size: 1.2rem; margin: 2rem 0 0.75rem; }
+    .blog-body :global(p) { color: rgb(55 65 81); line-height: 1.75; margin: 1rem 0; font-size: 1.0625rem; }
+    .blog-body :global(ul), .blog-body :global(ol) { margin: 1rem 0; padding-left: 1.5rem; color: rgb(55 65 81); line-height: 1.75; }
+    .blog-body :global(ul) { list-style: disc; }
+    .blog-body :global(ol) { list-style: decimal; }
+    .blog-body :global(li) { margin: 0.4rem 0; }
+    .blog-body :global(a) { text-decoration: underline; font-weight: 600; }
+    .blog-body :global(blockquote) { border-left: 4px solid rgb(163 230 53); padding: 0.25rem 1rem; margin: 1.5rem 0; color: rgb(55 65 81); }
+    .blog-body :global(table) { width: 100%; border-collapse: collapse; margin: 1.5rem 0; font-size: 0.95rem; display: block; overflow-x: auto; }
+    .blog-body :global(th), .blog-body :global(td) { border: 1px solid rgb(229 231 235); padding: 0.5rem 0.75rem; text-align: left; vertical-align: top; }
+    .blog-body :global(th) { background: rgb(248 250 252); font-weight: 600; }
+    .blog-body :global(code) { background: rgb(243 244 246); padding: 0.1rem 0.35rem; border-radius: 0.25rem; font-size: 0.9em; }
+    .blog-body :global(hr) { margin: 2rem 0; border-color: rgb(229 231 235); }
+</style>

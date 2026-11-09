@@ -74,6 +74,7 @@ const CARDS: Record<string, OgCard> = {
   "/ticketeras-en-chile": card("Comparación con fuentes", "Ticketeras en Chile: cuánto cobra cada una", [p("aitk-publico")]),
   "/web-gratis": card("Para productoras", "Tu web de eventos gratis", [p("aitk-musica")]),
   "/guias": card("Guías para productores", "Lo práctico de vender entradas y llenar tus funciones", [p("aitk-backstage")]),
+  "/blog": card("Blog para productores", "Ideas probadas para producir, difundir y llenar tus eventos", [p("aitk-backstage")]),
   "/presentacion": card("Presentación de AI Tickets", "¿Y si cada función estuviera llena?", [p("aitk-publico")]),
   "/organizadores/registro": card("Crea tu cuenta gratis", "Publica tu próxima función hoy", [p("aitk-seminario-organizadora")]),
   "/terms": card("Legal", "Términos y condiciones para compradores"),

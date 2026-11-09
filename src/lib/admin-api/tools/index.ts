@@ -14,6 +14,7 @@ import { operationTools } from "./operations";
 import { payoutCycleTools } from "./payout-cycle";
 import { verificationTools } from "./verification";
 import { healthTools } from "./health";
+import { blogAdminTools } from "./blog";
 import { leadTools } from "./leads";
 import { mirrorTools } from "../mirror";
 
@@ -31,6 +32,7 @@ export const ADMIN_TOOLS: AdminToolDef[] = [
     ...payoutCycleTools,
     ...verificationTools,
     ...healthTools,
+    ...blogAdminTools,
     ...leadTools,
     ...mirrorTools,
 ];

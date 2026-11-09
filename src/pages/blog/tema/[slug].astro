@@ -1,0 +1,73 @@
+---
+// Hub de un tema del blog (cluster): introducción, todos sus artículos y la landing de AI Tickets del tema. Enlaza
+// los artículos entre sí y concentra la autoridad del tema. Sin artículos publicados, 404 (no hay hubs vacíos).
+import AppHeader from "../../../components/AppHeader.vue";
+import AppFooter from "../../../components/AppFooter.vue";
+import CallToAction from "../../../components/CallToAction.vue";
+import CtaTracking from "../../../components/landing/CtaTracking.astro";
+import Layout from "../../../layouts/Layout.astro";
+import { blogShareImage, listPublishedPosts, listTopics, readingMinutes } from "../../../lib/blog";
+import { BLOG_PAGES_TAG, cachePublicPage } from "../../../lib/cdnCache";
+import { notFound } from "../../../lib/notFound";
+import "../../../styles/global.css";
+
+export const prerender = false;
+
+const slug = String(Astro.params.slug || "");
+const topic = (await listTopics()).find((t) => t.slug === slug && t.active);
+if (!topic) return notFound();
+const posts = await listPublishedPosts({ topicId: topic.id, limit: 100 });
+if (!posts.length) return notFound();
+
+const share = blogShareImage(topic);
+cachePublicPage(Astro.response.headers, { sMaxAge: 1800, staleWhileRevalidate: 86400, tag: BLOG_PAGES_TAG });
+const SITE_URL = (import.meta.env.SITE_URL || "https://aitickets.cl").replace(/\/$/, "");
+const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: topic.name,
+    description: topic.description,
+    url: `${SITE_URL}/blog/tema/${topic.slug}`,
+    inLanguage: "es-CL",
+    hasPart: posts.slice(0, 30).map((p) => ({ "@type": "BlogPosting", headline: p.title, url: `${SITE_URL}/blog/${p.slug}` })),
+};
+---
+
+<Layout
+    title={`${topic.name}: guías para productores | AI Tickets`}
+    description={topic.description || `Artículos de ${topic.name} para productores de eventos en Chile.`}
+    canonical={`/blog/tema/${topic.slug}`}
+    image={share.image}
+    imageAlt={share.alt}
+>
+    <AppHeader client:idle />
+    <main class="font-['Prompt']">
+        <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+        <section class="bg-black text-white px-4 pt-32 pb-16">
+            <div class="container mx-auto md:px-8 max-w-5xl">
+                <nav class="text-xs text-white/60 mb-4" aria-label="Ruta"><a href="/blog" class="hover:underline">Blog</a> / {topic.name}</nav>
+                <h1 class="text-3xl md:text-5xl font-bold font-['Unbounded']">{topic.name}</h1>
+                {topic.description && <p class="mt-4 text-lg text-white/80 max-w-2xl">{topic.description}</p>}
+            </div>
+        </section>
+        <section class="px-4 py-16 bg-white">
+            <div class="container mx-auto md:px-8 max-w-5xl grid grid-cols-1 md:grid-cols-2 gap-6">
+                {posts.map((p) => (
+                    <a href={`/blog/${p.slug}`} class="block p-6 rounded-xl border border-gray-200 hover:border-black transition">
+                        <h2 class="text-lg font-semibold font-['Unbounded']">{p.title}</h2>
+                        <p class="mt-2 text-sm text-gray-600">{p.excerpt || p.description}</p>
+                        <p class="mt-3 text-xs text-gray-400">{readingMinutes(p.word_count)} min de lectura</p>
+                    </a>
+                ))}
+            </div>
+            {topic.landing_path && (
+                <div class="container mx-auto md:px-8 max-w-5xl mt-10">
+                    <a href={topic.landing_path} data-cta="blog_topic" data-section="blog_topic" class="inline-block text-sm font-semibold underline">Cómo vender entradas para {topic.name.toLowerCase()} con AI Tickets →</a>
+                </div>
+            )}
+        </section>
+        <CallToAction campaign={`blog_tema_${topic.slug}`} />
+    </main>
+    <AppFooter client:idle />
+    <CtaTracking />
+</Layout>

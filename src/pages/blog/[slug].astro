@@ -1,0 +1,84 @@
+---
+// Artículo del blog SEO (docs/specs/blog-seo.md). SSR con caché en el CDN (etiqueta blog-pages: se vacía al publicar o
+// actualizar). Solo artículos publicados; los borradores se ven en /blog/vista-previa/<id> con link firmado.
+import AppHeader from "../../components/AppHeader.vue";
+import AppFooter from "../../components/AppFooter.vue";
+import CallToAction from "../../components/CallToAction.vue";
+import CtaTracking from "../../components/landing/CtaTracking.astro";
+import BlogArticle from "../../components/blog/BlogArticle.astro";
+import Layout from "../../layouts/Layout.astro";
+import { blogShareImage, getPostBySlug, listTopics, relatedPosts } from "../../lib/blog";
+import { BLOG_PAGES_TAG, cachePublicPage } from "../../lib/cdnCache";
+import { notFound } from "../../lib/notFound";
+import "../../styles/global.css";
+
+export const prerender = false;
+
+const slug = String(Astro.params.slug || "");
+const post = await getPostBySlug(slug);
+if (!post) return notFound();
+
+const topics = await listTopics();
+const topic = topics.find((t) => t.id === post.topic_id) || null;
+const related = await relatedPosts(post);
+const share = blogShareImage(topic);
+cachePublicPage(Astro.response.headers, { sMaxAge: 3600, staleWhileRevalidate: 86400, tag: BLOG_PAGES_TAG });
+
+const SITE_URL = (import.meta.env.SITE_URL || "https://aitickets.cl").replace(/\/$/, "");
+const url = `${SITE_URL}/blog/${post.slug}`;
+const published = post.published_at || post.created_at;
+const modified = post.content_updated_at || published;
+const org = { "@type": "Organization", name: "AI Tickets", url: SITE_URL, logo: { "@type": "ImageObject", url: `${SITE_URL}/android-chrome-512x512.png` } };
+const jsonLd: Record<string, unknown>[] = [
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        headline: post.title,
+        description: post.description,
+        datePublished: published,
+        dateModified: modified,
+        author: { "@type": "Organization", name: "Equipo AI Tickets", url: SITE_URL },
+        publisher: org,
+        mainEntityOfPage: url,
+        image: `${SITE_URL}${share.image}`,
+        inLanguage: "es-CL",
+        ...(topic ? { articleSection: topic.name } : {}),
+        ...(post.word_count ? { wordCount: post.word_count } : {}),
+    },
+    {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: [
+            { "@type": "ListItem", position: 1, name: "AI Tickets", item: SITE_URL },
+            { "@type": "ListItem", position: 2, name: "Blog", item: `${SITE_URL}/blog` },
+            ...(topic ? [{ "@type": "ListItem", position: 3, name: topic.name, item: `${SITE_URL}/blog/tema/${topic.slug}` }] : []),
+            { "@type": "ListItem", position: topic ? 4 : 3, name: post.title, item: url },
+        ],
+    },
+];
+if (post.faq.length) {
+    jsonLd.push({
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        mainEntity: post.faq.map((f) => ({ "@type": "Question", name: f.question, acceptedAnswer: { "@type": "Answer", text: f.answer } })),
+    });
+}
+---
+
+<Layout
+    title={`${post.meta_title || post.title} | AI Tickets`}
+    description={post.description}
+    canonical={`/blog/${post.slug}`}
+    ogType="article"
+    image={share.image}
+    imageAlt={share.alt}
+>
+    <AppHeader client:idle />
+    <main class="font-['Prompt']">
+        <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+        <BlogArticle post={post} topic={topic} related={related} />
+        <CallToAction campaign={`blog_${post.slug}`.slice(0, 80)} />
+    </main>
+    <AppFooter client:idle />
+    <CtaTracking />
+</Layout>
