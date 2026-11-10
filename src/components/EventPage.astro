@@ -10,15 +10,16 @@ import Layout from "../layouts/Layout.astro";
 import type { PublicEventResult } from "../lib/eventPage";
 import "../styles/global.css";
 
-type Props = Pick<PublicEventResult, "eventData" | "seo">;
+// analytics=false: vista previa con el token en la URL (?preview=): no se carga Google Analytics
+type Props = Pick<PublicEventResult, "eventData" | "seo"> & { analytics?: boolean };
 
-const { eventData, seo } = Astro.props;
+const { eventData, seo, analytics = true } = Astro.props;
 const visitEventId = eventData.is_preview ? null : eventData.id;
 const pageTitle = seo.title;
 const metaDescription = seo.description;
 const canonicalPath = seo.canonicalPath;
 ---
-<Layout>
+<Layout analytics={analytics}>
   <EventMetaTags
     slot="head"
     event={eventData}

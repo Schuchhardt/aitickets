@@ -2,7 +2,7 @@
 // Modal "Compartir" de la página del evento: redes sociales, copiar link y el share nativo del sistema.
 // Bottom sheet en mobile, diálogo centrado en desktop. El link es siempre el de la página pública (?ref=share),
 // nunca el de una entrada u orden (shareActions.eventShareUrl).
-import { ref, computed, watch, nextTick, onBeforeUnmount } from "vue";
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from "vue";
 import { Link as LinkIcon, Mail, MessageSquare, Share2, Linkedin, X, Check } from "lucide-vue-next";
 import { eventShareUrl } from "./shareActions.js";
 import { useGoogleAnalytics } from "../../composables/useGoogleAnalytics.js";
@@ -13,6 +13,10 @@ const props = defineProps({
   event: { type: Object, required: true },
 });
 const emit = defineEmits(["close"]);
+// El Teleport se monta recién en el cliente. Hidratado, Vue busca su contenido en el primer hijo de <body>
+// (el servidor no lo renderiza ahí) y, al no calzar, BORRA ese nodo: en la vista previa era el <main> entero.
+const teleportReady = ref(false);
+onMounted(() => (teleportReady.value = true));
 const { trackShare } = useGoogleAnalytics();
 
 const url = computed(() => (props.show ? eventShareUrl(props.event, "share") : ""));
@@ -92,7 +96,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <Teleport to="body">
+  <Teleport v-if="teleportReady" to="body">
     <Transition name="share">
       <div v-if="show" class="share-root ev-motion" @click.self="emit('close')">
         <div ref="dialog" class="share-sheet" role="dialog" aria-modal="true" aria-labelledby="share-title">

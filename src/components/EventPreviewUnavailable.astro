@@ -1,0 +1,23 @@
+---
+// Mensaje de un link de vista previa que no se puede abrir (vencido, revocado, ya usado, inexistente) o que
+// pidió un bot de vista previa de links. Lo usan /eventos/[slug]?preview=<token> y la ruta anterior
+// /eventos/vista-previa/<token>.
+import type { PreviewUnavailableReason } from "../lib/eventPreview";
+
+type Props = { reason: PreviewUnavailableReason };
+
+const messages: Record<PreviewUnavailableReason, { title: string; text: string }> = {
+  not_found: { title: "Vista previa no disponible", text: "El link no existe o el evento fue eliminado. Pide un link nuevo a quien te lo envió." },
+  expired: { title: "Este link de vista previa venció", text: "Pide un link nuevo a la productora del evento." },
+  revoked: { title: "Este link de vista previa fue desactivado", text: "Pide un link nuevo a la productora del evento." },
+  used: { title: "Este link ya fue usado", text: "Era un link de vista previa de un solo uso y ya se abrió en otro navegador. Pide uno nuevo a la productora." },
+  bot: { title: "Vista previa privada de un evento", text: "Abre este link en tu navegador para ver el evento." },
+};
+const { reason } = Astro.props;
+const message = messages[reason];
+---
+<section class="max-w-xl mx-auto px-6 py-24 text-center font-[Prompt]" data-testid="event-preview-unavailable" data-reason={reason}>
+  <h1 class="text-2xl font-bold font-[Unbounded] mb-3">{message.title}</h1>
+  <p class="text-gray-600">{message.text}</p>
+  <a href="/eventos" class="inline-block mt-8 px-5 py-2 rounded-full bg-black text-white font-medium">Ver eventos publicados</a>
+</section>

@@ -28,13 +28,14 @@ beforeEach(() => {
   })
 })
 
-const tokenOf = (url) => url.split('/').pop()
+const tokenOf = (url) => new URL(url).searchParams.get('preview')
 const create = (opts = {}) => preview.createPreviewLink({ eventId: 10, orgId: 7, origin: ORIGIN, ...opts })
 
 describe('createPreviewLink', () => {
   it('genera una URL con token y guarda solo su hash', async () => {
     const { url, link } = await create()
-    expect(url).toMatch(/^https:\/\/aitickets\.cl\/eventos\/vista-previa\/pv_[A-Za-z0-9_-]{40,}$/)
+    // La URL de la página del evento, con el token en ?preview=
+    expect(url).toMatch(/^https:\/\/aitickets\.cl\/eventos\/fiesta-1234\?preview=pv_[A-Za-z0-9_-]{40,}$/)
     const row = db.tables.aitickets_event_preview_links[0]
     expect(row.token_hash).toBe(preview.sha256Hex(tokenOf(url)))
     expect(JSON.stringify(row)).not.toContain(tokenOf(url))
@@ -43,6 +44,12 @@ describe('createPreviewLink', () => {
     const hours = (new Date(row.expires_at).getTime() - Date.now()) / 3600000
     expect(hours).toBeGreaterThan(167)
     expect(hours).toBeLessThanOrEqual(168)
+  })
+
+  it('previewUrl: slug + ?preview=; sin slug, la ruta anterior', () => {
+    expect(preview.previewUrl('https://aitickets.cl/', 'pv_x', 'mi-fiesta')).toBe('https://aitickets.cl/eventos/mi-fiesta?preview=pv_x')
+    expect(preview.previewUrl('https://aitickets.cl', 'pv_x')).toBe('https://aitickets.cl/eventos/vista-previa/pv_x')
+    expect(preview.previewUrl('https://aitickets.cl', 'pv_x', null)).toBe('https://aitickets.cl/eventos/vista-previa/pv_x')
   })
 
   it('sin vencimiento y validación del rango', async () => {
@@ -125,7 +132,7 @@ describe('herramientas de la API de productores', () => {
       public_url: null,
       link: { single_use: true, expires_at: null, label: 'Artista', created_via: 'mcp' },
     })
-    expect(res.result.preview_url).toMatch(/\/eventos\/vista-previa\/pv_/)
+    expect(res.result.preview_url).toMatch(/\/eventos\/[a-z0-9-]+\?preview=pv_/)
     expect(res.result.note).toMatch(/BORRADOR/)
   })
 

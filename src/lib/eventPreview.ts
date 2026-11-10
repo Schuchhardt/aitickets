@@ -1,4 +1,5 @@
-// Links privados de vista previa de un evento (también borradores): /eventos/vista-previa/<token>.
+// Links privados de vista previa de un evento (también borradores): /eventos/<slug>?preview=<token>.
+// La ruta anterior (/eventos/vista-previa/<token>) sigue funcionando para los links ya compartidos.
 // Solo servidor. Tabla aitickets_event_preview_links (migración 202610080100): se guarda el sha256 del token.
 //
 // Opciones al crear:
@@ -10,7 +11,12 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { getSupabaseAdmin } from "./auth-helpers";
 
+/** Ruta anterior de los links (token en el path). Se mantiene para los que ya se compartieron. */
 export const PREVIEW_PATH = "/eventos/vista-previa";
+/** Query param con el token en la página del evento: /eventos/<slug>?preview=<token>. */
+export const PREVIEW_PARAM = "preview";
+/** Path de la cookie de un link de un solo uso: cubre /eventos/<slug> y la ruta anterior. */
+export const PREVIEW_COOKIE_PATH = "/eventos";
 export const PREVIEW_TOKEN_PREFIX = "pv_";
 export const PREVIEW_DEFAULT_HOURS = 7 * 24;
 export const PREVIEW_MAX_HOURS = 365 * 24;
@@ -54,8 +60,11 @@ export class PreviewLinkError extends Error {
 const isMissingTable = (error: any) =>
     !!error && (error.code === "42P01" || error.code === "PGRST205" || /aitickets_event_preview_links/.test(error.message || ""));
 
-export function previewUrl(origin: string, token: string) {
-    return `${origin.replace(/\/+$/, "")}${PREVIEW_PATH}/${token}`;
+/** URL del link: la de la página del evento con el token en `?preview=`. Sin slug, la ruta anterior. */
+export function previewUrl(origin: string, token: string, slug?: string | null) {
+    const base = origin.replace(/\/+$/, "");
+    if (!slug) return `${base}${PREVIEW_PATH}/${token}`;
+    return `${base}/eventos/${encodeURIComponent(slug)}?${PREVIEW_PARAM}=${token}`;
 }
 
 export type PreviewLinkStatus = "active" | "expired" | "revoked" | "used";
@@ -148,7 +157,9 @@ export async function createPreviewLink(input: CreatePreviewLinkInput, supabase 
         if (isMissingTable(error)) throw new PreviewLinkError("unavailable", "Los links de vista previa estarán disponibles en unos minutos.");
         throw error;
     }
-    return { url: previewUrl(input.origin, token), link: presentPreviewLink(data as PreviewLinkRow) };
+    // El slug va en la URL (si cambia después, la página redirige al vigente: src/pages/eventos/[slug].astro)
+    const { data: event } = await supabase.from("events").select("slug").eq("id", input.eventId).maybeSingle();
+    return { url: previewUrl(input.origin, token, (event as any)?.slug), link: presentPreviewLink(data as PreviewLinkRow) };
 }
 
 /** Links de un evento (más recientes primero). [] si la tabla aún no existe. */
@@ -190,6 +201,9 @@ export async function revokePreviewLink(linkId: string, orgId: number, supabase 
 export type ResolvePreviewResult =
     | { ok: true; link: PreviewLinkRow; eventId: number; orgId: number; setCookie?: { name: string; value: string; maxAge: number | undefined } }
     | { ok: false; reason: "not_found" | "expired" | "revoked" | "used" | "bot" };
+
+/** Por qué un link no se puede abrir (mensajes en src/components/EventPreviewUnavailable.astro). */
+export type PreviewUnavailableReason = Extract<ResolvePreviewResult, { ok: false }>["reason"];
 
 /**
  * Valida un token de la URL y registra la visita. `cookieNonce` es el valor de la cookie del navegador
