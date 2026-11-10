@@ -91,7 +91,8 @@ const getEventCompliance: ToolDef = {
     title: "Autorización, documentos y liberación del evento",
     description:
         "Muestra el nivel de riesgo y la reserva del evento, si es masivo, el estado de su autorización (Delegación Presidencial), los documentos subidos y " +
-        "los que faltan, y por cada función si lo vendido está liberado o retenido y por qué. Los documentos se suben desde el panel del evento.",
+        "los que faltan, los ingresos (check-ins) del evento entero —incluidas las entradas sin función asignada, que no aparecen en los check-ins por función— " +
+        "y por cada función si lo vendido está liberado o retenido y por qué. Los documentos se suben desde el panel del evento.",
     scope: "read",
     permission: "events.read",
     annotations: { readOnlyHint: true },
@@ -131,6 +132,20 @@ const getEventCompliance: ToolDef = {
                       reserve_release_local: localDateTime(ledger.reserve_release_at),
                       hold_reasons: ledger.hold_reasons.map((r) => ({ code: r.code, label: r.label, amount: r.amount ?? null })),
                       summary: `Disponible ${clp(ledger.available)} · Pendiente ${clp(ledger.pending)} · Retenido ${clp(ledger.retained)}`,
+                  }
+                : null,
+            checkins: ledger
+                ? {
+                      paid_tickets: ledger.checkins.sold,
+                      checked_in: ledger.checkins.checked_in,
+                      ratio: ledger.checkins.sold > 0 ? Math.round((ledger.checkins.checked_in / ledger.checkins.sold) * 100) / 100 : null,
+                      unassigned_paid_tickets: ledger.checkins.unassigned_sold,
+                      unassigned_checked_in: ledger.checkins.unassigned_checked_in,
+                      summary:
+                          `${ledger.checkins.checked_in} de ${ledger.checkins.sold} entradas pagadas con ingreso` +
+                          (ledger.checkins.unassigned_sold > 0
+                              ? ` (${ledger.checkins.unassigned_checked_in} de ${ledger.checkins.unassigned_sold} son entradas sin función asignada: no aparecen en functions[].checkins, pero cuentan para liberar el evento)`
+                              : ""),
                   }
                 : null,
             functions: (ledger?.functions || []).map((f) => ({
