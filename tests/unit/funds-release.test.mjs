@@ -6,7 +6,7 @@ import { createFakeSupabase } from '../fixtures/fake-supabase.mjs'
 let db
 vi.mock('../../src/lib/auth-helpers', () => ({ getSupabaseAdmin: () => db, getFriendlyErrorMessage: (e) => String(e?.message || e) }))
 
-const { computeOrgLedger, CHECKIN_RELEASE_THRESHOLD } = await import('../../src/lib/producer-api/ledger.ts')
+const { computeOrgLedger, MIN_CHECKINS_FOR_RELEASE } = await import('../../src/lib/producer-api/ledger.ts')
 const { scoreEventRisk, refreshEventRisk } = await import('../../netlify/lib/event-risk.mjs')
 const { permitStatusFor, missingDocumentKinds } = await import('../../src/lib/eventDocuments.ts')
 const { checkAdminSecret, directRefundEvent } = await import('../../src/lib/adminDirectRefund.ts')
@@ -31,7 +31,7 @@ function seed({ org = {}, account = {}, event = {}, attendees, tables = {} } = {
       ],
       event_attendees: attendees || [
         { event_id: 40, event_order_id: 'a', event_ticket_id: 1, status: 'validated', validated_at: iso(-4 * DAY) },
-        { event_id: 40, event_order_id: 'b', event_ticket_id: 1, status: 'active', validated_at: null },
+        { event_id: 40, event_order_id: 'b', event_ticket_id: 1, status: 'validated', validated_at: iso(-4 * DAY) },
       ],
       aitickets_refunds: [],
       event_withdrawals: [],
@@ -50,7 +50,7 @@ describe('liberación condicionada', () => {
   it('con todo en regla libera la función', async () => {
     const l = await computeOrgLedger(db, 7)
     expect(l.events[0]).toMatchObject({ available: 20000, held: 0, pending: 0 })
-    expect(l.events[0].functions[0]).toMatchObject({ release_status: 'released', released: true, checkins: 1, checkin_ratio: 0.5 })
+    expect(l.events[0].functions[0]).toMatchObject({ release_status: 'released', released: true, checkins: 2, checkin_ratio: 1 })
     expect(l.hold_reasons).toEqual([])
   })
 
@@ -84,7 +84,7 @@ describe('liberación condicionada', () => {
     expect((await computeOrgLedger(db, 7)).hold_reasons.map((r) => r.code)).toEqual(['holder_mismatch'])
   })
 
-  it(`check-ins bajo ${CHECKIN_RELEASE_THRESHOLD * 100}% retienen hasta que el productor acredite la función`, async () => {
+  it(`menos de ${MIN_CHECKINS_FOR_RELEASE} check-ins retienen hasta que el productor acredite la función`, async () => {
     seed({
       attendees: [
         { event_id: 40, event_order_id: 'a', event_ticket_id: 1, status: 'active' },
@@ -109,16 +109,33 @@ describe('liberación condicionada', () => {
     expect((await computeOrgLedger(db, 7)).events[0].available).toBe(20000)
   })
 
-  it('reserva por riesgo: retiene el % hasta 60 días después de la función y luego libera', async () => {
-    seed({ event: { reserve_pct: 30, risk_level: 'medium' } })
-    let l = (await computeOrgLedger(db, 7)).events[0]
-    expect(l).toMatchObject({ available: 14000, reserve_amount: 6000, held: 6000, pending: 0 })
-    expect(l.reserve_release_at).toBeTruthy()
-    expect(l.functions[0].release_status).toBe('held')
+  it('un par de check-ins basta, aunque sea un % bajo de lo vendido', async () => {
+    const orders = Array.from({ length: 50 }, (_, i) => ({ id: `o${i}`, event_id: 40, status: 'paid', amount: 1000, ticket_qty: 1 }))
+    const att = (n) => orders.map((o, i) => ({ event_id: 40, event_order_id: o.id, event_ticket_id: 1, status: i < n ? 'validated' : 'active', validated_at: i < n ? iso(-4 * DAY) : null }))
+    seed({ attendees: att(2), tables: { event_orders: orders } })
+    expect((await computeOrgLedger(db, 7)).events[0]).toMatchObject({ available: 50000, held: 0 })
+    seed({ attendees: att(1), tables: { event_orders: orders } })
+    expect((await computeOrgLedger(db, 7)).events[0]).toMatchObject({ available: 0, held: 50000 })
+  })
 
-    db.tables.event_dates[0].date = chileDate(-70 * DAY)
-    l = (await computeOrgLedger(db, 7)).events[0]
-    expect(l).toMatchObject({ available: 20000, reserve_amount: 0, held: 0 })
+  it('con una sola entrada vendida basta que esa entre', async () => {
+    seed({
+      attendees: [{ event_id: 40, event_order_id: 'a', event_ticket_id: 1, status: 'validated', validated_at: iso(-4 * DAY) }],
+      tables: { event_orders: [{ id: 'a', event_id: 40, status: 'paid', amount: 10000, ticket_qty: 1 }] },
+    })
+    expect((await computeOrgLedger(db, 7)).events[0]).toMatchObject({ available: 10000, held: 0 })
+  })
+
+  it('entradas válidas para cualquier función usan los check-ins del evento', async () => {
+    seed({ tables: { event_tickets: [{ id: 1, event_id: 40, event_date_id: null }] } })
+    expect((await computeOrgLedger(db, 7)).events[0]).toMatchObject({ available: 20000, held: 0 })
+  })
+
+  it('sin reserva por riesgo: reserve_pct del evento no retiene nada', async () => {
+    seed({ event: { reserve_pct: 30, risk_level: 'medium' } })
+    const l = (await computeOrgLedger(db, 7)).events[0]
+    expect(l).toMatchObject({ available: 20000, reserve_amount: 0, held: 0, pending: 0, reserve_pct: 0 })
+    expect(l.functions[0].release_status).toBe('released')
   })
 
   it('funciones por realizarse siguen pendientes (no retenidas)', async () => {
@@ -134,15 +151,15 @@ describe('score de riesgo', () => {
     expect(r).toMatchObject({ level: 'low', reserve_pct: 0, requires_documents: false, signals: [] })
   })
 
-  it('productor nuevo: medio (30%)', () => {
+  it('productor nuevo: medio, sin reserva', () => {
     const r = scoreEventRisk({ orgCreatedAt: iso(-5 * DAY), priorHeldEvents: 0, hasExactAddress: true, capacity: 200 })
-    expect(r).toMatchObject({ level: 'medium', reserve_pct: 30 })
+    expect(r).toMatchObject({ level: 'medium', reserve_pct: 0 })
     expect(r.signals.map((s) => s.code)).toEqual(['new_producer'])
   })
 
-  it('nuevo + masivo + sin dirección: alto (100%) y exige documentos', () => {
+  it('nuevo + masivo + sin dirección: alto y exige documentos, sin reserva', () => {
     const r = scoreEventRisk({ orgCreatedAt: iso(-5 * DAY), priorHeldEvents: 0, hasExactAddress: false, capacity: 3000, isMassive: true })
-    expect(r).toMatchObject({ level: 'high', reserve_pct: 100, requires_documents: true })
+    expect(r).toMatchObject({ level: 'high', reserve_pct: 0, requires_documents: true })
   })
 
   it('pico de ventas y teléfono compartido suman señales', () => {

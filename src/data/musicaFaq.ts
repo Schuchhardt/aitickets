@@ -13,8 +13,7 @@
 import { PRODUCER_FAQ, type FaqItem } from "./producerFaq";
 import { ORGANIZADORES_FAQ } from "./organizadoresFaq";
 import { getLanding } from "./landings";
-import { LARGE_CAPACITY, RESERVE_BY_LEVEL } from "../../netlify/lib/event-risk.mjs";
-import { RESERVE_HOLD_DAYS } from "../lib/producer-api/ledger";
+import { LARGE_CAPACITY } from "../../netlify/lib/event-risk.mjs";
 
 const pick = (list: FaqItem[], q: string): FaqItem => {
     const item = list.find((f) => f.q === q);
@@ -51,7 +50,7 @@ export const MUSICA_FAQ: FaqItem[] = [
     pick(ORGANIZADORES_FAQ, "¿Puedo poner un video como portada del evento?"),
     {
         q: "¿Sirve para un concierto grande?",
-        a: `Sí. Si el aforo pasa de ${LARGE_CAPACITY.toLocaleString("es-CL")} personas o es un evento masivo, te pedimos el permiso del lugar y una póliza de responsabilidad civil (y, si es masivo, la autorización de la Delegación Presidencial). Según el riesgo del evento, entre el ${RESERVE_BY_LEVEL.medium}% y el ${RESERVE_BY_LEVEL.high}% de lo vendido puede quedar como reserva hasta ${RESERVE_HOLD_DAYS} días después del show.`,
+        a: `Sí. Si el aforo pasa de ${LARGE_CAPACITY.toLocaleString("es-CL")} personas o es un evento masivo, te pedimos el permiso del lugar y una póliza de responsabilidad civil (y, si es masivo, la autorización de la Delegación Presidencial).`,
         terms: true,
     },
     pick(ORGANIZADORES_FAQ, "¿Cómo funcionan las reseñas?"),

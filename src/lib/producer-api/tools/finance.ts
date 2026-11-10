@@ -6,7 +6,7 @@ import { randomUUID } from "node:crypto";
 import { ToolError, type ToolDef, type ToolContext, channelLabel } from "../registry";
 import { eventIdSchema, loadOwnedEvent, clp, fetchAll, localDateTime } from "./common";
 import { PAYOUT_BUSINESS_DAYS as LEGAL_PAYOUT_BUSINESS_DAYS } from "../../../../netlify/lib/legal.mjs";
-import { computeOrgLedger, addBusinessDays, loadOrgEvents, RELEASE_HOURS, WITHDRAWN_STATUSES, isActiveRefund, CHECKIN_RELEASE_THRESHOLD, RESERVE_HOLD_DAYS } from "../ledger";
+import { computeOrgLedger, addBusinessDays, loadOrgEvents, RELEASE_HOURS, WITHDRAWN_STATUSES, isActiveRefund, MIN_CHECKINS_FOR_RELEASE } from "../ledger";
 import { computeFeeSplit, SERVICE_FEE_RATE, IVA_RATE, SERVICE_FEE_PERCENT_LABEL, IVA_PERCENT_LABEL } from "../../../../netlify/lib/fees.mjs";
 import { computeDiscountAmount } from "../../../../netlify/lib/discounts.mjs";
 import { notifySlack } from "../../../pages/api/_lib/server-utils";
@@ -460,9 +460,9 @@ const getBalance: ToolDef = {
     description:
         `Saldo del productor en CLP: disponible para retirar (ventas de funciones que terminaron hace ≥ ${RELEASE_HOURS} h y cumplen las condiciones de liberación), ` +
         "pendiente (funciones por realizarse) y retenido (pagos en revisión, eventos cancelados o condiciones sin cumplir). " +
-        "Condiciones para liberar una función: identidad del productor verificada, cuenta bancaria verificada a su nombre, check-ins de al menos " +
-        `${Math.round(CHECKIN_RELEASE_THRESHOLD * 100)}% de las entradas (o la función acreditada con attest_function_held) y sin reclamos ni contracargos abiertos; ` +
-        `además puede aplicarse una reserva por riesgo de hasta el 100% por hasta ${RESERVE_HOLD_DAYS} días. hold_reasons explica cada retención (código y texto). Incluye el detalle por evento y función.`,
+        "Condiciones para liberar una función: identidad del productor verificada, cuenta bancaria verificada a su nombre, al menos " +
+        `${MIN_CHECKINS_FOR_RELEASE} check-ins (o la función acreditada con attest_function_held) y sin reclamos ni contracargos abiertos. ` +
+        `Se libera el 100% (sin reserva por riesgo). hold_reasons explica cada retención (código y texto). Incluye el detalle por evento y función.`,
     scope: "finance",
     permission: "finance.read",
     annotations: { readOnlyHint: true },
