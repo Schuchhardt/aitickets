@@ -205,6 +205,7 @@ export async function loadOrgEvents(supabase: any, orgId: number, eventIds?: num
         return q;
     };
     for (const cols of [
+        "id, name, status, start_date, end_date, cancelled_at, fee_absorbed, reserve_pct, risk_level, held_attested_at, released_early_at, release_override_at",
         "id, name, status, start_date, end_date, cancelled_at, fee_absorbed, reserve_pct, risk_level, held_attested_at, released_early_at",
         "id, name, status, start_date, end_date, cancelled_at, fee_absorbed, reserve_pct, risk_level, held_attested_at",
         "id, name, status, start_date, end_date, cancelled_at, fee_absorbed",
@@ -284,9 +285,28 @@ function mergeReason(into: HoldReason[], add: HoldReason) {
 }
 
 /** Saldo por evento de la organización (opcionalmente solo algunos eventos). */
-export async function computeOrgLedger(supabase: any, orgId: number, opts: { eventIds?: number[] | null; now?: Date } = {}): Promise<OrgLedger> {
+/**
+ * Liberación anticipada que se SIMULA sin escribir (release_event_funds la usa para mostrar el monto exacto antes
+ * de confirmar): el evento entero o solo esas funciones, con o sin omitir las condiciones.
+ */
+export type AssumeEarlyRelease = { eventId: number; eventDateIds?: number[] | null; override?: boolean };
+
+export async function computeOrgLedger(
+    supabase: any,
+    orgId: number,
+    opts: { eventIds?: number[] | null; now?: Date; assumeEarlyRelease?: AssumeEarlyRelease | null } = {},
+): Promise<OrgLedger> {
     const now = opts.now || new Date();
     const events = await loadOrgEvents(supabase, orgId, opts.eventIds);
+    const simulated = opts.assumeEarlyRelease || null;
+    if (simulated) {
+        const nowIso = now.toISOString();
+        for (const e of events) {
+            if (Number(e.id) !== simulated.eventId || simulated.eventDateIds?.length) continue;
+            e.released_early_at = e.released_early_at || nowIso;
+            if (simulated.override) e.release_override_at = e.release_override_at || nowIso;
+        }
+    }
     const ids = events.map((e) => Number(e.id));
     const empty: OrgLedger = {
         events: [],
@@ -299,7 +319,12 @@ export async function computeOrgLedger(supabase: any, orgId: number, opts: { eve
         fetchAllRows(() => supabase.from("event_orders").select("id, event_id, status, amount, ticket_qty").in("event_id", ids).in("status", ["paid", "review"])),
         tolerantCols(
             (cols) => supabase.from("event_dates").select(cols).in("event_id", ids),
-            ["id, event_id, date, start_time, end_time, held_attested_at, released_early_at", "id, event_id, date, start_time, end_time, held_attested_at", "id, event_id, date, start_time, end_time"],
+            [
+                "id, event_id, date, start_time, end_time, held_attested_at, released_early_at, release_override_at",
+                "id, event_id, date, start_time, end_time, held_attested_at, released_early_at",
+                "id, event_id, date, start_time, end_time, held_attested_at",
+                "id, event_id, date, start_time, end_time",
+            ],
         ),
         tolerant(() => supabase.from("aitickets_refunds").select("order_id, event_id, ticket_amount, status").eq("organization_id", orgId).in("event_id", ids)),
         tolerant(() => supabase.from("event_withdrawals").select("event_id, amount, status").in("event_id", ids)),
@@ -344,6 +369,19 @@ export async function computeOrgLedger(supabase: any, orgId: number, opts: { eve
         const fnId = a.event_ticket_id == null ? null : ticketDate.get(String(a.event_ticket_id)) ?? null;
         if (fnId != null) bump(checkinsByFn, fnId, a);
     }
+    if (simulated?.eventDateIds?.length) {
+        const nowIso = now.toISOString();
+        const wanted = new Set(simulated.eventDateIds.map(Number));
+        for (const d of dates) {
+            if (Number(d.event_id) !== simulated.eventId || !wanted.has(Number(d.id))) continue;
+            d.released_early_at = d.released_early_at || nowIso;
+            if (simulated.override) d.release_override_at = d.release_override_at || nowIso;
+        }
+    }
+    // Liberación anticipada (release_event_funds): no espera las 48 h; con override tampoco exige condiciones.
+    const earlyFns = new Set<number>(dates.filter((d) => d.released_early_at).map((d) => Number(d.id)));
+    const overrideFns = new Set<number>(dates.filter((d) => d.release_override_at).map((d) => Number(d.id)));
+
     const ratio = (c?: { sold: number; in: number }) => (c && c.sold > 0 ? c.in / c.sold : null);
 
     const disputedEvents = new Set<number>();
@@ -481,12 +519,17 @@ export async function computeOrgLedger(supabase: any, orgId: number, opts: { eve
             f.tickets += qty;
         }
         if (l.cancelled) continue;
-        const end = f ? new Date(f.ends_at) : eventEnd.get(l.event_id) ?? null;
-        const release = releaseOf(end);
-        if (!release || release.getTime() > now.getTime()) continue; // aún no cumple 48 h: pendiente
+        const ev = eventRow.get(l.event_id);
+        const early = Boolean(ev?.released_early_at || (f && earlyFns.has(f.event_date_id)));
+        const override = Boolean(ev?.release_override_at || (f && overrideFns.has(f.event_date_id)));
+        if (!early) {
+            const end = f ? new Date(f.ends_at) : eventEnd.get(l.event_id) ?? null;
+            const release = releaseOf(end);
+            if (!release || release.getTime() > now.getTime()) continue; // aún no cumple 48 h: pendiente
+        }
 
         const net = amount - (refundsByOrder.get(String(o.id)) || 0);
-        const reasons = conditionsFor(l, f);
+        const reasons = override ? [] : conditionsFor(l, f);
         if (reasons.length) {
             add(heldNet, l.event_id, net);
             for (const r of reasons) {
@@ -528,7 +571,8 @@ export async function computeOrgLedger(supabase: any, orgId: number, opts: { eve
             l.retained = l.held;
         }
         const releasesAt = l.releases_at ? new Date(l.releases_at) : null;
-        l.released = !l.cancelled && Boolean(releasesAt && releasesAt.getTime() <= now.getTime()) && l.held === 0;
+        const releasedEarly = Boolean(eventRow.get(l.event_id)?.released_early_at);
+        l.released = !l.cancelled && (releasedEarly || Boolean(releasesAt && releasesAt.getTime() <= now.getTime())) && l.held === 0;
         if (!l.cancelled && l.pending > 0) {
             const next = l.functions.find((f) => f.release_status === "pending" && f.releases_at > nowIso && f.sales_net > 0)?.releases_at;
             l.next_release_at = next || (l.releases_at && l.releases_at > nowIso ? l.releases_at : null);

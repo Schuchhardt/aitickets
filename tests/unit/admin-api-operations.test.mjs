@@ -35,6 +35,7 @@ const { resetSupportUserCache } = await import('../../src/lib/admin-api/context.
 const { getAdminTool } = await import('../../src/lib/admin-api/tools/index.ts')
 const { runAdminTool } = await import('../../src/lib/admin-api/registry.ts')
 const { payoutSlackSql } = await import('../../src/lib/producer-api/tools/finance.ts')
+const { computeOrgLedger } = await import('../../src/lib/producer-api/ledger.ts')
 const adminRoute = await import('../../src/pages/api/admin/mcp.ts')
 
 const SITE = 'https://aitickets.cl'
@@ -255,6 +256,73 @@ describe('retiros', () => {
   it('el aviso de Slack del retiro sugiere el camino por Claude', () => {
     expect(payoutSlackSql(7, P1)).toContain(`«paga el retiro ${P1}»`)
     expect(payoutSlackSql(7, P1)).toContain("aitickets_set_payout_status")
+  })
+})
+
+describe('release_event_funds', () => {
+  const chileDate = (ms) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago' }).format(new Date(Date.now() + ms))
+  const hm = (ms) => new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Santiago', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(Date.now() + ms))
+  // Evento 20 de la org 7: una función que terminó hace ~1 h (faltan ~47 h para liberar) y entradas SIN función
+  // asignada (event_date_id null), como el Concierto de Primavera: no suman en functions[].sales_net.
+  function seedEvent({ checkedIn = 2 } = {}) {
+    db.tables.events.push({ id: 20, name: 'Concierto Veinte', slug: 'concierto-veinte', status: 'published', organization_id: 7, start_date: iso(-3 * HOUR), end_date: null, created_at: iso(-30 * DAY) })
+    db.tables.event_dates = [{ id: 201, event_id: 20, date: chileDate(-2 * HOUR), start_time: hm(-2 * HOUR), end_time: hm(-1 * HOUR) }]
+    db.tables.event_tickets = [{ id: 71, event_id: 20, event_date_id: null }]
+    db.tables.event_orders.push(
+      { id: 'c1', event_id: 20, status: 'paid', amount: 30000, ticket_qty: 1 },
+      { id: 'c2', event_id: 20, status: 'paid', amount: 30000, ticket_qty: 1 },
+    )
+    db.tables.event_attendees = ['c1', 'c2'].map((id, i) => ({ event_id: 20, event_order_id: id, event_ticket_id: 71, status: i < checkedIn ? 'validated' : 'active', validated_at: i < checkedIn ? iso(-2 * HOUR) : null }))
+    db.tables.aitickets_disputes = []
+  }
+  const eventLedger = async () => (await computeOrgLedger(db, 7, { eventIds: [20] })).events[0]
+
+  it('libera las ventas sin función asignada: muestra el monto real y el saldo queda disponible', async () => {
+    seedEvent()
+    expect(await eventLedger()).toMatchObject({ available: 0, pending: 60000 })
+    const args = { event_id: 20, reason: 'Productor pidió adelantar, Flow ya liquidó (WhatsApp 10-11)' }
+    const { first, second } = await confirmAndRun('release_event_funds', args)
+    expect(first.result.summary).toMatch(/60\.000/)
+    expect(second.ok, JSON.stringify(second)).toBe(true)
+    expect(second.result).toMatchObject({ amount: 60000, available: 60000, override_conditions: false })
+    expect(db.tables.events.find((e) => e.id === 20)).toMatchObject({ released_early_by: 'admin:abcd1234' })
+    expect(db.tables.events.find((e) => e.id === 20).release_override_at).toBeUndefined()
+    expect(db.tables.events.find((e) => e.id === 20).released_early_at).toBeTruthy()
+    expect(await eventLedger()).toMatchObject({ available: 60000, pending: 0, held: 0, released: true })
+    expect(sent.at(-1).html).toContain('60.000')
+  })
+
+  it('sin check-ins se niega antes de confirmar; con override libera y el ledger deja de exigir las condiciones', async () => {
+    seedEvent({ checkedIn: 0 })
+    const denied = await run('release_event_funds', { event_id: 20, reason: 'Productor pidió adelantar' })
+    expect(denied).toMatchObject({ ok: false, code: 'conflict' })
+    expect(denied.message).toMatch(/Condiciones sin cumplir.*60\.000/)
+
+    const args = { event_id: 20, override_conditions: true, notify_producer: false, reason: 'Flow liquidó y el evento se hizo (fotos por WhatsApp)' }
+    const { second } = await confirmAndRun('release_event_funds', args)
+    expect(second.result).toMatchObject({ amount: 60000, available: 60000, override_conditions: true })
+    expect(db.tables.events.find((e) => e.id === 20).release_override_at).toBeTruthy()
+    expect(await eventLedger()).toMatchObject({ available: 60000, held: 0 })
+  })
+
+  it('una función puntual: solo se libera lo de esa función', async () => {
+    seedEvent()
+    db.tables.event_dates.push({ id: 202, event_id: 20, date: chileDate(5 * DAY), start_time: '20:00', end_time: '23:00' })
+    db.tables.event_tickets.push({ id: 72, event_id: 20, event_date_id: 201 })
+    db.tables.event_orders.push({ id: 'c3', event_id: 20, status: 'paid', amount: 15000, ticket_qty: 1 })
+    db.tables.event_attendees.push({ event_id: 20, event_order_id: 'c3', event_ticket_id: 72, status: 'validated', validated_at: iso(-2 * HOUR) })
+    const { first, second } = await confirmAndRun('release_event_funds', { event_id: 20, event_date_id: 201, notify_producer: false, reason: 'Productor pidió adelantar la función 1' })
+    expect(first.result.summary).toMatch(/15\.000/)
+    expect(second.result).toMatchObject({ amount: 15000 })
+    expect(db.tables.event_dates.find((d) => d.id === 201).released_early_at).toBeTruthy()
+    expect(db.tables.events.find((e) => e.id === 20).released_early_at).toBeUndefined()
+    expect(await eventLedger()).toMatchObject({ available: 15000, pending: 60000 })
+  })
+
+  it('si ya está todo disponible no hay nada que liberar', async () => {
+    const res = await run('release_event_funds', { event_id: 10, reason: 'Probar liberar algo ya liberado' })
+    expect(res).toMatchObject({ ok: false, code: 'conflict' })
+    expect(res.message).toMatch(/No hay fondos por liberar/)
   })
 })
 
