@@ -130,7 +130,7 @@ const markPayoutPaid: AdminToolDef = {
     description:
         "Registra que AI Tickets YA transfirió un retiro: guarda el n° de comprobante (reference, obligatorio: pídelo, nunca lo inventes), " +
         "deja el retiro y su reparto por evento en 'paid' y, por defecto, le avisa al productor por correo con el monto, la cuenta (últimos 4) y el comprobante. " +
-        "Se niega si la cuenta no está verificada, cambió después de pedir el retiro o sus últimos 4 no calzan, salvo force=true (solo si ya " +
+        "Se niega si la cuenta cambió después de pedir el retiro o sus últimos 4 no calzan, salvo force=true (solo si ya " +
         "transferiste a la cuenta correcta). Pide confirmación.",
     readOnly: false,
     idempotent: true,
@@ -159,7 +159,7 @@ const markPayoutPaid: AdminToolDef = {
         if (warnings.length && !args.force) {
             throw new ToolError(
                 "conflict",
-                `${warnings.join(" ")} Si NO has transferido, resuélvelo primero (verify_payout_account o confirma la cuenta con el productor). ` +
+                `${warnings.join(" ")} Si NO has transferido, resuélvelo primero (confirma la cuenta con el productor). ` +
                     "Si ya transferiste a la cuenta correcta, repite con force=true.",
             );
         }

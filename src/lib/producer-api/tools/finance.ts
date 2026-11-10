@@ -12,7 +12,7 @@ import { computeDiscountAmount } from "../../../../netlify/lib/discounts.mjs";
 import { notifySlack } from "../../../pages/api/_lib/server-utils";
 import { isTransferOrder } from "../../orderKinds";
 import { functionSettlement, SettlementError } from "../../functionSettlement";
-import { identityApproved, loadOrgIdentity, recomputeHolderMatch, orgExceedsFreeSoldTickets, IDENTITY_REQUIRED_FOR_PAYOUT_MESSAGE } from "../../producerIdentity";
+import { identityApproved, loadOrgIdentity, orgExceedsFreeSoldTickets, IDENTITY_REQUIRED_FOR_PAYOUT_MESSAGE } from "../../producerIdentity";
 
 export const BANK_CHANGE_HOLD_HOURS = 72;
 const PAYOUT_BUSINESS_DAYS = LEGAL_PAYOUT_BUSINESS_DAYS;
@@ -63,13 +63,9 @@ export function payoutAccountState(acc: any, now = new Date()) {
     const complete = Boolean(acc?.bank_name && acc?.bank_account_number && acc?.bank_account_holder && acc?.bank_account_rut);
     const holdUntil = acc?.bank_changed_at ? new Date(new Date(acc.bank_changed_at).getTime() + BANK_CHANGE_HOLD_HOURS * 3600000) : null;
     const coolingActive = Boolean(holdUntil && holdUntil.getTime() > now.getTime());
-    let status: "missing" | "pending_verification" | "verified" | "rejected" | "removed";
-    if (!complete) status = acc?.removed_at ? "removed" : "missing";
-    else if (acc?.verified_at) status = "verified";
-    // AI Tickets la rechazó y el productor aún no corrige los datos (cambiarlos borra el rechazo en la BD)
-    else if (acc?.verification_rejected_at) status = "rejected";
-    else status = "pending_verification";
-    return { complete, status, holdUntil, coolingActive, canPayout: status === "verified" && !coolingActive };
+    // La cuenta no se verifica: basta con que esté completa (solo se verifica la identidad de la persona).
+    const status: "missing" | "active" | "removed" = complete ? "active" : acc?.removed_at ? "removed" : "missing";
+    return { complete, status, holdUntil, coolingActive, canPayout: complete && !coolingActive };
 }
 
 /** Cuenta de pago para mostrar: banco, tipo y últimos 4 dígitos; nunca el número completo ni el RUT. */
@@ -83,8 +79,6 @@ export function presentAccount(acc: any) {
         holder: maskName(acc?.bank_account_holder),
         holder_rut: maskRut(acc?.bank_account_rut),
         legal_name: acc?.legal_name || null,
-        verified_at: acc?.verified_at || null,
-        ...(state.status === "rejected" ? { rejected_at: acc.verification_rejected_at, rejection_reason: acc.verification_notes || null } : {}),
         last_changed_at: acc?.bank_changed_at || acc?.updated_at || null,
         payouts_blocked_until: state.coolingActive ? state.holdUntil!.toISOString() : null,
         can_request_payout: state.canPayout,
@@ -97,8 +91,8 @@ const getPayoutAccount: ToolDef = {
     name: "get_payout_account",
     title: "Ver cuenta de pago",
     description:
-        "Muestra si hay una cuenta bancaria registrada para recibir los pagos y su estado (missing, pending_verification, verified, rejected, removed). " +
-        "Si AI Tickets la rechazó, rejection_reason dice qué corregir en el panel. " +
+        "Muestra si hay una cuenta bancaria registrada para recibir los pagos y su estado (missing, active, removed). " +
+        "La cuenta no requiere verificación de AI Tickets: basta con registrarla completa. " +
         "Solo expone banco, tipo de cuenta y últimos 4 dígitos: nunca el número completo ni el RUT.",
     scope: "finance",
     permission: "finance.read",
@@ -141,7 +135,7 @@ const createPayoutAccountLink: ToolDef = {
 const getVerificationStatus: ToolDef = {
     name: "get_verification_status",
     title: "Estado de verificación para retiros",
-    description: "Indica qué falta para poder retirar dinero: correo verificado, términos aceptados, datos bancarios completos, verificación de AI Tickets y espera tras cambios. La identidad (Didit) se exige solo a partir de 10 entradas vendidas.",
+    description: "Indica qué falta para poder retirar dinero: correo verificado, términos aceptados, datos bancarios completos y espera tras cambios (la cuenta no se verifica). La identidad (Didit) se exige solo a partir de 10 entradas vendidas.",
     scope: "finance",
     permission: "finance.read",
     annotations: { readOnlyHint: true },
@@ -152,7 +146,6 @@ const getVerificationStatus: ToolDef = {
         const identity = await loadOrgIdentity(ctx.supabase, ctx.actor.orgId);
         const acc = await loadPayoutAccount(ctx);
         const state = payoutAccountState(acc);
-        const holder = await holderMatchStatus(ctx, acc, identity);
         const exceedsThreshold = await orgExceedsFreeSoldTickets(ctx.supabase, ctx.actor.orgId);
         const identityRequired = exceedsThreshold;
         const checks = [
@@ -160,16 +153,6 @@ const getVerificationStatus: ToolDef = {
             { item: "terms_accepted", label: "Términos para productores aceptados", ok: Boolean(org?.terms_accepted_at), required: false },
             { item: "legal_identity", label: "Razón social y RUT de la empresa (recomendado para la boleta/factura)", ok: Boolean(acc?.legal_name && acc?.legal_rut), required: false },
             { item: "bank_account", label: "Datos bancarios completos (banco, número, titular y RUT del titular)", ok: state.complete, required: true },
-            state.status === "rejected"
-                ? {
-                      item: "bank_verified",
-                      label: `AI Tickets rechazó la cuenta: ${acc.verification_notes || "revisa los datos"}. Corrige los datos bancarios en el panel y guárdalos de nuevo.`,
-                      ok: false,
-                      required: true,
-                      rejected: true,
-                      rejection_reason: acc.verification_notes || null,
-                  }
-                : { item: "bank_verified", label: "Cuenta verificada por AI Tickets", ok: state.status === "verified", required: true },
             {
                 item: "identity_verified",
                 label: identityRequired
@@ -178,13 +161,6 @@ const getVerificationStatus: ToolDef = {
                 ok: identityApproved(identity),
                 required: identityRequired,
                 status: identity?.identity_status ?? "not_started",
-            },
-            {
-                item: "holder_matches_identity",
-                label: "Cuenta bancaria a nombre de la persona o empresa verificada (no se transfiere a terceros)",
-                ok: holder === "match",
-                required: identityRequired,
-                status: holder,
             },
             {
                 item: "bank_change_hold",
@@ -200,12 +176,6 @@ const getVerificationStatus: ToolDef = {
             missing,
             checks,
             manage_url: settingsUrl(ctx),
-            note:
-                state.status === "pending_verification"
-                    ? "AI Tickets revisa las cuentas nuevas o modificadas, normalmente en 1 día hábil."
-                    : state.status === "rejected"
-                      ? "Al guardar datos bancarios corregidos, la cuenta vuelve a revisión."
-                      : undefined,
         };
     },
 };
@@ -605,15 +575,6 @@ function allocateFifo(ledgerEvents: any[], amount: number): Allocation[] {
     return out;
 }
 
-/** holder_match_status de la cuenta; si nunca se calculó (cuenta anterior a la regla) se calcula ahora. */
-async function holderMatchStatus(ctx: ToolContext, acc: any, identity: any): Promise<"match" | "mismatch" | "pending"> {
-    if (!acc?.bank_account_rut) return "pending";
-    const stored = acc.holder_match_status;
-    if (stored === "match" || stored === "mismatch") return stored;
-    if (!identityApproved(identity)) return "pending";
-    return (await recomputeHolderMatch(ctx.supabase, ctx.actor.orgId))?.status ?? "pending";
-}
-
 async function planPayout(args: any, ctx: ToolContext) {
     const acc = await loadPayoutAccount(ctx);
     const state = payoutAccountState(acc);
@@ -622,19 +583,6 @@ async function planPayout(args: any, ctx: ToolContext) {
         throw new ToolError("conflict", `${IDENTITY_REQUIRED_FOR_PAYOUT_MESSAGE} Hazlo en ${ctx.origin}/dashboard/settings#identidad. Revisa get_verification_status.`);
     }
     if (!state.complete) throw new ToolError("conflict", `No hay una cuenta bancaria registrada. Regístrala en ${settingsUrl(ctx)} (create_payout_account_link).`);
-    if (state.status === "rejected") {
-        throw new ToolError("conflict", `AI Tickets rechazó la cuenta bancaria: ${acc.verification_notes || "revisa los datos"}. Corrígela en ${settingsUrl(ctx)} y vuelve a guardarla.`);
-    }
-    if (state.status !== "verified") throw new ToolError("conflict", "La cuenta bancaria aún no está verificada por AI Tickets. Revisa get_verification_status.");
-    if (identityApproved(identity)) {
-        const holder = await holderMatchStatus(ctx, acc, identity);
-        if (holder !== "match") {
-            throw new ToolError(
-                "conflict",
-                "La cuenta bancaria debe estar a nombre de la persona o empresa verificada: no transferimos a cuentas de terceros. AI Tickets la revisará; si la cuenta es correcta, escríbenos a soporte.",
-            );
-        }
-    }
     if (state.coolingActive) {
         throw new ToolError("conflict", `La cuenta bancaria cambió hace poco: por seguridad los retiros quedan habilitados desde ${state.holdUntil!.toISOString()}.`);
     }

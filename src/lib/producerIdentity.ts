@@ -184,11 +184,6 @@ export async function recomputeHolderMatch(supabase: any, orgId: number): Promis
         .update({ holder_match_status: result.status, holder_checked_at: new Date().toISOString() })
         .eq("organization_id", orgId);
     if (updError && !isMissing(updError)) throw updError;
-    if (result.status === "mismatch" && acc.holder_match_status !== "mismatch") {
-        await notifySlack(
-            `⚠️ *Titular de cuenta ≠ identidad verificada* (org ${orgId}). Retiros bloqueados hasta revisión manual.\n• ${result.reason}`,
-        );
-    }
     return result;
 }
 

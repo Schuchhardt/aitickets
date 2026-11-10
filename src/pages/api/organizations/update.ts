@@ -2,7 +2,7 @@ import type { APIRoute } from "astro";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { getSessionContext, hasRole, ORG_ADMIN_ROLES, jsonResponse } from "../../../lib/supabaseServer";
 import { notifySlack } from "../_lib/server-utils";
-import { recomputeHolderMatch, syncOrganizerLegalData } from "../../../lib/producerIdentity";
+import { syncOrganizerLegalData } from "../../../lib/producerIdentity";
 import { roleAllows } from "../../../lib/producer-api/permissions";
 
 // Campos editables de la organización (public.organizations) y su largo máximo
@@ -26,16 +26,10 @@ const PAYOUT_FIELDS: Record<string, number> = {
 
 const RUT_REGEX = /^[0-9]{1,2}\.?[0-9]{3}\.?[0-9]{3}-?[0-9kK]$/;
 
-/** Aviso a AI Tickets de una cuenta por verificar, con el SQL para aprobarla o rechazarla (solo los últimos 4 dígitos). */
-function bankAccountSlackMessage(orgId: number, userId: number, bankName: string | null | undefined, accountNumber: string, holderMatch?: string | null) {
+/** Aviso informativo a AI Tickets de una cuenta registrada o cambiada (solo los últimos 4 dígitos). No hay nada que verificar. */
+function bankAccountSlackMessage(orgId: number, userId: number, bankName: string | null | undefined, accountNumber: string) {
     const last4 = String(accountNumber || "").replace(/\D/g, "").slice(-4);
-    const holder = holderMatch === "match" ? "coincide con la identidad verificada" : holderMatch === "mismatch" ? "NO coincide con la identidad verificada" : "identidad aún sin verificar";
-    return (
-        `🏦 *Cuenta bancaria por verificar* (org ${orgId}, usuario ${userId}, ${bankName || "banco"} ****${last4}; titular: ${holder})\n` +
-        `• *Ver datos:* \`select * from organization_payout_accounts where organization_id = ${orgId};\`\n` +
-        `• *Aprobar:* \`select aitickets_verify_payout_account(${orgId}, 'approve', '<tu nombre>', null, '${last4}');\`\n` +
-        `• *Rechazar:* \`select aitickets_verify_payout_account(${orgId}, 'reject', '<tu nombre>', '<qué debe corregir el productor>', '${last4}');\``
-    );
+    return `🏦 *Cuenta bancaria actualizada* (org ${orgId}, usuario ${userId}, ${bankName || "banco"} ****${last4})`;
 }
 
 function pickFields(body: any, fields: Record<string, number>) {
@@ -98,6 +92,12 @@ export const POST: APIRoute = async (context) => {
         }
 
         if (Object.keys(payoutData).length) {
+            const BANK_FIELDS = ["bank_name", "bank_account_type", "bank_account_number", "bank_account_holder", "bank_account_rut"];
+            const { data: before } = await supabaseAdmin
+                .from("organization_payout_accounts")
+                .select(BANK_FIELDS.join(", "))
+                .eq("organization_id", dbUser.organization_id)
+                .maybeSingle();
             const { error } = await supabaseAdmin
                 .from("organization_payout_accounts")
                 .upsert(
@@ -110,20 +110,18 @@ export const POST: APIRoute = async (context) => {
                     { onConflict: "organization_id" }
                 );
             if (error) throw error;
-            const bankChanged = ["bank_name", "bank_account_type", "bank_account_number", "bank_account_holder", "bank_account_rut"].some((f) => f in payoutData);
+            const bankChanged = BANK_FIELDS.some((f) => f in payoutData && (payoutData[f] ?? null) !== ((before as any)?.[f] ?? null));
             // Razón social y RUT visibles en la página del evento; titular de la cuenta = identidad verificada (§2 bis)
             await syncOrganizerLegalData(supabaseAdmin, Number(dbUser.organization_id), payoutData);
-            if (bankChanged || "legal_rut" in payoutData) await recomputeHolderMatch(supabaseAdmin, Number(dbUser.organization_id));
-            // El trigger de la BD anula la verificación solo si los datos cambiaron: se avisa a AI Tickets solo si
-            // la cuenta quedó por verificar, con el SQL listo (aitickets_verify_payout_account, payout_ops.sql).
+            // La cuenta no se verifica: solo se avisa a AI Tickets que cambió (informativo, no hay nada que aprobar).
             if (bankChanged) {
                 const { data: saved } = await supabaseAdmin
                     .from("organization_payout_accounts")
-                    .select("*")
+                    .select("bank_name, bank_account_number")
                     .eq("organization_id", dbUser.organization_id)
                     .maybeSingle();
-                if (!saved?.verified_at && saved?.bank_account_number) {
-                    await notifySlack(bankAccountSlackMessage(Number(dbUser.organization_id), Number(dbUser.id), saved.bank_name, saved.bank_account_number, saved.holder_match_status));
+                if (saved?.bank_account_number) {
+                    await notifySlack(bankAccountSlackMessage(Number(dbUser.organization_id), Number(dbUser.id), saved.bank_name, saved.bank_account_number));
                 }
             }
         }

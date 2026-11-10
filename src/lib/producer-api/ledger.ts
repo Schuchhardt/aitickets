@@ -18,7 +18,7 @@
 //       - un evento cancelado no libera saldo: queda retenido hasta cuadrar los reembolsos.
 //   * Condiciones de liberación (Términos para productores §8). Un tramo que ya cumplió las 48 h se libera solo si:
 //       1. la identidad del productor está aprobada (organizations.identity_status = 'approved', Didit);
-//       2. la cuenta bancaria está verificada y a nombre de la identidad verificada (holder_match_status = 'match');
+//       2. (la cuenta bancaria no se verifica: solo la identidad de la persona);
 //       3. la función tiene al menos MIN_CHECKINS_FOR_RELEASE check-ins (o todas sus entradas pagadas, si vendió menos),
 //          o el productor acreditó que se realizó (event_dates.held_attested_at; events.held_attested_at para abonos/órdenes mixtas);
 //       4. no hay reclamos ni contracargos abiertos (aitickets_disputes) sobre la función o el evento.
@@ -225,8 +225,8 @@ async function loadOrgReleaseHours(supabase: any, orgId: number): Promise<number
 }
 
 /**
- * Condiciones de la organización para liberar fondos: cuenta bancaria verificada y, si la org supera el umbral de
- * entradas vendidas (IDENTITY_FREE_SOLD_TICKETS), identidad aprobada (Didit) y holder_match_status = 'match'.
+ * Condiciones de la organización para liberar fondos: si la org supera el umbral de entradas vendidas
+ * (IDENTITY_FREE_SOLD_TICKETS), identidad aprobada (Didit). La cuenta bancaria no se verifica.
  * Si las columnas aún no existen (deploy sin migrar), no se exigen.
  */
 export async function loadOrgReleaseGate(supabase: any, orgId: number): Promise<HoldReason[]> {
@@ -237,18 +237,6 @@ export async function loadOrgReleaseGate(supabase: any, orgId: number): Promise<
         const { data: org, error: orgError } = await supabase.from("organizations").select("id, identity_status, identity_verified_at").eq("id", orgId).maybeSingle();
         if (orgError && !isMissing(orgError)) throw orgError;
         if (!orgError && !(org?.identity_status === "approved" && org?.identity_verified_at)) reasons.push(holdReason("identity_pending"));
-    }
-
-    const { data: acc, error: accError } = await supabase
-        .from("organization_payout_accounts")
-        .select("organization_id, verified_at, removed_at, holder_match_status")
-        .eq("organization_id", orgId)
-        .maybeSingle();
-    if (accError && !isMissing(accError)) throw accError;
-    if (!accError) {
-        if (!acc?.verified_at || acc?.removed_at) reasons.push(holdReason("bank_unverified"));
-        else if (identityRequired && acc.holder_match_status === "mismatch") reasons.push(holdReason("holder_mismatch"));
-        else if (identityRequired && acc.holder_match_status !== "match") reasons.push(holdReason("holder_unchecked"));
     }
     return reasons;
 }

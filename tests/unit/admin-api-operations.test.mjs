@@ -166,10 +166,10 @@ describe('retiros', () => {
     expect(r.result.payouts.map((p) => p.payout_id)).toEqual([P1, P2])
     const [siete, ocho] = r.result.payouts
     expect(siete).toMatchObject({ organization: { id: 7, name: 'Productora Siete' }, amount_clp: 150000, account_last4: '6789', consistent: true })
-    expect(siete.flags).toMatchObject({ account_not_verified: false, account_changed_after_request: false, last4_mismatch: false })
+    expect(siete.flags).toEqual({ account_missing: false, account_changed_after_request: false, last4_mismatch: false })
     expect(siete.events[0]).toMatchObject({ event_id: 10, name: 'Fiesta Siete', amount_clp: 150000 })
-    expect(ocho.flags).toMatchObject({ account_not_verified: true })
-    expect(ocho.warnings.join(' ')).toMatch(/NO está verificada/)
+    expect(ocho.flags).not.toHaveProperty('account_not_verified')
+    expect(ocho.warnings.join(' ')).not.toMatch(/verificad/)
     expect(r.result.open_total_clp).toBe(200000)
     expect(JSON.stringify(r.result)).not.toContain('000123456789')
   })
@@ -209,23 +209,21 @@ describe('retiros', () => {
     expect(sent[0].html).not.toContain('000123456789')
   })
 
-  it('mark_payout_paid: titular distinto de la identidad verificada (Didit) se niega sin force', async () => {
+  it('mark_payout_paid: la cuenta no se verifica (titular distinto o sin verificar no bloquean)', async () => {
     db.tables.organization_payout_accounts[0].holder_match_status = 'mismatch'
-    const blocked = await run('mark_payout_paid', { payout_id: P1, reference: 'TRX-55', reason: 'Pago del retiro de Siete' })
-    expect(blocked).toMatchObject({ ok: false, code: 'conflict' })
-    expect(blocked.message).toMatch(/no se transfiere a terceros/)
-    db.tables.organization_payout_accounts[0].holder_match_status = 'match'
+    db.tables.organization_payout_accounts[0].verified_at = null
     const ok = await run('mark_payout_paid', { payout_id: P1, reference: 'TRX-55', reason: 'Pago del retiro de Siete' })
     expect(ok.result.status).toBe('confirmation_required')
+    expect(ok.result.warnings ?? []).toEqual([])
   })
 
-  it('mark_payout_paid: con la cuenta sin verificar se niega antes de confirmar; con force pide confirmación con advertencias', async () => {
+  it('mark_payout_paid: con la cuenta cambiada después del retiro se niega antes de confirmar; con force pide confirmación con advertencias', async () => {
     const blocked = await run('mark_payout_paid', { payout_id: P2, reference: 'TRX-9', reason: 'Pago del retiro de Ocho' })
     expect(blocked).toMatchObject({ ok: false, code: 'conflict' })
     expect(blocked.message).toMatch(/force=true/)
     const forced = await run('mark_payout_paid', { payout_id: P2, reference: 'TRX-9', force: true, reason: 'Ya transferí a la cuenta correcta' })
     expect(forced.result.status).toBe('confirmation_required')
-    expect(forced.result.warnings.join(' ')).toMatch(/NO está verificada/)
+    expect(forced.result.warnings.join(' ')).toMatch(/cambió DESPUÉS/)
   })
 
   it('si el correo al productor falla, el pago igual queda registrado', async () => {
@@ -336,9 +334,8 @@ describe('bandeja, salud y finanzas', () => {
     const r = await run('list_pending_operations', {})
     const keys = r.result.sections.map((s) => s.key)
     expect(keys[0]).toBe('payouts')
-    expect(keys).toEqual(expect.arrayContaining(['payouts', 'refunds', 'orders_in_review', 'paid_without_email', 'payout_accounts_to_verify', 'outreach']))
-    const accounts = r.result.sections.find((s) => s.key === 'payout_accounts_to_verify')
-    expect(accounts.items).toEqual([expect.objectContaining({ organization: { id: 8, name: 'Ocho Eventos' }, account_last4: '3210' })])
+    expect(keys).toEqual(expect.arrayContaining(['payouts', 'refunds', 'orders_in_review', 'paid_without_email', 'outreach']))
+    expect(keys).not.toContain('payout_accounts_to_verify') // la cuenta bancaria no se verifica
     expect(r.result.sections.find((s) => s.key === 'paid_without_email').items[0].order_id).toBe('o4')
     expect(r.result.sections.find((s) => s.key === 'outreach').items[0]).toMatchObject({ type: 'paused', reason: 'rebotes' })
     expect(JSON.stringify(r.result)).not.toContain('9876543210')

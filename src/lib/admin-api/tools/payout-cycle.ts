@@ -5,7 +5,7 @@ import { ToolError, type JsonSchema } from "../../producer-api/registry";
 import { fetchAll } from "../../producer-api/tools/common";
 import { computeOrgLedger, loadOrgReleaseGate, addBusinessDays, RELEASE_HOURS } from "../../producer-api/ledger";
 import { payoutAccountState, presentAccount, maskAccountNumber } from "../../producer-api/tools/finance";
-import { identityApproved, loadOrgIdentity, orgExceedsFreeSoldTickets, recomputeHolderMatch, IDENTITY_REQUIRED_FOR_PAYOUT_MESSAGE } from "../../producerIdentity";
+import { identityApproved, loadOrgIdentity, orgExceedsFreeSoldTickets, IDENTITY_REQUIRED_FOR_PAYOUT_MESSAGE } from "../../producerIdentity";
 import { notifySlack } from "../../../pages/api/_lib/server-utils";
 import { sendEmail, formatRecipient, isValidEmail } from "../../../../netlify/lib/mailer.mjs";
 import { PAYOUT_BUSINESS_DAYS } from "../../../../netlify/lib/legal.mjs";
@@ -70,14 +70,6 @@ function allocateFifo(ledgerEvents: any[], amount: number): Allocation[] {
         left -= take;
     }
     return out;
-}
-
-async function holderMatchStatus(supabase: any, orgId: number, acc: any, identity: any): Promise<"match" | "mismatch" | "pending"> {
-    if (!acc?.bank_account_rut) return "pending";
-    const stored = acc.holder_match_status;
-    if (stored === "match" || stored === "mismatch") return stored;
-    if (!identityApproved(identity)) return "pending";
-    return (await recomputeHolderMatch(supabase, orgId))?.status ?? "pending";
 }
 
 // ---------------------------------------------------------------------------
@@ -263,7 +255,7 @@ const orgRequestPayout: AdminToolDef = {
     title: "Solicitar retiro a nombre de la productora",
     description:
         "Solicita un retiro a nombre de una organización (cuando el productor lo pide por email, WhatsApp o teléfono). " +
-        "Mismas validaciones que request_payout del productor (cuenta verificada, cooling, saldo disponible). " +
+        "Mismas validaciones que request_payout del productor (identidad si corresponde, cuenta registrada, espera tras cambio, saldo disponible). " +
         "Registra requested_by = soporte, requested_via = 'admin' y el canal por el que lo pidió el productor. " +
         "El payout_id resultante se puede usar en get_payout_transfer_details y mark_payout_paid. Pide confirmación.",
     readOnly: false,
@@ -398,15 +390,6 @@ async function adminPlanPayout(actx: AdminContext, orgId: number, requestedAmoun
         throw new ToolError("conflict", `La organización necesita verificar su identidad antes de retirar. ${IDENTITY_REQUIRED_FOR_PAYOUT_MESSAGE}`);
     }
     if (!state.complete) throw new ToolError("conflict", `${orgName} no tiene datos bancarios registrados.`);
-    if (state.status === "rejected") throw new ToolError("conflict", `La cuenta bancaria de ${orgName} fue rechazada: ${accRow.verification_notes || "debe corregir los datos"}.`);
-    if (state.status !== "verified") throw new ToolError("conflict", `La cuenta bancaria de ${orgName} aún no está verificada.`);
-
-    if (identityApproved(identity)) {
-        const holder = await holderMatchStatus(supabase, orgId, accRow, identity);
-        if (holder !== "match") {
-            throw new ToolError("conflict", "El titular de la cuenta no coincide con la identidad verificada: no se transfiere a terceros.");
-        }
-    }
     if (state.coolingActive) {
         throw new ToolError("conflict", `La cuenta bancaria cambió hace poco: retiros habilitados desde ${state.holdUntil!.toISOString()}.`);
     }

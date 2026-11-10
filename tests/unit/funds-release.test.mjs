@@ -69,19 +69,12 @@ describe('liberación condicionada', () => {
     expect(l.events[0].functions[0].release_status).toBe('held')
   })
 
-  it('cuenta sin verificar o titular distinto no retienen con ≤10 ventas', async () => {
-    seed({ account: { verified_at: null } })
-    expect((await computeOrgLedger(db, 7)).hold_reasons.map((r) => r.code)).toEqual(['bank_unverified'])
-    seed({ account: { holder_match_status: 'mismatch' } })
-    expect((await computeOrgLedger(db, 7)).hold_reasons).toEqual([])
-    seed({ account: { holder_match_status: null } })
-    expect((await computeOrgLedger(db, 7)).hold_reasons).toEqual([])
-  })
-
-  it('titular distinto retiene cuando hay >10 ventas', async () => {
+  it('la cuenta bancaria no se verifica: ni sin verificar ni titular distinto retienen', async () => {
     const manyAttendees = Array.from({ length: 11 }, (_, i) => ({ event_id: 40, event_order_id: 'a', event_ticket_id: 1, status: 'validated', validated_at: iso(-4 * DAY) }))
-    seed({ account: { holder_match_status: 'mismatch' }, attendees: manyAttendees })
-    expect((await computeOrgLedger(db, 7)).hold_reasons.map((r) => r.code)).toEqual(['holder_mismatch'])
+    for (const account of [{ verified_at: null }, { holder_match_status: 'mismatch' }, { holder_match_status: null }]) {
+      seed({ account, attendees: manyAttendees })
+      expect((await computeOrgLedger(db, 7)).hold_reasons).toEqual([])
+    }
   })
 
   it(`menos de ${MIN_CHECKINS_FOR_RELEASE} check-ins retienen hasta que el productor acredite la función`, async () => {

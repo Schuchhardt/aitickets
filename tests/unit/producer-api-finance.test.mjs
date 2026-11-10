@@ -111,7 +111,7 @@ describe('cuenta de pago', () => {
     const text = JSON.stringify(out.result)
     expect(text).not.toContain('000123456789')
     expect(text).not.toContain('12.345.678-9')
-    expect(out.result.account).toMatchObject({ status: 'verified', account_last4: '6789', bank: 'BancoEstado', can_request_payout: true })
+    expect(out.result.account).toMatchObject({ status: 'active', account_last4: '6789', bank: 'BancoEstado', can_request_payout: true })
   })
 
   it('create_payout_account_link apunta al panel con sesión', async () => {
@@ -123,7 +123,7 @@ describe('cuenta de pago', () => {
     seed({ account: { verified_at: null, verified_by: null, bank_changed_at: iso(-1 * 3600000) } })
     const out = await call('get_verification_status')
     expect(out.result.can_request_payout).toBe(false)
-    expect(out.result.missing.map((m) => m.item)).toEqual(expect.arrayContaining(['bank_verified', 'bank_change_hold']))
+    expect(out.result.missing.map((m) => m.item)).toEqual(['bank_change_hold'])
   })
 
   it('remove_payout_account pide confirmación y se niega con retiros en curso', async () => {
@@ -216,19 +216,21 @@ describe('saldo y retiros', () => {
     expect((await call('get_balance')).result.available).toBe(45000)
   })
 
-  it('cuenta rechazada por AI Tickets: el productor ve el motivo y no puede retirar', async () => {
-    seed({ account: { verified_at: null, verified_by: 'ops', verification_rejected_at: iso(-1 * DAY), verification_notes: 'El RUT del titular no coincide con la cartola' } })
-    const acc = await call('get_payout_account')
-    expect(acc.result.account).toMatchObject({ status: 'rejected', rejection_reason: 'El RUT del titular no coincide con la cartola', can_request_payout: false })
-    const v = await call('get_verification_status')
-    expect(v.result.can_request_payout).toBe(false)
-    expect(v.result.missing).toEqual(
-      expect.arrayContaining([expect.objectContaining({ item: 'bank_verified', rejected: true, rejection_reason: 'El RUT del titular no coincide con la cartola', blocks_payouts: true })]),
-    )
-    expect(v.result.missing.find((m) => m.item === 'bank_verified').label).toMatch(/rechazó la cuenta: El RUT del titular/)
-    const payout = await call('request_payout')
-    expect(payout).toMatchObject({ ok: false, code: 'conflict' })
-    expect(payout.message).toMatch(/rechazó la cuenta bancaria: El RUT del titular/)
+  it('la cuenta no se verifica: sin verificar, rechazada antes o de otro titular igual puede retirar', async () => {
+    for (const account of [
+      { verified_at: null, verified_by: null },
+      { verified_at: null, verified_by: 'ops', verification_rejected_at: iso(-1 * DAY), verification_notes: 'El RUT del titular no coincide' },
+      { holder_match_status: 'mismatch' },
+    ]) {
+      seed({ account })
+      const acc = await call('get_payout_account')
+      expect(acc.result.account).toMatchObject({ status: 'active', can_request_payout: true })
+      const v = await call('get_verification_status')
+      expect(v.result.can_request_payout).toBe(true)
+      expect(v.result.checks.map((c) => c.item)).not.toContain('bank_verified')
+      expect(v.result.checks.map((c) => c.item)).not.toContain('holder_matches_identity')
+      expect(await call('request_payout')).toMatchObject({ ok: true })
+    }
   })
 
   it('sin columnas de rechazo (BD sin migrar) la cuenta sigue funcionando', async () => {
@@ -239,10 +241,8 @@ describe('saldo y retiros', () => {
     expect(v.result.can_request_payout).toBe(true)
   })
 
-  it('request_payout bloqueado sin verificación o en la espera de 72 h', async () => {
+  it('request_payout bloqueado en la espera de 72 h tras cambiar la cuenta', async () => {
     seed({ account: { verified_at: iso(-1 * DAY), bank_changed_at: iso(-2 * 3600000) } })
-    expect(await call('request_payout')).toMatchObject({ ok: false, code: 'conflict' })
-    seed({ account: { verified_at: null } })
     expect(await call('request_payout')).toMatchObject({ ok: false, code: 'conflict' })
   })
 
