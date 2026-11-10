@@ -3,6 +3,7 @@
 bucket:Events	public=true limit=- mimes=-
 bucket:aitickets-event-documents	public=false limit=15728640 mimes=application/pdf,image/jpeg,image/png,image/webp
 bucket:aitickets-event-videos	public=true limit=52428800 mimes=video/mp4,video/webm,video/quicktime
+bucket:aitickets-payout-receipts	public=false limit=5242880 mimes=application/pdf,image/jpeg,image/png
 column:ad_account_connections.access_token	text notnull=false default=-
 column:ad_account_connections.account_name	text notnull=false default=-
 column:ad_account_connections.created_at	timestamp with time zone notnull=true default=now()
