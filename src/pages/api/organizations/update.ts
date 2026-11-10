@@ -27,9 +27,20 @@ const PAYOUT_FIELDS: Record<string, number> = {
 const RUT_REGEX = /^[0-9]{1,2}\.?[0-9]{3}\.?[0-9]{3}-?[0-9kK]$/;
 
 /** Aviso informativo a AI Tickets de una cuenta registrada o cambiada (solo los últimos 4 dígitos). No hay nada que verificar. */
-function bankAccountSlackMessage(orgId: number, userId: number, bankName: string | null | undefined, accountNumber: string) {
+function bankAccountSlackMessage(
+    org: { id: number; name?: string | null },
+    user: { id: number; name?: string | null; email?: string | null },
+    bankName: string | null | undefined,
+    accountNumber: string,
+) {
     const last4 = String(accountNumber || "").replace(/\D/g, "").slice(-4);
-    return `🏦 *Cuenta bancaria actualizada* (org ${orgId}, usuario ${userId}, ${bankName || "banco"} ****${last4})`;
+    const who = [user.name, user.email].filter(Boolean).join(" · ") || "sin nombre";
+    return (
+        `🏦 *Cuenta bancaria actualizada*\n` +
+        `• *Organización:* ${org.name || "sin nombre"} (#${org.id})\n` +
+        `• *Usuario:* ${who} (#${user.id})\n` +
+        `• *Cuenta:* ${bankName || "banco"} ****${last4}`
+    );
 }
 
 function pickFields(body: any, fields: Record<string, number>) {
@@ -121,7 +132,15 @@ export const POST: APIRoute = async (context) => {
                     .eq("organization_id", dbUser.organization_id)
                     .maybeSingle();
                 if (saved?.bank_account_number) {
-                    await notifySlack(bankAccountSlackMessage(Number(dbUser.organization_id), Number(dbUser.id), saved.bank_name, saved.bank_account_number));
+                    const { data: org } = await supabaseAdmin.from("organizations").select("public_name").eq("id", dbUser.organization_id).maybeSingle();
+                    await notifySlack(
+                        bankAccountSlackMessage(
+                            { id: Number(dbUser.organization_id), name: org?.public_name },
+                            { id: Number(dbUser.id), name: dbUser.name, email: dbUser.email },
+                            saved.bank_name,
+                            saved.bank_account_number,
+                        ),
+                    );
                 }
             }
         }

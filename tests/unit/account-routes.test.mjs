@@ -296,7 +296,8 @@ describe('POST /api/organizations/update', () => {
     const msg = notifySlack.mock.calls[0][0]
     expect(msg).toMatch(/Cuenta bancaria actualizada/)
     expect(msg).not.toMatch(/verificar|aitickets_verify_payout_account|select /)
-    expect(msg).toMatch(/org 7, usuario 1/)
+    expect(msg).toMatch(/Prod SpA \(#7\)/)
+    expect(msg).toMatch(/Ana · ana@prod\.cl \(#1\)/)
     expect(msg).toMatch(/\*\*\*\*0123/)
     expect(msg).not.toContain(BANK.bank_account_number)
     expect(msg).not.toContain('000111222333')
