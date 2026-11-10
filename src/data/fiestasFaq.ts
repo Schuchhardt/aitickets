@@ -12,9 +12,8 @@ import { PRODUCER_FAQ, type FaqItem } from "./producerFaq";
 import { ORGANIZADORES_FAQ } from "./organizadoresFaq";
 import { getLanding } from "./landings";
 import { PAYOUT_SCHEDULE_TEXT } from "../../netlify/lib/legal.mjs";
-import { LARGE_CAPACITY, RESERVE_BY_LEVEL } from "../../netlify/lib/event-risk.mjs";
+import { LARGE_CAPACITY } from "../../netlify/lib/event-risk.mjs";
 import { FEED_MESSAGE_MAX } from "../../netlify/lib/attendee-community.mjs";
-import { RESERVE_HOLD_DAYS } from "../lib/producer-api/ledger";
 
 const pick = (list: FaqItem[], q: string): FaqItem => {
     const item = list.find((f) => f.q === q);
@@ -55,7 +54,7 @@ export const FIESTAS_FAQ: FaqItem[] = [
     pick(partyLanding.faq, "¿Cómo le paso su entrada a cada amigo?"),
     {
         q: "¿Sirve para una fiesta grande o masiva?",
-        a: `Sí. Si el aforo pasa de ${LARGE_CAPACITY.toLocaleString("es-CL")} personas o es un evento masivo, te pedimos el permiso del lugar y una póliza de responsabilidad civil (y, si es masivo, la autorización de la Delegación Presidencial). Según el riesgo del evento, entre el ${RESERVE_BY_LEVEL.medium}% y el ${RESERVE_BY_LEVEL.high}% de lo vendido puede quedar como reserva hasta ${RESERVE_HOLD_DAYS} días después de la fiesta.`,
+        a: `Sí. Si el aforo pasa de ${LARGE_CAPACITY.toLocaleString("es-CL")} personas o es un evento masivo, te pedimos el permiso del lugar y una póliza de responsabilidad civil (y, si es masivo, la autorización de la Delegación Presidencial).`,
         terms: true,
     },
     pick(partyLanding.faq, "¿Se puede vender en la puerta?"),

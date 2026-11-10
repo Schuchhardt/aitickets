@@ -28,7 +28,6 @@ import { MAX_EVENT_FUNCTIONS, PRODUCER_FAQ } from '../../src/data/producerFaq'
 import { MAX_FUNCTIONS } from '../../src/lib/functionPattern.mjs'
 import { PAYOUT_RELEASE_HOURS, PAYOUT_SCHEDULE_TEXT } from '../../netlify/lib/legal.mjs'
 import { LARGE_CAPACITY } from '../../netlify/lib/event-risk.mjs'
-import { RESERVE_HOLD_DAYS } from '../../src/lib/producer-api/ledger'
 
 describe('serie automática (§4.8)', () => {
   const marks = seriesMarks(DEFAULT_CADENCE)
@@ -156,8 +155,8 @@ describe('MUSICA_FAQ (§4.11)', () => {
     expect(MUSICA_FAQ.find((f) => f.q === '¿Qué pasa cuando se agota?')?.a).toContain('correo automático')
     const big = MUSICA_FAQ.find((f) => f.q === '¿Sirve para un concierto grande?')
     expect(big?.a).toContain(LARGE_CAPACITY.toLocaleString('es-CL'))
-    // Lo que retiene fondos es la reserva por riesgo, no los documentos (ledger.ts)
-    expect(big?.a).toContain(`${RESERVE_HOLD_DAYS} días`)
+    // Sin reserva por riesgo: la respuesta no promete retener fondos
+    expect(big?.a).not.toMatch(/reserva/)
     expect(big?.a).not.toMatch(/antes de liberar/)
     expect(big?.terms).toBe(true)
   })

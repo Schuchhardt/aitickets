@@ -3,7 +3,7 @@
 //   get_event_compliance   riesgo, reserva, autorización y documentos del evento, y estado de liberación por función
 import { ToolError, type ToolDef } from "../registry";
 import { eventIdSchema, loadOwnedEvent, localDateTime, clp } from "./common";
-import { computeEventLedger, functionEnd, CHECKIN_RELEASE_THRESHOLD, RELEASE_HOURS } from "../ledger";
+import { computeEventLedger, functionEnd, MIN_CHECKINS_FOR_RELEASE, RELEASE_HOURS } from "../ledger";
 import { DOCUMENT_KINDS, PERMIT_STATUS_LABELS, loadEventDocuments, missingDocumentKinds } from "../../eventDocuments";
 import { RISK_LEVEL_LABELS } from "../../eventRisk";
 import { notifySlack } from "../../../pages/api/_lib/server-utils";
@@ -16,7 +16,7 @@ const attestFunctionHeld: ToolDef = {
     title: "Acreditar que la función se realizó",
     description:
         `Declara que una función ya realizada efectivamente ocurrió. Lo vendido para una función se libera ${RELEASE_HOURS} h después de que termina si tiene ` +
-        `check-ins de al menos ${Math.round(CHECKIN_RELEASE_THRESHOLD * 100)}% de las entradas; si no (p. ej. no se usó el escáner de AI Tickets), el productor ` +
+        `al menos ${MIN_CHECKINS_FOR_RELEASE} check-ins; si no (p. ej. no se usó el escáner de AI Tickets), el productor ` +
         "puede acreditar que se realizó con esta herramienta. event_date_id omitido = todo el evento (abonos y entradas para varias funciones). " +
         "Es una declaración del productor: AI Tickets puede pedir evidencia (fotos, contrato del lugar) y una declaración falsa es causal de retención y término.",
     scope: "finance",

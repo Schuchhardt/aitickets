@@ -117,7 +117,7 @@ const toggleMassive = async (value) => {
       <div class="flex flex-wrap items-center gap-2 mb-3 text-xs">
         <span class="px-2 py-1 rounded-full bg-gray-100 text-gray-700" data-testid="permit-status">{{ PERMIT_LABEL[state.event.permit_status] || 'Sin documentos' }}</span>
         <span v-if="state.event.risk_level && state.event.risk_level !== 'low'" class="px-2 py-1 rounded-full bg-amber-100 text-amber-700">
-          Riesgo {{ RISK_LABEL[state.event.risk_level] }} · reserva {{ state.event.reserve_pct }}%
+          Riesgo {{ RISK_LABEL[state.event.risk_level] }}
         </span>
       </div>
 

@@ -12,7 +12,7 @@
 //   device_cluster    muchas tarjetas distintas desde un mismo dispositivo. HOY NO HAY DATOS: ni Flow ni el checkout
 //                     guardan huella de tarjeta o dispositivo; la señal se activa si quien llama pasa
 //                     input.deviceCluster = true (gancho para cuando exista ese dato).
-// Nivel: low < 25 ≤ medium < 50 ≤ high. Reserva: low 0%, medium 30%, high 100% (hasta 60 días después de la función).
+// Nivel: low < 25 ≤ medium < 50 ≤ high. El nivel sirve para pedir documentos y alertar; no retiene plata (sin reserva).
 //
 // refreshEventRisk() guarda el resultado en events (risk_score, risk_level, risk_signals, reserve_pct,
 // requires_documents) salvo que AI Tickets lo haya fijado a mano (risk_locked). Tolera columnas que aún no existen.
@@ -45,7 +45,8 @@ export const RISK_SIGNAL_LABELS = Object.freeze({
   device_cluster: 'Muchas tarjetas desde un mismo dispositivo',
 })
 
-export const RESERVE_BY_LEVEL = Object.freeze({ low: 0, medium: 30, high: 100 })
+/** Sin reserva por riesgo: lo vendido se libera completo (ver ledger.ts). Se mantiene en 0 por compatibilidad. */
+export const RESERVE_BY_LEVEL = Object.freeze({ low: 0, medium: 0, high: 0 })
 export const RISK_LEVEL_LABELS = Object.freeze({ low: 'Bajo', medium: 'Medio', high: 'Alto' })
 
 const MISSING = ['42P01', 'PGRST205', '42703', 'PGRST204']

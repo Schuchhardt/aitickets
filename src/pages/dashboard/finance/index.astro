@@ -5,7 +5,7 @@ import { ORG_ADMIN_ROLES } from "../../../lib/supabaseServer";
 import { requireDashboardSession } from "../_lib/guard";
 import { SERVICE_FEE_PERCENT_LABEL, IVA_PERCENT_LABEL } from "../../../../netlify/lib/fees.mjs";
 import { getStaffEventIds } from "../../../../netlify/lib/event-staff.mjs";
-import { computeOrgLedger, RELEASE_HOURS, CHECKIN_RELEASE_THRESHOLD, RESERVE_HOLD_DAYS, type OrgLedger, type HoldReason } from "../../../lib/producer-api/ledger";
+import { computeOrgLedger, RELEASE_HOURS, MIN_CHECKINS_FOR_RELEASE, type OrgLedger, type HoldReason } from "../../../lib/producer-api/ledger";
 import { RISK_LEVEL_LABELS } from "../../../lib/eventRisk";
 import { roleAllows } from "../../../lib/producer-api/permissions";
 import { getTool } from "../../../lib/producer-api/tools";
@@ -347,7 +347,7 @@ const formatDateTime = (d: string | null) =>
                                         {s.cancelled && <span class="block text-xs text-red-600">Cancelado: saldo retenido</span>}
                                         {s.risk_level && s.risk_level !== "low" && (
                                             <span class="block text-xs text-amber-700">
-                                                Riesgo {RISK_LEVEL_LABELS[s.risk_level as keyof typeof RISK_LEVEL_LABELS]?.toLowerCase() || s.risk_level} · reserva {s.reserve_pct}%
+                                                Riesgo {RISK_LEVEL_LABELS[s.risk_level as keyof typeof RISK_LEVEL_LABELS]?.toLowerCase() || s.risk_level}
                                             </span>
                                         )}
                                         {s.reserve_amount > 0 && (
@@ -480,8 +480,7 @@ const formatDateTime = (d: string | null) =>
         )}
         <p class="text-xs text-gray-400">
             Lo de cada función se libera {RELEASE_HOURS} h después de que termina si tu identidad y tu cuenta bancaria están verificadas, la función registró
-            check-ins de al menos {Math.round(CHECKIN_RELEASE_THRESHOLD * 100)}% de las entradas (o acreditas que se realizó) y no hay reclamos abiertos. En eventos con
-            riesgo podemos retener una reserva hasta {RESERVE_HOLD_DAYS} días después de la función.{" "}
+            al menos {MIN_CHECKINS_FOR_RELEASE} check-ins (o acreditas que se realizó) y no hay reclamos abiertos. Se libera el 100% de lo vendido.{" "}
             <a href="/terminos-productores#recaudacion" class="underline">*Se aplican términos y condiciones</a>
         </p>
     </div>

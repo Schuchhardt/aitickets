@@ -19,12 +19,11 @@
 //   * Condiciones de liberación (Términos para productores §8). Un tramo que ya cumplió las 48 h se libera solo si:
 //       1. la identidad del productor está aprobada (organizations.identity_status = 'approved', Didit);
 //       2. la cuenta bancaria está verificada y a nombre de la identidad verificada (holder_match_status = 'match');
-//       3. la función tiene check-ins ≥ CHECKIN_RELEASE_THRESHOLD de sus entradas pagadas, o el productor acreditó
-//          que se realizó (event_dates.held_attested_at; events.held_attested_at para abonos/órdenes mixtas);
+//       3. la función tiene al menos MIN_CHECKINS_FOR_RELEASE check-ins (o todas sus entradas pagadas, si vendió menos),
+//          o el productor acreditó que se realizó (event_dates.held_attested_at; events.held_attested_at para abonos/órdenes mixtas);
 //       4. no hay reclamos ni contracargos abiertos (aitickets_disputes) sobre la función o el evento.
 //     Si falla alguna, el tramo queda en held (retenido) con hold_reasons visibles en el panel.
-//     Si se cumplen, se aplica la reserva por riesgo: events.reserve_pct % queda retenido hasta RESERVE_HOLD_DAYS
-//     días después de la función.
+//     No hay reserva por riesgo: si se cumplen, se libera el 100% (events.reserve_pct ya no retiene nada).
 //   * Los retiros solo salen de lo liberado, así que se restan de ese tramo.
 //   * retained = órdenes 'review' (pago en revisión manual) + saldo de eventos cancelados + held.
 //   * Un saldo negativo (reembolso después de un retiro) se informa en negative_balance y se descuenta
@@ -142,10 +141,9 @@ export type OrgLedger = {
     hold_reasons: HoldReason[];
 };
 
-/** Mínimo de check-ins (sobre entradas pagadas de la función) para liberar sin que el productor acredite la función. */
-export const CHECKIN_RELEASE_THRESHOLD = 0.3;
-/** Días máximos de la reserva por riesgo después de terminar la función. */
-export const RESERVE_HOLD_DAYS = 60;
+/** Check-ins mínimos (de entradas pagadas) para liberar sin que el productor acredite la función. Basta con un par:
+ *  solo prueban que la función se hizo. Si se vendieron menos entradas, basta con que entren todas. */
+export const MIN_CHECKINS_FOR_RELEASE = 2;
 export const OPEN_DISPUTE_STATUSES = ["open"];
 
 export const HOLD_LABELS: Record<HoldReasonCode, string> = {
@@ -337,7 +335,6 @@ export async function computeOrgLedger(supabase: any, orgId: number, opts: { eve
     }
     const orgReleaseHours = await loadOrgReleaseHours(supabase, orgId);
     const releaseOf = (end: Date | null) => (end ? new Date(end.getTime() + orgReleaseHours * 3600000) : null);
-    const reserveUntilOf = (end: Date | null) => (end ? new Date(end.getTime() + RESERVE_HOLD_DAYS * 86400000) : null);
 
     const paidOrderIds = new Set(orders.filter((o) => o.status === "paid").map((o) => String(o.id)));
 
@@ -433,7 +430,7 @@ export async function computeOrgLedger(supabase: any, orgId: number, opts: { eve
             held: 0,
             reserve_amount: 0,
             reserve_release_at: null,
-            reserve_pct: Math.max(0, Math.min(100, Math.round(Number(e.reserve_pct) || 0))),
+            reserve_pct: 0, // sin reserva por riesgo: se ignora events.reserve_pct
             risk_level: e.risk_level ?? null,
             hold_reasons: [],
         });
@@ -450,16 +447,16 @@ export async function computeOrgLedger(supabase: any, orgId: number, opts: { eve
     const conditionsFor = (l: EventLedger, f: FunctionRelease | null): HoldReason[] => {
         const out = orgReasons.map((r) => ({ ...r }));
         let attested: boolean;
-        let r: number | null;
+        let c: { sold: number; in: number } | undefined;
         if (f) {
             attested = Boolean(f.attested_at);
-            r = f.checkin_ratio;
+            c = checkinsByFn.get(f.event_date_id);
         } else {
             const lastFn = l.functions[l.functions.length - 1];
             attested = Boolean(eventRow.get(l.event_id)?.held_attested_at || lastFn?.attested_at);
-            r = ratio(checkinsByEvent.get(l.event_id));
+            c = checkinsByEvent.get(l.event_id);
         }
-        if (!attested && r != null && r < CHECKIN_RELEASE_THRESHOLD) out.push(holdReason("low_checkins"));
+        if (!attested && c && c.sold > 0 && c.in < Math.min(MIN_CHECKINS_FOR_RELEASE, c.sold)) out.push(holdReason("low_checkins"));
         if (disputedEvents.has(l.event_id) || (f && disputedFns.has(f.event_date_id))) out.push(holdReason("open_disputes"));
         return out;
     };
@@ -511,24 +508,8 @@ export async function computeOrgLedger(supabase: any, orgId: number, opts: { eve
             if (f) f.release_status = "held";
             continue;
         }
-        // Reserva por riesgo: un % de lo vendido queda retenido hasta RESERVE_HOLD_DAYS días después de la función.
-        const until = reserveUntilOf(end);
-        const reserve = l.reserve_pct > 0 && until && until.getTime() > now.getTime() ? Math.round((Math.max(0, net) * l.reserve_pct) / 100) : 0;
-        if (reserve > 0) {
-            const untilIso = until!.toISOString();
-            l.reserve_amount += reserve;
-            if (!l.reserve_release_at || untilIso > l.reserve_release_at) l.reserve_release_at = untilIso;
-            add(heldNet, l.event_id, reserve);
-            const rr = holdReason("risk_reserve", { amount: reserve, until: untilIso });
-            mergeReason(l.hold_reasons, rr);
-            if (f) {
-                f.reserve_amount += reserve;
-                if (!f.reserve_release_at || untilIso > f.reserve_release_at) f.reserve_release_at = untilIso;
-                mergeReason(f.hold_reasons, rr);
-            }
-        }
-        l.released_sales += amount - Math.round((amount * (reserve > 0 ? l.reserve_pct : 0)) / 100);
-        add(releasedNet, l.event_id, net - reserve);
+        l.released_sales += amount;
+        add(releasedNet, l.event_id, net);
     }
     for (const f of fnById.values()) {
         if (f.release_status === "released" && f.reserve_amount > 0) f.release_status = "held";

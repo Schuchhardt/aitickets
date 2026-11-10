@@ -14,11 +14,10 @@ import { PRODUCER_FAQ, type FaqItem } from "./producerFaq";
 import { ORGANIZADORES_FAQ } from "./organizadoresFaq";
 import { getLanding } from "./landings";
 import { PAYOUT_SCHEDULE_TEXT } from "../../netlify/lib/legal.mjs";
-import { LARGE_CAPACITY, RESERVE_BY_LEVEL } from "../../netlify/lib/event-risk.mjs";
+import { LARGE_CAPACITY } from "../../netlify/lib/event-risk.mjs";
 import { DEFAULT_MAX_PER_PURCHASE } from "../components/Reservation/pricing.js";
 import { MAX_PER_ORDER_AI, congressReleaseText } from "../components/landing/seminarios/seminariosLanding.js";
 import { MAX_COURTESY_PER_REQUEST } from "../lib/courtesy";
-import { RESERVE_HOLD_DAYS } from "../lib/producer-api/ledger";
 
 const pick = (list: FaqItem[], q: string): FaqItem => {
     const item = list.find((f) => f.q === q);
@@ -65,7 +64,7 @@ export const SEMINARIOS_FAQ: FaqItem[] = [
     own("¿Sirve para una charla online o híbrida?"),
     {
         q: "¿Sirve para un congreso grande?",
-        a: `Sí. Si el aforo pasa de ${LARGE_CAPACITY.toLocaleString("es-CL")} personas o es un evento masivo, te pedimos el permiso del lugar y una póliza de responsabilidad civil (y, si es masivo, la autorización de la Delegación Presidencial). Según el riesgo del evento, entre el ${RESERVE_BY_LEVEL.medium}% y el ${RESERVE_BY_LEVEL.high}% de lo vendido puede quedar como reserva hasta ${RESERVE_HOLD_DAYS} días después del congreso.`,
+        a: `Sí. Si el aforo pasa de ${LARGE_CAPACITY.toLocaleString("es-CL")} personas o es un evento masivo, te pedimos el permiso del lugar y una póliza de responsabilidad civil (y, si es masivo, la autorización de la Delegación Presidencial).`,
         terms: true,
     },
     pick(ORGANIZADORES_FAQ, "¿Cómo funciona la publicación automática en redes?"),
