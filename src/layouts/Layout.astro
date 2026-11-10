@@ -126,7 +126,7 @@ const hasCustomHead = Astro.slots.has('head');
 					// Nunca enviar tokens ni correos de la URL a terceros
 					try {
 						var u = new URL(window.location.href);
-						['t', 'token', 'email', 'code', 'access_token', 'refresh_token'].forEach(function (k) { u.searchParams.delete(k); });
+						['t', 'token', 'preview', 'email', 'code', 'access_token', 'refresh_token'].forEach(function (k) { u.searchParams.delete(k); });
 						u.hash = '';
 						return u.toString();
 					} catch (e) {

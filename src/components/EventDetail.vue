@@ -92,6 +92,8 @@ function onParallaxScroll() {
 
 // Imagen completa (diseño compacto: la miniatura abre la imagen)
 const showImage = ref(false);
+// Teleport solo en el cliente: hidratado, Vue borra el primer hijo de <body> (ver ShareSheet.vue)
+const teleportReady = ref(false);
 const onImageKey = (e) => e.key === "Escape" && (showImage.value = false);
 
 // Tinte del póster (events.cover_meta, calculado en el servidor) y proporción real del póster
@@ -249,6 +251,7 @@ function onAssistantOpenCheckout() {
 const producerBannerUrl = computed(() => `/organizadores?utm_source=aitickets&utm_medium=event_footer&utm_campaign=${encodeURIComponent(props.event?.slug || "evento")}`);
 
 onMounted(() => {
+  teleportReady.value = true;
   const prices = (props.event.tickets || []).map((t) => Number(t.price) || 0);
   trackViewItem(props.event.id, props.event.name, prices.length ? Math.min(...prices) : 0);
   trackFunnel("event_view", props.event, { state: state.value });
@@ -484,7 +487,7 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value && !cardHasChips.va
     <ShareSheet :show="showShareModal" :event="event" @close="showShareModal = false" />
     <PurchasedTicketsModal :show="showOrders" :eventOrders="orders" :event="event" @close="showOrders = false" />
 
-    <Teleport to="body">
+    <Teleport v-if="teleportReady" to="body">
       <Transition name="lightbox">
         <div v-if="showImage" class="lightbox ev-motion" role="dialog" aria-modal="true" :aria-label="event.name" @click="showImage = false">
           <img :src="event.image_url" :alt="event.name" />

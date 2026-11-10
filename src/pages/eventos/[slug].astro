@@ -1,7 +1,13 @@
 ---
 import EventPage from "../../components/EventPage.astro";
+import EventPreviewUnavailable from "../../components/EventPreviewUnavailable.astro";
+import AppHeader from "../../components/AppHeader.vue";
+import AppFooter from "../../components/AppFooter.vue";
+import Layout from "../../layouts/Layout.astro";
+import "../../styles/global.css";
 import { getPublicEventData } from "../../lib/eventPage";
 import { resolveEventSlugRedirect, slugRedirectResponse } from "../../lib/eventSlug";
+import { isPreviewToken, previewCookieName, resolvePreviewToken, PREVIEW_COOKIE_PATH, PREVIEW_PARAM, type PreviewUnavailableReason } from "../../lib/eventPreview";
 import { getSupabaseAdmin } from "../../lib/auth-helpers";
 import { getSessionContext } from "../../lib/supabaseServer";
 
@@ -13,7 +19,54 @@ export const prerender = false;
 
 // Toda la carga (evento, entradas/stock, funciones, SEO) vive en src/lib/eventPage.ts,
 // compartida con los sitios de productor (/o/[site]/eventos/[slug]).
-let result = await getPublicEventData(Astro.params.slug, { locals: Astro.locals });
+let result = null as Awaited<ReturnType<typeof getPublicEventData>>;
+
+// Vista previa privada: /eventos/<slug>?preview=<token> (src/lib/eventPreview.ts). Con un token válido se ve
+// la página aunque el evento esté en borrador. Nunca se cachea ni se indexa, no envía Referer (el token va en
+// la URL) y no carga analíticas. Los bots de vista previa de links (WhatsApp, Slack…) no ven datos del borrador.
+const previewToken = Astro.url.searchParams.get(PREVIEW_PARAM);
+let previewAccess = false;
+let previewFailure: PreviewUnavailableReason | null = null;
+if (isPreviewToken(previewToken)) {
+  const resolved = await resolvePreviewToken(previewToken, {
+    userAgent: Astro.request.headers.get("user-agent"),
+    cookieNonce: Astro.cookies.get(previewCookieName(previewToken))?.value || null,
+  });
+  if (resolved.ok) {
+    if (resolved.setCookie) {
+      Astro.cookies.set(resolved.setCookie.name, resolved.setCookie.value, {
+        path: PREVIEW_COOKIE_PATH,
+        httpOnly: true,
+        secure: import.meta.env.PROD,
+        sameSite: "lax",
+        maxAge: resolved.setCookie.maxAge ?? 60 * 60 * 24 * 365,
+      });
+    }
+    const preview = await getPublicEventData(undefined, { previewEventId: resolved.eventId });
+    // El evento debe seguir perteneciendo a la organización que creó el link
+    if (preview && Number(preview.eventData.organization_id) === resolved.orgId) {
+      // El slug cambió después de crear el link: al vigente, con el mismo token
+      if (preview.eventData.slug !== Astro.params.slug) {
+        return Astro.redirect(`/eventos/${encodeURIComponent(preview.eventData.slug)}?${PREVIEW_PARAM}=${previewToken}`, 302);
+      }
+      result = preview;
+      previewAccess = true;
+    } else {
+      previewFailure = "not_found";
+    }
+  } else {
+    previewFailure = resolved.reason;
+  }
+}
+if (previewToken !== null) {
+  Astro.response.headers.set("Cache-Control", "private, no-store");
+  Astro.response.headers.set("Netlify-CDN-Cache-Control", "no-store");
+  Astro.response.headers.set("Referrer-Policy", "no-referrer");
+  Astro.response.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+}
+
+// Toda la carga normal: el evento publicado (también cuando el link de vista previa ya no sirve)
+if (!result) result = await getPublicEventData(Astro.params.slug, { locals: Astro.locals });
 
 // Borrador: el equipo de la productora (con sesión) lo ve en modo vista previa. Para compartirlo con
 // alguien sin cuenta se usa un link privado (/eventos/vista-previa/<token>, ver src/lib/eventPreview.ts).
@@ -35,23 +88,36 @@ if (!result && Astro.params.slug && Astro.cookies.get("sb-access-token")) {
 }
 
 // Slug anterior de un evento publicado o con registrados (src/lib/eventSlug.ts) => 301 al slug vigente
-if (!result) {
+if (!result && !previewFailure) {
   const currentSlug = await resolveEventSlugRedirect(Astro.params.slug);
   if (currentSlug) return slugRedirectResponse(`/eventos/${currentSlug}${Astro.url.search}`);
 }
 
 // Borradores (para el público), eventos inexistentes o slugs inválidos => 404 real (src/pages/404.astro)
-if (!result) {
+// Con un link de vista previa que ya no sirve (o pedido por un bot) se explica por qué, en vez del 404.
+if (!result && !previewFailure) {
   return notFound();
 }
+if (!result && previewFailure !== "bot") Astro.response.status = previewFailure === "not_found" ? 404 : 410;
 
-const { eventData, seo } = result;
+const eventData = result?.eventData;
+const seo = result?.seo;
 
 // Página pública (no la vista previa del dueño): igual para todos => se sirve desde el CDN de Netlify
 // (src/lib/cdnCache.ts). Cualquier cambio del productor la vacía al instante; el TTL corto solo acota el atraso
 // del stock mostrado (la compra lo valida en el servidor). Los demo no cambian: TTL más largo.
-if (!eventData.is_preview && !getTrustedTenantProxy(Astro.request)) {
+if (eventData && !eventData.is_preview && previewToken === null && !getTrustedTenantProxy(Astro.request)) {
   cachePublicPage(Astro.response.headers, eventData.is_demo ? { sMaxAge: 60, staleWhileRevalidate: 600 } : { sMaxAge: 30, staleWhileRevalidate: 60 });
 }
 ---
-<EventPage eventData={eventData} seo={seo} />
+{eventData && seo ? (
+  <EventPage eventData={eventData} seo={seo} analytics={!previewAccess} />
+) : (
+  <Layout title="Vista previa privada | AI Tickets" noindex={true} analytics={false}>
+    <AppHeader client:idle />
+    <main class="pt-16">
+      <EventPreviewUnavailable reason={previewFailure || "not_found"} />
+    </main>
+    <AppFooter client:idle />
+  </Layout>
+)}

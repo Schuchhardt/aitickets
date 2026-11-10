@@ -226,6 +226,26 @@ test.describe("sin venta", () => {
     await expect(card.getByTestId("review-cta")).toHaveCount(0);
   });
 
+  // Un <Teleport to="body"> hidratado hacía que Vue borrara el primer hijo de <body>: en la vista previa
+  // privada era el <main> completo (la página cargaba y quedaba en blanco).
+  test("la hidratación no borra nodos de la página (Teleport)", async ({ page }) => {
+    const mismatches: string[] = [];
+    page.on("console", (m) => /hydration/i.test(m.text()) && mismatches.push(m.text().slice(0, 200)));
+    await page.addInitScript(() => {
+      (window as any).__bodyRemovals = 0;
+      const removeChild = Node.prototype.removeChild;
+      Node.prototype.removeChild = function <T extends Node>(this: Node, child: T): T {
+        if (this === document.body) (window as any).__bodyRemovals++;
+        return removeChild.call(this, child) as T;
+      };
+    });
+    await openScenario(page, "vista-previa");
+    await page.locator("astro-island:not([ssr])").first().waitFor({ state: "attached" });
+    expect(await page.evaluate(() => (window as any).__bodyRemovals)).toBe(0);
+    expect(mismatches).toEqual([]);
+    await expect(page.locator("main .ev-page")).toBeVisible();
+  });
+
   test("venta cerrada", async ({ page }) => {
     const card = await openScenario(page, "venta-cerrada");
     await expect(label(page)).toHaveText("Venta cerrada");

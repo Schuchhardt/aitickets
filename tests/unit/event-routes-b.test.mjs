@@ -698,9 +698,9 @@ describe('/api/events/preview-links', () => {
   it('feliz: crea (la URL con el token solo se muestra una vez), lista y revoca', async () => {
     const created = await hit(previewLinks.POST, 'editor', { method: 'POST', body: { eventId: 10, expiresInHours: 48, singleUse: true, label: 'Para el artista' } })
     expect(created.status).toBe(201)
-    expect(created.body.url).toMatch(/^https:\/\/aitickets\.test\/eventos\/vista-previa\/pv_[A-Za-z0-9_-]{32,64}$/)
+    expect(created.body.url).toMatch(/^https:\/\/aitickets\.test\/eventos\/[^/?]+\?preview=pv_[A-Za-z0-9_-]{32,64}$/)
     expect(created.body.link).toMatchObject({ event_id: 10, label: 'Para el artista', single_use: true, status: 'active' })
-    const token = created.body.url.split('/').pop()
+    const token = new URL(created.body.url).searchParams.get('preview')
     const row = db.tables.aitickets_event_preview_links.find((l) => l.id === created.body.link.id)
     expect(row).toMatchObject({ organization_id: 7, created_by_user_id: 3, token_hash: sha256Hex(token) })
     expect(JSON.stringify(db.tables.aitickets_event_preview_links)).not.toContain(token)
