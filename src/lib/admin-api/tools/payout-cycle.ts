@@ -497,7 +497,7 @@ const setReleasePolicy: AdminToolDef = {
 // 4. Comprobantes de transferencia
 // ---------------------------------------------------------------------------
 
-const RECEIPT_BUCKET = "payout-receipts";
+const RECEIPT_BUCKET = "aitickets-payout-receipts";
 const MAX_RECEIPT_SIZE = 5 * 1024 * 1024; // 5 MB
 const CONTENT_TYPES: Record<string, string> = { "application/pdf": "pdf", "image/jpeg": "jpg", "image/png": "png" };
 
