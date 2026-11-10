@@ -874,6 +874,7 @@ column:event_dates.held_attested_at	timestamp with time zone notnull=false defau
 column:event_dates.held_attested_by	bigint notnull=false default=-
 column:event_dates.held_attested_note	text notnull=false default=-
 column:event_dates.id	bigint notnull=true default=- identity=d
+column:event_dates.release_override_at	timestamp with time zone notnull=false default=-
 column:event_dates.released_early_at	timestamp with time zone notnull=false default=-
 column:event_dates.released_early_by	text notnull=false default=-
 column:event_dates.start_time	time without time zone notnull=true default=-
@@ -1020,6 +1021,7 @@ column:events.organization_id	bigint notnull=false default=-
 column:events.page_settings	jsonb notnull=false default=-
 column:events.panel_modules	jsonb notnull=false default=-
 column:events.permit_status	text notnull=true default='none'::text
+column:events.release_override_at	timestamp with time zone notnull=false default=-
 column:events.released_early_at	timestamp with time zone notnull=false default=-
 column:events.released_early_by	text notnull=false default=-
 column:events.requires_documents	boolean notnull=true default=false

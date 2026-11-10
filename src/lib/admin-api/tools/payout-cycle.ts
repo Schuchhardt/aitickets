@@ -81,7 +81,8 @@ const releaseEventFunds: AdminToolDef = {
     title: "Liberar fondos de un evento anticipadamente",
     description:
         "Libera anticipadamente los fondos de un evento (o una función específica), sin esperar las 48 h. " +
-        "Evalúa condiciones (identidad verificada, cuenta bancaria, check-ins, disputas). Con override_conditions=true las omite (p. ej. Flow ya liquidó). " +
+        "Incluye las ventas sin función asignada (entradas válidas para cualquier función, abonos). El resumen muestra el monto exacto que queda disponible. " +
+        "Evalúa condiciones (identidad, check-ins, reclamos). Con override_conditions=true las omite y el saldo deja de exigirlas para ese tramo (p. ej. Flow ya liquidó). " +
         "Le avisa al productor por correo y registra quién y por qué lo hizo. Pide confirmación.",
     readOnly: false,
     idempotent: true,
@@ -92,7 +93,7 @@ const releaseEventFunds: AdminToolDef = {
         properties: {
             event_id: { type: "integer", minimum: 1, description: "ID del evento." },
             event_date_id: { type: "integer", minimum: 1, description: "Función específica (omitir = todas las del evento)." },
-            override_conditions: { type: "boolean", default: false, description: "Ignorar condiciones de liberación (identidad, cuenta, check-ins, disputas). Usar solo cuando Flow ya liquidó o hay razón justificada." },
+            override_conditions: { type: "boolean", default: false, description: "Ignorar condiciones de liberación (identidad, check-ins, reclamos). Usar solo cuando Flow ya liquidó o hay razón justificada." },
             notify_producer: { type: "boolean", default: true },
         },
     },
@@ -110,22 +111,19 @@ const releaseEventFunds: AdminToolDef = {
         const eventLedger = ledger.events.find((l) => l.event_id === args.event_id);
         if (!eventLedger) throw new ToolError("conflict", `El evento "${event.name}" no tiene ventas registradas.`);
 
-        let targetFunctions = eventLedger.functions;
-        if (args.event_date_id) {
-            targetFunctions = targetFunctions.filter((f) => f.event_date_id === args.event_date_id);
-            if (!targetFunctions.length) throw new ToolError("not_found", `No se encontró la función ${args.event_date_id} en el evento ${args.event_id}.`);
+        if (args.event_date_id && !eventLedger.functions.some((f) => f.event_date_id === args.event_date_id)) {
+            throw new ToolError("not_found", `No se encontró la función ${args.event_date_id} en el evento ${args.event_id}.`);
         }
+        const targetFunctions = args.event_date_id ? eventLedger.functions.filter((f) => f.event_date_id === args.event_date_id) : eventLedger.functions;
 
-        const releasableAmount = targetFunctions.reduce((s, f) => s + f.sales_net, 0);
-        const alreadyReleased = targetFunctions.filter((f) => f.release_status === "released");
-        const pendingOrHeld = targetFunctions.filter((f) => f.release_status === "pending" || f.release_status === "held");
-
-        if (!pendingOrHeld.length && alreadyReleased.length === targetFunctions.length) {
-            throw new ToolError("conflict", `Todos los fondos ${args.event_date_id ? "de esa función" : "del evento"} ya están liberados.`);
-        }
-        if (releasableAmount <= 0) {
-            throw new ToolError("conflict", `No hay fondos por liberar (neto de ventas: ${clp(releasableAmount)}).`);
-        }
+        // Monto exacto: el ledger con la liberación simulada menos el de ahora. Así cuenta también las ventas sin
+        // función asignada (entradas válidas para cualquier función, abonos), que no suman en functions[].sales_net.
+        const after = await computeOrgLedger(supabase, orgId, {
+            eventIds: [args.event_id],
+            assumeEarlyRelease: { eventId: args.event_id, eventDateIds: args.event_date_id ? [args.event_date_id] : null, override: Boolean(args.override_conditions) },
+        });
+        const afterLedger = after.events.find((l) => l.event_id === args.event_id) || eventLedger;
+        const releasableAmount = Math.max(0, afterLedger.available - eventLedger.available);
 
         const warnings: string[] = [];
 
@@ -137,16 +135,22 @@ const releaseEventFunds: AdminToolDef = {
                     `No se puede liberar: ${orgReasons.map((r) => r.label).join("; ")}. Usa override_conditions=true si tienes justificación (p. ej. Flow ya liquidó).`,
                 );
             }
-            const functionHolds = pendingOrHeld.flatMap((f) => f.hold_reasons.filter((r) => r.code !== "risk_reserve"));
-            if (functionHolds.length) {
-                const unique = [...new Set(functionHolds.map((r) => r.label))];
+            if (afterLedger.held > 0) {
+                const unique = [...new Set(afterLedger.hold_reasons.filter((r) => r.code !== "risk_reserve").map((r) => r.label))];
                 throw new ToolError(
                     "conflict",
-                    `Condiciones sin cumplir: ${unique.join("; ")}. Usa override_conditions=true si hay justificación.`,
+                    `Condiciones sin cumplir${unique.length ? `: ${unique.join("; ")}` : ""} (quedarían retenidos ${clp(afterLedger.held)}). Usa override_conditions=true si hay justificación.`,
                 );
             }
         } else {
             warnings.push("Se omiten las condiciones de liberación (override_conditions=true).");
+        }
+
+        if (releasableAmount <= 0) {
+            throw new ToolError(
+                "conflict",
+                `No hay fondos por liberar ${args.event_date_id ? "de esa función" : "del evento"}: disponible ${clp(eventLedger.available)}, pendiente ${clp(eventLedger.pending)}, retenido ${clp(eventLedger.held)}.`,
+            );
         }
 
         const functionLabel = args.event_date_id
@@ -164,7 +168,8 @@ const releaseEventFunds: AdminToolDef = {
                 event_date_id: args.event_date_id ?? null,
                 organization_id: orgId,
                 amount: releasableAmount,
-                functions_count: pendingOrHeld.length,
+                available_after: afterLedger.available,
+                functions_count: targetFunctions.length,
                 override_conditions: Boolean(args.override_conditions),
             },
             warnings,
@@ -186,24 +191,29 @@ const releaseEventFunds: AdminToolDef = {
         const orgId = Number(event.organization_id);
         const now = new Date().toISOString();
         const actor = actorOf(actx);
+        // release_override_at: el ledger deja de exigir las condiciones (identidad, check-ins, reclamos) a ese tramo.
+        const patch: Record<string, unknown> = { released_early_at: now, released_early_by: actor };
+        if (args.override_conditions) patch.release_override_at = now;
+        const before = await computeOrgLedger(supabase, orgId, { eventIds: [args.event_id] });
+        const availableBefore = before.events.find((l) => l.event_id === args.event_id)?.available ?? 0;
 
         if (args.event_date_id) {
             const { error: updErr } = await supabase
                 .from("event_dates")
-                .update({ released_early_at: now, released_early_by: actor })
+                .update(patch)
                 .eq("id", args.event_date_id)
                 .eq("event_id", args.event_id);
             if (updErr && !isMissing(updErr)) throw updErr;
         } else {
             const { error: evErr } = await supabase
                 .from("events")
-                .update({ released_early_at: now, released_early_by: actor })
+                .update(patch)
                 .eq("id", args.event_id);
             if (evErr && !isMissing(evErr)) throw evErr;
 
             const { error: datesErr } = await supabase
                 .from("event_dates")
-                .update({ released_early_at: now, released_early_by: actor })
+                .update(patch)
                 .eq("event_id", args.event_id);
             if (datesErr && !isMissing(datesErr)) throw datesErr;
         }
@@ -211,6 +221,7 @@ const releaseEventFunds: AdminToolDef = {
         const ledger = await computeOrgLedger(supabase, orgId, { eventIds: [args.event_id] });
         const eventLedger = ledger.events.find((l) => l.event_id === args.event_id);
         const newAvailable = eventLedger?.available ?? 0;
+        const released = Math.max(0, newAvailable - availableBefore);
 
         const notice =
             args.notify_producer !== false
@@ -229,7 +240,7 @@ const releaseEventFunds: AdminToolDef = {
         await notifySlack(
             `🔓 *Fondos liberados anticipadamente vía Admin*\n• *Org:* ${orgId}\n• *Evento:* ${event.name} (#${args.event_id})` +
                 (args.event_date_id ? `\n• *Función:* ${args.event_date_id}` : "") +
-                `\n• *Disponible ahora:* ${clp(newAvailable)}` +
+                `\n• *Liberado:* ${clp(released)} · *Disponible ahora:* ${clp(newAvailable)}` +
                 (args.override_conditions ? "\n• *Con override de condiciones*" : "") +
                 `\n• *Aviso al productor:* ${notice.email_sent ? "enviado" : "NO enviado"}`,
         );
@@ -239,7 +250,8 @@ const releaseEventFunds: AdminToolDef = {
             event_date_id: args.event_date_id ?? null,
             organization_id: orgId,
             event_name: event.name,
-            amount: newAvailable,
+            amount: released,
+            available: newAvailable,
             override_conditions: Boolean(args.override_conditions),
             ...notice,
         };
