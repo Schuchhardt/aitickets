@@ -172,11 +172,11 @@ describe('decisión de Didit en la organización', () => {
     expect(await applyDiditDecision(db, 7, { sessionId: 'otra', status: 'Declined' })).toBeNull()
     expect(db.tables.organizations[0].identity_status).toBeNull()
   })
-  it('cuenta de un tercero => mismatch y aviso a Slack', async () => {
+  it('cuenta de un tercero => mismatch informativo, sin aviso a Slack ni bloqueo', async () => {
     seed({ identity: { identity_status: 'approved', identity_rut: '12345678-5', identity_name: 'Ana Pérez' }, account: { bank_account_rut: '11.111.111-1', bank_account_holder: 'Juan' } })
     expect((await recomputeHolderMatch(db, 7)).status).toBe('mismatch')
     expect(db.tables.organization_payout_accounts[0].holder_match_status).toBe('mismatch')
-    expect(slack.some((t) => t.includes('Titular'))).toBe(true)
+    expect(slack.some((t) => t.includes('Titular'))).toBe(false)
   })
 })
 

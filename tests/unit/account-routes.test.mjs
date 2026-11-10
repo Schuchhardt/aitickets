@@ -282,27 +282,29 @@ describe('POST /api/organizations/update', () => {
     expect(payout(7) ?? null).toEqual(before)
   })
 
-  it('cambio de cuenta bancaria: guarda, recalcula el titular y avisa a AI Tickets SOLO con los últimos 4 dígitos', async () => {
+  it('cambio de cuenta bancaria: guarda y avisa a AI Tickets (informativo) SOLO con los últimos 4 dígitos', async () => {
     loginAs('producer')
     const r = await update(BANK)
     expect(r.status).toBe(200)
     const saved = payout(7)
-    expect(saved).toMatchObject({ ...BANK, organization_id: 7, updated_by: 1, holder_match_status: 'pending' })
+    expect(saved).toMatchObject({ ...BANK, organization_id: 7, updated_by: 1 })
     expect(saved.updated_at).toEqual(expect.any(String))
     const upsert = writes('organization_payout_accounts').find((c) => c.op === 'upsert')
     expect(upsert.values.organization_id).toBe(7)
 
     expect(notifySlack).toHaveBeenCalledTimes(1)
     const msg = notifySlack.mock.calls[0][0]
-    expect(msg).toMatch(/Cuenta bancaria por verificar/)
-    expect(msg).toMatch(/org 7, usuario 1/)
+    expect(msg).toMatch(/Cuenta bancaria actualizada/)
+    expect(msg).not.toMatch(/verificar|aitickets_verify_payout_account|select /)
+    expect(msg).toMatch(/Prod SpA \(#7\)/)
+    expect(msg).toMatch(/Ana · ana@prod\.cl \(#1\)/)
     expect(msg).toMatch(/\*\*\*\*0123/)
     expect(msg).not.toContain(BANK.bank_account_number)
     expect(msg).not.toContain('000111222333')
   })
 
-  it('si la cuenta sigue verificada (el trigger no la anuló), no avisa', async () => {
-    db.tables.organization_payout_accounts.push({ organization_id: 7, ...BANK, verified_at: '2026-10-01T00:00:00Z' })
+  it('si los datos bancarios no cambiaron, no avisa', async () => {
+    db.tables.organization_payout_accounts.push({ organization_id: 7, ...BANK })
     expect((await update(BANK)).status).toBe(200)
     expect(notifySlack).not.toHaveBeenCalled()
   })

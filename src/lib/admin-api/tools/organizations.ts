@@ -305,7 +305,7 @@ const getOrganization: AdminToolDef = {
             }
         }
         const payout = presentAccount(account);
-        if (balance && balance.available > 0 && payout.status !== "verified") {
+        if (balance && balance.available > 0 && payout.status !== "active") {
             alerts.push(`Tiene $${balance.available.toLocaleString("es-CL")} CLP disponibles y su cuenta bancaria está "${payout.status}": no puede retirar.`);
         }
         if (reviewOrders.length) alerts.push(`${reviewOrders.length} orden(es) en revisión manual ('review').`);

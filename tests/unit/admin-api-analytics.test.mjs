@@ -189,7 +189,7 @@ describe('rank_producers', () => {
     expect(siete.previous_period.gross_sales_clp).toBe(21904)
     expect(siete.growth_pct).toBe(Math.round(((19714 - 21904) / 21904) * 1000) / 10)
     expect(siete.reviews).toEqual({ average: 4.5, count: 2 })
-    expect(siete.alerts.join(' ')).toMatch(/Cuenta bancaria/)
+    expect(siete.alerts.join(' ')).not.toMatch(/Cuenta bancaria/) // sin verificar ya no es alerta: la cuenta no se verifica
     const all = await run('rank_producers', { preset: '30d', include_inactive: true })
     expect(all.producers.map((p) => p.organization_id)).toContain(8)
   })

@@ -485,7 +485,7 @@ const rankProducers: AdminToolDef = {
             if (r.segment === "en_riesgo") alerts.push("En riesgo: vendía y no tiene ventas recientes ni evento próximo.");
             if (r.segment === "publicado_sin_ventas") alerts.push("Evento publicado próximo sin ninguna venta.");
             if (before.paid_orders >= 5 && growth != null && growth <= -50) alerts.push(`Ventas ${growth}% vs el período anterior.`);
-            if (r.totals.paid_orders > 0 && r.payoutStatus !== "verified") alerts.push(`Cuenta bancaria: ${r.payoutStatus}.`);
+            if (r.totals.paid_orders > 0 && r.payoutStatus !== "active") alerts.push(`Cuenta bancaria: ${r.payoutStatus}.`);
             if (rating && rating.n >= 5 && rating.sum / rating.n < 3.5) alerts.push(`Nota de reseñas baja (${Math.round((rating.sum / rating.n) * 10) / 10}).`);
             return {
                 organization_id: id,

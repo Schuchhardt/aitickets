@@ -62,7 +62,6 @@ const bankComplete = Boolean(payout?.bank_name && payout?.bank_account_number &&
 const holdUntil = payout?.bank_changed_at ? new Date(new Date(payout.bank_changed_at).getTime() + BANK_CHANGE_HOLD_HOURS * 3600000) : null;
 const holdActive = Boolean(holdUntil && holdUntil.getTime() > Date.now());
 // AI Tickets rechazó la cuenta y el productor aún no corrige los datos (guardarlos de nuevo borra el rechazo)
-const bankRejected = Boolean(bankComplete && !payout?.verified_at && payout?.verification_rejected_at);
 
 // Verificación de identidad (Didit). Al volver del flujo (?identidad=volver) se consulta la decisión por si el
 // webhook aún no llega.
@@ -78,7 +77,6 @@ if (Astro.url.searchParams.get("identidad") === "volver" && identity?.identity_s
 const identityStatus = identity?.identity_status ?? null;
 const identityLabel = identityStatus ? IDENTITY_STATUS_LABELS[identityStatus] : "Sin verificar";
 const canStartIdentity = canEditOrg && identityStatus !== "approved" && identityStatus !== "in_review";
-const holderMismatch = (payout as any)?.holder_match_status === "mismatch";
 
 const BANKS = [
     "BancoEstado", "Banco de Chile / Edwards", "Santander", "BCI / MACH", "Scotiabank", "Itaú", "Banco Security",
@@ -203,22 +201,12 @@ const ACCOUNT_TYPES = ["Cuenta Corriente", "Cuenta Vista / CuentaRUT", "Cuenta d
             <div id="bankMsg" class="hidden order-1 sm:order-none rounded-lg px-4 py-3 text-sm font-medium"></div>
 
             <div class="rounded-lg border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-900" data-testid="bank-verification-note">
-                {bankComplete && payout?.verified_at && !holdActive && <p class="font-medium">✓ Cuenta verificada: puedes solicitar retiros.</p>}
-                {bankComplete && !payout?.verified_at && !bankRejected && <p class="font-medium">Cuenta en verificación por AI Tickets (normalmente 1 día hábil).</p>}
-                {bankRejected && (
-                    <p class="font-medium text-red-700" data-testid="bank-rejected-note">
-                        AI Tickets no pudo verificar la cuenta: {payout?.verification_notes || "revisa los datos"}. Corrige los datos y guárdalos de nuevo para que la revisemos.
-                    </p>
-                )}
+                {bankComplete && !holdActive && <p class="font-medium">✓ Cuenta registrada: puedes solicitar retiros.</p>}
                 {holdActive && holdUntil && (
                     <p class="font-medium">Por seguridad, los retiros quedan habilitados desde el {holdUntil.toLocaleString("es-CL", { timeZone: "America/Santiago", dateStyle: "medium", timeStyle: "short" })}.</p>
                 )}
-                {holderMismatch && (
-                    <p class="font-medium text-red-700" data-testid="holder-mismatch">La cuenta no está a nombre de la persona o empresa verificada: los retiros quedan bloqueados hasta que AI Tickets la revise.</p>
-                )}
                 <p class="mt-1">
-                    La cuenta debe estar a nombre de la persona verificada o de la empresa que representa: no transferimos a cuentas de terceros.
-                    Cambiar los datos bancarios requiere una nueva verificación de AI Tickets y bloquea los retiros durante {BANK_CHANGE_HOLD_HOURS} horas.
+                    Por seguridad, cambiar los datos bancarios bloquea los retiros durante {BANK_CHANGE_HOLD_HOURS} horas.
                     Nunca compartas tu número de cuenta por chat: ingrésalo solo aquí.
                 </p>
             </div>

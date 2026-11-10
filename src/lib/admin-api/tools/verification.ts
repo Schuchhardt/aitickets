@@ -49,15 +49,8 @@ const getVerificationQueue: AdminToolDef = {
             .limit(200);
         if (ipErr && !isMissing(ipErr)) throw ipErr;
 
-        // Orgs con cuenta bancaria sin verificar (que tengan datos ingresados)
-        const { data: bankPending, error: bpErr } = await actx.supabase
-            .from("organization_payout_accounts")
-            .select("organization_id")
-            .is("verified_at", null)
-            .not("bank_account_number", "is", null)
-            .is("removed_at", null)
-            .limit(200);
-        if (bpErr && !isMissing(bpErr)) throw bpErr;
+        // La cuenta bancaria no se verifica: la cola es solo de identidades pendientes.
+        const bankPending: any[] = [];
 
         const allOrgIds = [...new Set([
             ...(identityPending || []).map((o: any) => Number(o.id)),

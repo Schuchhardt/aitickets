@@ -49,7 +49,7 @@ const listPendingOperations: AdminToolDef = {
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
     async handler(_args, actx) {
         const { supabase } = actx;
-        const [payouts, refunds, review, processing, noEmail, bounces, accounts, scheduled, sites, drafts, paused] = await Promise.all([
+        const [payouts, refunds, review, processing, noEmail, bounces, scheduled, sites, drafts, paused] = await Promise.all([
             rows(() => supabase.from("aitickets_payouts").select("id, organization_id, amount, status, created_at, bank_name, bank_account_last4").in("status", ["requested", "processing"]).order("created_at", { ascending: true }).limit(200)),
             rows(() => supabase.from("aitickets_refunds").select("id, organization_id, event_id, order_id, kind, total_amount, created_at").in("status", ["requested", "processing"]).order("created_at", { ascending: true }).limit(200)),
             rows(() => supabase.from("event_orders").select("id, event_id, created_at, total_payment, payment_external_id").eq("status", "review").order("created_at", { ascending: true }).limit(200)),
@@ -57,7 +57,6 @@ const listPendingOperations: AdminToolDef = {
             // Solo la última semana: las órdenes anteriores a email_sent_at no lo tienen
             rows(() => supabase.from("event_orders").select("id, event_id, created_at, payment_provider").eq("status", "paid").is("email_sent_at", null).lt("created_at", ago(15 * MIN)).gte("created_at", ago(7 * DAY)).order("created_at", { ascending: true }).limit(200)),
             rows(() => supabase.from("aitickets_email_log").select("id, order_id, event_id, status, error, last_event_at, created_at").in("status", ["bounced", "complained"]).gte("created_at", ago(7 * DAY)).order("created_at", { ascending: false }).limit(200)),
-            rows(() => supabase.from("organization_payout_accounts").select("organization_id, bank_name, bank_account_number, bank_account_holder, bank_account_rut, verified_at, verification_rejected_at, removed_at, bank_changed_at, updated_at").is("verified_at", null).limit(500)),
             rows(() => supabase.from("aitickets_scheduled_messages").select("id, organization_id, event_id, kind, subject, send_at, failed_count, recipients_count").eq("status", "failed").gte("send_at", ago(14 * DAY)).order("send_at", { ascending: false }).limit(200)),
             rows(() => supabase.from("aitickets_sites").select("organization_id, slug, custom_domain, domain_status, domain_error, domain_requested_at, domain_checked_at").in("domain_status", ["pending_provider", "failed"]).limit(200)),
             rows(() => supabase.from("aitickets_outreach_messages").select("id, lead_id, subject, ai_intent, ai_confidence, created_at").eq("direction", "out").eq("status", "draft").order("created_at", { ascending: true }).limit(200)),
@@ -66,14 +65,10 @@ const listPendingOperations: AdminToolDef = {
 
         // Las compras de los eventos demo no envían correo de entradas
         const paidWithoutEmail = noEmail.data.filter((o: any) => o.payment_provider !== "demo");
-        const pendingAccounts = accounts.data.filter(
-            (a: any) => a.bank_name && a.bank_account_number && a.bank_account_holder && a.bank_account_rut && !a.verification_rejected_at && !a.removed_at,
-        );
         const recentFailedDomains = sites.data.filter((s: any) => s.domain_status === "pending_provider" || (s.domain_checked_at && Date.parse(s.domain_checked_at) >= Date.now() - 14 * DAY));
         const orgIds = [
             ...payouts.data.map((p: any) => p.organization_id),
             ...refunds.data.map((r: any) => r.organization_id),
-            ...pendingAccounts.map((a: any) => a.organization_id),
             ...scheduled.data.map((m: any) => m.organization_id),
             ...recentFailedDomains.map((s: any) => s.organization_id),
         ].map(Number);
@@ -131,14 +126,6 @@ const listPendingOperations: AdminToolDef = {
                 resolve_with: "org_get_order para ver la dirección; pedir otra al comprador y org_transfer_ticket",
                 items: cap(bounces.data).map((b: any) => ({ order_id: b.order_id, event_id: b.event_id != null ? Number(b.event_id) : null, status: b.status, error: b.error ?? null, at: b.last_event_at || b.created_at })),
                 ...(bounces.missing ? { note: "El registro de correos aún no existe en esta base." } : {}),
-            },
-            {
-                key: "payout_accounts_to_verify",
-                title: "Cuentas bancarias por verificar",
-                urgency: 7,
-                count: pendingAccounts.length,
-                resolve_with: "get_organization para revisar; verify_payout_account(approve|reject, expected_last4)",
-                items: cap(pendingAccounts).map((a: any) => ({ organization: org(a.organization_id), bank: a.bank_name, account_last4: String(a.bank_account_number).replace(/\D/g, "").slice(-4), waiting_since: a.bank_changed_at || a.updated_at || null })),
             },
             {
                 key: "scheduled_messages_failed",
