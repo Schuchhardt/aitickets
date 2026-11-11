@@ -121,6 +121,11 @@ export type EventLedger = {
     risk_level: string | null;
     /** Motivos de retención del evento (los de la organización y los de sus funciones). */
     hold_reasons: HoldReason[];
+    /**
+     * Ingresos de entradas pagadas del evento entero. unassigned_* son las entradas sin función asignada (válidas para
+     * cualquier función, abonos): no cuentan en functions[].checkins, pero sí aquí y en la regla de liberación del evento.
+     */
+    checkins: { sold: number; checked_in: number; unassigned_sold: number; unassigned_checked_in: number };
 };
 
 export type OrgLedger = {
@@ -355,6 +360,7 @@ export async function computeOrgLedger(
     const orderEvent = new Map<string, number>(orders.map((o) => [String(o.id), Number(o.event_id)]));
     const checkinsByFn = new Map<number, { sold: number; in: number }>();
     const checkinsByEvent = new Map<number, { sold: number; in: number }>();
+    const checkinsUnassigned = new Map<number, { sold: number; in: number }>();
     const bump = (map: Map<number, { sold: number; in: number }>, key: number, a: any) => {
         const c = map.get(key) || { sold: 0, in: 0 };
         c.sold += 1;
@@ -368,6 +374,7 @@ export async function computeOrgLedger(
         bump(checkinsByEvent, evId, a);
         const fnId = a.event_ticket_id == null ? null : ticketDate.get(String(a.event_ticket_id)) ?? null;
         if (fnId != null) bump(checkinsByFn, fnId, a);
+        else bump(checkinsUnassigned, evId, a);
     }
     if (simulated?.eventDateIds?.length) {
         const nowIso = now.toISOString();
@@ -459,6 +466,12 @@ export async function computeOrgLedger(
             reserve_pct: 0, // sin reserva por riesgo: se ignora events.reserve_pct
             risk_level: e.risk_level ?? null,
             hold_reasons: [],
+            checkins: {
+                sold: checkinsByEvent.get(Number(e.id))?.sold || 0,
+                checked_in: checkinsByEvent.get(Number(e.id))?.in || 0,
+                unassigned_sold: checkinsUnassigned.get(Number(e.id))?.sold || 0,
+                unassigned_checked_in: checkinsUnassigned.get(Number(e.id))?.in || 0,
+            },
         });
     }
     /** Función de una orden si TODAS sus entradas son de la misma función conocida; si no, null (= última del evento). */

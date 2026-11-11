@@ -252,3 +252,33 @@ describe('acreditar función', () => {
     expect(await runTool(getTool('attest_function_held'), { event_id: 40, event_date_id: 401, note: 'ya fue' }, ctx('editor'))).toMatchObject({ ok: false, code: 'forbidden' })
   })
 })
+
+describe('check-ins de entradas sin función asignada', () => {
+  const ctx = () => ({
+    supabase: db,
+    actor: { keyId: null, userId: 1, orgId: 7, role: 'producer', name: 'Ana', email: 'ana@prod.cl', scopes: ['read', 'write', 'publish', 'attendees', 'finance', 'team'], eventIds: null },
+    origin: 'https://aitickets.cl',
+    requestUrl: new URL('https://aitickets.cl/mcp'),
+    channel: 'mcp',
+  })
+
+  it('cuentan en el evento (y lo liberan) aunque la función muestre 0; compliance lo explica', async () => {
+    seed({ tables: { event_tickets: [{ id: 1, event_id: 40, event_date_id: null }] } })
+    const l = await computeOrgLedger(db, 7)
+    expect(l.events[0]).toMatchObject({ available: 20000, held: 0 })
+    expect(l.events[0].functions[0]).toMatchObject({ checkins: 0, checkin_ratio: null })
+    expect(l.events[0].checkins).toEqual({ sold: 2, checked_in: 2, unassigned_sold: 2, unassigned_checked_in: 2 })
+
+    const out = await runTool(getTool('get_event_compliance'), { event_id: 40 }, ctx())
+    expect(out.ok, JSON.stringify(out)).toBe(true)
+    expect(out.result.checkins).toMatchObject({ paid_tickets: 2, checked_in: 2, ratio: 1, unassigned_paid_tickets: 2, unassigned_checked_in: 2 })
+    expect(out.result.checkins.summary).toMatch(/2 de 2 entradas pagadas con ingreso \(2 de 2 son entradas sin función asignada/)
+  })
+
+  it('con entradas asignadas a la función no agrega la aclaración', async () => {
+    const out = await runTool(getTool('get_event_compliance'), { event_id: 40 }, ctx())
+    expect(out.result.checkins).toMatchObject({ paid_tickets: 2, checked_in: 2, unassigned_paid_tickets: 0 })
+    expect(out.result.checkins.summary).toBe('2 de 2 entradas pagadas con ingreso')
+    expect(out.result.functions[0]).toMatchObject({ checkins: 2, checkin_ratio: 1 })
+  })
+})
