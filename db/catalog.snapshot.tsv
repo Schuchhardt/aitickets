@@ -481,6 +481,32 @@ column:aitickets_lead_sources.enabled	boolean notnull=true default=false
 column:aitickets_lead_sources.key	text notnull=true default=-
 column:aitickets_lead_sources.last_result	jsonb notnull=false default=-
 column:aitickets_lead_sources.last_run_at	timestamp with time zone notnull=false default=-
+column:aitickets_lead_strategies.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_lead_strategies.landing_url	text notnull=false default=-
+column:aitickets_lead_strategies.name	text notnull=true default=-
+column:aitickets_lead_strategies.niche	text notnull=true default=-
+column:aitickets_lead_strategies.notes	text notnull=false default=-
+column:aitickets_lead_strategies.pitch	text notnull=false default=-
+column:aitickets_lead_strategies.slug	text notnull=true default=-
+column:aitickets_lead_strategies.status	text notnull=true default='active'::text
+column:aitickets_lead_strategies.updated_at	timestamp with time zone notnull=true default=now()
+column:aitickets_lead_touches.channel	text notnull=false default=-
+column:aitickets_lead_touches.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_lead_touches.cta	text notnull=false default=-
+column:aitickets_lead_touches.drafted_at	timestamp with time zone notnull=true default=now()
+column:aitickets_lead_touches.gmail_draft_id	text notnull=false default=-
+column:aitickets_lead_touches.gmail_message_id	text notnull=false default=-
+column:aitickets_lead_touches.gmail_thread_id	text notnull=false default=-
+column:aitickets_lead_touches.id	bigint notnull=true default=- identity=d
+column:aitickets_lead_touches.kind	text notnull=true default=-
+column:aitickets_lead_touches.lead_id	uuid notnull=true default=-
+column:aitickets_lead_touches.outcome	text notnull=true default='drafted'::text
+column:aitickets_lead_touches.reply_at	timestamp with time zone notnull=false default=-
+column:aitickets_lead_touches.reply_sentiment	text notnull=false default=-
+column:aitickets_lead_touches.sent_at	timestamp with time zone notnull=false default=-
+column:aitickets_lead_touches.step	integer notnull=false default=-
+column:aitickets_lead_touches.strategy_slug	text notnull=false default=-
+column:aitickets_lead_touches.subject	text notnull=false default=-
 column:aitickets_leads.categories	text[] notnull=false default=-
 column:aitickets_leads.city	text notnull=false default=-
 column:aitickets_leads.consent_at	timestamp with time zone notnull=false default=-
@@ -489,6 +515,7 @@ column:aitickets_leads.contacts_enriched_at	timestamp with time zone notnull=fal
 column:aitickets_leads.country	character(2) notnull=true default='CL'::bpchar
 column:aitickets_leads.created_at	timestamp with time zone notnull=true default=now()
 column:aitickets_leads.current_ticketing	text notnull=false default=-
+column:aitickets_leads.discovered_event	jsonb notnull=false default=-
 column:aitickets_leads.domain	text notnull=false default=-
 column:aitickets_leads.email	text notnull=false default=-
 column:aitickets_leads.email_found_at	timestamp with time zone notnull=false default=-
@@ -496,6 +523,7 @@ column:aitickets_leads.email_source_url	text notnull=false default=-
 column:aitickets_leads.email_type	text notnull=false default=-
 column:aitickets_leads.enrich_attempts	integer notnull=true default=0
 column:aitickets_leads.events_on_passline	integer notnull=true default=0
+column:aitickets_leads.gmail_thread_id	text notnull=false default=-
 column:aitickets_leads.id	uuid notnull=true default=gen_random_uuid()
 column:aitickets_leads.instagram	text notnull=false default=-
 column:aitickets_leads.invalid_reason	text notnull=false default=-
@@ -504,13 +532,22 @@ column:aitickets_leads.last_passline_event	jsonb notnull=false default=-
 column:aitickets_leads.last_seen_event_at	timestamp with time zone notnull=false default=-
 column:aitickets_leads.lawful_basis	text notnull=true default='legitimate_interest_b2b'::text
 column:aitickets_leads.lead_type	text notnull=false default=-
+column:aitickets_leads.lost_reason	text notnull=false default=-
 column:aitickets_leads.manual_only	boolean notnull=true default=false
 column:aitickets_leads.name_key	text notnull=false default=-
+column:aitickets_leads.next_action	text notnull=false default=-
 column:aitickets_leads.next_action_at	timestamp with time zone notnull=false default=-
+column:aitickets_leads.niche	text notnull=false default=-
 column:aitickets_leads.notes	text notnull=false default=-
 column:aitickets_leads.org_name	text notnull=false default=-
 column:aitickets_leads.organization_id	bigint notnull=false default=-
 column:aitickets_leads.place_id	text notnull=false default=-
+column:aitickets_leads.potential	text notnull=false default=-
+column:aitickets_leads.potential_reason	text notnull=false default=-
+column:aitickets_leads.potential_score	integer notnull=false default=-
+column:aitickets_leads.proposal_created_at	timestamp with time zone notnull=false default=-
+column:aitickets_leads.proposal_event_id	bigint notnull=false default=-
+column:aitickets_leads.proposal_preview_link_id	bigint notnull=false default=-
 column:aitickets_leads.score	integer notnull=false default=-
 column:aitickets_leads.score_reasons	jsonb notnull=false default=-
 column:aitickets_leads.sequence_step	integer notnull=true default=0
@@ -1429,12 +1466,26 @@ constraint:aitickets_guests.aitickets_guests_plus_ones_check	CHECK (((plus_ones 
 constraint:aitickets_guests.aitickets_guests_status_v2_check	CHECK ((status = ANY (ARRAY['pending'::text, 'link_ready'::text, 'invited'::text, 'removed'::text])))
 constraint:aitickets_job_heartbeats.aitickets_job_heartbeats_pkey	PRIMARY KEY (job)
 constraint:aitickets_lead_sources.aitickets_lead_sources_pkey	PRIMARY KEY (key)
+constraint:aitickets_lead_strategies.aitickets_lead_strategies_niche_check	CHECK ((niche = ANY (ARRAY['stand_up'::text, 'teatro'::text, 'musica_en_vivo'::text, 'fiestas'::text, 'clubs'::text, 'talleres'::text, 'seminarios'::text, 'academias'::text, 'otro'::text])))
+constraint:aitickets_lead_strategies.aitickets_lead_strategies_pkey	PRIMARY KEY (slug)
+constraint:aitickets_lead_strategies.aitickets_lead_strategies_status_check	CHECK ((status = ANY (ARRAY['active'::text, 'paused'::text, 'discarded'::text])))
+constraint:aitickets_lead_touches.aitickets_lead_touches_channel_check	CHECK (((channel IS NULL) OR (channel = ANY (ARRAY['email'::text, 'whatsapp'::text, 'instagram'::text]))))
+constraint:aitickets_lead_touches.aitickets_lead_touches_kind_check	CHECK ((kind = ANY (ARRAY['outreach'::text, 'reply'::text, 'proposal'::text])))
+constraint:aitickets_lead_touches.aitickets_lead_touches_lead_id_fkey	FOREIGN KEY (lead_id) REFERENCES aitickets_leads(id) ON DELETE CASCADE
+constraint:aitickets_lead_touches.aitickets_lead_touches_outcome_check	CHECK ((outcome = ANY (ARRAY['drafted'::text, 'sent'::text, 'replied'::text, 'bounced'::text, 'discarded'::text])))
+constraint:aitickets_lead_touches.aitickets_lead_touches_pkey	PRIMARY KEY (id)
+constraint:aitickets_lead_touches.aitickets_lead_touches_reply_sentiment_check	CHECK (((reply_sentiment IS NULL) OR (reply_sentiment = ANY (ARRAY['positive'::text, 'neutral'::text, 'negative'::text, 'unsubscribe'::text]))))
 constraint:aitickets_leads.aitickets_leads_domain_key	UNIQUE (domain)
 constraint:aitickets_leads.aitickets_leads_domain_lower	CHECK (((domain IS NULL) OR (domain = lower(domain))))
 constraint:aitickets_leads.aitickets_leads_email_type_check	CHECK (((email_type IS NULL) OR (email_type = ANY (ARRAY['role'::text, 'personal'::text]))))
 constraint:aitickets_leads.aitickets_leads_lead_type_check	CHECK (((lead_type IS NULL) OR (lead_type = ANY (ARRAY['producer'::text, 'venue'::text]))))
+constraint:aitickets_leads.aitickets_leads_lost_reason_check	CHECK (((lost_reason IS NULL) OR (lost_reason = ANY (ARRAY['no_reply'::text, 'not_interested'::text, 'bounced'::text, 'bad_fit'::text, 'locked_in_competitor'::text, 'other'::text]))))
+constraint:aitickets_leads.aitickets_leads_next_action_check	CHECK (((next_action IS NULL) OR (next_action = ANY (ARRAY['draft_t1'::text, 'draft_t2'::text, 'draft_t3'::text, 'mark_lost'::text, 'reply'::text, 'proposal'::text, 'none'::text]))))
+constraint:aitickets_leads.aitickets_leads_niche_check	CHECK (((niche IS NULL) OR (niche = ANY (ARRAY['stand_up'::text, 'teatro'::text, 'musica_en_vivo'::text, 'fiestas'::text, 'clubs'::text, 'talleres'::text, 'seminarios'::text, 'academias'::text, 'otro'::text]))))
 constraint:aitickets_leads.aitickets_leads_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE SET NULL
 constraint:aitickets_leads.aitickets_leads_pkey	PRIMARY KEY (id)
+constraint:aitickets_leads.aitickets_leads_potential_check	CHECK (((potential IS NULL) OR (potential = ANY (ARRAY['low'::text, 'medium'::text, 'high'::text]))))
+constraint:aitickets_leads.aitickets_leads_potential_score_check	CHECK (((potential_score IS NULL) OR ((potential_score >= 0) AND (potential_score <= 100))))
 constraint:aitickets_leads.aitickets_leads_status_check	CHECK ((status = ANY (ARRAY['new'::text, 'enriched'::text, 'queued'::text, 'contacted'::text, 'replied'::text, 'interested'::text, 'converted'::text, 'lost'::text, 'suppressed'::text, 'invalid'::text])))
 constraint:aitickets_oauth_clients.aitickets_oauth_clients_client_secret_hash_check	CHECK (((client_secret_hash IS NULL) OR (client_secret_hash ~ '^[0-9a-f]{64}$'::text)))
 constraint:aitickets_oauth_clients.aitickets_oauth_clients_pkey	PRIMARY KEY (client_id)
@@ -1761,6 +1812,8 @@ grant:aitickets_event_waitlist	-
 grant:aitickets_guests	-
 grant:aitickets_job_heartbeats	-
 grant:aitickets_lead_sources	-
+grant:aitickets_lead_strategies	-
+grant:aitickets_lead_touches	-
 grant:aitickets_leads	-
 grant:aitickets_oauth_clients	-
 grant:aitickets_oauth_codes	-
@@ -1870,8 +1923,13 @@ index:aitickets_event_slug_redirects.aitickets_event_slug_redirects_event_idx	CR
 index:aitickets_event_staff.aitickets_event_staff_user_idx	CREATE INDEX aitickets_event_staff_user_idx ON aitickets_event_staff USING btree (user_id)
 index:aitickets_event_waitlist.aitickets_event_waitlist_event_email_kind_idx	CREATE UNIQUE INDEX aitickets_event_waitlist_event_email_kind_idx ON aitickets_event_waitlist USING btree (event_id, lower(email), kind)
 index:aitickets_guests.aitickets_guests_event_idx	CREATE INDEX aitickets_guests_event_idx ON aitickets_guests USING btree (event_id, created_at)
+index:aitickets_lead_touches.aitickets_lead_touches_lead_idx	CREATE INDEX aitickets_lead_touches_lead_idx ON aitickets_lead_touches USING btree (lead_id, created_at)
+index:aitickets_lead_touches.aitickets_lead_touches_outcome_idx	CREATE INDEX aitickets_lead_touches_outcome_idx ON aitickets_lead_touches USING btree (outcome, sent_at)
+index:aitickets_lead_touches.aitickets_lead_touches_strategy_idx	CREATE INDEX aitickets_lead_touches_strategy_idx ON aitickets_lead_touches USING btree (strategy_slug) WHERE (strategy_slug IS NOT NULL)
 index:aitickets_leads.aitickets_leads_email_lower_uidx	CREATE UNIQUE INDEX aitickets_leads_email_lower_uidx ON aitickets_leads USING btree (lower(email)) WHERE (email IS NOT NULL)
 index:aitickets_leads.aitickets_leads_name_key_uidx	CREATE UNIQUE INDEX aitickets_leads_name_key_uidx ON aitickets_leads USING btree (name_key)
+index:aitickets_leads.aitickets_leads_next_action_idx	CREATE INDEX aitickets_leads_next_action_idx ON aitickets_leads USING btree (next_action, next_action_at) WHERE (next_action IS NOT NULL)
+index:aitickets_leads.aitickets_leads_niche_idx	CREATE INDEX aitickets_leads_niche_idx ON aitickets_leads USING btree (niche) WHERE (niche IS NOT NULL)
 index:aitickets_leads.aitickets_leads_organization_idx	CREATE INDEX aitickets_leads_organization_idx ON aitickets_leads USING btree (organization_id) WHERE (organization_id IS NOT NULL)
 index:aitickets_leads.aitickets_leads_source_idx	CREATE INDEX aitickets_leads_source_idx ON aitickets_leads USING btree (source, status)
 index:aitickets_leads.aitickets_leads_status_next_idx	CREATE INDEX aitickets_leads_status_next_idx ON aitickets_leads USING btree (status, next_action_at)
@@ -1989,6 +2047,8 @@ table:aitickets_event_waitlist	rls=true force=false
 table:aitickets_guests	rls=true force=false
 table:aitickets_job_heartbeats	rls=true force=false
 table:aitickets_lead_sources	rls=true force=false
+table:aitickets_lead_strategies	rls=true force=false
+table:aitickets_lead_touches	rls=true force=false
 table:aitickets_leads	rls=true force=false
 table:aitickets_oauth_clients	rls=true force=false
 table:aitickets_oauth_codes	rls=true force=false
