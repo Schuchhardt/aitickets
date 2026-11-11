@@ -14,6 +14,7 @@
 // navegador (src/components/Reservation): NO debe importar nada de Node. Las funciones con BD reciben
 // el cliente de Supabase (service role) como parámetro.
 import { computeFeeSplit } from './fees.mjs'
+import { zonedDateTimeToUtc } from './dates.mjs'
 
 export const DISCOUNT_CODE_RE = /^[A-Z0-9_-]{3,30}$/
 export const DISCOUNT_KINDS = ['percent', 'fixed']
@@ -290,8 +291,17 @@ export function validateDiscountInput(body = {}, { partial = false } = {}) {
       values[column] = null
       return null
     }
-    const d = new Date(raw)
-    if (Number.isNaN(d.getTime())) return 'Fecha de vigencia inválida.'
+    const str = String(raw).trim()
+    let d
+    if (/(?:Z|[+-]\d{2}:?\d{2})\s*$/.test(str)) {
+      d = new Date(str)
+    } else {
+      // Sin zona horaria: interpretar como hora de Chile (America/Santiago)
+      const dateMatch = str.match(/^(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2}(?::\d{2})?))?$/)
+      if (!dateMatch) return 'Fecha de vigencia inválida.'
+      d = zonedDateTimeToUtc(dateMatch[1], dateMatch[2] || '00:00')
+    }
+    if (!d || Number.isNaN(d.getTime())) return 'Fecha de vigencia inválida.'
     values[column] = d.toISOString()
     return null
   }

@@ -206,25 +206,31 @@ function functionEnd(d) {
   return end
 }
 
-/** El evento sigue vigente si su end_date no pasó o tiene alguna función de hoy en adelante (C3). */
+/** El evento sigue vigente si su end_date no pasó o tiene alguna función que aún no terminó (C3). */
 async function isEventStillOn(supabase, event) {
   if (!event.end_date || new Date(event.end_date) >= new Date()) return true
-  const { count } = await supabase
+  const today = todayInTimeZone()
+  const { data: fns } = await supabase
     .from('event_dates')
-    .select('id', { count: 'exact', head: true })
+    .select('date, start_time, end_time')
     .eq('event_id', event.id)
-    .gte('date', todayInTimeZone())
-  return (count || 0) > 0
+    .gte('date', today)
+  if (!fns?.length) return false
+  const now = new Date()
+  return fns.some(fn => {
+    if (String(fn.date).slice(0, 10) > today) return true
+    return functionEnd(fn) > now
+  })
 }
 
-/** ¿El email ya tiene una orden gratis pagada (con entradas vigentes) para este evento? */
+/** ¿El email ya tiene una orden gratis pagada o pendiente (reserva vigente) para este evento? */
 async function hasFreeRegistration(supabase, eventId, email) {
   const { data, error } = await supabase
     .from('event_orders')
     .select('id')
     .eq('event_id', eventId)
     .eq('buyer_email', email)
-    .eq('status', 'paid')
+    .in('status', ['paid', 'pending'])
     .eq('total_payment', 0)
     .limit(1)
   if (error) {
@@ -611,7 +617,11 @@ export default async function handler(req) {
     // Cargo absorbido: la reserva atómica no conoce la columna; se marca la orden aparte (antes del pago).
     if (feeAbsorbed && total > 0) {
       const { error: absorbedError } = await supabase.from('event_orders').update({ fee_absorbed: true }).eq('id', order.id)
-      if (absorbedError) console.error(`No se pudo marcar fee_absorbed en la orden ${order.id}:`, absorbedError.message)
+      if (absorbedError) {
+        console.error(`No se pudo marcar fee_absorbed en la orden ${order.id}, cancelando:`, absorbedError.message)
+        await supabase.from('event_orders').update({ status: 'cancelled' }).eq('id', order.id).eq('status', 'pending')
+        throw new Error(`Error al marcar fee_absorbed en la orden ${order.id}: ${absorbedError.message}`)
+      }
     }
 
     // Datos extra del checkout: aparte de la reserva atómica (que no los conoce), antes de emitir las entradas.

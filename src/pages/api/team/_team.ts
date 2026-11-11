@@ -6,8 +6,8 @@ import { ASSIGNABLE_ROLES as ASSIGNABLE_API_ROLES } from "../../../lib/producer-
 /** Roles que un administrador puede asignar desde el dashboard. 'producer' (dueño de la cuenta) no se asigna. */
 export const ASSIGNABLE_ROLES: string[] = [...ASSIGNABLE_API_ROLES];
 
-/** Roles que solo el dueño (producer) puede dar o quitar: finanzas mueve plata (retiros, reembolsos). */
-export const OWNER_ONLY_ROLES = ["finance"];
+/** Roles que solo el dueño (producer) puede dar o quitar: admin gestiona el equipo, finanzas mueve plata. */
+export const OWNER_ONLY_ROLES = ["admin", "finance"];
 
 export const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
