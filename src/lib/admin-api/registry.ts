@@ -272,7 +272,15 @@ export async function runAdminTool(tool: AdminToolDef, rawArgs: unknown, actx: A
             outcome = { ok: false, code: err.code, message: err.message };
         } else {
             console.error(`admin tool ${tool.name}:`, err?.message || err);
-            outcome = { ok: false, code: "internal" as ToolErrorCode, message: "Error interno al ejecutar la acción. Intenta nuevamente." };
+            // El MCP Admin lo usa solo el dueño: mostrar el error de Postgres/PostgREST ahorra ir a los logs.
+            const dbError = err && typeof err.code === "string" && typeof err.message === "string";
+            outcome = {
+                ok: false,
+                code: "internal" as ToolErrorCode,
+                message: dbError
+                    ? `Error de base de datos (${err.code}): ${err.message}${err.details ? ` — ${err.details}` : ""}`
+                    : "Error interno al ejecutar la acción. Intenta nuevamente.",
+            };
         }
     } finally {
         // La bitácora corre siempre (también en los return anticipados de confirmación e idempotencia)
