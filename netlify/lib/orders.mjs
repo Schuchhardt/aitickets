@@ -211,6 +211,16 @@ export async function notifyFirstSaleIfNeeded(supabase, order, amount) {
 
 const PROVIDER_LABEL = { flow: 'Flow' }
 
+/** { cancelled_at } si el evento fue cancelado (cancel_event); null si no (o si la base no tiene la columna). */
+async function loadCancelledEvent(supabase, eventId) {
+  const { data, error } = await supabase.from('events').select('id, cancelled_at').eq('id', eventId).maybeSingle()
+  if (error) {
+    if (isMissingSchemaError(error)) return null
+    throw new Error(`Error leyendo el evento de la orden: ${error.message}`)
+  }
+  return data?.cancelled_at ? data : null
+}
+
 /**
  * Confirma el pago de una orden y la cumple (entradas + correo).
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
@@ -288,6 +298,22 @@ export async function confirmPaidOrder(supabase, orderId, payment) {
     return { status: 'retry', httpStatus: 503, message: 'Orden en proceso', inProgress: true }
   }
   const claimedOrder = claimed[0]
+
+  // Evento cancelado (cancel_event) mientras el comprador pagaba: cancel_event solo reembolsa las órdenes que ya
+  // estaban pagadas, así que este pago no debe emitir entradas en silencio. Queda en 'review' para reembolsarlo.
+  let cancelledEvent
+  try {
+    cancelledEvent = await loadCancelledEvent(supabase, order.event_id)
+  } catch (err) {
+    await supabase.from('event_orders').update({ status: 'pending', processing_started_at: null }).eq('id', order.id).eq('status', 'processing')
+    throw err
+  }
+  if (cancelledEvent) {
+    console.error(`⚠️ Orden ${order.id}: pagada pero el evento ${order.event_id} fue cancelado. Requiere revisión manual.`)
+    await supabase.from('event_orders').update({ status: 'review', ...paymentFields }).eq('id', order.id).eq('status', 'processing')
+    await notifySlack(`🚨 Pago sobre evento cancelado: la orden ${order.id} (evento ${order.event_id}) fue pagada en ${label} (${amount} CLP, ref ${externalId}) después de cancelar el evento (${cancelledEvent.cancelled_at}). Quedó en 'review' sin emitir entradas: reembolsar al comprador.`)
+    return { status: 'review', httpStatus: 200, message: 'Pago registrado para revisión (evento cancelado)' }
+  }
 
   // Sobreventa (pagos tardíos / carreras): no emitir en silencio. Si la orden ya no tenía su reserva
   // vigente (pago tardío, o un 'processing' abandonado) también cuentan las reservas de otros compradores.
