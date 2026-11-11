@@ -25,7 +25,7 @@ export const GET: APIRoute = async ({ params, request }) => {
         }
         const { data: dates } = await auth.supabase
             .from("event_dates")
-            .select("id, date, start_time")
+            .select("id, date, start_time, end_time")
             .eq("event_id", auth.event.id)
             .order("date", { ascending: true })
             .order("start_time", { ascending: true });

@@ -81,6 +81,46 @@ describe('qué función se valida', () => {
     expect(pickSession(gap, at(5)).id).toBe(2)
   })
 
+  it('una función que cruza la medianoche sigue siendo la que se valida en la madrugada', () => {
+    // Viernes 13 y sábado 14 de noviembre de 2026 a las 22:00 (Santiago, UTC-3)
+    const nights = [
+      { id: 1, date: '2026-11-13', start_time: '22:00:00' },
+      { id: 2, date: '2026-11-14', start_time: '22:00:00' },
+    ]
+    const sat = (hhmm) => new Date(`2026-11-14T${hhmm}:00-03:00`)
+    expect(pickSession(nights, sat('00:30')).id).toBe(1)
+    expect(pickSession(nights, sat('05:59')).id).toBe(1)
+    expect(pickSession(nights, sat('12:00')).id).toBe(2)
+    expect(pickSession(nights, sat('21:00')).id).toBe(2)
+    // Con hora de término explícita, hasta esa hora
+    const withEnd = nights.map((d) => ({ ...d, end_time: '04:00:00' }))
+    expect(pickSession(withEnd, sat('03:59')).id).toBe(1)
+    expect(pickSession(withEnd, sat('04:30')).id).toBe(2)
+    // Sin función hoy: la de anoche, no la de mañana
+    const gap = [
+      { id: 1, date: '2026-11-13', start_time: '22:00:00' },
+      { id: 2, date: '2026-11-15', start_time: '22:00:00' },
+    ]
+    expect(pickSession(gap, sat('01:00')).id).toBe(1)
+    // Una función de día no se extiende a la madrugada siguiente
+    const days = [
+      { id: 1, date: '2026-11-13', start_time: '10:00:00' },
+      { id: 2, date: '2026-11-14', start_time: '10:00:00' },
+    ]
+    expect(pickSession(days, sat('01:00')).id).toBe(2)
+  })
+
+  it('el pase de la fiesta del viernes no entra dos veces la misma noche ni pierde la hora límite', async () => {
+    const { entryDeadlineCheck } = await import('../../src/lib/entryDeadline.mjs')
+    const nights = [
+      { id: 1, date: '2026-11-13', start_time: '22:00:00' },
+      { id: 2, date: '2026-11-14', start_time: '22:00:00' },
+    ]
+    // "Hasta las 01:00": el viernes vence el sábado 14 a las 01:00 (04:00 UTC)
+    const late = entryDeadlineCheck({ entryUntil: '01:00', dates: nights, at: new Date('2026-11-14T02:00:00-03:00') })
+    expect(late).toMatchObject({ late: true, deadline_at: '2026-11-14T04:00:00.000Z' })
+  })
+
   it('el escáner ve el estado de la función de hoy, también sin conexión', () => {
     const pass = { id: PASS, status: 'validated', event_tickets: { event_date_id: null }, session_checkins: [{ event_date_id: 501, checked_in_at: at(5).toISOString() }] }
     expect(sessionView(pass, DATES, at(5))).toMatchObject({ status: 'validated', session_date_id: 501, sessions_attended: 1, sessions_total: 3 })

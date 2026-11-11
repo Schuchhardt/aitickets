@@ -5,6 +5,10 @@
 const TIME_ZONE = 'America/Santiago'
 /** Una función "está por empezar" desde 2 horas antes: dos funciones el mismo día se distinguen por la hora. */
 const EARLY_MINUTES = 120
+/** Sin hora de término, una función se da por terminada 12 horas después de empezar… */
+const DEFAULT_LENGTH_MINUTES = 12 * 60
+/** …y, si cruza la medianoche, a más tardar a las 06:00 del día siguiente. */
+const NIGHT_END_MINUTES = 6 * 60
 
 const dayFmt = new Intl.DateTimeFormat('en-CA', { timeZone: TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' })
 const timeFmt = new Intl.DateTimeFormat('en-GB', { timeZone: TIME_ZONE, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
@@ -21,6 +25,20 @@ const dayNumber = (ymd) => {
   return Date.UTC(y, m - 1, d) / 86_400_000
 }
 
+/**
+ * Hasta qué minuto del día SIGUIENTE sigue la función `d` (0 si termina el mismo día). Con end_time anterior a la
+ * hora de inicio, ese end_time; sin end_time, inicio + 12 h, a más tardar las 06:00.
+ */
+function overnightUntil(d) {
+  if (!d?.start_time) return 0
+  const start = minutesOf(d.start_time)
+  if (d.end_time) {
+    const end = minutesOf(d.end_time)
+    return end < start ? end : 0
+  }
+  return Math.max(0, Math.min(start + DEFAULT_LENGTH_MINUTES - 24 * 60, NIGHT_END_MINUTES))
+}
+
 /** La entrada vale para todas las funciones de un evento que tiene varias. */
 export function isMultiSession(eventDateId, dates) {
   return (eventDateId === null || eventDateId === undefined || eventDateId === '') && Array.isArray(dates) && dates.length > 1
@@ -29,19 +47,21 @@ export function isMultiSession(eventDateId, dates) {
 /**
  * La función que se está validando en el momento `at`: la de hoy (hora de Chile). Con varias el mismo día, la última
  * que ya empezó o empieza dentro de 2 horas (si ninguna, la primera del día). Si hoy no hay función, la más cercana
- * (a igual distancia, la que viene).
+ * (a igual distancia, la que viene). Una función de anoche que cruza la medianoche (fiesta de 22:00 a 05:00) sigue
+ * siendo la que se valida en la madrugada, mientras no haya empezado una de hoy.
  */
 export function pickSession(dates, at = new Date()) {
   if (!Array.isArray(dates) || !dates.length) return null
   const today = santiagoDay(at)
+  const t = dayNumber(today)
+  const now = minutesOf(timeFmt.format(toDate(at)))
   const sorted = [...dates].sort((a, b) => `${a.date}|${a.start_time || ''}`.localeCompare(`${b.date}|${b.start_time || ''}`))
   const todays = sorted.filter((d) => String(d.date).slice(0, 10) === today)
-  if (todays.length) {
-    const now = minutesOf(timeFmt.format(toDate(at)))
-    const started = todays.filter((d) => minutesOf(d.start_time) - EARLY_MINUTES <= now)
-    return started.length ? started[started.length - 1] : todays[0]
-  }
-  const t = dayNumber(today)
+  const started = todays.filter((d) => minutesOf(d.start_time) - EARLY_MINUTES <= now)
+  if (started.length) return started[started.length - 1]
+  const lastNight = sorted.filter((d) => dayNumber(d.date) === t - 1 && now < overnightUntil(d))
+  if (lastNight.length) return lastNight[lastNight.length - 1]
+  if (todays.length) return todays[0]
   let best = null
   let bestDist = Infinity
   for (const d of sorted) {

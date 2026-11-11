@@ -6,7 +6,7 @@ import { randomUUID } from "node:crypto";
 import { ToolError, type ToolDef, type ToolContext, channelLabel } from "../registry";
 import { eventIdSchema, loadOwnedEvent, clp, fetchAll, localDateTime } from "./common";
 import { PAYOUT_BUSINESS_DAYS as LEGAL_PAYOUT_BUSINESS_DAYS } from "../../../../netlify/lib/legal.mjs";
-import { computeOrgLedger, addBusinessDays, loadOrgEvents, RELEASE_HOURS, WITHDRAWN_STATUSES, isActiveRefund, MIN_CHECKINS_FOR_RELEASE } from "../ledger";
+import { computeOrgLedger, payoutOverdrawn, addBusinessDays, loadOrgEvents, RELEASE_HOURS, WITHDRAWN_STATUSES, isActiveRefund, MIN_CHECKINS_FOR_RELEASE } from "../ledger";
 import { computeFeeSplit, SERVICE_FEE_RATE, IVA_RATE, SERVICE_FEE_PERCENT_LABEL, IVA_PERCENT_LABEL } from "../../../../netlify/lib/fees.mjs";
 import { computeDiscountAmount } from "../../../../netlify/lib/discounts.mjs";
 import { notifySlack } from "../../../pages/api/_lib/server-utils";
@@ -588,7 +588,13 @@ async function planPayout(args: any, ctx: ToolContext) {
     }
     // Un miembro con acceso limitado a ciertos eventos solo retira el saldo de esos eventos (igual que get_balance)
     const ledger = await computeOrgLedger(ctx.supabase, ctx.actor.orgId, { eventIds: ctx.actor.eventIds });
-    const available = ledger.totals.available;
+    let available = ledger.totals.available;
+    // …pero sin saltarse el saldo negativo de los otros eventos de la organización (reembolsos tras un retiro):
+    // el retiro nunca supera lo disponible de la organización completa.
+    if (ctx.actor.eventIds) {
+        const org = await computeOrgLedger(ctx.supabase, ctx.actor.orgId);
+        available = Math.min(available, org.totals.available);
+    }
     if (available <= 0) {
         const why = ledger.hold_reasons.length ? ` Retenido hasta resolver: ${ledger.hold_reasons.map((r) => r.label).join("; ")}.` : "";
         throw new ToolError("conflict", `No hay saldo disponible para retirar (pendiente ${clp(ledger.totals.pending)}, retenido ${clp(ledger.totals.retained)}).${why}`);
@@ -690,8 +696,9 @@ const requestPayout: ToolDef = {
             throw wError;
         }
         // Dos solicitudes simultáneas podrían asignar el mismo saldo: se revisa después de insertar.
-        const after = await computeOrgLedger(ctx.supabase, ctx.actor.orgId, { eventIds: ctx.actor.eventIds });
-        if (after.events.some((l) => (l.net_due < 0 || l.released_due < 0) && plan.allocations.some((a) => a.event_id === l.event_id))) {
+        // Se revisa con la organización completa: también el saldo negativo de otros eventos.
+        const after = await computeOrgLedger(ctx.supabase, ctx.actor.orgId);
+        if (payoutOverdrawn(after, plan.allocations.map((a) => a.event_id))) {
             await rollback();
             throw new ToolError("conflict", "El saldo cambió mientras se procesaba el retiro (¿otra solicitud en curso?). Revisa get_balance y vuelve a intentarlo.");
         }

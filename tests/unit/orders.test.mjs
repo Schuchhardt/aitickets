@@ -113,6 +113,49 @@ describe('confirmPaidOrder', () => {
     expect(res.status).toBe('review')
   })
 
+  // El doble no soporta .or(): el reclamo atómico (status in CLAIMABLE_STATUSES …) se trata como cumplido.
+  const withClaim = (db) => {
+    const from = db.from
+    db.from = (table) => {
+      const b = from(table)
+      b.or = () => b
+      return b
+    }
+    return db
+  }
+
+  it('pago que llega después de cancelar el evento → review, Slack y sin emitir entradas', async () => {
+    const db = withClaim(createFakeSupabase({
+      tables: {
+        event_orders: [order({ status: 'expired' })],
+        events: [{ id: 7, name: 'Fiesta', status: 'draft', cancelled_at: '2026-11-10T23:05:00Z' }],
+      },
+    }))
+    const res = await confirmPaidOrder(db, ORDER_ID, { provider: 'flow', amount: 33000, externalId: '555' })
+    expect(res).toMatchObject({ status: 'review', httpStatus: 200 })
+    expect(mocks.ensureOrderAttendees).not.toHaveBeenCalled()
+    expect(mocks.sendOrderTicketsEmail).not.toHaveBeenCalled()
+    expect(db.tables.event_orders[0]).toMatchObject({ status: 'review', total_payment: 33000, payment_external_id: '555' })
+    expect(mocks.notifySlack.mock.calls[0][0]).toMatch(/evento cancelado/)
+  })
+
+  it('un evento no cancelado se cumple normalmente', async () => {
+    const db = withClaim(createFakeSupabase({
+      tables: { event_orders: [order()], events: [{ id: 7, name: 'Fiesta', status: 'published', cancelled_at: null }] },
+    }))
+    expect(await confirmPaidOrder(db, ORDER_ID, { provider: 'flow', amount: 33000, externalId: '555' })).toMatchObject({ status: 'paid' })
+    expect(mocks.ensureOrderAttendees).toHaveBeenCalled()
+    expect(db.tables.event_orders[0].status).toBe('paid')
+  })
+
+  it('si no se puede leer el evento, libera el reclamo para que el proveedor reintente', async () => {
+    const db = withClaim(createFakeSupabase({ tables: { event_orders: [order()], events: [] } }))
+    db.failOn('events', 'select', { code: '57014', message: 'timeout' })
+    await expect(confirmPaidOrder(db, ORDER_ID, { provider: 'flow', amount: 33000 })).rejects.toThrow(/evento/)
+    expect(db.tables.event_orders[0].status).toBe('pending')
+    expect(mocks.ensureOrderAttendees).not.toHaveBeenCalled()
+  })
+
   it('una orden en review no se toca', async () => {
     const db = createFakeSupabase({ tables: { event_orders: [order({ status: 'review' })] } })
     expect(await confirmPaidOrder(db, ORDER_ID, { provider: 'flow', amount: 33000 })).toMatchObject({ status: 'review' })

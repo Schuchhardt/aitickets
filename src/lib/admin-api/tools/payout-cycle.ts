@@ -3,7 +3,7 @@
 import { randomUUID, createHash } from "node:crypto";
 import { ToolError, type JsonSchema } from "../../producer-api/registry";
 import { fetchAll } from "../../producer-api/tools/common";
-import { computeOrgLedger, loadOrgReleaseGate, addBusinessDays, RELEASE_HOURS } from "../../producer-api/ledger";
+import { computeOrgLedger, payoutOverdrawn, loadOrgReleaseGate, addBusinessDays, RELEASE_HOURS } from "../../producer-api/ledger";
 import { payoutAccountState, presentAccount, maskAccountNumber } from "../../producer-api/tools/finance";
 import { identityApproved, loadOrgIdentity, orgExceedsFreeSoldTickets, IDENTITY_REQUIRED_FOR_PAYOUT_MESSAGE } from "../../producerIdentity";
 import { notifySlack } from "../../../pages/api/_lib/server-utils";
@@ -361,7 +361,7 @@ const orgRequestPayout: AdminToolDef = {
         }
 
         const after = await computeOrgLedger(supabase, args.organization_id);
-        if (after.events.some((l) => (l.net_due < 0 || l.released_due < 0) && plan.allocations.some((a) => a.event_id === l.event_id))) {
+        if (payoutOverdrawn(after, plan.allocations.map((a) => a.event_id))) {
             await rollback();
             throw new ToolError("conflict", "El saldo cambió mientras se procesaba el retiro (¿otra solicitud en curso?). Revisa org_get_balance y vuelve a intentarlo.");
         }

@@ -82,7 +82,7 @@ export async function loadCheckinEvent<E extends { id: number | string }>(supaba
     }
     const { data: dates } = await supabase
         .from("event_dates")
-        .select("id, date, start_time")
+        .select("id, date, start_time, end_time")
         .eq("event_id", event.id)
         .order("date", { ascending: true })
         .order("start_time", { ascending: true });

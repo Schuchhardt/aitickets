@@ -606,6 +606,19 @@ export async function computeOrgLedger(
     return { events: [...byEvent.values()], totals, hold_reasons: orgReasons };
 }
 
+/**
+ * true si lo retirado supera lo que la organización tiene para retirar: algún evento quedó con retiros por sobre su
+ * saldo (o lo liberado), o la suma de lo disponible ya no cubre el saldo negativo de otros eventos (reembolsos
+ * posteriores a un retiro). Se usa después de insertar un retiro para detectar dos solicitudes simultáneas.
+ * `ledger` debe ser el de TODA la organización (sin eventIds).
+ */
+export function payoutOverdrawn(ledger: { events: Array<{ event_id: number; net_due: number; released_due: number; available: number }>; totals: { negative_balance: number } }, eventIds: number[]): boolean {
+    const allocated = new Set(eventIds.map(Number));
+    if (ledger.events.some((l) => allocated.has(Number(l.event_id)) && (l.net_due < 0 || l.released_due < 0))) return true;
+    const available = ledger.events.reduce((sum, l) => sum + (Number(l.available) || 0), 0);
+    return available < (Number(ledger.totals.negative_balance) || 0);
+}
+
 /** Saldo de un solo evento (lo usan los reembolsos para no devolver más de lo que queda por pagar). */
 export async function computeEventLedger(supabase: any, orgId: number, eventId: number, now?: Date): Promise<EventLedger | null> {
     const ledger = await computeOrgLedger(supabase, orgId, { eventIds: [eventId], now });
