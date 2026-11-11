@@ -19,7 +19,7 @@ const LEAD_COLUMNS =
     "proposal_event_id, proposal_preview_link_id, proposal_created_at, discovered_event, created_at, updated_at";
 
 const ALL_STATUSES = ["new", "enriched", "queued", "contacted", "replied", "interested", "converted", "lost", "suppressed", "invalid"];
-const SETTABLE_STATUSES = ["new", "queued", "contacted", "replied", "interested", "converted", "lost", "invalid"];
+const SETTABLE_STATUSES = ["new", "contacted", "replied", "interested", "converted", "lost", "invalid"];
 const NICHES = ["stand_up", "teatro", "musica_en_vivo", "fiestas", "clubs", "talleres", "seminarios", "academias", "otro"];
 const POTENTIALS = ["low", "medium", "high"];
 const NEXT_ACTIONS = ["draft_t1", "draft_t2", "draft_t3", "mark_lost", "reply", "proposal", "none"];
@@ -258,8 +258,6 @@ const updateLead: AdminToolDef = {
     async handler(args, actx) {
         if (!args.status && !args.add_note && !args.niche && args.potential === undefined && args.potential_score === undefined && !args.potential_reason && !args.next_action_at && !args.lost_reason)
             throw new ToolError("invalid_input", "Indica al menos un campo a cambiar: status, niche, potential, potential_score, potential_reason, next_action_at, lost_reason o add_note.");
-        if (args.status === "lost" && !args.lost_reason) throw new ToolError("invalid_input", "status=lost exige lost_reason.");
-        if (args.lost_reason && args.status !== "lost") throw new ToolError("invalid_input", "lost_reason solo aplica cuando status=lost.");
 
         const lead = await loadLead(actx.supabase, args.lead_id);
         const nowIso = new Date().toISOString();
@@ -269,7 +267,9 @@ const updateLead: AdminToolDef = {
         if (args.status && args.status !== lead.status) {
             if (lead.status === "suppressed") throw new ToolError("conflict", "Este lead tiene una baja: no se puede reactivar desde aquí.");
             if (String(lead.invalid_reason || "").startsWith("duplicate_of:")) throw new ToolError("conflict", `Este lead es un duplicado (${lead.invalid_reason}): actualiza el original.`);
-            if (!lead.manual_only && !["queued"].includes(args.status)) throw new ToolError("conflict", "Este lead está en el outreach automático: su estado lo maneja la secuencia. Solo se le pueden agregar notas.");
+            if (!lead.manual_only) throw new ToolError("conflict", "Este lead está en el outreach automático: su estado lo maneja la secuencia. Solo se le pueden agregar notas.");
+            if (args.status === "lost" && !args.lost_reason) throw new ToolError("invalid_input", "status=lost exige lost_reason.");
+            if (args.lost_reason && args.status !== "lost") throw new ToolError("invalid_input", "lost_reason solo aplica cuando status=lost.");
             patch.status = args.status;
             patch.invalid_reason = args.status === "invalid" ? "manual" : null;
             if (args.status === "contacted") patch.last_contacted_at = nowIso;
