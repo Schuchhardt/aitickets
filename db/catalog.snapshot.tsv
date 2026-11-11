@@ -493,7 +493,7 @@ column:aitickets_lead_strategies.updated_at	timestamp with time zone notnull=tru
 column:aitickets_lead_touches.channel	text notnull=false default=-
 column:aitickets_lead_touches.created_at	timestamp with time zone notnull=true default=now()
 column:aitickets_lead_touches.cta	text notnull=false default=-
-column:aitickets_lead_touches.drafted_at	timestamp with time zone notnull=true default=now()
+column:aitickets_lead_touches.drafted_at	timestamp with time zone notnull=false default=-
 column:aitickets_lead_touches.gmail_draft_id	text notnull=false default=-
 column:aitickets_lead_touches.gmail_message_id	text notnull=false default=-
 column:aitickets_lead_touches.gmail_thread_id	text notnull=false default=-
