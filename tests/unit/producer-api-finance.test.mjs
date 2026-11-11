@@ -216,6 +216,46 @@ describe('saldo y retiros', () => {
     expect((await call('get_balance')).result.available).toBe(45000)
   })
 
+  it('un miembro limitado a ciertos eventos no retira por sobre el saldo de la organización completa', async () => {
+    // Otro evento de la organización quedó en negativo: reembolso posterior a un retiro (−5000)
+    db.tables.events.push({ id: 13, name: 'Otro', status: 'published', organization_id: 7, end_date: iso(-20 * DAY), fee_absorbed: false })
+    db.tables.event_orders.push({ id: 'o13', event_id: 13, status: 'paid', amount: 20000, ticket_qty: 2, created_at: iso(-40 * DAY) })
+    db.tables.event_withdrawals.push({ id: 13, event_id: 13, amount: 25000, status: 'paid', paid_at: iso(-30 * DAY), created_at: iso(-30 * DAY), payout_id: null })
+    expect((await call('get_balance')).result.available).toBe(40000)
+
+    const scoped = { ...ctx('finance'), actor: { ...ctx('finance').actor, eventIds: [10] } }
+    const tooMuch = await call('request_payout', { amount: 45000 }, scoped)
+    expect(tooMuch).toMatchObject({ ok: false, code: 'conflict' })
+    const all = await call('request_payout', {}, scoped)
+    expect(all.result.details.amount).toBe(40000)
+    expect(db.tables.aitickets_payouts).toHaveLength(0)
+  })
+
+  it('dos retiros simultáneos no superan el saldo cuando otro evento está en negativo', async () => {
+    db.tables.events.push({ id: 13, name: 'Otro', status: 'published', organization_id: 7, end_date: iso(-20 * DAY), fee_absorbed: false })
+    db.tables.event_orders.push({ id: 'o13', event_id: 13, status: 'paid', amount: 20000, ticket_qty: 2, created_at: iso(-40 * DAY) })
+    db.tables.event_withdrawals.push({ id: 13, event_id: 13, amount: 25000, status: 'paid', paid_at: iso(-30 * DAY), created_at: iso(-30 * DAY), payout_id: null })
+    // Disponible de la organización: 45000 (evento 10) − 5000 (evento 13) = 40000
+    const first = await call('request_payout', { amount: 25000 })
+    // Otra solicitud de 20000 se registra justo después de que esta calculó el saldo (antes de insertar)
+    const from = db.from
+    let injected = false
+    db.from = (table) => {
+      if (table === 'aitickets_payouts' && !injected) {
+        injected = true
+        // El evento 10 queda justo en 0 (25000 + 20000 = 45000): solo el negativo del evento 13 delata el exceso
+        db.tables.event_withdrawals.push({ id: 99, event_id: 10, amount: 20000, status: 'requested', created_at: iso(0), payout_id: 'otro' })
+      }
+      return from(table)
+    }
+    const done = await call('request_payout', { amount: 25000, confirmation_token: first.result.confirmation_token })
+    db.from = from
+    expect(injected).toBe(true)
+    expect(done).toMatchObject({ ok: false, code: 'conflict' })
+    expect(db.tables.aitickets_payouts).toHaveLength(0)
+    expect(db.tables.event_withdrawals.filter((w) => w.event_id === 10 && w.status === 'requested')).toHaveLength(1)
+  })
+
   it('la cuenta no se verifica: sin verificar, rechazada antes o de otro titular igual puede retirar', async () => {
     for (const account of [
       { verified_at: null, verified_by: null },
