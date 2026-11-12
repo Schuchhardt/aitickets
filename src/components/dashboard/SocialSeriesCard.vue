@@ -1,7 +1,8 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import SkeletonRows from './SkeletonRows.vue'
-import { Instagram, Facebook, Music2, Clapperboard, CalendarClock, Pause, Play, X, RefreshCw, ImagePlus, MessageCircle, Check, AlertTriangle, ChevronLeft, ChevronRight, Megaphone } from 'lucide-vue-next'
+import { Clapperboard, CalendarClock, Pause, Play, X, RefreshCw, ImagePlus, MessageCircle, Check, AlertTriangle, ChevronLeft, ChevronRight, Megaphone } from 'lucide-vue-next'
+import SocialIcon from '../SocialIcon.vue'
 import { CANVA_REEL_URL } from '../../lib/socialPlatforms'
 
 // Difusión automática (docs/specs/historias-automaticas.md): el productor aprueba una vez y AI Tickets publica
@@ -23,10 +24,9 @@ const configuring = ref(false)
 const previewVersion = ref(Date.now())
 const form = ref({ feed_posts_enabled: true, sold_out_story_enabled: false, keyword: 'ENTRADAS', dm_message: '', base_image_url: '', facebook_enabled: false, tiktok_enabled: false, reel_enabled: true })
 const NETWORKS = [
-  { id: 'facebook', name: 'Facebook', icon: Facebook, what: 'Las mismas historias y publicaciones en tu página' },
-  { id: 'tiktok', name: 'TikTok', icon: Music2, what: 'Una publicación con foto vertical cada día de la última semana' },
+  { id: 'facebook', name: 'Facebook', what: 'Las mismas historias y publicaciones en tu página' },
+  { id: 'tiktok', name: 'TikTok', what: 'Una publicación con foto vertical cada día de la última semana' },
 ]
-const PLATFORM_ICON = { instagram: Instagram, facebook: Facebook, tiktok: Music2 }
 
 const series = computed(() => view.value?.series || null)
 const status = computed(() => series.value?.status || 'none')
@@ -247,7 +247,7 @@ const done = computed(() => (view.value?.slots || []).filter((s) => ['published'
   <section class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden" data-track-section="Difusión automática" data-testid="social-series">
     <div class="p-4 sm:p-6 border-b border-gray-100 flex items-start justify-between gap-3">
       <div class="min-w-0">
-        <h3 class="font-bold text-lg flex items-center gap-2"><Instagram :size="18" /> Difusión automática</h3>
+        <h3 class="font-bold text-lg flex items-center gap-2"><SocialIcon name="instagram" :size="20" /> Difusión automática</h3>
         <p class="text-sm text-gray-500 mt-1">
           Historias en tu Instagram hasta el día del evento, sin que tengas que hacer nada. Quien responde la historia recibe el link por DM.
           Si quieres, también en tu página de Facebook y en TikTok.
@@ -290,7 +290,7 @@ const done = computed(() => (view.value?.slots || []).filter((s) => ['published'
               data-track="Conectar Instagram (difusión)"
               class="inline-flex items-center gap-2 px-4 py-2 bg-black text-white rounded-lg text-sm font-medium hover:bg-gray-900"
             >
-              <Instagram :size="16" /> Conectar Instagram
+              <SocialIcon name="instagram" :size="18" /> Conectar Instagram
             </a>
           </div>
 
@@ -338,7 +338,7 @@ const done = computed(() => (view.value?.slots || []).filter((s) => ['published'
 
             <fieldset class="space-y-2" data-testid="social-series-networks">
               <legend class="block text-xs font-bold text-gray-500 uppercase mb-1">Dónde publicar</legend>
-              <p class="flex items-center gap-2 text-sm text-gray-700"><Instagram :size="16" /> Instagram <span class="text-gray-400">· {{ view.instagram.account || 'conectado' }} (siempre)</span></p>
+              <p class="flex items-center gap-2 text-sm text-gray-700"><SocialIcon name="instagram" :size="16" /> Instagram <span class="text-gray-400">· {{ view.instagram.account || 'conectado' }} (siempre)</span></p>
               <div v-for="n in NETWORKS" :key="n.id" class="flex items-start gap-2 text-sm text-gray-700">
                 <input
                   :id="`series-${n.id}`"
@@ -349,7 +349,7 @@ const done = computed(() => (view.value?.slots || []).filter((s) => ['published'
                   @change="savePreview"
                 />
                 <label :for="`series-${n.id}`" class="cursor-pointer">
-                  <span class="inline-flex items-center gap-1 font-medium"><component :is="n.icon" :size="16" /> {{ n.name }}</span>
+                  <span class="inline-flex items-center gap-1 font-medium"><SocialIcon :name="n.id" :size="16" /> {{ n.name }}</span>
                   <span v-if="view.networks?.[n.id]?.connected" class="text-gray-500"> · {{ view.networks[n.id].account || 'conectado' }}. {{ n.what }}.</span>
                   <span v-else class="text-gray-500"> · <a href="/dashboard/promote" class="underline">Conéctalo en Promocionar</a> para sumarlo.</span>
                 </label>
@@ -464,7 +464,7 @@ const done = computed(() => (view.value?.slots || []).filter((s) => ['published'
               class="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium"
               :class="n.ok ? 'bg-gray-100 text-gray-700' : 'bg-amber-100 text-amber-800'"
             >
-              <component :is="PLATFORM_ICON[n.id]" :size="14" /> {{ n.label }}
+              <SocialIcon :name="n.id" :size="14" /> {{ n.label }}
             </li>
           </ul>
 
@@ -500,7 +500,7 @@ const done = computed(() => (view.value?.slots || []).filter((s) => ['published'
                 </button>
                 <span v-else class="shrink-0 w-9 aspect-[9/16] rounded border border-gray-200 bg-gray-100 flex items-center justify-center text-gray-500" aria-hidden="true"><Clapperboard :size="14" /></span>
                 <div class="min-w-0 flex-1">
-                  <p class="font-medium text-gray-800 flex items-center gap-1"><component :is="PLATFORM_ICON[s.platform || 'instagram']" :size="14" class="shrink-0" /> {{ s.kind_label }} · {{ s.stage }}</p>
+                  <p class="font-medium text-gray-800 flex items-center gap-1"><SocialIcon :name="s.platform || 'instagram'" :size="14" /> {{ s.kind_label }} · {{ s.stage }}</p>
                   <p class="text-xs text-gray-500">{{ fmt(s.publish_local) }}<template v-if="s.error"> · <span class="text-red-600">{{ s.error }}</span></template></p>
                 </div>
                 <div class="flex items-center gap-2 shrink-0">

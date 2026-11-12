@@ -2,6 +2,7 @@
 import { defineProps, defineEmits, computed, ref } from "vue";
 import { useGoogleAnalytics } from "../composables/useGoogleAnalytics.js";
 import { showSuccess, showError } from "../lib/toastBus.js";
+import SocialIcon from "./SocialIcon.vue";
 
 const props = defineProps({
   show: Boolean,
@@ -128,7 +129,7 @@ const trackShare_ = (platform) => {
           target="_blank" rel="noopener noreferrer" 
           @click="trackShare_('facebook')"
           class="flex items-center gap-2 w-full border px-4 py-2 rounded-lg text-sm hover:bg-gray-50 justify-center">
-          <img src="https://cdn.simpleicons.org/facebook" alt="facebook" class="w-5 h-5" />
+          <SocialIcon name="facebook" :size="20" aria-hidden="true" />
           Facebook
         </a>
 

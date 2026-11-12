@@ -2,7 +2,8 @@
 // Cuentas de redes de la productora (Promocionar → Cuentas): Instagram, Facebook (página), TikTok y LinkedIn (perfil o
 // página de empresa, se elige al conectar). Conectar pasa por /api/promote/connect (OAuth de Zernio).
 import { ref } from 'vue'
-import { Instagram, Facebook, Linkedin, Music2, Plus, Unplug, Loader2, CheckCircle } from 'lucide-vue-next'
+import { Plus, Unplug, Loader2, CheckCircle } from 'lucide-vue-next'
+import SocialIcon from '../../SocialIcon.vue'
 
 const props = defineProps({
   accounts: { type: Array, default: () => [] },
@@ -16,7 +17,6 @@ const platforms = [
   {
     id: 'instagram',
     name: 'Instagram',
-    icon: Instagram,
     color: 'from-purple-500 to-pink-500',
     bgColor: 'bg-gradient-to-br from-purple-50 to-pink-50',
     borderColor: 'border-purple-200',
@@ -25,7 +25,6 @@ const platforms = [
   {
     id: 'facebook',
     name: 'Facebook',
-    icon: Facebook,
     color: 'from-blue-500 to-blue-600',
     bgColor: 'bg-blue-50',
     borderColor: 'border-blue-200',
@@ -35,7 +34,6 @@ const platforms = [
   {
     id: 'tiktok',
     name: 'TikTok',
-    icon: Music2,
     color: 'from-gray-900 to-gray-700',
     bgColor: 'bg-gray-50',
     borderColor: 'border-gray-300',
@@ -45,7 +43,6 @@ const platforms = [
   {
     id: 'linkedin',
     name: 'LinkedIn',
-    icon: Linkedin,
     color: 'from-sky-700 to-sky-800',
     bgColor: 'bg-sky-50',
     borderColor: 'border-sky-200',
@@ -101,12 +98,7 @@ const handleDisconnect = (accountId) => {
           <!-- Platform Header -->
           <div class="flex items-center justify-between mb-4">
             <div class="flex items-center gap-3">
-              <div
-                class="w-12 h-12 rounded-xl flex items-center justify-center text-white bg-gradient-to-br"
-                :class="platform.color"
-              >
-                <component :is="platform.icon" :size="24" />
-              </div>
+              <SocialIcon :name="platform.id" :size="48" />
               <div>
                 <h3 class="font-bold text-lg">{{ platform.name }}</h3>
                 <p v-if="getAccountForPlatform(platform.id)" class="text-sm text-green-600 flex items-center gap-1">
@@ -128,9 +120,7 @@ const handleDisconnect = (accountId) => {
                 class="w-10 h-10 shrink-0 rounded-full object-cover"
                 :alt="getAccountForPlatform(platform.id).account_name"
               />
-              <div v-else class="w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-white bg-gradient-to-br" :class="platform.color">
-                <component :is="platform.icon" :size="18" />
-              </div>
+              <SocialIcon v-else :name="platform.id" :size="40" />
               <div class="min-w-0">
                 <p class="font-medium text-sm break-all" :class="platform.textColor">
                   @{{ getAccountForPlatform(platform.id).account_name || 'Cuenta conectada' }}

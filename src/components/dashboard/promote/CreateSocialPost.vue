@@ -5,9 +5,10 @@ import { prepareImageForUpload } from '../../../lib/clientImage'
 import { SOCIAL_PLATFORMS, PLATFORM_RULES, postMediaProblem } from '../../../lib/socialPlatforms'
 import { ref, computed, watch } from 'vue'
 import {
-  ArrowLeft, ArrowRight, Check, Image, Instagram, Facebook, Linkedin, Music2,
+  ArrowLeft, ArrowRight, Check, Image,
   Sparkles, Upload, X, Loader2, Calendar, Clock, Send, Eye, Wand2
 } from 'lucide-vue-next'
+import SocialIcon from '../../SocialIcon.vue'
 
 const props = defineProps({
   eventsJson: { type: String, default: '[]' },
@@ -43,8 +44,7 @@ const connectedPlatforms = computed(() => {
   return platformIds
 })
 
-const PLATFORM_ICONS = { instagram: Instagram, facebook: Facebook, tiktok: Music2, linkedin: Linkedin }
-const platformOptions = SOCIAL_PLATFORMS.map((id) => ({ id, name: PLATFORM_RULES[id].name, icon: PLATFORM_ICONS[id], maxChars: PLATFORM_RULES[id].maxChars }))
+const platformOptions = SOCIAL_PLATFORMS.map((id) => ({ id, name: PLATFORM_RULES[id].name, maxChars: PLATFORM_RULES[id].maxChars }))
 // Lo que falta para publicar en las redes elegidas (Instagram y TikTok piden imagen; LinkedIn, hasta 3.000 caracteres)
 const mediaProblem = computed(() => postMediaProblem(selectedPlatforms.value, imageUrls.value.length, postContent.value.length))
 
@@ -426,7 +426,7 @@ const selectedTone = ref('')
               class="flex items-center gap-2 px-4 py-3 rounded-xl border-2 transition-all"
               :class="selectedPlatforms.includes(platform.id) ? 'border-black bg-gray-50' : 'border-gray-100 hover:border-gray-300'"
             >
-              <component :is="platform.icon" :size="20" />
+              <SocialIcon :name="platform.id" :size="22" />
               <span class="font-medium text-sm">{{ platform.name }}</span>
               <Check v-if="selectedPlatforms.includes(platform.id)" :size="16" class="text-green-600" />
             </button>
@@ -487,7 +487,7 @@ const selectedTone = ref('')
           <!-- Post meta -->
           <div class="px-4 pb-4 flex flex-wrap items-center gap-3 text-xs text-gray-400">
             <span v-for="p in selectedPlatforms" :key="p" class="flex items-center gap-1 capitalize">
-              <component :is="PLATFORM_ICONS[p]" v-if="PLATFORM_ICONS[p]" :size="12" />
+              <SocialIcon :name="p" :size="14" />
               {{ PLATFORM_RULES[p]?.name || p }}
             </span>
             <span v-if="isScheduled && scheduledFor" class="flex items-center gap-1">
