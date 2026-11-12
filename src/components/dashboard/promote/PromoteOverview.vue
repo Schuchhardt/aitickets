@@ -1,11 +1,12 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { 
-  Megaphone, Plus, Instagram, Facebook, Send, Calendar, 
+  Megaphone, Plus, Send, Calendar, 
   TrendingUp, Clock, AlertCircle, CheckCircle, XCircle,
   ExternalLink, Unplug, Target, DollarSign, Share2, ArrowRight
 } from 'lucide-vue-next'
 import ConnectedAccounts from './ConnectedAccounts.vue'
+import SocialIcon from '../../SocialIcon.vue'
 import PostHistory from './PostHistory.vue'
 import AdCampaignList from './AdCampaignList.vue'
 
@@ -154,7 +155,7 @@ const handleDisconnect = async (accountId) => {
                   class="px-2 py-0.5 rounded text-xs font-medium"
                   :class="SERIES_CLASS[e.series] || 'bg-gray-100 text-gray-500'"
                 >
-                  <Instagram :size="12" class="inline -mt-0.5" /> {{ SERIES_LABEL[e.series] || 'Sin historias automáticas' }}
+                  <SocialIcon name="instagram" :size="12" class="-mt-0.5" /> {{ SERIES_LABEL[e.series] || 'Sin historias automáticas' }}
                 </span>
                 <span v-if="e.activeAds" class="px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700">
                   {{ e.activeAds }} {{ e.activeAds === 1 ? 'anuncio activo' : 'anuncios activos' }}

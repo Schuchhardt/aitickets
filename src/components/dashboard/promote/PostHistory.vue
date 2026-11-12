@@ -2,8 +2,9 @@
 import { ref, computed } from 'vue'
 import { 
   Send, Clock, AlertCircle, CheckCircle, XCircle, FileText,
-  Instagram, Facebook, Linkedin, Music2, Image, ListFilter, Eye
+  Image, ListFilter, Eye
 } from 'lucide-vue-next'
+import SocialIcon from '../../SocialIcon.vue'
 
 const props = defineProps({
   posts: { type: Array, default: () => [] },
@@ -33,12 +34,6 @@ const statusConfig = {
   failed: { label: 'Fallida', class: 'bg-red-100 text-red-700' },
 }
 
-const platformIcons = {
-  instagram: Instagram,
-  facebook: Facebook,
-  tiktok: Music2,
-  linkedin: Linkedin,
-}
 
 const getEventName = (post) => {
   return post.events?.title || post.events?.name || 'Evento'
@@ -134,12 +129,11 @@ const retryPublish = async (postId) => {
               <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2">
                 <!-- Platforms -->
                 <div class="flex items-center gap-1">
-                  <component
+                  <SocialIcon
                     v-for="platform in (post.platforms || [])"
                     :key="platform"
-                    :is="platformIcons[platform]"
-                    :size="14"
-                    class="text-gray-400"
+                    :name="platform"
+                    :size="16"
                   />
                 </div>
 

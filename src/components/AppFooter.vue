@@ -3,6 +3,7 @@ import logoLight from "../images/logo.png";
 import iconArrowGreen from "../images/icon-arrow-green.png";
 import { computed, ref, onMounted } from "vue";
 import { LEGAL } from "../lib/legal";
+import SocialIcon from "./SocialIcon.vue";
 
 const props = defineProps({
   /**
@@ -19,7 +20,6 @@ const toneClasses = computed(() =>
         footer: "bg-[#fbf7f0] border-[#1b1712]/10",
         logo: "",
         muted: "text-[#6f665c]",
-        icon: "",
         title: "text-[#1b1712]",
         list: "text-[#5e554b]",
         link: "hover:text-[#1b1712] hover:underline",
@@ -32,7 +32,6 @@ const toneClasses = computed(() =>
         footer: "bg-[#0c1220] border-white/10",
         logo: "invert",
         muted: "text-[#a49d8e]",
-        icon: "invert",
         title: "text-[#f0e8d8]",
         list: "text-[#a49d8e]",
         link: "hover:text-white hover:underline",
@@ -45,7 +44,6 @@ const toneClasses = computed(() =>
         footer: "bg-[#0e0b09] border-white/10",
         logo: "invert",
         muted: "text-[#b5aba0]",
-        icon: "invert",
         title: "text-[#f4ede4]",
         list: "text-[#b5aba0]",
         link: "hover:text-white hover:underline",
@@ -57,7 +55,6 @@ const toneClasses = computed(() =>
         footer: "bg-white border-gray-200",
         logo: "",
         muted: "text-gray-500",
-        icon: "",
         title: "text-gray-900",
         list: "text-gray-600",
         link: "hover:text-gray-900 hover:underline",
@@ -199,10 +196,10 @@ const submitForm = async (event) => {
         <p class="mt-3 text-xs" :class="toneClasses.muted">© 2026 {{ LEGAL.brand }}</p>
         <div class="flex space-x-4 mt-4">
           <a href="https://www.facebook.com/profile.php?id=61573771138631" target="_blank" rel="noopener noreferrer" class="cursor-pointer">
-            <img src="https://cdn.simpleicons.org/facebook/000000" alt="Facebook" class="w-6 h-6" :class="toneClasses.icon" loading="lazy" width="24" height="24" />
+            <SocialIcon name="facebook" :size="24" />
           </a>
           <a href="https://www.linkedin.com/company/ai-tickets" target="_blank" rel="noopener noreferrer" class="cursor-pointer">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/8/81/LinkedIn_icon.svg" alt="LinkedIn" class="w-6 h-6" loading="lazy" width="24" height="24" />
+            <SocialIcon name="linkedin" :size="24" />
           </a>
         </div>
       </div>
