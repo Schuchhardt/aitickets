@@ -3,7 +3,8 @@
 // Bottom sheet en mobile, diálogo centrado en desktop. El link es siempre el de la página pública (?ref=share),
 // nunca el de una entrada u orden (shareActions.eventShareUrl).
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from "vue";
-import { Link as LinkIcon, Mail, MessageSquare, Share2, Linkedin, X, Check } from "lucide-vue-next";
+import { Link as LinkIcon, Mail, MessageSquare, Share2, X, Check } from "lucide-vue-next";
+import SocialIcon from "../SocialIcon.vue";
 import { eventShareUrl } from "./shareActions.js";
 import { useGoogleAnalytics } from "../../composables/useGoogleAnalytics.js";
 import { showError } from "../../lib/toastBus.js";
@@ -23,14 +24,15 @@ const url = computed(() => (props.show ? eventShareUrl(props.event, "share") : "
 const text = computed(() => `Mira este evento: ${props.event?.name || ""}`);
 const enc = encodeURIComponent;
 
-// Íconos de marca: mismo CDN que usaba el modal anterior (blanco sobre el color de la marca)
+// Íconos de marca: blanco sobre el color de la marca. Facebook y LinkedIn con el logo oficial inline (SocialIcon); el resto
+// del mismo CDN que usaba el modal anterior.
 const brand = (slug) => `https://cdn.simpleicons.org/${slug}/ffffff`;
 const networks = computed(() => [
   { id: "whatsapp", label: "WhatsApp", bg: "#25D366", img: brand("whatsapp"), href: `https://wa.me/?text=${enc(`${text.value} ${url.value}`)}` },
-  { id: "facebook", label: "Facebook", bg: "#0866FF", img: brand("facebook"), href: `https://www.facebook.com/sharer/sharer.php?u=${enc(url.value)}` },
+  { id: "facebook", label: "Facebook", bg: "#0866FF", social: "facebook", href: `https://www.facebook.com/sharer/sharer.php?u=${enc(url.value)}` },
   { id: "x", label: "X", bg: "#0A0A0B", img: brand("x"), href: `https://twitter.com/intent/tweet?text=${enc(text.value)}&url=${enc(url.value)}` },
   { id: "telegram", label: "Telegram", bg: "#26A5E4", img: brand("telegram"), href: `https://t.me/share/url?url=${enc(url.value)}&text=${enc(text.value)}` },
-  { id: "linkedin", label: "LinkedIn", bg: "#0A66C2", icon: Linkedin, href: `https://www.linkedin.com/sharing/share-offsite/?url=${enc(url.value)}` },
+  { id: "linkedin", label: "LinkedIn", bg: "#0A66C2", social: "linkedin", href: `https://www.linkedin.com/sharing/share-offsite/?url=${enc(url.value)}` },
   { id: "email", label: "Correo", bg: "#5B5B63", icon: Mail, href: `mailto:?subject=${enc(props.event?.name || "Evento")}&body=${enc(`${text.value}\n${url.value}`)}`, self: true },
   { id: "sms", label: "Mensaje", bg: "#5B5B63", icon: MessageSquare, href: `sms:?&body=${enc(`${text.value} ${url.value}`)}`, self: true, mobileOnly: true },
 ]);
@@ -118,7 +120,8 @@ onBeforeUnmount(() => {
             <li v-for="(n, i) in networks.filter((n) => !n.mobileOnly || isTouch)" :key="n.id" class="item" :style="{ '--i': i }">
               <a :href="n.href" :target="n.self ? undefined : '_blank'" rel="noopener noreferrer" class="net" @click="onNetwork(n)">
                 <span class="net-icon" :style="{ background: n.bg }">
-                  <img v-if="n.img" :src="n.img" alt="" width="22" height="22" loading="lazy" />
+                  <SocialIcon v-if="n.social" :name="n.social" variant="mono" :size="22" style="color: #fff" aria-hidden="true" />
+                  <img v-else-if="n.img" :src="n.img" alt="" width="22" height="22" loading="lazy" />
                   <component :is="n.icon" v-else :size="22" color="#fff" aria-hidden="true" />
                 </span>
                 <span class="net-label">{{ n.label }}</span>
