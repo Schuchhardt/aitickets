@@ -31,3 +31,6 @@ playwright-report/
 # E2E con base real local (tests/e2e/stack)
 tests/e2e/stack/.stack.env
 playwright-report-stack/
+
+# Worktrees de Claude Code
+.claude/worktrees/
