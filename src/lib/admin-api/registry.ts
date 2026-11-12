@@ -3,6 +3,7 @@
 // Reutiliza el validador y los tipos de la API de productores (src/lib/producer-api/registry.ts).
 import { createHash, randomBytes } from "node:crypto";
 import {
+    internalErrorMessage,
     stableStringify,
     ToolError,
     validateArgs,
@@ -272,15 +273,8 @@ export async function runAdminTool(tool: AdminToolDef, rawArgs: unknown, actx: A
             outcome = { ok: false, code: err.code, message: err.message };
         } else {
             console.error(`admin tool ${tool.name}:`, err?.message || err);
-            // El MCP Admin lo usa solo el dueño: mostrar el error de Postgres/PostgREST ahorra ir a los logs.
-            const dbError = err && typeof err.code === "string" && typeof err.message === "string";
-            outcome = {
-                ok: false,
-                code: "internal" as ToolErrorCode,
-                message: dbError
-                    ? `Error de base de datos (${err.code}): ${err.message}${err.details ? ` — ${err.details}` : ""}`
-                    : "Error interno al ejecutar la acción. Intenta nuevamente.",
-            };
+            // El MCP Admin lo usa solo el dueño: mostrar el error real (Postgres/PostgREST o la excepción) ahorra ir a los logs.
+            outcome = { ok: false, code: "internal" as ToolErrorCode, message: internalErrorMessage(err) };
         }
     } finally {
         // La bitácora corre siempre (también en los return anticipados de confirmación e idempotencia)

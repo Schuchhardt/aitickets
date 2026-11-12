@@ -6,6 +6,10 @@ import { fetchAll } from "../../producer-api/tools/common";
 import { buildLeadsCsv, filterExportableLeads as filterLeads, leadPriority } from "../../../../netlify/lib/leads/export.mjs";
 import { suppress } from "../../../../netlify/lib/outreach/guardrails.mjs";
 import { isFreeMailDomain, leadDomainFor, normalizeEmail, registrableDomain, emailDomain } from "../../../../netlify/lib/outreach/domains.mjs";
+import { createPreviewLink, listPreviewLinks, presentPreviewLink, revokePreviewLink, PreviewLinkError, PREVIEW_LINK_COLUMNS } from "../../eventPreview";
+import { runTool } from "../../producer-api/registry";
+import { TOOLS } from "../../producer-api/tools";
+import { getSupportUserId, orgToolContext } from "../context";
 import type { AdminToolDef } from "../registry";
 
 const LEADS = "aitickets_leads";
@@ -17,6 +21,10 @@ const LEAD_COLUMNS =
     "events_on_passline, last_passline_event, last_seen_event_at, last_contacted_at, contacts_enriched_at, contact_sources, notes, organization_id, " +
     "niche, potential, potential_score, potential_reason, sequence_step, next_action, next_action_at, lost_reason, gmail_thread_id, " +
     "proposal_event_id, proposal_preview_link_id, proposal_created_at, discovered_event, created_at, updated_at";
+
+const TOUCH_COLUMNS =
+    "id, lead_id, step, kind, channel, strategy_slug, cta, subject, gmail_draft_id, gmail_message_id, reply_gmail_message_id, gmail_thread_id, " +
+    "outcome, reply_sentiment, drafted_at, sent_at, reply_at, created_at";
 
 const ALL_STATUSES = ["new", "enriched", "queued", "contacted", "replied", "interested", "converted", "lost", "suppressed", "invalid"];
 const SETTABLE_STATUSES = ["new", "contacted", "replied", "interested", "converted", "lost", "invalid"];
@@ -80,6 +88,23 @@ function presentLead(lead: any, blocked: string | null | undefined, now: Date) {
     };
 }
 
+/** Fila corta de list_leads (compact=true). */
+const compactLead = (l: ReturnType<typeof presentLead>) => ({
+    id: l.id,
+    name: l.name,
+    niche: l.niche,
+    status: l.status,
+    priority: l.priority,
+    potential_score: l.potential_score,
+    sequence_step: l.sequence_step,
+    next_action: l.next_action,
+    next_action_at: l.next_action_at,
+    contactable: l.contactable,
+    blocked_reason: l.blocked_reason,
+    email: l.email,
+    last_contacted_at: l.last_contacted_at,
+});
+
 async function loadLead(supabase: any, id: string) {
     const { data, error } = await supabase.from(LEADS).select(LEAD_COLUMNS).eq("id", id).maybeSingle();
     if (error) throw error;
@@ -96,7 +121,7 @@ const listLeads: AdminToolDef = {
     title: "Listar leads",
     description:
         "Leads para contacto manual, ordenados por prioridad (0-100), con sus contactos públicos y counts_by_status. " +
-        "Filtros: niche, potential, sequence_step, due (next_action_at vencido), next_action, strategy_slug, has_proposal. " +
+        "Filtros: niche, potential, sequence_step, due (next_action_at vencido), next_action, strategy_slug, has_proposal. compact=true para listas largas. " +
         "contactable=false y blocked_reason dicen por qué no escribirle. No envía nada.",
     readOnly: true,
     inputSchema: {
@@ -117,6 +142,7 @@ const listLeads: AdminToolDef = {
             query: { type: "string", maxLength: 100, description: "Parte del nombre, dominio o correo." },
             contactable_only: { type: "boolean", description: "Solo los que tienen correo, WhatsApp o Instagram y ningún bloqueo." },
             min_priority: { type: "integer", minimum: 0, maximum: 100 },
+            compact: { type: "boolean", default: false, description: "true = fila corta por lead (sin notas, categorías, web ni último evento): para recorrer listas largas. El detalle va con get_lead." },
             limit: { type: "integer", minimum: 1, maximum: 200, default: 50 },
             offset: { type: "integer", minimum: 0, default: 0 },
         },
@@ -144,7 +170,7 @@ const listLeads: AdminToolDef = {
             .filter((r) => args.sequence_step == null || r.sequence_step === args.sequence_step)
             .filter((r) => !args.due || (r.next_action_at && new Date(r.next_action_at) <= now))
             .filter((r) => !args.next_action || r.next_action === args.next_action)
-            .filter((r) => !args.has_proposal || (args.has_proposal ? r.proposal_event_id != null : r.proposal_event_id == null))
+            .filter((r) => args.has_proposal == null || (args.has_proposal ? r.proposal_event_id != null : r.proposal_event_id == null))
             .filter((r) => !city || norm(r.city).includes(city))
             .filter((r) => !query || [r.org_name, r.domain, r.email].some((v) => norm(v).includes(query)))
             .map((r) => presentLead(r, blocked.get(r.id), now))
@@ -165,9 +191,34 @@ const listLeads: AdminToolDef = {
 
         const limit = args.limit ?? 50;
         const offset = args.offset ?? 0;
-        return { total: filtered.length, counts_by_status: counts, counts_by_niche: countsByNiche, limit, offset, leads: filtered.slice(offset, offset + limit) };
+        const page = filtered.slice(offset, offset + limit);
+        return { total: filtered.length, counts_by_status: counts, counts_by_niche: countsByNiche, limit, offset, leads: args.compact ? page.map(compactLead) : page };
     },
 };
+
+/** Propuesta del lead: el evento borrador y las visitas al link de vista previa (la URL no se guarda). */
+async function loadProposal(actx: { supabase: any; origin: string }, lead: any) {
+    if (!lead.proposal_event_id) return null;
+    const [{ data: event }, linkResult] = await Promise.all([
+        actx.supabase.from("events").select("id, name, slug, status, organization_id").eq("id", lead.proposal_event_id).maybeSingle(),
+        lead.proposal_preview_link_id
+            ? actx.supabase.from("aitickets_event_preview_links").select(PREVIEW_LINK_COLUMNS).eq("id", lead.proposal_preview_link_id).maybeSingle()
+            : Promise.resolve({ data: null }),
+    ]);
+    const link = linkResult?.data ? presentPreviewLink(linkResult.data) : null;
+    return {
+        event_id: Number(lead.proposal_event_id),
+        event_name: event?.name ?? null,
+        event_status: event?.status ?? null,
+        organization_id: event?.organization_id != null ? Number(event.organization_id) : null,
+        dashboard_url: `${actx.origin}/dashboard/events/${lead.proposal_event_id}`,
+        preview_link: link
+            ? { id: link.id, status: link.status, expires_at: link.expires_at, view_count: link.view_count, last_viewed_at: link.last_viewed_at }
+            : lead.proposal_preview_link_id ? { id: lead.proposal_preview_link_id, status: "unknown" } : null,
+        opened: Boolean(link && link.view_count > 0),
+        created_at: lead.proposal_created_at || null,
+    };
+}
 
 // ---------------------------------------------------------------------------
 // get_lead (mejorada: touches timeline, proposal info)
@@ -195,7 +246,7 @@ const getLead: AdminToolDef = {
                 .limit(20),
             actx.supabase
                 .from(TOUCHES)
-                .select("id, step, kind, channel, strategy_slug, cta, subject, gmail_draft_id, gmail_message_id, gmail_thread_id, outcome, reply_sentiment, drafted_at, sent_at, reply_at")
+                .select(TOUCH_COLUMNS)
                 .eq("lead_id", lead.id)
                 .order("created_at", { ascending: true })
                 .limit(50),
@@ -215,9 +266,7 @@ const getLead: AdminToolDef = {
             contact_sources: lead.contact_sources || [],
             discovered_event: lead.discovered_event || null,
             organization_id: lead.organization_id ?? null,
-            proposal: lead.proposal_event_id
-                ? { event_id: lead.proposal_event_id, preview_link_id: lead.proposal_preview_link_id || null, created_at: lead.proposal_created_at || null }
-                : null,
+            proposal: await loadProposal(actx, lead),
             created_at: lead.created_at,
             touches,
             last_touch: lastTouch,
@@ -444,38 +493,77 @@ const createLead: AdminToolDef = {
 };
 
 // ---------------------------------------------------------------------------
-// log_lead_touch (nueva)
+// log_lead_touch / update_lead_touch / delete_lead_touch
 // ---------------------------------------------------------------------------
 
 /** Días de espera entre pasos de la secuencia. */
 const STEP_WAIT_DAYS: Record<number, number> = { 1: 4, 2: 5, 3: 7 };
 
 /**
- * Fila abierta que la acción hace avanzar: `sent` y `discarded` cierran un borrador; `replied` y
- * `bounced` cierran un envío. Calza por gmail_draft_id si viene; si no, por paso (o la más reciente
- * cuando no se indica paso). Devuelve null si no hay ninguna: entonces se inserta una fila nueva.
+ * Estados en que el lead ya salió de la secuencia. Un `sent` que llega tarde (importación desde Gmail fuera de
+ * orden) se registra y actualiza sequence_step y last_contacted_at, pero no lo devuelve a contacted ni le
+ * programa el siguiente paso.
  */
-async function findOpenTouch(supabase: any, leadId: string, args: Record<string, any>): Promise<{ id: number } | null> {
+const PAST_SEQUENCE_STATUSES = new Set(["replied", "interested", "converted", "lost", "suppressed"]);
+
+const isMissingTouchTable = (error: any) => ["42P01", "PGRST205"].includes(String(error?.code || ""));
+function throwTouchError(error: any): never {
+    if (isMissingTouchTable(error)) throw new ToolError("unavailable", "La tabla de touches aún no existe (falta la migración del pipeline SDR).");
+    throw error;
+}
+
+const ms = (v: unknown) => (v ? Date.parse(String(v)) : NaN);
+const newestFirst = (a: any, b: any) => String(b.created_at).localeCompare(String(a.created_at)) || Number(b.id) - Number(a.id);
+
+async function loadLeadTouches(supabase: any, leadId: string): Promise<any[]> {
+    const { data, error } = await supabase.from(TOUCHES).select(TOUCH_COLUMNS).eq("lead_id", leadId);
+    if (error) throwTouchError(error);
+    return [...(data || [])].sort(newestFirst);
+}
+
+/**
+ * Fila abierta que la acción hace avanzar: `sent` y `discarded` cierran un borrador; `replied` y `bounced`
+ * cierran un envío. Calza por gmail_draft_id si viene; si no, por paso (o la más reciente cuando no se indica
+ * paso). null si no hay ninguna.
+ */
+function findOpenTouch(rows: any[], args: Record<string, any>): any | null {
     const fromOutcome = args.action === "sent" || args.action === "discarded" ? "drafted" : "sent";
-    const { data, error } = await supabase
-        .from(TOUCHES)
-        .select("id, step, gmail_draft_id, created_at")
-        .eq("lead_id", leadId)
-        .eq("kind", "outreach")
-        .eq("outcome", fromOutcome);
-    if (error) {
-        if (["42P01", "PGRST205"].includes(String(error.code || ""))) {
-            throw new ToolError("unavailable", "La tabla de touches aún no existe (falta la migración del pipeline SDR).");
-        }
-        throw error;
-    }
-    const rows: any[] = [...(data || [])].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)) || Number(b.id) - Number(a.id));
+    const open = rows.filter((r) => r.kind === "outreach" && r.outcome === fromOutcome);
     if (args.gmail_draft_id) {
-        const byDraft = rows.find((r) => r.gmail_draft_id === args.gmail_draft_id);
+        const byDraft = open.find((r) => r.gmail_draft_id === args.gmail_draft_id);
         if (byDraft) return byDraft;
     }
-    const candidates = args.step ? rows.filter((r) => r.step === args.step) : rows;
+    const candidates = args.step ? open.filter((r) => r.step === args.step) : open;
     return candidates[0] || null;
+}
+
+/**
+ * Respuesta registrada antes que su envío (importación fuera de orden): fila kind=reply sin sent_at, recibida
+ * después de este envío. Un `sent` sin borrador se fusiona con ella en vez de crear otra fila, así la
+ * respuesta no queda contada dos veces.
+ */
+function findOrphanReply(rows: any[], sentAt: Date): any | null {
+    return (
+        rows
+            .filter((r) => r.kind === "reply" && !r.sent_at && (!r.reply_at || ms(r.reply_at) >= sentAt.getTime()))
+            .sort((a, b) => (ms(a.reply_at) || 0) - (ms(b.reply_at) || 0))[0] || null
+    );
+}
+
+/** Campos del correo que copia cada acción. replied/bounced no pisan el asunto ni el id del correo enviado. */
+const COPY_KEYS: Record<string, string[]> = {
+    drafted: ["strategy_slug", "cta", "subject", "gmail_draft_id", "gmail_message_id", "gmail_thread_id"],
+    sent: ["strategy_slug", "cta", "subject", "gmail_draft_id", "gmail_message_id", "gmail_thread_id"],
+    discarded: ["strategy_slug", "cta", "subject", "gmail_draft_id", "gmail_thread_id"],
+    replied: ["strategy_slug", "cta", "gmail_thread_id"],
+    bounced: ["strategy_slug", "cta", "gmail_thread_id"],
+};
+
+async function strategyWarnings(supabase: any, slug: string | null | undefined): Promise<string[]> {
+    if (!slug) return [];
+    const { data, error } = await supabase.from(STRATEGIES).select("slug").eq("slug", slug).maybeSingle();
+    if (error || data) return [];
+    return [`La estrategia "${slug}" no está en el catálogo: créala con upsert_lead_strategy para que el embudo la muestre con nombre.`];
 }
 
 const logLeadTouch: AdminToolDef = {
@@ -483,11 +571,13 @@ const logLeadTouch: AdminToolDef = {
     title: "Registrar touch de un lead",
     description:
         "Registra cada paso de la secuencia de contacto y mueve el estado del lead. " +
-        "drafted → status=queued. sent → status=contacted, calcula next_action_at. " +
+        "drafted → status=queued. sent → status=contacted, calcula next_action_at (el reloj corre desde sent_at real). " +
         "replied → status=replied, corta la secuencia. bounced → status=invalid. " +
-        "El reloj corre desde sent_at real, no desde el borrador. " +
-        "Cada touch es una fila que avanza: sent actualiza el borrador de ese paso y replied/bounced el envío; " +
-        "si no hay fila previa (envío sin borrador registrado) se crea una.",
+        "Cada touch es una fila que avanza: sent actualiza el borrador de ese paso y replied/bounced el envío; si no hay fila previa se crea una. " +
+        "Importaciones fuera de orden: un sent sobre un lead replied/interested/converted/lost/suppressed solo registra el envío " +
+        "(sequence_step y last_contacted_at) sin tocar estado ni próxima acción; un sent posterior a una respuesta suelta se fusiona con ella. " +
+        "Con action=replied, gmail_message_id es el id del correo de RESPUESTA (va a reply_gmail_message_id; el del envío se conserva) " +
+        "y repetir el mismo id no duplica la respuesta.",
     readOnly: false,
     inputSchema: {
         type: "object",
@@ -497,79 +587,109 @@ const logLeadTouch: AdminToolDef = {
             lead_id: leadIdSchema,
             action: { type: "string", enum: TOUCH_OUTCOMES, description: "drafted, sent, replied, bounced o discarded." },
             step: { type: "integer", minimum: 1, maximum: 3, description: "Paso de la secuencia (1-3)." },
-            strategy_slug: { type: "string", maxLength: 80, description: "Slug de la estrategia usada." },
+            strategy_slug: { type: "string", maxLength: 80, description: "Slug de la estrategia usada (list_lead_strategies)." },
             cta: { type: "string", maxLength: 200, description: "Call to action usado." },
-            subject: { type: "string", maxLength: 200, description: "Asunto del correo." },
+            subject: { type: "string", maxLength: 200, description: "Asunto del correo enviado (se ignora con replied/bounced)." },
             gmail_draft_id: { type: "string", maxLength: 100 },
-            gmail_message_id: { type: "string", maxLength: 100 },
+            gmail_message_id: { type: "string", maxLength: 100, description: "Id del correo: el enviado (drafted/sent) o el de la respuesta (replied)." },
             gmail_thread_id: { type: "string", maxLength: 100 },
             occurred_at: { type: "string", format: "date-time", description: "Cuándo ocurrió (por defecto ahora)." },
             reply_sentiment: { type: "string", enum: REPLY_SENTIMENTS, description: "Sentimiento de la respuesta (solo con action=replied)." },
         },
     },
-    audit: (args, result) => ({ target: `lead:${args.lead_id}`, summary: `Touch ${args.action} step ${args.step || "?"}` }),
+    audit: (args, result) => ({ target: `lead:${args.lead_id}`, summary: `Touch ${args.action} step ${args.step || "?"}${result.duplicate ? " (repetido)" : ""}` }),
     async handler(args, actx) {
         const lead = await loadLead(actx.supabase, args.lead_id);
         const now = new Date();
         const occurredAt = args.occurred_at ? new Date(args.occurred_at) : now;
+        const occurredIso = occurredAt.toISOString();
         const nowIso = now.toISOString();
 
         if (args.action === "replied" && !args.reply_sentiment) throw new ToolError("invalid_input", "action=replied necesita reply_sentiment.");
         if (args.reply_sentiment && args.action !== "replied") throw new ToolError("invalid_input", "reply_sentiment solo aplica con action=replied.");
 
-        // Un touch es UNA fila que avanza: drafted → sent → replied/bounced. Si ya hay una fila abierta
-        // para este paso se actualiza (conserva drafted_at y sent_at, que usa el embudo); si no, se crea.
-        // Un envío sin borrador previo (importación desde Gmail, correo escrito a mano) usa la fecha
-        // del envío como drafted_at: la columna es NOT NULL y un null explícito pisa su DEFAULT.
-        const occurredIso = occurredAt.toISOString();
-        const open = args.action === "drafted" ? null : await findOpenTouch(actx.supabase, lead.id, args);
+        const rows = args.action === "drafted" ? [] : await loadLeadTouches(actx.supabase, lead.id);
+        const warnings = await strategyWarnings(actx.supabase, args.strategy_slug);
+
+        // La misma respuesta registrada dos veces (reintento, importación repetida): no se cuenta de nuevo.
+        if (args.action === "replied" && args.gmail_message_id) {
+            const same = rows.find((r) => r.reply_gmail_message_id === args.gmail_message_id);
+            if (same) {
+                return {
+                    touch_id: same.id,
+                    touch_updated: false,
+                    duplicate: true,
+                    lead_id: lead.id,
+                    action: args.action,
+                    step: same.step ?? null,
+                    new_status: lead.status,
+                    next_action: lead.next_action || null,
+                    next_action_at: lead.next_action_at || null,
+                    note: "Esta respuesta ya estaba registrada (mismo gmail_message_id): no se cambió nada.",
+                    warnings,
+                };
+            }
+        }
+
+        const copied: Record<string, unknown> = {};
+        for (const key of COPY_KEYS[args.action]) if (args[key]) copied[key] = args[key];
+        if (args.action === "replied" && args.gmail_message_id) copied.reply_gmail_message_id = args.gmail_message_id;
+
+        // Un touch es UNA fila que avanza: drafted → sent → replied/bounced. Si hay una fila abierta se actualiza
+        // (conserva drafted_at y sent_at, que usa el embudo); un sent posterior a una respuesta suelta se fusiona
+        // con ella; si no, se crea. drafted_at solo existe si hubo borrador.
+        const open = args.action === "drafted" ? null : findOpenTouch(rows, args);
+        const orphan = !open && args.action === "sent" ? findOrphanReply(rows, occurredAt) : null;
 
         let touchId: number;
+        let mode: "updated" | "merged" | "created";
         if (open) {
-            const patch: Record<string, unknown> = { outcome: args.action };
+            const patch: Record<string, unknown> = { ...copied, outcome: args.action };
             if (args.action === "sent") patch.sent_at = occurredIso;
             if (args.action === "replied") {
                 patch.reply_at = occurredIso;
                 patch.reply_sentiment = args.reply_sentiment;
             }
-            for (const key of ["strategy_slug", "cta", "subject", "gmail_draft_id", "gmail_message_id", "gmail_thread_id"]) {
-                if (args[key]) patch[key] = args[key];
-            }
-            const { error: patchError } = await actx.supabase.from(TOUCHES).update(patch).eq("id", open.id);
-            if (patchError) throw patchError;
+            const { error } = await actx.supabase.from(TOUCHES).update(patch).eq("id", open.id);
+            if (error) throwTouchError(error);
             touchId = open.id;
+            mode = "updated";
+        } else if (orphan) {
+            const patch: Record<string, unknown> = { ...copied, kind: "outreach", sent_at: occurredIso };
+            if (args.step) patch.step = args.step;
+            const { error } = await actx.supabase.from(TOUCHES).update(patch).eq("id", orphan.id);
+            if (error) throwTouchError(error);
+            touchId = orphan.id;
+            mode = "merged";
         } else {
             const touchRow: Record<string, unknown> = {
                 lead_id: lead.id,
                 step: args.step || null,
                 kind: args.action === "replied" ? "reply" : "outreach",
                 channel: "email",
-                strategy_slug: args.strategy_slug || null,
-                cta: args.cta || null,
-                subject: args.subject || null,
-                gmail_draft_id: args.gmail_draft_id || null,
-                gmail_message_id: args.gmail_message_id || null,
-                gmail_thread_id: args.gmail_thread_id || null,
+                strategy_slug: null,
+                cta: null,
+                subject: null,
+                gmail_draft_id: null,
+                gmail_message_id: null,
+                gmail_thread_id: null,
+                ...copied,
                 outcome: args.action,
                 reply_sentiment: args.reply_sentiment || null,
-                drafted_at: occurredIso,
+                drafted_at: args.action === "drafted" ? occurredIso : null,
                 sent_at: args.action === "sent" ? occurredIso : null,
                 reply_at: args.action === "replied" ? occurredIso : null,
                 created_at: nowIso,
             };
-            const { data: touchData, error: touchError } = await actx.supabase.from(TOUCHES).insert(touchRow).select("id").single();
-            if (touchError) {
-                if (String(touchError.code) === "42P01" || String(touchError.code) === "PGRST205") {
-                    throw new ToolError("unavailable", "La tabla de touches aún no existe (falta la migración del pipeline SDR).");
-                }
-                throw touchError;
-            }
-            touchId = touchData.id;
+            const { data, error } = await actx.supabase.from(TOUCHES).insert(touchRow).select("id").single();
+            if (error) throwTouchError(error);
+            touchId = data.id;
+            mode = "created";
         }
 
-        // Update lead state based on action
+        // Estado del lead
         const leadPatch: Record<string, unknown> = { updated_at: nowIso };
-
+        let note: string | undefined;
         if (args.gmail_thread_id && !lead.gmail_thread_id) leadPatch.gmail_thread_id = args.gmail_thread_id;
 
         switch (args.action) {
@@ -578,23 +698,31 @@ const logLeadTouch: AdminToolDef = {
                 break;
 
             case "sent": {
-                leadPatch.status = "contacted";
-                leadPatch.last_contacted_at = occurredAt.toISOString();
                 const step = args.step || 1;
-                leadPatch.sequence_step = step;
-                const waitDays = STEP_WAIT_DAYS[step] || 7;
-                const nextAt = new Date(occurredAt.getTime() + waitDays * 86_400_000);
-                if (step < 3) {
-                    leadPatch.next_action = `draft_t${step + 1}`;
-                } else {
-                    leadPatch.next_action = "mark_lost";
+                const currentStep = Number(lead.sequence_step) || 0;
+                const lastContacted = ms(lead.last_contacted_at);
+                if (!(lastContacted > occurredAt.getTime())) leadPatch.last_contacted_at = occurredIso;
+                if (step > currentStep) leadPatch.sequence_step = step;
+                if (PAST_SEQUENCE_STATUSES.has(lead.status)) {
+                    note = `El lead está en ${lead.status}: se registró el envío sin cambiar su estado ni su próxima acción.`;
+                    break;
                 }
-                leadPatch.next_action_at = nextAt.toISOString();
+                if (lead.status === "contacted" && step < currentStep) {
+                    note = `El lead ya va en el paso ${currentStep}: se registró este envío del paso ${step} sin reprogramar la secuencia.`;
+                    break;
+                }
+                leadPatch.status = "contacted";
+                leadPatch.next_action = step < 3 ? `draft_t${step + 1}` : "mark_lost";
+                leadPatch.next_action_at = new Date(occurredAt.getTime() + (STEP_WAIT_DAYS[step] || 7) * 86_400_000).toISOString();
                 break;
             }
 
             case "replied":
-                leadPatch.status = "replied";
+                if (["converted", "suppressed"].includes(lead.status)) {
+                    note = `El lead está en ${lead.status}: se registró la respuesta sin cambiar su estado.`;
+                    break;
+                }
+                if (lead.status !== "interested") leadPatch.status = "replied";
                 leadPatch.next_action = args.reply_sentiment === "positive" || args.reply_sentiment === "neutral" ? "reply" : "none";
                 leadPatch.next_action_at = null;
                 break;
@@ -615,15 +743,288 @@ const logLeadTouch: AdminToolDef = {
         const { error: updateError } = await actx.supabase.from(LEADS).update(leadPatch).eq("id", lead.id);
         if (updateError) throw updateError;
 
+        const pick = (key: string) => (key in leadPatch ? leadPatch[key] : lead[key]) ?? null;
         return {
             touch_id: touchId,
-            touch_updated: Boolean(open),
+            touch_updated: mode !== "created",
+            ...(mode === "merged" ? { merged_with_reply: true } : {}),
             lead_id: lead.id,
             action: args.action,
             step: args.step || null,
-            new_status: (leadPatch.status as string) || lead.status,
-            next_action: (leadPatch.next_action as string) || lead.next_action || null,
-            next_action_at: (leadPatch.next_action_at as string) || lead.next_action_at || null,
+            new_status: pick("status"),
+            sequence_step: pick("sequence_step"),
+            next_action: pick("next_action"),
+            next_action_at: pick("next_action_at"),
+            ...(note ? { note } : {}),
+            warnings,
+        };
+    },
+};
+
+const touchIdSchema: JsonSchema = { type: "integer", minimum: 1, description: "id del touch (get_lead → touches)." };
+const nullableDate: JsonSchema = { type: "string", format: "date-time", nullable: true };
+
+const updateLeadTouch: AdminToolDef = {
+    name: "update_lead_touch",
+    title: "Corregir touch de un lead",
+    description:
+        "Corrige un touch registrado (touch_id de get_lead) o etiqueta varios a la vez (touch_ids, solo strategy_slug y cta: sirve para " +
+        "marcar con su estrategia los envíos importados). Solo cambia los campos enviados; null borra el valor. " +
+        "NO recalcula el estado del lead: si cambia la historia, ajústalo con update_lead.",
+    readOnly: false,
+    inputSchema: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+            touch_id: touchIdSchema,
+            touch_ids: { type: "array", items: { type: "integer", minimum: 1 }, minItems: 1, maxItems: 500, description: "Varios touches: solo strategy_slug y cta." },
+            step: { type: "integer", minimum: 1, maximum: 3, nullable: true },
+            kind: { type: "string", enum: TOUCH_KINDS },
+            outcome: { type: "string", enum: TOUCH_OUTCOMES },
+            strategy_slug: { type: "string", maxLength: 80, nullable: true },
+            cta: { type: "string", maxLength: 200, nullable: true },
+            subject: { type: "string", maxLength: 200, nullable: true },
+            gmail_draft_id: { type: "string", maxLength: 100, nullable: true },
+            gmail_message_id: { type: "string", maxLength: 100, nullable: true },
+            reply_gmail_message_id: { type: "string", maxLength: 100, nullable: true },
+            gmail_thread_id: { type: "string", maxLength: 100, nullable: true },
+            reply_sentiment: { type: "string", enum: REPLY_SENTIMENTS, nullable: true },
+            drafted_at: nullableDate,
+            sent_at: nullableDate,
+            reply_at: nullableDate,
+        },
+    },
+    audit: (args, result) => ({
+        target: args.touch_id ? `lead_touch:${args.touch_id}` : `lead_touches:${(args.touch_ids || []).length}`,
+        summary: `Touch(s) corregido(s): ${(result.updated_fields as string[] | undefined)?.join(", ") || "-"}`,
+    }),
+    async handler(args, actx) {
+        const { touch_id, touch_ids, ...fields } = args;
+        if (Boolean(touch_id) === Boolean(touch_ids)) throw new ToolError("invalid_input", "Indica touch_id o touch_ids (uno de los dos).");
+        const keys = Object.keys(fields);
+        if (!keys.length) throw new ToolError("invalid_input", "Indica al menos un campo a corregir.");
+        if (touch_ids && keys.some((k) => k !== "strategy_slug" && k !== "cta")) {
+            throw new ToolError("invalid_input", "Con touch_ids solo se pueden cambiar strategy_slug y cta. Corrige lo demás touch por touch.");
+        }
+        const ids: number[] = touch_ids || [touch_id];
+        const { data: found, error: findError } = await actx.supabase.from(TOUCHES).select("id, lead_id").in("id", ids);
+        if (findError) throwTouchError(findError);
+        const missing = ids.filter((id) => !(found || []).some((r: any) => Number(r.id) === id));
+        if (missing.length) throw new ToolError("not_found", `No existen los touches: ${missing.slice(0, 20).join(", ")}.`);
+
+        const { error } = await actx.supabase.from(TOUCHES).update(fields).in("id", ids);
+        if (error) throwTouchError(error);
+        const warnings = await strategyWarnings(actx.supabase, fields.strategy_slug);
+        let touch: any = null;
+        if (touch_id) {
+            const { data } = await actx.supabase.from(TOUCHES).select(TOUCH_COLUMNS).eq("id", touch_id).maybeSingle();
+            touch = data || null;
+        }
+        return {
+            updated: ids.length,
+            updated_fields: keys,
+            lead_ids: [...new Set((found || []).map((r: any) => r.lead_id))],
+            ...(touch ? { touch } : {}),
+            note: "El estado del lead no se recalcula: revísalo con get_lead y ajústalo con update_lead si hace falta.",
+            warnings,
+        };
+    },
+};
+
+const deleteLeadTouch: AdminToolDef = {
+    name: "delete_lead_touch",
+    title: "Borrar touch de un lead",
+    description:
+        "Borra un touch registrado por error (touch_id de get_lead). Pide confirmación. NO recalcula el estado del lead: " +
+        "ajústalo después con update_lead si hace falta.",
+    readOnly: false,
+    annotations: { destructiveHint: true },
+    inputSchema: { type: "object", additionalProperties: false, required: ["touch_id"], properties: { touch_id: touchIdSchema } },
+    confirm: async (args, actx) => {
+        const { data, error } = await actx.supabase.from(TOUCHES).select(TOUCH_COLUMNS).eq("id", args.touch_id).maybeSingle();
+        if (error) throwTouchError(error);
+        if (!data) throw new ToolError("not_found", "Touch no encontrado.");
+        return {
+            message: `Se borrará el touch ${data.id} (${data.kind}, ${data.outcome}${data.step ? `, paso ${data.step}` : ""}) del lead ${data.lead_id}.`,
+            details: { subject: data.subject, sent_at: data.sent_at, reply_at: data.reply_at, strategy_slug: data.strategy_slug },
+            warnings: ["No se puede deshacer. El estado del lead no se recalcula."],
+        };
+    },
+    audit: (args) => ({ target: `lead_touch:${args.touch_id}`, summary: "Touch borrado" }),
+    async handler(args, actx) {
+        const { data, error } = await actx.supabase.from(TOUCHES).delete().eq("id", args.touch_id).select("id, lead_id");
+        if (error) throwTouchError(error);
+        if (!data?.length) throw new ToolError("not_found", "Touch no encontrado.");
+        return { deleted: true, touch_id: args.touch_id, lead_id: data[0].lead_id, note: "Revisa el estado del lead con get_lead." };
+    },
+};
+
+// ---------------------------------------------------------------------------
+// create_lead_proposal
+// ---------------------------------------------------------------------------
+
+export const PROPOSALS_ORG_NAME = "Propuestas AI Tickets";
+const PROPOSAL_DEFAULT_HOURS = 720;
+const CREATE_EVENT = TOOLS.find((t) => t.name === "create_event")!;
+
+/** Organización "Propuestas AI Tickets" (migración 202611120200_lead_proposals.sql). */
+async function getProposalsOrgId(supabase: any): Promise<number> {
+    const { data, error } = await supabase.from("aitickets_platform_settings").select("value").eq("key", "proposals_org_id").maybeSingle();
+    if (error && !["42P01", "PGRST205"].includes(String(error.code || ""))) throw error;
+    const id = Number(data?.value);
+    if (!Number.isInteger(id) || id <= 0) {
+        throw new ToolError("unavailable", `Falta la organización "${PROPOSALS_ORG_NAME}": la migración 202611120200_lead_proposals.sql aún no se aplica en esta base.`);
+    }
+    return id;
+}
+
+const createLeadProposal: AdminToolDef = {
+    name: "create_lead_proposal",
+    title: "Crear propuesta para un lead",
+    description:
+        `Arma la propuesta de un lead: crea su evento en BORRADOR en la organización "${PROPOSALS_ORG_NAME}" (event: mismos campos que create_event), ` +
+        `crea un link privado de vista previa (${PROPOSAL_DEFAULT_HOURS} h por defecto), guarda evento y link en el lead (get_lead → proposal, con las visitas al link) ` +
+        "y registra un touch kind=proposal. preview_url se entrega SOLO en esta respuesta (no se guarda): cópialo al correo del lead. " +
+        "Para enlazar un evento que ya existe usa event_id (y preview_link_id si ya tiene su link; si no, se crea uno). " +
+        "Si el lead ya tiene propuesta pide replace=true; el link anterior se revoca. No envía nada.",
+    readOnly: false,
+    inputSchema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["lead_id"],
+        properties: {
+            lead_id: leadIdSchema,
+            event: { ...CREATE_EVENT.inputSchema, description: `Evento nuevo (campos de create_event). Queda en borrador en "${PROPOSALS_ORG_NAME}".` },
+            event_id: { type: "integer", minimum: 1, description: "Evento existente a enlazar en vez de crear uno (search_events)." },
+            preview_link_id: { type: "string", pattern: "^[0-9a-fA-F-]{36}$", description: "Link de vista previa existente de event_id (org_list_preview_links). Su URL no se puede recuperar." },
+            expires_in_hours: { type: "integer", minimum: 1, maximum: 8760, default: PROPOSAL_DEFAULT_HOURS, description: "Validez del link nuevo (por defecto 720 h = 30 días)." },
+            no_expiration: { type: "boolean", default: false, description: "true = el link nuevo no vence." },
+            strategy_slug: { type: "string", maxLength: 80, description: "Estrategia con que se ofrece la propuesta (para el embudo)." },
+            replace: { type: "boolean", default: false, description: "true = reemplaza la propuesta que ya tenga el lead." },
+        },
+    },
+    audit: (args, result) => ({
+        target: `lead:${args.lead_id}`,
+        event_id: (result.event_id as number) ?? null,
+        organization_id: (result.organization_id as number) ?? null,
+        summary: `Propuesta ${args.event_id ? "enlazada" : "creada"}: evento ${result.event_id}`,
+    }),
+    async handler(args, actx) {
+        if (Boolean(args.event) === Boolean(args.event_id)) throw new ToolError("invalid_input", "Indica event (crear uno nuevo) o event_id (enlazar uno existente), no ambos.");
+        if (args.preview_link_id && !args.event_id) throw new ToolError("invalid_input", "preview_link_id solo sirve con event_id.");
+        const lead = await loadLead(actx.supabase, args.lead_id);
+        if (["suppressed", "invalid"].includes(lead.status)) throw new ToolError("conflict", `Este lead está ${lead.status}: no se le arma propuesta.`);
+        if (lead.proposal_event_id && !args.replace) {
+            throw new ToolError("conflict", `Este lead ya tiene propuesta (evento ${lead.proposal_event_id}). Usa replace=true para reemplazarla.`);
+        }
+        const warnings: string[] = await strategyWarnings(actx.supabase, args.strategy_slug);
+        const supportUserId = await getSupportUserId(actx.supabase);
+
+        // 1. Evento
+        let eventId: number;
+        let orgId: number;
+        let eventName: string;
+        let eventStatus: string;
+        if (args.event) {
+            orgId = await getProposalsOrgId(actx.supabase);
+            const outcome = await runTool(CREATE_EVENT, args.event, await orgToolContext(actx, orgId));
+            if (!outcome.ok) throw new ToolError(outcome.code, outcome.message);
+            const created = outcome.result as any;
+            eventId = Number(created.event_id);
+            eventName = created.name ?? args.event.name;
+            eventStatus = created.status ?? "draft";
+            // create_event deja un link de 7 días cuya URL aquí se descarta: se revoca para que no quede uno suelto.
+            for (const l of await listPreviewLinks(eventId, orgId, actx.supabase)) {
+                if (l.status === "active" && l.label === "Creado con el evento") await revokePreviewLink(l.id, orgId, actx.supabase);
+            }
+        } else {
+            const { data: event, error } = await actx.supabase.from("events").select("id, name, status, organization_id").eq("id", args.event_id).maybeSingle();
+            if (error) throw error;
+            if (!event) throw new ToolError("not_found", `No existe el evento ${args.event_id}. Usa search_events.`);
+            eventId = Number(event.id);
+            orgId = Number(event.organization_id);
+            eventName = event.name;
+            eventStatus = event.status;
+            const proposalsOrg = await getProposalsOrgId(actx.supabase).catch(() => null);
+            if (proposalsOrg && orgId !== proposalsOrg) warnings.push(`El evento está en la organización ${orgId}, no en "${PROPOSALS_ORG_NAME}" (${proposalsOrg}).`);
+            if (eventStatus === "published") warnings.push("El evento ya está publicado: su link público también funciona.");
+        }
+
+        // 2. Link de vista previa
+        let previewUrl: string | null = null;
+        let link: any;
+        if (args.preview_link_id) {
+            const { data, error } = await actx.supabase.from("aitickets_event_preview_links").select(PREVIEW_LINK_COLUMNS).eq("id", args.preview_link_id).eq("event_id", eventId).maybeSingle();
+            if (error) throw error;
+            if (!data) throw new ToolError("not_found", `El link ${args.preview_link_id} no es del evento ${eventId}. Revisa con org_list_preview_links.`);
+            link = presentPreviewLink(data);
+            if (link.status !== "active") warnings.push(`El link está ${link.status}: el lead no podrá abrirlo. Crea otro omitiendo preview_link_id.`);
+        } else {
+            const created = await createPreviewLink(
+                {
+                    eventId,
+                    orgId,
+                    userId: supportUserId,
+                    expiresInHours: args.no_expiration ? null : (args.expires_in_hours ?? PROPOSAL_DEFAULT_HOURS),
+                    label: `Propuesta: ${lead.org_name || lead.id}`.slice(0, 80),
+                    via: "admin",
+                    origin: actx.origin,
+                },
+                actx.supabase,
+            ).catch((err: unknown) => {
+                if (err instanceof PreviewLinkError) throw new ToolError(err.code, err.message);
+                throw err;
+            });
+            previewUrl = created.url;
+            link = created.link;
+        }
+
+        // 3. Propuesta anterior: su link deja de funcionar
+        if (lead.proposal_preview_link_id && lead.proposal_preview_link_id !== link.id) {
+            const { data: old } = await actx.supabase.from("aitickets_event_preview_links").select("organization_id").eq("id", lead.proposal_preview_link_id).maybeSingle();
+            if (old) await revokePreviewLink(lead.proposal_preview_link_id, Number(old.organization_id), actx.supabase);
+            warnings.push(`Se revocó el link de la propuesta anterior (evento ${lead.proposal_event_id}); el evento sigue en borrador.`);
+        }
+
+        // 4. Lead + touch
+        const nowIso = new Date().toISOString();
+        const { error: leadError } = await actx.supabase
+            .from(LEADS)
+            .update({ proposal_event_id: eventId, proposal_preview_link_id: link.id, proposal_created_at: nowIso, updated_at: nowIso })
+            .eq("id", lead.id);
+        if (leadError) throw leadError;
+        const { data: touch, error: touchError } = await actx.supabase
+            .from(TOUCHES)
+            .insert({
+                lead_id: lead.id,
+                step: null,
+                kind: "proposal",
+                channel: "email",
+                strategy_slug: args.strategy_slug || null,
+                subject: String(eventName || "").slice(0, 200) || null,
+                gmail_thread_id: lead.gmail_thread_id || null,
+                outcome: "drafted",
+                drafted_at: nowIso,
+                created_at: nowIso,
+            })
+            .select("id")
+            .single();
+        if (touchError) throwTouchError(touchError);
+
+        return {
+            lead_id: lead.id,
+            event_id: eventId,
+            event_name: eventName,
+            event_status: eventStatus,
+            organization_id: orgId,
+            preview_url: previewUrl,
+            preview_link: { id: link.id, status: link.status, expires_at: link.expires_at, view_count: link.view_count },
+            dashboard_url: `${actx.origin}/dashboard/events/${eventId}`,
+            touch_id: touch.id,
+            note: previewUrl
+                ? "preview_url se muestra SOLO esta vez (no se guarda): cópialo al correo del lead. El evento está en BORRADOR; get_lead muestra si abrieron el link."
+                : "Se enlazó un link existente: su URL no se puede recuperar. Si no la tienes, repite con replace=true sin preview_link_id para crear otro.",
+            warnings,
         };
     },
 };
@@ -970,6 +1371,9 @@ export const leadTools: AdminToolDef[] = [
     updateLead,
     createLead,
     logLeadTouch,
+    updateLeadTouch,
+    deleteLeadTouch,
+    createLeadProposal,
     listLeadStrategies,
     upsertLeadStrategy,
     getLeadFunnel,

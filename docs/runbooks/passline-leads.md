@@ -105,6 +105,9 @@ Ninguna herramienta envía mensajes.
 | `list_leads` | A quién escribir: por prioridad, con filtros, `contactable` y `blocked_reason` |
 | `get_lead` | De dónde salió cada contacto y qué eventos se vieron |
 | `update_lead` | Registrar `contacted`, `replied`, `interested`, `converted`, `lost` o `invalid`, y agregar notas |
+| `log_lead_touch` | Cada borrador, envío, respuesta o rebote. Tolera importaciones fuera de orden: un envío sobre un lead que ya respondió no reinicia la secuencia y se fusiona con la respuesta |
+| `update_lead_touch` / `delete_lead_touch` | Corregir o borrar un touch (`touch_ids` etiqueta envíos en lote con `strategy_slug` y `cta`). No recalculan el estado del lead |
+| `create_lead_proposal` | Evento borrador en la org "Propuestas AI Tickets" + link de vista previa de 720 h, guardados en el lead, con touch `kind=proposal`. La URL sale una sola vez. Con `event_id` (y `preview_link_id`) enlaza uno existente |
 | `add_suppression` | Registrar un "no me escriban más". Pide confirmación y no se deshace desde el MCP |
 | `export_leads` | El CSV en la respuesta, con la llave completa |
 
