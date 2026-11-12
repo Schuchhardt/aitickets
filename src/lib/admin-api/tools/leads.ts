@@ -450,6 +450,34 @@ const createLead: AdminToolDef = {
 /** Días de espera entre pasos de la secuencia. */
 const STEP_WAIT_DAYS: Record<number, number> = { 1: 4, 2: 5, 3: 7 };
 
+/**
+ * Fila abierta que la acción hace avanzar: `sent` y `discarded` cierran un borrador; `replied` y
+ * `bounced` cierran un envío. Calza por gmail_draft_id si viene; si no, por paso (o la más reciente
+ * cuando no se indica paso). Devuelve null si no hay ninguna: entonces se inserta una fila nueva.
+ */
+async function findOpenTouch(supabase: any, leadId: string, args: Record<string, any>): Promise<{ id: number } | null> {
+    const fromOutcome = args.action === "sent" || args.action === "discarded" ? "drafted" : "sent";
+    const { data, error } = await supabase
+        .from(TOUCHES)
+        .select("id, step, gmail_draft_id, created_at")
+        .eq("lead_id", leadId)
+        .eq("kind", "outreach")
+        .eq("outcome", fromOutcome);
+    if (error) {
+        if (["42P01", "PGRST205"].includes(String(error.code || ""))) {
+            throw new ToolError("unavailable", "La tabla de touches aún no existe (falta la migración del pipeline SDR).");
+        }
+        throw error;
+    }
+    const rows: any[] = [...(data || [])].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)) || Number(b.id) - Number(a.id));
+    if (args.gmail_draft_id) {
+        const byDraft = rows.find((r) => r.gmail_draft_id === args.gmail_draft_id);
+        if (byDraft) return byDraft;
+    }
+    const candidates = args.step ? rows.filter((r) => r.step === args.step) : rows;
+    return candidates[0] || null;
+}
+
 const logLeadTouch: AdminToolDef = {
     name: "log_lead_touch",
     title: "Registrar touch de un lead",
@@ -457,7 +485,9 @@ const logLeadTouch: AdminToolDef = {
         "Registra cada paso de la secuencia de contacto y mueve el estado del lead. " +
         "drafted → status=queued. sent → status=contacted, calcula next_action_at. " +
         "replied → status=replied, corta la secuencia. bounced → status=invalid. " +
-        "El reloj corre desde sent_at real, no desde el borrador.",
+        "El reloj corre desde sent_at real, no desde el borrador. " +
+        "Cada touch es una fila que avanza: sent actualiza el borrador de ese paso y replied/bounced el envío; " +
+        "si no hay fila previa (envío sin borrador registrado) se crea una.",
     readOnly: false,
     inputSchema: {
         type: "object",
@@ -487,32 +517,54 @@ const logLeadTouch: AdminToolDef = {
         if (args.action === "replied" && !args.reply_sentiment) throw new ToolError("invalid_input", "action=replied necesita reply_sentiment.");
         if (args.reply_sentiment && args.action !== "replied") throw new ToolError("invalid_input", "reply_sentiment solo aplica con action=replied.");
 
-        // Insert touch
-        const touchRow: Record<string, unknown> = {
-            lead_id: lead.id,
-            step: args.step || null,
-            kind: args.action === "replied" ? "reply" : "outreach",
-            channel: "email",
-            strategy_slug: args.strategy_slug || null,
-            cta: args.cta || null,
-            subject: args.subject || null,
-            gmail_draft_id: args.gmail_draft_id || null,
-            gmail_message_id: args.gmail_message_id || null,
-            gmail_thread_id: args.gmail_thread_id || null,
-            outcome: args.action,
-            reply_sentiment: args.reply_sentiment || null,
-            drafted_at: args.action === "drafted" ? occurredAt.toISOString() : null,
-            sent_at: args.action === "sent" ? occurredAt.toISOString() : null,
-            reply_at: args.action === "replied" ? occurredAt.toISOString() : null,
-            created_at: nowIso,
-        };
+        // Un touch es UNA fila que avanza: drafted → sent → replied/bounced. Si ya hay una fila abierta
+        // para este paso se actualiza (conserva drafted_at y sent_at, que usa el embudo); si no, se crea.
+        // Un envío sin borrador previo (importación desde Gmail, correo escrito a mano) usa la fecha
+        // del envío como drafted_at: la columna es NOT NULL y un null explícito pisa su DEFAULT.
+        const occurredIso = occurredAt.toISOString();
+        const open = args.action === "drafted" ? null : await findOpenTouch(actx.supabase, lead.id, args);
 
-        const { data: touchData, error: touchError } = await actx.supabase.from(TOUCHES).insert(touchRow).select("id").single();
-        if (touchError) {
-            if (String(touchError.code) === "42P01" || String(touchError.code) === "PGRST205") {
-                throw new ToolError("unavailable", "La tabla de touches aún no existe (falta la migración del pipeline SDR).");
+        let touchId: number;
+        if (open) {
+            const patch: Record<string, unknown> = { outcome: args.action };
+            if (args.action === "sent") patch.sent_at = occurredIso;
+            if (args.action === "replied") {
+                patch.reply_at = occurredIso;
+                patch.reply_sentiment = args.reply_sentiment;
             }
-            throw touchError;
+            for (const key of ["strategy_slug", "cta", "subject", "gmail_draft_id", "gmail_message_id", "gmail_thread_id"]) {
+                if (args[key]) patch[key] = args[key];
+            }
+            const { error: patchError } = await actx.supabase.from(TOUCHES).update(patch).eq("id", open.id);
+            if (patchError) throw patchError;
+            touchId = open.id;
+        } else {
+            const touchRow: Record<string, unknown> = {
+                lead_id: lead.id,
+                step: args.step || null,
+                kind: args.action === "replied" ? "reply" : "outreach",
+                channel: "email",
+                strategy_slug: args.strategy_slug || null,
+                cta: args.cta || null,
+                subject: args.subject || null,
+                gmail_draft_id: args.gmail_draft_id || null,
+                gmail_message_id: args.gmail_message_id || null,
+                gmail_thread_id: args.gmail_thread_id || null,
+                outcome: args.action,
+                reply_sentiment: args.reply_sentiment || null,
+                drafted_at: occurredIso,
+                sent_at: args.action === "sent" ? occurredIso : null,
+                reply_at: args.action === "replied" ? occurredIso : null,
+                created_at: nowIso,
+            };
+            const { data: touchData, error: touchError } = await actx.supabase.from(TOUCHES).insert(touchRow).select("id").single();
+            if (touchError) {
+                if (String(touchError.code) === "42P01" || String(touchError.code) === "PGRST205") {
+                    throw new ToolError("unavailable", "La tabla de touches aún no existe (falta la migración del pipeline SDR).");
+                }
+                throw touchError;
+            }
+            touchId = touchData.id;
         }
 
         // Update lead state based on action
@@ -564,7 +616,8 @@ const logLeadTouch: AdminToolDef = {
         if (updateError) throw updateError;
 
         return {
-            touch_id: touchData.id,
+            touch_id: touchId,
+            touch_updated: Boolean(open),
             lead_id: lead.id,
             action: args.action,
             step: args.step || null,
@@ -742,7 +795,8 @@ const getLeadFunnel: AdminToolDef = {
             if (!lead) continue;
             const bucket = getBucket(lead.niche || "otro", t.strategy_slug);
 
-            if (t.outcome === "sent") bucket.contacted.add(t.lead_id);
+            // Una fila respondida también fue un envío: sin esto la tasa de respuesta se dispara.
+            if (t.outcome === "sent" || (t.outcome === "replied" && t.sent_at)) bucket.contacted.add(t.lead_id);
             if (t.outcome === "replied") {
                 bucket.replied.add(t.lead_id);
                 if (t.reply_sentiment === "positive") bucket.positive.add(t.lead_id);
