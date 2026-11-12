@@ -5,6 +5,8 @@ import { GOOGLE_STATE_COOKIE, decodeGoogleState, ensureGoogleProducer, finishGoo
 import { onboardingUrl, safeNextPath } from "../../../lib/onboarding";
 import { recordLogin, setSessionCookies } from "../../../lib/supabaseServer";
 import { notifySlack } from "../../api/_lib/server-utils";
+import { getSupabaseAdmin } from "../../../lib/auth-helpers";
+import { googlePhotoUrl, importGoogleAvatar } from "../../../lib/userAvatar";
 
 export const prerender = false;
 
@@ -43,6 +45,13 @@ export const GET: APIRoute = async (context) => {
     await recordLogin({ auth_user_id: user.id });
 
     if (account.created) {
+        // Cuenta nueva: su foto de Google queda como foto de perfil (la puede cambiar o quitar en Mi Perfil)
+        if (googlePhotoUrl(user)) {
+            const { data: profile } = await getSupabaseAdmin().from("users").select("id").eq("auth_user_id", user.id).maybeSingle();
+            if (profile?.id) {
+                await importGoogleAvatar(Number(profile.id), user).catch((err) => console.warn("google avatar:", err?.message || err));
+            }
+        }
         const a = state.attribution || {};
         const source = [a.utm_source, a.utm_medium, a.utm_campaign].filter(Boolean).join(" / ");
         await notifySlack(

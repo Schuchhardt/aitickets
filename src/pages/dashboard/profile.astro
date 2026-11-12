@@ -2,6 +2,7 @@
 import DashboardLayout from "../../layouts/DashboardLayout.astro";
 import { getSupabaseAdmin } from "../../lib/auth-helpers";
 import { requireDashboardSession } from "./_lib/guard";
+import { googlePhotoUrl } from "../../lib/userAvatar";
 
 // Perfil propio: cualquier rol
 const guard = await requireDashboardSession(Astro);
@@ -13,6 +14,11 @@ const { data: dbUser } = await getSupabaseAdmin()
     .select("id, name, email, phone, role, organization_id")
     .eq("id", guard.session.dbUser.id)
     .single();
+
+const avatarUrl = guard.session.dbUser.avatar_url || null;
+const hasGooglePhoto = Boolean(googlePhotoUrl(user));
+const initial =
+    (dbUser?.name || user.user_metadata?.full_name)?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || "U";
 ---
 
 <DashboardLayout title="Mi Perfil">
@@ -20,20 +26,59 @@ const { data: dbUser } = await getSupabaseAdmin()
         <h1 class="text-2xl font-bold font-[Unbounded] mb-6">Mi Perfil</h1>
 
         <div class="bg-white p-4 md:p-6 rounded-xl border border-gray-200 shadow-sm">
-            <div class="flex items-center gap-4 mb-6 md:mb-8">
-                <div
-                    class="w-16 h-16 shrink-0 rounded-full bg-black text-white flex items-center justify-center text-2xl font-bold"
-                >
-                    {
-                        (dbUser?.name || user.user_metadata?.full_name)?.[0]?.toUpperCase() ||
-                            user.email?.[0]?.toUpperCase()
-                    }
+            <div class="flex flex-col sm:flex-row sm:items-center gap-4 mb-6 md:mb-8">
+                <div class="relative w-20 h-20 shrink-0">
+                    <img
+                        id="avatarImg"
+                        src={avatarUrl || undefined}
+                        alt="Tu foto de perfil"
+                        class:list={["w-20 h-20 rounded-full object-cover bg-gray-200", { hidden: !avatarUrl }]}
+                    />
+                    <div
+                        id="avatarInitial"
+                        class:list={["w-20 h-20 rounded-full bg-black text-white flex items-center justify-center text-3xl font-bold", { hidden: !!avatarUrl }]}
+                    >
+                        {initial}
+                    </div>
+                    <div id="avatarSpinner" class="hidden absolute inset-0 rounded-full bg-white/70 flex items-center justify-center">
+                        <div class="animate-spin h-6 w-6 border-2 border-black border-t-transparent rounded-full"></div>
+                    </div>
                 </div>
                 <div class="min-w-0">
                     <h2 class="text-lg font-bold break-words">
                         {dbUser?.name || user.user_metadata?.full_name || "Usuario"}
                     </h2>
                     <p class="text-gray-500 break-all">{user.email}</p>
+                    <div class="flex flex-wrap gap-2 mt-3">
+                        <label
+                            class="cursor-pointer px-3 py-1.5 text-sm rounded-lg border border-gray-300 hover:bg-gray-50 font-medium"
+                            data-testid="profile-avatar-upload"
+                        >
+                            <span id="avatarUploadLabel">{avatarUrl ? "Cambiar foto" : "Subir foto"}</span>
+                            <input id="avatarInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif" class="sr-only" />
+                        </label>
+                        {
+                            hasGooglePhoto && (
+                                <button
+                                    type="button"
+                                    id="avatarGoogleBtn"
+                                    class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 hover:bg-gray-50 font-medium"
+                                    data-testid="profile-avatar-google"
+                                >
+                                    Usar mi foto de Google
+                                </button>
+                            )
+                        }
+                        <button
+                            type="button"
+                            id="avatarRemoveBtn"
+                            class:list={["px-3 py-1.5 text-sm rounded-lg text-red-600 hover:bg-red-50 font-medium", { hidden: !avatarUrl }]}
+                        >
+                            Quitar
+                        </button>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-2">JPG, PNG, WEBP o GIF, hasta 5 MB.</p>
+                    <p id="avatarMsg" class="hidden text-sm mt-2" aria-live="polite"></p>
                 </div>
             </div>
 
@@ -182,6 +227,77 @@ const { data: dbUser } = await getSupabaseAdmin()
                 }
             });
         }
+
+        // Foto de perfil: subir, copiar la de Google o quitar
+        const avatarImg = document.getElementById("avatarImg") as HTMLImageElement | null;
+        const avatarInitial = document.getElementById("avatarInitial") as HTMLElement | null;
+        const avatarSpinner = document.getElementById("avatarSpinner") as HTMLElement | null;
+        const avatarInput = document.getElementById("avatarInput") as HTMLInputElement | null;
+        const avatarUploadLabel = document.getElementById("avatarUploadLabel") as HTMLElement | null;
+        const avatarGoogleBtn = document.getElementById("avatarGoogleBtn") as HTMLButtonElement | null;
+        const avatarRemoveBtn = document.getElementById("avatarRemoveBtn") as HTMLButtonElement | null;
+        const avatarMsg = document.getElementById("avatarMsg") as HTMLElement | null;
+
+        const showAvatarMsg = (text: string, isError: boolean) => {
+            if (!avatarMsg) return;
+            avatarMsg.textContent = text;
+            avatarMsg.className = `text-sm mt-2 ${isError ? "text-red-600" : "text-green-700"}`;
+        };
+
+        const renderAvatar = (url: string | null) => {
+            if (url && avatarImg) avatarImg.src = url;
+            avatarImg?.classList.toggle("hidden", !url);
+            avatarInitial?.classList.toggle("hidden", !!url);
+            avatarRemoveBtn?.classList.toggle("hidden", !url);
+            if (avatarUploadLabel) avatarUploadLabel.textContent = url ? "Cambiar foto" : "Subir foto";
+            // La barra lateral también muestra la foto
+            setTimeout(() => window.location.reload(), 1200);
+        };
+
+        const avatarRequest = async (init: RequestInit, okText: string) => {
+            avatarSpinner?.classList.remove("hidden");
+            avatarMsg?.classList.add("hidden");
+            for (const b of [avatarGoogleBtn, avatarRemoveBtn]) if (b) b.disabled = true;
+            if (avatarInput) avatarInput.disabled = true;
+            try {
+                const res = await fetch("/api/users/avatar", init);
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(data.message || "No pudimos guardar tu foto");
+                showAvatarMsg(okText, false);
+                renderAvatar(data.url || null);
+            } catch (err) {
+                showAvatarMsg(err instanceof Error ? err.message : "Error de conexión", true);
+            } finally {
+                avatarSpinner?.classList.add("hidden");
+                for (const b of [avatarGoogleBtn, avatarRemoveBtn]) if (b) b.disabled = false;
+                if (avatarInput) {
+                    avatarInput.disabled = false;
+                    avatarInput.value = "";
+                }
+            }
+        };
+
+        avatarInput?.addEventListener("change", () => {
+            const file = avatarInput.files?.[0];
+            if (!file) return;
+            if (file.size > 5 * 1024 * 1024) {
+                showAvatarMsg("La imagen no debe superar los 5MB", true);
+                avatarInput.value = "";
+                return;
+            }
+            const fd = new FormData();
+            fd.append("file", file);
+            avatarRequest({ method: "POST", body: fd }, "Foto actualizada.");
+        });
+
+        avatarGoogleBtn?.addEventListener("click", () =>
+            avatarRequest(
+                { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source: "google" }) },
+                "Ahora usas tu foto de Google.",
+            ),
+        );
+
+        avatarRemoveBtn?.addEventListener("click", () => avatarRequest({ method: "DELETE" }, "Foto eliminada."));
 
         // Cambio de contraseña: enviar el enlace al correo
         const pwMsg = document.getElementById("pwMsg") as HTMLElement | null;

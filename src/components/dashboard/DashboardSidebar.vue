@@ -215,7 +215,14 @@ const menuItems = allMenuItems.filter(item => !item.roles || item.roles.includes
         :class="collapsed ? 'justify-center' : ''"
         :title="collapsed ? 'Mi perfil' : undefined"
       >
-        <div class="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center font-bold text-sm shrink-0">
+        <img
+          v-if="user.avatarUrl"
+          :src="user.avatarUrl"
+          alt=""
+          class="w-8 h-8 rounded-full object-cover shrink-0 bg-gray-200"
+          referrerpolicy="no-referrer"
+        />
+        <div v-else class="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center font-bold text-sm shrink-0">
           {{ user.dbName?.[0]?.toUpperCase() || user.user_metadata?.full_name?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || 'U' }}
         </div>
 

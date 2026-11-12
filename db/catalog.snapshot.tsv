@@ -1172,6 +1172,7 @@ column:social_posts.status	text notnull=true default='draft'::text
 column:social_posts.zernio_post_id	text notnull=false default=-
 column:users.active	boolean notnull=false default=true
 column:users.auth_user_id	uuid notnull=false default=-
+column:users.avatar_url	text notnull=false default=-
 column:users.created_at	timestamp with time zone notnull=true default=now()
 column:users.email	text notnull=false default=-
 column:users.encrypted_password	text notnull=false default=-

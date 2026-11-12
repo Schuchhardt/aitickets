@@ -112,6 +112,8 @@ CREATE TABLE public.users (
   updated_at timestamp with time zone,
   role text DEFAULT 'admin'::text,
   auth_user_id uuid,
+  -- 202611120100: foto de perfil (URL pública en el bucket Events; NULL = inicial)
+  avatar_url text,
   CONSTRAINT users_pkey PRIMARY KEY (id),
   CONSTRAINT users_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id),
   CONSTRAINT users_auth_user_id_fkey FOREIGN KEY (auth_user_id) REFERENCES auth.users(id)
