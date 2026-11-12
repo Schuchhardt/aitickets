@@ -74,6 +74,8 @@ export type DbUser = {
     organization_id: number;
     role: string | null;
     active: boolean | null;
+    /** Foto de perfil (null = sin foto: se muestra la inicial). */
+    avatar_url?: string | null;
 };
 
 export type SessionContext = { authUser: User; dbUser: DbUser };
@@ -133,11 +135,20 @@ export const getSessionContext = async (context: CookieContext): Promise<Session
     const authUser = await getSessionUser(context);
     if (!authUser) return null;
 
-    const { data: dbUser } = await getSupabaseAdmin()
+    const admin = getSupabaseAdmin();
+    let { data: dbUser, error } = await admin
         .from("users")
-        .select("id, name, email, organization_id, role, active")
+        .select("id, name, email, organization_id, role, active, avatar_url")
         .eq("auth_user_id", authUser.id)
         .single();
+    // Deploy previews comparten la BD de producción y no migran: sin la columna avatar_url, se lee sin ella
+    if (error && /avatar_url/.test(error.message || "")) {
+        ({ data: dbUser } = await admin
+            .from("users")
+            .select("id, name, email, organization_id, role, active")
+            .eq("auth_user_id", authUser.id)
+            .single());
+    }
 
     if (!dbUser || !dbUser.organization_id || dbUser.active === false) return null;
     if (!(await isOrgEmailVerified(Number(dbUser.organization_id), authUser))) return null;

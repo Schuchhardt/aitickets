@@ -25,6 +25,7 @@ const userData = session
       id: session.authUser.id,
       dbName: session.dbUser.name || null, // Nombre desde public.users
       role: session.dbUser.role || null,
+      avatarUrl: session.dbUser.avatar_url || null, // Foto de perfil (null = inicial)
     }
   : null;
 
