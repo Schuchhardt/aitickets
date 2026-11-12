@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin } from "../../../../lib/auth-helpers";
 import { getSessionContext, hasRole, EVENT_MANAGER_ROLES } from "../../../../lib/supabaseServer";
+import { getStaffEventIds } from "../../../../../netlify/lib/event-staff.mjs";
 
 export const GET: APIRoute = async (context) => {
     const session = await getSessionContext(context);
@@ -31,6 +32,11 @@ export const GET: APIRoute = async (context) => {
 
         if (status && status !== "all") {
             query = query.eq("status", status);
+        }
+
+        const staffEventIds = await getStaffEventIds(supabaseAdmin, dbUser.id);
+        if (staffEventIds) {
+            query = query.in("event_id", staffEventIds);
         }
 
         const { data: posts, error } = await query;

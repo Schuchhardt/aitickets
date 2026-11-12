@@ -165,10 +165,14 @@ export const TICKET_SELECT = "id, event_id, event_date_id, ticket_name, price, m
 export const DATE_PATTERN = "^\\d{4}-\\d{2}-\\d{2}$";
 export const TIME_PATTERN = "^\\d{2}:\\d{2}$";
 
-/** Convierte un timestamp ISO opcional a ISO normalizado o null. */
+/** Convierte un timestamp ISO opcional a ISO normalizado o null. Exige zona horaria para evitar ambigüedad UTC/Chile. */
 export function isoOrNull(v: unknown): string | null {
     if (v === null || v === undefined || v === "") return null;
-    const d = new Date(String(v));
+    const s = String(v).trim();
+    if (!/(?:Z|[+-]\d{2}:?\d{2})\s*$/.test(s)) {
+        throw new ToolError("invalid_input", `Fecha sin zona horaria: ${v}. Agrega un offset (ej. 2026-11-15T23:59:00-03:00 para Chile, o Z para UTC).`);
+    }
+    const d = new Date(s);
     if (Number.isNaN(d.getTime())) throw new ToolError("invalid_input", `Fecha inválida: ${v}`);
     return d.toISOString();
 }

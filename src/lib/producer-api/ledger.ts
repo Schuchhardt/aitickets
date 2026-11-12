@@ -321,7 +321,7 @@ export async function computeOrgLedger(
     if (!ids.length) return empty;
 
     const [orders, dates, refunds, withdrawals, tickets, attendees, disputes, orgReasons] = await Promise.all([
-        fetchAllRows(() => supabase.from("event_orders").select("id, event_id, status, amount, ticket_qty").in("event_id", ids).in("status", ["paid", "review"])),
+        fetchAllRows(() => supabase.from("event_orders").select("id, event_id, status, amount, ticket_qty, total_payment").in("event_id", ids).in("status", ["paid", "review"])),
         tolerantCols(
             (cols) => supabase.from("event_dates").select(cols).in("event_id", ids),
             [
@@ -355,25 +355,31 @@ export async function computeOrgLedger(
     const releaseOf = (end: Date | null) => (end ? new Date(end.getTime() + orgReleaseHours * 3600000) : null);
 
     const paidOrderIds = new Set(orders.filter((o) => o.status === "paid").map((o) => String(o.id)));
+    const courtesyOrderIds = new Set(orders.filter((o) => o.status === "paid" && o.total_payment != null && Number(o.total_payment) === 0).map((o) => String(o.id)));
 
     // Check-ins de entradas pagadas, por función y por evento (abonos y órdenes mixtas usan los del evento).
     const orderEvent = new Map<string, number>(orders.map((o) => [String(o.id), Number(o.event_id)]));
     const checkinsByFn = new Map<number, { sold: number; in: number }>();
     const checkinsByEvent = new Map<number, { sold: number; in: number }>();
     const checkinsUnassigned = new Map<number, { sold: number; in: number }>();
+    const courtesyByFn = new Map<number, number>();
+    const courtesyByEvent = new Map<number, number>();
     const bump = (map: Map<number, { sold: number; in: number }>, key: number, a: any) => {
         const c = map.get(key) || { sold: 0, in: 0 };
         c.sold += 1;
         if (isCheckedIn(a)) c.in += 1;
         map.set(key, c);
     };
+    const bumpCourtesy = (map: Map<number, number>, key: number) => map.set(key, (map.get(key) || 0) + 1);
     for (const a of attendees) {
         if (!paidOrderIds.has(String(a.event_order_id)) || a.status === "cancelled") continue;
         const evId = orderEvent.get(String(a.event_order_id));
         if (evId == null) continue;
+        const isCourtesy = courtesyOrderIds.has(String(a.event_order_id));
         bump(checkinsByEvent, evId, a);
+        if (isCourtesy) bumpCourtesy(courtesyByEvent, evId);
         const fnId = a.event_ticket_id == null ? null : ticketDate.get(String(a.event_ticket_id)) ?? null;
-        if (fnId != null) bump(checkinsByFn, fnId, a);
+        if (fnId != null) { bump(checkinsByFn, fnId, a); if (isCourtesy) bumpCourtesy(courtesyByFn, fnId); }
         else bump(checkinsUnassigned, evId, a);
     }
     if (simulated?.eventDateIds?.length) {
@@ -495,7 +501,9 @@ export async function computeOrgLedger(
             attested = Boolean(eventRow.get(l.event_id)?.held_attested_at || lastFn?.attested_at);
             c = checkinsByEvent.get(l.event_id);
         }
-        if (!attested && c && c.sold > 0 && c.in < Math.min(MIN_CHECKINS_FOR_RELEASE, c.sold)) out.push(holdReason("low_checkins"));
+        const courtesies = f ? (courtesyByFn.get(f.event_date_id) || 0) : (courtesyByEvent.get(l.event_id) || 0);
+        const paidSold = c ? c.sold - courtesies : 0;
+        if (!attested && paidSold > 0 && c!.in < Math.min(MIN_CHECKINS_FOR_RELEASE, paidSold)) out.push(holdReason("low_checkins"));
         if (disputedEvents.has(l.event_id) || (f && disputedFns.has(f.event_date_id))) out.push(holdReason("open_disputes"));
         return out;
     };

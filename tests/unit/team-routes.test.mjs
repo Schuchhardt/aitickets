@@ -302,9 +302,14 @@ describe('POST /api/team/toggle-status', () => {
     expect(user(3).active).toBe(false)
   })
 
-  it('un admin puede desactivar a otro admin mientras quede un administrador activo', async () => {
+  it('un admin NO puede desactivar a otro admin (solo el dueño)', async () => {
     db.tables.users.push({ id: 10, name: 'Ada', email: 'ada@prod.cl', organization_id: 7, role: 'admin', active: true, auth_user_id: null })
     loginAs('admin')
+    const r = await toggle({ userId: 10, active: false })
+    expect(r.status).toBe(403)
+    expect(user(10).active).toBe(true)
+
+    loginAs('producer')
     expect((await toggle({ userId: 10, active: false })).status).toBe(200)
     expect(user(10).active).toBe(false)
   })
@@ -519,11 +524,24 @@ describe('POST /api/team/update', () => {
     expect(user(1).role).toBe('producer')
   })
 
-  it('un admin tampoco puede quitarse su propio rol de administrador', async () => {
+  it('un admin tampoco puede quitarse su propio rol de administrador (owner-only)', async () => {
     loginAs('admin')
     const r = await edit(asIs(2, { role: 'viewer' }))
-    expect(r.status).toBe(400)
+    expect(r.status).toBe(403)
     expect(user(2).role).toBe('admin')
+  })
+
+  it('solo el dueño da el rol de admin', async () => {
+    loginAs('admin')
+    const r = await edit(asIs(5, { role: 'admin' }))
+    expect(r.status).toBe(403)
+    expect(user(5).role).toBe('validator')
+
+    loginAs('producer')
+    expect((await edit(asIs(5, { role: 'admin' }))).status).toBe(200)
+    expect(user(5).role).toBe('admin')
+    // restaurar
+    user(5).role = 'validator'
   })
 
   it('solo el dueño da el rol de finanzas', async () => {
@@ -606,9 +624,14 @@ describe('POST /api/team/update', () => {
     expect(user(2).role).toBe('admin')
   })
 
-  it('bajar a un admin a editor con el dueño activo: permitido', async () => {
+  it('un admin no puede bajar a otro admin a editor (solo el dueño)', async () => {
+    loginAs('admin')
     const r = await edit(asIs(2, { role: 'editor' }))
-    expect(r.status).toBe(200)
+    expect(r.status).toBe(403)
+    expect(user(2).role).toBe('admin')
+
+    loginAs('producer')
+    expect((await edit(asIs(2, { role: 'editor' }))).status).toBe(200)
     expect(user(2).role).toBe('editor')
   })
 
