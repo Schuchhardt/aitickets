@@ -11,7 +11,7 @@ vi.mock('../../netlify/lib/slack.mjs', () => ({ notifySlack: mocks.notifySlack }
 const { POST } = await import('../../src/pages/api/webhooks/sentry.ts')
 
 const SECRET = 'client-secret-de-prueba'
-const issue = { id: '6011223344', shortId: 'AITICKETS-1A', title: 'TypeError: x', level: 'error', status: 'unresolved', firstSeen: new Date().toISOString(), lastSeen: new Date().toISOString(), count: '1', userCount: 1 }
+const issue = { id: '6011223344', shortId: 'AITICKETS-1A', title: 'TypeError: x', level: 'error', status: 'unresolved', project: { id: '4510110385897472', slug: 'aitickets' }, firstSeen: new Date().toISOString(), lastSeen: new Date().toISOString(), count: '1', userCount: 1 }
 const request = (payload, { resource = 'issue', secret = SECRET, raw, tamper = false } = {}) => {
   const body = raw ?? JSON.stringify(payload)
   const sig = createHmac('sha256', secret).update(body).digest('hex')
@@ -51,6 +51,13 @@ describe('POST /api/webhooks/sentry', () => {
     expect(await again.json()).toMatchObject({ ok: true, created: false })
     expect(mocks.db.tables.aitickets_error_issues).toHaveLength(1)
     expect(mocks.notifySlack).toHaveBeenCalledTimes(1)
+  })
+
+  it('no guarda issues de otros proyectos de la organización', async () => {
+    const res = await call(request({ action: 'created', data: { issue: { ...issue, project: { id: '4510083517775872', slug: 'aitickets-lambda' } } } }))
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ ok: true, ignored: expect.stringMatching(/otro proyecto/) })
+    expect(mocks.db.tables.aitickets_error_issues).toHaveLength(0)
   })
 
   it('ignora recursos que no maneja', async () => {

@@ -23,6 +23,7 @@ const issue = (extra = {}) => ({
   platform: 'javascript',
   status: 'unresolved',
   permalink: 'https://acme.sentry.io/issues/6011223344/',
+  project: { id: '4510110385897472', slug: 'aitickets' },
   firstSeen: '2026-11-12T14:00:00Z',
   lastSeen: '2026-11-12T14:30:00Z',
   count: '3',
@@ -78,6 +79,11 @@ describe('ingestIssue', () => {
     expect(notify.mock.calls[0][0]).toContain('AITICKETS-1A')
   })
 
+  it('usa el total de la vida del issue (lifetime) cuando la lista trae solo el período', async () => {
+    await ingestIssue(db, issue({ count: '4', userCount: 1, lifetime: { count: '120', userCount: 30 } }), { now: NOW, notify })
+    expect(rows()[0]).toMatchObject({ event_count: 120, user_count: 30 })
+  })
+
   it('no retrocede conteos ni last_seen con datos más viejos', async () => {
     await ingestIssue(db, issue({ count: '10', lastSeen: '2026-11-12T14:50:00Z' }), { now: NOW, notify })
     await ingestIssue(db, issue({ count: '4', lastSeen: '2026-11-12T14:10:00Z' }), { now: NOW, notify })
@@ -127,6 +133,14 @@ describe('ingestIssue', () => {
 })
 
 describe('handleSentryWebhook', () => {
+  it('ignora issues de otros proyectos de la organización (o sin proyecto)', async () => {
+    const other = { action: 'created', data: { issue: issue({ project: { id: '4510083517775872', slug: 'aitickets-lambda' } }) } }
+    expect(await handleSentryWebhook(db, { resource: 'issue', payload: other, config: null, notify })).toMatchObject({ ok: true, ignored: expect.stringMatching(/otro proyecto/) })
+    expect(await handleSentryWebhook(db, { resource: 'issue', payload: { data: { issue: issue({ project: undefined }) } }, config: null, notify })).toMatchObject({ ignored: expect.any(String) })
+    expect(rows()).toHaveLength(0)
+    expect(notify).not.toHaveBeenCalled()
+  })
+
   it('issue: guarda; installation: ignora', async () => {
     expect(await handleSentryWebhook(db, { resource: 'issue', payload: { action: 'created', data: { issue: issue() } }, config: null, notify })).toMatchObject({ ok: true, created: true })
     expect(await handleSentryWebhook(db, { resource: 'installation', payload: {}, config: null, notify })).toMatchObject({ ok: true, ignored: expect.any(String) })
@@ -148,13 +162,13 @@ describe('runSentrySync', () => {
     const config = sentryConfig({ SENTRY_API_TOKEN: 't', SENTRY_ORG: 'acme' })
     const page2 = 'https://sentry.io/api/0/organizations/acme/issues/?cursor=2'
     const fetchImpl = vi.fn(async (url) => {
-      if (url === page2) return new Response(JSON.stringify([issue({ id: '2', shortId: 'AITICKETS-2' }), issue()]), { status: 200 })
+      if (url === page2) return new Response(JSON.stringify([issue({ id: '2', shortId: 'AITICKETS-2' }), issue(), issue({ id: '3', project: { id: '1', slug: 'chlog-web' } })]), { status: 200 })
       expect(url).toContain('project=4510110385897472')
       expect(url).toContain('query=lastSeen%3A-24h')
       return new Response(JSON.stringify([issue()]), { status: 200, headers: { link: `<${page2}>; rel="next"; results="true"; cursor="2"` } })
     })
     const r = await runSentrySync(db, config, { notify, fetchImpl, now: () => NOW })
-    expect(r).toMatchObject({ checked: 3, created: 2, failed: 0, truncated: false })
+    expect(r).toMatchObject({ checked: 4, created: 2, failed: 0, skipped_other_project: 1, truncated: false })
     expect(rows()).toHaveLength(2)
   })
 
@@ -167,8 +181,9 @@ describe('runSentrySync', () => {
 })
 
 describe('sentryConfig', () => {
-  it('exige token y organización válidos', () => {
+  it('exige token; org y proyecto por defecto son los de este repo', () => {
     expect(sentryConfig({})).toBeNull()
+    expect(sentryConfig({ SENTRY_API_TOKEN: 't' })).toMatchObject({ org: 'seba', projectId: '4510110385897472', apiBase: 'https://sentry.io/api/0' })
     expect(sentryConfig({ SENTRY_API_TOKEN: 't', SENTRY_ORG: 'acme/../x' })).toBeNull()
     expect(sentryConfig({ SENTRY_API_TOKEN: 't', SENTRY_ORG: 'acme', SENTRY_PROJECT_ID: '99' })).toMatchObject({ org: 'acme', projectId: '99' })
   })

@@ -128,7 +128,7 @@ const getErrorIssue: AdminToolDef = {
         const config = sentryEnvConfig();
         let latest_event: unknown = null;
         const warnings: string[] = [];
-        if (!config) warnings.push("Falta SENTRY_API_TOKEN o SENTRY_ORG: no se puede leer el stack trace desde Sentry.");
+        if (!config) warnings.push("Falta SENTRY_API_TOKEN: no se puede leer el stack trace desde Sentry.");
         else {
             try {
                 latest_event = summarizeEvent(await fetchLatestEvent(config, row.sentry_issue_id));

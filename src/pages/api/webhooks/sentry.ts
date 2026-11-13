@@ -3,13 +3,14 @@
 // unresolved, ignored…) y `event_alert` (acción "Send a notification via <integración>" de una regla de alerta).
 //
 // Configuración: SENTRY_CLIENT_SECRET (Internal Integration > Credentials > Client Secret), leída en runtime. Sin ella
-// la ruta no existe (404). Para `event_alert` además SENTRY_API_TOKEN y SENTRY_ORG (lee el issue de la API).
+// la ruta no existe (404). Para `event_alert` además SENTRY_API_TOKEN (lee el issue de la API). El webhook de la
+// integración trae issues de toda la organización: solo se guardan los del proyecto aitickets (SENTRY_PROJECT_ID).
 // Respuestas: 200 aplicado o ignorado (recurso desconocido, repetido), 401 firma inválida, 400 JSON inválido,
 // 413 cuerpo grande, 500 error de BD o de la API de Sentry (Sentry reintenta).
 import type { APIRoute } from "astro";
 import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { serverEnv } from "../_lib/server-utils";
-import { handleSentryWebhook, sentryConfig, verifySentrySignature } from "../../../../netlify/lib/sentry-issues.mjs";
+import { handleSentryWebhook, sentryConfig, sentryProjectId, verifySentrySignature } from "../../../../netlify/lib/sentry-issues.mjs";
 
 export const prerender = false;
 
@@ -45,7 +46,12 @@ export const POST: APIRoute = async ({ request }) => {
         SENTRY_PROJECT_ID: serverEnv("SENTRY_PROJECT_ID"),
         SENTRY_API_BASE: serverEnv("SENTRY_API_BASE"),
     });
-    const result: any = await handleSentryWebhook(getSupabaseAdmin(), { resource: request.headers.get("sentry-hook-resource"), payload, config });
+    const result: any = await handleSentryWebhook(getSupabaseAdmin(), {
+        resource: request.headers.get("sentry-hook-resource"),
+        payload,
+        config,
+        projectId: sentryProjectId({ SENTRY_PROJECT_ID: serverEnv("SENTRY_PROJECT_ID") }),
+    });
     if (!result.ok) {
         console.error("webhook sentry:", result.reason);
         return json({ error: "processing_error" }, 500);

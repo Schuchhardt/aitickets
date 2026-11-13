@@ -21,6 +21,10 @@ URLs ni datos del error. Títulos, mensajes y breadcrumbs ya se guardan sin corr
 | `netlify/lib/sentry-issues.mjs` | Lógica compartida: firma, normalización, deduplicación, regresiones, avisos, API de Sentry |
 | `db/migrations/202611120300_error_issues.sql` | Tabla `aitickets_error_issues` (`sentry_issue_id` UNIQUE) |
 
+Solo el proyecto `aitickets`: la organización `seba` tiene otros proyectos (`aitickets-lambda`, `chlog-*`…) y el webhook de
+una Internal Integration manda los issues de toda la organización. El webhook y el cron descartan los issues de otro
+proyecto (y los que no dicen de qué proyecto son).
+
 Sin duplicados: Sentry agrupa los eventos del mismo error en un issue con id estable. Un INSERT que choca con
 `sentry_issue_id` pasa a UPDATE (conteos y fechas solo avanzan), y cada aviso a Slack se reclama con un UPDATE
 condicional (`notified_at IS NULL`, `sentry_status = 'resolved'`), así que webhook y cron a la vez avisan una sola vez.
@@ -35,9 +39,9 @@ Solo se avisan errores `error`/`fatal` cuyo primer evento tiene menos de 24 h (l
    - Guardar. Copiar el **Client Secret** y crear un **token** (Tokens → New Token).
 2. **Netlify** → Site settings → Environment variables (scope Functions, contexto Production):
    - `SENTRY_CLIENT_SECRET`: el Client Secret (sin esto el webhook responde 404).
-   - `SENTRY_API_TOKEN`: el token de la integración.
-   - `SENTRY_ORG`: el slug de la organización (el de `https://<slug>.sentry.io`).
-   - Opcionales: `SENTRY_PROJECT_ID` (por defecto el proyecto del DSN) y `SENTRY_API_BASE` (por defecto `https://sentry.io/api/0`).
+   - `SENTRY_API_TOKEN`: el token de la integración (o un token de usuario con lectura de issues y eventos).
+   - Opcionales, con el valor correcto por defecto: `SENTRY_ORG` (`seba`), `SENTRY_PROJECT_ID` (`4510110385897472`,
+     el proyecto `aitickets` del DSN) y `SENTRY_API_BASE` (`https://sentry.io/api/0`).
 3. Redeploy. Revisar en el MCP Admin: `get_system_health` (job `sentry-sync` sin `skipped`) y `list_error_issues`.
 
 Si el plan de Sentry no entrega webhooks de `issue`, igual funciona: el cron sincroniza cada 30 min. También se puede

@@ -182,7 +182,7 @@ const SCHEDULED_JOBS: { job: string; label: string; everyHours: number; note: st
     { job: "send-waitlist-notifications", label: "send-waitlist-notifications", everyHours: 1 / 4, note: "Corre cada 15 min; avisa si hay entradas para la lista de espera." },
     { job: "send-weekly-reports", label: "send-weekly-reports", everyHours: 168, note: "Corre los domingos." },
     { job: "purge-producer-activity", label: "purge-producer-activity", everyHours: 24, note: "Corre a diario (07:50 UTC)." },
-    { job: "sentry-sync", label: "sentry-sync (bandeja de errores)", everyHours: 1 / 2, note: "Corre cada 30 min; trae de Sentry los errores de las últimas 24 h (list_error_issues). Sin SENTRY_API_TOKEN o SENTRY_ORG, last_note dice skipped." },
+    { job: "sentry-sync", label: "sentry-sync (bandeja de errores)", everyHours: 1 / 2, note: "Corre cada 30 min; trae de Sentry los errores de las últimas 24 h (list_error_issues). Solo el proyecto aitickets de Sentry. Sin SENTRY_API_TOKEN, last_note dice skipped." },
     { job: "blog-tick", label: "blog-tick (blog SEO)", everyHours: 24, note: "Corre a diario (12:47 UTC). Solo trabaja con BLOG_ENABLED=true: si no, last_note dice skipped. El detalle de cada corrida está en list_blog_runs." },
 ];
 

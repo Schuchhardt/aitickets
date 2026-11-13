@@ -13,15 +13,19 @@
 // El repo es PÚBLICO: nada de esto se publica en GitHub. Títulos, mensajes y breadcrumbs pasan por redactText()
 // (correos, RUT, teléfonos, tokens y query strings) antes de guardarse o mostrarse.
 //
-// Configuración (Netlify, scope Functions): SENTRY_ORG (slug de la organización), SENTRY_API_TOKEN (token de la
-// Internal Integration, Issue & Event: Read), SENTRY_CLIENT_SECRET (firma del webhook). SENTRY_PROJECT_ID es opcional
-// (por defecto el proyecto del DSN) y SENTRY_API_BASE también (https://sentry.io/api/0).
+// Solo el proyecto `aitickets` (el del DSN de este repo): la organización de Sentry tiene otros proyectos y el webhook de
+// una Internal Integration trae issues de TODOS; los de otro proyecto se ignoran.
+//
+// Configuración (Netlify, scope Functions): SENTRY_API_TOKEN (Issue & Event: Read) y SENTRY_CLIENT_SECRET (firma del
+// webhook). SENTRY_ORG, SENTRY_PROJECT_ID y SENTRY_API_BASE son opcionales (por defecto seba, el proyecto del DSN y
+// https://sentry.io/api/0).
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { notifySlack } from './slack.mjs'
 
 export const ERROR_ISSUES_TABLE = 'aitickets_error_issues'
 /** Proyecto del DSN de sentry.server.config.js / sentry.client.config.js. */
 export const DEFAULT_SENTRY_PROJECT_ID = '4510110385897472'
+export const DEFAULT_SENTRY_ORG = 'seba'
 export const SYNC_WINDOW_HOURS = 24
 /** Un issue nuevo avisa a Slack solo si su primer evento es reciente (la primera sincronización no inunda Slack). */
 export const NOTIFY_MAX_AGE_HOURS = 24
@@ -105,9 +109,21 @@ export function normalizeIssue(issue) {
     permalink: sentryUrl(issue.permalink || issue.web_url),
     first_seen: iso(issue.firstSeen),
     last_seen: iso(issue.lastSeen),
-    event_count: int(issue.count),
-    user_count: int(issue.userCount),
+    // `lifetime` (lista de la API) trae el total; `count` solo el período consultado. Se toma el mayor.
+    event_count: Math.max(int(issue.count), int(issue.lifetime?.count)),
+    user_count: Math.max(int(issue.userCount), int(issue.lifetime?.userCount)),
   }
+}
+
+/** Proyecto de Sentry de este repo (env SENTRY_PROJECT_ID o el del DSN). */
+export function sentryProjectId(env = process.env) {
+  return /^\d{1,30}$/.test(String(env?.SENTRY_PROJECT_ID || '')) ? String(env.SENTRY_PROJECT_ID) : DEFAULT_SENTRY_PROJECT_ID
+}
+
+/** ¿El issue es del proyecto de este repo? Sin datos de proyecto no se acepta (no se puede saber de dónde viene). */
+export function isProjectIssue(issue, projectId) {
+  const id = issue?.project?.id ?? issue?.projectId ?? issue?.project_id
+  return id !== undefined && id !== null && String(id) === String(projectId)
 }
 
 const later = (a, b) => (!a ? b : !b ? a : Date.parse(a) >= Date.parse(b) ? a : b)
@@ -214,12 +230,12 @@ export async function ingestIssue(supabase, issue, { now = new Date(), notify = 
 // API de Sentry
 // ---------------------------------------------------------------------------
 
-/** Configuración desde el entorno; null si falta el token o la organización. */
+/** Configuración desde el entorno; null si falta el token (o la organización es inválida). */
 export function sentryConfig(env = process.env) {
   const token = env.SENTRY_API_TOKEN
-  const org = env.SENTRY_ORG
-  if (!token || !org || !/^[A-Za-z0-9_-]{1,100}$/.test(org)) return null
-  const projectId = /^\d{1,30}$/.test(String(env.SENTRY_PROJECT_ID || '')) ? String(env.SENTRY_PROJECT_ID) : DEFAULT_SENTRY_PROJECT_ID
+  const org = env.SENTRY_ORG || DEFAULT_SENTRY_ORG
+  if (!token || !/^[A-Za-z0-9_-]{1,100}$/.test(org)) return null
+  const projectId = sentryProjectId(env)
   const apiBase = String(env.SENTRY_API_BASE || 'https://sentry.io/api/0').replace(/\/+$/, '')
   return { token, org, projectId, apiBase }
 }
@@ -353,21 +369,25 @@ export function summarizeEvent(event) {
 // ---------------------------------------------------------------------------
 
 /**
- * Aplica un webhook ya verificado.
- * @param {{ resource: string | null, payload: any, config: ReturnType<typeof sentryConfig>, notify?: Function, fetchImpl?: Function }} input
+ * Aplica un webhook ya verificado. Solo guarda issues del proyecto `projectId` (el webhook trae los de toda la org).
+ * @param {{ resource: string | null, payload: any, config: ReturnType<typeof sentryConfig>, projectId?: string, notify?: Function, fetchImpl?: Function }} input
  */
-export async function handleSentryWebhook(supabase, { resource, payload, config, notify = notifySlack, fetchImpl = undefined }) {
+export async function handleSentryWebhook(supabase, { resource, payload, config, projectId = config?.projectId || sentryProjectId(), notify = notifySlack, fetchImpl = undefined }) {
+  const otherProject = { ok: true, ignored: 'issue de otro proyecto de Sentry' }
   if (resource === 'issue') {
     const issue = payload?.data?.issue
     if (!issue) return { ok: true, ignored: 'sin issue' }
+    if (!isProjectIssue(issue, projectId)) return otherProject
     return ingestIssue(supabase, issue, { notify })
   }
   if (resource === 'event_alert' || resource === 'error') {
     const issueId = payload?.data?.event?.issue_id ?? payload?.data?.error?.issue_id
     if (!issueId) return { ok: true, ignored: 'sin issue_id' }
-    if (!config) return { ok: true, ignored: 'falta SENTRY_API_TOKEN/SENTRY_ORG para leer el issue' }
+    if (!config) return { ok: true, ignored: 'falta SENTRY_API_TOKEN para leer el issue' }
     try {
-      return ingestIssue(supabase, await fetchIssue(config, issueId, { fetchImpl }), { notify })
+      const issue = await fetchIssue(config, issueId, { fetchImpl })
+      if (!isProjectIssue(issue, projectId)) return otherProject
+      return ingestIssue(supabase, issue, { notify })
     } catch (err) {
       return { ok: false, reason: err?.message || 'sentry_api' }
     }
@@ -385,8 +405,12 @@ export async function runSentrySync(supabase, config, { hours = SYNC_WINDOW_HOUR
       result.out_of_time = true
       break
     }
-    const r = await ingestIssue(supabase, issue, { notify, now: now() })
     result.checked++
+    if (!isProjectIssue(issue, config.projectId)) {
+      result.skipped_other_project = (result.skipped_other_project || 0) + 1
+      continue
+    }
+    const r = await ingestIssue(supabase, issue, { notify, now: now() })
     if (!r.ok) {
       result.failed++
       continue
