@@ -33,7 +33,7 @@ const STATE_CHANGING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
  * autentican SOLO con credenciales en el header/cuerpo y nunca leen cookies, así que no hay CSRF que prevenir;
  * deben aceptar clientes de otros orígenes. /api/oauth/authorize NO está aquí: usa la sesión del productor.
  * /api/webhooks/resend se autentica con la firma de Svix (RESEND_WEBHOOK_SECRET), /api/webhooks/zernio con la de Zernio
- * (ZERNIO_WEBHOOK_SECRET), /api/social-series/run con x-internal-secret y /api/admin/mcp con la llave de administración
+ * (ZERNIO_WEBHOOK_SECRET), /api/webhooks/sentry con la de Sentry (SENTRY_CLIENT_SECRET), /api/social-series/run con x-internal-secret y /api/admin/mcp con la llave de administración
  * (src/lib/admin-api/auth.ts).
  */
 const TOKEN_ONLY_APIS = new Set([
@@ -44,6 +44,7 @@ const TOKEN_ONLY_APIS = new Set([
     "/api/oauth/revoke",
     "/api/webhooks/resend",
     "/api/webhooks/zernio",
+    "/api/webhooks/sentry",
     "/api/admin/mcp",
     "/api/social-series/run",
 ]);
