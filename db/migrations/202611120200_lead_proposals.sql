@@ -23,12 +23,23 @@ $$;
 
 ALTER TABLE public.aitickets_lead_touches ADD COLUMN IF NOT EXISTS reply_gmail_message_id text;
 
+-- Si alguna organización se insertó con id explícito, la secuencia de organizations.id puede ir atrás y el
+-- INSERT chocaría con la PK (23505). Solo se adelanta, nunca se retrocede.
 DO $$
-DECLARE oid bigint;
+DECLARE oid bigint; seq text; max_id bigint; last_id bigint;
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.aitickets_platform_settings WHERE key = 'proposals_org_id') THEN
     SELECT id INTO oid FROM public.organizations WHERE public_name = 'Propuestas AI Tickets' ORDER BY id LIMIT 1;
     IF oid IS NULL THEN
+      seq := pg_get_serial_sequence('public.organizations', 'id');
+      IF seq IS NOT NULL THEN
+        SELECT COALESCE(max(id), 0) INTO max_id FROM public.organizations;
+        SELECT COALESCE(s.last_value, 0) INTO last_id FROM pg_sequences s
+          WHERE format('%I.%I', s.schemaname, s.sequencename) = seq;
+        IF max_id > COALESCE(last_id, 0) THEN
+          PERFORM setval(seq, max_id);
+        END IF;
+      END IF;
       INSERT INTO public.organizations (public_name, country)
       VALUES ('Propuestas AI Tickets', 'CL')
       RETURNING id INTO oid;
