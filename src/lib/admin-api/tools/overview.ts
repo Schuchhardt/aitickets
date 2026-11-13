@@ -48,6 +48,7 @@ const getAdminContext: AdminToolDef = {
                 operations: "Escrituras de AI Tickets (verificar cuentas, registrar retiros y reembolsos…): exigen reason y, si mueven plata, confirmación.",
                 dashboard_usage:
                     "get_producer_activity (cómo usa el panel una productora: sesiones, tiempo por sección, clics, errores y dónde se trabó) y list_dashboard_issues (errores y fricción de todos).",
+                error_inbox: "list_error_issues, get_error_issue y update_error_issue: errores de producción de Sentry, uno por error, con su triage y el PR que los arregla.",
                 act_as_producer: `org_<herramienta>: las herramientas del MCP de productores sobre la organización indicada (organization_id, o inferida del event_id). Quedan en la bitácora del productor firmadas por "${SUPPORT_ACTOR_NAME}".`,
             },
             spec: "docs/specs/mcp-admin.md",

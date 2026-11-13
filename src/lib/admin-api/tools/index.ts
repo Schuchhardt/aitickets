@@ -16,6 +16,7 @@ import { verificationTools } from "./verification";
 import { healthTools } from "./health";
 import { blogAdminTools } from "./blog";
 import { leadTools } from "./leads";
+import { errorIssueTools } from "./errors";
 import { mirrorTools } from "../mirror";
 
 export const ADMIN_TOOLS: AdminToolDef[] = [
@@ -34,6 +35,7 @@ export const ADMIN_TOOLS: AdminToolDef[] = [
     ...healthTools,
     ...blogAdminTools,
     ...leadTools,
+    ...errorIssueTools,
     ...mirrorTools,
 ];
 
