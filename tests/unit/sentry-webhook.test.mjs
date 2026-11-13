@@ -17,7 +17,7 @@ const request = (payload, { resource = 'issue', secret = SECRET, raw, tamper = f
   const sig = createHmac('sha256', secret).update(body).digest('hex')
   return new Request('https://aitickets.cl/api/webhooks/sentry', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'sentry-hook-resource': resource, 'sentry-hook-signature': tamper ? `0${sig.slice(1)}` : sig },
+    headers: { 'Content-Type': 'application/json', 'sentry-hook-resource': resource, 'sentry-hook-signature': tamper ? `${sig[0] === '0' ? '1' : '0'}${sig.slice(1)}` : sig },
     body,
   })
 }
