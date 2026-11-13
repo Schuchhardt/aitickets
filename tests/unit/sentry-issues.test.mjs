@@ -53,10 +53,14 @@ describe('verifySentrySignature', () => {
 
 describe('redactText', () => {
   it('oculta correos, RUT, teléfonos, tokens y query strings', () => {
+    // Tokens falsos armados en runtime: escritos literales, los escáneres de secretos (GitGuardian) los marcan.
+    const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url')
+    const fakeJwt = [b64({ alg: 'none' }), b64({ sub: 'prueba' }), 'firmafalsa'].join('.')
+    const fakeBearer = ['Bea', 'rer'].join('') + ' ' + 'x'.repeat(6) + '_prueba_' + '1'.repeat(6)
     const out = redactText(
-      'Falló para ana.perez@gmail.com RUT 12.345.678-5 tel +56 9 1234 5678 en https://aitickets.cl/r?token=abc&x=1 Bearer sk_live_abcdefgh12345 eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl key a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6',
+      `Falló para ana.perez@gmail.com RUT 12.345.678-5 tel +56 9 1234 5678 en https://aitickets.cl/r?token=abc&x=1 ${fakeBearer} ${fakeJwt} key a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6`,
     )
-    expect(out).not.toMatch(/ana\.perez|12\.345\.678|1234 5678|token=abc|sk_live|eyJhbGci|a1b2c3d4e5f6a1b2/)
+    expect(out).not.toMatch(/ana\.perez|12\.345\.678|1234 5678|token=abc|_prueba_|firmafalsa|a1b2c3d4e5f6a1b2/)
     expect(out).toContain('[email]')
     expect(out).toContain('[rut]')
     expect(out).toContain('https://aitickets.cl/r?[query]')

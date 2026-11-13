@@ -37,3 +37,5 @@ CREATE INDEX IF NOT EXISTS aitickets_error_issues_triage_last_seen_idx
 
 ALTER TABLE public.aitickets_error_issues ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.aitickets_error_issues FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON SEQUENCE public.aitickets_error_issues_id_seq FROM PUBLIC, anon, authenticated;
+GRANT USAGE, SELECT ON SEQUENCE public.aitickets_error_issues_id_seq TO service_role;
