@@ -484,6 +484,9 @@ Admin").
 | `add_organization_note` | Nota interna (CRM de soporte) | No | — |
 | `send_login_help` | Reenvía el correo de verificación o un link mágico **al correo registrado del usuario** (nunca a otro) | No | — |
 | `update_lead` | Estado y notas de un lead para contacto manual. Un lead con baja o duplicado no cambia de estado; los del outreach automático solo aceptan notas. No envía nada | No | — |
+| `log_lead_touch` | Borrador, envío, respuesta o rebote de un lead. Un envío tardío sobre un lead que ya respondió solo se registra; el id de la respuesta va en `reply_gmail_message_id` | No | — |
+| `update_lead_touch` / `delete_lead_touch` | Corregir (o etiquetar en lote con `strategy_slug`/`cta`) y borrar touches. No recalculan el estado del lead | No / Sí | — |
+| `create_lead_proposal` | Evento borrador en "Propuestas AI Tickets" (`proposals_org_id` en `aitickets_platform_settings`), link de vista previa (720 h) y touch `kind=proposal`. La URL no se guarda | No | — |
 | `add_suppression` | Baja de un lead, un correo o un dominio. Frena a todos los leads con ese contacto, salvo clientes. No se deshace desde el MCP | Sí | Sí |
 
 **Fase 4 (opcionales):**

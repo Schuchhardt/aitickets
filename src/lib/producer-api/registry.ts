@@ -400,6 +400,18 @@ function defaultTarget(args: Record<string, unknown> | undefined, eventId: numbe
     return eventId ? `event:${eventId}` : undefined;
 }
 
+/**
+ * Mensaje de un error no previsto para quien opera la plataforma (MCP Admin): el de Postgres/PostgREST con su
+ * código y detalle, o el de la excepción. Nunca para productores.
+ */
+export function internalErrorMessage(err: any): string {
+    if (err && typeof err.code === "string" && err.code && typeof err.message === "string") {
+        return `Error de base de datos (${err.code}): ${err.message}${err.details ? ` — ${err.details}` : ""}${err.hint ? ` (${err.hint})` : ""}`;
+    }
+    const message = typeof err?.message === "string" && err.message ? err.message : typeof err === "string" ? err : "";
+    return message ? `Error interno: ${message.slice(0, 500)}` : "Error interno al ejecutar la acción. Intenta nuevamente.";
+}
+
 export async function runTool(tool: ToolDef, rawArgs: unknown, ctx: ToolContext): Promise<ToolOutcome> {
     let outcome: ToolOutcome;
     let eventId: number | null = rawEventId(rawArgs);
@@ -450,7 +462,9 @@ export async function runTool(tool: ToolDef, rawArgs: unknown, ctx: ToolContext)
             outcome = { ok: false, code: err.code, message: err.message };
         } else {
             console.error(`API tool ${tool.name}:`, err?.message || err);
-            outcome = { ok: false, code: "internal", message: "Error interno al ejecutar la acción. Intenta nuevamente." };
+            // Bajo el MCP Admin (org_*, create_lead_proposal) lo usa solo el dueño: el error real ahorra ir a los logs.
+            // A un productor nunca se le muestran detalles internos.
+            outcome = { ok: false, code: "internal", message: ctx.channel === "admin" ? internalErrorMessage(err) : "Error interno al ejecutar la acción. Intenta nuevamente." };
         }
     }
     // Una escritura que se ejecutó puede cambiar lo que muestra la página pública del evento: vaciar su caché

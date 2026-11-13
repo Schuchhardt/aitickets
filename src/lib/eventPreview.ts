@@ -47,7 +47,7 @@ export type PreviewLinkRow = {
     created_at: string;
 };
 
-const LINK_COLUMNS = "id, event_id, organization_id, single_use, expires_at, consumed_at, consumed_nonce_hash, revoked_at, view_count, last_viewed_at, label, created_via, created_at";
+export const PREVIEW_LINK_COLUMNS = "id, event_id, organization_id, single_use, expires_at, consumed_at, consumed_nonce_hash, revoked_at, view_count, last_viewed_at, label, created_via, created_at";
 
 export class PreviewLinkError extends Error {
     code: "invalid_input" | "conflict" | "unavailable";
@@ -151,7 +151,7 @@ export async function createPreviewLink(input: CreatePreviewLinkInput, supabase 
             created_by_user_id: input.userId ?? null,
             created_via: input.via || "dashboard",
         })
-        .select(LINK_COLUMNS)
+        .select(PREVIEW_LINK_COLUMNS)
         .single();
     if (error) {
         if (isMissingTable(error)) throw new PreviewLinkError("unavailable", "Los links de vista previa estarán disponibles en unos minutos.");
@@ -166,7 +166,7 @@ export async function createPreviewLink(input: CreatePreviewLinkInput, supabase 
 export async function listPreviewLinks(eventId: number, orgId: number, supabase = getSupabaseAdmin()) {
     const { data, error } = await supabase
         .from("aitickets_event_preview_links")
-        .select(LINK_COLUMNS)
+        .select(PREVIEW_LINK_COLUMNS)
         .eq("event_id", eventId)
         .eq("organization_id", orgId)
         .order("created_at", { ascending: false })
@@ -218,7 +218,7 @@ export async function resolvePreviewToken(
     if (!isPreviewToken(token)) return { ok: false, reason: "not_found" };
     const { data, error } = await supabase
         .from("aitickets_event_preview_links")
-        .select(LINK_COLUMNS)
+        .select(PREVIEW_LINK_COLUMNS)
         .eq("token_hash", sha256Hex(token))
         .maybeSingle();
     if (error && !isMissingTable(error)) console.error("preview link:", error.message);
