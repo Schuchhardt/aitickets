@@ -333,6 +333,26 @@ column:aitickets_email_log.provider_message_id	text notnull=false default=-
 column:aitickets_email_log.recipient	text notnull=false default=-
 column:aitickets_email_log.status	text notnull=true default=-
 column:aitickets_email_log.updated_at	timestamp with time zone notnull=true default=now()
+column:aitickets_error_issues.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_error_issues.culprit	text notnull=false default=-
+column:aitickets_error_issues.event_count	integer notnull=true default=0
+column:aitickets_error_issues.first_seen	timestamp with time zone notnull=false default=-
+column:aitickets_error_issues.id	bigint notnull=true default=- identity=d
+column:aitickets_error_issues.last_seen	timestamp with time zone notnull=false default=-
+column:aitickets_error_issues.level	text notnull=false default=-
+column:aitickets_error_issues.notes	text notnull=false default=-
+column:aitickets_error_issues.notified_at	timestamp with time zone notnull=false default=-
+column:aitickets_error_issues.permalink	text notnull=false default=-
+column:aitickets_error_issues.platform	text notnull=false default=-
+column:aitickets_error_issues.pr_url	text notnull=false default=-
+column:aitickets_error_issues.regressed_at	timestamp with time zone notnull=false default=-
+column:aitickets_error_issues.sentry_issue_id	text notnull=true default=-
+column:aitickets_error_issues.sentry_status	text notnull=true default='unresolved'::text
+column:aitickets_error_issues.short_id	text notnull=false default=-
+column:aitickets_error_issues.title	text notnull=true default=-
+column:aitickets_error_issues.triage_status	text notnull=true default='new'::text
+column:aitickets_error_issues.updated_at	timestamp with time zone notnull=true default=now()
+column:aitickets_error_issues.user_count	integer notnull=true default=0
 column:aitickets_event_agenda.created_at	timestamp with time zone notnull=true default=now()
 column:aitickets_event_agenda.ends_at	time without time zone notnull=false default=-
 column:aitickets_event_agenda.event_date_id	bigint notnull=false default=-
@@ -1362,6 +1382,9 @@ constraint:aitickets_email_log.aitickets_email_log_provider_check	CHECK ((provid
 constraint:aitickets_email_log.aitickets_email_log_provider_message_id_check	CHECK (((provider_message_id IS NULL) OR (char_length(provider_message_id) <= 200)))
 constraint:aitickets_email_log.aitickets_email_log_recipient_check	CHECK (((recipient IS NULL) OR (char_length(recipient) <= 320)))
 constraint:aitickets_email_log.aitickets_email_log_status_check	CHECK ((status = ANY (ARRAY['sent'::text, 'failed'::text, 'delivered'::text, 'delayed'::text, 'bounced'::text, 'complained'::text])))
+constraint:aitickets_error_issues.aitickets_error_issues_pkey	PRIMARY KEY (id)
+constraint:aitickets_error_issues.aitickets_error_issues_sentry_issue_id_key	UNIQUE (sentry_issue_id)
+constraint:aitickets_error_issues.aitickets_error_issues_triage_status_check	CHECK ((triage_status = ANY (ARRAY['new'::text, 'in_progress'::text, 'fixed'::text, 'ignored'::text])))
 constraint:aitickets_event_agenda.aitickets_event_agenda_event_date_id_fkey	FOREIGN KEY (event_date_id) REFERENCES event_dates(id) ON DELETE SET NULL
 constraint:aitickets_event_agenda.aitickets_event_agenda_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
 constraint:aitickets_event_agenda.aitickets_event_agenda_pkey	PRIMARY KEY (id)
@@ -1800,6 +1823,7 @@ grant:aitickets_competitor_events	-
 grant:aitickets_discount_codes	-
 grant:aitickets_disputes	-
 grant:aitickets_email_log	-
+grant:aitickets_error_issues	-
 grant:aitickets_event_agenda	-
 grant:aitickets_event_documents	-
 grant:aitickets_event_feed_posts	-
@@ -1907,6 +1931,7 @@ index:aitickets_email_log.aitickets_email_log_created_idx	CREATE INDEX aitickets
 index:aitickets_email_log.aitickets_email_log_order_idx	CREATE INDEX aitickets_email_log_order_idx ON aitickets_email_log USING btree (order_id, created_at DESC)
 index:aitickets_email_log.aitickets_email_log_provider_message_key	CREATE UNIQUE INDEX aitickets_email_log_provider_message_key ON aitickets_email_log USING btree (provider, provider_message_id) WHERE (provider_message_id IS NOT NULL)
 index:aitickets_email_log.aitickets_email_log_status_idx	CREATE INDEX aitickets_email_log_status_idx ON aitickets_email_log USING btree (status, created_at DESC)
+index:aitickets_error_issues.aitickets_error_issues_triage_last_seen_idx	CREATE INDEX aitickets_error_issues_triage_last_seen_idx ON aitickets_error_issues USING btree (triage_status, last_seen DESC)
 index:aitickets_event_agenda.aitickets_event_agenda_event_idx	CREATE INDEX aitickets_event_agenda_event_idx ON aitickets_event_agenda USING btree (event_id, event_date_id, starts_at)
 index:aitickets_event_documents.aitickets_event_documents_event_idx	CREATE INDEX aitickets_event_documents_event_idx ON aitickets_event_documents USING btree (event_id, kind, created_at DESC)
 index:aitickets_event_documents.aitickets_event_documents_pending_idx	CREATE INDEX aitickets_event_documents_pending_idx ON aitickets_event_documents USING btree (status, created_at) WHERE (status = 'pending'::text)
@@ -2035,6 +2060,7 @@ table:aitickets_competitor_events	rls=true force=false
 table:aitickets_discount_codes	rls=true force=false
 table:aitickets_disputes	rls=true force=false
 table:aitickets_email_log	rls=true force=false
+table:aitickets_error_issues	rls=true force=false
 table:aitickets_event_agenda	rls=true force=false
 table:aitickets_event_documents	rls=true force=false
 table:aitickets_event_feed_posts	rls=true force=false
