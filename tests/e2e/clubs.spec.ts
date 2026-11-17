@@ -41,7 +41,7 @@ test("sin JS se lee completa: H1, la noche en su estado de 01:30 con la tabla y 
   await expect(page.locator("#en-vivo table tbody tr")).toHaveCount(6);
   await expect(page.getByTestId("club-month").locator(".cm-night")).toHaveCount(15);
   const jsonLd = await page.locator('script[type="application/ld+json"]').textContent();
-  const faq = JSON.parse(jsonLd || "[]").find((item: { "@type": string }) => item["@type"] === "FAQPage");
+  const faq = JSON.parse(jsonLd || "{}")["@graph"].find((item: { "@type": string }) => item["@type"] === "FAQPage");
   expect(faq.mainEntity).toHaveLength(16);
   await expect(page.getByTestId("landing-faq").getByRole("button")).toHaveCount(16);
   await context.close();

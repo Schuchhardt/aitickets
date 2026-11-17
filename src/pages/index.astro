@@ -1,4 +1,5 @@
 ---
+import { jsonLdString } from "../lib/jsonLd";
 // Portada (/): la ticketera para cualquier tipo de evento. Cuenta una historia con las fotos de cada nicho: el hero con
 // un mosaico de todos los escenarios, una card por nicho que lleva a su landing (vestida con sus colores), la semana de
 // una función de principio a fin con fotos de nichos distintos, el precio, la IA, las preguntas frecuentes y el cierre.
@@ -67,7 +68,7 @@ const jsonLd = [
   <LandingMotion />
   <LandingHeader client:idle publishHref={publishUrl("home_header")} />
   <main class="lp ev-motion">
-    <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+    <script is:inline type="application/ld+json" set:html={jsonLdString(jsonLd)} />
     <HomeHero />
     <HomeMarquee />
     <HomeNiches />

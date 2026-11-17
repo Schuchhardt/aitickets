@@ -60,7 +60,11 @@ export function useTurnstile(container, { disabled = () => false } = {}) {
       appearance: "interaction-only",
       callback: (t) => (token.value = t),
       "expired-callback": () => (token.value = ""),
-      "error-callback": () => (token.value = ""),
+      // Devolver true marca el error como manejado; si no, Turnstile lanza una excepción no capturada.
+      "error-callback": () => {
+        token.value = "";
+        return true;
+      },
     });
   }
 

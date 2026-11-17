@@ -1,4 +1,5 @@
 ---
+import { jsonLdString } from "../lib/jsonLd";
 // Landing especializada para fiestas y productoras de eventos (docs/specs/rediseno/SPEC_landing_fiestas_aitickets.md,
 // fases 1 a 3): fiestas universitarias, temáticas, en galpón o casona, Año Nuevo y fiestas que salen de gira, con
 // preventa por etapas, promotores, mucha difusión en Instagram y la puerta sin señal. Ruta nueva /ticketera-fiestas,
@@ -127,7 +128,7 @@ const jsonLd = [
   <div class="fi" data-theme="fiestas">
     <PartyHeader client:idle publishHref={publishUrl("fiestas_header")} />
     <main>
-      <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+      <script is:inline type="application/ld+json" set:html={jsonLdString(jsonLd)} />
       <PartyHero ctaLabel={landing.cta.label} demoHref={demoHref} demoLabel={demoLabel} schedule={schedule} />
       <PartyForWho />
       <PartyPresale schedule={schedule} soldOut={soldOut} />

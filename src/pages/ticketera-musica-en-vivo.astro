@@ -1,4 +1,5 @@
 ---
+import { jsonLdString } from "../lib/jsonLd";
 // Landing especializada para música en vivo (docs/specs/rediseno/SPEC_landing_musica_aitickets.md, fases 1 a 3): bandas,
 // solistas, productoras de conciertos y salas. Misma URL que la landing SEO anterior (src/data/landings.ts la marca
 // dedicated: [landing].astro ya no la genera, y la tarjeta, el sitemap, las relacionadas y "Según lo que produces" de
@@ -90,7 +91,7 @@ const jsonLd = [
   <div class="mu" data-theme="musica">
     <MusicHeader client:idle publishHref={publishUrl("musica_header")} />
     <main>
-      <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+      <script is:inline type="application/ld+json" set:html={jsonLdString(jsonLd)} />
       <MusicHero ctaLabel={landing.cta.label} demoHref={demoHref} demoLabel={demoLabel} />
       <MusicForWho />
       <MusicCurveSection />

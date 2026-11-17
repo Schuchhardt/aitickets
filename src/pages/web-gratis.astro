@@ -31,6 +31,13 @@ const faqs = [
   description="Crea gratis la web de tu productora con tu cartelera, banner, formulario de contacto y venta de entradas integrada. 0% de comisión para el productor."
   canonical="/web-gratis"
 >
+  {turnstileSiteKey && (
+    <script is:inline>
+      // data-error-callback del widget: devolver true marca el error como manejado (si no, Turnstile lanza
+      // una excepción no capturada, p. ej. 300031). El envío ya exige el token, así que no hace falta más.
+      window.onTurnstileError = function () { return true; };
+    </script>
+  )}
   {turnstileSiteKey && <script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>}
   <AppHeader client:idle />
 
@@ -100,7 +107,7 @@ const faqs = [
               <input type="checkbox" name="acceptedPrivacy" required class="mt-1" />
               <span>Acepto que {LEGAL.brand} use estos datos para contactarme sobre mi web y la venta de entradas, según la <a href="/privacy" class="underline" target="_blank">política de privacidad</a>.</span>
             </label>
-            {turnstileSiteKey && <div class="cf-turnstile" data-sitekey={turnstileSiteKey} data-language="es"></div>}
+            {turnstileSiteKey && <div class="cf-turnstile" data-sitekey={turnstileSiteKey} data-language="es" data-error-callback="onTurnstileError"></div>}
             <p id="wg-error" class="hidden rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert"></p>
             <button type="submit" id="wg-submit" class="w-full rounded-xl bg-violet-600 px-6 py-3 font-semibold text-white hover:bg-violet-700 disabled:opacity-60">
               Quiero mi web gratis

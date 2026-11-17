@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { turnstileErrorHandler } from '../../lib/turnstileClient.js'
 import { Eye, EyeOff } from 'lucide-vue-next'
 import { trackSignUp } from '../../composables/useGoogleAnalytics.js'
 import AiBrandIcon from '../ai/AiBrandIcon.vue'
@@ -125,6 +126,10 @@ onMounted(() => {
     turnstileWidgetId.value = window.turnstile.render('#cf-turnstile-widget', {
       sitekey: props.turnstileSiteKey,
       callback: (token) => { turnstileToken.value = token },
+      'expired-callback': () => { turnstileToken.value = '' },
+      // Sin error-callback, Turnstile lanza una excepción no capturada (p. ej. 300031, el widget se cayó).
+      // Se limpia el token y se reintenta: si sigue fallando, el formulario pide completar el CAPTCHA.
+      'error-callback': turnstileErrorHandler(() => turnstileWidgetId.value, turnstileToken),
     })
   }
   if (window.turnstile) {

@@ -1,4 +1,5 @@
 ---
+import { jsonLdString } from "../lib/jsonLd";
 // Landing especializada para seminarios, congresos y charlas (docs/specs/rediseno/SPEC_landing_seminarios_aitickets.md,
 // fases 1 a 3): eventos de conocimiento con expositores, un programa por días y bloques, públicos con precios distintos,
 // empresas que compran para su equipo y la acreditación de las 08:30. Ruta nueva /ticketera-seminarios, registrada en
@@ -127,7 +128,7 @@ const jsonLd = [
   <div class="se" data-theme="seminarios">
     <SeminarHeader client:idle publishHref={publishUrl("seminarios_header")} />
     <main>
-      <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+      <script is:inline type="application/ld+json" set:html={jsonLdString(jsonLd)} />
       <SeminarHero ctaLabel={landing.cta.label} demoHref={demoHref} demoLabel={demoLabel} />
       <SeminarFormats />
       <SeminarProgram date={schedule.d1} />

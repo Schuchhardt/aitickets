@@ -44,7 +44,7 @@ test("sin JS se lee completa: H1, el reparto, los cinco momentos de la temporada
   await expect(page.getByTestId("theatre-season-moments").locator(":scope > li")).toHaveCount(5);
   await expect(season.locator("table caption")).toHaveText("Temporada de ejemplo, 16 funciones");
   const jsonLd = await page.locator('script[type="application/ld+json"]').textContent();
-  const faq = JSON.parse(jsonLd || "[]").find((item: { "@type": string }) => item["@type"] === "FAQPage");
+  const faq = JSON.parse(jsonLd || "{}")["@graph"].find((item: { "@type": string }) => item["@type"] === "FAQPage");
   expect(faq.mainEntity).toHaveLength(18);
   await expect(page.getByTestId("landing-faq").getByRole("button")).toHaveCount(18);
   await context.close();

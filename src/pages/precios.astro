@@ -1,4 +1,5 @@
 ---
+import { jsonLdString } from "../lib/jsonLd";
 // /precios — precios públicos de AI Tickets: 0% para el productor, cargo por servicio para el comprador.
 // La calculadora usa la misma regla que el checkout (netlify/lib/fees.mjs): cargo 8% del subtotal + IVA del cargo.
 export const prerender = true;
@@ -106,7 +107,7 @@ const jsonLd = [
   <AppHeader client:idle />
 
   <main class="bg-white font-['Prompt']">
-    <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+    <script is:inline type="application/ld+json" set:html={jsonLdString(jsonLd)} />
 
     <section class="px-4 pt-28 pb-16 sm:pt-32 bg-gradient-to-b from-lime-50 to-white">
       <div class="mx-auto max-w-5xl grid gap-12 lg:grid-cols-2 lg:items-start">

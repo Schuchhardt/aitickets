@@ -1,4 +1,5 @@
 ---
+import { jsonLdString } from "../lib/jsonLd";
 // Landing especializada para clubs y discotecas (docs/specs/rediseno/SPEC_landing_clubs_aitickets.md, fases 1 a 3):
 // clubs nocturnos, discotecas, bares con pista y productoras de noche con noches que se repiten (lista free, cover,
 // mesas, RRPP y puerta). Ruta nueva /ticketera-discotecas, registrada en src/data/landings.ts como dedicated: [landing].astro
@@ -95,7 +96,7 @@ const jsonLd = [
   <div class="cl" data-theme="clubs">
     <ClubHeader client:idle publishHref={publishUrl("clubs_header")} />
     <main>
-      <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+      <script is:inline type="application/ld+json" set:html={jsonLdString(jsonLd)} />
       <ClubHero ctaLabel={landing.cta.label} demoHref={demoHref} demoLabel={demoLabel} />
       <ClubNights />
       <ClubDiffusion />

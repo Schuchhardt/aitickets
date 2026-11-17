@@ -41,7 +41,7 @@ test("sin JS se lee completa: H1, la escalera con su tabla, el escáner como lis
   await expect(page.getByTestId("party-scanner").locator("ol li")).toHaveCount(4);
   await expect(page.getByTestId("party-hero-card")).toContainText("Disponible desde el");
   const jsonLd = await page.locator('script[type="application/ld+json"]').textContent();
-  const faq = JSON.parse(jsonLd || "[]").find((item: { "@type": string }) => item["@type"] === "FAQPage");
+  const faq = JSON.parse(jsonLd || "{}")["@graph"].find((item: { "@type": string }) => item["@type"] === "FAQPage");
   expect(faq.mainEntity).toHaveLength(18);
   await expect(page.getByTestId("landing-faq").getByRole("button")).toHaveCount(18);
   await context.close();

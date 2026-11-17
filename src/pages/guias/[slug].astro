@@ -1,4 +1,5 @@
 ---
+import { jsonLdString } from "../../lib/jsonLd";
 export const prerender = true;
 import { getCollection, render } from "astro:content";
 import AppHeader from "../../components/AppHeader.vue";
@@ -51,7 +52,7 @@ const jsonLd = [
 <Layout title={`${guide.data.title} | AI Tickets`} description={guide.data.description} canonical={`/guias/${guide.id}`} ogType="article" ogCard={guideOgCard(guide)}>
     <AppHeader client:idle />
     <main class="font-['Prompt']">
-        <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+        <script is:inline type="application/ld+json" set:html={jsonLdString(jsonLd)} />
         <article class="px-4 pt-32 pb-16 bg-white">
             <div class="mx-auto max-w-3xl">
                 <nav class="text-xs text-gray-500 mb-6" aria-label="Ruta"><a href="/guias" class="hover:underline">Guías</a> / {guide.data.cardTitle}</nav>

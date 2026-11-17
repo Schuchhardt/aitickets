@@ -1,4 +1,5 @@
 ---
+import { jsonLdString } from "../../lib/jsonLd";
 // Landing para productores (docs/specs/rediseno/SPEC_landing_productores_aitickets.md, fases A, B y C). Diez secciones con
 // solo dos fondos oscuros; el precio, la calculadora y los demás montos salen de fees.mjs/legal.mjs y las respuestas de
 // dinero de PRODUCER_FAQ. Lo que enlazaba el hub anterior sigue enlazado: las cuatro guías desde los links de las
@@ -88,7 +89,7 @@ const jsonLd = [
   <LandingMotion />
   <LandingHeader client:idle publishHref={publishUrl("organizadores_header")} />
   <main class="lp ev-motion">
-    <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+    <script is:inline type="application/ld+json" set:html={jsonLdString(jsonLd)} />
     <HeroSection />
     <HowSection />
     <PricingSection />

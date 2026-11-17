@@ -1,4 +1,5 @@
 ---
+import { jsonLdString } from "../lib/jsonLd";
 // Landing especializada para talleres y cursos cortos (docs/specs/rediseno/SPEC_landing_talleres_aitickets.md, fases 1
 // a 3): talleristas independientes y espacios que programan talleres. Misma URL que la landing SEO anterior
 // (src/data/landings.ts la marca dedicated: [landing].astro ya no la genera, y la tarjeta, el sitemap, las relacionadas
@@ -102,7 +103,7 @@ const jsonLd = [
   <div class="tl" data-theme="talleres">
     <WorkshopHeader client:idle publishHref={publishUrl("talleres_header")} ctaLabel={landing.cta.label} />
     <main>
-      <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+      <script is:inline type="application/ld+json" set:html={jsonLdString(jsonLd)} />
       <WorkshopHero lead={landing.intro} ctaLabel={landing.cta.label} demoHref={demoHref} demoLabel={demoLabel} />
       <PendingList />
       <WorkshopBuild />

@@ -18,6 +18,7 @@ import { eventOgImagePath } from "../lib/ogImage";
 import { defaultOgImagePath, DEFAULT_OG_CARD } from "../lib/ogPages";
 import { OG_HEIGHT, OG_WIDTH } from "../lib/imageOptimize";
 import { cdnImage, cdnSrcset, EVENT_COVER_SIZES } from "../lib/imageCdn.js";
+import { jsonLdString } from "../lib/jsonLd";
 
 const { event, title, description, canonicalPath, noindex = false } = Astro.props;
 const siteUrl = (import.meta.env.SITE_URL || "https://aitickets.cl").replace(/\/$/, "");
@@ -154,7 +155,7 @@ const generateEventJsonLd = () => {
       return item;
     }
   );
-  return JSON.stringify(entries.length === 1 ? entries[0] : entries).replace(/</g, "\\u003c");
+  return jsonLdString(entries);
 };
 
 const eventJsonLd = generateEventJsonLd();

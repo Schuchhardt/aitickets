@@ -16,6 +16,13 @@ const turnstileSiteKey = import.meta.env.TURNSTILE_SITE_KEY || import.meta.env.P
   description="Qué es AITicketsBot, qué información revisa y cómo excluir tu sitio."
   canonical="/bot"
 >
+  {turnstileSiteKey && (
+    <script is:inline>
+      // data-error-callback del widget: devolver true marca el error como manejado (si no, Turnstile lanza
+      // una excepción no capturada, p. ej. 300031). El envío ya exige el token, así que no hace falta más.
+      window.onTurnstileError = function () { return true; };
+    </script>
+  )}
   {turnstileSiteKey && <script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>}
   <AppHeader client:idle />
 
@@ -56,7 +63,7 @@ const turnstileSiteKey = import.meta.env.TURNSTILE_SITE_KEY || import.meta.env.P
           <label for="bo-email" class="block text-sm font-medium text-gray-700">Correo (opcional)</label>
           <input id="bo-email" name="email" type="email" maxlength="254" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-violet-500 focus:outline-none" />
         </div>
-        {turnstileSiteKey && <div class="cf-turnstile" data-sitekey={turnstileSiteKey} data-language="es"></div>}
+        {turnstileSiteKey && <div class="cf-turnstile" data-sitekey={turnstileSiteKey} data-language="es" data-error-callback="onTurnstileError"></div>}
         <p id="bo-msg" class="hidden rounded-lg px-3 py-2 text-sm" role="status"></p>
         <button type="submit" id="bo-submit" class="rounded-xl bg-gray-900 px-6 py-3 font-semibold text-white hover:bg-gray-700 disabled:opacity-60">Excluir</button>
       </form>
