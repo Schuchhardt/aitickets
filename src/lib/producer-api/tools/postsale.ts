@@ -429,10 +429,12 @@ async function planRefund(args: any, ctx: ToolContext): Promise<RefundPlan> {
     const amount = Number(order.amount) || 0;
     const feeTotal = (Number(order.ticket_fee) || 0) + (Number(order.service_fee_tax) || 0);
     const lines = orderLines(order);
-    const priceByType = new Map(lines.map((l) => [Number(l?.id), Number(l?.price) || 0]));
+    // Mesa para N (línea con `people`): precio y cantidad son por mesa, pero cada QR es una persona. Todo se lleva a QR.
+    const qrPerUnit = (l: any) => Math.max(1, Math.floor(Number(l?.people) || 1));
+    const priceByType = new Map(lines.map((l) => [Number(l?.id), (Number(l?.price) || 0) / qrPerUnit(l)]));
     // Cantidades de la venta original: las líneas bajan `quantity` al transferir, pero guardan transferred_out
     const gross = lines.reduce((n, l) => n + (Number(l?.total) || (Number(l?.price) || 0) * lineSoldQty(l)), 0);
-    const qtyInDetails = lines.reduce((n, l) => n + lineSoldQty(l), 0);
+    const qtyInDetails = lines.reduce((n, l) => n + lineSoldQty(l) * qrPerUnit(l), 0);
     const prior = (await loadRefunds(ctx, { orderId: order.id })).filter(ACTIVE_REFUND);
     const priorTickets = prior.reduce((n, r) => n + (Number(r.ticket_amount) || 0), 0);
     const priorFee = prior.reduce((n, r) => n + (Number(r.fee_amount) || 0), 0);

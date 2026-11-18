@@ -318,6 +318,32 @@ describe('postventa', () => {
 })
 
 describe('postventa: casos de borde de reembolsos y cancelación', () => {
+  describe('mesa para N (un QR por persona)', () => {
+    const ORDER_M = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+    const M = ['44444444-4444-4444-8444-444444444441', '44444444-4444-4444-8444-444444444442', '44444444-4444-4444-8444-444444444443']
+    beforeEach(() => {
+      db.tables.event_tickets.push({ id: 6, event_id: 10, ticket_name: 'Mesa x3', price: 30000, people_per_ticket: 3 })
+      db.tables.event_orders.push({
+        id: ORDER_M, event_id: 10, attendee_id: 300, status: 'paid', amount: 30000, ticket_fee: 2400, service_fee_tax: 456, total_payment: 32856,
+        ticket_qty: 1, ticket_details: [{ id: 6, name: 'Mesa x3', price: 30000, quantity: 1, total: 30000, people: 3 }],
+        buyer_first_name: 'Bea', buyer_email: 'bea@mail.cl', payment_provider: 'flow', payment_external_id: '778', created_at: '2026-10-03',
+      })
+      M.forEach((id, i) => db.tables.event_attendees.push({ id, event_id: 10, event_ticket_id: 6, attendee_id: 300, event_order_id: ORDER_M, qr_code: `qm${i}`, status: 'active', validated_at: null }))
+    })
+
+    it('reembolsar un QR devuelve la parte de esa persona, no la mesa entera', async () => {
+      const r = await confirmAndRun('refund_order', { order_id: ORDER_M, ticket_ids: [M[0]], refund_service_fee: true })
+      expect(r.result).toMatchObject({ kind: 'partial', ticket_amount_clp: 10000, service_fee_refund_clp: 952, order_status: 'paid' })
+    })
+
+    it('tras transferir un QR de la mesa, reembolsar el resto es parcial (no devuelve la mesa completa)', async () => {
+      expect((await call('transfer_ticket', { ticket_id: M[0], new_holder_name: 'Carla', new_holder_email: 'carla@x.cl' })).ok).toBe(true)
+      const r = await confirmAndRun('refund_order', { order_id: ORDER_M })
+      expect(r.result).toMatchObject({ kind: 'partial', ticket_amount_clp: 20000, order_status: 'paid' })
+      expect(db.tables.event_attendees.find((x) => x.id === M[0]).status).toBe('active')
+    })
+  })
+
   it('dos reembolsos confirmados en paralelo de la misma entrada: solo uno se ejecuta', async () => {
     const args = { order_id: ORDER_A, ticket_ids: [T1] }
     const a = await call('refund_order', args)
