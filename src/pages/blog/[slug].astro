@@ -1,4 +1,5 @@
 ---
+import { jsonLdString } from "../../lib/jsonLd";
 // Artículo del blog SEO (docs/specs/blog-seo.md). SSR con caché en el CDN (etiqueta blog-pages: se vacía al publicar o
 // actualizar). Solo artículos publicados; los borradores se ven en /blog/vista-previa/<id> con link firmado.
 import AppHeader from "../../components/AppHeader.vue";
@@ -75,7 +76,7 @@ if (post.faq.length) {
 >
     <AppHeader client:idle />
     <main class="font-['Prompt']">
-        <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+        <script is:inline type="application/ld+json" set:html={jsonLdString(jsonLd)} />
         <BlogArticle post={post} topic={topic} related={related} />
         <CallToAction campaign={`blog_${post.slug}`.slice(0, 80)} />
     </main>

@@ -2,6 +2,7 @@
 // "¿Olvidaste tu contraseña?" → POST /api/auth/magic-link { email, purpose: 'recovery' }.
 // El servidor siempre responde un mensaje genérico (no revela si la cuenta existe).
 import { ref, onMounted } from 'vue'
+import { turnstileErrorHandler } from '../../lib/turnstileClient.js'
 
 const props = defineProps({
   turnstileSiteKey: { type: String, default: '' },
@@ -27,6 +28,8 @@ onMounted(() => {
     turnstileWidgetId.value = window.turnstile.render('#cf-turnstile-recover', {
       sitekey: props.turnstileSiteKey,
       callback: (token) => { turnstileToken.value = token },
+      'expired-callback': () => { turnstileToken.value = '' },
+      'error-callback': turnstileErrorHandler(() => turnstileWidgetId.value, turnstileToken),
     })
   }
   if (window.turnstile) return render()

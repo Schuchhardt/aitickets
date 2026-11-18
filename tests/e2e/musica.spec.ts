@@ -40,7 +40,7 @@ test("sin JS se lee completa: H1, las tres audiencias, los momentos y la FAQ con
   for (const label of ["Banda o solista", "Productora", "Sala o venue"]) await expect(audience.getByRole("heading", { name: label })).toBeAttached();
   await expect(page.getByTestId("music-curve").locator("ol > li")).toHaveCount(6);
   const jsonLd = await page.locator('script[type="application/ld+json"]').textContent();
-  const faq = JSON.parse(jsonLd || "[]").find((item: { "@type": string }) => item["@type"] === "FAQPage");
+  const faq = JSON.parse(jsonLd || "{}")["@graph"].find((item: { "@type": string }) => item["@type"] === "FAQPage");
   expect(faq.mainEntity).toHaveLength(16);
   await expect(page.getByTestId("landing-faq").getByRole("button")).toHaveCount(16);
   await context.close();

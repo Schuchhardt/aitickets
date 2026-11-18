@@ -1,4 +1,5 @@
 ---
+import { jsonLdString } from "../../lib/jsonLd";
 // Plantilla de las landings SEO (src/data/landings.ts). El contenido de cada página es propio; esta
 // plantilla solo arma la estructura, el CTA contextual, las relacionadas y los datos estructurados.
 import AppHeader from "../AppHeader.vue";
@@ -35,7 +36,7 @@ const jsonLd = {
 <Layout title={landing.title} description={landing.description} canonical={`/${landing.slug}`}>
     <AppHeader client:idle />
     <main class="font-['Prompt']">
-        <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+        <script is:inline type="application/ld+json" set:html={jsonLdString(jsonLd)} />
 
         <section class="relative overflow-hidden bg-black text-white px-4 pt-32 pb-20">
             <div class="absolute -top-32 -right-32 w-[28rem] h-[28rem] rounded-full bg-lime-400/20 blur-3xl pointer-events-none" aria-hidden="true"></div>

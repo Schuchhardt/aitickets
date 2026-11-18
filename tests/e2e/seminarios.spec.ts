@@ -43,7 +43,7 @@ test("sin JS se lee completa: H1, la matriz de solo lectura, la mesa como lista 
   await expect(page.getByTestId("seminar-card-label")).toHaveText("2 funciones");
   await expect(page.getByTestId("seminar-desk").locator("ol li")).toHaveCount(5);
   const jsonLd = await page.locator('script[type="application/ld+json"]').textContent();
-  const faq = JSON.parse(jsonLd || "[]").find((item: { "@type": string }) => item["@type"] === "FAQPage");
+  const faq = JSON.parse(jsonLd || "{}")["@graph"].find((item: { "@type": string }) => item["@type"] === "FAQPage");
   expect(faq.mainEntity).toHaveLength(20);
   await expect(page.getByTestId("landing-faq").getByRole("button")).toHaveCount(20);
   await context.close();

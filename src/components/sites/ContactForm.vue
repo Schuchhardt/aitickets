@@ -3,6 +3,7 @@
 // Antiabuso: honeypot (campo "hp" oculto), tiempo mínimo de llenado (startedAt), límite por IP en el
 // servidor y Turnstile cuando el sitio se ve bajo aitickets.cl (turnstileSiteKey presente).
 import { ref, reactive, onMounted, computed } from "vue";
+import { turnstileErrorHandler } from "../../lib/turnstileClient.js";
 
 const props = defineProps({
   siteSlug: { type: String, required: true },
@@ -32,6 +33,7 @@ onMounted(() => {
       "expired-callback": () => {
         turnstileToken.value = "";
       },
+      "error-callback": turnstileErrorHandler(() => turnstileWidgetId.value, turnstileToken),
     });
     return true;
   };

@@ -1,4 +1,5 @@
 ---
+import { jsonLdString } from "../lib/jsonLd";
 // Landing especializada para productores de stand-up (docs/specs/rediseno/SPEC_landing_standup_aitickets.md, fases 1 a 3).
 // Misma URL que la landing SEO anterior (src/data/landings.ts la marca dedicated: [landing].astro ya no la genera, y
 // la tarjeta, el sitemap y las relacionadas siguen leyendo de ahí). Tema propio oscuro y cálido ([data-theme="standup"],
@@ -93,7 +94,7 @@ const jsonLd = [
   <div class="su" data-theme="standup">
     <StandupHeader client:idle publishHref={publishUrl("standup_header")} />
     <main class="ev-motion">
-      <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+      <script is:inline type="application/ld+json" set:html={jsonLdString(jsonLd)} />
       <StandupHero />
       <FormatMarquee />
       <WeekChapters />

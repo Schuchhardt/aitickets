@@ -47,7 +47,7 @@ test("sin JS se lee completa: H1, pendientes tachados, el armador en su estado i
   await expect(builder.getByTestId("workshop-enrolled")).toBeHidden();
   await expect(page.getByTestId("workshop-roll-count")).toHaveText("9");
   const jsonLd = await page.locator('script[type="application/ld+json"]').textContent();
-  const faq = JSON.parse(jsonLd || "[]").find((item: { "@type": string }) => item["@type"] === "FAQPage");
+  const faq = JSON.parse(jsonLd || "{}")["@graph"].find((item: { "@type": string }) => item["@type"] === "FAQPage");
   expect(faq.mainEntity).toHaveLength(20);
   await expect(page.getByTestId("landing-faq").getByRole("button")).toHaveCount(20);
   await context.close();
