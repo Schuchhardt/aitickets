@@ -222,6 +222,22 @@ describe('ciclo de vida', () => {
     expect(db.tables.event_tickets).toHaveLength(0)
   })
 
+  it('delete_event no deja sin restricción a un miembro cuyo único evento asignado es el que se borra', async () => {
+    db.tables.aitickets_event_staff = [
+      { user_id: 2, event_id: 12 },
+      { user_id: 3, event_id: 12 },
+      { user_id: 3, event_id: 10 },
+    ]
+    const r = await call('delete_event', { event_id: 12 })
+    expect(r).toMatchObject({ ok: false, code: 'conflict' })
+    expect(r.message).toMatch(/1 miembro/)
+    expect(db.tables.events.some((e) => e.id === 12)).toBe(true)
+    // Con otro evento asignado, se puede borrar
+    db.tables.aitickets_event_staff.push({ user_id: 2, event_id: 10 })
+    const first = await call('delete_event', { event_id: 12 })
+    expect(first.result.status).toBe('confirmation_required')
+  })
+
   it('duplicate_event crea el borrador con la nueva función', async () => {
     const r = await call('duplicate_event', { event_id: 11, date: FUTURE_DAY, start_time: '20:00' })
     expect(r.ok).toBe(true)
