@@ -362,6 +362,14 @@ export async function confirmPaidOrder(supabase, orderId, payment) {
   try {
     await ensureOrderAttendees(supabase, claimedOrder)
   } catch (err) {
+    // Un tipo de entrada de la orden ya no existe (se borró mientras el comprador pagaba): ningún reintento lo
+    // arregla y la orden terminaría expirada con el pago cobrado. Queda en 'review' para emitir o reembolsar.
+    if (err?.code === 'invalid_ticket_types') {
+      console.error(`⚠️ Orden ${order.id}: pagada pero tiene tipos de entrada que ya no existen. Requiere revisión manual.`)
+      await supabase.from('event_orders').update({ status: 'review', ...paymentFields }).eq('id', order.id).eq('status', 'processing')
+      await notifySlack(`🚨 Tipo de entrada eliminado: la orden ${order.id} (evento ${order.event_id}) fue pagada en ${label} (${amount} CLP, ref ${externalId}) pero alguno de sus tipos de entrada ya no existe. Quedó en 'review' sin emitir entradas: reembolsar o emitir manualmente.`)
+      return { status: 'review', httpStatus: 200, message: 'Pago registrado para revisión (tipo de entrada eliminado)' }
+    }
     // Liberar el reclamo para que el reintento del proveedor vuelva a intentarlo
     await supabase.from('event_orders').update({ status: 'pending', processing_started_at: null }).eq('id', order.id).eq('status', 'processing')
     throw err

@@ -282,7 +282,8 @@ export async function ensureOrderAttendees(supabase, order) {
     .in('id', ids)
   if (ticketsError) throw new Error(`Error validando tipos de entrada: ${ticketsError.message}`)
   if ((validTickets || []).length !== ids.length) {
-    throw new Error('La orden contiene tipos de entrada que no pertenecen al evento')
+    // Error permanente (p. ej. el productor borró el tipo de entrada mientras el comprador pagaba): reintentar no sirve.
+    throw Object.assign(new Error('La orden contiene tipos de entrada que no pertenecen al evento'), { code: 'invalid_ticket_types' })
   }
 
   const [people, holders, seatSelection] = await Promise.all([
