@@ -258,6 +258,20 @@ describe('ciclo de vida', () => {
     const shared = await call('update_venue', { venue_id: '22222222-2222-2222-2222-222222222222', name: 'Otro nombre' })
     expect(shared).toMatchObject({ ok: false, code: 'conflict' })
   })
+
+  it('update_venue: un miembro limitado a ciertos eventos no edita un lugar que usan otros eventos', async () => {
+    db.tables.event_locations.push(
+      { id: 'l1', event_id: 10, venue_id: '11111111-1111-1111-1111-111111111111', events: { organization_id: 7 }, 'events.organization_id': 7 },
+      { id: 'l4', event_id: 12, venue_id: '11111111-1111-1111-1111-111111111111', events: { organization_id: 7 }, 'events.organization_id': 7 },
+    )
+    const limited = ctx('editor', 3)
+    limited.actor.eventIds = [12]
+    const r = await call('update_venue', { venue_id: '11111111-1111-1111-1111-111111111111', address: 'Otra 1' }, limited)
+    expect(r).toMatchObject({ ok: false, code: 'forbidden' })
+    expect(db.tables.venues[0].address_line1).not.toBe('Otra 1')
+    limited.actor.eventIds = [10, 12]
+    expect((await call('update_venue', { venue_id: '11111111-1111-1111-1111-111111111111', address: 'Otra 1' }, limited)).ok).toBe(true)
+  })
 })
 
 describe('auditoría y exportación', () => {

@@ -271,6 +271,11 @@ const updateVenue: ToolDef = {
         if (usedBy.some((u: { orgId: number }) => u.orgId !== ctx.actor.orgId)) {
             throw new ToolError("conflict", "Este lugar también lo usan eventos de otra productora, así que no se puede editar. Crea un lugar nuevo desde el panel y asígnalo a tu evento.");
         }
+        // Acceso por evento: un miembro limitado a ciertos eventos no puede cambiar el lugar de eventos que no tiene asignados
+        const allowed = ctx.actor.eventIds;
+        if (allowed && usedBy.some((u: { eventId: number }) => !allowed.includes(u.eventId))) {
+            throw new ToolError("forbidden", "Este lugar también lo usan eventos a los que no tienes acceso, así que no puedes editarlo.");
+        }
 
         const patch: Record<string, unknown> = {};
         for (const [arg, column] of Object.entries(VENUE_FIELDS)) {
