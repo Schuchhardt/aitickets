@@ -645,14 +645,24 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value && !cardHasChips.va
 .cover.is-contain .cover-img {
   object-fit: contain;
 }
-/* Foto para celular: vertical 4:5 (la que se recomienda subir), sin el alto del ajuste de portada */
+/* Foto para celular: se muestra entera en su propia proporción (cuadrada, 4:5...), sin el alto del ajuste de portada.
+   Solo una más alta que 4:5 se recorta (centrada) a 4:5, para que la portada no ocupe más de una pantalla. */
 .cover.has-mobile {
   height: auto;
-  aspect-ratio: 4 / 5;
-  max-height: 75vh;
+  max-height: none;
 }
 .cover.has-mobile .cover-img {
+  height: auto;
+  max-height: 125vw;
   object-fit: cover;
+  object-position: center;
+}
+/* Tablets: la foto entera dentro del alto de la pantalla (bandas a los lados si hace falta) */
+@media (min-width: 640px) {
+  .cover.has-mobile .cover-img {
+    max-height: 80vh;
+    object-fit: contain;
+  }
 }
 .cover.has-mobile .cover-blur {
   display: none;
@@ -690,6 +700,12 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value && !cardHasChips.va
   border-radius: var(--r-xl);
   margin-left: -16px;
   margin-right: -16px;
+}
+/* Con foto para celular (un afiche completo) el título se monta lo justo para la esquina redondeada: no tapa el pie del afiche */
+@media (max-width: 1023px) {
+  .cover.has-mobile + .layout .hero-area {
+    margin-top: -16px;
+  }
 }
 
 /* ---- Imagen completa (diseño compacto) ---- */
@@ -863,8 +879,13 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value && !cardHasChips.va
   /* Escritorio: la imagen principal con el alto del ajuste de portada, aunque haya foto para celular */
   .cover.has-mobile {
     height: var(--banner-h-d);
-    aspect-ratio: auto;
     max-height: 62vh;
+  }
+  .cover.has-mobile .cover-img {
+    height: 100%;
+    max-height: none;
+    object-fit: cover;
+    object-position: var(--banner-pos-d);
   }
   .cover.has-mobile.is-contain .cover-img {
     object-fit: contain;
