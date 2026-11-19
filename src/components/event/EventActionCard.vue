@@ -30,6 +30,8 @@ const props = defineProps({
   externalUrl: { type: String, default: "" },
   // Órdenes guardadas en este navegador (storedOrders): franja "Tienes N entradas"
   orders: { type: Array, default: () => [] },
+  // El encabezado ya muestra "Organiza <productora> ✓ Verificado": la card no repite el sello
+  organizerInHero: { type: Boolean, default: false },
 });
 const emit = defineEmits(["checkout", "view-orders", "rsvp-state", "review", "show-functions"]);
 
@@ -223,7 +225,7 @@ function buySimple() {
       </div>
     </div>
 
-    <EventTrust :event="event" />
+    <EventTrust :event="event" part="badges" :hide-verified="organizerInHero" />
   </section>
 </template>
 
