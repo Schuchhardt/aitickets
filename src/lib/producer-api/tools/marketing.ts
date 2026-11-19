@@ -16,6 +16,8 @@ import { createPromoterLink, listPromoterLinks, revokePromoterLink, promoterRef,
 import { storeVideoBuffer, VideoStorageError } from "../../videoStorage";
 import { SOCIAL_PLATFORMS, platformName, postMediaProblem } from "../../socialPlatforms";
 import { checkSocialPostInput } from "../../socialPostInput";
+import { applyEventImage, assertCanUseEventImage, EventImageUseError, type EventImageUse } from "../../eventImageUse";
+import { signImageUploadToken, IMAGE_UPLOAD_DEFAULT_MINUTES, IMAGE_UPLOAD_MAX_MINUTES } from "../../../../netlify/lib/image-upload-token.mjs";
 
 const IMAGE_GENERATIONS_PER_DAY = 20;
 const VIDEO_UPLOADS_PER_HOUR = 20;
@@ -77,10 +79,44 @@ export function decodeBase64Image(data: string): { buffer: Buffer; contentType: 
     return { buffer, contentType };
 }
 
-async function setCover(ctx: ToolContext, eventId: number, url: string) {
-    const { error } = await ctx.supabase.from("events").update({ image_url: url }).eq("id", eventId).eq("organization_id", ctx.actor.orgId);
-    if (error) throw error;
+const asToolError = (err: unknown) =>
+    err instanceof EventImageUseError ? new ToolError(err.kind === "invalid" ? "invalid_input" : err.kind, err.message) : err;
+
+/** set_as_cover / set_as_mobile_cover: a lo más uno, y con evento. Devuelve el destino (o null = solo alojar). */
+function imageUseFromArgs(args: Record<string, any>): EventImageUse | null {
+    if (args.set_as_cover && args.set_as_mobile_cover) {
+        throw new ToolError("invalid_input", "Elige uno: set_as_cover (imagen principal) o set_as_mobile_cover (foto para celular). Para las dos, sube cada imagen por separado.");
+    }
+    const use: EventImageUse | null = args.set_as_cover ? "cover" : args.set_as_mobile_cover ? "mobile_cover" : null;
+    if (use && !args.event_id) throw new ToolError("invalid_input", `${use === "cover" ? "set_as_cover" : "set_as_mobile_cover"} requiere event_id.`);
+    return use;
 }
+
+/** Antes de alojar o generar nada: la foto para celular necesita un evento con imagen principal. */
+async function checkImageUse(ctx: ToolContext, eventId: number, use: EventImageUse | null) {
+    if (use !== "mobile_cover") return;
+    try {
+        await assertCanUseEventImage(ctx.supabase, ctx.actor.orgId, eventId, use);
+    } catch (err) {
+        throw asToolError(err);
+    }
+}
+
+/** Deja la imagen como portada o como foto para celular del evento. Devuelve los avisos (diseño que no la usa). */
+async function useImage(ctx: ToolContext, eventId: number, use: EventImageUse | null, url: string): Promise<string[]> {
+    if (!use) return [];
+    try {
+        return (await applyEventImage(ctx.supabase, ctx.actor.orgId, eventId, use, url)).warnings;
+    } catch (err) {
+        throw asToolError(err);
+    }
+}
+
+const MOBILE_COVER_FLAG_HELP =
+    "Deja la imagen como foto para celular de la portada ancha (events.cover_mobile_url): la página la muestra en pantallas chicas en vez " +
+    "de la imagen principal, que se sigue viendo en computador. Requiere event_id y que el evento ya tenga imagen principal. " +
+    "No se combina con set_as_cover.";
+const imageUseSuffix = (args: Record<string, any>) => (args.set_as_cover ? " (portada)" : args.set_as_mobile_cover ? " (foto para celular)" : "");
 
 // ---------------------------------------------------------------------------
 // Herramientas
@@ -168,10 +204,11 @@ const uploadImage: ToolDef = {
     description:
         "Sube una imagen (JPG, PNG, WEBP o GIF, máx. 5 MB) desde una URL https pública (p. ej. un flyer, logo o foto que el productor compartió " +
         "por link) o en base64, y devuelve su URL alojada en AI Tickets. Esa URL sirve como portada (event_id + set_as_cover=true), " +
-        "para create_social_post o como referencia en generate_image (reference_image_urls). Si el productor adjuntó la imagen en el chat " +
-        "y no tienes una URL pública, envíala en image_base64.",
+        "como foto para celular de la portada ancha (event_id + set_as_mobile_cover=true), para create_social_post o como referencia en " +
+        "generate_image (reference_image_urls). Si el productor adjuntó la imagen en el chat y no tienes una URL pública, envíala en " +
+        "image_base64; si tampoco puedes (archivo grande o solo lo tiene en su teléfono), usa create_image_upload_link.",
     scope: "write",
-    audit: (args) => ({ summary: `Subió una imagen${args.set_as_cover ? " (portada)" : ""}`, ...(args.event_id ? { target: `event:${args.event_id}` } : {}) }),
+    audit: (args) => ({ summary: `Subió una imagen${imageUseSuffix(args)}`, ...(args.event_id ? { target: `event:${args.event_id}` } : {}) }),
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     inputSchema: {
         type: "object",
@@ -181,16 +218,26 @@ const uploadImage: ToolDef = {
             image_base64: { type: "string", maxLength: 7_100_000, description: "Imagen en base64 (o data URL)." },
             event_id: eventIdSchema,
             set_as_cover: { type: "boolean", default: false },
+            set_as_mobile_cover: { type: "boolean", default: false, description: MOBILE_COVER_FLAG_HELP },
         },
     },
     async handler(args, ctx) {
         if (!args.image_url === !args.image_base64) throw new ToolError("invalid_input", "Envía image_url o image_base64 (uno de los dos).");
-        if (args.set_as_cover && !args.event_id) throw new ToolError("invalid_input", "set_as_cover requiere event_id.");
+        const use = imageUseFromArgs(args);
         if (args.event_id) await loadOwnedEvent(ctx, args.event_id, "id");
+        await checkImageUse(ctx, args.event_id, use);
         const { buffer, contentType } = args.image_base64 ? decodeBase64Image(args.image_base64) : await fetchPublicImage(args.image_url);
         const url = await storeImage(ctx.actor.orgId, buffer, contentType, "api");
-        if (args.set_as_cover) await setCover(ctx, args.event_id, url);
-        return { url, content_type: contentType, bytes: buffer.length, event_id: args.event_id ?? null, set_as_cover: Boolean(args.set_as_cover) };
+        const warnings = await useImage(ctx, args.event_id, use, url);
+        return {
+            url,
+            content_type: contentType,
+            bytes: buffer.length,
+            event_id: args.event_id ?? null,
+            set_as_cover: use === "cover",
+            set_as_mobile_cover: use === "mobile_cover",
+            ...(warnings.length ? { warnings } : {}),
+        };
     },
 };
 
@@ -308,10 +355,11 @@ const generateImage: ToolDef = {
         "(reference_image_urls: flyer anterior, logo, foto del artista o del lugar; también URLs devueltas por upload_image) " +
         "o usar la portada actual del evento (use_event_cover_as_reference). Las referencias guían estilo, colores y elementos; " +
         "si quieres editar la referencia (p. ej. adaptar el flyer a formato story), dilo en prompt. " +
-        `Máximo ${IMAGE_GENERATIONS_PER_DAY} por día por organización. Formatos: square (feed), portrait (stories/reels), landscape (portada/web).`,
+        `Máximo ${IMAGE_GENERATIONS_PER_DAY} por día por organización. Formatos: square (feed), portrait (stories/reels), landscape (portada/web). ` +
+        "set_as_mobile_cover=true la deja como foto para celular de la portada ancha (usa format portrait o square).",
     scope: "write",
     audit: (args, result) => ({
-        summary: `Generó una imagen ${args.format}${(result as any).reference_images_used ? ` con ${(result as any).reference_images_used} referencia(s)` : ""}${args.set_as_cover ? " (portada)" : ""}`,
+        summary: `Generó una imagen ${args.format}${(result as any).reference_images_used ? ` con ${(result as any).reference_images_used} referencia(s)` : ""}${imageUseSuffix(args)}`,
         target: `event:${args.event_id}`,
     }),
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
@@ -332,13 +380,17 @@ const generateImage: ToolDef = {
             },
             use_event_cover_as_reference: { type: "boolean", default: false, description: "Usa la imagen de portada actual del evento como referencia." },
             set_as_cover: { type: "boolean", default: false },
+            set_as_mobile_cover: { type: "boolean", default: false, description: MOBILE_COVER_FLAG_HELP },
         },
     },
     async handler(args, ctx) {
         if (!isImageGenerationConfigured()) {
             throw new ToolError("unavailable", "La generación de imágenes no está habilitada. Sube una imagen con upload_image.");
         }
+        const use = imageUseFromArgs(args);
         const event = await loadOwnedEvent<any>(ctx, args.event_id, EVENT_CONTEXT_SELECT);
+        // Antes de gastar una generación: la foto para celular necesita la imagen principal
+        await checkImageUse(ctx, Number(event.id), use);
         const referenceUrls: string[] = [...(args.reference_image_urls || [])];
         if (args.use_event_cover_as_reference) {
             if (!event.image_url) throw new ToolError("invalid_input", "El evento no tiene portada: sube una con upload_image o pasa reference_image_urls.");
@@ -357,8 +409,67 @@ const generateImage: ToolDef = {
             console.error("generate_image:", err?.message);
             throw new ToolError("upstream", "No se pudo generar la imagen. Intenta con otra dirección creativa o sube una propia.");
         }
-        if (args.set_as_cover) await setCover(ctx, Number(event.id), url);
-        return { event_id: Number(event.id), url, format: args.format, reference_images_used: referenceImages.length, set_as_cover: Boolean(args.set_as_cover) };
+        const warnings = await useImage(ctx, Number(event.id), use, url);
+        return {
+            event_id: Number(event.id),
+            url,
+            format: args.format,
+            reference_images_used: referenceImages.length,
+            set_as_cover: use === "cover",
+            set_as_mobile_cover: use === "mobile_cover",
+            ...(warnings.length ? { warnings } : {}),
+        };
+    },
+};
+
+const IMAGE_UPLOAD_USE_LABEL: Record<string, string> = { library: "solo alojarla", cover: "portada", mobile_cover: "foto para celular" };
+
+const createImageUploadLink: ToolDef = {
+    name: "create_image_upload_link",
+    title: "Crear link para subir una imagen",
+    description:
+        "Crea un link temporal para que el productor suba una imagen desde su teléfono o computador, sin iniciar sesión. Úsalo cuando la " +
+        "imagen está adjunta en el chat o guardada en su equipo y no tienes una URL pública ni puedes mandarla en image_base64 con " +
+        "upload_image. use dice qué pasa al subirla: cover = queda como imagen principal del evento; mobile_cover = queda como foto para " +
+        "celular de la portada ancha (el evento ya debe tener imagen principal); library = solo se aloja y la página muestra su URL para " +
+        "pegarla en el chat (sirve para create_social_post o reference_image_urls). cover y mobile_cover requieren event_id. " +
+        `Vence en ${IMAGE_UPLOAD_DEFAULT_MINUTES} minutos (expires_in_minutes, máximo ${IMAGE_UPLOAD_MAX_MINUTES}). Mientras no venza, quien ` +
+        "tenga el link puede subir imágenes a ese destino: entrégalo solo al productor. Después de que suba, confirma con get_event.",
+    scope: "write",
+    audit: (args) => ({
+        summary: `Creó un link para subir una imagen (${IMAGE_UPLOAD_USE_LABEL[args.use] || args.use})`,
+        ...(args.event_id ? { target: `event:${args.event_id}` } : {}),
+    }),
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    inputSchema: {
+        type: "object",
+        required: ["use"],
+        additionalProperties: false,
+        properties: {
+            use: { type: "string", enum: ["cover", "mobile_cover", "library"], description: "Qué se hace con la imagen al subirla." },
+            event_id: eventIdSchema,
+            expires_in_minutes: { type: "integer", minimum: 5, maximum: IMAGE_UPLOAD_MAX_MINUTES, default: IMAGE_UPLOAD_DEFAULT_MINUTES },
+        },
+    },
+    async handler(args, ctx) {
+        const use = String(args.use);
+        if (use !== "library" && !args.event_id) throw new ToolError("invalid_input", `use = ${use} requiere event_id.`);
+        let eventId: number | null = null;
+        if (args.event_id) {
+            const event = await loadOwnedEvent<any>(ctx, args.event_id, "id");
+            eventId = Number(event.id);
+        }
+        if (eventId) await checkImageUse(ctx, eventId, use === "mobile_cover" ? "mobile_cover" : null);
+        const signed = signImageUploadToken({ orgId: Number(ctx.actor.orgId), eventId, use, minutes: args.expires_in_minutes });
+        if (!signed) throw new ToolError("unavailable", "Los links de subida no están disponibles en este entorno. Usa upload_image.");
+        return {
+            upload_url: `${ctx.origin}/subir-imagen/${signed.token}`,
+            use,
+            event_id: eventId,
+            expires_at: signed.expiresAt.toISOString(),
+            expires_at_local: localDateTime(signed.expiresAt.toISOString()),
+            note: "El link se entrega solo esta vez. El productor lo abre, elige la imagen (JPG, PNG, WEBP o GIF) y queda aplicada al instante.",
+        };
     },
 };
 
@@ -666,5 +777,5 @@ const revokePromoterLinkTool: ToolDef = {
     },
 };
 
-export const marketingTools: ToolDef[] = [getMarketingKit, createTrackingLink, uploadImage, setEventVideo, generateImage, createSocialPost, listSocialPosts, deleteSocialPost, publishPost,
+export const marketingTools: ToolDef[] = [getMarketingKit, createTrackingLink, uploadImage, createImageUploadLink, setEventVideo, generateImage, createSocialPost, listSocialPosts, deleteSocialPost, publishPost,
     createPromoterLinkTool, listPromoterLinksTool, revokePromoterLinkTool];
