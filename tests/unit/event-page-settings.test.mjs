@@ -88,3 +88,51 @@ describe('update_event: diseño de la página', () => {
     expect(settingsOf(20)).toBeNull()
   })
 })
+
+describe('foto para celular de la portada ancha (events.cover_mobile_url)', () => {
+  const coverOf = (id) => db.tables.events.find((e) => e.id === id).cover_mobile_url
+  const MOBILE = 'https://cdn.aitickets.cl/m.jpg'
+
+  it('bannerMobileCover: solo con diseño banner, imagen principal y sin video de portada', async () => {
+    const { bannerMobileCover } = await import('../../src/lib/eventPageSettings.ts')
+    const base = { image_url: 'https://cdn.aitickets.cl/a.jpg', cover_mobile_url: MOBILE, page_settings: { layout: 'banner' } }
+    expect(bannerMobileCover(base)).toBe(MOBILE)
+    expect(bannerMobileCover({ ...base, page_settings: { layout: 'poster' } })).toBe('')
+    expect(bannerMobileCover({ ...base, page_settings: null })).toBe('')
+    expect(bannerMobileCover({ ...base, image_url: null })).toBe('')
+    expect(bannerMobileCover({ ...base, cover_video: { url: 'https://x/v.mp4' } })).toBe('')
+    expect(bannerMobileCover({ ...base, cover_mobile_url: null })).toBe('')
+    expect(bannerMobileCover(null)).toBe('')
+  })
+
+  it('update_event la guarda, get_event la devuelve y null o "" la quita', async () => {
+    await run({ event_id: 10, page_layout: 'banner' })
+    const res = await run({ event_id: 10, cover_mobile_url: MOBILE })
+    expect(res.ok).toBe(true)
+    expect(res.result).toMatchObject({ updated: ['cover_mobile_url'], cover_mobile_url: MOBILE })
+    expect(res.result.warnings).toBeUndefined()
+    expect(coverOf(10)).toBe(MOBILE)
+    expect((await runTool(getTool('get_event'), { event_id: 10 }, ctx())).result).toMatchObject({ cover_mobile_url: MOBILE, page_layout: 'banner' })
+    await run({ event_id: 10, cover_mobile_url: '' })
+    expect(coverOf(10)).toBeNull()
+    await run({ event_id: 10, cover_mobile_url: MOBILE })
+    await run({ event_id: 10, cover_mobile_url: null })
+    expect(coverOf(10)).toBeNull()
+  })
+
+  it('con otro diseño la guarda pero avisa que solo se usa en banner', async () => {
+    const res = await run({ event_id: 10, cover_mobile_url: MOBILE })
+    expect(res.ok).toBe(true)
+    expect(res.result.warnings.join(' ')).toMatch(/banner/)
+    // En la misma llamada que cambia a banner no avisa
+    expect((await run({ event_id: 10, page_layout: 'banner', cover_mobile_url: MOBILE })).result.warnings).toBeUndefined()
+  })
+
+  it('rechaza links que no son https sin guardar nada, y no toca eventos de otra organización', async () => {
+    expect(await run({ event_id: 10, name: 'Nuevo nombre', cover_mobile_url: 'http://x/m.jpg' })).toMatchObject({ ok: false, code: 'invalid_input' })
+    expect(db.tables.events.find((e) => e.id === 10).name).toBe('Fiesta')
+    expect(coverOf(10)).toBeUndefined()
+    expect(await run({ event_id: 20, cover_mobile_url: MOBILE })).toMatchObject({ ok: false, code: 'not_found' })
+    expect(coverOf(20)).toBeUndefined()
+  })
+})

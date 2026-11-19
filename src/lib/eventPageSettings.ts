@@ -60,3 +60,15 @@ export const isDefaultPageSettings = (s: EventPageSettings) =>
 const DEMO_SUFFIX = /\s*\(evento de demostración\)\s*$/i;
 /** Nombre sin el sufijo "(evento de demostración)" (los demo ya muestran un banner). */
 export const stripDemoSuffix = (name: string | null | undefined) => String(name || "").replace(DEMO_SUFFIX, "");
+
+/** Hasta este ancho (px) la portada ancha usa la foto para celular. Desde 1024 px la página pasa al diseño de escritorio. */
+export const COVER_MOBILE_MAX_WIDTH = 1023;
+
+/**
+ * Foto para celular de la portada ancha (events.cover_mobile_url), solo si aplica: diseño banner, con imagen principal
+ * y sin video de portada (el video reemplaza a las dos). "" si no aplica.
+ */
+export function bannerMobileCover(event: any): string {
+  if (!event?.cover_mobile_url || !event?.image_url || event?.cover_video) return "";
+  return normalizePageSettings(event.page_settings).layout === "banner" ? String(event.cover_mobile_url) : "";
+}

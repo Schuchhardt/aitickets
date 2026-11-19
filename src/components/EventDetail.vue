@@ -16,7 +16,7 @@ import EventReviews from "./event/EventReviews.vue";
 import ShareSheet from "./event/ShareSheet.vue";
 import { vReveal } from "./event/reveal.js";
 import IridescenceBg from "./event/IridescenceBg.vue";
-import { normalizePageSettings, pageBackgroundPreset } from "../lib/eventPageSettings";
+import { bannerMobileCover, COVER_MOBILE_MAX_WIDTH, normalizePageSettings, pageBackgroundPreset } from "../lib/eventPageSettings";
 import PurchasedTicketsModal from "./PurchasedTicketsModal.vue";
 import { cardState, stockSummary, soldPercentLabel, minFinalPrice, formatCLP, formatSaleStart, readCheckoutParams, upcomingFunctions, formatFunctionShort, readReviewHash, formatRating, reviewsCountLabel, cardFunctionChips, attendeeFeedUrl } from "./event/eventView.js";
 import { addToCalendar } from "./event/shareActions.js";
@@ -64,12 +64,17 @@ const dockDate = computed(() => {
 });
 
 // Portada ancha: alto y encuadre del ajuste de portada (events.cover_settings, CoverAdjuster.vue)
+// Foto para celular de la portada ancha (events.cover_mobile_url): reemplaza la imagen bajo 1024 px, con su propio
+// encuadre centrado (el ajuste de portada mobile es para la imagen principal)
+const mobileCover = computed(() => bannerMobileCover({ ...props.event, cover_video: coverVideo.value }));
+const mobileCoverSrcset = computed(() => cdnSrcset(mobileCover.value));
+const mobileCoverMedia = `(max-width: ${COVER_MOBILE_MAX_WIDTH}px)`;
 const bannerStyle = computed(() => {
   const c = props.event?.cover_settings || {};
   return {
     "--banner-h-m": `${c.mobile?.height || 340}px`,
     "--banner-h-d": `${c.desktop?.height || 480}px`,
-    "--banner-pos-m": `50% ${c.mobile?.position_y ?? 50}%`,
+    "--banner-pos-m": mobileCover.value ? "50% 50%" : `50% ${c.mobile?.position_y ?? 50}%`,
     "--banner-pos-d": `50% ${c.desktop?.position_y ?? 50}%`,
   };
 });
@@ -363,13 +368,17 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value && !cardHasChips.va
       </div>
 
       <!-- Portada ancha: la imagen ocupa todo el ancho y el título se monta sobre su borde -->
-      <figure v-if="layout === 'banner'" ref="coverEl" class="cover" :class="{ 'is-contain': bannerContain && !coverVideo }" :style="bannerStyle" data-testid="event-cover">
+      <figure v-if="layout === 'banner'" ref="coverEl" class="cover" :class="{ 'is-contain': bannerContain && !coverVideo, 'has-mobile': mobileCover }" :style="bannerStyle" data-testid="event-cover">
         <div v-if="coverVideo" ref="bannerImg" class="cover-media">
           <AutoplayVideo fill eager sound-position="top" :video="coverVideo" :event-name="event.name" test-id="cover-video" @failed="coverVideoFailed = true" />
         </div>
         <template v-else>
           <img v-if="bannerContain" :src="coverSrc" :srcset="coverSrcset" :sizes="EVENT_COVER_SIZES" alt="" class="cover-blur" aria-hidden="true" />
-          <img ref="bannerImg" :src="coverSrc" :srcset="coverSrcset" :sizes="EVENT_COVER_SIZES" :alt="event.name" class="cover-img" fetchpriority="high" loading="eager" decoding="async" />
+          <picture v-if="mobileCover">
+            <source :media="mobileCoverMedia" :srcset="mobileCoverSrcset || mobileCover" sizes="100vw" />
+            <img ref="bannerImg" :src="coverSrc" :srcset="coverSrcset" :sizes="EVENT_COVER_SIZES" :alt="event.name" class="cover-img" fetchpriority="high" loading="eager" decoding="async" data-testid="cover-mobile-picture" />
+          </picture>
+          <img v-else ref="bannerImg" :src="coverSrc" :srcset="coverSrcset" :sizes="EVENT_COVER_SIZES" :alt="event.name" class="cover-img" fetchpriority="high" loading="eager" decoding="async" />
         </template>
       </figure>
 
@@ -632,6 +641,18 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value && !cardHasChips.va
 .cover.is-contain .cover-img {
   object-fit: contain;
 }
+/* Foto para celular: vertical 4:5 (la que se recomienda subir), sin el alto del ajuste de portada */
+.cover.has-mobile {
+  height: auto;
+  aspect-ratio: 4 / 5;
+  max-height: 75vh;
+}
+.cover.has-mobile .cover-img {
+  object-fit: cover;
+}
+.cover.has-mobile .cover-blur {
+  display: none;
+}
 .cover-blur {
   position: absolute;
   inset: -24px;
@@ -834,6 +855,18 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value && !cardHasChips.va
     margin: 0;
     border-radius: var(--r-xl);
     box-shadow: var(--shadow-card);
+  }
+  /* Escritorio: la imagen principal con el alto del ajuste de portada, aunque haya foto para celular */
+  .cover.has-mobile {
+    height: var(--banner-h-d);
+    aspect-ratio: auto;
+    max-height: 62vh;
+  }
+  .cover.has-mobile.is-contain .cover-img {
+    object-fit: contain;
+  }
+  .cover.has-mobile .cover-blur {
+    display: block;
   }
   .cover-img {
     object-position: var(--banner-pos-d);

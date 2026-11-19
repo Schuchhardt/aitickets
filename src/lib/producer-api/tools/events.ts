@@ -19,6 +19,7 @@ import { normalizeEventVideo } from "../../eventVideo";
 import { notifySlack, dedupeLocation } from "../../../pages/api/_lib/server-utils";
 import { normalizeCheckoutFields, isDefaultCheckoutFields, ATTENDEE_NAME_MODES, HOLDER_MODES, QUESTION_SCOPES, QUESTION_TYPES, MAX_QUESTIONS, MAX_OPTIONS, MAX_LABEL } from "../../checkoutFields.mjs";
 import { loadPeoplePerTicket } from "../../../../netlify/lib/tickets.mjs";
+import { CoverMobileError, loadCoverMobileUrl, normalizeCoverMobileUrl, saveCoverMobileUrl } from "../../eventCoverMobile";
 
 const EVENT_LIST_COLUMNS = "id, name, slug, status, accessibility, start_date, end_date, location, image_url, created_at";
 
@@ -191,6 +192,7 @@ async function eventDetail(ctx: ToolContext, eventId: number) {
     const previewLinks = await listPreviewLinks(Number(event.id), ctx.actor.orgId, ctx.supabase).catch(() => []);
     const pageSettings = await loadPageSettings(ctx, Number(event.id));
     const videos = await loadEventVideos(ctx, Number(event.id));
+    const coverMobileUrl = await loadCoverMobileUrl(ctx.supabase, Number(event.id), ctx.actor.orgId);
     const [checkoutFields, people] = await Promise.all([loadCheckoutFields(ctx, Number(event.id)), loadPeoplePerTicket(ctx.supabase, Number(event.id))]);
     const secret = await loadSecretLocation(ctx.supabase, Number(event.id)).catch(() => ({ address: null, revealHours: null }));
     const venueOf = new Map<string, any>();
@@ -220,6 +222,8 @@ async function eventDetail(ctx: ToolContext, eventId: number) {
         cover_video: videos.cover_video,
         gallery_video: videos.gallery_video,
         page_layout: pageSettings.layout,
+        // Foto para celular de la portada ancha: solo se usa con page_layout = banner (null = image_url en todos los tamaños)
+        cover_mobile_url: coverMobileUrl,
         show_organizer: pageSettings.show_organizer,
         page_background: pageSettings.background,
         // Dirección que solo ven quienes compran (la página muestra el lugar y la comuna, sin la calle)
@@ -381,8 +385,11 @@ const updateEvent: ToolDef = {
     name: "update_event",
     title: "Editar evento",
     description:
-        "Edita datos generales de un evento (nombre, descripción, categoría, imagen, privacidad, slug de la URL, diseño de la página, fondo " +
-        "animado y si se muestra el organizador). Solo cambia los campos enviados. " +
+        "Edita datos generales de un evento (nombre, descripción, categoría, imagen, foto para celular, privacidad, slug de la URL, diseño de " +
+        "la página, fondo animado y si se muestra el organizador). Solo cambia los campos enviados. " +
+        "cover_mobile_url: con page_layout = banner (Portada ancha), foto vertical u horizontal alternativa que la página muestra en celulares " +
+        "(menos de 1024 px de ancho, en proporción 4:5, p. ej. 1080×1350) en vez de image_url; en computador se sigue viendo image_url. " +
+        "Súbela con upload_image o generate_image. null o \"\" la quita. No cambia la imagen de la cartelera, al compartir ni de los correos. " +
         "slug cambia el link público (/eventos/<slug>); cambiar el nombre NO cambia el slug. Si el evento está publicado o ya tiene registrados " +
         "(órdenes pagadas, entradas o invitados), el link anterior queda redirigiendo (301) al nuevo, así no se rompen los links ya " +
         "compartidos ni los QR; en un borrador sin registrados, el link anterior se libera. " +
@@ -412,6 +419,12 @@ const updateEvent: ToolDef = {
             description: { type: "string", maxLength: 20000 },
             category: { type: "string", maxLength: 80 },
             image_url: { type: "string", maxLength: 1000, pattern: "^https://" },
+            cover_mobile_url: {
+                type: "string",
+                maxLength: 1000,
+                nullable: true,
+                description: "Foto para celular del diseño banner (https, idealmente 4:5). null o \"\" = la misma image_url en todos los tamaños.",
+            },
             is_private: { type: "boolean" },
             slug: {
                 type: "string",
@@ -502,7 +515,18 @@ const updateEvent: ToolDef = {
         const pageChange = args.page_layout !== undefined || args.show_organizer !== undefined || args.page_background !== undefined;
         const secretChange = args.private_address !== undefined || args.private_address_reveal_hours !== undefined;
         const checkoutChange = args.checkout_fields !== undefined && Object.keys(args.checkout_fields || {}).length > 0;
-        if (!Object.keys(patch).length && args.category === undefined && args.slug === undefined && !pageChange && !checkoutChange && !secretChange) throw new ToolError("invalid_input", "No enviaste cambios.");
+        const coverMobileChange = args.cover_mobile_url !== undefined;
+        if (!Object.keys(patch).length && args.category === undefined && args.slug === undefined && !pageChange && !checkoutChange && !secretChange && !coverMobileChange) throw new ToolError("invalid_input", "No enviaste cambios.");
+        // Foto para celular: se valida antes de guardar nada
+        let coverMobileUrl: string | null = null;
+        if (coverMobileChange) {
+            try {
+                coverMobileUrl = normalizeCoverMobileUrl(args.cover_mobile_url);
+            } catch (err) {
+                if (err instanceof CoverMobileError) throw new ToolError("invalid_input", err.message);
+                throw err;
+            }
+        }
         // Datos extra del checkout: se valida antes de guardar nada (una pregunta de opciones necesita 2 o más)
         let checkoutFields: ReturnType<typeof normalizeCheckoutFields> | null = null;
         if (checkoutChange) {
@@ -556,6 +580,14 @@ const updateEvent: ToolDef = {
             if (error) throw error;
         }
         let warnings: string[] = [];
+        if (coverMobileChange) {
+            const saved = await saveCoverMobileUrl(ctx.supabase, Number(event.id), ctx.actor.orgId, coverMobileUrl);
+            if (!saved) throw new ToolError("unavailable", "La foto para celular estará disponible después del próximo deploy.");
+            if (coverMobileUrl) {
+                const layout = pageSettings?.layout ?? (await loadPageSettings(ctx, Number(event.id))).layout;
+                if (layout !== "banner") warnings.push("La foto para celular solo se usa con page_layout = banner (Portada ancha); el diseño actual es " + layout + ".");
+            }
+        }
         // Dirección privada: después se recalcula events.location (los listados quedan sin la calle)
         let secret: { address: string | null; revealHours: number | null } | null = null;
         if (secretChange) {
@@ -583,6 +615,7 @@ const updateEvent: ToolDef = {
                 ...(args.category !== undefined ? ["category"] : []),
                 ...(slugChange?.changed ? ["slug"] : []),
                 ...(args.page_layout !== undefined ? ["page_layout"] : []),
+                ...(coverMobileChange ? ["cover_mobile_url"] : []),
                 ...(args.show_organizer !== undefined ? ["show_organizer"] : []),
                 ...(args.page_background !== undefined ? ["page_background"] : []),
                 ...(checkoutFields ? ["checkout_fields"] : []),
@@ -590,6 +623,7 @@ const updateEvent: ToolDef = {
                 ...(args.private_address_reveal_hours !== undefined ? ["private_address_reveal_hours"] : []),
             ],
             ...(checkoutFields ? { checkout_fields: checkoutFields } : {}),
+            ...(coverMobileChange ? { cover_mobile_url: coverMobileUrl } : {}),
             ...(secret ? { private_address: secret.address, private_address_reveal_hours: secret.revealHours } : {}),
             ...(pageSettings ? { page_layout: pageSettings.layout, show_organizer: pageSettings.show_organizer, page_background: pageSettings.background } : {}),
             ...eventUrls(ctx, event),

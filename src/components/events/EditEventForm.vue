@@ -75,6 +75,8 @@ const form = ref(JSON.parse(JSON.stringify(props.initialFormState)));
 // Diseño de la página pública y organizador visible (events.page_settings)
 form.value.general.pageSettings = normalizePageSettings(form.value.general.pageSettings)
 if (typeof form.value.general.slug !== 'string') form.value.general.slug = ''
+// Portada para celular del diseño "Portada ancha" (events.cover_mobile_url); "" = la misma imagen en todos los tamaños
+if (typeof form.value.general.coverMobileUrl !== 'string') form.value.general.coverMobileUrl = ''
 // Reseñas: correos "¿Cómo estuvo?" después de cada función (toggle al final del formulario)
 if (!form.value.reviews) form.value.reviews = { enabled: true }
 
@@ -348,6 +350,35 @@ const uploadFile = async (file) => {
 
 const removeImage = () => {
   form.value.general.imageUrl = ''
+  form.value.general.coverMobileUrl = ''
+}
+
+// Portada para celular (solo diseño "Portada ancha"): misma subida que la imagen principal
+const uploadingMobile = ref(false)
+const mobileUploadError = ref('')
+const handleMobileImageUpload = async (event) => {
+  const file = event.target.files?.[0]
+  event.target.value = ''
+  if (!file) return
+  if (!file.type.startsWith('image/')) { mobileUploadError.value = 'Solo se permiten imágenes.'; return }
+  if (file.size > MAX_SOURCE_BYTES) { mobileUploadError.value = 'La imagen es demasiado pesada (máx. 30MB).'; return }
+  uploadingMobile.value = true
+  mobileUploadError.value = ''
+  try {
+    const prepared = await prepareImageForUpload(file)
+    if (prepared.size > MAX_UPLOAD_BYTES) throw new Error('La imagen no debe superar los 5MB.')
+    const formData = new FormData()
+    formData.append('file', prepared)
+    const response = await fetch('/api/events/upload-image', { method: 'POST', body: formData })
+    const result = await response.json()
+    if (!response.ok) throw new Error(result.message || 'Error al subir imagen')
+    form.value.general.coverMobileUrl = result.url
+  } catch (e) {
+    console.error(e)
+    mobileUploadError.value = e.message || 'Error al subir la imagen. Intenta nuevamente.'
+  } finally {
+    uploadingMobile.value = false
+  }
 }
 
 // Video de portada (se guarda al instante, EventVideoUploader.vue). Si el evento no tenía imagen, el servidor usa
@@ -665,6 +696,29 @@ const submitEvent = async ({ exit = false } = {}) => {
                 <span class="text-xs text-gray-500 leading-snug">{{ opt.hint }}</span>
                 <CheckCircle v-if="form.general.pageSettings.layout === opt.value" size="18" class="absolute top-2 right-2 text-black bg-white rounded-full" />
               </label>
+            </div>
+
+            <!-- Portada ancha: foto opcional para celular (events.cover_mobile_url) -->
+            <div v-if="form.general.pageSettings.layout === 'banner' && form.general.imageUrl" class="mt-4 p-4 rounded-xl border border-gray-200" data-testid="cover-mobile">
+              <p class="text-sm font-medium text-gray-700">Foto para celular <span class="font-normal text-gray-500">(opcional)</span></p>
+              <p class="text-xs text-gray-500 mt-1 mb-3">
+                En celular la portada ancha se recorta. Sube una versión vertical o cuadrada y la mostramos en pantallas chicas;
+                en computador se sigue viendo la imagen principal. Si no subes una, se usa la principal en todos los tamaños.
+              </p>
+              <input id="editEventMobileImageInput" type="file" accept="image/*" class="hidden" @change="handleMobileImageUpload" />
+              <div class="flex items-center gap-4">
+                <div class="w-20 h-28 shrink-0 rounded-lg overflow-hidden border border-gray-200 bg-gray-50 flex items-center justify-center">
+                  <img v-if="form.general.coverMobileUrl" :src="form.general.coverMobileUrl" alt="Foto para celular" class="w-full h-full object-cover" />
+                  <img v-else :src="form.general.imageUrl" alt="" class="w-full h-full object-cover opacity-40" />
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <label for="editEventMobileImageInput" class="cursor-pointer px-3 py-1.5 text-sm rounded-lg border border-gray-200 hover:bg-gray-50" :class="uploadingMobile ? 'opacity-50 pointer-events-none' : ''">
+                    {{ uploadingMobile ? 'Subiendo...' : form.general.coverMobileUrl ? 'Cambiar foto' : 'Subir foto para celular' }}
+                  </label>
+                  <button v-if="form.general.coverMobileUrl" type="button" class="px-3 py-1.5 text-sm rounded-lg text-gray-600 hover:bg-gray-50" @click="form.general.coverMobileUrl = ''">Quitar</button>
+                </div>
+              </div>
+              <p v-if="mobileUploadError" class="mt-2 text-sm text-red-600">{{ mobileUploadError }}</p>
             </div>
 
             <p class="block text-sm font-medium text-gray-700 mt-5 mb-1">Fondo</p>
