@@ -156,6 +156,27 @@ describe('confirmPaidOrder', () => {
     expect(mocks.ensureOrderAttendees).not.toHaveBeenCalled()
   })
 
+  it('si un tipo de entrada de la orden ya no existe, queda en review y avisa (no vuelve a pending)', async () => {
+    const db = withClaim(createFakeSupabase({
+      tables: { event_orders: [order()], events: [{ id: 7, name: 'Fiesta', status: 'published', cancelled_at: null }] },
+    }))
+    mocks.ensureOrderAttendees.mockRejectedValueOnce(Object.assign(new Error('La orden contiene tipos de entrada que no pertenecen al evento'), { code: 'invalid_ticket_types' }))
+    const res = await confirmPaidOrder(db, ORDER_ID, { provider: 'flow', amount: 33000, externalId: '555' })
+    expect(res).toMatchObject({ status: 'review', httpStatus: 200 })
+    expect(db.tables.event_orders[0]).toMatchObject({ status: 'review', total_payment: 33000, payment_external_id: '555' })
+    expect(mocks.notifySlack.mock.calls[0][0]).toMatch(/Tipo de entrada eliminado/)
+    expect(mocks.sendOrderTicketsEmail).not.toHaveBeenCalled()
+  })
+
+  it('un error transitorio al emitir libera el reclamo para reintentar', async () => {
+    const db = withClaim(createFakeSupabase({
+      tables: { event_orders: [order()], events: [{ id: 7, name: 'Fiesta', status: 'published', cancelled_at: null }] },
+    }))
+    mocks.ensureOrderAttendees.mockRejectedValueOnce(new Error('timeout'))
+    await expect(confirmPaidOrder(db, ORDER_ID, { provider: 'flow', amount: 33000, externalId: '555' })).rejects.toThrow(/timeout/)
+    expect(db.tables.event_orders[0].status).toBe('pending')
+  })
+
   it('una orden en review no se toca', async () => {
     const db = createFakeSupabase({ tables: { event_orders: [order({ status: 'review' })] } })
     expect(await confirmPaidOrder(db, ORDER_ID, { provider: 'flow', amount: 33000 })).toMatchObject({ status: 'review' })

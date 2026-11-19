@@ -143,7 +143,34 @@ async function deletionCheck(ctx: ToolContext, eventId: number) {
             `El evento tiene ${orders.count || 0} orden(es) y ${issued.count || 0} entrada(s) emitida(s): no se puede eliminar (se conserva para contabilidad). Usa archive_event para ocultarlo.`,
         );
     }
+    await assertNoMemberLosesRestriction(ctx, Number(event.id));
     return { event, ticketTypes: tickets.count || 0, functions: dates.count || 0 };
+}
+
+/**
+ * Las filas de aitickets_event_staff caen en cascada al borrar el evento, y un miembro SIN filas ve todos los
+ * eventos de la organización. Si para alguien este es su único evento asignado, borrarlo le daría acceso a todo.
+ */
+async function assertNoMemberLosesRestriction(ctx: ToolContext, eventId: number) {
+    const missing = (e: any) => ["42P01", "PGRST205"].includes(String(e?.code || ""));
+    const { data: staff, error } = await ctx.supabase.from("aitickets_event_staff").select("user_id").eq("event_id", eventId);
+    if (error) {
+        if (missing(error)) return;
+        throw error;
+    }
+    const userIds = [...new Set((staff || []).map((r: any) => Number(r.user_id)))];
+    if (!userIds.length) return;
+    const { data: rows, error: rowsError } = await ctx.supabase.from("aitickets_event_staff").select("user_id, event_id").in("user_id", userIds);
+    if (rowsError) throw rowsError;
+    const others = new Set((rows || []).filter((r: any) => Number(r.event_id) !== eventId).map((r: any) => Number(r.user_id)));
+    const orphaned = userIds.filter((id) => !others.has(id));
+    if (orphaned.length) {
+        throw new ToolError(
+            "conflict",
+            `${orphaned.length} miembro(s) del equipo solo tienen acceso a este evento: si se elimina, pasarían a ver TODOS los eventos de la organización. ` +
+                "Asígnales otro evento (assign_event_staff) o quítalos (remove_member) antes de eliminarlo.",
+        );
+    }
 }
 
 const deleteEvent: ToolDef = {
@@ -243,6 +270,11 @@ const updateVenue: ToolDef = {
         const usedBy = (uses || []).map((u: any) => ({ eventId: Number(u.event_id), orgId: Number((Array.isArray(u.events) ? u.events[0] : u.events)?.organization_id) }));
         if (usedBy.some((u: { orgId: number }) => u.orgId !== ctx.actor.orgId)) {
             throw new ToolError("conflict", "Este lugar también lo usan eventos de otra productora, así que no se puede editar. Crea un lugar nuevo desde el panel y asígnalo a tu evento.");
+        }
+        // Acceso por evento: un miembro limitado a ciertos eventos no puede cambiar el lugar de eventos que no tiene asignados
+        const allowed = ctx.actor.eventIds;
+        if (allowed && usedBy.some((u: { eventId: number }) => !allowed.includes(u.eventId))) {
+            throw new ToolError("forbidden", "Este lugar también lo usan eventos a los que no tienes acceso, así que no puedes editarlo.");
         }
 
         const patch: Record<string, unknown> = {};
