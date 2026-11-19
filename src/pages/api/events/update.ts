@@ -9,6 +9,7 @@ import { listOrgVenues, isVenueAllowed, insertOrgVenue } from "../../../lib/orgV
 import { loadSchedule, describeScheduleChange } from "../_lib/eventSchedule";
 import { changeEventSlug, EventSlugError, type SlugChangeResult } from "../../../lib/eventSlug";
 import { normalizeReviewSettings } from "../../../../netlify/lib/reviews.mjs";
+import { CoverMobileError, normalizeCoverMobileUrl, saveCoverMobileUrl } from "../../../lib/eventCoverMobile";
 
 /** Correos "¿Cómo estuvo?" después de cada función (toggle al final del formulario). Premio y moderación no cambian. */
 async function saveReviewsEnabled(supabase: ReturnType<typeof getSupabaseAdmin>, eventId: number, organizationId: number, enabled: boolean) {
@@ -40,6 +41,17 @@ export const POST: APIRoute = async (context) => {
 
         if (!eventId) {
             return jsonResponse({ message: "Event ID is required" }, 400);
+        }
+
+        // Portada para celular: se valida antes de escribir nada
+        let coverMobile: string | null = null;
+        if (general?.coverMobileUrl !== undefined) {
+            try {
+                coverMobile = normalizeCoverMobileUrl(general.coverMobileUrl);
+            } catch (err) {
+                if (err instanceof CoverMobileError) return jsonResponse({ message: err.message }, 400);
+                throw err;
+            }
         }
 
         const supabaseAdmin = getSupabaseAdmin();
@@ -160,6 +172,10 @@ export const POST: APIRoute = async (context) => {
         // Ajuste de portada (solo si el formulario lo envía: clientes antiguos no lo conocen)
         if (general.coverSettings !== undefined) {
             await saveCoverSettings(event.id, dbUser.organization_id, general.imageUrl ? general.coverSettings : null);
+        }
+        // Portada para celular del diseño "Portada ancha" (idem). Sin imagen principal no hay portada para celular.
+        if (general.coverMobileUrl !== undefined) {
+            await saveCoverMobileUrl(supabaseAdmin, event.id, dbUser.organization_id, general.imageUrl ? coverMobile : null);
         }
         // Diseño de la página y organizador visible (idem: solo si el formulario lo envía)
         if (general.pageSettings !== undefined) {

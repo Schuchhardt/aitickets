@@ -365,7 +365,9 @@ async function loadEventPageRowsByQueries(
       : baseQuery.eq("slug", slug!).eq("status", "published")
     ).maybeSingle();
   };
-  let { data: event, error }: { data: any; error: any } = await loadEvent(`${EVENT_PUBLIC_COLUMNS}, cover_settings, fee_absorbed, cover_meta, page_settings, cover_video, gallery_video`);
+  let { data: event, error }: { data: any; error: any } = await loadEvent(`${EVENT_PUBLIC_COLUMNS}, cover_settings, fee_absorbed, cover_meta, page_settings, cover_video, gallery_video, cover_mobile_url`);
+  // cover_mobile_url: foto para celular de la portada ancha (migración 202611180200)
+  if (error?.code === "42703") ({ data: event, error } = await loadEvent(`${EVENT_PUBLIC_COLUMNS}, cover_settings, fee_absorbed, cover_meta, page_settings, cover_video, gallery_video`));
   // Deploy previews comparten la BD de producción: tolerar que las migraciones de videos/page_settings/cover_meta/cover_settings/fee_absorbed no estén aplicadas
   if (error?.code === "42703") ({ data: event, error } = await loadEvent(`${EVENT_PUBLIC_COLUMNS}, cover_settings, fee_absorbed, cover_meta, page_settings`));
   if (error?.code === "42703") ({ data: event, error } = await loadEvent(`${EVENT_PUBLIC_COLUMNS}, cover_settings, fee_absorbed, cover_meta`));
@@ -766,6 +768,8 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
     permit,
     venue: primaryVenue,
     cover_settings: normalizeCoverSettings(event.cover_settings),
+    // Foto para celular de la portada ancha (EventDetail.vue la usa bajo 1024 px; null = image_url en todos los tamaños)
+    cover_mobile_url: event.cover_mobile_url || null,
     // Diseño de la página y si se muestra el organizador (src/lib/eventPageSettings.ts)
     page_settings: normalizePageSettings(rawPageSettings),
     // El productor absorbe el cargo por servicio: el precio de la entrada es el total (src/components/Reservation/pricing.js)

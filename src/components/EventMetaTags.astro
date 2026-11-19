@@ -19,8 +19,11 @@ import { defaultOgImagePath, DEFAULT_OG_CARD } from "../lib/ogPages";
 import { OG_HEIGHT, OG_WIDTH } from "../lib/imageOptimize";
 import { cdnImage, cdnSrcset, EVENT_COVER_SIZES } from "../lib/imageCdn.js";
 import { jsonLdString } from "../lib/jsonLd";
+import { bannerMobileCover, COVER_MOBILE_MAX_WIDTH } from "../lib/eventPageSettings";
 
 const { event, title, description, canonicalPath, noindex = false } = Astro.props;
+// Portada ancha con foto para celular: se precarga la de cada pantalla
+const coverMobileUrl = bannerMobileCover(event);
 const siteUrl = (import.meta.env.SITE_URL || "https://aitickets.cl").replace(/\/$/, "");
 // Sin portada: la tarjeta genérica de AI Tickets (1200×630 JPEG, src/lib/ogPages.ts)
 const fallbackImagePath = defaultOgImagePath();
@@ -193,6 +196,14 @@ const eventJsonLd = generateEventJsonLd();
      se precarga el póster del video, que se pinta mientras el video carga -->
 {event?.cover_video
   ? event.cover_video.poster_url && <link rel="preload" as="image" href={event.cover_video.poster_url} fetchpriority="high" />
+  : coverMobileUrl
+  ? (
+    <>
+      <!-- Portada ancha con foto para celular (events.cover_mobile_url): cada pantalla precarga solo la suya -->
+      <link rel="preload" as="image" media={`(max-width: ${COVER_MOBILE_MAX_WIDTH}px)`} href={cdnImage(coverMobileUrl, 1080)} imagesrcset={cdnSrcset(coverMobileUrl)} imagesizes={cdnSrcset(coverMobileUrl) ? "100vw" : undefined} fetchpriority="high" />
+      <link rel="preload" as="image" media={`(min-width: ${COVER_MOBILE_MAX_WIDTH + 1}px)`} href={cdnImage(event.image_url, 1080)} imagesrcset={cdnSrcset(event.image_url)} imagesizes={cdnSrcset(event.image_url) ? EVENT_COVER_SIZES : undefined} fetchpriority="high" />
+    </>
+  )
   : event?.image_url && <link rel="preload" as="image" href={cdnImage(event.image_url, 1080)} imagesrcset={cdnSrcset(event.image_url)} imagesizes={cdnSrcset(event.image_url) ? EVENT_COVER_SIZES : undefined} fetchpriority="high" />}
 
 <!-- JSON-LD Structured Data -->

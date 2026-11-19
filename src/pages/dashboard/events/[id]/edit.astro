@@ -1,4 +1,5 @@
 ---
+import { loadCoverMobileUrl } from "../../../../lib/eventCoverMobile";
 import DashboardLayout from "../../../../layouts/DashboardLayout.astro";
 import EditEventForm from "../../../../components/events/EditEventForm.vue";
 import { getSupabaseAdmin } from "../../../../lib/auth-helpers";
@@ -79,6 +80,8 @@ const [peoplePerTicket, checkoutFieldsRes] = await Promise.all([
     loadPeoplePerTicket(supabaseAdmin, event.id),
     supabaseAdmin.from("events").select("checkout_fields").eq("id", event.id).maybeSingle(),
 ]);
+// Portada para celular del diseño "Portada ancha" (null sin la migración 202611180200)
+const coverMobileUrl = await loadCoverMobileUrl(supabaseAdmin, Number(event.id)).catch(() => null);
 const checkoutFields = normalizeCheckoutFields(checkoutFieldsRes.error ? null : (checkoutFieldsRes.data as any)?.checkout_fields);
 // Hora límite de ingreso por entrada (vacío si la migración 202610300300 aún no está aplicada)
 const entryDeadlines = await loadEntryDeadlines(supabaseAdmin, event.id);
@@ -98,6 +101,7 @@ const initialFormState = {
         // Descripción guardada como texto plano sanitizado: mostrar sin entidades HTML en el textarea
         description: /<\/?[a-z][^>]*>/i.test(event.description || "") ? event.description : decodeBasicEntities(event.description || ""),
         imageUrl: event.image_url || "",
+        coverMobileUrl: coverMobileUrl || "",
         coverSettings: event.cover_settings || null,
         pageSettings: normalizePageSettings(event.page_settings),
         category: (event as any).event_tags?.[0]?.category_tags?.name || "",

@@ -90,3 +90,26 @@ describe('/api/events/update: toggle de reseñas', () => {
     expect(db.tables.events[0].review_settings).toBeNull()
   })
 })
+
+describe('/api/events/update: foto para celular de la portada ancha', () => {
+  const MOBILE = 'https://cdn.aitickets.cl/m.jpg'
+  it('la guarda con imagen principal; "" la quita; sin imagen principal queda vacía', async () => {
+    seed()
+    expect((await save({ imageUrl: 'https://cdn.aitickets.cl/a.jpg', coverMobileUrl: MOBILE })).status).toBe(200)
+    expect(db.tables.events[0].cover_mobile_url).toBe(MOBILE)
+    await save({ imageUrl: 'https://cdn.aitickets.cl/a.jpg', coverMobileUrl: '' })
+    expect(db.tables.events[0].cover_mobile_url).toBeNull()
+    await save({ imageUrl: '', coverMobileUrl: MOBILE })
+    expect(db.tables.events[0].cover_mobile_url).toBeNull()
+  })
+
+  it('link inválido: 400 sin guardar nada; sin el campo (cliente antiguo) no se toca', async () => {
+    seed()
+    const res = await save({ imageUrl: 'https://cdn.aitickets.cl/a.jpg', coverMobileUrl: 'javascript:alert(1)' })
+    expect(res.status).toBe(400)
+    expect(db.tables.events[0]).toMatchObject({ name: 'Fiesta' })
+    db.tables.events[0].cover_mobile_url = MOBILE
+    expect((await save({ imageUrl: 'https://cdn.aitickets.cl/a.jpg' })).status).toBe(200)
+    expect(db.tables.events[0].cover_mobile_url).toBe(MOBILE)
+  })
+})
