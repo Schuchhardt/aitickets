@@ -15,6 +15,13 @@ import { getSupabaseAdmin } from "./auth-helpers";
 export const PREVIEW_PATH = "/eventos/vista-previa";
 /** Query param con el token en la página del evento: /eventos/<slug>?preview=<token>. */
 export const PREVIEW_PARAM = "preview";
+/**
+ * `&incognito=1` junto al token: abre la vista previa SIN registrar la visita (view_count / last_viewed_at).
+ * Es para que el equipo de AI Tickets revise un borrador (p. ej. desde el aviso de Slack) sin ensuciar la señal
+ * "el lead abrió su propuesta". No da acceso extra: sin un token válido no abre nada, y un link de un solo uso
+ * lo ignora (se consume y cuenta igual; si no, el flag serviría para abrirlo muchas veces).
+ */
+export const PREVIEW_INCOGNITO_PARAM = "incognito";
 /** Path de la cookie de un link de un solo uso: cubre /eventos/<slug> y la ruta anterior. */
 export const PREVIEW_COOKIE_PATH = "/eventos";
 export const PREVIEW_TOKEN_PREFIX = "pv_";
@@ -65,6 +72,16 @@ export function previewUrl(origin: string, token: string, slug?: string | null) 
     const base = origin.replace(/\/+$/, "");
     if (!slug) return `${base}${PREVIEW_PATH}/${token}`;
     return `${base}/eventos/${encodeURIComponent(slug)}?${PREVIEW_PARAM}=${token}`;
+}
+
+/** ¿La URL pide no registrar la visita? (`incognito=1`) */
+export const isIncognitoPreview = (params: URLSearchParams) => params.get(PREVIEW_INCOGNITO_PARAM) === "1";
+
+/** La misma URL de vista previa con `incognito=1` (ver PREVIEW_INCOGNITO_PARAM). Solo para uso interno. */
+export function incognitoPreviewUrl(url: string) {
+    const u = new URL(url);
+    u.searchParams.set(PREVIEW_INCOGNITO_PARAM, "1");
+    return u.toString();
 }
 
 export type PreviewLinkStatus = "active" | "expired" | "revoked" | "used";
@@ -208,11 +225,12 @@ export type PreviewUnavailableReason = Extract<ResolvePreviewResult, { ok: false
 /**
  * Valida un token de la URL y registra la visita. `cookieNonce` es el valor de la cookie del navegador
  * para este link (si existe). Para un link de un solo uso aún no consumido, lo consume y devuelve la cookie
- * que hay que fijar. Los bots nunca consumen ni registran visitas.
+ * que hay que fijar. Los bots nunca consumen ni registran visitas. Con `incognito` un link de varios usos
+ * se abre sin registrar la visita; uno de un solo uso lo ignora.
  */
 export async function resolvePreviewToken(
     token: unknown,
-    { userAgent, cookieNonce }: { userAgent?: string | null; cookieNonce?: string | null },
+    { userAgent, cookieNonce, incognito }: { userAgent?: string | null; cookieNonce?: string | null; incognito?: boolean },
     supabase = getSupabaseAdmin(),
 ): Promise<ResolvePreviewResult> {
     if (!isPreviewToken(token)) return { ok: false, reason: "not_found" };
@@ -262,12 +280,14 @@ export async function resolvePreviewToken(
         return { ok: false, reason: "bot" };
     }
 
-    // Visita (best effort, no bloquea)
-    supabase
-        .from("aitickets_event_preview_links")
-        .update({ view_count: (link.view_count || 0) + 1, last_viewed_at: new Date().toISOString() })
-        .eq("id", link.id)
-        .then(({ error: e }: any) => e && console.warn("preview link view:", e.message));
+    // Visita (best effort, no bloquea). Con incognito=1 un link de varios usos no la registra.
+    if (!(incognito && !link.single_use)) {
+        supabase
+            .from("aitickets_event_preview_links")
+            .update({ view_count: (link.view_count || 0) + 1, last_viewed_at: new Date().toISOString() })
+            .eq("id", link.id)
+            .then(({ error: e }: any) => e && console.warn("preview link view:", e.message));
+    }
 
     return { ok: true, link, eventId: Number(link.event_id), orgId: Number(link.organization_id) };
 }

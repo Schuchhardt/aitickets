@@ -6,10 +6,11 @@ import { fetchAll } from "../../producer-api/tools/common";
 import { buildLeadsCsv, filterExportableLeads as filterLeads, leadPriority } from "../../../../netlify/lib/leads/export.mjs";
 import { suppress } from "../../../../netlify/lib/outreach/guardrails.mjs";
 import { isFreeMailDomain, leadDomainFor, normalizeEmail, registrableDomain, emailDomain } from "../../../../netlify/lib/outreach/domains.mjs";
-import { createPreviewLink, listPreviewLinks, presentPreviewLink, revokePreviewLink, PreviewLinkError, PREVIEW_LINK_COLUMNS } from "../../eventPreview";
+import { createPreviewLink, incognitoPreviewUrl, listPreviewLinks, presentPreviewLink, revokePreviewLink, PreviewLinkError, PREVIEW_LINK_COLUMNS } from "../../eventPreview";
 import { runTool } from "../../producer-api/registry";
 import { TOOLS } from "../../producer-api/tools";
 import { getSupportUserId, orgToolContext } from "../context";
+import { notifySlack } from "../../../pages/api/_lib/server-utils";
 import type { AdminToolDef } from "../registry";
 
 const LEADS = "aitickets_leads";
@@ -927,7 +928,8 @@ const createLeadProposal: AdminToolDef = {
         let eventStatus: string;
         if (args.event) {
             orgId = await getProposalsOrgId(actx.supabase);
-            const outcome = await runTool(CREATE_EVENT, args.event, await orgToolContext(actx, orgId));
+            // quiet: el aviso de Slack lo manda esta herramienta, con el link de la propuesta (el de create_event se revoca).
+            const outcome = await runTool(CREATE_EVENT, args.event, { ...(await orgToolContext(actx, orgId)), quiet: true });
             if (!outcome.ok) throw new ToolError(outcome.code, outcome.message);
             const created = outcome.result as any;
             eventId = Number(created.event_id);
@@ -1010,6 +1012,16 @@ const createLeadProposal: AdminToolDef = {
             .select("id")
             .single();
         if (touchError) throwTouchError(touchError);
+
+        // Aviso (solo cuando se creó el evento): el link va con incognito=1 para revisarlo sin que cuente como
+        // "el lead abrió su propuesta" (get_lead → proposal.opened).
+        if (args.event) {
+            await notifySlack(
+                `🤝 *Propuesta armada para un lead vía Admin* (evento en borrador)\n• *Lead:* ${lead.org_name || lead.id}\n• *Evento:* ${eventName}` +
+                    (previewUrl ? `\n• *Vista previa:* <${incognitoPreviewUrl(previewUrl)}|abrir sin contar la visita>` : "") +
+                    `\n• *Panel:* ${actx.origin}/dashboard/events/${eventId}`,
+            );
+        }
 
         return {
             lead_id: lead.id,

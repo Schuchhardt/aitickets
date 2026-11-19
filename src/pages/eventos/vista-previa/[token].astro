@@ -10,7 +10,7 @@ import EventDetail from "../../../components/EventDetail.vue";
 import EventMetaTags from "../../../components/EventMetaTags.astro";
 import EventPreviewUnavailable from "../../../components/EventPreviewUnavailable.astro";
 import { getPublicEventData } from "../../../lib/eventPage";
-import { previewCookieName, resolvePreviewToken, isPreviewToken, PREVIEW_COOKIE_PATH } from "../../../lib/eventPreview";
+import { isIncognitoPreview, previewCookieName, resolvePreviewToken, isPreviewToken, PREVIEW_COOKIE_PATH } from "../../../lib/eventPreview";
 import Layout from "../../../layouts/Layout.astro";
 import "../../../styles/global.css";
 
@@ -26,6 +26,7 @@ const cookieName = isPreviewToken(token) ? previewCookieName(token) : null;
 const resolved = await resolvePreviewToken(token, {
   userAgent: Astro.request.headers.get("user-agent"),
   cookieNonce: cookieName ? Astro.cookies.get(cookieName)?.value || null : null,
+  incognito: isIncognitoPreview(Astro.url.searchParams),
 });
 
 let result = null as Awaited<ReturnType<typeof getPublicEventData>>;

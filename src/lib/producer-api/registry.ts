@@ -39,6 +39,8 @@ export type ToolContext = {
     channel: ToolChannel;
     /** Resumen que el productor confirmó (solo en la segunda llamada de una herramienta con confirm). */
     confirmed?: ConfirmationSummary;
+    /** true = la herramienta no avisa en Slack: quien la llama manda su propio aviso (p. ej. create_lead_proposal). */
+    quiet?: boolean;
 };
 
 export type ToolChannel = "mcp" | "rest" | "dashboard" | "admin";

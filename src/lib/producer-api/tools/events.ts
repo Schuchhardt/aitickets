@@ -8,7 +8,7 @@ import {
     rejectCourtesyName, clp, localDateTime, ticketChainInfo,
 } from "./common";
 import { isCourtesyOrder, isTransferOrder, orderSoldQty } from "../../orderKinds";
-import { createPreviewLink, listPreviewLinks, revokePreviewLink, PreviewLinkError, PREVIEW_DEFAULT_HOURS } from "../../eventPreview";
+import { createPreviewLink, incognitoPreviewUrl, listPreviewLinks, revokePreviewLink, PreviewLinkError, PREVIEW_DEFAULT_HOURS } from "../../eventPreview";
 import { createEventGraph, setEventStatus, syncEventCategory, refreshEventDenorm, EventInputError, type EventGraphInput } from "../../../pages/api/_lib/events";
 import { loadSecretLocation, saveSecretLocation, MAX_REVEAL_HOURS, SECRET_LOCATION_MAX, DEFAULT_REVEAL_HOURS } from "../../../../netlify/lib/secret-location.mjs";
 import { listOrgVenues } from "../../orgVenues";
@@ -359,7 +359,6 @@ const createEvent: ToolDef = {
             })),
         };
         const created = await createEventGraph({ userId: ctx.actor.userId, orgId: ctx.actor.orgId }, input).catch(rethrowEventInput);
-        await notifySlack(`🤖 *Nuevo evento creado vía ${channelLabel(ctx.channel)}*\n• *Nombre:* ${created.name}\n• *Link:* /eventos/${created.slug}`);
         let preview: { url: string; expires_at: string | null } | null = null;
         try {
             const p = await createPreviewLink(
@@ -369,6 +368,15 @@ const createEvent: ToolDef = {
             preview = { url: p.url, expires_at: p.link.expires_at };
         } catch (err: any) {
             console.warn("create_event preview link:", err?.message);
+        }
+        // El evento nace en BORRADOR: su URL pública da 404. El aviso lleva la vista previa privada con incognito=1
+        // (no cuenta como visita del link) y el panel.
+        if (!ctx.quiet) {
+            await notifySlack(
+                `🤖 *Nuevo evento creado vía ${channelLabel(ctx.channel)}* (borrador)\n• *Nombre:* ${created.name}` +
+                    (preview ? `\n• *Vista previa:* <${incognitoPreviewUrl(preview.url)}|abrir sin contar la visita>` : "") +
+                    `\n• *Panel:* ${ctx.origin}/dashboard/events/${created.id}`,
+            );
         }
         return {
             ...(await eventDetail(ctx, Number(created.id))),
