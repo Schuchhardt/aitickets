@@ -9,7 +9,10 @@ ALTER TABLE public.organizations ADD COLUMN IF NOT EXISTS logo_url text;
 COMMENT ON COLUMN public.organizations.logo_url IS
   'Logo público de la organización (bucket Events, org-logos/). NULL = iniciales del nombre público.';
 
--- La página pública trae el logo junto al nombre público. Misma función que 202610290100, solo con logo_url agregado.
+-- La página pública trae el logo junto al nombre público. Misma función que 202610290100 con organizations.logo_url y
+-- events.cover_mobile_url leídos con to_jsonb(...) para tolerar que la columna del otro cambio (foto para celular de la
+-- portada ancha, 202611180200) no exista todavía: así este archivo y ese dejan exactamente la misma función, se
+-- apliquen en el orden que sea.
 CREATE OR REPLACE FUNCTION public.aitickets_public_event_page(p_slug text DEFAULT NULL, p_event_id bigint DEFAULT NULL)
 RETURNS jsonb
 LANGUAGE sql
@@ -29,7 +32,8 @@ AS $$
       SELECT to_jsonb(x) FROM (
         SELECT ev.id, ev.slug, ev.name, ev.title, ev.description, ev.image_url, ev.location, ev.capacity, ev.status,
                ev.accessibility, ev.start_date, ev.end_date, ev.organization_id,
-               ev.cover_settings, ev.fee_absorbed, ev.cover_meta, ev.page_settings, ev.cover_video, ev.gallery_video
+               ev.cover_settings, ev.fee_absorbed, ev.cover_meta, ev.page_settings, ev.cover_video, ev.gallery_video,
+               (to_jsonb(ev) ->> 'cover_mobile_url') AS cover_mobile_url
       ) x
     ),
     'categories', COALESCE((
@@ -79,7 +83,7 @@ AS $$
     ), '[]'::jsonb),
     'org', (
       SELECT to_jsonb(o) FROM (
-        SELECT org.public_name, org.website, org.instagram, org.logo_url FROM public.organizations org WHERE org.id = ev.organization_id
+        SELECT org.public_name, org.website, org.instagram, to_jsonb(org) -> 'logo_url' AS logo_url FROM public.organizations org WHERE org.id = ev.organization_id
       ) o
     ),
     'trust', (
