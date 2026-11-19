@@ -64,7 +64,7 @@ embeber (`frame-ancestors 'none'`).
 | Agenda | `get_event_agenda`, `update_event_agenda` (bloques con hora, expositores y sala por función) |
 | Certificados | `get_attendance_certificates` (attendees), `send_attendance_certificates` (publish, con confirmación) |
 | Reseñas | `list_event_reviews` (attendees), `update_review_settings`, `invite_past_attendees` (publish, con confirmación) |
-| Marketing | `get_marketing_kit`, `create_tracking_link`, `upload_image`, `set_event_video`, `generate_image`, `create_social_post`, `list_social_posts`, `publish_social_post` (publish) |
+| Marketing | `get_marketing_kit`, `create_tracking_link`, `upload_image`, `create_image_upload_link`, `set_event_video`, `generate_image`, `create_social_post`, `list_social_posts`, `publish_social_post` (publish) |
 | Difusión automática (Instagram) | `get_social_series`, `prepare_social_series` (borrador), `approve_social_series` (publish, confirmación), `pause_social_series`, `resume_social_series` (confirmación), `cancel_social_series` (confirmación). Ver `docs/specs/historias-automaticas.md` |
 
 El servidor MCP además entrega `instructions` (reglas de uso para el modelo) y 3 prompts:
@@ -78,6 +78,16 @@ Decisiones:
   imágenes, genera imágenes (OpenAI, opcional) y publica vía Zernio.
 - `upload_image` por URL: solo https, DNS resuelto a IPs públicas, redirecciones re-verificadas, 5 MB,
   tipo detectado por bytes (sin SVG).
+- `upload_image` y `generate_image` aceptan `set_as_cover` (imagen principal) o `set_as_mobile_cover` (foto para
+  celular de la portada ancha, `events.cover_mobile_url`; exige que el evento ya tenga imagen principal y avisa si
+  el diseño no es `banner`). Uno de los dos, nunca ambos.
+- `create_image_upload_link`: para cuando el asistente no tiene una URL pública ni puede mandar el base64 (imagen
+  adjunta en el chat, archivo en el teléfono del productor). Devuelve `/subir-imagen/<token>`: token firmado sin
+  estado (`netlify/lib/image-upload-token.mjs`: organización, evento, destino `cover` / `mobile_cover` / `library`,
+  vence en 30 min, máx. 120). La página no pide sesión y manda el archivo a `POST /api/images/upload-link`, que
+  aplica las mismas reglas de imagen (5 MB, tipo por bytes), máx. 20 subidas por hora por organización, y vacía la
+  caché de las páginas de eventos. El link no es de un solo uso: mientras no venza, quien lo tenga puede volver a
+  subir a ese destino. En el MCP Admin es `org_create_image_upload_link`.
 - `set_event_video` (video de portada en vez de la imagen, o arriba de la galería con `slot=gallery`): mismas
   reglas de descarga, 50 MB, 20 s de descarga (la función es síncrona), MP4/WEBM/MOV detectado por bytes
   (src/lib/videoProbe.ts, que también lee ancho, alto rotado y duración del MP4) y copia en nuestro Storage

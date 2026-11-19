@@ -1,0 +1,152 @@
+---
+// Subir una imagen con el link temporal de create_image_upload_link (MCP). Sin sesión: el token firmado dice la
+// organización, el evento y el destino (portada, foto para celular o solo alojarla). El archivo se manda a
+// /api/images/upload-link. La URL lleva el token: sin caché, sin indexar, sin Analytics y sin Referer.
+import Layout from "../../layouts/Layout.astro";
+import { getSupabaseAdmin } from "../../lib/auth-helpers";
+import { verifyImageUploadToken } from "../../../netlify/lib/image-upload-token.mjs";
+import "../../styles/global.css";
+
+export const prerender = false;
+
+const token = Astro.params.token || "";
+Astro.response.headers.set("Cache-Control", "no-store");
+Astro.response.headers.set("Referrer-Policy", "no-referrer");
+Astro.response.headers.set("X-Robots-Tag", "noindex, nofollow");
+
+const link = verifyImageUploadToken(token);
+let orgName = "";
+let eventName = "";
+let eventMissing = false;
+if (link) {
+  const supabase = getSupabaseAdmin();
+  const { data: org } = await supabase.from("organizations").select("public_name").eq("id", link.orgId).maybeSingle();
+  orgName = org?.public_name || "";
+  if (link.eventId) {
+    const { data: event } = await supabase.from("events").select("name").eq("id", link.eventId).eq("organization_id", link.orgId).maybeSingle();
+    eventName = event?.name || "";
+    eventMissing = !event;
+  }
+}
+const valid = Boolean(link) && !eventMissing;
+
+const COPY = {
+  cover: { title: "Sube la portada del evento", help: "Queda como imagen principal del evento: en su página, en la cartelera, al compartir y en los correos.", done: "Listo, ya es la portada del evento." },
+  mobile_cover: { title: "Sube la foto para celular", help: "La página del evento la muestra en teléfonos en vez de la portada ancha. Sirve una imagen vertical (ideal 4:5, por ejemplo 1080×1350) o cuadrada. En computador se sigue viendo la portada principal.", done: "Listo, ya es la foto para celular del evento." },
+  library: { title: "Sube tu imagen", help: "La guardamos en AI Tickets y te mostramos su link para que lo pegues en el chat.", done: "Listo, la imagen quedó guardada. Copia este link y pégalo en el chat:" },
+} as const;
+const copy = link ? COPY[link.use] : COPY.library;
+---
+
+<Layout title="Subir imagen | AI Tickets" description="Sube una imagen para tu evento." noindex analytics={false}>
+  <main class="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-16">
+    <div class="w-full max-w-md bg-white border border-gray-200 rounded-2xl p-8 shadow-sm">
+      <a href="/" class="inline-block mb-6 text-lg font-bold text-gray-900">AI Tickets</a>
+      {valid ? (
+        <div id="imageUploadLink" data-token={token} data-use={link!.use} data-done={copy.done}>
+          <h1 class="text-2xl font-bold text-gray-900 mb-2">{copy.title}</h1>
+          {(eventName || orgName) && (
+            <p class="text-sm text-gray-500 mb-3" data-testid="upload-link-target">{[eventName, orgName].filter(Boolean).join(" · ")}</p>
+          )}
+          <p class="text-gray-600 mb-6">{copy.help}</p>
+
+          <div id="uploadForm">
+            <input id="uploadFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" class="hidden" data-testid="upload-link-file" />
+            <label for="uploadFile" id="uploadPick" class="block cursor-pointer rounded-xl border-2 border-dashed border-gray-300 px-4 py-8 text-center text-gray-600 hover:bg-gray-50">
+              <span class="block font-medium text-gray-900">Elegir imagen</span>
+              <span class="block text-xs text-gray-500 mt-1">JPG, PNG, WEBP o GIF</span>
+            </label>
+            <img id="uploadPreview" alt="Vista previa" class="hidden mt-4 mx-auto max-h-72 rounded-lg border border-gray-200" />
+            <button id="uploadSend" type="button" disabled class="mt-4 w-full rounded-xl bg-gray-900 px-6 py-3 font-semibold text-white hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed" data-testid="upload-link-send">
+              Subir imagen
+            </button>
+            <p id="uploadError" class="hidden mt-3 text-sm text-red-600" role="alert"></p>
+          </div>
+
+          <div id="uploadDone" class="hidden" data-testid="upload-link-done">
+            <p id="uploadDoneText" class="text-gray-900 font-medium"></p>
+            <input id="uploadDoneUrl" type="text" readonly class="hidden mt-3 w-full px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-700" />
+            <p id="uploadWarning" class="hidden mt-3 text-sm text-amber-700"></p>
+            <button id="uploadAgain" type="button" class="mt-5 text-sm underline text-gray-600">Subir otra imagen</button>
+          </div>
+          <noscript><p class="mt-4 text-sm text-red-600">Para subir la imagen necesitas activar JavaScript en tu navegador.</p></noscript>
+        </div>
+      ) : (
+        <>
+          <h1 class="text-2xl font-bold text-gray-900 mb-3">Este link ya no sirve</h1>
+          <p class="text-gray-600">Los links para subir imágenes duran poco. Pide uno nuevo en el chat, o sube la imagen desde el panel de tu evento.</p>
+        </>
+      )}
+    </div>
+  </main>
+</Layout>
+
+<script>
+  import { prepareImageForUpload, MAX_SOURCE_BYTES, MAX_UPLOAD_BYTES } from "../../lib/clientImage.js";
+
+  const root = document.getElementById("imageUploadLink");
+  if (root) {
+    const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+    const input = $<HTMLInputElement>("uploadFile");
+    const send = $<HTMLButtonElement>("uploadSend");
+    const preview = $<HTMLImageElement>("uploadPreview");
+    const errorEl = $("uploadError");
+    const show = (el: HTMLElement, on: boolean) => el.classList.toggle("hidden", !on);
+    const fail = (message: string) => { errorEl.textContent = message; show(errorEl, true); };
+    let chosen: File | null = null;
+
+    input.addEventListener("change", () => {
+      const file = input.files?.[0] || null;
+      show(errorEl, false);
+      chosen = null;
+      send.disabled = true;
+      show(preview, false);
+      if (!file) return;
+      if (!file.type.startsWith("image/")) return fail("Solo se permiten imágenes.");
+      if (file.size > MAX_SOURCE_BYTES) return fail("La imagen es demasiado pesada (máx. 30MB).");
+      chosen = file;
+      preview.src = URL.createObjectURL(file);
+      show(preview, true);
+      send.disabled = false;
+    });
+
+    send.addEventListener("click", async () => {
+      if (!chosen) return;
+      send.disabled = true;
+      send.textContent = "Subiendo...";
+      show(errorEl, false);
+      try {
+        const prepared = await prepareImageForUpload(chosen);
+        if (prepared.size > MAX_UPLOAD_BYTES) throw new Error("La imagen no debe superar los 5MB.");
+        const body = new FormData();
+        body.append("t", root.dataset.token || "");
+        body.append("file", prepared);
+        const response = await fetch("/api/images/upload-link", { method: "POST", body });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.message || "Error al subir la imagen. Intenta nuevamente.");
+        $("uploadDoneText").textContent = root.dataset.done || "Listo.";
+        const urlBox = $<HTMLInputElement>("uploadDoneUrl");
+        if (root.dataset.use === "library") { urlBox.value = result.url || ""; show(urlBox, true); urlBox.addEventListener("focus", () => urlBox.select()); }
+        const warning = $("uploadWarning");
+        warning.textContent = (result.warnings || []).join(" ");
+        show(warning, Boolean(warning.textContent));
+        show($("uploadForm"), false);
+        show($("uploadDone"), true);
+      } catch (e: any) {
+        fail(e?.message || "Error al subir la imagen. Intenta nuevamente.");
+        send.disabled = false;
+      } finally {
+        send.textContent = "Subir imagen";
+      }
+    });
+
+    $("uploadAgain").addEventListener("click", () => {
+      input.value = "";
+      chosen = null;
+      send.disabled = true;
+      show(preview, false);
+      show($("uploadDone"), false);
+      show($("uploadForm"), true);
+    });
+  }
+</script>

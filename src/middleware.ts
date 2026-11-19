@@ -98,7 +98,7 @@ function isCrossSiteRequest(request: Request, url: URL): boolean {
 const EDGE_TENANT_PREFIX = "/o/_host";
 
 /** En un host de tenant estas rutas viven en aitickets.cl. */
-const MAIN_ONLY_PREFIXES = ["/dashboard", "/organizadores", "/auth", "/api/auth", "/oauth", "/qr", "/validador", "/order", "/ticket", "/mis-entradas", "/payment-confirmation", "/pago", "/invitacion"];
+const MAIN_ONLY_PREFIXES = ["/dashboard", "/organizadores", "/auth", "/api/auth", "/oauth", "/qr", "/validador", "/order", "/ticket", "/mis-entradas", "/payment-confirmation", "/pago", "/invitacion", "/subir-imagen"];
 
 /** APIs de Astro permitidas en un host de tenant. */
 const TENANT_API_ALLOWLIST = new Set(["/api/sites/contact", "/api/events/visit"]);
