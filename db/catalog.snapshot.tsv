@@ -1151,6 +1151,7 @@ column:organizations.instagram	text notnull=false default=-
 column:organizations.legal_id	text notnull=false default=-
 column:organizations.legal_name	text notnull=false default=-
 column:organizations.linkedin	text notnull=false default=-
+column:organizations.logo_url	text notnull=false default=-
 column:organizations.onboarding_pending	boolean notnull=true default=false
 column:organizations.phone	text notnull=false default=-
 column:organizations.public_name	text notnull=true default=-

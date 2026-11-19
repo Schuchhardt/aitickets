@@ -4,6 +4,7 @@ import { getSessionContext, hasRole, ORG_ADMIN_ROLES, jsonResponse } from "../..
 import { notifySlack } from "../_lib/server-utils";
 import { syncOrganizerLegalData } from "../../../lib/producerIdentity";
 import { roleAllows } from "../../../lib/producer-api/permissions";
+import { purgeEventPages } from "../../../lib/cdnCache";
 
 // Campos editables de la organización (public.organizations) y su largo máximo
 const ORG_FIELDS: Record<string, number> = {
@@ -88,6 +89,10 @@ export const POST: APIRoute = async (context) => {
         if (payoutData.legal_rut && !RUT_REGEX.test(payoutData.legal_rut)) {
             return jsonResponse({ message: "RUT de la empresa inválido (ej: 76.123.456-7)" }, 400);
         }
+        // Empresa: razón social y RUT van juntos (persona natural manda ambos vacíos)
+        if ("legal_name" in payoutData && "legal_rut" in payoutData && Boolean(payoutData.legal_name) !== Boolean(payoutData.legal_rut)) {
+            return jsonResponse({ message: "Para cobrar como empresa completa la razón social y el RUT de la empresa" }, 400);
+        }
         if (!Object.keys(orgData).length && !Object.keys(payoutData).length) {
             return jsonResponse({ message: "Nada que actualizar" }, 400);
         }
@@ -144,6 +149,9 @@ export const POST: APIRoute = async (context) => {
                 }
             }
         }
+
+        // El nombre público ("Organiza …") y la razón social/RUT se ven en las páginas de eventos (caché del CDN)
+        if ("public_name" in orgData || "legal_name" in payoutData || "legal_rut" in payoutData) await purgeEventPages();
 
         return jsonResponse({ message: "Organización actualizada" }, 200);
     } catch (error: any) {

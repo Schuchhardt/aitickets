@@ -76,7 +76,7 @@ export interface PublicEventSeo {
 export interface PublicEventResult {
   eventData: any;
   seo: PublicEventSeo;
-  org: { id: number; name: string; website: string | null; instagram: string | null } | null;
+  org: { id: number; name: string; website: string | null; instagram: string | null; logo_url?: string | null } | null;
 }
 
 /**
@@ -400,7 +400,17 @@ async function loadEventPageRowsByQueries(
       .order("date", { ascending: true })
       .order("start_time", { ascending: true }),
     event.organization_id
-      ? supabase.from("organizations").select("public_name, website, instagram").eq("id", event.organization_id).maybeSingle()
+      ? supabase
+          .from("organizations")
+          .select("public_name, website, instagram, logo_url")
+          .eq("id", event.organization_id)
+          .maybeSingle()
+          .then((res) =>
+            // logo_url existe desde 202611180100 (deploy preview sin migrar: sin logo)
+            res.error?.code === "42703"
+              ? supabase.from("organizations").select("public_name, website, instagram").eq("id", event.organization_id).maybeSingle()
+              : res
+          )
       : Promise.resolve({ data: null, error: null }),
     // Solo saber SI existe dirección secreta, sin leer su valor (C4)
     supabase
@@ -547,6 +557,8 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
         name: orgRow.public_name,
         website: orgRow.website,
         instagram: orgRow.instagram,
+        // Logo de la productora junto a "Organiza …" (migración 202611180100); sin logo, las iniciales
+        logo_url: orgRow.logo_url || null,
         // Identificación del organizador (Ley 19.496) y sello "Productor verificado" (Didit aprobado)
         legal_name: trust.legal_name || null,
         legal_rut: trust.legal_rut || null,

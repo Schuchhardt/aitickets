@@ -258,6 +258,20 @@ describe('POST /api/organizations/update', () => {
     expect(writes('organization_payout_accounts')).toHaveLength(0)
   })
 
+  it('empresa: razón social y RUT van juntos; persona natural (ambos vacíos) los borra de la cuenta y de la página', async () => {
+    const half = await update({ ...BANK, legal_name: 'Dance Studio SpA', legal_rut: '' })
+    expect(half.status).toBe(400)
+    expect(half.body.message).toMatch(/razón social y el RUT/)
+    expect((await update({ ...BANK, legal_name: '', legal_rut: '76.123.456-0' })).status).toBe(400)
+    expect(writes('organization_payout_accounts')).toHaveLength(0)
+
+    expect((await update({ ...BANK, legal_name: 'Dance Studio SpA', legal_rut: '76.123.456-0' })).status).toBe(200)
+    expect(org(7)).toMatchObject({ legal_name: 'Dance Studio SpA', legal_id: '76123456-0' })
+    expect((await update({ ...BANK, legal_name: '', legal_rut: '' })).status).toBe(200)
+    expect(payout(7)).toMatchObject({ ...BANK, legal_name: null, legal_rut: null })
+    expect(org(7)).toMatchObject({ legal_name: null, legal_id: null })
+  })
+
   it('recorta los textos a su largo máximo', async () => {
     await update({ public_name: 'n'.repeat(500), phone: '9'.repeat(100) })
     expect(org(7).public_name).toHaveLength(150)
