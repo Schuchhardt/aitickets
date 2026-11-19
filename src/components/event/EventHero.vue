@@ -55,6 +55,7 @@ const placeAddress = computed(() => {
 
 const organizer = computed(() => props.event.organization?.name || "");
 const organizerUrl = computed(() => props.event.organization?.website || "");
+const organizerLogo = computed(() => props.event.organization?.logo_url || "");
 </script>
 
 <template>
@@ -77,7 +78,8 @@ const organizerUrl = computed(() => props.event.organization?.website || "");
     </div>
 
     <div v-if="organizer && showOrganizer" class="organizer hero-in" style="--i: 2">
-      <span class="avatar" aria-hidden="true">{{ initialsOf(organizer) }}</span>
+      <img v-if="organizerLogo" class="avatar avatar-logo" :src="organizerLogo" alt="" width="28" height="28" loading="lazy" decoding="async" data-testid="organizer-logo" />
+      <span v-else class="avatar" aria-hidden="true">{{ initialsOf(organizer) }}</span>
       <span>Organiza
         <a v-if="organizerUrl" :href="organizerUrl" target="_blank" rel="noopener" class="organizer-name ev-link">{{ organizer }}</a>
         <strong v-else class="organizer-name">{{ organizer }}</strong>
@@ -261,6 +263,13 @@ const organizerUrl = computed(() => props.event.organization?.website || "");
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
+}
+.avatar-logo {
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  background: #fff;
 }
 .meta {
   display: flex;

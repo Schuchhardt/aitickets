@@ -1150,6 +1150,7 @@ column:organizations.instagram	text notnull=false default=-
 column:organizations.legal_id	text notnull=false default=-
 column:organizations.legal_name	text notnull=false default=-
 column:organizations.linkedin	text notnull=false default=-
+column:organizations.logo_url	text notnull=false default=-
 column:organizations.onboarding_pending	boolean notnull=true default=false
 column:organizations.phone	text notnull=false default=-
 column:organizations.public_name	text notnull=true default=-
@@ -1751,7 +1752,7 @@ function:aitickets_outreach_bump_counter(p_key text, p_delta bigint)	md5=3c1cfab
 function:aitickets_payout_account_changed()	md5=bb748cde7981edd1c492ed98febbbecc lang=plpgsql secdef=false returns=trigger config=search_path=public
 function:aitickets_payout_sync_withdrawals()	md5=420e3181144b44f59e6ba60c9eb07700 lang=plpgsql secdef=true returns=trigger config=search_path=public
 function:aitickets_payout_touch()	md5=5492f1791d9571e8e4bed2321c9f36f7 lang=plpgsql secdef=false returns=trigger config=search_path=public
-function:aitickets_public_event_page(p_slug text, p_event_id bigint)	md5=c90de63c75d000ef0b2e291242687bbc lang=sql secdef=true returns=jsonb config=search_path=public
+function:aitickets_public_event_page(p_slug text, p_event_id bigint)	md5=96bbae8ef2a0779bd3529eb87d492b9c lang=sql secdef=true returns=jsonb config=search_path=public
 function:aitickets_purge_producer_activity(p_keep_days integer, p_batch integer)	md5=e25fca9c9cbcd6ce61389df471193bb1 lang=plpgsql secdef=true returns=integer config=search_path=public
 function:aitickets_rate_limit_hit(p_bucket text, p_key_hash text, p_window_seconds integer, p_max integer)	md5=92624dd79140e02c60b8044ab507acea lang=plpgsql secdef=true returns=boolean config=search_path=public
 function:aitickets_reserve_order(p_event_id bigint, p_lines jsonb, p_order jsonb, p_hold_minutes integer)	md5=e9cd3d0a3dbd7ab4e260f214194412cd lang=plpgsql secdef=true returns=uuid config=search_path=public
