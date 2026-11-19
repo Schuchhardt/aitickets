@@ -10,6 +10,7 @@ import EventActionCard from "./event/EventActionCard.vue";
 import EventSections from "./event/EventSections.vue";
 import MobileStickyBar from "./event/MobileStickyBar.vue";
 import CheckoutSheet from "./event/CheckoutSheet.vue";
+import EventTrust from "./event/EventTrust.vue";
 import EventGallery from "./EventGallery.vue";
 import AutoplayVideo from "./event/AutoplayVideo.vue";
 import EventReviews from "./event/EventReviews.vue";
@@ -433,6 +434,7 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value && !cardHasChips.va
               :state="state"
               :external-url="externalUrl"
               :orders="orders"
+              :organizer-in-hero="Boolean(pageSettings.show_organizer && event.organization?.name)"
               @checkout="openCheckout"
               @view-orders="showOrders = true"
               @rsvp-state="rsvpState = $event"
@@ -479,6 +481,8 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value && !cardHasChips.va
           />
           <EventReviews v-if="showReviews" :event="event" :ended="state === 'ended'" :external-origin="reviewsOrigin" />
           <EventGallery v-if="event.gallery?.length || event.gallery_video" v-reveal :images="event.gallery || []" :video="event.gallery_video" :eventName="event.name" />
+          <!-- Razón social y RUT de quien organiza (Ley 19.496): al final de la página, no en la card de compra -->
+          <EventTrust :event="event" part="legal" />
         </div>
       </div>
 

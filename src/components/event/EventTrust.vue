@@ -2,10 +2,16 @@
 // Identificación del organizador en la página del evento: razón social y RUT (Ley 19.496), sello "Productor
 // verificado" (identidad aprobada con Didit) y, en eventos masivos, el estado de la autorización de la
 // Delegación Presidencial (Ley 21.659). Datos: eventData.organization y eventData.permit (src/lib/eventPage.ts).
+// Se usa en dos lugares de EventDetail.vue:
+//   - part="badges" en la card de compra: solo los sellos. "Productor verificado" se omite si el encabezado ya lo
+//     dice junto a "Organiza <productora>" (hideVerified), para no repetirlo.
+//   - part="legal" al final de la página: la línea "Organiza: razón social · RUT", fuera de la card de compra.
 import { computed } from "vue";
 
 const props = defineProps({
   event: { type: Object, required: true },
+  part: { type: String, default: "badges", validator: (v) => ["badges", "legal"].includes(v) },
+  hideVerified: { type: Boolean, default: false },
 });
 
 const org = computed(() => props.event.organization || null);
@@ -15,14 +21,14 @@ const legalLine = computed(() => {
   return [o.legal_name, o.legal_rut ? `RUT ${o.legal_rut}` : ""].filter(Boolean).join(" · ");
 });
 const permit = computed(() => props.event.permit || null);
-const visible = computed(() => Boolean(legalLine.value || org.value?.verified || permit.value));
+const showVerified = computed(() => Boolean(org.value?.verified) && !props.hideVerified);
 </script>
 
 <template>
-  <div v-if="visible" class="trust" data-testid="event-trust">
-    <p v-if="legalLine" class="legal">Organiza: {{ legalLine }}</p>
-    <div v-if="org?.verified || permit" class="badges">
-      <span v-if="org?.verified" class="badge ok" data-testid="producer-verified" title="AI Tickets verificó la identidad de este productor">
+  <p v-if="part === 'legal' && legalLine" class="legal legal-foot" data-testid="event-legal">Organiza: {{ legalLine }}</p>
+  <div v-else-if="part === 'badges' && (showVerified || permit)" class="trust" data-testid="event-trust">
+    <div class="badges">
+      <span v-if="showVerified" class="badge ok" data-testid="producer-verified" title="AI Tickets verificó la identidad de este productor">
         <span aria-hidden="true">✓</span> Productor verificado
       </span>
       <span
@@ -50,6 +56,11 @@ const visible = computed(() => Boolean(legalLine.value || org.value?.verified ||
   line-height: 16px;
   color: var(--text-2);
   overflow-wrap: anywhere;
+}
+.legal-foot {
+  margin-top: 40px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
 }
 .badges {
   display: flex;
