@@ -5,9 +5,8 @@
 //   Safari:  "Importing a module script failed."
 //   Chrome:  "Failed to fetch dynamically imported module"
 //   Firefox: "error loading dynamically imported module"
-// La marca en sessionStorage (por ruta) evita un bucle de recargas si el problema persiste.
-// window.__chunkReloading avisa a Sentry (sentry.client.config.js) que el error ya se está resolviendo con
-// la recarga, para no reportarlo; si la recarga no lo arregla, el error de la página recargada sí llega.
+// La marca en sessionStorage (por ruta) evita un bucle de recargas si el problema persiste. window.__aitChunkReloading
+// le dice a Sentry que no reporte el error que esta recarga va a arreglar (si vuelve después, sí se reporta).
 ---
 <script is:inline>
 	(function () {
@@ -20,7 +19,8 @@
 			} catch (e) {
 				return false;
 			}
-			window.__chunkReloading = true;
+			// Sentry descarta el error de este módulo mientras la recarga está en curso (src/lib/sentryFilters.js)
+			window.__aitChunkReloading = true;
 			location.reload();
 			return true;
 		}
