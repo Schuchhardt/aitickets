@@ -70,6 +70,40 @@ describe('resolvePreviewToken', () => {
     }
   })
 
+  it('incognito: un link de varios usos se abre sin registrar la visita', async () => {
+    const { url } = await create()
+    const token = tokenOf(url)
+    const row = () => db.tables.aitickets_event_preview_links[0]
+    expect(await preview.resolvePreviewToken(token, { userAgent: BROWSER, incognito: true })).toMatchObject({ ok: true, eventId: 10 })
+    await new Promise((r) => setTimeout(r, 0))
+    expect(row().view_count || 0).toBe(0)
+    expect(row().last_viewed_at ?? null).toBeNull()
+    // Sin el flag sí cuenta
+    await preview.resolvePreviewToken(token, { userAgent: BROWSER })
+    await new Promise((r) => setTimeout(r, 0))
+    expect(row().view_count).toBe(1)
+    expect(row().last_viewed_at).toBeTruthy()
+  })
+
+  it('incognito: un link de un solo uso lo ignora (se consume y cuenta igual)', async () => {
+    const { url } = await create({ singleUse: true })
+    const token = tokenOf(url)
+    const first = await preview.resolvePreviewToken(token, { userAgent: BROWSER, incognito: true })
+    expect(first.setCookie).toBeTruthy()
+    expect(db.tables.aitickets_event_preview_links[0]).toMatchObject({ view_count: 1 })
+    expect(db.tables.aitickets_event_preview_links[0].consumed_at).toBeTruthy()
+    expect(await preview.resolvePreviewToken(token, { userAgent: BROWSER, incognito: true })).toEqual({ ok: false, reason: 'used' })
+  })
+
+  it('incognito: sin token válido no abre nada; incognitoPreviewUrl e isIncognitoPreview', async () => {
+    expect(await preview.resolvePreviewToken('pv_' + 'a'.repeat(43), { userAgent: BROWSER, incognito: true })).toEqual({ ok: false, reason: 'not_found' })
+    expect(preview.incognitoPreviewUrl('https://aitickets.cl/eventos/mi-fiesta?preview=pv_x')).toBe('https://aitickets.cl/eventos/mi-fiesta?preview=pv_x&incognito=1')
+    expect(preview.incognitoPreviewUrl('https://aitickets.cl/eventos/vista-previa/pv_x')).toBe('https://aitickets.cl/eventos/vista-previa/pv_x?incognito=1')
+    expect(preview.isIncognitoPreview(new URLSearchParams('preview=pv_x&incognito=1'))).toBe(true)
+    expect(preview.isIncognitoPreview(new URLSearchParams('preview=pv_x&incognito=true'))).toBe(false)
+    expect(preview.isIncognitoPreview(new URLSearchParams('preview=pv_x'))).toBe(false)
+  })
+
   it('link de un solo uso: queda atado al primer navegador (cookie) y rechaza a los demás', async () => {
     const { url } = await create({ singleUse: true })
     const token = tokenOf(url)

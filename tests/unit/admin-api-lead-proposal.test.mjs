@@ -5,7 +5,8 @@ import { createFakeSupabase } from '../fixtures/fake-supabase.mjs'
 
 let db
 vi.mock('../../src/lib/auth-helpers', () => ({ getSupabaseAdmin: () => db, getFriendlyErrorMessage: (e) => String(e?.message || e) }))
-vi.mock('../../src/pages/api/_lib/server-utils', async (orig) => ({ ...(await orig()), notifySlack: async () => {} }))
+const slack = vi.hoisted(() => ({ messages: [] }))
+vi.mock('../../src/pages/api/_lib/server-utils', async (orig) => ({ ...(await orig()), notifySlack: async (text) => { slack.messages.push(text) } }))
 // El grafo del evento (lugar, funciones, entradas) tiene sus propios tests: aquí solo crea la fila del evento.
 vi.mock('../../src/pages/api/_lib/events', async (orig) => ({
   ...(await orig()),
@@ -39,6 +40,7 @@ const EVENT = {
 }
 
 beforeEach(() => {
+  slack.messages.length = 0
   resetSupportUserCache()
   db = createFakeSupabase({
     tables: {
@@ -61,6 +63,23 @@ beforeEach(() => {
 })
 
 describe('create_lead_proposal', () => {
+  it('avisa una sola vez en Slack, con la vista previa de la propuesta en incognito y el panel', async () => {
+    const r = await run('create_lead_proposal', { lead_id: LEAD, event: EVENT })
+    expect(slack.messages).toHaveLength(1) // el aviso de create_event se omite (quiet)
+    const msg = slack.messages[0]
+    expect(msg).toContain('Next Producciones')
+    expect(msg).toContain(`<${r.preview_url}&incognito=1|`)
+    expect(msg).toContain(`https://aitickets.cl/dashboard/events/${r.event_id}`)
+    expect(msg).not.toMatch(/Link:\*? \/eventos\//)
+    // La URL que se entrega para el lead no lleva el flag
+    expect(r.preview_url).not.toContain('incognito')
+  })
+
+  it('enlazar un evento existente no avisa en Slack', async () => {
+    await run('create_lead_proposal', { lead_id: LEAD, event_id: 149 })
+    expect(slack.messages).toHaveLength(0)
+  })
+
   it('crea el evento borrador en la org de propuestas, un link de 720 h, lo guarda en el lead y registra el touch', async () => {
     const before = Date.now()
     const r = await run('create_lead_proposal', { lead_id: LEAD, event: EVENT })
