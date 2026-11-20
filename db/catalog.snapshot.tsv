@@ -472,46 +472,71 @@ column:aitickets_event_waitlist.notified_at	timestamp with time zone notnull=fal
 column:aitickets_event_waitlist.utm_campaign	text notnull=false default=-
 column:aitickets_event_waitlist.utm_medium	text notnull=false default=-
 column:aitickets_event_waitlist.utm_source	text notnull=false default=-
+column:aitickets_external_event_dates.attendance	integer notnull=false default=-
+column:aitickets_external_event_dates.capacity	integer notnull=false default=-
+column:aitickets_external_event_dates.city	text notnull=false default=-
+column:aitickets_external_event_dates.city_key	text notnull=false default=-
+column:aitickets_external_event_dates.commune	text notnull=false default=-
+column:aitickets_external_event_dates.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_external_event_dates.end_date	date notnull=false default=-
+column:aitickets_external_event_dates.event_date	date notnull=true default=-
+column:aitickets_external_event_dates.event_id	bigint notnull=true default=-
+column:aitickets_external_event_dates.id	bigint notnull=true default=- identity=d
+column:aitickets_external_event_dates.notes	text notnull=false default=-
+column:aitickets_external_event_dates.region	text notnull=false default=-
+column:aitickets_external_event_dates.slot_key	text notnull=true default=-
+column:aitickets_external_event_dates.sold_out	boolean notnull=false default=-
+column:aitickets_external_event_dates.sold_out_at	timestamp with time zone notnull=false default=-
+column:aitickets_external_event_dates.sold_pct	numeric(5,2) notnull=false default=-
+column:aitickets_external_event_dates.start_time	time without time zone notnull=false default=-
+column:aitickets_external_event_dates.status	text notnull=true default='scheduled'::text
+column:aitickets_external_event_dates.ticketing_url	text notnull=false default=-
+column:aitickets_external_event_dates.updated_at	timestamp with time zone notnull=true default=now()
+column:aitickets_external_event_dates.venue_id	bigint notnull=false default=-
 column:aitickets_external_events.announced_at	timestamp with time zone notnull=false default=-
-column:aitickets_external_events.attendance	integer notnull=false default=-
-column:aitickets_external_events.capacity	integer notnull=false default=-
-column:aitickets_external_events.city	text notnull=false default=-
-column:aitickets_external_events.city_key	text notnull=false default=-
-column:aitickets_external_events.commune	text notnull=false default=-
-column:aitickets_external_events.country	character(2) notnull=true default='CL'::bpchar
+column:aitickets_external_events.category	text notnull=true default=-
 column:aitickets_external_events.created_at	timestamp with time zone notnull=true default=now()
-column:aitickets_external_events.dedupe_key	text notnull=true default=-
-column:aitickets_external_events.end_date	date notnull=false default=-
-column:aitickets_external_events.event_date	date notnull=true default=-
-column:aitickets_external_events.event_type	text notnull=true default=-
 column:aitickets_external_events.external_id	text notnull=false default=-
-column:aitickets_external_events.genre	text notnull=false default=-
 column:aitickets_external_events.id	bigint notnull=true default=- identity=d
 column:aitickets_external_events.is_free	boolean notnull=false default=-
-column:aitickets_external_events.lead_id	uuid notnull=false default=-
 column:aitickets_external_events.name	text notnull=true default=-
+column:aitickets_external_events.name_key	text notnull=true default=-
+column:aitickets_external_events.niche	text notnull=false default=-
 column:aitickets_external_events.notes	text notnull=false default=-
-column:aitickets_external_events.organization_id	bigint notnull=false default=-
-column:aitickets_external_events.organizer_instagram	text notnull=false default=-
-column:aitickets_external_events.organizer_key	text notnull=false default=-
-column:aitickets_external_events.organizer_name	text notnull=false default=-
-column:aitickets_external_events.organizer_website	text notnull=false default=-
 column:aitickets_external_events.price_max	integer notnull=false default=-
 column:aitickets_external_events.price_min	integer notnull=false default=-
-column:aitickets_external_events.region	text notnull=false default=-
-column:aitickets_external_events.series_key	text notnull=false default=-
-column:aitickets_external_events.sold_out	boolean notnull=false default=-
-column:aitickets_external_events.sold_out_at	timestamp with time zone notnull=false default=-
-column:aitickets_external_events.sold_pct	numeric(5,2) notnull=false default=-
+column:aitickets_external_events.producer_id	bigint notnull=false default=-
 column:aitickets_external_events.source	text notnull=true default='manual'::text
 column:aitickets_external_events.source_url	text notnull=false default=-
-column:aitickets_external_events.start_time	time without time zone notnull=false default=-
-column:aitickets_external_events.status	text notnull=true default='scheduled'::text
 column:aitickets_external_events.tags	text[] notnull=true default='{}'::text[]
 column:aitickets_external_events.ticketing_platform	text notnull=false default=-
 column:aitickets_external_events.ticketing_url	text notnull=false default=-
 column:aitickets_external_events.updated_at	timestamp with time zone notnull=true default=now()
-column:aitickets_external_events.venue_name	text notnull=false default=-
+column:aitickets_external_producers.city	text notnull=false default=-
+column:aitickets_external_producers.city_key	text notnull=false default=-
+column:aitickets_external_producers.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_external_producers.id	bigint notnull=true default=- identity=d
+column:aitickets_external_producers.instagram	text notnull=false default=-
+column:aitickets_external_producers.lead_id	uuid notnull=false default=-
+column:aitickets_external_producers.name	text notnull=true default=-
+column:aitickets_external_producers.notes	text notnull=false default=-
+column:aitickets_external_producers.organization_id	bigint notnull=false default=-
+column:aitickets_external_producers.producer_key	text notnull=true default=-
+column:aitickets_external_producers.region	text notnull=false default=-
+column:aitickets_external_producers.updated_at	timestamp with time zone notnull=true default=now()
+column:aitickets_external_producers.website	text notnull=false default=-
+column:aitickets_external_venues.address	text notnull=false default=-
+column:aitickets_external_venues.capacity	integer notnull=false default=-
+column:aitickets_external_venues.city	text notnull=false default=-
+column:aitickets_external_venues.city_key	text notnull=false default=-
+column:aitickets_external_venues.commune	text notnull=false default=-
+column:aitickets_external_venues.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_external_venues.id	bigint notnull=true default=- identity=d
+column:aitickets_external_venues.name	text notnull=true default=-
+column:aitickets_external_venues.notes	text notnull=false default=-
+column:aitickets_external_venues.region	text notnull=false default=-
+column:aitickets_external_venues.updated_at	timestamp with time zone notnull=true default=now()
+column:aitickets_external_venues.venue_key	text notnull=true default=-
 column:aitickets_guests.created_at	timestamp with time zone notnull=true default=now()
 column:aitickets_guests.created_by	bigint notnull=false default=-
 column:aitickets_guests.email	text notnull=false default=-
@@ -619,11 +644,11 @@ column:aitickets_leads.upcoming_event	jsonb notnull=false default=-
 column:aitickets_leads.updated_at	timestamp with time zone notnull=true default=now()
 column:aitickets_leads.website	text notnull=false default=-
 column:aitickets_leads.whatsapp	text notnull=false default=-
+column:aitickets_market_calendar.categories	text[] notnull=false default=-
 column:aitickets_market_calendar.city_key	text notnull=false default=-
 column:aitickets_market_calendar.created_at	timestamp with time zone notnull=true default=now()
 column:aitickets_market_calendar.date_from	date notnull=true default=-
 column:aitickets_market_calendar.date_to	date notnull=true default=-
-column:aitickets_market_calendar.event_types	text[] notnull=false default=-
 column:aitickets_market_calendar.id	bigint notnull=true default=- identity=d
 column:aitickets_market_calendar.impact	numeric(4,2) notnull=false default=-
 column:aitickets_market_calendar.kind	text notnull=true default=-
@@ -1532,16 +1557,25 @@ constraint:aitickets_event_waitlist.aitickets_event_waitlist_pkey	PRIMARY KEY (i
 constraint:aitickets_event_waitlist.aitickets_event_waitlist_utm_campaign_check	CHECK (((utm_campaign IS NULL) OR (char_length(utm_campaign) <= 128)))
 constraint:aitickets_event_waitlist.aitickets_event_waitlist_utm_medium_check	CHECK (((utm_medium IS NULL) OR (char_length(utm_medium) <= 128)))
 constraint:aitickets_event_waitlist.aitickets_event_waitlist_utm_source_check	CHECK (((utm_source IS NULL) OR (char_length(utm_source) <= 128)))
-constraint:aitickets_external_events.aitickets_external_events_attendance_check	CHECK (((attendance IS NULL) OR (attendance >= 0)))
-constraint:aitickets_external_events.aitickets_external_events_capacity_check	CHECK (((capacity IS NULL) OR (capacity > 0)))
-constraint:aitickets_external_events.aitickets_external_events_dedupe_key_key	UNIQUE (dedupe_key)
-constraint:aitickets_external_events.aitickets_external_events_end_date_check	CHECK (((end_date IS NULL) OR (end_date >= event_date)))
-constraint:aitickets_external_events.aitickets_external_events_lead_id_fkey	FOREIGN KEY (lead_id) REFERENCES aitickets_leads(id) ON DELETE SET NULL
-constraint:aitickets_external_events.aitickets_external_events_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE SET NULL
+constraint:aitickets_external_event_dates.aitickets_external_event_dates_attendance_check	CHECK (((attendance IS NULL) OR (attendance >= 0)))
+constraint:aitickets_external_event_dates.aitickets_external_event_dates_capacity_check	CHECK (((capacity IS NULL) OR (capacity > 0)))
+constraint:aitickets_external_event_dates.aitickets_external_event_dates_end_date_check	CHECK (((end_date IS NULL) OR (end_date >= event_date)))
+constraint:aitickets_external_event_dates.aitickets_external_event_dates_event_id_fkey	FOREIGN KEY (event_id) REFERENCES aitickets_external_events(id) ON DELETE CASCADE
+constraint:aitickets_external_event_dates.aitickets_external_event_dates_pkey	PRIMARY KEY (id)
+constraint:aitickets_external_event_dates.aitickets_external_event_dates_slot_key	UNIQUE (event_id, slot_key)
+constraint:aitickets_external_event_dates.aitickets_external_event_dates_sold_pct_check	CHECK (((sold_pct IS NULL) OR ((sold_pct >= (0)::numeric) AND (sold_pct <= (100)::numeric))))
+constraint:aitickets_external_event_dates.aitickets_external_event_dates_status_check	CHECK ((status = ANY (ARRAY['scheduled'::text, 'postponed'::text, 'cancelled'::text, 'completed'::text])))
+constraint:aitickets_external_event_dates.aitickets_external_event_dates_venue_id_fkey	FOREIGN KEY (venue_id) REFERENCES aitickets_external_venues(id) ON DELETE SET NULL
 constraint:aitickets_external_events.aitickets_external_events_pkey	PRIMARY KEY (id)
 constraint:aitickets_external_events.aitickets_external_events_prices_check	CHECK ((((price_min IS NULL) OR (price_min >= 0)) AND ((price_max IS NULL) OR (price_max >= 0)) AND ((price_min IS NULL) OR (price_max IS NULL) OR (price_min <= price_max))))
-constraint:aitickets_external_events.aitickets_external_events_sold_pct_check	CHECK (((sold_pct IS NULL) OR ((sold_pct >= (0)::numeric) AND (sold_pct <= (100)::numeric))))
-constraint:aitickets_external_events.aitickets_external_events_status_check	CHECK ((status = ANY (ARRAY['scheduled'::text, 'postponed'::text, 'cancelled'::text, 'completed'::text])))
+constraint:aitickets_external_events.aitickets_external_events_producer_id_fkey	FOREIGN KEY (producer_id) REFERENCES aitickets_external_producers(id) ON DELETE SET NULL
+constraint:aitickets_external_producers.aitickets_external_producers_lead_id_fkey	FOREIGN KEY (lead_id) REFERENCES aitickets_leads(id) ON DELETE SET NULL
+constraint:aitickets_external_producers.aitickets_external_producers_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE SET NULL
+constraint:aitickets_external_producers.aitickets_external_producers_pkey	PRIMARY KEY (id)
+constraint:aitickets_external_producers.aitickets_external_producers_producer_key_key	UNIQUE (producer_key)
+constraint:aitickets_external_venues.aitickets_external_venues_capacity_check	CHECK (((capacity IS NULL) OR (capacity > 0)))
+constraint:aitickets_external_venues.aitickets_external_venues_pkey	PRIMARY KEY (id)
+constraint:aitickets_external_venues.aitickets_external_venues_venue_key_key	UNIQUE (venue_key)
 constraint:aitickets_guests.aitickets_guests_created_by_fkey	FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 constraint:aitickets_guests.aitickets_guests_email_check	CHECK (((email IS NULL) OR (char_length(email) <= 200)))
 constraint:aitickets_guests.aitickets_guests_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
@@ -1903,7 +1937,10 @@ grant:aitickets_event_seats	-
 grant:aitickets_event_slug_redirects	-
 grant:aitickets_event_staff	-
 grant:aitickets_event_waitlist	-
+grant:aitickets_external_event_dates	-
 grant:aitickets_external_events	-
+grant:aitickets_external_producers	-
+grant:aitickets_external_venues	-
 grant:aitickets_guests	-
 grant:aitickets_job_heartbeats	-
 grant:aitickets_lead_sources	-
@@ -2019,13 +2056,16 @@ index:aitickets_event_seats.aitickets_event_seats_order_idx	CREATE INDEX aiticke
 index:aitickets_event_slug_redirects.aitickets_event_slug_redirects_event_idx	CREATE INDEX aitickets_event_slug_redirects_event_idx ON aitickets_event_slug_redirects USING btree (event_id)
 index:aitickets_event_staff.aitickets_event_staff_user_idx	CREATE INDEX aitickets_event_staff_user_idx ON aitickets_event_staff USING btree (user_id)
 index:aitickets_event_waitlist.aitickets_event_waitlist_event_email_kind_idx	CREATE UNIQUE INDEX aitickets_event_waitlist_event_email_kind_idx ON aitickets_event_waitlist USING btree (event_id, lower(email), kind)
-index:aitickets_external_events.aitickets_external_events_city_date_idx	CREATE INDEX aitickets_external_events_city_date_idx ON aitickets_external_events USING btree (city_key, event_date)
-index:aitickets_external_events.aitickets_external_events_event_date_idx	CREATE INDEX aitickets_external_events_event_date_idx ON aitickets_external_events USING btree (event_date)
-index:aitickets_external_events.aitickets_external_events_lead_idx	CREATE INDEX aitickets_external_events_lead_idx ON aitickets_external_events USING btree (lead_id) WHERE (lead_id IS NOT NULL)
-index:aitickets_external_events.aitickets_external_events_organization_idx	CREATE INDEX aitickets_external_events_organization_idx ON aitickets_external_events USING btree (organization_id) WHERE (organization_id IS NOT NULL)
-index:aitickets_external_events.aitickets_external_events_organizer_idx	CREATE INDEX aitickets_external_events_organizer_idx ON aitickets_external_events USING btree (organizer_key)
+index:aitickets_external_event_dates.aitickets_external_event_dates_city_date_idx	CREATE INDEX aitickets_external_event_dates_city_date_idx ON aitickets_external_event_dates USING btree (city_key, event_date)
+index:aitickets_external_event_dates.aitickets_external_event_dates_date_idx	CREATE INDEX aitickets_external_event_dates_date_idx ON aitickets_external_event_dates USING btree (event_date)
+index:aitickets_external_event_dates.aitickets_external_event_dates_venue_idx	CREATE INDEX aitickets_external_event_dates_venue_idx ON aitickets_external_event_dates USING btree (venue_id) WHERE (venue_id IS NOT NULL)
+index:aitickets_external_events.aitickets_external_events_category_idx	CREATE INDEX aitickets_external_events_category_idx ON aitickets_external_events USING btree (category, niche)
+index:aitickets_external_events.aitickets_external_events_name_key_idx	CREATE INDEX aitickets_external_events_name_key_idx ON aitickets_external_events USING btree (name_key)
+index:aitickets_external_events.aitickets_external_events_producer_idx	CREATE INDEX aitickets_external_events_producer_idx ON aitickets_external_events USING btree (producer_id)
 index:aitickets_external_events.aitickets_external_events_source_external_id_key	CREATE UNIQUE INDEX aitickets_external_events_source_external_id_key ON aitickets_external_events USING btree (source, external_id) WHERE (external_id IS NOT NULL)
-index:aitickets_external_events.aitickets_external_events_type_date_idx	CREATE INDEX aitickets_external_events_type_date_idx ON aitickets_external_events USING btree (event_type, event_date)
+index:aitickets_external_producers.aitickets_external_producers_lead_idx	CREATE INDEX aitickets_external_producers_lead_idx ON aitickets_external_producers USING btree (lead_id) WHERE (lead_id IS NOT NULL)
+index:aitickets_external_producers.aitickets_external_producers_organization_idx	CREATE INDEX aitickets_external_producers_organization_idx ON aitickets_external_producers USING btree (organization_id) WHERE (organization_id IS NOT NULL)
+index:aitickets_external_venues.aitickets_external_venues_city_idx	CREATE INDEX aitickets_external_venues_city_idx ON aitickets_external_venues USING btree (city_key)
 index:aitickets_guests.aitickets_guests_event_idx	CREATE INDEX aitickets_guests_event_idx ON aitickets_guests USING btree (event_id, created_at)
 index:aitickets_lead_touches.aitickets_lead_touches_lead_idx	CREATE INDEX aitickets_lead_touches_lead_idx ON aitickets_lead_touches USING btree (lead_id, created_at)
 index:aitickets_lead_touches.aitickets_lead_touches_outcome_idx	CREATE INDEX aitickets_lead_touches_outcome_idx ON aitickets_lead_touches USING btree (outcome, sent_at)
@@ -2150,7 +2190,10 @@ table:aitickets_event_seats	rls=true force=false
 table:aitickets_event_slug_redirects	rls=true force=false
 table:aitickets_event_staff	rls=true force=false
 table:aitickets_event_waitlist	rls=true force=false
+table:aitickets_external_event_dates	rls=true force=false
 table:aitickets_external_events	rls=true force=false
+table:aitickets_external_producers	rls=true force=false
+table:aitickets_external_venues	rls=true force=false
 table:aitickets_guests	rls=true force=false
 table:aitickets_job_heartbeats	rls=true force=false
 table:aitickets_lead_sources	rls=true force=false

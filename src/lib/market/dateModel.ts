@@ -1,4 +1,4 @@
-// Modelo de fechas v1: ¿es buena esta fecha para un evento de este tipo en esta ciudad? y ¿qué fechas recomiendo?
+// Modelo de fechas v1: ¿es buena esta fecha para un evento de esta categoría (y nicho) en esta ciudad? y ¿qué fechas recomiendo?
 //
 // Es un modelo heurístico EXPLICABLE, no un modelo de ML: con pocos datos un modelo entrenado sería ruido. Parte de
 // supuestos razonables (priors) y los corrige con los eventos registrados (externos + AI Tickets) a medida que hay más,
@@ -7,17 +7,17 @@
 //
 //   nota = 100 × día_semana^0.6 × temporada × calendario × competencia × quincena × resultados × anticipación
 //
-//   día_semana   preferencia del tipo por ese día (prior + distribución observada); la víspera de feriado cuenta como viernes
-//   temporada    mes del año (prior por tipo; los destinos de verano suben en enero y febrero)
+//   día_semana   preferencia de la categoría por ese día (prior + distribución observada); la víspera de feriado cuenta como viernes
+//   temporada    mes del año (prior por categoría; los destinos de verano suben en enero y febrero)
 //   calendario   fin de semana largo, Fiestas Patrias, Navidad, Año Nuevo y el calendario de mercado del dueño
-//   competencia  eventos parecidos ese día y alrededor en la misma ciudad, vs lo normal para ese día de la semana
+//   competencia  funciones parecidas (categoría y nicho) ese día y alrededor en la misma ciudad, vs lo normal para ese día de la semana
 //   quincena     cerca del pago de sueldos sube, la segunda quincena baja (leve)
-//   resultados   % de eventos agotados de ese tipo por día de la semana (solo con ≥ 8 resultados)
+//   resultados   % de eventos agotados de esa categoría por día de la semana (solo con ≥ 8 resultados)
 //   anticipación cuánto falta: muy poco tiempo para vender baja la nota
 //
 // Spec: docs/specs/eventos-externos.md.
 import { addDays, dayOfWeek, diffDays, makeCalendar, MONTH_NAMES, WEEKDAY_NAMES, type CalendarEntry, type CalendarFactor } from "./calendar";
-import { affinity, cityInfo, isDestination, normalizeText, TYPE_INFO, type EventType, type TypeGroup } from "./taxonomy";
+import { affinity, cityInfo, isDestination, normalizeText, CATEGORY_INFO, type Category, type TypeGroup } from "./taxonomy";
 
 export const MODEL_VERSION = "v1-heuristico";
 
@@ -26,8 +26,8 @@ export type MarketEvent = {
     source: "external" | "aitickets";
     id: number;
     name: string;
-    event_type: EventType;
-    genre: string | null;
+    category: Category;
+    niche: string | null;
     date: string;
     /** Noche a la que pertenece: una función que empieza antes de las 06:00 es de la noche anterior. */
     night_date: string;
@@ -37,8 +37,8 @@ export type MarketEvent = {
     region: string | null;
     venue_name: string | null;
     capacity: number | null;
-    organizer_key: string | null;
-    organizer_name: string | null;
+    producer_key: string | null;
+    producer_name: string | null;
     ticketing_platform: string | null;
     price_min: number | null;
     price_max: number | null;
@@ -47,7 +47,8 @@ export type MarketEvent = {
     sold_out: boolean | null;
     sold_pct: number | null;
     announced_at: string | null;
-    series_key: string | null;
+    /** Agrupa las funciones de un mismo evento (temporada o gira): ext:<id> o ait:<id>. */
+    show_key: string;
     organization_id: number | null;
     lead_id: string | null;
 };
@@ -56,7 +57,7 @@ export type MarketEvent = {
 export const nightDate = (date: string, startTime: string | null | undefined) => (startTime && startTime < "06:00" ? addDays(date, -1) : date);
 
 const MONTH_BASE = [0.78, 0.72, 0.92, 1, 1, 0.95, 0.92, 0.97, 0.9, 1, 1, 0.95];
-const MONTH_BY_TYPE: Partial<Record<EventType, number[]>> = {
+const MONTH_BY_TYPE: Partial<Record<Category, number[]>> = {
     festival: [1, 1, 0.95, 0.8, 0.65, 0.55, 0.55, 0.6, 0.75, 0.9, 1, 0.95],
     feria: [0.9, 0.9, 0.9, 0.95, 0.9, 0.8, 0.85, 0.85, 0.95, 1, 1, 1],
     deportes: [0.85, 0.8, 0.95, 1, 0.95, 0.85, 0.85, 0.9, 0.95, 1, 1, 0.9],
@@ -100,14 +101,14 @@ export function verdictFor(score: number): "buena" | "aceptable" | "riesgosa" | 
 }
 
 export type DateQuery = {
-    event_type: EventType;
+    category: Category;
     city?: string | null;
     region?: string | null;
     start_time?: string | null;
-    genre?: string | null;
+    niche?: string | null;
     capacity?: number | null;
     price?: number | null;
-    /** Claves de MarketEvent a ignorar (p. ej. el mismo evento que se está evaluando). */
+    /** Claves de MarketEvent o show_key (ext:<id>) a ignorar: el mismo evento que se está evaluando no compite consigo mismo. */
     exclude_keys?: string[];
 };
 
@@ -136,12 +137,12 @@ export function buildDateModel(opts: { events: MarketEvent[]; calendarEntries?: 
         }
         return v;
     };
-    const groupOf = (type: EventType, startTime: string | null | undefined): TypeGroup => {
-        const base = TYPE_INFO[type].group;
+    const groupOf = (type: Category, startTime: string | null | undefined): TypeGroup => {
+        const base = CATEGORY_INFO[type].group;
         if (base === "formacion" || !startTime) return base;
         return startTime >= "06:00" && startTime < "17:00" ? "dia" : "noche";
     };
-    const eventEffDow = (e: MarketEvent) => effDowOf(e.night_date, groupOf(e.event_type, e.start_time), e.city_key, e.region);
+    const eventEffDow = (e: MarketEvent) => effDowOf(e.night_date, groupOf(e.category, e.start_time), e.city_key, e.region);
 
     function scopeFor(q: DateQuery) {
         const info = cityInfo(q.city, q.region);
@@ -151,15 +152,15 @@ export function buildDateModel(opts: { events: MarketEvent[]; calendarEntries?: 
 
     const inCity = (e: MarketEvent, scope: Scope) => !scope.cityKey || e.city_key === scope.cityKey;
     /** Eventos de ese tipo en la ciudad (o en todo Chile si la ciudad tiene pocos). */
-    function sampleFor(type: EventType, scope: Scope, min = 15) {
-        const all = active.filter((e) => e.event_type === type && (scope.cityKey === "online" ? e.city_key === "online" : e.city_key !== "online"));
+    function sampleFor(type: Category, scope: Scope, min = 15) {
+        const all = active.filter((e) => e.category === type && (scope.cityKey === "online" ? e.city_key === "online" : e.city_key !== "online"));
         const local = scope.cityKey ? all.filter((e) => inCity(e, scope)) : all;
         return local.length >= min || !scope.cityKey ? { events: local, national: !scope.cityKey } : { events: all, national: true };
     }
 
     // --- Día de la semana -------------------------------------------------
     const fitCache = new Map<string, ReturnType<typeof weekdayFits>>();
-    function weekdayFit(type: EventType, scope: Scope) {
+    function weekdayFit(type: Category, scope: Scope) {
         const k = `${type}|${scope.cityKey}`;
         let v = fitCache.get(k);
         if (!v) {
@@ -169,14 +170,14 @@ export function buildDateModel(opts: { events: MarketEvent[]; calendarEntries?: 
         return v;
     }
     /** Preferencia (0 a 1) de cada día de la semana: supuesto inicial + días observados, con shrinkage. */
-    function weekdayFits(type: EventType, scope: Scope) {
-        const prior = TYPE_INFO[type].weekday;
+    function weekdayFits(type: Category, scope: Scope) {
+        const prior = CATEGORY_INFO[type].weekday;
         const priorSum = prior.reduce((a, b) => a + b, 0);
         const { events, national } = sampleFor(type, scope);
         const counts = [0, 0, 0, 0, 0, 0, 0];
         const seen = new Set<string>();
         for (const e of events) {
-            const k = `${e.series_key || e.key}|${e.night_date}`;
+            const k = `${e.show_key}|${e.night_date}`;
             if (seen.has(k)) continue;
             seen.add(k);
             counts[eventEffDow(e)] += 1;
@@ -189,7 +190,7 @@ export function buildDateModel(opts: { events: MarketEvent[]; calendarEntries?: 
     }
 
     // --- Resultados (agotados) por día de la semana ------------------------
-    function outcomeAdjust(type: EventType, scope: Scope, dow: number) {
+    function outcomeAdjust(type: Category, scope: Scope, dow: number) {
         const { events } = sampleFor(type, scope, 8);
         const known = events.filter((e) => e.night_date < today && (e.sold_out != null || e.sold_pct != null));
         const none = { multiplier: 1, n: known.length, rate: null as number | null, rate_dow: null as number | null };
@@ -204,13 +205,13 @@ export function buildDateModel(opts: { events: MarketEvent[]; calendarEntries?: 
 
     // --- Anuncio de eventos (para corregir fechas lejanas) -----------------
     const announceCache = new Map<string, number>();
-    function announcedFraction(type: EventType, lead: number) {
+    function announcedFraction(type: Category, lead: number) {
         const bucket = ANNOUNCE_PRIOR.findIndex(([max]) => lead <= max);
         const ck = `${type}|${bucket}`;
         const cached = announceCache.get(ck);
         if (cached !== undefined) return cached;
         const prior = announcePrior(lead);
-        const sample = active.filter((e) => e.announced_at && e.night_date < today && affinity(type, e.event_type) >= 0.5);
+        const sample = active.filter((e) => e.announced_at && e.night_date < today && affinity(type, e.category) >= 0.5);
         const ge = sample.filter((e) => diffDays(e.night_date, String(e.announced_at).slice(0, 10)) >= lead).length;
         const f = (ge + ANNOUNCE_PRIOR_STRENGTH * prior) / (sample.length + ANNOUNCE_PRIOR_STRENGTH);
         announceCache.set(ck, f);
@@ -230,14 +231,20 @@ export function buildDateModel(opts: { events: MarketEvent[]; calendarEntries?: 
     type Hit = { event: MarketEvent; weight: number; days_apart: number };
     function pressureOn(date: string, q: DateQuery, scope: Scope, exclude: Set<string>) {
         const hits: Hit[] = [];
-        const genre = q.genre ? normalizeText(q.genre) : null;
+        const niche = q.niche ? normalizeText(q.niche) : null;
         for (let dd = -3; dd <= 3; dd++) {
             for (const e of byNight.get(addDays(date, dd)) || []) {
-                if (exclude.has(e.key)) continue;
+                if (exclude.has(e.key) || exclude.has(e.show_key)) continue;
                 const cf = cityFactor(e, scope);
                 if (!cf) continue;
-                let a = affinity(q.event_type, e.event_type);
-                if (a > 0 && a < 1 && genre && e.genre && normalizeText(e.genre) === genre) a = Math.min(1, a * 1.3);
+                let a = affinity(q.category, e.category);
+                // Nicho: el mismo público compite de lleno; dentro de la misma categoría, otro nicho compite menos
+                // (una fiesta techno y una de reggaetón no se quitan tanto público); entre categorías afines, el mismo nicho suma
+                if (niche && e.niche) {
+                    const sameNiche = normalizeText(e.niche) === niche;
+                    if (q.category === e.category) a = sameNiche ? 1 : 0.6;
+                    else if (a > 0 && sameNiche) a = Math.min(1, a * 1.3);
+                }
                 if (dd === 0 && cf >= 1 && (e.capacity || 0) >= MEGA_CAPACITY) a = Math.max(a, 0.4);
                 if (!a) continue;
                 const weight = a * cf * DECAY[Math.abs(dd)] * sizeWeight(e.capacity);
@@ -246,7 +253,7 @@ export function buildDateModel(opts: { events: MarketEvent[]; calendarEntries?: 
         }
         const total = hits.reduce((s, h) => s + h.weight, 0);
         const lead = diffDays(date, today);
-        const announced = lead > 0 ? announcedFraction(q.event_type, lead) : 1;
+        const announced = lead > 0 ? announcedFraction(q.category, lead) : 1;
         return { hits, total, adjusted: total / Math.max(announced, 0.25), announced };
     }
 
@@ -290,7 +297,7 @@ export function buildDateModel(opts: { events: MarketEvent[]; calendarEntries?: 
 
     // --- Nota de una fecha --------------------------------------------------
     function scoreDate(date: string, q: DateQuery, scope: Scope, exclude: Set<string>, memo: Map<string, ReturnType<typeof pressureOn>>) {
-        const type = q.event_type;
+        const type = q.category;
         const group = groupOf(type, q.start_time);
         const leisure = group !== "formacion";
         const dow = dayOfWeek(date);
@@ -308,7 +315,7 @@ export function buildDateModel(opts: { events: MarketEvent[]; calendarEntries?: 
             factor: "dia_semana",
             multiplier: r3(weekdayMult),
             detail:
-                `${WEEKDAY_NAMES[dow]}${effNote}: preferencia ${Math.round(fit * 100)}% del mejor día para ${TYPE_INFO[type].label.toLowerCase()} ` +
+                `${WEEKDAY_NAMES[dow]}${effNote}: preferencia ${Math.round(fit * 100)}% del mejor día para ${CATEGORY_INFO[type].label.toLowerCase()} ` +
                 (wf.n ? `(${wf.n} eventos registrados${wf.national ? " en todo Chile" : ""} + supuesto inicial)` : "(supuesto inicial, aún sin datos)"),
         });
 
@@ -367,7 +374,7 @@ export function buildDateModel(opts: { events: MarketEvent[]; calendarEntries?: 
     }
 
     function confidenceFor(date: string, q: DateQuery, scope: Scope, lead: number) {
-        const nType = active.filter((e) => e.event_type === q.event_type && inCity(e, scope)).length;
+        const nType = active.filter((e) => e.category === q.category && inCity(e, scope)).length;
         const around = active.filter((e) => cityFactor(e, scope) >= 1 && Math.abs(diffDays(e.night_date, date)) <= 7).length;
         const reasons: string[] = [];
         if (nType < 12) reasons.push(`Solo ${nType} eventos de este tipo registrados${scope.cityKey ? ` en ${scope.label}` : ""}: la preferencia por día sale casi toda del supuesto inicial.`);
@@ -379,7 +386,9 @@ export function buildDateModel(opts: { events: MarketEvent[]; calendarEntries?: 
 
     const presentHit = (h: Hit) => ({
         name: h.event.name,
-        event_type: h.event.event_type,
+        category: h.event.category,
+        niche: h.event.niche,
+        producer: h.event.producer_name,
         date: h.event.date,
         days_apart: h.days_apart,
         city: h.event.city,
@@ -393,7 +402,7 @@ export function buildDateModel(opts: { events: MarketEvent[]; calendarEntries?: 
 
     function priceCheck(q: DateQuery, scope: Scope) {
         if (q.price == null) return null;
-        const { events, national } = sampleFor(q.event_type, scope, 8);
+        const { events, national } = sampleFor(q.category, scope, 8);
         const priced = events.filter((e) => !e.is_free && e.price_min != null && e.price_min > 0);
         if (!priced.length) return { n: 0, note: "Sin precios registrados para este tipo de evento." };
         const mins = priced.map((e) => Number(e.price_min));
@@ -436,7 +445,7 @@ export function buildDateModel(opts: { events: MarketEvent[]; calendarEntries?: 
         return {
             date,
             weekday: WEEKDAY_NAMES[s.dow],
-            event_type: q.event_type,
+            category: q.category,
             city: scope.label,
             city_key: scope.cityKey,
             score: s.score,
@@ -493,7 +502,7 @@ export function buildDateModel(opts: { events: MarketEvent[]; calendarEntries?: 
         }
         const mid = scored.length ? scored[Math.floor(scored.length / 2)].date : opts.from;
         return {
-            event_type: q.event_type,
+            category: q.category,
             city: scope.label,
             city_key: scope.cityKey,
             from: opts.from,

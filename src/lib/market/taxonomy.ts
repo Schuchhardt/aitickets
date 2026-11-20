@@ -2,7 +2,7 @@
 // regiones de Chile, y las claves normalizadas para agrupar y evitar duplicados. Lo usan el MCP de admin
 // (src/lib/admin-api/tools/market.ts) y el modelo de fechas (dateModel.ts). Spec: docs/specs/eventos-externos.md.
 
-export const EVENT_TYPES = [
+export const CATEGORIES = [
     "concierto",
     "festival",
     "fiesta",
@@ -18,7 +18,7 @@ export const EVENT_TYPES = [
     "cine",
     "otro",
 ] as const;
-export type EventType = (typeof EVENT_TYPES)[number];
+export type Category = (typeof CATEGORIES)[number];
 
 /** Cuándo ocurre típicamente: define cómo afectan los feriados y fines de semana largos. */
 export type TypeGroup = "noche" | "dia" | "formacion";
@@ -30,7 +30,7 @@ type TypeInfo = {
     weekday: [number, number, number, number, number, number, number];
 };
 
-export const TYPE_INFO: Record<EventType, TypeInfo> = {
+export const CATEGORY_INFO: Record<Category, TypeInfo> = {
     concierto: { label: "Concierto / música en vivo", group: "noche", weekday: [0.45, 0.15, 0.25, 0.4, 0.65, 1, 1] },
     festival: { label: "Festival", group: "dia", weekday: [0.8, 0.05, 0.05, 0.1, 0.2, 0.6, 1] },
     fiesta: { label: "Fiesta (electrónica, reggaetón, temática)", group: "noche", weekday: [0.15, 0.05, 0.05, 0.2, 0.45, 0.95, 1] },
@@ -47,10 +47,10 @@ export const TYPE_INFO: Record<EventType, TypeInfo> = {
     otro: { label: "Otro", group: "noche", weekday: [0.7, 0.3, 0.4, 0.5, 0.6, 0.9, 1] },
 };
 
-export const isEventType = (v: unknown): v is EventType => typeof v === "string" && (EVENT_TYPES as readonly string[]).includes(v);
+export const isCategory = (v: unknown): v is Category => typeof v === "string" && (CATEGORIES as readonly string[]).includes(v);
 
 /** Cuánto compiten dos tipos por el mismo público (0 a 1). Simétrica; el mismo tipo = 1. */
-const AFFINITY_PAIRS: [EventType, EventType, number][] = [
+const AFFINITY_PAIRS: [Category, Category, number][] = [
     ["fiesta", "club", 0.8],
     ["concierto", "festival", 0.6],
     ["concierto", "fiesta", 0.3],
@@ -280,7 +280,7 @@ export const isDestination = (cityKey: string | null | undefined) => Boolean(cit
 export const cityLabel = (cityKey: string | null | undefined) => (cityKey ? CITY_LABELS[cityKey] || cityKey.replace(/_/g, " ") : null);
 
 // ---------------------------------------------------------------------------
-// Organizadores y duplicados
+// Productoras, lugares, eventos y funciones: claves para no duplicar
 // ---------------------------------------------------------------------------
 
 /** "@Mi.Productora", "instagram.com/mi.productora/" → "mi.productora". */
@@ -295,22 +295,126 @@ export function normalizeInstagram(v: unknown): string | null {
     return /^[a-z0-9._]{1,30}$/.test(handle) ? handle : null;
 }
 
-/** Clave del organizador: su Instagram si se conoce (más estable que el nombre), si no el nombre normalizado. */
-export function organizerKey(name: unknown, instagram: unknown): string | null {
+/** Clave de la productora: su Instagram si se conoce (más estable que el nombre), si no el nombre normalizado. */
+export function producerKey(name: unknown, instagram: unknown): string | null {
     const ig = normalizeInstagram(instagram);
     if (ig) return `ig:${ig}`;
     const n = slugKey(name);
     return n ? `name:${n}` : null;
 }
 
-/** Mismo evento si coincide nombre normalizado, día y ciudad (una fila por función y día). */
-export const dedupeKey = (name: unknown, date: string, cityKey: string | null | undefined) => `${slugKey(name)}|${date}|${cityKey || "-"}`;
+/** Clave del lugar: nombre normalizado + ciudad normalizada ("teatro_caupolican|santiago"). */
+export const venueKey = (name: unknown, cityKey: string | null | undefined) => `${slugKey(name)}|${cityKey || "-"}`;
+
+/** Nombre normalizado del evento (para encontrarlo cuando llega desde otra fuente). */
+export const eventNameKey = (name: unknown) => slugKey(name);
+
+/** Clave de una función dentro de su evento: día, hora y lugar (o ciudad si no se conoce el lugar). */
+export const slotKey = (date: string, startTime: string | null | undefined, venueId: number | null | undefined, cityKey: string | null | undefined) =>
+    `${date}|${startTime ? String(startTime).slice(0, 5) : "-"}|${venueId ? `v${venueId}` : cityKey || "-"}`;
 
 // ---------------------------------------------------------------------------
-// Categorías de AI Tickets (category_tags.name, texto libre) → tipo
+// Nichos: segmento dentro de la categoría (techno, reggaetón, impro, jazz, tecnología…). Texto libre normalizado
+// con alias para que no se fragmente ("tecno" = "techno").
 // ---------------------------------------------------------------------------
 
-const CATEGORY_RULES: [RegExp, EventType][] = [
+const NICHE_ALIASES: Record<string, string> = {
+    tecno: "techno",
+    techno_house: "techno",
+    regueton: "reggaeton",
+    reggaetton: "reggaeton",
+    perreo: "reggaeton",
+    urbano: "urbano",
+    musica_urbana: "urbano",
+    trap: "urbano",
+    electronica: "electronica",
+    electronic: "electronica",
+    edm: "electronica",
+    house_music: "house",
+    rock_and_roll: "rock",
+    rock_n_roll: "rock",
+    hip_hop: "hip_hop",
+    hiphop: "hip_hop",
+    rap: "hip_hop",
+    cumbia_villera: "cumbia",
+    cumbia_chilena: "cumbia",
+    ochentera: "retro",
+    ochentas: "retro",
+    "80s": "retro",
+    "90s": "retro",
+    noventera: "retro",
+    lgbt: "lgbtiq",
+    lgbtq: "lgbtiq",
+    lgbtiq: "lgbtiq",
+    gay: "lgbtiq",
+    stand_up_comedy: "stand_up",
+    standup: "stand_up",
+    improvisacion: "impro",
+    improv: "impro",
+    tech: "tecnologia",
+    tecnologia: "tecnologia",
+    ia: "inteligencia_artificial",
+    ai: "inteligencia_artificial",
+    emprendimiento: "emprendimiento",
+    startups: "emprendimiento",
+    musical: "musical",
+    musicales: "musical",
+    tributo: "tributo",
+    tributos: "tributo",
+    cover: "tributo",
+};
+
+/** "Tecno", "TECHNO " → "techno"; "Música urbana" → "urbano". null si viene vacío. */
+export function normalizeNiche(v: unknown): string | null {
+    const k = slugKey(v);
+    if (!k) return null;
+    return NICHE_ALIASES[k] || k;
+}
+
+/** Nichos de ejemplo por categoría (para orientar al registrar; se puede usar cualquier otro). */
+export const NICHE_EXAMPLES: Partial<Record<Category, string[]>> = {
+    concierto: ["rock", "indie", "metal", "jazz", "urbano", "pop", "folclor", "tributo", "clasica"],
+    festival: ["electronica", "rock", "urbano", "indie", "gastronomico", "cerveza"],
+    fiesta: ["techno", "reggaeton", "electronica", "retro", "lgbtiq", "universitaria", "cumbia", "tematica"],
+    club: ["techno", "house", "reggaeton", "hip_hop", "electronica"],
+    stand_up: ["stand_up", "impro", "open_mic", "humor_politico"],
+    teatro: ["drama", "comedia", "musical", "infantil", "circo"],
+    conferencia: ["tecnologia", "inteligencia_artificial", "emprendimiento", "marketing", "salud", "educacion"],
+    taller: ["ceramica", "cocina", "fotografia", "musica", "baile", "bienestar"],
+    deportes: ["running", "ciclismo", "esports", "futbol"],
+    feria: ["gastronomica", "diseno", "emprendedores", "libros", "vinos"],
+};
+
+/** Nicho del pipeline de leads (create_lead) que corresponde a la categoría. */
+export function leadNicheFor(category: string | null | undefined): string {
+    switch (category) {
+        case "stand_up":
+            return "stand_up";
+        case "teatro":
+        case "danza":
+        case "infantil":
+            return "teatro";
+        case "concierto":
+        case "festival":
+            return "musica_en_vivo";
+        case "fiesta":
+            return "fiestas";
+        case "club":
+            return "clubs";
+        case "taller":
+            return "talleres";
+        case "conferencia":
+            return "seminarios";
+        default:
+            return "otro";
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Categorías de AI Tickets (category_tags.name, texto libre) → categoría de la taxonomía
+// ---------------------------------------------------------------------------
+
+const CATEGORY_RULES: [RegExp, Category][] = [
     [/festival/, "festival"],
     [/stand.?up|comedia|humor|impro/, "stand_up"],
     [/infantil|ninos|familia/, "infantil"],
@@ -326,7 +430,7 @@ const CATEGORY_RULES: [RegExp, EventType][] = [
     [/feria|gastronom|mercado|expo/, "feria"],
 ];
 
-export function typeFromCategory(category: string | null | undefined): EventType {
+export function categoryFromTag(category: string | null | undefined): Category {
     const n = normalizeText(category);
     return CATEGORY_RULES.find(([re]) => re.test(n))?.[1] || "otro";
 }

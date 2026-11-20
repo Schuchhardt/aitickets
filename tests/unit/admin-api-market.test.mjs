@@ -1,5 +1,5 @@
-// MCP de administración: eventos externos, mapa de mercado, modelo de fechas y calendario de mercado
-// (src/lib/admin-api/tools/market.ts). Supabase falso: sin red ni BD.
+// MCP de administración: eventos externos (con productora, lugar, categoría, nicho y varias funciones o giras), mapa de
+// mercado, modelo de fechas y calendario de mercado (src/lib/admin-api/tools/market.ts). Supabase falso: sin red ni BD.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createFakeSupabase } from '../fixtures/fake-supabase.mjs'
 
@@ -18,25 +18,41 @@ const run = async (name, args, keyKind) => {
 }
 const reason = 'Mapeo de mercado desde Puntoticket, prueba'
 const LEAD = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
-const rows = () => db.tables.aitickets_external_events
-const byName = (name) => rows().find((r) => r.name === name)
+const T = {
+  events: () => db.tables.aitickets_external_events,
+  dates: () => db.tables.aitickets_external_event_dates,
+  producers: () => db.tables.aitickets_external_producers,
+  venues: () => db.tables.aitickets_external_venues,
+}
+const eventNamed = (name) => T.events().find((e) => e.name === name)
+const datesOf = (name) => T.dates().filter((d) => d.event_id === eventNamed(name).id)
 
-const BASE = [
-  {
-    name: 'Techno Night', event_type: 'fiesta', date: '2026-12-12', start_time: '23:30', city: 'Providencia', venue_name: 'Club Y', capacity: 800,
-    organizer_name: 'Noche Prod', organizer_instagram: '@NocheProd', ticketing_platform: 'Punto Ticket', price_min: 10000, price_max: 15000,
-    source: 'puntoticket', source_url: 'https://www.puntoticket.com/techno', external_id: 'PT-1', genre: 'Techno',
-  },
-  { name: 'Stand Up Martes', event_type: 'stand_up', date: '2026-12-15', city: 'Santiago', ticketing_platform: 'Ticketera Rara' },
-  { name: 'Fonda Libre', event_type: 'fiesta', date: '2026-12-12', city: 'Ñuñoa', ticketing_platform: 'DM', organizer_name: 'Fonda Crew', price_max: 0 },
-]
+const TOUR = {
+  name: 'Gira Rock Andino 2026', category: 'concierto', niche: 'Rock', ticketing_platform: 'Punto Ticket', price_min: 15000, price_max: 30000,
+  source: 'puntoticket', source_url: 'https://www.puntoticket.com/rock-andino', external_id: 'PT-77',
+  producer: { name: 'Andes Prod', instagram: '@AndesProd' },
+  dates: [
+    { date: '2026-12-11', start_time: '21:00', venue: { name: 'Teatro Caupolicán', city: 'Santiago', capacity: 4500 } },
+    { date: '2026-12-12', start_time: '21:00', venue: { name: 'Teatro Municipal de Viña', city: 'Viña del Mar', capacity: 1200 } },
+    { date: '2026-12-14', venue: { name: 'Teatro Regional', city: 'Concepción' } },
+  ],
+}
+const PARTY = {
+  name: 'Techno Night', category: 'fiesta', niche: 'Tecno', ticketing_platform: 'passline',
+  producer: { name: 'Noche Prod', instagram: 'nocheprod' },
+  dates: [{ date: '2026-12-12', start_time: '23:30', venue: { name: 'Club Y', city: 'Providencia', capacity: 800 } }],
+}
+const FONDA = { name: 'Fonda Libre', category: 'fiesta', niche: 'cumbia', ticketing_platform: 'DM', producer: { name: 'Fonda Crew' }, price_max: 0, dates: [{ date: '2026-12-12', city: 'Ñuñoa' }] }
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-11-20T15:00:00Z'))
   db = createFakeSupabase({
     tables: {
+      aitickets_external_producers: [],
+      aitickets_external_venues: [],
       aitickets_external_events: [],
+      aitickets_external_event_dates: [],
       aitickets_market_calendar: [],
       organizations: [{ id: 7, public_name: 'Productora Siete' }],
       aitickets_leads: [{ id: LEAD, org_name: 'Noche Prod', status: 'new' }],
@@ -55,70 +71,100 @@ beforeEach(() => {
       aitickets_admin_confirmations: [],
       aitickets_admin_idempotency: [],
     },
-    unique: { aitickets_admin_idempotency: [['tool', 'idem_key']], aitickets_external_events: [['dedupe_key']] },
+    unique: {
+      aitickets_admin_idempotency: [['tool', 'idem_key']],
+      aitickets_external_producers: [['producer_key']],
+      aitickets_external_venues: [['venue_key']],
+      aitickets_external_event_dates: [['event_id', 'slot_key']],
+    },
   })
 })
 afterEach(() => vi.useRealTimers())
 
 describe('register_external_events', () => {
-  it('simula, registra y normaliza (ciudad, región, Instagram, ticketera, gratis)', async () => {
-    const dry = await run('register_external_events', { events: BASE, dry_run: true, reason })
-    expect(dry).toMatchObject({ dry_run: true, created: 3, errors: 0 })
-    expect(rows()).toHaveLength(0)
-    expect(dry.results[0]).toMatchObject({ status: 'would_create', city_key: 'santiago', ticketing_platform: 'puntoticket' })
-    expect(dry.results[1].warnings.join(' ')).toMatch(/Ticketera nueva "ticketera_rara"/)
+  it('simula y registra: gira en 3 ciudades, productoras y lugares nuevos, nicho y ticketera normalizados', async () => {
+    const dry = await run('register_external_events', { events: [TOUR, PARTY, FONDA], dry_run: true, reason })
+    expect(dry).toMatchObject({ dry_run: true, events_created: 3, dates_added: 5, producers_created: 3, venues_created: 4, errors: 0 })
+    expect(T.events()).toHaveLength(0)
+    expect(T.dates()).toHaveLength(0)
+    expect(dry.results[0]).toMatchObject({ status: 'would_create', tour_cities: ['Santiago', 'Gran Valparaíso (Viña, Valparaíso, Concón…)', 'Gran Concepción'] })
 
-    const r = await run('register_external_events', { events: BASE, reason })
-    expect(r).toMatchObject({ created: 3, updated: 0, errors: 0 })
-    expect(byName('Techno Night')).toMatchObject({
-      city_key: 'santiago', region: 'metropolitana', organizer_key: 'ig:nocheprod', organizer_instagram: 'nocheprod', ticketing_platform: 'puntoticket',
-      genre: 'techno', dedupe_key: 'techno_night|2026-12-12|santiago', status: 'scheduled', source: 'puntoticket', start_time: '23:30',
+    const r = await run('register_external_events', { events: [TOUR, PARTY, FONDA], reason })
+    expect(r).toMatchObject({ events_created: 3, dates_added: 5, producers_created: 3, venues_created: 4, errors: 0 })
+    const tour = eventNamed('Gira Rock Andino 2026')
+    expect(tour).toMatchObject({ category: 'concierto', niche: 'rock', ticketing_platform: 'puntoticket', name_key: 'gira_rock_andino_2026', source: 'puntoticket', external_id: 'PT-77' })
+    expect(T.producers().find((p) => p.id === tour.producer_id)).toMatchObject({ name: 'Andes Prod', instagram: 'andesprod', producer_key: 'ig:andesprod' })
+    expect(datesOf('Gira Rock Andino 2026').map((d) => [d.event_date, d.city_key, d.status])).toEqual([
+      ['2026-12-11', 'santiago', 'scheduled'],
+      ['2026-12-12', 'gran_valparaiso', 'scheduled'],
+      ['2026-12-14', 'gran_concepcion', 'scheduled'],
+    ])
+    expect(T.venues().find((v) => v.name === 'Teatro Municipal de Viña')).toMatchObject({ city_key: 'gran_valparaiso', region: 'valparaiso', capacity: 1200, venue_key: 'teatro_municipal_de_vina|gran_valparaiso' })
+    expect(eventNamed('Techno Night').niche).toBe('techno')
+    expect(eventNamed('Fonda Libre')).toMatchObject({ ticketing_platform: 'none', is_free: true })
+    expect(datesOf('Fonda Libre')[0]).toMatchObject({ city: 'Ñuñoa', city_key: 'santiago', venue_id: null, region: 'metropolitana' })
+    expect(r.results[2].warnings || []).not.toEqual(expect.arrayContaining([expect.stringMatching(/Nicho nuevo/)])) // cumbia es un nicho sugerido de fiesta
+    const odd = { name: 'Fiesta Rara', category: 'fiesta', niche: 'Vaporwave', dates: [{ date: '2026-12-05', city: 'Santiago' }] }
+    const first = await run('register_external_events', { events: [odd], reason })
+    expect(first.results[0].warnings.join(' ')).toMatch(/Nicho nuevo "vaporwave" en fiesta \(usados o sugeridos: .*techno/)
+    const second = await run('register_external_events', { events: [{ ...odd, name: 'Otra Rara' }], reason })
+    expect((second.results[0].warnings || []).join(' ')).not.toMatch(/Nicho nuevo/)
+    expect(db.tables.aitickets_admin_audit.find((a) => a.tool === 'register_external_events' && !a.summary.includes('simulación') && a.summary.includes('3 creados'))).toMatchObject({ reason, summary: expect.stringMatching(/5 funciones nuevas/) })
+  })
+
+  it('el mismo evento desde otra fuente: completa funciones y reutiliza productora y lugar', async () => {
+    await run('register_external_events', { events: [TOUR, PARTY], reason })
+    // Misma gira (source + external_id): una función nueva en Temuco y la de Viña agotada
+    const again = await run('register_external_events', {
+      events: [{ ...TOUR, dates: [{ ...TOUR.dates[1], sold_out: true }, { date: '2026-12-18', start_time: '21:00', venue: { name: 'Teatro Municipal', city: 'Temuco' } }] }],
+      reason,
     })
-    expect(byName('Fonda Libre')).toMatchObject({ ticketing_platform: 'none', is_free: true, source: 'manual' })
-    expect(db.tables.aitickets_admin_audit.at(-1)).toMatchObject({ tool: 'register_external_events', reason, read_only: false, summary: expect.stringMatching(/3 creados/) })
+    expect(again).toMatchObject({ events_created: 0, events_updated: 1, dates_added: 1, dates_updated: 1, producers_created: 0, venues_created: 1 })
+    expect(again.results[0]).toMatchObject({ matched_by: 'external_id', producer: { status: 'existing' } })
+    expect(datesOf('Gira Rock Andino 2026')).toHaveLength(4)
+    expect(datesOf('Gira Rock Andino 2026').find((d) => d.event_date === '2026-12-12').sold_out).toBe(true)
+
+    // La fiesta vista en Instagram: sin external_id, la productora solo por nombre, la función sin hora
+    const ig = await run('register_external_events', {
+      events: [{ name: 'TECHNO NIGHT', category: 'fiesta', source: 'instagram', producer: { name: 'noche prod' }, dates: [{ date: '2026-12-12', venue: { name: 'club y', city: 'Santiago' } }] }],
+      reason,
+    })
+    expect(ig).toMatchObject({ events_created: 0, producers_created: 0, venues_created: 0, dates_added: 0 })
+    expect(ig.results[0]).toMatchObject({ matched_by: 'nombre_y_fechas', status: 'updated' })
+    expect(eventNamed('Techno Night')).toMatchObject({ source: 'instagram' }) // el nombre guardado no se pisa
+    expect(T.events()).toHaveLength(2)
+
+    // skip deja el existente igual
+    const skip = await run('register_external_events', { events: [{ ...PARTY, price_min: 1 }], on_duplicate: 'skip', reason })
+    expect(skip).toMatchObject({ events_skipped: 1 })
+    expect(eventNamed('Techno Night').price_min).toBeUndefined()
+
+    // Un año después es otro evento (fuera de la ventana de 120 días)
+    const next = await run('register_external_events', { events: [{ ...PARTY, dates: [{ ...PARTY.dates[0], date: '2027-12-11' }] }], reason })
+    expect(next).toMatchObject({ events_created: 1 })
   })
 
-  it('duplicados: completa por nombre/día/ciudad, respeta skip y reconoce source + external_id', async () => {
-    await run('register_external_events', { events: [{ ...BASE[0], tags: ['A'] }], reason })
-    const merged = await run('register_external_events', { events: [{ name: 'TECHNO night', event_type: 'fiesta', date: '2026-12-12', city: 'Las Condes', sold_out: true, tags: ['b'] }], reason })
-    expect(merged).toMatchObject({ created: 0, updated: 1 })
-    expect(merged.results[0]).toMatchObject({ matched_by: 'nombre_dia_ciudad' })
-    expect(rows()).toHaveLength(1)
-    expect(rows()[0]).toMatchObject({ sold_out: true, tags: ['a', 'b'], name: 'Techno Night', city: 'Providencia', ticketing_platform: 'puntoticket' })
-
-    const skipped = await run('register_external_events', { events: [{ name: 'Techno Night', event_type: 'fiesta', date: '2026-12-12', city: 'Santiago', capacity: 1 }], on_duplicate: 'skip', reason })
-    expect(skipped).toMatchObject({ skipped: 1, updated: 0 })
-    expect(rows()[0].capacity).toBe(800)
-
-    const renamed = await run('register_external_events', { events: [{ name: 'Techno Night Vol 2', event_type: 'fiesta', date: '2026-12-12', city: 'Santiago', source: 'puntoticket', external_id: 'PT-1' }], reason })
-    expect(renamed.results[0]).toMatchObject({ status: 'updated', matched_by: 'external_id' })
-    expect(rows()).toHaveLength(1)
-    expect(rows()[0].dedupe_key).toBe('techno_night_vol_2|2026-12-12|santiago')
-
-    const same = await run('register_external_events', { events: [{ name: 'Techno Night Vol 2', event_type: 'fiesta', date: '2026-12-12', city: 'Santiago' }], reason })
-    expect(same).toMatchObject({ unchanged: 1 })
-  })
-
-  it('errores por ítem sin frenar el resto; motivo obligatorio; la llave de solo lectura no escribe', async () => {
+  it('errores por ítem; motivo obligatorio; la llave de solo lectura no escribe', async () => {
     const r = await run('register_external_events', {
       events: [
-        { name: 'Con productora falsa', event_type: 'teatro', date: '2026-12-10', city: 'Santiago', organization_id: 999 },
-        { name: 'Precios al revés', event_type: 'teatro', date: '2026-12-10', city: 'Santiago', price_min: 5000, price_max: 1000 },
-        { name: 'Con lead', event_type: 'teatro', date: '2026-12-10', city: 'Santiago', lead_id: LEAD, organization_id: 7 },
-        { name: 'Fecha mala', event_type: 'teatro', date: '2026-02-30', city: 'Santiago' },
+        { name: 'Sin categoría', dates: [{ date: '2026-12-10', city: 'Santiago' }] },
+        { name: 'Sin ciudad', category: 'teatro', dates: [{ date: '2026-12-10' }] },
+        { name: 'Productora falsa', category: 'teatro', producer: { name: 'Productora X', organization_id: 999 }, dates: [{ date: '2026-12-10', city: 'Santiago' }] },
+        { name: 'Precios al revés', category: 'teatro', price_min: 5000, price_max: 1000, dates: [{ date: '2026-12-10', city: 'Santiago' }] },
+        { name: 'Una buena y una mala', category: 'teatro', producer: { name: 'Lead Teatro', lead_id: LEAD }, dates: [{ date: '2026-12-10', city: 'Santiago' }, { date: '2026-12-11' }] },
       ],
       reason,
     })
-    expect(r).toMatchObject({ created: 1, errors: 3 })
-    expect(r.results.map((x) => x.status)).toEqual(['error', 'error', 'created', 'error'])
-    expect(r.results[0].error).toMatch(/organization_id 999/)
-    expect(r.results[1].error).toMatch(/price_min/)
-    expect(byName('Con lead')).toMatchObject({ lead_id: LEAD, organization_id: 7 })
+    expect(r.results.map((x) => x.status)).toEqual(['error', 'error', 'error', 'error', 'created'])
+    expect(r.results[0].error).toMatch(/name y category/)
+    expect(r.results[1].error).toMatch(/ciudad o lugar/)
+    expect(r.results[2].error).toMatch(/organization_id 999/)
+    expect(r.results[3].error).toMatch(/price_min/)
+    expect(r.results[4].dates).toMatchObject({ added: 1, errors: 1 })
+    expect(T.producers().find((p) => p.name === 'Lead Teatro').lead_id).toBe(LEAD)
 
-    const noReason = await raw('register_external_events', { events: BASE })
-    expect(noReason).toMatchObject({ ok: false, code: 'invalid_input' })
-    const ro = await raw('register_external_events', { events: BASE, reason }, 'readonly')
-    expect(ro).toMatchObject({ ok: false, code: 'forbidden' })
+    expect(await raw('register_external_events', { events: [PARTY] })).toMatchObject({ ok: false, code: 'invalid_input' })
+    expect(await raw('register_external_events', { events: [PARTY], reason }, 'readonly')).toMatchObject({ ok: false, code: 'forbidden' })
     expect((await raw('list_external_events', {}, 'readonly')).ok).toBe(true)
   })
 })
@@ -126,67 +172,157 @@ describe('register_external_events', () => {
 describe('list / get / update / delete', () => {
   beforeEach(async () => {
     await run('register_external_events', {
+      events: [TOUR, PARTY, FONDA, { name: 'Pasado', category: 'concierto', ticketing_platform: 'passline', dates: [{ date: '2026-10-01', city: 'Temuco', sold_out: true }] }],
+      reason,
+    })
+  })
+
+  it('list_external_events: resumen de funciones, giras y filtros', async () => {
+    const all = await run('list_external_events', {})
+    expect(all.total).toBe(3)
+    expect(all.counts_by_category).toMatchObject({ fiesta: 2, concierto: 1 })
+    expect(all.counts_by_niche).toMatchObject({ rock: 1, techno: 1, cumbia: 1 })
+    const tour = all.items.find((i) => i.name === 'Gira Rock Andino 2026')
+    expect(tour).toMatchObject({ functions: 3, first_date: '2026-12-11', last_date: '2026-12-14', is_tour: true, producer: { name: 'Andes Prod' } })
+    expect(tour.dates.map((d) => d.venue?.name)).toEqual(['Teatro Caupolicán', 'Teatro Municipal de Viña', 'Teatro Regional'])
+    expect(tour.lead_niche).toBe('musica_en_vivo')
+    expect((await run('list_external_events', { all_dates: true })).total).toBe(4)
+    expect((await run('list_external_events', { city: 'Viña del Mar' })).items.map((i) => i.name)).toEqual(['Gira Rock Andino 2026'])
+    expect((await run('list_external_events', { tours_only: true })).total).toBe(1)
+    expect((await run('list_external_events', { niche: 'Tecno' })).items.map((i) => i.name)).toEqual(['Techno Night'])
+    expect((await run('list_external_events', { uses_ticketing: false })).items.map((i) => i.name)).toEqual(['Fonda Libre'])
+    expect((await run('list_external_events', { producer: '@andesprod' })).total).toBe(1)
+    expect((await run('list_external_events', { query: 'caupolican' })).total).toBe(1)
+    const venueId = T.venues().find((v) => v.name === 'Club Y').id
+    expect((await run('list_external_events', { venue_id: venueId })).items.map((i) => i.name)).toEqual(['Techno Night'])
+    expect((await run('list_external_events', { all_dates: true, has_outcome: true })).items.map((i) => i.name)).toEqual(['Pasado'])
+    const compact = await run('list_external_events', { compact: true, limit: 1 })
+    expect(compact.items[0]).toMatchObject({ functions: 3, is_tour: true })
+    expect(compact.items[0]).not.toHaveProperty('dates')
+  })
+
+  it('get_external_event: funciones con lugar y los otros eventos de esas noches', async () => {
+    const party = eventNamed('Techno Night')
+    const g = await run('get_external_event', { id: party.id })
+    expect(g.event).toMatchObject({ name: 'Techno Night', niche: 'techno', is_tour: false, producer: { name: 'Noche Prod', instagram: 'nocheprod' } })
+    expect(g.event.dates[0]).toMatchObject({ date: '2026-12-12', weekday: 'sábado', start_time: '23:30', venue: { name: 'Club Y', capacity: 800 }, city_key: 'santiago' })
+    expect(g.same_nights.map((x) => x.name)).toEqual(['Fonda Libre'])
+    expect(g.next_step).toMatch(/niche=techno/)
+    expect(await raw('get_external_event', { id: 424242 })).toMatchObject({ ok: false, code: 'not_found' })
+  })
+
+  it('update_external_event: datos, productora y funciones (agregar, cambiar, borrar, estado)', async () => {
+    const tour = eventNamed('Gira Rock Andino 2026')
+    const [scl, vina, conce] = datesOf('Gira Rock Andino 2026')
+    const u = await run('update_external_event', {
+      id: tour.id,
+      niche: 'Rock Latino',
+      add_note: 'Agregaron Temuco',
+      add_dates: [{ date: '2026-12-19', start_time: '21:00', venue: { name: 'Teatro Municipal', city: 'Temuco', capacity: 900 } }],
+      update_dates: [{ id: vina.id, sold_out: true, sold_pct: 100, attendance: 1180 }, { id: scl.id, start_time: '20:30' }],
+      remove_date_ids: [conce.id],
+      reason,
+    })
+    expect(u.changes.map((c) => c.field).sort()).toEqual(['niche', 'notes'])
+    expect(u.dates).toMatchObject({ added: 1, updated: 2, removed: 1, errors: [] })
+    expect(u.event).toMatchObject({ niche: 'rock_latino', functions: 3, is_tour: true, sold_out_functions: 1 })
+    expect(u.event.cities).toEqual(['Santiago', 'Gran Valparaíso (Viña, Valparaíso, Concón…)', 'temuco'])
+    expect(T.dates().find((d) => d.id === scl.id)).toMatchObject({ start_time: '20:30', slot_key: `2026-12-11|20:30|v${scl.venue_id}` })
+    expect(eventNamed('Gira Rock Andino 2026').notes).toBe('[2026-11-20] Agregaron Temuco')
+
+    // Mover una función al lugar y hora de otra del mismo evento choca
+    const clash = await run('update_external_event', { id: tour.id, update_dates: [{ id: vina.id, date: '2026-12-11', start_time: '20:30', venue: { venue_id: scl.venue_id } }], reason })
+    expect(clash.dates.errors[0]).toMatch(/Ya hay otra función/)
+
+    // Se cayó todo; y desvincular la productora
+    const cancel = await run('update_external_event', { id: tour.id, set_status_all_dates: 'cancelled', producer: null, reason })
+    expect(cancel.event.statuses).toEqual({ cancelled: 3 })
+    expect(cancel.event.producer).toBeNull()
+
+    expect(await raw('update_external_event', { id: tour.id, reason })).toMatchObject({ ok: false, code: 'invalid_input' })
+    expect(await raw('update_external_event', { id: tour.id, category: null, reason })).toMatchObject({ ok: false, code: 'invalid_input' })
+  })
+
+  it('delete_external_events: pide confirmación y borra el evento con sus funciones', async () => {
+    const tour = eventNamed('Gira Rock Andino 2026')
+    const first = await run('delete_external_events', { ids: [tour.id, 999999], reason })
+    expect(first.status).toBe('confirmation_required')
+    expect(first.summary).toMatch(/1 evento\(s\) externo\(s\) y sus 3 funciones/)
+    expect(first.warnings[0]).toMatch(/999999/)
+    const done = await run('delete_external_events', { ids: [tour.id, 999999], reason, confirmation_token: first.confirmation_token })
+    expect(done).toMatchObject({ deleted: 1, functions_deleted: 3, not_found: [999999] })
+    expect(T.events()).toHaveLength(3)
+    expect(T.dates().some((d) => d.event_id === tour.id)).toBe(false)
+    expect(T.producers().some((p) => p.name === 'Andes Prod')).toBe(true) // la productora queda
+  })
+})
+
+describe('productoras y lugares', () => {
+  beforeEach(async () => {
+    await run('register_external_events', {
       events: [
-        ...BASE,
-        { name: 'Obra Larga', event_type: 'teatro', date: '2026-12-11', city: 'Santiago', series_key: 'obra-larga', ticketing_platform: 'ticketplus', organizer_name: 'Teatro Uno' },
-        { name: 'Obra Larga', event_type: 'teatro', date: '2026-12-18', city: 'Santiago', series_key: 'obra-larga', ticketing_platform: 'ticketplus', organizer_name: 'Teatro Uno' },
-        { name: 'Pasado', event_type: 'concierto', date: '2026-10-01', city: 'Temuco', ticketing_platform: 'passline', sold_out: true },
+        TOUR,
+        PARTY,
+        { name: 'After Techno', category: 'club', niche: 'techno', ticketing_platform: 'passline', producer: { name: 'Noche Prod', instagram: 'nocheprod' }, dates: [{ date: '2026-12-19', venue: { name: 'Club Y', city: 'Santiago' } }] },
+        { name: 'Unplugged', category: 'concierto', producer: { name: 'Andes Producciones' }, dates: [{ date: '2026-12-20', venue: { name: 'Caupolicán', city: 'Santiago' } }] },
       ],
       reason,
     })
   })
 
-  it('list_external_events: filtros, conteos y paginación', async () => {
-    const all = await run('list_external_events', {})
-    expect(all.total).toBe(5) // sin el pasado
-    expect(all.counts_by_type).toMatchObject({ fiesta: 2, teatro: 2, stand_up: 1 })
-    expect(all.items[0].date <= all.items[1].date).toBe(true)
-    expect(all.note).toMatch(/DATO/)
-    expect((await run('list_external_events', { all_dates: true })).total).toBe(6)
-    expect((await run('list_external_events', { city: 'Providencia' })).total).toBe(5)
-    expect((await run('list_external_events', { ticketing_platforms: ['none'] })).items.map((i) => i.name)).toEqual(['Fonda Libre'])
-    expect((await run('list_external_events', { uses_ticketing: false })).total).toBe(1)
-    expect((await run('list_external_events', { query: 'techno' })).items[0].name).toBe('Techno Night')
-    expect((await run('list_external_events', { organizer: '@nocheprod' })).total).toBe(1)
-    expect((await run('list_external_events', { all_dates: true, has_outcome: true })).items.map((i) => i.name)).toEqual(['Pasado'])
-    const page = await run('list_external_events', { compact: true, limit: 2, offset: 1 })
-    expect(page.items).toHaveLength(2)
-    expect(page.items[0]).not.toHaveProperty('ticketing')
+  it('list_external_producers: actividad, ticketeras, enlaces y nicho de lead sugerido', async () => {
+    const r = await run('list_external_producers', {})
+    expect(r.items[0]).toMatchObject({ name: 'Noche Prod', events: 2, functions: 2, niches: ['techno'], platforms: ['passline'], cities: ['Santiago'] })
+    expect(r.items[0].categories.sort()).toEqual(['club', 'fiesta'])
+    expect(r.items.find((p) => p.name === 'Andes Prod')).toMatchObject({ events: 1, functions: 3, suggested_lead_niche: 'musica_en_vivo' })
+    expect((await run('list_external_producers', { linked: 'none', min_events: 2 })).items.map((p) => p.name)).toEqual(['Noche Prod'])
+    expect((await run('list_external_producers', { city: 'Concepción' })).items.map((p) => p.name)).toEqual(['Andes Prod'])
   })
 
-  it('get_external_event: funciones del mismo espectáculo y eventos de esa noche', async () => {
-    const obra = rows().find((r) => r.event_date === '2026-12-11')
-    const g = await run('get_external_event', { id: obra.id })
-    expect(g.event).toMatchObject({ name: 'Obra Larga', weekday: 'viernes', ticketing: { platform: 'ticketplus', uses_ticketing: true } })
-    expect(g.other_functions.map((f) => f.date)).toEqual(['2026-12-18'])
-    const techno = byName('Techno Night')
-    expect((await run('get_external_event', { id: techno.id })).same_night_same_city.map((e) => e.name)).toEqual(['Fonda Libre'])
-    expect(await raw('get_external_event', { id: 424242 })).toMatchObject({ ok: false, code: 'not_found' })
-  })
+  it('update_external_producer: enlazar a lead, choque de Instagram y fusión de duplicados', async () => {
+    const noche = T.producers().find((p) => p.name === 'Noche Prod')
+    const linked = await run('update_external_producer', { id: noche.id, lead_id: LEAD, website: 'https://noche.cl', reason })
+    expect(linked.changes.map((c) => c.field).sort()).toEqual(['lead_id', 'website'])
+    expect((await run('list_external_producers', { linked: 'lead' })).items.map((p) => p.name)).toEqual(['Noche Prod'])
 
-  it('update_external_event: resultado, borrar con null, nota y choque de duplicado', async () => {
-    const techno = byName('Techno Night')
-    const u = await run('update_external_event', { id: techno.id, sold_pct: 95, venue_name: null, add_note: 'Agotó preventa', reason })
-    expect(u.changes.map((c) => c.field).sort()).toEqual(['notes', 'sold_pct', 'venue_name'])
-    expect(byName('Techno Night')).toMatchObject({ sold_pct: 95, venue_name: null, notes: '[2026-11-20] Agotó preventa' })
-    expect(u.event.outcome.sold_pct).toBe(95)
-    const clash = await raw('update_external_event', { id: techno.id, name: 'Fonda Libre', reason })
+    const dup = T.producers().find((p) => p.name === 'Andes Producciones')
+    const clash = await raw('update_external_producer', { id: dup.id, instagram: '@andesprod', reason })
     expect(clash).toMatchObject({ ok: false, code: 'conflict' })
-    const noop = await run('update_external_event', { id: techno.id, sold_pct: 95, reason })
-    expect(noop.changes).toEqual([])
-    expect(await raw('update_external_event', { id: techno.id, name: null, reason })).toMatchObject({ ok: false, code: 'invalid_input' })
+    expect(clash.message).toMatch(/merge_into_id/)
+
+    const target = T.producers().find((p) => p.name === 'Andes Prod')
+    const first = await run('update_external_producer', { id: dup.id, merge_into_id: target.id, reason })
+    expect(first.status).toBe('confirmation_required')
+    const merged = await run('update_external_producer', { id: dup.id, merge_into_id: target.id, reason, confirmation_token: first.confirmation_token })
+    expect(merged).toMatchObject({ merged_into: target.id, events_moved: 1 })
+    expect(eventNamed('Unplugged').producer_id).toBe(target.id)
+    expect(T.producers().some((p) => p.id === dup.id)).toBe(false)
+
+    const del = await run('update_external_producer', { id: target.id, delete: true, reason })
+    expect(del.status).toBe('confirmation_required')
+    expect(await raw('update_external_producer', { id: target.id, delete: true, reason, confirmation_token: del.confirmation_token })).toMatchObject({ ok: false, code: 'conflict' })
   })
 
-  it('delete_external_events: pide confirmación y luego borra', async () => {
-    const ids = rows().filter((r) => r.name === 'Obra Larga').map((r) => r.id)
-    const first = await run('delete_external_events', { ids: [...ids, 999999], reason })
+  it('list_external_venues y update_external_venue: actividad, cambio de ciudad y fusión', async () => {
+    const venues = await run('list_external_venues', { city: 'Santiago' })
+    expect(venues.items[0]).toMatchObject({ name: 'Club Y', functions: 2, events: 2 })
+    expect(venues.items.find((v) => v.name === 'Teatro Caupolicán')).toMatchObject({ capacity: 4500, functions: 1 })
+
+    // Corregir la ciudad del Teatro Regional mueve sus funciones
+    const regional = T.venues().find((v) => v.name === 'Teatro Regional')
+    const moved = await run('update_external_venue', { id: regional.id, city: 'Talcahuano', capacity: 1500, reason })
+    expect(moved.changes.map((c) => c.field)).toEqual(expect.arrayContaining(['city', 'capacity']))
+    expect(T.dates().find((d) => d.venue_id === regional.id)).toMatchObject({ city: 'Talcahuano', city_key: 'gran_concepcion' })
+
+    // "Caupolicán" es el mismo lugar que "Teatro Caupolicán"
+    const dup = T.venues().find((v) => v.name === 'Caupolicán')
+    const real = T.venues().find((v) => v.name === 'Teatro Caupolicán')
+    const first = await run('update_external_venue', { id: dup.id, merge_into_id: real.id, reason })
     expect(first.status).toBe('confirmation_required')
-    expect(first.summary).toMatch(/Borrar 2 evento/)
-    expect(first.warnings[0]).toMatch(/999999/)
-    expect(rows()).toHaveLength(6)
-    const done = await run('delete_external_events', { ids: [...ids, 999999], reason, confirmation_token: first.confirmation_token })
-    expect(done).toMatchObject({ deleted: 2, not_found: [999999] })
-    expect(rows()).toHaveLength(4)
+    const merged = await run('update_external_venue', { id: dup.id, merge_into_id: real.id, reason, confirmation_token: first.confirmation_token })
+    expect(merged).toMatchObject({ merged_into: real.id, functions_moved: 1, functions_deduplicated: 0 })
+    expect(datesOf('Unplugged')[0]).toMatchObject({ venue_id: real.id, slot_key: `2026-12-20|-|v${real.id}` })
+    expect(T.venues().some((v) => v.id === dup.id)).toBe(false)
   })
 })
 
@@ -194,55 +330,58 @@ describe('mapa de mercado y modelo', () => {
   beforeEach(async () => {
     await run('register_external_events', {
       events: [
-        ...BASE,
-        { name: 'Techno Night II', event_type: 'fiesta', date: '2026-12-19', city: 'Santiago', organizer_name: 'Noche Prod', organizer_instagram: 'nocheprod', ticketing_platform: 'puntoticket', price_min: 12000 },
-        { name: 'Rock Bar', event_type: 'concierto', date: '2026-12-11', city: 'Viña del Mar', ticketing_platform: 'passline', organizer_name: 'Rock Viña' },
+        TOUR,
+        PARTY,
+        FONDA,
+        { name: 'Techno Night II', category: 'fiesta', niche: 'techno', ticketing_platform: 'passline', price_min: 12000, producer: { name: 'Noche Prod', instagram: 'nocheprod' }, dates: [{ date: '2026-12-19', venue: { name: 'Club Y', city: 'Santiago' } }] },
       ],
       reason,
     })
   })
 
-  it('get_market_map: participación por ticketera, tipos, oportunidades y eventos de AI Tickets', async () => {
+  it('get_market_map: categorías con nichos, giras, lugares, ticketeras y oportunidades', async () => {
     const m = await run('get_market_map', {})
-    expect(m.sources).toMatchObject({ external_functions: 5, aitickets_functions: 1, include_internal: true })
-    expect(m.totals.shows).toBe(6)
-    const pt = m.platforms.find((p) => p.platform === 'puntoticket')
-    expect(pt).toMatchObject({ shows: 2, organizers: 1 })
-    expect(m.platforms.find((p) => p.platform === 'aitickets')).toMatchObject({ shows: 1, label: 'AI Tickets' })
-    expect(m.types.find((t) => t.event_type === 'fiesta')).toMatchObject({ shows: 4 })
+    expect(m.sources).toMatchObject({ external_functions: 6, aitickets_functions: 1, include_internal: true })
+    expect(m.totals).toMatchObject({ events: 5, functions: 7, tours: 1 })
+    const fiesta = m.categories.find((c) => c.category === 'fiesta')
+    expect(fiesta).toMatchObject({ events: 4 })
+    expect(fiesta.niches.map((x) => x.key)).toEqual(expect.arrayContaining(['techno', 'cumbia']))
+    expect(m.tours[0]).toMatchObject({ event: 'Gira Rock Andino 2026', producer: 'Andes Prod', functions: 3 })
+    expect(m.tours[0].cities).toHaveLength(3)
+    expect(m.venues[0]).toMatchObject({ name: 'Club Y', functions: 2 })
+    expect(m.platforms.find((p) => p.platform === 'aitickets')).toMatchObject({ events: 1 })
     expect(m.opportunities.map((o) => o.name)).toEqual(['Noche Prod'])
-    expect(m.opportunities[0]).toMatchObject({ shows: 2, platforms: ['puntoticket'], aitickets_customer: false })
-    expect(m.top_organizers.find((o) => o.name === 'Productora Siete')).toMatchObject({ aitickets_customer: true })
-    const scl = await run('get_market_map', { city: 'Santiago', include_internal: false })
-    expect(scl.totals.shows).toBe(4)
-    expect(scl.platforms.some((p) => p.platform === 'aitickets')).toBe(false)
+    expect(m.opportunities[0]).toMatchObject({ events: 2, platforms: ['passline'], suggested_lead_niche: 'fiestas', producer_id: expect.any(Number) })
+    expect(m.data_quality).toMatchObject({ events_without_producer: 0, events_without_niche: 0 })
+    const techno = await run('get_market_map', { niche: 'Tecno', include_internal: false })
+    expect(techno.totals.events).toBe(2)
   })
 
-  it('evaluate_event_date: competidores externos y de AI Tickets, sin contarse a sí mismo', async () => {
-    const r = await run('evaluate_event_date', { event_type: 'fiesta', date: '2026-12-12', city: 'Las Condes' })
-    expect(r).toMatchObject({ weekday: 'sábado', city_key: 'santiago', event_type: 'fiesta' })
-    expect(r.score).toBeGreaterThanOrEqual(0)
-    expect(r.factors.map((f) => f.factor)).toEqual(expect.arrayContaining(['dia_semana', 'temporada', 'competencia']))
-    const names = r.competition.events.map((e) => e.name)
-    expect(names).toEqual(expect.arrayContaining(['Techno Night', 'Fonda Libre', 'Fiesta AI']))
-    expect(r.competition.events.find((e) => e.name === 'Fiesta AI')).toMatchObject({ source: 'aitickets', ticketing_platform: 'aitickets' })
-    expect(r.data_used).toMatchObject({ external_functions: 5, aitickets_functions: 1 })
-    expect(r.note).toMatch(/heurístico/)
-    const techno = byName('Techno Night')
-    const self = await run('evaluate_event_date', { event_type: 'fiesta', date: '2026-12-12', city: 'Santiago', external_event_id: techno.id, include_internal: false, price: 11000 })
-    expect(self.competition.events.map((e) => e.name)).not.toContain('Techno Night')
-    expect(self.price_check).toMatchObject({ your_price: 11000 })
-    expect(await raw('evaluate_event_date', { event_type: 'fiesta' })).toMatchObject({ ok: false, code: 'invalid_input' })
+  it('evaluate_event_date: la gira compite en cada ciudad; el nicho pesa; un evento no compite consigo mismo', async () => {
+    const vina = await run('evaluate_event_date', { category: 'concierto', date: '2026-12-12', city: 'Viña del Mar', include_internal: false })
+    expect(vina.competition.events.map((e) => e.name)).toEqual(['Gira Rock Andino 2026'])
+    expect(vina.competition.events[0]).toMatchObject({ niche: 'rock', producer: 'Andes Prod', ticketing_platform: 'puntoticket' })
+    const tour = eventNamed('Gira Rock Andino 2026')
+    const self = await run('evaluate_event_date', { category: 'concierto', date: '2026-12-12', city: 'Viña del Mar', external_event_id: tour.id, include_internal: false })
+    expect(self.competition.events).toEqual([])
+
+    const party = await run('evaluate_event_date', { category: 'fiesta', niche: 'techno', date: '2026-12-12', city: 'Las Condes', price: 11000 })
+    const w = Object.fromEntries(party.competition.events.map((e) => [e.name, e.weight]))
+    expect(w['Fonda Libre']).toBe(0.6) // otro nicho de la misma categoría
+    expect(w['Techno Night']).toBeGreaterThan(1) // mismo nicho y 800 personas
+    expect(w['Fiesta AI']).toBeGreaterThan(0) // AI Tickets (sin nicho)
+    expect(party.price_check).toMatchObject({ your_price: 11000 })
+    expect(party.note).toMatch(/heurístico/)
+    expect(await raw('evaluate_event_date', { category: 'fiesta' })).toMatchObject({ ok: false, code: 'invalid_input' })
   })
 
-  it('recommend_event_dates: rango, filtro por día y límite', async () => {
-    const r = await run('recommend_event_dates', { event_type: 'fiesta', city: 'Santiago', from: '2026-12-01', to: '2026-12-31', weekdays: ['viernes', 'sabado'], top: 3 })
+  it('recommend_event_dates: rango, días de la semana y límite', async () => {
+    const r = await run('recommend_event_dates', { category: 'fiesta', niche: 'techno', city: 'Santiago', from: '2026-12-01', to: '2026-12-31', weekdays: ['viernes', 'sabado'], top: 3 })
     expect(r.top).toHaveLength(3)
     expect(r.top.every((t) => ['viernes', 'sábado'].includes(t.weekday))).toBe(true)
     expect(r.evaluated_dates).toBe(8)
-    const def = await run('recommend_event_dates', { event_type: 'teatro' })
-    expect(def).toMatchObject({ from: '2026-12-04', to: '2027-03-03' })
-    expect(await raw('recommend_event_dates', { event_type: 'fiesta', from: '2026-12-01', to: '2027-12-01' })).toMatchObject({ ok: false, code: 'invalid_input' })
+    expect(await run('recommend_event_dates', { category: 'teatro' })).toMatchObject({ from: '2026-12-04', to: '2027-03-03' })
+    expect(await raw('recommend_event_dates', { category: 'fiesta', from: '2026-12-01', to: '2027-12-01' })).toMatchObject({ ok: false, code: 'invalid_input' })
   })
 })
 
@@ -251,18 +390,17 @@ describe('calendario de mercado', () => {
     const up = await run('upsert_market_calendar', {
       entries: [
         { kind: 'bridge_holiday', label: 'Interferiado 7 de diciembre', date_from: '2026-12-07', region: 'metropolitana' },
-        { kind: 'school_vacation', label: 'Vacaciones de invierno', date_from: '2027-07-05', date_to: '2027-07-16', event_types: ['infantil'] },
+        { kind: 'school_vacation', label: 'Vacaciones de invierno', date_from: '2027-07-05', date_to: '2027-07-16', categories: ['infantil'] },
       ],
       reason,
     })
     expect(up).toMatchObject({ created: 2, updated: 0 })
-    expect(up.entries[0]).toMatchObject({ kind: 'bridge_holiday', date_to: '2026-12-07', region: 'metropolitana' })
+    expect(up.entries[1]).toMatchObject({ kind: 'school_vacation', categories: ['infantil'] })
 
     const cal = await run('list_market_calendar', { from: '2026-12-01', to: '2026-12-31', city: 'Santiago' })
     expect(cal.holidays.map((h) => h.date)).toEqual(['2026-12-07', '2026-12-08', '2026-12-25'])
     expect(cal.holidays[0]).toMatchObject({ source: 'calendario' })
     expect(cal.long_weekends.map((l) => [l.start, l.end, l.days])).toEqual([['2026-12-05', '2026-12-08', 4], ['2026-12-25', '2026-12-27', 3]])
-    expect(cal.entries).toHaveLength(1)
 
     // Sin el interferiado (otra región) el 8 de diciembre martes no arma fin de semana largo; Navidad (viernes) sí
     const temuco = await run('list_market_calendar', { from: '2026-12-01', to: '2026-12-31', city: 'Temuco' })
@@ -281,11 +419,12 @@ describe('calendario de mercado', () => {
 describe('sin la migración', () => {
   it('las lecturas avisan y las escrituras responden unavailable', async () => {
     db.failOn('aitickets_external_events', 'select', { code: '42P01', message: 'no existe' })
-    const list = await run('list_external_events', {})
-    expect(list.note).toMatch(/202611200100/)
+    expect((await run('list_external_events', { all_dates: true })).note).toMatch(/202611200100/)
     db.failOn('aitickets_external_events', 'select', { code: '42P01', message: 'no existe' }, { once: false })
-    expect(await raw('register_external_events', { events: BASE, reason })).toMatchObject({ ok: false, code: 'unavailable' })
-    const r = await run('evaluate_event_date', { event_type: 'fiesta', date: '2026-12-12', city: 'Santiago' })
+    db.failOn('aitickets_external_producers', 'select', { code: '42P01', message: 'no existe' }, { once: false })
+    expect(await raw('register_external_events', { events: [PARTY], reason })).toMatchObject({ ok: false, code: 'unavailable' })
+    expect((await run('list_external_producers', {})).note).toMatch(/202611200100/)
+    const r = await run('evaluate_event_date', { category: 'fiesta', date: '2026-12-12', city: 'Santiago' })
     expect(r.warnings.join(' ')).toMatch(/202611200100/)
   })
 })

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 const { chileHolidays, easterSunday, makeCalendar, addDays } = await import('../../src/lib/market/calendar.ts')
 const { buildDateModel, nightDate, verdictFor } = await import('../../src/lib/market/dateModel.ts')
-const { cityInfo, normalizePlatform, normalizeInstagram, organizerKey, dedupeKey, typeFromCategory, affinity, usesTicketing } = await import('../../src/lib/market/taxonomy.ts')
+const { cityInfo, normalizePlatform, normalizeInstagram, producerKey, venueKey, slotKey, normalizeNiche, leadNicheFor, categoryFromTag, affinity, usesTicketing } = await import('../../src/lib/market/taxonomy.ts')
 
 const holidayDates = (year) => chileHolidays(year).map((h) => h.date)
 
@@ -13,10 +13,10 @@ const ev = (over = {}) => {
   const id = ++seq
   const date = over.date || '2026-06-13'
   return {
-    key: `ext:${id}`, source: 'external', id, name: `Evento ${id}`, event_type: 'fiesta', genre: null, date,
+    key: `ext:${id}:${date}`, source: 'external', id, name: `Evento ${id}`, category: 'fiesta', niche: null, date,
     night_date: nightDate(date, over.start_time ?? null), start_time: null, city_key: 'santiago', city: 'Santiago', region: 'metropolitana',
-    venue_name: null, capacity: null, organizer_key: null, organizer_name: null, ticketing_platform: 'passline', price_min: null, price_max: null,
-    is_free: null, status: 'scheduled', sold_out: null, sold_pct: null, announced_at: null, series_key: null, organization_id: null, lead_id: null,
+    venue_name: null, capacity: null, producer_key: null, producer_name: null, ticketing_platform: 'passline', price_min: null, price_max: null,
+    is_free: null, status: 'scheduled', sold_out: null, sold_pct: null, announced_at: null, show_key: `ext:${id}`, organization_id: null, lead_id: null,
     ...over,
   }
 }
@@ -107,16 +107,32 @@ describe('taxonomía', () => {
     expect(usesTicketing(null)).toBeNull()
     expect(normalizeInstagram('https://instagram.com/Mi.Productora/?hl=es')).toBe('mi.productora')
     expect(normalizeInstagram('@fiestas_x')).toBe('fiestas_x')
-    expect(organizerKey('Fiestas X', '@fiestas_x')).toBe('ig:fiestas_x')
-    expect(organizerKey('Fiestas X', null)).toBe('name:fiestas_x')
-    expect(dedupeKey('Fiesta Ñoña!', '2026-06-13', 'santiago')).toBe('fiesta_nona|2026-06-13|santiago')
+    expect(producerKey('Fiestas X', '@fiestas_x')).toBe('ig:fiestas_x')
+    expect(producerKey('Fiestas X', null)).toBe('name:fiestas_x')
+    expect(venueKey('Teatro Caupolicán', 'santiago')).toBe('teatro_caupolican|santiago')
+    expect(slotKey('2026-06-13', '21:00:00', 12, 'santiago')).toBe('2026-06-13|21:00|v12')
+    expect(slotKey('2026-06-13', null, null, 'temuco')).toBe('2026-06-13|-|temuco')
   })
 
-  it('categorías de AI Tickets → tipo y afinidad', () => {
-    expect(typeFromCategory('Festival de música')).toBe('festival')
-    expect(typeFromCategory('Stand Up')).toBe('stand_up')
-    expect(typeFromCategory('Música')).toBe('concierto')
-    expect(typeFromCategory(null)).toBe('otro')
+  it('nichos: normalizados con alias, y nicho de lead por categoría', () => {
+    expect(normalizeNiche('Tecno')).toBe('techno')
+    expect(normalizeNiche(' TECHNO ')).toBe('techno')
+    expect(normalizeNiche('Reguetón')).toBe('reggaeton')
+    expect(normalizeNiche('Música urbana')).toBe('urbano')
+    expect(normalizeNiche('Stand Up Comedy')).toBe('stand_up')
+    expect(normalizeNiche('Cerámica')).toBe('ceramica')
+    expect(normalizeNiche('')).toBeNull()
+    expect(leadNicheFor('concierto')).toBe('musica_en_vivo')
+    expect(leadNicheFor('fiesta')).toBe('fiestas')
+    expect(leadNicheFor('conferencia')).toBe('seminarios')
+    expect(leadNicheFor('feria')).toBe('otro')
+  })
+
+  it('categorías de AI Tickets → categoría y afinidad', () => {
+    expect(categoryFromTag('Festival de música')).toBe('festival')
+    expect(categoryFromTag('Stand Up')).toBe('stand_up')
+    expect(categoryFromTag('Música')).toBe('concierto')
+    expect(categoryFromTag(null)).toBe('otro')
     expect(affinity('fiesta', 'club')).toBe(0.8)
     expect(affinity('club', 'fiesta')).toBe(0.8)
     expect(affinity('fiesta', 'conferencia')).toBe(0)
@@ -126,15 +142,15 @@ describe('taxonomía', () => {
 describe('modelo de fechas', () => {
   it('sin datos: el supuesto inicial ordena los días por tipo', () => {
     const m = buildDateModel({ events: [], today: '2026-03-01' })
-    const sat = m.evaluate('2026-06-13', { event_type: 'fiesta', city: 'Santiago' })
-    const mon = m.evaluate('2026-06-15', { event_type: 'fiesta', city: 'Santiago' })
+    const sat = m.evaluate('2026-06-13', { category: 'fiesta', city: 'Santiago' })
+    const mon = m.evaluate('2026-06-15', { category: 'fiesta', city: 'Santiago' })
     expect(sat.score).toBeGreaterThan(80)
     expect(mon.score).toBeLessThan(30)
     expect(sat.verdict).toBe('buena')
     expect(mon.verdict).toBe('mala')
     expect(sat.confidence.level).toBe('baja')
-    const wed = m.evaluate('2026-06-17', { event_type: 'conferencia', city: 'Santiago' })
-    const satConf = m.evaluate('2026-06-13', { event_type: 'conferencia', city: 'Santiago' })
+    const wed = m.evaluate('2026-06-17', { category: 'conferencia', city: 'Santiago' })
+    const satConf = m.evaluate('2026-06-13', { category: 'conferencia', city: 'Santiago' })
     expect(wed.score).toBeGreaterThan(satConf.score)
     expect(verdictFor(75)).toBe('buena')
     expect(verdictFor(39)).toBe('mala')
@@ -142,8 +158,8 @@ describe('modelo de fechas', () => {
 
   it('víspera de feriado: un miércoles antes de un jueves feriado vale como viernes para una fiesta', () => {
     const m = buildDateModel({ events: [], today: '2026-03-01' })
-    const eve = m.evaluate('2026-05-20', { event_type: 'fiesta', city: 'Santiago' })
-    const normal = m.evaluate('2026-05-13', { event_type: 'fiesta', city: 'Santiago' })
+    const eve = m.evaluate('2026-05-20', { category: 'fiesta', city: 'Santiago' })
+    const normal = m.evaluate('2026-05-13', { category: 'fiesta', city: 'Santiago' })
     expect(eve.score).toBeGreaterThan(normal.score + 30)
     expect(eve.factors.find((f) => f.factor === 'dia_semana').detail).toMatch(/viernes/)
     expect(eve.calendar.next_day_holiday).toBe('Día de las Glorias Navales')
@@ -158,36 +174,36 @@ describe('modelo de fechas', () => {
     }
     // Un club en otra ciudad y una conferencia el mismo día no compiten
     events.push(ev({ date: '2026-06-13', city_key: 'temuco', region: 'araucania', city: 'Temuco' }))
-    events.push(ev({ date: '2026-06-13', event_type: 'conferencia' }))
+    events.push(ev({ date: '2026-06-13', category: 'conferencia' }))
     const m = buildDateModel({ events, today: '2026-12-01' })
-    const busy = m.evaluate('2026-06-13', { event_type: 'fiesta', city: 'Providencia' })
-    const quiet = m.evaluate('2026-06-20', { event_type: 'fiesta', city: 'Providencia' })
+    const busy = m.evaluate('2026-06-13', { category: 'fiesta', city: 'Providencia' })
+    const quiet = m.evaluate('2026-06-20', { category: 'fiesta', city: 'Providencia' })
     const comp = busy.factors.find((f) => f.factor === 'competencia')
     expect(comp.multiplier).toBeLessThan(0.6)
     expect(busy.score).toBeLessThan(quiet.score)
     expect(busy.competition.same_day).toBe(6)
     expect(busy.competition.normal_for_weekday).toBe(1)
-    expect(busy.competition.events.every((e) => e.event_type === 'fiesta')).toBe(true)
+    expect(busy.competition.events.every((e) => e.category === 'fiesta')).toBe(true)
     expect(busy.alternatives.length).toBeGreaterThan(0)
     expect(busy.alternatives[0].score).toBeGreaterThan(busy.score)
     // Excluir un evento lo saca de la competencia
-    const excl = m.evaluate('2026-06-13', { event_type: 'fiesta', city: 'Santiago', exclude_keys: [busy.competition.events[0].external_event_id].map((id) => `ext:${id}`) })
+    const excl = m.evaluate('2026-06-13', { category: 'fiesta', city: 'Santiago', exclude_keys: [`ext:${busy.competition.events[0].external_event_id}`] })
     expect(excl.competition.same_day).toBe(5)
   })
 
   it('un evento grande del mismo día pesa aunque sea de otro tipo', () => {
-    const m = buildDateModel({ events: [ev({ date: '2026-06-13', event_type: 'concierto', capacity: 50000, name: 'Estadio' })], today: '2026-12-01' })
-    const r = m.evaluate('2026-06-13', { event_type: 'teatro', city: 'Santiago' })
+    const m = buildDateModel({ events: [ev({ date: '2026-06-13', category: 'concierto', capacity: 50000, name: 'Estadio' })], today: '2026-12-01' })
+    const r = m.evaluate('2026-06-13', { category: 'teatro', city: 'Santiago' })
     expect(r.competition.events[0]).toMatchObject({ name: 'Estadio', weight: 1.6 })
   })
 
   it('fecha lejana: corrige por eventos aún no anunciados; fecha cercana: castiga la poca anticipación', () => {
     const m = buildDateModel({ events: [ev({ date: '2026-10-10' })], today: '2026-06-01' })
-    const far = m.evaluate('2026-10-10', { event_type: 'fiesta', city: 'Santiago' })
+    const far = m.evaluate('2026-10-10', { category: 'fiesta', city: 'Santiago' })
     expect(far.competition.pressure).toBeGreaterThan(1)
     expect(far.factors.find((f) => f.factor === 'competencia').detail).toMatch(/anunciado/)
     expect(far.confidence.reasons.join(' ')).toMatch(/aún no se anuncian/)
-    const soon = m.evaluate('2026-06-06', { event_type: 'fiesta', city: 'Santiago' })
+    const soon = m.evaluate('2026-06-06', { category: 'fiesta', city: 'Santiago' })
     expect(soon.factors.find((f) => f.factor === 'anticipacion')).toMatchObject({ multiplier: 0.8 })
   })
 
@@ -195,46 +211,69 @@ describe('modelo de fechas', () => {
     expect(nightDate('2026-06-13', '01:00')).toBe('2026-06-12')
     expect(nightDate('2026-06-13', '22:00')).toBe('2026-06-13')
     const m = buildDateModel({ events: [ev({ date: '2026-06-13', start_time: '01:00' })], today: '2026-12-01' })
-    expect(m.evaluate('2026-06-12', { event_type: 'fiesta', city: 'Santiago' }).competition.same_day).toBe(1)
-    expect(m.evaluate('2026-06-13', { event_type: 'fiesta', city: 'Santiago' }).competition.same_day).toBe(0)
+    expect(m.evaluate('2026-06-12', { category: 'fiesta', city: 'Santiago' }).competition.same_day).toBe(1)
+    expect(m.evaluate('2026-06-13', { category: 'fiesta', city: 'Santiago' }).competition.same_day).toBe(0)
   })
 
   it('los datos corrigen el supuesto del día de la semana y los resultados ajustan la nota', () => {
     const events = []
     // 60 stand-up registrados los martes en Santiago
-    for (let i = 0; i < 60; i++) events.push(ev({ event_type: 'stand_up', date: addDays('2025-01-07', 7 * i), name: `Impro ${i}` }))
+    for (let i = 0; i < 60; i++) events.push(ev({ category: 'stand_up', date: addDays('2025-01-07', 7 * i), name: `Impro ${i}` }))
     const m = buildDateModel({ events, today: '2026-12-01' })
-    const r = m.evaluate('2027-03-02', { event_type: 'stand_up', city: 'Santiago' })
+    const r = m.evaluate('2027-03-02', { category: 'stand_up', city: 'Santiago' })
     expect(r.factors[0].detail).toMatch(/60 eventos registrados/)
-    const prior = buildDateModel({ events: [], today: '2026-12-01' }).evaluate('2027-03-02', { event_type: 'stand_up', city: 'Santiago' })
+    const prior = buildDateModel({ events: [], today: '2026-12-01' }).evaluate('2027-03-02', { category: 'stand_up', city: 'Santiago' })
     expect(r.factors[0].multiplier).toBeGreaterThan(prior.factors[0].multiplier)
 
     // Resultados: los viernes se agotan, los jueves no
     const outcomes = []
-    for (let i = 0; i < 10; i++) outcomes.push(ev({ event_type: 'teatro', date: addDays('2026-01-02', 7 * i), sold_out: true, name: `V${i}` }))
-    for (let i = 0; i < 10; i++) outcomes.push(ev({ event_type: 'teatro', date: addDays('2026-01-01', 7 * i), sold_out: false, name: `J${i}` }))
+    for (let i = 0; i < 10; i++) outcomes.push(ev({ category: 'teatro', date: addDays('2026-01-02', 7 * i), sold_out: true, name: `V${i}` }))
+    for (let i = 0; i < 10; i++) outcomes.push(ev({ category: 'teatro', date: addDays('2026-01-01', 7 * i), sold_out: false, name: `J${i}` }))
     const mo = buildDateModel({ events: outcomes, today: '2026-12-01' })
-    const fri = mo.evaluate('2027-03-05', { event_type: 'teatro', city: 'Santiago' })
-    const thu = mo.evaluate('2027-03-04', { event_type: 'teatro', city: 'Santiago' })
+    const fri = mo.evaluate('2027-03-05', { category: 'teatro', city: 'Santiago' })
+    const thu = mo.evaluate('2027-03-04', { category: 'teatro', city: 'Santiago' })
     expect(fri.factors.find((f) => f.factor === 'resultados').multiplier).toBeGreaterThan(1)
     expect(thu.factors.find((f) => f.factor === 'resultados').multiplier).toBeLessThan(1)
   })
 
+  it('nicho: el mismo nicho compite de lleno; otro nicho de la misma categoría compite menos', () => {
+    const events = [ev({ date: '2026-06-13', niche: 'techno', name: 'T' }), ev({ date: '2026-06-13', niche: 'reggaeton', name: 'R' })]
+    const m = buildDateModel({ events, today: '2026-12-01' })
+    const r = m.evaluate('2026-06-13', { category: 'fiesta', niche: 'techno', city: 'Santiago' })
+    const w = Object.fromEntries(r.competition.events.map((e) => [e.name, e.weight]))
+    expect(w.T).toBe(1)
+    expect(w.R).toBe(0.6)
+    // Sin nicho en la consulta, ambos pesan igual
+    const any = m.evaluate('2026-06-13', { category: 'fiesta', city: 'Santiago' })
+    expect(any.competition.events.map((e) => e.weight)).toEqual([1, 1])
+  })
+
+  it('gira: compite en cada ciudad de sus funciones y un evento no compite consigo mismo', () => {
+    const tour = [
+      ev({ id: 500, key: 'ext:500:2026-06-12:santiago', show_key: 'ext:500', date: '2026-06-12', category: 'concierto', name: 'Gira' }),
+      ev({ id: 500, key: 'ext:500:2026-06-13:gran_valparaiso', show_key: 'ext:500', date: '2026-06-13', category: 'concierto', city_key: 'gran_valparaiso', region: 'valparaiso', name: 'Gira' }),
+    ]
+    const m = buildDateModel({ events: tour, today: '2026-12-01' })
+    expect(m.evaluate('2026-06-13', { category: 'concierto', city: 'Viña del Mar' }).competition.same_day).toBe(1)
+    expect(m.evaluate('2026-06-12', { category: 'concierto', city: 'Santiago' }).competition.same_day).toBe(1)
+    expect(m.evaluate('2026-06-13', { category: 'concierto', city: 'Viña del Mar', exclude_keys: ['ext:500'] }).competition.same_day).toBe(0)
+  })
+
   it('precio vs mercado', () => {
-    const events = [10000, 15000, 20000, 25000].map((p, i) => ev({ event_type: 'concierto', price_min: p, price_max: p * 2, name: `C${i}` }))
-    const r = buildDateModel({ events, today: '2026-12-01' }).evaluate('2027-03-06', { event_type: 'concierto', city: 'Santiago', price: 18000 })
+    const events = [10000, 15000, 20000, 25000].map((p, i) => ev({ category: 'concierto', price_min: p, price_max: p * 2, name: `C${i}` }))
+    const r = buildDateModel({ events, today: '2026-12-01' }).evaluate('2027-03-06', { category: 'concierto', city: 'Santiago', price: 18000 })
     expect(r.price_check).toMatchObject({ n: 4, median_price_min: 17500, percentile: 50 })
   })
 
   it('recomienda fechas: ranking, filtro por día y mejor fecha por semana', () => {
     const m = buildDateModel({ events: [], today: '2026-03-01' })
-    const r = m.recommend({ event_type: 'fiesta', city: 'Santiago' }, { from: '2026-06-01', to: '2026-06-28', top: 5 })
+    const r = m.recommend({ category: 'fiesta', city: 'Santiago' }, { from: '2026-06-01', to: '2026-06-28', top: 5 })
     expect(r.evaluated_dates).toBe(28)
     expect(r.top).toHaveLength(5)
     expect(r.top.map((t) => t.score)).toEqual([...r.top.map((t) => t.score)].sort((a, b) => b - a))
     expect(['viernes', 'sábado']).toContain(r.top[0].weekday)
     expect(r.best_per_week.length).toBe(4)
-    const fridays = m.recommend({ event_type: 'fiesta', city: 'Santiago' }, { from: '2026-06-01', to: '2026-06-28', weekdays: [5] })
+    const fridays = m.recommend({ category: 'fiesta', city: 'Santiago' }, { from: '2026-06-01', to: '2026-06-28', weekdays: [5] })
     expect(fridays.top.every((t) => t.weekday === 'viernes')).toBe(true)
     expect(fridays.evaluated_dates).toBe(4)
   })

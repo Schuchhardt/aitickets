@@ -1,7 +1,7 @@
 // Calendario del modelo de fechas: feriados nacionales de Chile calculados por ley, fines de semana largos, fechas
 // especiales (Fiestas Patrias, Navidad, Año Nuevo) y las entradas que carga el dueño en aitickets_market_calendar
 // (interferiados, feriados regionales, vacaciones escolares, elecciones, mega eventos…). Fechas como "YYYY-MM-DD".
-import { type EventType, TYPE_INFO, type TypeGroup } from "./taxonomy";
+import { type Category, CATEGORY_INFO, type TypeGroup } from "./taxonomy";
 
 const DAY_MS = 86_400_000;
 
@@ -148,7 +148,7 @@ export type CalendarEntry = {
     date_to: string;
     region?: string | null;
     city_key?: string | null;
-    event_types?: string[] | null;
+    categories?: string[] | null;
     impact?: number | null;
     notes?: string | null;
 };
@@ -156,7 +156,7 @@ export type CalendarEntry = {
 export type Scope = { cityKey: string | null; region: string | null };
 
 /** Multiplicador por defecto de una entrada según su tipo (kind) y el tipo de evento. null = no cambia la nota. */
-function defaultImpact(kind: CalendarKind, type: EventType): number | null {
+function defaultImpact(kind: CalendarKind, type: Category): number | null {
     switch (kind) {
         case "school_vacation":
             return type === "infantil" ? 1.15 : type === "feria" ? 1.05 : null;
@@ -225,10 +225,10 @@ export function makeCalendar(entries: CalendarEntry[] = []) {
     }
 
     /** Fechas especiales calculadas y entradas del calendario que cambian la nota de esa fecha para ese tipo. */
-    function factors(date: string, type: EventType, scope: Scope & { destination: boolean }): CalendarFactor[] {
+    function factors(date: string, type: Category, scope: Scope & { destination: boolean }): CalendarFactor[] {
         const out: CalendarFactor[] = [];
         const md = date.slice(5);
-        const group = TYPE_INFO[type].group;
+        const group = CATEGORY_INFO[type].group;
         const nightlife = type === "fiesta" || type === "club";
         const lw = longWeekend(date, scope);
         const fiestasPatrias = (md >= "09-17" && md <= "09-20") || Boolean(lw && lw.start.slice(5) <= "09-19" && lw.end.slice(5) >= "09-18" && lw.start.slice(0, 4) === date.slice(0, 4));
@@ -254,7 +254,7 @@ export function makeCalendar(entries: CalendarEntry[] = []) {
         if (md === "01-01") out.push({ label: "1 de enero", multiplier: nightlife ? 0.7 : 0.5, source: "computed" });
 
         for (const e of on(date, scope)) {
-            if (e.event_types?.length && !e.event_types.includes(type)) continue;
+            if (e.categories?.length && !e.categories.includes(type)) continue;
             const m = e.impact != null ? Number(e.impact) : defaultImpact(e.kind, type);
             if (m == null || m === 1) continue;
             out.push({ label: `${CALENDAR_KIND_LABELS[e.kind]}: ${e.label}`, multiplier: m, source: "calendar", ...(e.id ? { entry_id: e.id } : {}) });
