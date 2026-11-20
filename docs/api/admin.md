@@ -46,7 +46,7 @@ claude mcp add --scope user --transport http aitickets-admin https://aitickets.c
 ## 3. Qué puedes hacer
 
 Empieza siempre con `get_admin_context`. Prompts listos: `ayudar_productor`, `revisar_productor`, `diagnosticar_panel`,
-`pagar_retiros`, `bandeja_operacion`, `cierre_mensual` y `reporte_plataforma`.
+`pagar_retiros`, `bandeja_operacion`, `cierre_mensual`, `reporte_plataforma`, `mapear_eventos` y `evaluar_fecha`.
 
 | Familia | Herramientas |
 | --- | --- |
@@ -59,6 +59,7 @@ Empieza siempre con `get_admin_context`. Prompts listos: `ayudar_productor`, `re
 | Compradores y órdenes | `search_orders`, `get_order_timeline` |
 | Plata | `get_platform_finance`, `list_payout_requests`, `get_payout_transfer_details` (sensible), `list_refund_requests` |
 | Operación (escrituras con `reason`) | `list_pending_operations` (lectura), `verify_payout_account`, `mark_payout_paid`, `mark_payout_failed`, `mark_refund_completed`, `mark_refund_failed`, `moderate_review`, `update_organization`, `add_organization_note`, `send_login_help` |
+| Mercado y fechas (no se muestra en la plataforma) | `register_external_events` (eventos de otras ticketeras o sin ticketera; `dry_run`, duplicados), `list_external_events` / `get_external_event` / `update_external_event` / `delete_external_events`, `get_market_map` (tipos, ciudades, participación por ticketera, precios, organizadores y oportunidades), `evaluate_event_date` (¿es buena fecha? nota 0-100 con cada factor) y `recommend_event_dates` (mejores fechas de un rango), `list_market_calendar` / `upsert_market_calendar` / `delete_market_calendar_entries` (feriados, interferiados, vacaciones, elecciones, mega eventos). Ver [`docs/specs/eventos-externos.md`](../specs/eventos-externos.md) |
 | Como productor | `org_<herramienta>` para todas las herramientas del MCP de productores, salvo pedir o anular retiros y tocar datos bancarios |
 
 **Pagar un retiro.** Llega el aviso de Slack. En Claude dices "paga los retiros" y te muestra los pendientes y
