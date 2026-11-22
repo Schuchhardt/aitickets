@@ -3,12 +3,24 @@
 // sheet de 92dvh en mobile. Alto fijo: header y footer quedan fijos y el contenido hace scroll (sin saltos).
 // Estado en la URL (?checkout=1&paso=2&funcion=679&entradas=82:2,83:1): el botón "atrás" del navegador vuelve
 // del paso 2 al 1 y del 1 cierra el sheet.
-import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from "vue";
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick, defineAsyncComponent } from "vue";
 import CheckoutStepChoose from "./CheckoutStepChoose.vue";
 import CheckoutStepPay from "./CheckoutStepPay.vue";
 import AnimatedNumber from "./AnimatedNumber.vue";
-import { checkoutFunctions, functionOnSale, ticketRowsFor, readCheckoutParams, writeCheckoutParams, formatCLP, upcomingFunctions } from "./eventView.js";
+import {
+  checkoutFunctions,
+  functionOnSale,
+  ticketRowsFor,
+  readCheckoutParams,
+  writeCheckoutParams,
+  formatCLP,
+  upcomingFunctions,
+  isDraftPreview,
+  isSimulatedCheckout,
+  simulatedTickets,
+} from "./eventView.js";
 import { trackFunnel } from "./checkoutApi.js";
+import { seatLabel } from "../../lib/seatMap.mjs";
 import {
   buildSelectedLines,
   computeTotalsWithDiscount,
@@ -20,6 +32,9 @@ import {
 } from "../Reservation/pricing.js";
 import { eventBus } from "../../utils/eventbus.js";
 import { fireConfetti } from "./confetti.js";
+
+// Final de la compra simulada de un borrador: se carga solo en la vista previa
+const SimulatedTickets = defineAsyncComponent(() => import("./SimulatedTickets.vue"));
 
 const props = defineProps({
   event: { type: Object, required: true },
@@ -48,6 +63,11 @@ const discount = ref(null);
 const busy = ref(false);
 const detailsOpen = ref(false);
 const demoResult = ref(null);
+// Vista previa de un borrador: la compra se simula y termina en la entrada con un QR de muestra
+const draftPreview = computed(() => isDraftPreview(props.event));
+const simulated = computed(() => isSimulatedCheckout(props.event));
+const previewResult = ref(null);
+const previewView = ref(null);
 const buyerPrefill = ref(null);
 const payStep = ref(null);
 const chooseStep = ref(null);
@@ -154,10 +174,19 @@ const chosenFunction = computed(() => {
   return upcoming.length === 1 ? upcoming[0] : null;
 });
 
+// Asientos elegidos ("Fila C · Asiento 7"), en orden, para las entradas simuladas
+const seatLabels = computed(() => {
+  const s = props.event.seating;
+  const key = seated.value && functionId.value ? s?.map_of_date?.[String(functionId.value)] : null;
+  if (!key) return [];
+  return [...seats.value].sort((a, b) => a.localeCompare(b, "es", { numeric: true })).map((k) => seatLabel(s.maps[key], k) || k);
+});
+
 const ctaLabel = computed(() => {
   if (step.value === 1) return "Continuar";
+  if (busy.value && draftPreview.value) return isFreeOrder.value ? "Confirmando…" : "Procesando pago…";
   if (busy.value) return isFreeOrder.value ? "Confirmando…" : "Redirigiendo a Webpay…";
-  if (props.event.is_demo) return isFreeOrder.value ? "Simular confirmación" : `Simular pago de ${formatCLP(totals.value.total)}`;
+  if (simulated.value) return isFreeOrder.value ? "Simular confirmación" : `Simular pago de ${formatCLP(totals.value.total)}`;
   return isFreeOrder.value ? "Confirmar asistencia" : `Pagar ${formatCLP(totals.value.total)} con Webpay`;
 });
 
@@ -324,12 +353,42 @@ const panelStyle = computed(() => (dragY.value ? { transform: `translateY(${drag
 
 // ---- Pago ----
 function showDemo(result) {
+  // Vista previa de un borrador: entradas con QR de muestra, como las recibiría el asistente
+  if (draftPreview.value) {
+    // "Probar otra compra" vuelve con el nombre y el email ya escritos
+    buyerPrefill.value = { name: result.name, email: result.email };
+    previewResult.value = {
+      ...result,
+      tickets: simulatedTickets(props.event, { lines: lines.value, fn: chosenFunction.value, holder: result.name, seats: seatLabels.value }),
+    };
+    nextTick(() => {
+      if (body.value) body.value.scrollTop = 0;
+      // El componente se carga aparte (defineAsyncComponent): el título aparece un instante después
+      const focusTitle = (tries = 0) => {
+        const title = previewView.value?.titleEl;
+        if (!title) return tries < 20 && setTimeout(() => focusTitle(tries + 1), 50);
+        previewView.value.focusTitle();
+        fireConfetti({ origin: title });
+      };
+      focusTitle();
+    });
+    return;
+  }
   demoResult.value = result;
   nextTick(() => {
     const title = body.value?.querySelector(".demo-title");
     title?.focus();
     fireConfetti({ origin: title || undefined });
   });
+}
+// "Probar otra compra": de vuelta al primer paso con la misma selección
+function restartPreview() {
+  previewResult.value = null;
+  direction.value = "back";
+  seats.value = [];
+  step.value = hasStep1.value ? 1 : 2;
+  replaceUrl();
+  focusStep();
 }
 function onPrimary() {
   if (step.value === 1) goStep2();
@@ -428,10 +487,12 @@ onBeforeUnmount(() => {
               </button>
             </div>
             <p v-if="event.is_demo" class="demo">Demostración: el flujo es real, pero no se crea ninguna orden ni se cobra nada.</p>
+            <p v-else-if="draftPreview" class="demo is-preview" data-testid="checkout-preview-note">Vista previa: compra de prueba. No se cobra ni se crea una orden.</p>
           </header>
 
           <div ref="body" class="body">
-            <div v-if="demoResult" class="demo-result" data-testid="resv-demo-result">
+            <SimulatedTickets v-if="previewResult" ref="previewView" :event="event" :result="previewResult" @close="requestClose" @again="restartPreview" />
+            <div v-else-if="demoResult" class="demo-result" data-testid="resv-demo-result">
               <h3 class="demo-title" tabindex="-1">{{ demoResult.free ? "Así terminaría la confirmación" : "Así terminaría la compra" }}</h3>
               <ol class="demo-list">
                 <li v-if="demoResult.free"><strong>Confirmación:</strong> la asistencia quedaría registrada al instante, sin pagar nada.</li>
@@ -487,7 +548,7 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <footer v-if="!demoResult" class="foot">
+          <footer v-if="!demoResult && !previewResult" class="foot">
             <div class="ev-collapse" :class="{ 'is-open': detailsOpen && totals.quantity > 0 }">
               <div>
                 <dl class="details" data-testid="checkout-breakdown">
@@ -665,6 +726,10 @@ onBeforeUnmount(() => {
   background: #faf5ff;
   border-radius: var(--r-sm);
   padding: 6px 10px;
+}
+.demo.is-preview {
+  color: #78350f;
+  background: #fffbeb;
 }
 .body {
   flex: 1 1 auto;

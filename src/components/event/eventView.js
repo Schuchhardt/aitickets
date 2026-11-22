@@ -213,14 +213,92 @@ export function minFinalPrice(event) {
   return prices.length ? Math.min(...prices) : null;
 }
 
+// ---------------------------------------------------------------------------------------------------------
+// Compra simulada: evento demo y vista previa de un borrador
+// ---------------------------------------------------------------------------------------------------------
+
+/** Vista previa privada de un evento que aún no se publica (borrador). */
+export const isDraftPreview = (event) => Boolean(event?.is_preview) && event?.status !== "published";
+
+/**
+ * La compra se simula: el checkout y el registro gratis recorren el flujo completo pero no llaman a la API (sin
+ * orden, sin cobro, sin captcha ni correo). En el evento demo y en la vista previa de un borrador.
+ */
+export const isSimulatedCheckout = (event) => Boolean(event?.is_demo) || isDraftPreview(event);
+
+/**
+ * Contenido del QR de muestra de una compra simulada. Nunca calza con uno real (hex de 64 caracteres,
+ * netlify/lib/tickets.mjs generateQrCode): el validador responde "No se encontró una entrada con ese código QR".
+ */
+export const SAMPLE_QR_PREFIX = "AITICKETS-VISTA-PREVIA-NO-VALIDA";
+
+/** "Sábado 12 de octubre · 20:00 hrs" (como la tarjeta de la entrada, TicketInfo.vue). */
+function ticketWhen(fn, now) {
+  if (!fn) return "";
+  const time = hhmm(fn.start_time);
+  return [formatLongDate(fn.date, { now }), time ? `${time} hrs` : ""].filter(Boolean).join(" · ");
+}
+
+/**
+ * Entradas de una compra simulada, como las muestra la página de la orden: una por QR (una mesa para N emite N, con
+ * "invitado 2 de 6"). El lugar nunca es la dirección privada (no viaja a la página pública, C4).
+ * @param {object} event
+ * @param {{ lines: Array<{ id, name, quantity }>, fn?: object | null, holder?: string, seats?: string[], now?: Date }} order
+ *   lines: buildSelectedLines; fn: función elegida en el checkout; seats: etiquetas de asientos ("Fila C · Asiento 7")
+ * @returns {Array<{ key: string, ticketName: string, when: string, where: string, holder: string, seat: string,
+ *   guest: string, position: number, total: number, code: string }>}
+ */
+export function simulatedTickets(event, { lines = [], fn = null, holder = "", seats = [], now = new Date() } = {}) {
+  const upcoming = upcomingFunctions(event, now);
+  const fnOf = (ticket) => {
+    if (ticket?.event_date_id != null) {
+      const own = (event?.dates || []).find((d) => String(d.id) === String(ticket.event_date_id));
+      if (own) return own;
+    }
+    return fn || (upcoming.length === 1 ? upcoming[0] : null);
+  };
+  const whereOf = (f) => {
+    const venue = f?.venue || event?.venue || null;
+    if (event?.has_secret_location) return [venue?.name, "la dirección llega con la entrada"].filter(Boolean).join(" · ");
+    return [venue?.name, venue?.address, venue?.city].filter(Boolean).join(", ") || event?.location || "";
+  };
+
+  const units = [];
+  for (const line of lines || []) {
+    const ticket = (event?.tickets || []).find((t) => String(t.id) === String(line.id));
+    const people = Math.max(1, Number(ticket?.people_per_ticket) || 1);
+    const f = fnOf(ticket);
+    for (let unit = 0; unit < (Number(line.quantity) || 0); unit++) {
+      for (let guest = 1; guest <= people; guest++) {
+        units.push({
+          ticketName: line.name || ticket?.ticket_name || "Entrada",
+          when: ticketWhen(f, now),
+          where: whereOf(f),
+          guest: people > 1 ? `Invitado ${guest} de ${people}` : "",
+        });
+      }
+    }
+  }
+  return units.map((u, i) => ({
+    ...u,
+    key: `sim-${i + 1}`,
+    holder: String(holder || "").trim(),
+    seat: seats[i] || "",
+    position: i + 1,
+    total: units.length,
+    code: `${SAMPLE_QR_PREFIX}-${event?.id ?? "0"}-${i + 1}`,
+  }));
+}
+
 /**
  * Estado de la card de acción (§4.4):
  *  'ended' | 'preview' | 'free' | 'free_full' | 'paid_simple' | 'paid_multi' | 'upcoming' | 'sold_out' | 'closed'
+ * La vista previa de un borrador muestra el mismo estado que tendría publicado (la compra se simula,
+ * isSimulatedCheckout); 'preview' queda solo para el borrador que aún no tiene entradas a la venta.
  */
 export function cardState(event, now = new Date()) {
   if (!event) return "closed";
   if (isEventEnded(event, now)) return "ended";
-  if (event.is_preview && event.status !== "published") return "preview";
   const tickets = event.tickets || [];
   const free = isFreeEventView(event);
   if (event.sale_state === "on_sale" && tickets.length) {
@@ -231,7 +309,7 @@ export function cardState(event, now = new Date()) {
   }
   if (event.sale_state === "sold_out") return free ? "free_full" : "sold_out";
   if (event.sale_state === "upcoming") return "upcoming";
-  return "closed";
+  return isDraftPreview(event) ? "preview" : "closed";
 }
 
 /**

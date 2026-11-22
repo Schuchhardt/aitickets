@@ -5,14 +5,14 @@
 // El servidor (/api/purchase-ticket) crea la orden de $0 y envía la entrada con QR igual que antes.
 // Si el evento lo pide (events.checkout_fields), CheckoutExtras agrega las preguntas al inscribirse y, con
 // acompañantes, el nombre y correo de cada uno (cada QR llega a su asistente).
-import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch, defineAsyncComponent } from "vue";
 import AutoHeight from "./AutoHeight.vue";
 import SuccessCheck from "./SuccessCheck.vue";
 import QuantityStepper from "./QuantityStepper.vue";
 import CheckoutExtras from "./CheckoutExtras.vue";
 import { suggestEmail } from "./emailSuggest.js";
 import { fireConfetti } from "./confetti.js";
-import { firstNameOf, ticketMax, formatFunctionShort, formatWaitingDate, upcomingFunctions } from "./eventView.js";
+import { firstNameOf, ticketMax, formatFunctionShort, formatWaitingDate, upcomingFunctions, isDraftPreview, isSimulatedCheckout, simulatedTickets } from "./eventView.js";
 import { addToCalendar, shareEvent } from "./shareActions.js";
 import {
   createOrder,
@@ -30,6 +30,9 @@ import { isValidEmail } from "../Reservation/pricing.js";
 import { maskEmail } from "../../../netlify/lib/reviews.mjs";
 import { trackPurchase } from "../../composables/useGoogleAnalytics.js";
 import { eventBus } from "../../utils/eventbus.js";
+
+// Entrada de muestra de la vista previa de un borrador: se carga solo al abrirla
+const SimulatedTicketsSheet = defineAsyncComponent(() => import("./SimulatedTicketsSheet.vue"));
 
 const props = defineProps({
   event: { type: Object, required: true },
@@ -61,7 +64,31 @@ const successTitle = ref(null);
 const captchaEl = ref(null);
 const extrasRef = ref(null);
 const extraLines = computed(() => (selectedTicket.value ? [{ id: selectedTicket.value.id, quantity: quantity.value, name: selectedTicket.value.ticket_name }] : []));
-const captcha = useTurnstile(captchaEl, { disabled: () => Boolean(props.event?.is_demo) });
+// Evento demo o vista previa de un borrador: la inscripción se simula (sin captcha, orden ni correo)
+const simulated = computed(() => isSimulatedCheckout(props.event));
+const draftPreview = computed(() => isDraftPreview(props.event));
+const captcha = useTurnstile(captchaEl, { disabled: () => isSimulatedCheckout(props.event) });
+// Vista previa: "Ver mi entrada" abre la entrada con el QR de muestra
+const simTickets = ref(null);
+function openSimTickets() {
+  simTickets.value = {
+    free: true,
+    total: 0,
+    name: result.value.name,
+    email: result.value.email,
+    tickets: simulatedTickets(props.event, {
+      lines: selectedTicket.value ? [{ id: selectedTicket.value.id, name: selectedTicket.value.ticket_name, quantity: result.value.quantity }] : [],
+      holder: result.value.name,
+    }),
+  };
+}
+function onSimTicketsClosed(action) {
+  simTickets.value = null;
+  if (action === "again") {
+    status.value = "idle";
+    nextTick(() => nameInput.value?.focus({ preventScroll: true }));
+  }
+}
 
 // Tipos de entrada gratis a la venta (chips solo si hay más de uno)
 const freeTickets = computed(() => (props.event?.tickets || []).filter((t) => !(Number(t.price) > 0)));
@@ -172,8 +199,8 @@ async function submit() {
   errorKind.value = "";
   trackFunnel("rsvp_submit", props.event, { quantity: quantity.value });
 
-  // Demo: el flujo completo sin crear una orden
-  if (props.event?.is_demo) {
+  // Demo o vista previa de un borrador: el flujo completo sin crear una orden
+  if (simulated.value) {
     await new Promise((r) => setTimeout(r, 900));
     succeed({ orderId: null });
     return;
@@ -231,7 +258,8 @@ async function submit() {
 
 async function succeed({ orderId }) {
   result.value = { orderId, quantity: quantity.value, name: name.value.trim(), email: email.value.trim(), functionId: selectedTicket.value?.event_date_id ?? null };
-  rememberBuyer(name.value.trim(), email.value.trim());
+  // Una inscripción simulada no deja datos guardados para las compras reales
+  if (!simulated.value) rememberBuyer(name.value.trim(), email.value.trim());
   trackFunnel("rsvp_success", props.event, { quantity: quantity.value });
   status.value = "success";
   liveMessage.value = `¡Listo, ${firstName.value}! Estás dentro.`;
@@ -262,7 +290,7 @@ async function submitWaitlist() {
   }
   waitError.value = "";
   waitBusy.value = true;
-  const res = props.event?.is_demo ? { ok: true } : await joinWaitlist(props.event, { email: waitEmail.value, kind: "full" });
+  const res = simulated.value ? { ok: true } : await joinWaitlist(props.event, { email: waitEmail.value, kind: "full" });
   waitBusy.value = false;
   if (res.ok) {
     status.value = "waitlist_ok";
@@ -491,6 +519,7 @@ watch(status, (s) => s !== "idle" && stopNudge());
           <a href="/privacy" target="_blank" rel="noopener">Política de privacidad</a>.
         </p>
         <p v-if="event.is_demo" class="demo-note">Demostración: no se crea ninguna entrada real.</p>
+        <p v-else-if="draftPreview" class="demo-note is-preview" data-testid="rsvp-preview-note">Vista previa: inscripción de prueba, no se crea ninguna entrada.</p>
       </form>
 
       <!-- Éxito -->
@@ -502,6 +531,10 @@ watch(status, (s) => s !== "idle" && stopNudge());
           <strong>{{ result.email }}</strong>
         </p>
         <p v-if="event.is_demo" class="demo-note">Demostración: no se creó ninguna entrada ni se envió un correo.</p>
+        <template v-else-if="draftPreview">
+          <button type="button" class="ev-btn ev-btn-primary w-full" data-testid="rsvp-preview-ticket" @click="openSimTickets">Ver mi entrada</button>
+          <p class="demo-note is-preview">Vista previa: no se creó ninguna entrada ni se envió un correo.</p>
+        </template>
         <div class="success-actions">
           <button type="button" class="ev-btn ev-btn-secondary" @click="addToCalendar(event)">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
@@ -585,6 +618,7 @@ watch(status, (s) => s !== "idle" && stopNudge());
         <p class="info-title">Listo. Te escribimos a {{ waitEmail.trim() }} si se libera un cupo.</p>
       </div>
     </Transition>
+    <SimulatedTicketsSheet v-if="simTickets" :event="event" :result="simTickets" @close="onSimTicketsClosed('close')" @again="onSimTicketsClosed('again')" />
   </AutoHeight>
 </template>
 
@@ -707,6 +741,9 @@ watch(status, (s) => s !== "idle" && stopNudge());
 .demo-note {
   font-size: 12px;
   color: #6b21a8;
+}
+.demo-note.is-preview {
+  color: var(--text-3);
 }
 .success {
   display: flex;

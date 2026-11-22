@@ -37,7 +37,7 @@ export const eventDashboardUrl = (ctx: ToolContext, id: number) => `${ctx.origin
 
 export const DRAFT_URL_NOTE =
     "BORRADOR: el evento NO está publicado; su link público da 404 a cualquier persona. Para mostrarlo sin publicar usa " +
-    "un link privado de vista previa (create_preview_link): la página indica 'Vista previa · Evento NO publicado'.";
+    "un link privado de vista previa (create_preview_link): la página indica 'Vista previa · Borrador sin publicar' y deja simular la compra (sin cobro).";
 
 /**
  * Links de un evento según su estado. Publicado: public_url. Borrador: public_url = null (no funciona para el

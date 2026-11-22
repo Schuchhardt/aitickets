@@ -282,7 +282,9 @@ Mismo contenedor, mismo lugar en la página y misma jerarquía que la v1: **esta
 | Venta aún no abre | `VENTA ABRE EL …` | contador < 24 h (igual) | `Avisarme cuando abra` | — |
 | Agotado | `AGOTADO` | igual | `Avisarme si se liberan` | — |
 | **Evento finalizado** | `EVENTO FINALIZADO` | Si hay reseñas: promedio `4,8 ★` + "86 reseñas" (de `EventReviews`/su endpoint). Si no: "Este evento ya ocurrió." | `★ ¿Fuiste? Califica el evento` (igual que hoy) | `Ver próximos eventos de {organizador} →` |
-| Vista previa / venta cerrada | igual que hoy | | | |
+| **Vista previa de un borrador** (link privado, `is_preview` y no publicado) | el del estado que tendría publicado | ídem + nota "Vista previa: compra de prueba, no se cobra." | ídem: la compra/inscripción **se simula** (sin captcha, orden, cobro ni correo; sin eventos de embudo) y termina en la entrada con un **QR de muestra** con el sello "Muestra · No válido" (`SimulatedTickets.vue`) | — |
+| Vista previa de un borrador sin entradas a la venta | `VISTA PREVIA` | "Este borrador todavía no tiene entradas a la venta…" | — | — |
+| Venta cerrada | igual que hoy | | | |
 
 **c) Chips de próximas funciones (solo varias funciones).**
 - Hasta 3 chips con las próximas funciones disponibles: `Vie 24 · 21:00` en una línea y, si hay varios lugares, el lugar en 12 px debajo. Agotadas no aparecen; con estado "últimas" llevan un punto `--warning`.

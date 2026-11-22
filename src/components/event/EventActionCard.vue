@@ -16,6 +16,7 @@ import {
   formatCLP,
   formatFunctionShort,
   formatRating,
+  isDraftPreview,
   minFinalPrice,
   reviewsCountLabel,
   ticketMax,
@@ -45,6 +46,9 @@ function onRsvpState(status) {
   emit("rsvp-state", status);
 }
 const label = computed(() => cardLabel(props.event, props.state, { rsvpStatus: rsvpStatus.value }));
+
+// Vista previa de un borrador: la compra funciona, pero es simulada (CheckoutSheet → entradas con QR de muestra)
+const draftPreview = computed(() => isDraftPreview(props.event));
 
 const absorbed = computed(() => isFeeAbsorbed(props.event));
 const priceNote = computed(() => (absorbed.value ? "precio final por entrada" : "por entrada, incluye cargo"));
@@ -142,6 +146,7 @@ function buySimple() {
       <button type="button" class="ev-btn ev-btn-primary w-full" data-testid="buy-button" @click="buySimple">
         {{ simpleCta }}<template v-if="qty > 1"> · <AnimatedNumber :value="simpleTotal" /></template>
       </button>
+      <p v-if="draftPreview" class="sim-note" data-testid="card-preview-note">Vista previa: compra de prueba, no se cobra.</p>
     </template>
 
     <!-- Pagado: varias funciones o tipos -->
@@ -169,6 +174,7 @@ function buySimple() {
         <p v-else>{{ typesSummary }}</p>
       </div>
       <button type="button" class="ev-btn ev-btn-primary w-full" data-testid="buy-button" @click="emit('checkout', { entry: 'card', step: 1 })">Elegir entradas</button>
+      <p v-if="draftPreview" class="sim-note" data-testid="card-preview-note">Vista previa: compra de prueba, no se cobra.</p>
       <button v-if="manyFunctions" type="button" class="sub-link" @click="emit('show-functions')">Ver todas las funciones ↓</button>
     </template>
 
@@ -202,10 +208,9 @@ function buySimple() {
       </a>
     </template>
 
-    <!-- Vista previa de un borrador -->
+    <!-- Vista previa de un borrador sin entradas a la venta (con entradas, la card muestra su estado y la compra se simula) -->
     <template v-else-if="state === 'preview'">
-      <p class="price-note">La {{ event.tickets?.length && !event.tickets.some((t) => t.price > 0) ? "inscripción" : "compra" }} se habilita al publicar el evento.</p>
-      <button type="button" class="ev-btn ev-btn-primary w-full" disabled>{{ event.tickets?.some((t) => t.price > 0) ? "Comprar entrada" : "Confirmar asistencia" }}</button>
+      <p class="price-note">Este borrador todavía no tiene entradas a la venta. Cuando las tenga, aquí podrás probar la compra.</p>
     </template>
 
     <!-- Venta cerrada -->
@@ -289,6 +294,13 @@ function buySimple() {
   font-size: 16px;
   font-weight: 600;
   line-height: 22px;
+}
+.sim-note {
+  margin-top: -6px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-3);
+  text-align: center;
 }
 .summary {
   font-size: 15px;

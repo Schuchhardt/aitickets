@@ -38,6 +38,47 @@ const fromPrice = computed(() => minFinalPrice(props.event));
 const isPrivate = computed(() => props.event?.accessibility && props.event.accessibility !== "public");
 const showAssistant = computed(() => !props.siteMode && !props.event?.is_preview);
 
+// ---- Aviso de vista previa: aparece al cargar, se va solo a los 5 s y se cierra con la X ----
+// El tiempo corre solo con la pestaña visible (un link abierto en segundo plano no lo pierde) y se pausa con el
+// mouse encima o el foco dentro (WCAG 2.2.1). Se monta en el cliente: el servidor no lo renderiza.
+const NOTICE_MS = 5000;
+const NOTICE_MIN_LEFT_MS = 1500;
+const noticeOpen = ref(false);
+const noticeHold = { hover: false, focus: false };
+let noticeTimer = 0;
+let noticeLeft = NOTICE_MS;
+let noticeDeadline = 0;
+function runNoticeTimer() {
+  if (noticeTimer || !noticeOpen.value || noticeHold.hover || noticeHold.focus || document.visibilityState === "hidden") return;
+  noticeDeadline = Date.now() + noticeLeft;
+  noticeTimer = setTimeout(dismissNotice, noticeLeft);
+}
+function pauseNoticeTimer() {
+  if (!noticeTimer) return;
+  clearTimeout(noticeTimer);
+  noticeTimer = 0;
+  noticeLeft = Math.max(NOTICE_MIN_LEFT_MS, noticeDeadline - Date.now());
+}
+function setNoticeHold(kind, on) {
+  noticeHold[kind] = on;
+  if (on) pauseNoticeTimer();
+  else runNoticeTimer();
+}
+function onNoticeFocusOut(e) {
+  if (e.currentTarget?.contains(e.relatedTarget)) return;
+  setNoticeHold("focus", false);
+}
+function onNoticeVisibility() {
+  if (document.visibilityState === "hidden") pauseNoticeTimer();
+  else runNoticeTimer();
+}
+function dismissNotice() {
+  clearTimeout(noticeTimer);
+  noticeTimer = 0;
+  noticeOpen.value = false;
+  document.removeEventListener("visibilitychange", onNoticeVisibility);
+}
+
 // Video de portada (events.cover_video, src/lib/eventVideo.ts): reemplaza la imagen en el póster y en la portada
 // ancha. Se reproduce solo y sin sonido en pantalla (AutoplayVideo.vue); si no carga, vuelve la imagen.
 const coverVideoFailed = ref(false);
@@ -258,6 +299,11 @@ const producerBannerUrl = computed(() => `/organizadores?utm_source=aitickets&ut
 
 onMounted(() => {
   teleportReady.value = true;
+  if (props.event?.is_preview) {
+    noticeOpen.value = true;
+    document.addEventListener("visibilitychange", onNoticeVisibility);
+    runNoticeTimer();
+  }
   const prices = (props.event.tickets || []).map((t) => Number(t.price) || 0);
   trackViewItem(props.event.id, props.event.name, prices.length ? Math.min(...prices) : 0);
   trackFunnel("event_view", props.event, { state: state.value });
@@ -327,6 +373,8 @@ onMounted(() => {
   }
 });
 onBeforeUnmount(() => {
+  clearTimeout(noticeTimer);
+  document.removeEventListener("visibilitychange", onNoticeVisibility);
   window.removeEventListener("scroll", onParallaxScroll);
   window.removeEventListener("keydown", onImageKey);
   cancelAnimationFrame(parallaxRaf);
@@ -349,24 +397,38 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value && !cardHasChips.va
     </div>
     <div v-else class="tint" aria-hidden="true"></div>
 
+    <!-- Aviso de vista previa: flota sobre la página (al irse no mueve el contenido), se va solo y se puede cerrar -->
+    <Transition name="notice">
+      <div
+        v-if="event.is_preview && noticeOpen"
+        data-testid="event-preview-banner"
+        :data-status="event.status"
+        class="preview-notice"
+        :class="{ 'is-draft': event.status !== 'published' }"
+        role="status"
+        @mouseenter="setNoticeHold('hover', true)"
+        @mouseleave="setNoticeHold('hover', false)"
+        @focusin="setNoticeHold('focus', true)"
+        @focusout="onNoticeFocusOut"
+      >
+        <span class="notice-dot" aria-hidden="true"></span>
+        <p v-if="event.status === 'published'" class="notice-text">
+          <strong>Vista previa</strong> · Ya está publicado.
+          <a :href="`/eventos/${event.slug}`" class="ev-link notice-link">Ver página pública →</a>
+        </p>
+        <p v-else class="notice-text"><strong>Vista previa</strong> · Borrador sin publicar. Puedes simular una compra.</p>
+        <button type="button" class="notice-close" aria-label="Cerrar aviso" data-testid="event-preview-banner-close" @click="dismissNotice">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+        </button>
+      </div>
+    </Transition>
+
     <div class="container">
       <p v-if="event.is_demo" class="banner banner-demo" role="note">
         <span class="demo-dot" aria-hidden="true"></span>
         <span class="demo-text">Evento de demostración: puedes recorrer el flujo completo, no se cobra nada.</span>
         <a href="/organizadores/registro?utm_source=aitickets&utm_medium=demo_event&utm_campaign=banner" class="ev-link">Crea tu evento gratis →</a>
       </p>
-      <div
-        v-if="event.is_preview"
-        data-testid="event-preview-banner"
-        :data-status="event.status"
-        class="banner"
-        :class="event.status === 'published' ? 'banner-info' : 'banner-warn'"
-        role="status"
-      >
-        <p v-if="event.status === 'published'"><strong>Vista previa.</strong> Este evento ya está publicado: esta es la misma página que ve el público.</p>
-        <p v-else><strong>Vista previa · Evento NO publicado (borrador).</strong> Solo quien tiene este link privado puede verlo. No aparece en búsquedas y la compra se habilita al publicarlo.</p>
-        <a v-if="event.status === 'published'" :href="`/eventos/${event.slug}`" class="ev-link">Ver página pública →</a>
-      </div>
 
       <!-- Portada ancha: la imagen ocupa todo el ancho y el título se monta sobre su borde -->
       <figure v-if="layout === 'banner'" ref="coverEl" class="cover" :class="{ 'is-contain': bannerContain && !coverVideo, 'has-mobile': mobileCover }" :style="bannerStyle" data-testid="event-cover">
@@ -589,14 +651,81 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value && !cardHasChips.va
   background: var(--brand-lime);
   animation: ev-pulse 1.6s ease-out 1s 4;
 }
-.banner-info {
-  background: #f0f9ff;
-  color: #0c4a6e;
+/* Aviso de vista previa: flota arriba al centro, sin ocupar lugar en la página (al irse no mueve nada) */
+.preview-notice {
+  position: fixed;
+  z-index: 40;
+  top: 12px;
+  left: 16px;
+  right: 16px;
+  max-width: 520px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 6px 6px 14px;
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--brand-ink) 90%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  color: #fff;
+  font-size: 13px;
+  line-height: 18px;
 }
-.banner-warn {
-  background: #fffbeb;
-  color: #78350f;
-  box-shadow: inset 0 0 0 1px #fcd34d;
+.notice-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #7dd3fc;
+}
+.preview-notice.is-draft .notice-dot {
+  background: #fbbf24;
+}
+.notice-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.notice-text strong {
+  font-weight: 600;
+}
+.notice-link {
+  color: #fff;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  white-space: nowrap;
+}
+.notice-close {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.8);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out);
+}
+.notice-close:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+.notice-close:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: -2px;
+}
+.notice-enter-active,
+.notice-leave-active {
+  transition: opacity var(--dur-3) var(--ease-out), transform var(--dur-3) var(--ease-out);
+}
+.notice-enter-from,
+.notice-leave-to {
+  opacity: 0;
+  transform: translateY(-12px);
 }
 .layout {
   display: flex;
@@ -846,6 +975,9 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value && !cardHasChips.va
 @media (min-width: 1024px) {
   .container {
     padding: 24px 24px 0;
+  }
+  .preview-notice {
+    top: 16px;
   }
   .layout {
     display: grid;

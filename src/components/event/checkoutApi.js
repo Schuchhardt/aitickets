@@ -3,6 +3,7 @@
 import { trackEvent } from "../../composables/useGoogleAnalytics.js";
 import { readAttribution } from "../Reservation/pricing.js";
 import { LEGAL } from "../../lib/legal";
+import { isDraftPreview } from "./eventView.js";
 
 const BUYER_KEY = "aitickets_buyer";
 const REQUEST_TIMEOUT_MS = 15000;
@@ -65,8 +66,12 @@ export function rememberOrder(event, { orderId, quantity, amount = 0, email = ""
   }
 }
 
-/** Evento de embudo (§14) con event_id y la atribución guardada por la página. */
+/**
+ * Evento de embudo (§14) con event_id y la atribución guardada por la página. La vista previa de un borrador no
+ * manda nada: su compra es simulada y no debe contar en el embudo del evento.
+ */
 export function trackFunnel(name, event, params = {}) {
+  if (isDraftPreview(event)) return;
   const { ref, utm } = readAttribution(event?.id);
   trackEvent(name, {
     event_id: event?.id,
