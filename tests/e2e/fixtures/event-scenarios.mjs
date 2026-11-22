@@ -183,8 +183,17 @@ export const SCENARIOS = {
   // Preguntas por persona: quien compra responde por todos, o cada invitado completa desde su correo
   "preguntas-por-persona": { layout: "poster", tickets: [TICKETS.general], checkoutFields: PER_PERSON_FIELDS },
   "invitar-por-correo": { layout: "poster", tickets: [TICKETS.general], checkoutFields: { ...PER_PERSON_FIELDS, attendee_names: "required", holders: "invite" } },
-  // Vista previa privada de un borrador (status draft + is_preview, como /eventos/vista-previa/…)
+  // Vista previa privada de un borrador (status draft + is_preview, como /eventos/vista-previa/…): la compra se
+  // simula y termina en la entrada con un QR de muestra (tests/e2e/event-preview.spec.ts)
   "vista-previa": { layout: "poster", tickets: [TICKETS.general], preview: true },
+  "vista-previa-gratis": { layout: "poster", tickets: [TICKETS.free], preview: true },
+  "vista-previa-mesa": { layout: "poster", tickets: [TICKETS.table], preview: true },
+  "vista-previa-sin-entradas": { layout: "poster", tickets: [], saleState: "closed", preview: true },
+  // Vista previa de un evento ya publicado: la página pública, con venta real
+  "vista-previa-publicada": { layout: "poster", tickets: [TICKETS.general], preview: "published" },
+  // Evento demo (is_demo, como los de src/lib/demoEvent.mjs): la misma compra simulada, con el registro de productores
+  "demo-pagado": { layout: "poster", tickets: [TICKETS.general], demo: true },
+  "demo-gratis": { layout: "poster", tickets: [TICKETS.free], demo: true },
   // Entradas numeradas: mapa de asientos de la sala
   "cine-numerado": { layout: "poster", ...CINEMA },
 };
@@ -265,7 +274,7 @@ export function fixtureEvent(name, { toPublicTicket, now = new Date() }) {
     name: "Concierto de prueba",
     slug: `e2e-${name}`,
     title: "Concierto de prueba",
-    status: scenario.preview ? "draft" : "published",
+    status: scenario.preview && scenario.preview !== "published" ? "draft" : "published",
     capacity: null,
     start_date: new Date(start).toISOString(),
     end_date: new Date(end).toISOString(),
@@ -316,7 +325,7 @@ export function fixtureEvent(name, { toPublicTicket, now = new Date() }) {
     organization: { name: "Productora de Prueba", website: null, instagram: null },
     venue,
     page_settings: { layout: scenario.layout, show_organizer: true, background: "none" },
-    is_demo: false,
+    is_demo: Boolean(scenario.demo),
     is_preview: Boolean(scenario.preview),
   };
 }

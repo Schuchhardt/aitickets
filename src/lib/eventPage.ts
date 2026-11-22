@@ -787,7 +787,7 @@ export async function getPublicEventData(slug: string | undefined, opts: PublicE
     // El productor absorbe el cargo por servicio: el precio de la entrada es el total (src/components/Reservation/pricing.js)
     fee_absorbed: event.fee_absorbed === true,
     is_demo: isDemo,
-    // Vista previa privada: la página muestra el aviso y no permite comprar si no está publicado
+    // Vista previa privada: la página muestra el aviso y, si no está publicado, la compra se simula (sin orden ni cobro)
     is_preview: isPreview,
   };
 

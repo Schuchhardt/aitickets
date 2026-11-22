@@ -3,12 +3,24 @@
 // sheet de 92dvh en mobile. Alto fijo: header y footer quedan fijos y el contenido hace scroll (sin saltos).
 // Estado en la URL (?checkout=1&paso=2&funcion=679&entradas=82:2,83:1): el botón "atrás" del navegador vuelve
 // del paso 2 al 1 y del 1 cierra el sheet.
-import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from "vue";
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick, defineAsyncComponent } from "vue";
 import CheckoutStepChoose from "./CheckoutStepChoose.vue";
 import CheckoutStepPay from "./CheckoutStepPay.vue";
 import AnimatedNumber from "./AnimatedNumber.vue";
-import { checkoutFunctions, functionOnSale, ticketRowsFor, readCheckoutParams, writeCheckoutParams, formatCLP, upcomingFunctions } from "./eventView.js";
+import {
+  checkoutFunctions,
+  functionOnSale,
+  ticketRowsFor,
+  readCheckoutParams,
+  writeCheckoutParams,
+  formatCLP,
+  upcomingFunctions,
+  isDraftPreview,
+  isSimulatedCheckout,
+  simulatedTickets,
+} from "./eventView.js";
 import { trackFunnel } from "./checkoutApi.js";
+import { seatLabel } from "../../lib/seatMap.mjs";
 import {
   buildSelectedLines,
   computeTotalsWithDiscount,
@@ -20,6 +32,9 @@ import {
 } from "../Reservation/pricing.js";
 import { eventBus } from "../../utils/eventbus.js";
 import { fireConfetti } from "./confetti.js";
+
+// Final de una compra simulada (demo o vista previa de un borrador): se carga solo ahí
+const SimulatedTickets = defineAsyncComponent(() => import("./SimulatedTickets.vue"));
 
 const props = defineProps({
   event: { type: Object, required: true },
@@ -47,7 +62,11 @@ const notice = ref("");
 const discount = ref(null);
 const busy = ref(false);
 const detailsOpen = ref(false);
-const demoResult = ref(null);
+// Evento demo o vista previa de un borrador: la compra se simula y termina en la entrada con un QR de muestra
+const draftPreview = computed(() => isDraftPreview(props.event));
+const simulated = computed(() => isSimulatedCheckout(props.event));
+const simResult = ref(null);
+const simView = ref(null);
 const buyerPrefill = ref(null);
 const payStep = ref(null);
 const chooseStep = ref(null);
@@ -154,10 +173,19 @@ const chosenFunction = computed(() => {
   return upcoming.length === 1 ? upcoming[0] : null;
 });
 
+// Asientos elegidos ("Fila C · Asiento 7"), en orden, para las entradas simuladas
+const seatLabels = computed(() => {
+  const s = props.event.seating;
+  const key = seated.value && functionId.value ? s?.map_of_date?.[String(functionId.value)] : null;
+  if (!key) return [];
+  return [...seats.value].sort((a, b) => a.localeCompare(b, "es", { numeric: true })).map((k) => seatLabel(s.maps[key], k) || k);
+});
+
 const ctaLabel = computed(() => {
   if (step.value === 1) return "Continuar";
+  if (busy.value && simulated.value) return isFreeOrder.value ? "Confirmando…" : "Procesando pago…";
   if (busy.value) return isFreeOrder.value ? "Confirmando…" : "Redirigiendo a Webpay…";
-  if (props.event.is_demo) return isFreeOrder.value ? "Simular confirmación" : `Simular pago de ${formatCLP(totals.value.total)}`;
+  if (simulated.value) return isFreeOrder.value ? "Simular confirmación" : `Simular pago de ${formatCLP(totals.value.total)}`;
   return isFreeOrder.value ? "Confirmar asistencia" : `Pagar ${formatCLP(totals.value.total)} con Webpay`;
 });
 
@@ -323,13 +351,33 @@ function onDragEnd() {
 const panelStyle = computed(() => (dragY.value ? { transform: `translateY(${dragY.value}px)`, transition: dragging.value ? "none" : undefined } : null));
 
 // ---- Pago ----
-function showDemo(result) {
-  demoResult.value = result;
+function showSimulation(result) {
+  // "Probar otra compra" vuelve con el nombre y el email ya escritos
+  buyerPrefill.value = { name: result.name, email: result.email };
+  simResult.value = {
+    ...result,
+    tickets: simulatedTickets(props.event, { lines: lines.value, fn: chosenFunction.value, holder: result.name, seats: seatLabels.value }),
+  };
   nextTick(() => {
-    const title = body.value?.querySelector(".demo-title");
-    title?.focus();
-    fireConfetti({ origin: title || undefined });
+    if (body.value) body.value.scrollTop = 0;
+    // El componente se carga aparte (defineAsyncComponent): el título aparece un instante después
+    const focusTitle = (tries = 0) => {
+      const title = simView.value?.titleEl;
+      if (!title) return tries < 20 && setTimeout(() => focusTitle(tries + 1), 50);
+      simView.value.focusTitle();
+      fireConfetti({ origin: title });
+    };
+    focusTitle();
   });
+}
+// "Probar otra compra": de vuelta al primer paso con la misma selección
+function restartSimulation() {
+  simResult.value = null;
+  direction.value = "back";
+  seats.value = [];
+  step.value = hasStep1.value ? 1 : 2;
+  replaceUrl();
+  focusStep();
 }
 function onPrimary() {
   if (step.value === 1) goStep2();
@@ -428,22 +476,11 @@ onBeforeUnmount(() => {
               </button>
             </div>
             <p v-if="event.is_demo" class="demo">Demostración: el flujo es real, pero no se crea ninguna orden ni se cobra nada.</p>
+            <p v-else-if="draftPreview" class="demo is-preview" data-testid="checkout-preview-note">Vista previa: compra de prueba. No se cobra ni se crea una orden.</p>
           </header>
 
           <div ref="body" class="body">
-            <div v-if="demoResult" class="demo-result" data-testid="resv-demo-result">
-              <h3 class="demo-title" tabindex="-1">{{ demoResult.free ? "Así terminaría la confirmación" : "Así terminaría la compra" }}</h3>
-              <ol class="demo-list">
-                <li v-if="demoResult.free"><strong>Confirmación:</strong> la asistencia quedaría registrada al instante, sin pagar nada.</li>
-                <li v-else><strong>Pago seguro:</strong> te llevaríamos a Webpay para pagar {{ formatCLP(demoResult.total) }}.</li>
-                <li><strong>Entradas por email:</strong> {{ demoResult.email || "el comprador" }} recibiría sus entradas con QR y un recordatorio 24 h antes.</li>
-                <li><strong>Check-in:</strong> el equipo del productor escanea el QR desde el celular, incluso sin señal.</li>
-                <li><strong>Para el productor:</strong> ve la venta al instante en su panel, con el canal que la trajo.</li>
-              </ol>
-              <p class="demo-note">Esto es una demostración: no se creó ninguna orden ni se realizó ningún cobro.</p>
-              <a href="/organizadores/registro?utm_source=aitickets&utm_medium=demo_event&utm_campaign=checkout" class="ev-btn ev-btn-primary w-full">Quiero vender entradas así</a>
-              <button type="button" class="ev-link demo-back" @click="demoResult = null">Volver</button>
-            </div>
+            <SimulatedTickets v-if="simResult" ref="simView" :event="event" :result="simResult" @close="requestClose" @again="restartSimulation" />
             <div v-else class="steps-stage">
               <Transition :name="`step-${direction}`">
                 <CheckoutStepChoose
@@ -480,14 +517,14 @@ onBeforeUnmount(() => {
                   @update:qty="setSimpleQty"
                   @busy="busy = $event"
                   @back="goBack"
-                  @demo="showDemo"
+                  @simulated="showSimulation"
                   @sold-out="onSoldOut"
                 />
               </Transition>
             </div>
           </div>
 
-          <footer v-if="!demoResult" class="foot">
+          <footer v-if="!simResult" class="foot">
             <div class="ev-collapse" :class="{ 'is-open': detailsOpen && totals.quantity > 0 }">
               <div>
                 <dl class="details" data-testid="checkout-breakdown">
@@ -666,6 +703,10 @@ onBeforeUnmount(() => {
   border-radius: var(--r-sm);
   padding: 6px 10px;
 }
+.demo.is-preview {
+  color: #78350f;
+  background: #fffbeb;
+}
 .body {
   flex: 1 1 auto;
   overflow-y: auto;
@@ -751,42 +792,6 @@ onBeforeUnmount(() => {
   line-height: 16px;
   color: var(--text-3);
   text-align: right;
-}
-.demo-result {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-.demo-title {
-  outline: none;
-  font-size: 18px;
-  font-weight: 600;
-}
-.demo-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  font-size: 14px;
-  line-height: 21px;
-  color: var(--text-2);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  padding: 14px;
-}
-.demo-list strong {
-  color: var(--text-1);
-}
-.demo-note {
-  font-size: 12px;
-  color: var(--text-3);
-}
-.demo-back {
-  align-self: center;
-  font-size: 14px;
-  background: none;
-  border: 0;
-  padding: 6px;
-  cursor: pointer;
 }
 
 /* A11 / A12: apertura y cierre */

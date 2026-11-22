@@ -218,12 +218,19 @@ test.describe("sin venta", () => {
     await expect(card.getByTestId("card-rating")).toHaveCount(0);
   });
 
-  test("vista previa de un borrador: VISTA PREVIA y la acción deshabilitada", async ({ page }) => {
+  // La compra simulada completa (hasta el QR de muestra) está en tests/e2e/event-preview.spec.ts
+  test("vista previa de un borrador: la card como publicada, con la compra de prueba", async ({ page, isMobile }) => {
+    test.skip(isMobile, "en mobile la card de los eventos pagados de una función no se muestra");
     const card = await openScenario(page, "vista-previa");
-    await expect(label(page)).toHaveText("Vista previa");
-    await expect(card).toContainText("La compra se habilita al publicar el evento.");
-    await expect(card.getByRole("button", { name: "Comprar entrada" })).toBeDisabled();
+    await expect(card.getByRole("button", { name: "Comprar entrada" })).toBeEnabled();
+    await expect(card.getByTestId("card-preview-note")).toHaveText("Vista previa: compra de prueba, no se cobra.");
     await expect(card.getByTestId("review-cta")).toHaveCount(0);
+  });
+
+  test("vista previa de un borrador sin entradas: VISTA PREVIA", async ({ page }) => {
+    const card = await openScenario(page, "vista-previa-sin-entradas");
+    await expect(label(page)).toHaveText("Vista previa");
+    await expect(card).toContainText("Este borrador todavía no tiene entradas a la venta.");
   });
 
   // Un <Teleport to="body"> hidratado hacía que Vue borrara el primer hijo de <body>: en la vista previa

@@ -384,7 +384,7 @@ const createEvent: ToolDef = {
             preview_expires_at: preview?.expires_at ?? null,
             next_steps:
                 "El evento quedó en BORRADOR (no visible al público). Muestra al productor el preview_url (vista previa privada; la página " +
-                "dice 'Vista previa · Evento NO publicado'). Revisa con get_event y publícalo con set_event_status cuando lo apruebe.",
+                "dice 'Vista previa · Borrador sin publicar' y deja simular la compra hasta el QR, sin cobro). Revisa con get_event y publícalo con set_event_status cuando lo apruebe.",
         };
     },
 };
@@ -735,7 +735,7 @@ const createPreviewLinkTool: ToolDef = {
     title: "Crear link de vista previa",
     description:
         "Crea un link PRIVADO para ver la página del evento aunque esté en borrador (no publicado). Quien lo abre ve la página real con un " +
-        "aviso 'Vista previa · Evento NO publicado' y la compra deshabilitada; no se indexa en buscadores. " +
+        "aviso 'Vista previa · Borrador sin publicar' y puede simular la compra (sin cobro ni orden) hasta la entrada con un QR de muestra que no sirve para entrar; no se indexa en buscadores. " +
         "Configurable: expires_in_hours (por defecto 168 = 7 días), no_expiration=true (sin vencimiento, hasta revocarlo) y " +
         "single_use=true (solo funciona en el primer navegador que lo abre). La URL se entrega solo esta vez: muéstrala al productor.",
     scope: "write",
@@ -780,7 +780,7 @@ const createPreviewLinkTool: ToolDef = {
             note:
                 event.status === "published"
                     ? "El evento ya está publicado: el link público también funciona."
-                    : "Evento en BORRADOR: este link privado es la única forma de verlo. La página muestra el aviso de vista previa y no permite comprar.",
+                    : "Evento en BORRADOR: este link privado es la única forma de verlo. La página muestra el aviso de vista previa y la compra es simulada (no se cobra ni se crea una orden).",
         };
     },
 };

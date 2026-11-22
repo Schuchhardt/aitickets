@@ -8,7 +8,7 @@ import AnimatedNumber from "./AnimatedNumber.vue";
 import QuantityStepper from "./QuantityStepper.vue";
 import CheckoutExtras from "./CheckoutExtras.vue";
 import { suggestEmail } from "./emailSuggest.js";
-import { formatCLP, formatFunctionShort, ticketMax } from "./eventView.js";
+import { formatCLP, formatFunctionShort, ticketMax, isDraftPreview, isSimulatedCheckout } from "./eventView.js";
 import { createOrder, previewDiscount, rememberBuyer, rememberedBuyer, trackFunnel } from "./checkoutApi.js";
 import { useTurnstile } from "./useTurnstile.js";
 import { isValidEmail, normalizeDiscountCode } from "../Reservation/pricing.js";
@@ -28,7 +28,7 @@ const props = defineProps({
   buyerPrefill: { type: Object, default: null }, // { name, email } (asistente IA)
   seats: { type: Object, default: null }, // entradas numeradas: { eventDateId, keys }
 });
-const emit = defineEmits(["update:discount", "update:qty", "busy", "back", "demo", "sold-out", "seats-taken"]);
+const emit = defineEmits(["update:discount", "update:qty", "busy", "back", "simulated", "sold-out", "seats-taken"]);
 
 // Asientos elegidos, para el resumen ("Fila C · Asiento 7")
 const seatLabels = computed(() => {
@@ -51,7 +51,9 @@ const emailInput = ref(null);
 const withdrawalInput = ref(null);
 const captchaEl = ref(null);
 const extrasRef = ref(null);
-const captcha = useTurnstile(captchaEl, { disabled: () => Boolean(props.event?.is_demo) });
+// Evento demo o vista previa de un borrador: el pago se simula (sin captcha ni llamada a la API)
+const simulated = computed(() => isSimulatedCheckout(props.event));
+const captcha = useTurnstile(captchaEl, { disabled: () => isSimulatedCheckout(props.event) });
 
 const isFree = computed(() => props.totals.total === 0);
 const suggestion = computed(() => (errors.value.email ? "" : suggestEmail(email.value)));
@@ -73,7 +75,8 @@ const codeOpen = ref(false);
 const codeInput = ref("");
 const codeError = ref("");
 const codeBusy = ref(false);
-const canUseCode = computed(() => !props.event?.is_demo && props.totals.grossSubtotal > 0);
+// /api/discount-code solo valida códigos de eventos publicados: en la compra simulada no se ofrece
+const canUseCode = computed(() => !simulated.value && props.totals.grossSubtotal > 0);
 
 async function applyCode(raw = codeInput.value) {
   codeError.value = "";
@@ -131,8 +134,12 @@ async function submit() {
     return;
   }
   serverError.value = "";
-  if (props.event?.is_demo) {
-    emit("demo", { email: email.value.trim(), total: props.totals.total, free: isFree.value });
+  if (simulated.value) {
+    // Demo o vista previa: una pausa breve, como la del pago real, antes de mostrar las entradas
+    setBusy(true);
+    await new Promise((r) => setTimeout(r, 900));
+    setBusy(false);
+    emit("simulated", { name: name.value.trim(), email: email.value.trim(), total: props.totals.total, free: isFree.value });
     return;
   }
   setBusy(true);
@@ -192,7 +199,7 @@ onMounted(() => {
   }
   summaryOpen.value = window.matchMedia?.("(min-width: 1024px)").matches ?? false;
   trackFunnel("checkout_step2_view", props.event, { total: props.totals.total, qty: props.totals.quantity });
-  trackBeginCheckout(props.event.id, props.event.name, props.totals.quantity, props.totals.total);
+  if (!isDraftPreview(props.event)) trackBeginCheckout(props.event.id, props.event.name, props.totals.quantity, props.totals.total);
   if (props.autoCode && canUseCode.value && !props.discount) applyCode(props.autoCode);
 });
 </script>

@@ -32,6 +32,10 @@ import {
   formatMonthLabel,
   groupByMonth,
   FUNCTION_LIST_LIMIT,
+  isDraftPreview,
+  isSimulatedCheckout,
+  simulatedTickets,
+  SAMPLE_QR_PREFIX,
 } from '../../src/components/event/eventView.js'
 import { suggestEmail, levenshtein } from '../../src/components/event/emailSuggest.js'
 import { dominantColor, pastelTint, tintContrast } from '../../src/lib/eventTint.js'
@@ -79,7 +83,16 @@ describe('estado de la card de acción', () => {
   it('venta por abrir, terminado y vista previa', () => {
     expect(cardState({ ...base, sale_state: 'upcoming', tickets: [] }, NOW)).toBe('upcoming')
     expect(cardState({ dates: [{ ...future('2026-10-01', 1), end_iso: '2026-10-01T23:00:00-03:00' }], sale_state: 'closed', tickets: [] }, NOW)).toBe('ended')
-    expect(cardState({ ...base, is_preview: true, status: 'draft', sale_state: 'on_sale', tickets: [{ id: 1, price: 0 }] }, NOW)).toBe('preview')
+  })
+  it('vista previa de un borrador: el mismo estado que tendría publicado (la compra se simula)', () => {
+    const draft = { ...base, is_preview: true, status: 'draft' }
+    expect(cardState({ ...draft, sale_state: 'on_sale', tickets: [{ id: 1, price: 0 }] }, NOW)).toBe('free')
+    expect(cardState({ ...draft, sale_state: 'on_sale', tickets: [{ id: 1, price: 4000 }] }, NOW)).toBe('paid_simple')
+    expect(cardState({ ...draft, sale_state: 'upcoming', tickets: [] }, NOW)).toBe('upcoming')
+    // Sin entradas a la venta no hay nada que simular
+    expect(cardState({ ...draft, sale_state: 'closed', tickets: [] }, NOW)).toBe('preview')
+    // Publicado: la vista previa es la página pública (venta real)
+    expect(cardState({ ...base, is_preview: true, status: 'published', sale_state: 'closed', tickets: [] }, NOW)).toBe('closed')
   })
   it('"Quedan N" / "Últimas entradas" con ≤ 10 o ≥ 80 % vendido; el % desde la mitad', () => {
     expect(stockSummary({ tickets: [{ remaining: 8, total_quantity: 200 }] })).toEqual({ remaining: 8, soldPercent: 96, few: true })
@@ -388,5 +401,70 @@ describe('nombre del comprador', () => {
   it('primer nombre e iniciales para la UI', () => {
     expect(firstNameOf('seba pérez')).toBe('Seba')
     expect(initialsOf('Club Surco')).toBe('CS')
+  })
+})
+
+describe('compra simulada (demo y vista previa de un borrador)', () => {
+  it('se simula en el demo y en el borrador; nunca en un evento publicado', () => {
+    expect(isDraftPreview({ is_preview: true, status: 'draft' })).toBe(true)
+    expect(isDraftPreview({ is_preview: true, status: 'published' })).toBe(false)
+    expect(isDraftPreview({ status: 'draft' })).toBe(false)
+    expect(isSimulatedCheckout({ is_demo: true, status: 'published' })).toBe(true)
+    expect(isSimulatedCheckout({ is_preview: true, status: 'draft' })).toBe(true)
+    expect(isSimulatedCheckout({ is_preview: true, status: 'published' })).toBe(false)
+    expect(isSimulatedCheckout({ status: 'published' })).toBe(false)
+    expect(isSimulatedCheckout(null)).toBe(false)
+  })
+
+  const venue = { name: 'Teatro Nescafé', address: 'Manuel Montt 32', city: 'Providencia' }
+  const event = {
+    id: 77,
+    dates: [{ id: 5, date: '2026-11-08', start_time: '20:00:00', end_iso: '2026-11-08T23:00:00-03:00', venue }],
+    tickets: [
+      { id: 1, ticket_name: 'General', people_per_ticket: 1 },
+      { id: 2, ticket_name: 'Mesa para 3', people_per_ticket: 3 },
+    ],
+  }
+
+  it('una entrada por QR, con la función, el lugar y quién la compró', () => {
+    const list = simulatedTickets(event, { lines: [{ id: 1, name: 'General', quantity: 2 }], holder: ' Ana Pérez ', now: NOW })
+    expect(list).toHaveLength(2)
+    expect(list[0]).toMatchObject({
+      ticketName: 'General',
+      when: 'Domingo 8 de noviembre · 20:00 hrs',
+      where: 'Teatro Nescafé, Manuel Montt 32, Providencia',
+      holder: 'Ana Pérez',
+      guest: '',
+      position: 1,
+      total: 2,
+    })
+    expect(list[1].position).toBe(2)
+  })
+
+  it('una mesa para N emite N QR ("Invitado 2 de 3") y los asientos van en orden', () => {
+    const list = simulatedTickets(event, { lines: [{ id: 2, name: 'Mesa para 3', quantity: 1 }], seats: ['Fila A · Asiento 1', 'Fila A · Asiento 2'], now: NOW })
+    expect(list.map((t) => t.guest)).toEqual(['Invitado 1 de 3', 'Invitado 2 de 3', 'Invitado 3 de 3'])
+    expect(list.map((t) => t.seat)).toEqual(['Fila A · Asiento 1', 'Fila A · Asiento 2', ''])
+  })
+
+  it('el QR de muestra nunca calza con uno real (hex de 64) y es distinto por entrada', () => {
+    const list = simulatedTickets(event, { lines: [{ id: 1, name: 'General', quantity: 3 }], now: NOW })
+    const codes = list.map((t) => t.code)
+    expect(new Set(codes).size).toBe(3)
+    for (const code of codes) {
+      expect(code.startsWith(`${SAMPLE_QR_PREFIX}-77-`)).toBe(true)
+      expect(code).not.toMatch(/^[0-9a-f]{64}$/)
+    }
+  })
+
+  it('con dirección privada no muestra la calle: llega con la entrada', () => {
+    const list = simulatedTickets({ ...event, has_secret_location: true, dates: [{ ...event.dates[0], venue: { name: 'Lugar secreto', city: 'Ñuñoa' } }] }, { lines: [{ id: 1, name: 'General', quantity: 1 }], now: NOW })
+    expect(list[0].where).toBe('Lugar secreto · la dirección llega con la entrada')
+  })
+
+  it('sin función elegida usa la de la entrada o la única próxima; sin líneas, nada', () => {
+    const tied = { ...event, dates: [...event.dates, { id: 6, date: '2026-11-09', start_time: '19:00:00', end_iso: '2026-11-09T22:00:00-03:00', venue }], tickets: [{ id: 1, ticket_name: 'Domingo', event_date_id: 6 }] }
+    expect(simulatedTickets(tied, { lines: [{ id: 1, name: 'Domingo', quantity: 1 }], now: NOW })[0].when).toBe('Lunes 9 de noviembre · 19:00 hrs')
+    expect(simulatedTickets(event, { lines: [], now: NOW })).toEqual([])
   })
 })

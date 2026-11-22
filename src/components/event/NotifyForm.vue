@@ -3,6 +3,7 @@
 import { ref, onMounted } from "vue";
 import { joinWaitlist, rememberedBuyer } from "./checkoutApi.js";
 import { isValidEmail } from "../Reservation/pricing.js";
+import { isSimulatedCheckout } from "./eventView.js";
 
 const props = defineProps({
   event: { type: Object, required: true },
@@ -30,7 +31,8 @@ async function submit() {
   }
   error.value = "";
   busy.value = true;
-  const res = props.event?.is_demo ? { ok: true } : await joinWaitlist(props.event, { email: email.value, kind: props.kind });
+  // Demo o vista previa de un borrador: no se anota a nadie en la lista de espera
+  const res = isSimulatedCheckout(props.event) ? { ok: true } : await joinWaitlist(props.event, { email: email.value, kind: props.kind });
   busy.value = false;
   if (res.ok) done.value = true;
   else error.value = res.network ? "No pudimos conectar. Revisa tu conexión e inténtalo de nuevo." : res.data?.message || "Algo falló de nuestro lado. Inténtalo en unos segundos.";

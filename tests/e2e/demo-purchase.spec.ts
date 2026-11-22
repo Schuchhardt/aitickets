@@ -64,8 +64,12 @@ test("elegir entradas, datos, no retracto y pago simulado", async ({ page }) => 
   await dialog.getByTestId("resv-terms-checkbox").check();
   await pay.click();
 
-  await expect(dialog.getByTestId("resv-demo-result")).toBeVisible();
-  await expect(dialog.getByTestId("resv-demo-result")).toContainText("no se creó ninguna orden");
+  // Termina en la entrada con el QR de muestra (SimulatedTickets.vue) y el registro de productores
+  const result = dialog.getByTestId("sim-result");
+  await expect(result).toBeVisible();
+  await expect(result).toContainText("no se creó ninguna orden");
+  await expect(result.getByTestId("sim-qr").first()).toBeVisible();
+  await expect(result.getByTestId("sim-signup")).toHaveAttribute("href", /\/organizadores\/registro\?.*utm_medium=demo_event/);
   expect(purchaseCalls).toEqual([]);
 
   // Esc cierra el sheet y limpia la URL
