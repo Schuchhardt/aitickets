@@ -1,6 +1,7 @@
-// Vista previa privada de un evento (tests/e2e/fixtures, sin BD): el aviso flotante (corto, se va solo a los 5 s, se
-// cierra con la X y se pausa con el mouse encima) y la compra simulada del borrador, que recorre el flujo del
-// asistente hasta la entrada con un QR de MUESTRA sin llamar a la API de compra ni mandar eventos a GA.
+// Vista previa privada de un evento y eventos demo (tests/e2e/fixtures, sin BD): el aviso flotante de la vista previa
+// (corto, se va solo a los 5 s, se cierra con la X y se pausa con el mouse encima) y la compra simulada, que recorre el
+// flujo del asistente hasta la entrada con un QR de MUESTRA sin llamar a la API de compra. La vista previa tampoco
+// manda eventos a GA; el demo suma el registro de productores ("Quiero vender entradas así").
 import { expect, test, type Page } from "@playwright/test";
 import { captureAnalytics, waitForIsland } from "./env";
 import { FIXTURE_ROUTE } from "./fixtures/event-scenarios.mjs";
@@ -105,7 +106,7 @@ test.describe("compra simulada del borrador", () => {
     await expect(pay).toHaveText("Simular pago de $8.762");
     await pay.click();
 
-    const result = dialog.getByTestId("preview-sim-result");
+    const result = dialog.getByTestId("sim-result");
     await expect(result).toBeVisible();
     await expect(result.getByRole("heading", { level: 3 })).toHaveText("¡Listo, Ana! Tus entradas están listas.");
     await expect(result).toContainText("Pago aprobado · $8.762");
@@ -132,7 +133,7 @@ test.describe("compra simulada del borrador", () => {
     await expect(dialog.getByLabel("Email")).toHaveValue("ana.e2e@gmail.com");
     await dialog.getByTestId("resv-terms-checkbox").check();
     await dialog.getByTestId("resv-pay-button").click();
-    await dialog.getByTestId("preview-sim-result").getByRole("button", { name: "Volver al evento" }).click();
+    await dialog.getByTestId("sim-result").getByRole("button", { name: "Volver al evento" }).click();
     await expect(dialog).toHaveCount(0);
     await expect(page).not.toHaveURL(/checkout=1/);
   });
@@ -145,7 +146,7 @@ test.describe("compra simulada del borrador", () => {
     await dialog.getByLabel("Email").fill("ana.e2e@gmail.com");
     await dialog.getByTestId("resv-terms-checkbox").check();
     await dialog.getByTestId("resv-pay-button").click();
-    const result = dialog.getByTestId("preview-sim-result");
+    const result = dialog.getByTestId("sim-result");
     // Se muestran 3 y el resto se resume
     await expect(result.getByTestId("sim-ticket")).toHaveCount(3);
     await expect(result.getByTestId("sim-ticket").nth(1)).toContainText("Invitado 2 de 4");
@@ -162,10 +163,10 @@ test.describe("compra simulada del borrador", () => {
     await card.getByRole("button", { name: "Confirmar asistencia" }).click();
     await expect(card.getByTestId("card-label")).toHaveText("Asistencia confirmada");
 
-    await card.getByTestId("rsvp-preview-ticket").click();
+    await card.getByTestId("rsvp-sim-ticket").click();
     const sheet = page.getByTestId("sim-tickets-sheet");
     await expect(sheet).toBeVisible();
-    const result = sheet.getByTestId("preview-sim-result");
+    const result = sheet.getByTestId("sim-result");
     await expect(result.getByRole("heading", { level: 3 })).toHaveText("¡Listo, Ana! Estás dentro.");
     await expect(result).toContainText("Asistencia confirmada");
     await expect(result.getByTestId("sim-qr")).toBeVisible();
@@ -187,5 +188,59 @@ test.describe("compra simulada del borrador", () => {
     await expect(card.getByTestId("card-label")).toHaveText("Vista previa");
     await expect(card).toContainText("Este borrador todavía no tiene entradas a la venta.");
     await expect(card.getByRole("button", { name: /Comprar|Confirmar|Elegir/ })).toHaveCount(0);
+  });
+});
+
+test.describe("compra simulada del evento demo", () => {
+  test("pagado: termina en la entrada con QR de muestra y el registro de productores", async ({ page }) => {
+    const purchases = await openPreview(page, "demo-pagado");
+    await expect(page.getByRole("note")).toContainText("hasta la entrada con QR");
+    await expect(notice(page)).toHaveCount(0); // el aviso flotante es solo de la vista previa
+
+    await openCheckout(page);
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toContainText("Demostración");
+    await dialog.getByLabel("Nombre y apellido").fill("Ana Pérez");
+    await dialog.getByLabel("Email").fill("ana.e2e@gmail.com");
+    await dialog.getByTestId("resv-terms-checkbox").check();
+    await expect(dialog.getByTestId("resv-pay-button")).toHaveText("Simular pago de $4.381");
+    await dialog.getByTestId("resv-pay-button").click();
+
+    const result = dialog.getByTestId("sim-result");
+    await expect(result.getByRole("heading", { level: 3 })).toHaveText("¡Listo, Ana! Tu entrada está lista.");
+    await expect(result).toContainText("Así recibe su entrada quien compra en AI Tickets.");
+    await expect(result).toContainText("El productor lo ve al instante");
+    await expect(result.getByTestId("sim-ticket")).toHaveCount(1);
+    await expect(result.getByTestId("sim-qr")).toBeVisible();
+    await expect(result).toContainText("Muestra · No válido");
+    await expect(result).toContainText("Demostración: no se creó ninguna orden");
+    await expect(result.getByTestId("sim-signup")).toHaveAttribute("href", "/organizadores/registro?utm_source=aitickets&utm_medium=demo_event&utm_campaign=checkout");
+    expect(purchases, "el demo no crea órdenes").toEqual([]);
+
+    await result.getByRole("button", { name: "Volver al evento" }).click();
+    await expect(dialog).toHaveCount(0);
+  });
+
+  test("gratis: confirmar asistencia y ver la entrada de muestra", async ({ page }) => {
+    const purchases = await openPreview(page, "demo-gratis");
+    const card = page.getByTestId("event-action-card");
+    await card.getByLabel("Nombre y apellido").fill("Ana Pérez");
+    await card.getByLabel("Email").fill("ana.e2e@gmail.com");
+    await card.getByRole("button", { name: "Confirmar asistencia" }).click();
+    await expect(card).toContainText("Demostración: no se creó ninguna entrada ni se envió un correo.");
+
+    await card.getByTestId("rsvp-sim-ticket").click();
+    const sheet = page.getByTestId("sim-tickets-sheet");
+    await expect(sheet).toContainText("Demostración · Entrada de muestra");
+    const result = sheet.getByTestId("sim-result");
+    await expect(result.getByRole("heading", { level: 3 })).toHaveText("¡Listo, Ana! Estás dentro.");
+    await expect(result).toContainText("Así recibe su entrada quien se inscribe en AI Tickets.");
+    await expect(result.getByTestId("sim-qr")).toBeVisible();
+    await expect(result.getByTestId("sim-signup")).toHaveAttribute("href", /utm_campaign=rsvp$/);
+    expect(purchases).toEqual([]);
+
+    // Esc cierra el panel
+    await page.keyboard.press("Escape");
+    await expect(sheet).toHaveCount(0);
   });
 });

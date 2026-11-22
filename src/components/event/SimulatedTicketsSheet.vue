@@ -1,5 +1,5 @@
 <script setup>
-// Panel con la entrada simulada de un registro gratis en la vista previa de un borrador (RsvpForm → "Ver mi entrada").
+// Panel con la entrada simulada de un registro gratis (evento demo o vista previa de un borrador; RsvpForm → "Ver mi entrada").
 // Mismo formato que el checkout (CheckoutSheet.vue): bottom sheet en mobile, panel lateral de 480 px en desktop.
 // Se monta solo después de una acción del usuario, así que el Teleport nunca se hidrata (ver ShareSheet.vue).
 import { ref, onMounted, onBeforeUnmount, nextTick } from "vue";
@@ -79,7 +79,7 @@ onBeforeUnmount(() => {
               <img v-if="event.image_url" :src="event.image_url" alt="" class="thumb" width="40" height="40" />
               <div class="head-text">
                 <p id="sim-sheet-title" class="head-title">{{ event.name }}</p>
-                <p class="head-sub">Vista previa · Entrada de muestra</p>
+                <p class="head-sub">{{ event.is_demo ? "Demostración" : "Vista previa" }} · Entrada de muestra</p>
               </div>
               <button type="button" class="close" aria-label="Cerrar" @click="close()">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>

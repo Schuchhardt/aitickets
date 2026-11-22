@@ -230,7 +230,7 @@ export const isSimulatedCheckout = (event) => Boolean(event?.is_demo) || isDraft
  * Contenido del QR de muestra de una compra simulada. Nunca calza con uno real (hex de 64 caracteres,
  * netlify/lib/tickets.mjs generateQrCode): el validador responde "No se encontró una entrada con ese código QR".
  */
-export const SAMPLE_QR_PREFIX = "AITICKETS-VISTA-PREVIA-NO-VALIDA";
+export const SAMPLE_QR_PREFIX = "AITICKETS-MUESTRA-NO-VALIDA";
 
 /** "Sábado 12 de octubre · 20:00 hrs" (como la tarjeta de la entrada, TicketInfo.vue). */
 function ticketWhen(fn, now) {

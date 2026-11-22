@@ -1,7 +1,8 @@
 <script setup>
-// Final de una compra simulada en la vista previa de un borrador (isDraftPreview): lo que vería el asistente al
-// terminar (pago o confirmación, correo, check-in) y sus entradas con un QR de MUESTRA. El QR lleva el sello "Muestra
-// · No válido" y su contenido (SAMPLE_QR_PREFIX) nunca calza con uno real: escaneado, el validador no lo encuentra.
+// Final de una compra simulada (isSimulatedCheckout: evento demo o vista previa de un borrador): lo que vería el
+// asistente al terminar (pago o confirmación, correo, check-in) y sus entradas con un QR de MUESTRA. El QR lleva el
+// sello "Muestra · No válido" y su contenido (SAMPLE_QR_PREFIX) nunca calza con uno real: el validador no lo encuentra.
+// En el demo (lo ven productores que evalúan AI Tickets) suma qué ve el productor y el botón para crear su cuenta.
 // Lo usan CheckoutSheet.vue (compra pagada) y SimulatedTicketsSheet.vue (registro gratis, RsvpForm).
 import { ref, computed, onMounted } from "vue";
 import SuccessCheck from "./SuccessCheck.vue";
@@ -13,6 +14,16 @@ const props = defineProps({
   result: { type: Object, required: true },
 });
 const emit = defineEmits(["close", "again"]);
+
+const demo = computed(() => Boolean(props.event?.is_demo));
+const noun = computed(() => (props.result.free ? "inscripción" : "compra"));
+const subtitle = computed(() => {
+  if (!demo.value) return `Así termina la ${noun.value} para tu asistente.`;
+  const what = props.result.tickets?.length === 1 ? "su entrada" : "sus entradas";
+  return `Así recibe ${what} quien ${props.result.free ? "se inscribe" : "compra"} en AI Tickets.`;
+});
+// Registro de productores desde el demo (misma atribución que el banner del evento demo)
+const signupUrl = computed(() => `/organizadores/registro?utm_source=aitickets&utm_medium=demo_event&utm_campaign=${props.result.free ? "rsvp" : "checkout"}`);
 
 // Con muchas entradas (o una mesa para 10) se muestran las primeras: cada una es igual a la anterior
 const MAX_SHOWN = 3;
@@ -46,11 +57,11 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="sim" data-testid="preview-sim-result">
+  <div class="sim" data-testid="sim-result">
     <div class="sim-head">
       <SuccessCheck :size="48" />
       <h3 ref="titleEl" class="sim-title" tabindex="-1">{{ title }}</h3>
-      <p class="sim-sub">Así termina la {{ result.free ? "inscripción" : "compra" }} para tu asistente.</p>
+      <p class="sim-sub">{{ subtitle }}</p>
     </div>
 
     <ol class="journey" aria-label="Qué pasa después">
@@ -72,7 +83,14 @@ onMounted(async () => {
         <span class="step-dot" aria-hidden="true">3</span>
         <div>
           <p class="step-title">Check-in con el QR</p>
-          <p class="step-sub">En la puerta, tu equipo lo escanea desde el celular.</p>
+          <p class="step-sub">{{ demo ? "En la puerta, el equipo del productor lo escanea desde el celular, incluso sin señal." : "En la puerta, tu equipo lo escanea desde el celular." }}</p>
+        </div>
+      </li>
+      <li v-if="demo">
+        <span class="step-dot" aria-hidden="true">4</span>
+        <div>
+          <p class="step-title">El productor lo ve al instante</p>
+          <p class="step-sub">La venta aparece en su panel, con el canal que la trajo.</p>
         </div>
       </li>
     </ol>
@@ -100,11 +118,19 @@ onMounted(async () => {
       <p v-if="hidden" class="more">+ {{ hidden }} {{ hidden === 1 ? "entrada más" : "entradas más" }}, cada una con su propio QR.</p>
     </section>
 
-    <p class="sim-note">Simulación: no se creó ninguna orden, no se cobró nada ni se envió un correo. Este QR no sirve para entrar.</p>
+    <p class="sim-note">{{ demo ? "Demostración" : "Simulación" }}: no se creó ninguna orden, no se cobró nada ni se envió un correo. Este QR no sirve para entrar.</p>
 
-    <div class="actions">
+    <div v-if="demo" class="actions">
+      <a :href="signupUrl" class="ev-btn ev-btn-primary w-full" data-testid="sim-signup">Quiero vender entradas así</a>
+      <div class="links">
+        <button type="button" class="ev-link again" @click="emit('close')">Volver al evento</button>
+        <span class="links-sep" aria-hidden="true">·</span>
+        <button type="button" class="ev-link again" @click="emit('again')">Probar otra {{ noun }}</button>
+      </div>
+    </div>
+    <div v-else class="actions">
       <button type="button" class="ev-btn ev-btn-primary w-full" @click="emit('close')">Volver al evento</button>
-      <button type="button" class="ev-link again" @click="emit('again')">Probar otra {{ result.free ? "inscripción" : "compra" }}</button>
+      <button type="button" class="ev-link again" @click="emit('again')">Probar otra {{ noun }}</button>
     </div>
   </div>
 </template>
@@ -324,6 +350,16 @@ onMounted(async () => {
   flex-direction: column;
   align-items: center;
   gap: 4px;
+}
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0 4px;
+}
+.links-sep {
+  color: var(--text-3);
 }
 .again {
   min-height: 44px;

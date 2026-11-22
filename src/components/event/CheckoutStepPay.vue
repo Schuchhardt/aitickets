@@ -28,7 +28,7 @@ const props = defineProps({
   buyerPrefill: { type: Object, default: null }, // { name, email } (asistente IA)
   seats: { type: Object, default: null }, // entradas numeradas: { eventDateId, keys }
 });
-const emit = defineEmits(["update:discount", "update:qty", "busy", "back", "demo", "sold-out", "seats-taken"]);
+const emit = defineEmits(["update:discount", "update:qty", "busy", "back", "simulated", "sold-out", "seats-taken"]);
 
 // Asientos elegidos, para el resumen ("Fila C · Asiento 7")
 const seatLabels = computed(() => {
@@ -135,13 +135,11 @@ async function submit() {
   }
   serverError.value = "";
   if (simulated.value) {
-    // Vista previa: una pausa breve, como la del pago real, antes de mostrar las entradas
-    if (isDraftPreview(props.event)) {
-      setBusy(true);
-      await new Promise((r) => setTimeout(r, 900));
-      setBusy(false);
-    }
-    emit("demo", { name: name.value.trim(), email: email.value.trim(), total: props.totals.total, free: isFree.value });
+    // Demo o vista previa: una pausa breve, como la del pago real, antes de mostrar las entradas
+    setBusy(true);
+    await new Promise((r) => setTimeout(r, 900));
+    setBusy(false);
+    emit("simulated", { name: name.value.trim(), email: email.value.trim(), total: props.totals.total, free: isFree.value });
     return;
   }
   setBusy(true);

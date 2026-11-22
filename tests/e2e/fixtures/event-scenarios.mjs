@@ -191,6 +191,9 @@ export const SCENARIOS = {
   "vista-previa-sin-entradas": { layout: "poster", tickets: [], saleState: "closed", preview: true },
   // Vista previa de un evento ya publicado: la página pública, con venta real
   "vista-previa-publicada": { layout: "poster", tickets: [TICKETS.general], preview: "published" },
+  // Evento demo (is_demo, como los de src/lib/demoEvent.mjs): la misma compra simulada, con el registro de productores
+  "demo-pagado": { layout: "poster", tickets: [TICKETS.general], demo: true },
+  "demo-gratis": { layout: "poster", tickets: [TICKETS.free], demo: true },
   // Entradas numeradas: mapa de asientos de la sala
   "cine-numerado": { layout: "poster", ...CINEMA },
 };
@@ -322,7 +325,7 @@ export function fixtureEvent(name, { toPublicTicket, now = new Date() }) {
     organization: { name: "Productora de Prueba", website: null, instagram: null },
     venue,
     page_settings: { layout: scenario.layout, show_organizer: true, background: "none" },
-    is_demo: false,
+    is_demo: Boolean(scenario.demo),
     is_preview: Boolean(scenario.preview),
   };
 }

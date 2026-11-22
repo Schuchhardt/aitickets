@@ -426,7 +426,7 @@ const cardHiddenOnMobile = computed(() => isPaidOnSale.value && !cardHasChips.va
     <div class="container">
       <p v-if="event.is_demo" class="banner banner-demo" role="note">
         <span class="demo-dot" aria-hidden="true"></span>
-        <span class="demo-text">Evento de demostración: puedes recorrer el flujo completo, no se cobra nada.</span>
+        <span class="demo-text">Evento de demostración: recorre la compra completa, hasta la entrada con QR. No se cobra nada.</span>
         <a href="/organizadores/registro?utm_source=aitickets&utm_medium=demo_event&utm_campaign=banner" class="ev-link">Crea tu evento gratis →</a>
       </p>
 

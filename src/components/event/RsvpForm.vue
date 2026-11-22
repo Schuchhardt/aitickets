@@ -31,7 +31,7 @@ import { maskEmail } from "../../../netlify/lib/reviews.mjs";
 import { trackPurchase } from "../../composables/useGoogleAnalytics.js";
 import { eventBus } from "../../utils/eventbus.js";
 
-// Entrada de muestra de la vista previa de un borrador: se carga solo al abrirla
+// Entrada de muestra (demo o vista previa de un borrador): se carga solo al abrirla
 const SimulatedTicketsSheet = defineAsyncComponent(() => import("./SimulatedTicketsSheet.vue"));
 
 const props = defineProps({
@@ -68,7 +68,7 @@ const extraLines = computed(() => (selectedTicket.value ? [{ id: selectedTicket.
 const simulated = computed(() => isSimulatedCheckout(props.event));
 const draftPreview = computed(() => isDraftPreview(props.event));
 const captcha = useTurnstile(captchaEl, { disabled: () => isSimulatedCheckout(props.event) });
-// Vista previa: "Ver mi entrada" abre la entrada con el QR de muestra
+// Demo o vista previa: "Ver mi entrada" abre la entrada con el QR de muestra
 const simTickets = ref(null);
 function openSimTickets() {
   simTickets.value = {
@@ -530,10 +530,10 @@ watch(status, (s) => s !== "idle" && stopNudge());
           Te enviamos {{ result.quantity > 1 ? "tus entradas" : "tu entrada" }} con QR a<br />
           <strong>{{ result.email }}</strong>
         </p>
-        <p v-if="event.is_demo" class="demo-note">Demostración: no se creó ninguna entrada ni se envió un correo.</p>
-        <template v-else-if="draftPreview">
-          <button type="button" class="ev-btn ev-btn-primary w-full" data-testid="rsvp-preview-ticket" @click="openSimTickets">Ver mi entrada</button>
-          <p class="demo-note is-preview">Vista previa: no se creó ninguna entrada ni se envió un correo.</p>
+        <!-- Demo o vista previa: la entrada de muestra con su QR (no se creó ninguna) -->
+        <template v-if="simulated">
+          <button type="button" class="ev-btn ev-btn-primary w-full" data-testid="rsvp-sim-ticket" @click="openSimTickets">Ver mi entrada</button>
+          <p class="demo-note" :class="{ 'is-preview': draftPreview }">{{ event.is_demo ? "Demostración" : "Vista previa" }}: no se creó ninguna entrada ni se envió un correo.</p>
         </template>
         <div class="success-actions">
           <button type="button" class="ev-btn ev-btn-secondary" @click="addToCalendar(event)">
