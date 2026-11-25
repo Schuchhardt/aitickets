@@ -2,7 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { QrcodeStream } from 'vue-qrcode-reader'
 import { useClientStorage } from '../composables/useClientStorage'
-import { sessionView, addLocalSessionCheckin } from '../lib/sessionCheckin.mjs'
+import { sessionView, addLocalSessionCheckin, isOtherFunction } from '../lib/sessionCheckin.mjs'
 import { entryDeadlineCheck, lateEntryMessage } from '../lib/entryDeadline.mjs'
 
 const props = defineProps({
@@ -84,7 +84,8 @@ const localFunctionCheck = (attendee) => {
   const dates = localEvent.value?.dates || props.event.dates || []
   const fn = dates.find(d => String(d.id) === String(fnId))
   if (!fn) return { function_mismatch: false, function_label: null }
-  return { function_mismatch: String(fn.date).slice(0, 10) !== todayInSantiago(), function_label: functionLabel(fn) }
+  // Por día de Chile, salvo en la madrugada de una función de anoche que cruza la medianoche (sessionCheckin.mjs)
+  return { function_mismatch: isOtherFunction(fn, dates), function_label: functionLabel(fn) }
 }
 
 // ==== Entradas multifunción (pase de varios días): entran una vez en cada función ====

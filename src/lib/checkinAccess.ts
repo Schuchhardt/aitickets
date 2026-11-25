@@ -245,7 +245,7 @@ export async function checkInTicket(
         const { data: current } = await supabase.from("event_attendees").select("status, validated_at").eq("id", ticket.id).maybeSingle();
         return reject(current || {});
     }
-    const fn = await getFunctionCheck(supabase, eventId, ticket.event_tickets?.event_date_id ?? null);
+    const fn = await getFunctionCheck(supabase, eventId, ticket.event_tickets?.event_date_id ?? null, validatedAt);
     return { ok: true, ticket_id: ticket.id, validated_at: validatedAt, function_mismatch: Boolean(fn.function_mismatch), function_label: fn.function_label ?? null, ...lateFields, ticket };
 }
 
