@@ -270,7 +270,7 @@ export async function ensureOrderAttendees(supabase, order) {
   if (existing && existing > 0) return { created: 0, existing }
 
   const lines = (Array.isArray(order.ticket_details) ? order.ticket_details : [])
-    .map(l => ({ id: Number(l?.id), quantity: Number(l?.quantity) }))
+    .map(l => ({ id: Number(l?.id), quantity: Number(l?.quantity), people: Number(l?.people) }))
     .filter(l => Number.isInteger(l.id) && Number.isInteger(l.quantity) && l.quantity > 0)
   if (!lines.length) throw new Error('La orden no tiene detalle de entradas válido')
 
@@ -286,8 +286,10 @@ export async function ensureOrderAttendees(supabase, order) {
     throw Object.assign(new Error('La orden contiene tipos de entrada que no pertenecen al evento'), { code: 'invalid_ticket_types' })
   }
 
-  const [people, holders, seatSelection] = await Promise.all([
-    loadPeoplePerTicket(supabase, order.event_id),
+  // Personas por mesa: las que se compraron (`people` de la línea, purchase-tickets lo guarda si es > 1), no el valor
+  // actual del tipo de entrada, que el productor pudo cambiar mientras el comprador pagaba. Sin `people` = 1 QR por unidad.
+  const people = new Map(lines.map(l => [l.id, Number.isInteger(l.people) && l.people > 1 ? l.people : 1]))
+  const [holders, seatSelection] = await Promise.all([
     loadOrderHolders(supabase, order),
     loadOrderSeatSelection(supabase, order),
   ])
