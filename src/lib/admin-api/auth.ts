@@ -115,7 +115,9 @@ export async function authenticateAdminRequest(request: Request, supabase: any):
                 const fingerprint = sha256(oauthKey).slice(0, 8);
                 const limit = await rateLimit("admin:key", fingerprint, { windowSeconds: 60, max: ADMIN_REQUESTS_PER_MINUTE, supabase });
                 if (!limit.allowed) return { ok: false, status: 429, error: `Demasiadas peticiones: máximo ${ADMIN_REQUESTS_PER_MINUTE} por minuto.` };
-                return { ok: true, keyKind: "full", fingerprint, ipHash };
+                // Los scopes del token mandan: sin "write" solo puede usar las herramientas de lectura no sensibles
+                const kind: AdminKeyKind = auth.actor.scopes.includes("write") ? "full" : "readonly";
+                return { ok: true, keyKind: kind, fingerprint, ipHash };
             }
         }
     }
