@@ -28,22 +28,28 @@ export function cachePublicPage(
 const PURGE_TIMEOUT_MS = 2500;
 
 /**
- * Vacía del CDN las páginas de eventos (y el listado). Nunca lanza: si falla, el TTL corto las renueva igual.
+ * Vacía del CDN las páginas con esas etiquetas. Nunca lanza: si falla, el TTL corto las renueva igual.
  * Fuera de Netlify (astro dev, tests) no hace nada: no hay NETLIFY_PURGE_API_TOKEN ni SITE_ID.
  */
-export async function purgeEventPages(): Promise<void> {
+export async function purgeCacheTags(tags: string[]): Promise<void> {
   const token = process.env.NETLIFY_PURGE_API_TOKEN;
   const siteId = process.env.SITE_ID;
-  if (!token || !siteId) return;
+  if (!token || !siteId || !tags.length) return;
   try {
     const res = await fetch("https://api.netlify.com/api/v1/purge", {
       method: "POST",
       headers: { "Content-Type": "application/json; charset=utf8", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ site_id: siteId, cache_tags: [EVENT_PAGES_TAG] }),
+      body: JSON.stringify({ site_id: siteId, cache_tags: tags }),
       signal: AbortSignal.timeout(PURGE_TIMEOUT_MS),
     });
-    if (!res.ok) console.error("No se pudo vaciar la caché de eventos:", res.status);
+    if (!res.ok) console.error(`No se pudo vaciar la caché (${tags.join(", ")}):`, res.status);
   } catch (err: any) {
-    console.error("No se pudo vaciar la caché de eventos:", err?.message || err);
+    console.error(`No se pudo vaciar la caché (${tags.join(", ")}):`, err?.message || err);
   }
 }
+
+/** Vacía del CDN las páginas de eventos (y el listado). */
+export const purgeEventPages = (): Promise<void> => purgeCacheTags([EVENT_PAGES_TAG]);
+
+/** Páginas de /panoramas (src/lib/panoramas.ts): las vacían las herramientas de eventos externos y de moderación. */
+export const PANORAMA_PAGES_TAG = "panorama-pages";

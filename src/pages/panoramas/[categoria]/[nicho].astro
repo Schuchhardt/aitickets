@@ -1,0 +1,72 @@
+---
+// /panoramas/<categoría>/<nicho> — panoramas de un nicho (fiestas techno, conciertos de jazz, stand-up de impro…).
+// Solo existen los nichos que tienen algún panorama vigente o reciente: cualquier otro da 404.
+import AppHeader from "../../../components/AppHeader.vue";
+import AppFooter from "../../../components/AppFooter.vue";
+import PanoramaListPage from "../../../components/panoramas/PanoramaListPage.astro";
+import Layout from "../../../layouts/Layout.astro";
+import { getSupabaseAdmin } from "../../../lib/auth-helpers";
+import { cachePublicPage } from "../../../lib/cdnCache";
+import { todayChile } from "../../../lib/market/calendar";
+import {
+    categoryFromSlug,
+    categoryPath,
+    CATEGORY_PUBLIC,
+    filterPanoramas,
+    loadPanoramaFeed,
+    nicheFromSlug,
+    nicheLabel,
+    nicheSlug,
+    PANORAMA_PAGES_TAG,
+    shortCityLabel,
+} from "../../../lib/panoramas";
+import { cityInfo } from "../../../lib/market/taxonomy";
+import { notFound } from "../../../lib/notFound";
+import "../../../styles/global.css";
+
+export const prerender = false;
+
+const category = categoryFromSlug(Astro.params.categoria);
+const niche = nicheFromSlug(Astro.params.nicho);
+if (!category || !niche) return notFound();
+const today = todayChile();
+const feed = await loadPanoramaFeed(getSupabaseAdmin(), today);
+const upcoming = feed ? filterPanoramas(feed.upcoming, { category, niche }) : [];
+const recent = feed ? filterPanoramas(feed.recent, { category, niche }) : [];
+if (!upcoming.length && !recent.length) return notFound();
+// Una sola URL por nicho: /fiestas/hip_hop o /fiestas/Hip-Hop → /fiestas/hip-hop
+if (Astro.params.nicho !== nicheSlug(niche)) return Astro.redirect(`${categoryPath(category, niche)}${Astro.url.search}`, 301);
+const city = Astro.url.searchParams.get("ciudad");
+const cityKey = city ? cityInfo(city).key : null;
+cachePublicPage(Astro.response.headers, { sMaxAge: 300, staleWhileRevalidate: 86400, tag: PANORAMA_PAGES_TAG });
+Astro.response.headers.set("Netlify-Vary", "query=ciudad");
+const catName = CATEGORY_PUBLIC[category].name;
+const label = nicheLabel(niche)!;
+const where = cityKey ? shortCityLabel(cityKey) : "Chile";
+const title = `${catName}: ${label} en ${where}`;
+---
+
+<Layout
+    title={`${title} | Panoramas AI Tickets`}
+    description={`${catName} de ${label.toLowerCase()} en ${where}: próximas fechas, lugares, precios y el link para conseguir tu entrada.`}
+    canonical={categoryPath(category, niche)}
+    noindex={Boolean(cityKey) || upcoming.length === 0}
+>
+    <AppHeader client:idle />
+    <main class="font-['Prompt']">
+        <PanoramaListPage
+            feed={feed}
+            today={today}
+            category={category}
+            niche={niche}
+            city={cityKey}
+            title={title}
+            intro={`Los próximos panoramas de ${label.toLowerCase()}, con fecha, lugar, precio y el link para conseguir tu entrada.`}
+            breadcrumbs={[
+                { name: "Panoramas", href: "/panoramas" },
+                { name: catName, href: categoryPath(category) },
+            ]}
+        />
+    </main>
+    <AppFooter client:idle />
+</Layout>

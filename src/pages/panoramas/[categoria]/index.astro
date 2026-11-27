@@ -1,0 +1,49 @@
+---
+// /panoramas/<categoría> — panoramas de una categoría (fiestas, conciertos, stand-up…), con sus nichos como filtro.
+import AppHeader from "../../../components/AppHeader.vue";
+import AppFooter from "../../../components/AppFooter.vue";
+import PanoramaListPage from "../../../components/panoramas/PanoramaListPage.astro";
+import Layout from "../../../layouts/Layout.astro";
+import { getSupabaseAdmin } from "../../../lib/auth-helpers";
+import { cachePublicPage } from "../../../lib/cdnCache";
+import { todayChile } from "../../../lib/market/calendar";
+import { categoryFromSlug, CATEGORY_PUBLIC, filterPanoramas, loadPanoramaFeed, PANORAMA_PAGES_TAG, shortCityLabel } from "../../../lib/panoramas";
+import { cityInfo } from "../../../lib/market/taxonomy";
+import { notFound } from "../../../lib/notFound";
+import "../../../styles/global.css";
+
+export const prerender = false;
+
+const category = categoryFromSlug(Astro.params.categoria);
+if (!category) return notFound();
+const today = todayChile();
+const city = Astro.url.searchParams.get("ciudad");
+const cityKey = city ? cityInfo(city).key : null;
+const feed = await loadPanoramaFeed(getSupabaseAdmin(), today);
+const count = feed ? filterPanoramas(feed.upcoming, { category }).length : 0;
+cachePublicPage(Astro.response.headers, { sMaxAge: 300, staleWhileRevalidate: 86400, tag: PANORAMA_PAGES_TAG });
+Astro.response.headers.set("Netlify-Vary", "query=ciudad");
+const name = CATEGORY_PUBLIC[category].name;
+const where = cityKey ? shortCityLabel(cityKey) : "Chile";
+---
+
+<Layout
+    title={`${name} en ${where}: próximos panoramas | AI Tickets`}
+    description={`${name} en ${where}: fechas, lugares, precios y el link para conseguir tu entrada. Filtra por estilo y revisa comentarios de asistentes verificados.`}
+    canonical={`/panoramas/${CATEGORY_PUBLIC[category].slug}`}
+    noindex={Boolean(cityKey) || count === 0}
+>
+    <AppHeader client:idle />
+    <main class="font-['Prompt']">
+        <PanoramaListPage
+            feed={feed}
+            today={today}
+            category={category}
+            city={cityKey}
+            title={`${name} en ${where}`}
+            intro={`Los próximos panoramas de ${name.toLowerCase()}, con fecha, lugar, precio y el link para conseguir tu entrada.`}
+            breadcrumbs={[{ name: "Panoramas", href: "/panoramas" }]}
+        />
+    </main>
+    <AppFooter client:idle />
+</Layout>

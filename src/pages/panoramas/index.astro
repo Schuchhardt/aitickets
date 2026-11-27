@@ -1,0 +1,43 @@
+---
+// /panoramas — cartelera pública de eventos externos (registrados desde el MCP de admin) con su link a la ticketera.
+// Filtros: categoría y nicho (rutas propias, indexables) y ciudad (?ciudad=, no indexable). Spec: docs/specs/panoramas.md.
+import AppHeader from "../../components/AppHeader.vue";
+import AppFooter from "../../components/AppFooter.vue";
+import PanoramaListPage from "../../components/panoramas/PanoramaListPage.astro";
+import Layout from "../../layouts/Layout.astro";
+import { getSupabaseAdmin } from "../../lib/auth-helpers";
+import { cachePublicPage } from "../../lib/cdnCache";
+import { todayChile } from "../../lib/market/calendar";
+import { loadPanoramaFeed, PANORAMA_PAGES_TAG, shortCityLabel } from "../../lib/panoramas";
+import { cityInfo } from "../../lib/market/taxonomy";
+import "../../styles/global.css";
+
+export const prerender = false;
+
+const today = todayChile();
+const city = Astro.url.searchParams.get("ciudad");
+const cityKey = city ? cityInfo(city).key : null;
+const feed = await loadPanoramaFeed(getSupabaseAdmin(), today);
+cachePublicPage(Astro.response.headers, { sMaxAge: 300, staleWhileRevalidate: 86400, tag: PANORAMA_PAGES_TAG });
+Astro.response.headers.set("Netlify-Vary", "query=ciudad");
+const where = cityKey ? shortCityLabel(cityKey) : "Chile";
+---
+
+<Layout
+    title={`Panoramas en ${where}: fiestas, conciertos, stand-up y más | AI Tickets`}
+    description={`Qué hacer en ${where}: fiestas, conciertos, stand-up, teatro, ferias y más, con fecha, lugar, precio y el link para conseguir tu entrada. Comentarios de asistentes verificados.`}
+    canonical="/panoramas"
+    noindex={Boolean(cityKey)}
+>
+    <AppHeader client:idle />
+    <main class="font-['Prompt']">
+        <PanoramaListPage
+            feed={feed}
+            today={today}
+            city={cityKey}
+            title={`Panoramas en ${where}`}
+            intro="Fiestas, conciertos, stand-up, teatro y más: los eventos que vienen, con fecha, lugar, precio y el link para conseguir tu entrada."
+        />
+    </main>
+    <AppFooter client:idle />
+</Layout>

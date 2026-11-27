@@ -43,13 +43,13 @@ const listPendingOperations: AdminToolDef = {
     description:
         "Todo lo que espera a AI Tickets, ordenado por urgencia: retiros por transferir, reembolsos por devolver en Flow, órdenes en revisión manual, " +
         "órdenes 'processing' atascadas, órdenes pagadas sin correo de entradas, correos de entradas rebotados, cuentas bancarias por verificar, " +
-        "mensajes programados fallidos, dominios propios pendientes o fallidos y outreach (borradores por aprobar o pausado). " +
+        "mensajes programados fallidos, dominios propios pendientes o fallidos, outreach (borradores por aprobar o pausado) y comentarios de /panoramas por validar. " +
         "Cada sección dice con qué herramienta se resuelve. Máximo 20 ítems por sección (count trae el total encontrado).",
     readOnly: true,
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
     async handler(_args, actx) {
         const { supabase } = actx;
-        const [payouts, refunds, review, processing, noEmail, bounces, scheduled, sites, drafts, paused] = await Promise.all([
+        const [payouts, refunds, review, processing, noEmail, bounces, scheduled, sites, drafts, paused, panoramaReviews] = await Promise.all([
             rows(() => supabase.from("aitickets_payouts").select("id, organization_id, amount, status, created_at, bank_name, bank_account_last4").in("status", ["requested", "processing"]).order("created_at", { ascending: true }).limit(200)),
             rows(() => supabase.from("aitickets_refunds").select("id, organization_id, event_id, order_id, kind, total_amount, created_at").in("status", ["requested", "processing"]).order("created_at", { ascending: true }).limit(200)),
             rows(() => supabase.from("event_orders").select("id, event_id, created_at, total_payment, payment_external_id").eq("status", "review").order("created_at", { ascending: true }).limit(200)),
@@ -61,6 +61,7 @@ const listPendingOperations: AdminToolDef = {
             rows(() => supabase.from("aitickets_sites").select("organization_id, slug, custom_domain, domain_status, domain_error, domain_requested_at, domain_checked_at").in("domain_status", ["pending_provider", "failed"]).limit(200)),
             rows(() => supabase.from("aitickets_outreach_messages").select("id, lead_id, subject, ai_intent, ai_confidence, created_at").eq("direction", "out").eq("status", "draft").order("created_at", { ascending: true }).limit(200)),
             rows(() => supabase.from("aitickets_outreach_state").select("key, value, updated_at").eq("key", "paused")),
+            rows(() => supabase.from("aitickets_panorama_reviews").select("id, event_id, rating, proof_kind, created_at").eq("status", "pending").order("created_at", { ascending: true }).limit(200)),
         ]);
 
         // Las compras de los eventos demo no envían correo de entradas
@@ -142,6 +143,14 @@ const listPendingOperations: AdminToolDef = {
                 count: recentFailedDomains.length,
                 resolve_with: "pending_provider: configurar el proveedor (DOMAIN_PROVIDER / NETLIFY_AUTH_TOKEN); failed: revisar el DNS con el productor",
                 items: cap(recentFailedDomains).map((s: any) => ({ organization: org(s.organization_id), domain: s.custom_domain, status: s.domain_status, error: s.domain_error ?? null, requested_at: s.domain_requested_at ?? null })),
+            },
+            {
+                key: "panorama_reviews",
+                title: "Comentarios de /panoramas por validar (con comprobante de asistencia)",
+                urgency: 11,
+                count: panoramaReviews.data.length,
+                resolve_with: "list_panorama_reviews → get_panorama_review (comprobante) → moderate_panorama_reviews (approve / reject)",
+                items: cap(panoramaReviews.data).map((r: any) => ({ review_id: r.id, event_id: Number(r.event_id), rating: Number(r.rating), proof: r.proof_kind ?? null, days_waiting: daysSince(r.created_at) })),
             },
             {
                 key: "outreach",

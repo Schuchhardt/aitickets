@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | Estado | **Implementado v1** (2026-11-20): `src/lib/market/`, `src/lib/admin-api/tools/market.ts`, migración `202611200100_external_events.sql` (productoras, lugares, eventos, funciones y calendario) |
-| Dónde se ve | **Solo en el MCP de administración.** No hay página, panel ni API pública que lo muestre |
+| Dónde se ve | MCP de administración. Desde 2026-11-27 los eventos externos (solo nombre, descripción, afiche, funciones, precios y link) se publican en **/panoramas** ([`panoramas.md`](panoramas.md)); productoras enlazadas, notas, fuentes y el mapa de mercado siguen siendo solo del MCP |
 | Relacionado | `docs/specs/mcp-admin.md`, `docs/api/admin.md`, leads (`src/lib/admin-api/tools/leads.ts`) |
 
 ## 0. Para qué
@@ -153,7 +153,8 @@ eventos del tipo hay en la ciudad, cuántos registrados esa semana y cuánto fal
 ## 4. Próximos pasos
 
 1. **Carga sistemática**: un importador programado desde Passline/Puntoticket/Ticketplus (ya existe
-   `scripts/passline-watch-local.mjs` para leads) que llame a la misma normalización y deduplicación.
+   `scripts/passline-watch-local.mjs` para leads) que llame a la misma normalización y deduplicación. La tarea
+   programada propuesta (con `description` e `image_url` para /panoramas) está en [`panoramas.md`](panoramas.md) §6.
 2. **Observaciones en el tiempo**: guardar disponibilidad por tanda cada N días → velocidad de venta y fecha de
    agotado, el mejor indicador de demanda.
 3. **Calibrar** los priors con los datos acumulados (backtesting: ¿las fechas con nota alta se agotaron más?) y

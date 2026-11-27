@@ -3,6 +3,8 @@ import { getSupabaseAdmin } from "../lib/auth-helpers";
 import { getCollection } from "astro:content";
 import { indexableComparisonSlugs } from "../data/comparisons";
 import { LANDINGS } from "../data/landings";
+import { loadPanoramaFeed } from "../lib/panoramas";
+import { todayChile } from "../lib/market/calendar";
 
 export const prerender = false;
 
@@ -11,6 +13,7 @@ const SITE_URL = (import.meta.env.SITE_URL || "https://aitickets.cl").replace(/\
 const STATIC_PAGES: { path: string; changefreq: string; priority: string }[] = [
   { path: "/", changefreq: "weekly", priority: "1.0" },
   { path: "/eventos", changefreq: "daily", priority: "0.9" },
+  { path: "/panoramas", changefreq: "daily", priority: "0.8" },
   { path: "/organizadores", changefreq: "weekly", priority: "0.9" },
   { path: "/organizadores/registro", changefreq: "monthly", priority: "0.7" },
   { path: "/precios", changefreq: "monthly", priority: "0.8" },
@@ -86,6 +89,25 @@ async function producerSiteEntries(orgsWithUpcoming: Set<number>): Promise<strin
   }
 }
 
+/** Panoramas (src/pages/panoramas): eventos externos vigentes, sus categorías y nichos. */
+async function panoramaEntries(): Promise<string[]> {
+  try {
+    const feed = await loadPanoramaFeed(getSupabaseAdmin(), todayChile());
+    if (!feed) return [];
+    const hubs = new Set<string>();
+    const out: string[] = [];
+    for (const p of feed.upcoming) {
+      hubs.add(p.category_path);
+      if (p.niche_path) hubs.add(p.niche_path);
+      out.push(urlEntry(`${SITE_URL}${p.path}`, { lastmod: p.updated_at ? new Date(p.updated_at).toISOString() : null, changefreq: "daily", priority: "0.6" }));
+    }
+    return [...[...hubs].map((h) => urlEntry(`${SITE_URL}${h}`, { changefreq: "daily", priority: "0.6" })), ...out];
+  } catch (err) {
+    console.error("Error agregando panoramas al sitemap:", err);
+    return [];
+  }
+}
+
 /** Artículos publicados del blog y los hubs de tema que tienen artículos (src/pages/blog). */
 async function blogEntries(): Promise<string[]> {
   try {
@@ -130,6 +152,7 @@ export const GET: APIRoute = async () => {
     console.error("Error agregando guías al sitemap:", err);
   }
   entries.push(...(await blogEntries()));
+  entries.push(...(await panoramaEntries()));
 
   try {
     const supabase = getSupabaseAdmin();

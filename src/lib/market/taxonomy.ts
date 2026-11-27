@@ -88,6 +88,16 @@ export const normalizeText = (v: unknown) =>
         .replace(/\s+/g, " ")
         .trim();
 
+/** "Fiesta Techno: Subterráneo" + 42 → "fiesta-techno-subterraneo-42" (URL de /panoramas). El id al final la hace única y estable. */
+export function panoramaSlug(name: unknown, id: number | string): string {
+    const base = normalizeText(name)
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 80)
+        .replace(/-+$/g, "");
+    return base ? `${base}-${id}` : String(id);
+}
+
 /** "Viña del Mar" → "vina_del_mar". */
 export const slugKey = (v: unknown) =>
     normalizeText(v)

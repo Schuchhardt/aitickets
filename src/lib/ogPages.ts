@@ -71,6 +71,7 @@ const CARDS: Record<string, OgCard> = {
   "/organizadores": card("AI Tickets para productores", "Tu próxima función merece vender más.", [p("aitk-productor")]),
   "/precios": card("Precios sin letra chica", "0% de comisión para el productor", [p("aitk-publico")], "Sin mensualidad"),
   "/eventos": card("Próximos eventos en Chile", "Encuentra tu próxima función y compra tu entrada", MOSAIC, "Entradas online con QR"),
+  "/panoramas": card("Panoramas en Chile", "Fiestas, conciertos, stand-up y más: qué hacer esta semana", MOSAIC, "Comentarios verificados"),
   "/ticketeras-en-chile": card("Comparación con fuentes", "Ticketeras en Chile: cuánto cobra cada una", [p("aitk-publico")]),
   "/web-gratis": card("Para productoras", "Tu web de eventos gratis", [p("aitk-musica")]),
   "/guias": card("Guías para productores", "Lo práctico de vender entradas y llenar tus funciones", [p("aitk-backstage")]),

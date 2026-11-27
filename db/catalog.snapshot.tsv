@@ -3,6 +3,7 @@
 bucket:Events	public=true limit=- mimes=-
 bucket:aitickets-event-documents	public=false limit=15728640 mimes=application/pdf,image/jpeg,image/png,image/webp
 bucket:aitickets-event-videos	public=true limit=52428800 mimes=video/mp4,video/webm,video/quicktime
+bucket:aitickets-panorama-proofs	public=false limit=5242880 mimes=image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf,message/rfc822
 bucket:aitickets-payout-receipts	public=false limit=5242880 mimes=application/pdf,image/jpeg,image/png
 column:ad_account_connections.access_token	text notnull=false default=-
 column:ad_account_connections.account_name	text notnull=false default=-
@@ -496,8 +497,10 @@ column:aitickets_external_event_dates.venue_id	bigint notnull=false default=-
 column:aitickets_external_events.announced_at	timestamp with time zone notnull=false default=-
 column:aitickets_external_events.category	text notnull=true default=-
 column:aitickets_external_events.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_external_events.description	text notnull=false default=-
 column:aitickets_external_events.external_id	text notnull=false default=-
 column:aitickets_external_events.id	bigint notnull=true default=- identity=d
+column:aitickets_external_events.image_url	text notnull=false default=-
 column:aitickets_external_events.is_free	boolean notnull=false default=-
 column:aitickets_external_events.name	text notnull=true default=-
 column:aitickets_external_events.name_key	text notnull=true default=-
@@ -506,6 +509,7 @@ column:aitickets_external_events.notes	text notnull=false default=-
 column:aitickets_external_events.price_max	integer notnull=false default=-
 column:aitickets_external_events.price_min	integer notnull=false default=-
 column:aitickets_external_events.producer_id	bigint notnull=false default=-
+column:aitickets_external_events.public_status	text notnull=true default='auto'::text
 column:aitickets_external_events.source	text notnull=true default='manual'::text
 column:aitickets_external_events.source_url	text notnull=false default=-
 column:aitickets_external_events.tags	text[] notnull=true default='{}'::text[]
@@ -721,6 +725,26 @@ column:aitickets_outreach_messages.thread_id	text notnull=false default=-
 column:aitickets_outreach_state.key	text notnull=true default=-
 column:aitickets_outreach_state.updated_at	timestamp with time zone notnull=true default=now()
 column:aitickets_outreach_state.value	jsonb notnull=true default='{}'::jsonb
+column:aitickets_panorama_reviews.comment	text notnull=true default=-
+column:aitickets_panorama_reviews.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_panorama_reviews.display_name	text notnull=false default=-
+column:aitickets_panorama_reviews.email	text notnull=true default=-
+column:aitickets_panorama_reviews.event_date_id	bigint notnull=false default=-
+column:aitickets_panorama_reviews.event_id	bigint notnull=true default=-
+column:aitickets_panorama_reviews.id	uuid notnull=true default=gen_random_uuid()
+column:aitickets_panorama_reviews.ip_hash	text notnull=false default=-
+column:aitickets_panorama_reviews.moderated_at	timestamp with time zone notnull=false default=-
+column:aitickets_panorama_reviews.moderation_note	text notnull=false default=-
+column:aitickets_panorama_reviews.proof_bytes	integer notnull=false default=-
+column:aitickets_panorama_reviews.proof_content_type	text notnull=false default=-
+column:aitickets_panorama_reviews.proof_deleted_at	timestamp with time zone notnull=false default=-
+column:aitickets_panorama_reviews.proof_kind	text notnull=false default=-
+column:aitickets_panorama_reviews.proof_path	text notnull=false default=-
+column:aitickets_panorama_reviews.proof_sha256	text notnull=false default=-
+column:aitickets_panorama_reviews.public_comment	text notnull=false default=-
+column:aitickets_panorama_reviews.rating	smallint notnull=true default=-
+column:aitickets_panorama_reviews.status	text notnull=true default='pending'::text
+column:aitickets_panorama_reviews.updated_at	timestamp with time zone notnull=true default=now()
 column:aitickets_payment_events.id	text notnull=true default=-
 column:aitickets_payment_events.order_id	uuid notnull=false default=-
 column:aitickets_payment_events.payload	jsonb notnull=false default=-
@@ -1566,9 +1590,12 @@ constraint:aitickets_external_event_dates.aitickets_external_event_dates_slot_ke
 constraint:aitickets_external_event_dates.aitickets_external_event_dates_sold_pct_check	CHECK (((sold_pct IS NULL) OR ((sold_pct >= (0)::numeric) AND (sold_pct <= (100)::numeric))))
 constraint:aitickets_external_event_dates.aitickets_external_event_dates_status_check	CHECK ((status = ANY (ARRAY['scheduled'::text, 'postponed'::text, 'cancelled'::text, 'completed'::text])))
 constraint:aitickets_external_event_dates.aitickets_external_event_dates_venue_id_fkey	FOREIGN KEY (venue_id) REFERENCES aitickets_external_venues(id) ON DELETE SET NULL
+constraint:aitickets_external_events.aitickets_external_events_description_check	CHECK (((description IS NULL) OR (char_length(description) <= 2000)))
+constraint:aitickets_external_events.aitickets_external_events_image_url_check	CHECK (((image_url IS NULL) OR (image_url ~ '^https://'::text)))
 constraint:aitickets_external_events.aitickets_external_events_pkey	PRIMARY KEY (id)
 constraint:aitickets_external_events.aitickets_external_events_prices_check	CHECK ((((price_min IS NULL) OR (price_min >= 0)) AND ((price_max IS NULL) OR (price_max >= 0)) AND ((price_min IS NULL) OR (price_max IS NULL) OR (price_min <= price_max))))
 constraint:aitickets_external_events.aitickets_external_events_producer_id_fkey	FOREIGN KEY (producer_id) REFERENCES aitickets_external_producers(id) ON DELETE SET NULL
+constraint:aitickets_external_events.aitickets_external_events_public_status_check	CHECK ((public_status = ANY (ARRAY['auto'::text, 'featured'::text, 'hidden'::text])))
 constraint:aitickets_external_producers.aitickets_external_producers_lead_id_fkey	FOREIGN KEY (lead_id) REFERENCES aitickets_leads(id) ON DELETE SET NULL
 constraint:aitickets_external_producers.aitickets_external_producers_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE SET NULL
 constraint:aitickets_external_producers.aitickets_external_producers_pkey	PRIMARY KEY (id)
@@ -1642,6 +1669,16 @@ constraint:aitickets_outreach_messages.aitickets_outreach_messages_lead_id_fkey	
 constraint:aitickets_outreach_messages.aitickets_outreach_messages_pkey	PRIMARY KEY (id)
 constraint:aitickets_outreach_messages.aitickets_outreach_messages_status_check	CHECK ((status = ANY (ARRAY['draft'::text, 'sending'::text, 'scheduled'::text, 'sent'::text, 'failed'::text, 'received'::text, 'approved'::text, 'rejected'::text])))
 constraint:aitickets_outreach_state.aitickets_outreach_state_pkey	PRIMARY KEY (key)
+constraint:aitickets_panorama_reviews.aitickets_panorama_reviews_comment_check	CHECK (((char_length(comment) >= 1) AND (char_length(comment) <= 1500)))
+constraint:aitickets_panorama_reviews.aitickets_panorama_reviews_display_name_check	CHECK (((display_name IS NULL) OR (char_length(display_name) <= 60)))
+constraint:aitickets_panorama_reviews.aitickets_panorama_reviews_event_date_id_fkey	FOREIGN KEY (event_date_id) REFERENCES aitickets_external_event_dates(id) ON DELETE SET NULL
+constraint:aitickets_panorama_reviews.aitickets_panorama_reviews_event_id_fkey	FOREIGN KEY (event_id) REFERENCES aitickets_external_events(id) ON DELETE CASCADE
+constraint:aitickets_panorama_reviews.aitickets_panorama_reviews_pkey	PRIMARY KEY (id)
+constraint:aitickets_panorama_reviews.aitickets_panorama_reviews_proof_bytes_check	CHECK (((proof_bytes IS NULL) OR (proof_bytes > 0)))
+constraint:aitickets_panorama_reviews.aitickets_panorama_reviews_proof_kind_check	CHECK (((proof_kind IS NULL) OR (proof_kind = ANY (ARRAY['image'::text, 'pdf'::text, 'email'::text]))))
+constraint:aitickets_panorama_reviews.aitickets_panorama_reviews_public_comment_check	CHECK (((public_comment IS NULL) OR (char_length(public_comment) <= 1500)))
+constraint:aitickets_panorama_reviews.aitickets_panorama_reviews_rating_check	CHECK (((rating >= 1) AND (rating <= 5)))
+constraint:aitickets_panorama_reviews.aitickets_panorama_reviews_status_check	CHECK ((status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text, 'hidden'::text])))
 constraint:aitickets_payment_events.aitickets_payment_events_pkey	PRIMARY KEY (id)
 constraint:aitickets_payout_receipts.aitickets_payout_receipts_payout_id_fkey	FOREIGN KEY (payout_id) REFERENCES aitickets_payouts(id)
 constraint:aitickets_payout_receipts.aitickets_payout_receipts_pkey	PRIMARY KEY (id)
@@ -1955,6 +1992,7 @@ grant:aitickets_org_email_optouts	-
 grant:aitickets_outreach_events	-
 grant:aitickets_outreach_messages	-
 grant:aitickets_outreach_state	-
+grant:aitickets_panorama_reviews	-
 grant:aitickets_payment_events	-
 grant:aitickets_payout_receipts	-
 grant:aitickets_payouts	-
@@ -2084,6 +2122,10 @@ index:aitickets_outreach_events.aitickets_outreach_events_type_idx	CREATE INDEX 
 index:aitickets_outreach_messages.aitickets_outreach_messages_lead_idx	CREATE INDEX aitickets_outreach_messages_lead_idx ON aitickets_outreach_messages USING btree (lead_id, created_at)
 index:aitickets_outreach_messages.aitickets_outreach_messages_provider_idx	CREATE INDEX aitickets_outreach_messages_provider_idx ON aitickets_outreach_messages USING btree (provider_message_id) WHERE (provider_message_id IS NOT NULL)
 index:aitickets_outreach_messages.aitickets_outreach_messages_status_idx	CREATE INDEX aitickets_outreach_messages_status_idx ON aitickets_outreach_messages USING btree (direction, status, sent_at)
+index:aitickets_panorama_reviews.aitickets_panorama_reviews_event_email_key	CREATE UNIQUE INDEX aitickets_panorama_reviews_event_email_key ON aitickets_panorama_reviews USING btree (event_id, lower(email))
+index:aitickets_panorama_reviews.aitickets_panorama_reviews_event_status_idx	CREATE INDEX aitickets_panorama_reviews_event_status_idx ON aitickets_panorama_reviews USING btree (event_id, status)
+index:aitickets_panorama_reviews.aitickets_panorama_reviews_proof_sha256_idx	CREATE INDEX aitickets_panorama_reviews_proof_sha256_idx ON aitickets_panorama_reviews USING btree (proof_sha256) WHERE (proof_sha256 IS NOT NULL)
+index:aitickets_panorama_reviews.aitickets_panorama_reviews_status_created_idx	CREATE INDEX aitickets_panorama_reviews_status_created_idx ON aitickets_panorama_reviews USING btree (status, created_at DESC)
 index:aitickets_payment_events.idx_aitickets_payment_events_order	CREATE INDEX idx_aitickets_payment_events_order ON aitickets_payment_events USING btree (order_id)
 index:aitickets_payout_receipts.idx_payout_receipts_payout	CREATE UNIQUE INDEX idx_payout_receipts_payout ON aitickets_payout_receipts USING btree (payout_id)
 index:aitickets_payouts.aitickets_payouts_org_idx	CREATE INDEX aitickets_payouts_org_idx ON aitickets_payouts USING btree (organization_id, created_at DESC)
@@ -2208,6 +2250,7 @@ table:aitickets_org_email_optouts	rls=true force=false
 table:aitickets_outreach_events	rls=true force=false
 table:aitickets_outreach_messages	rls=true force=false
 table:aitickets_outreach_state	rls=true force=false
+table:aitickets_panorama_reviews	rls=true force=false
 table:aitickets_payment_events	rls=true force=false
 table:aitickets_payout_receipts	rls=true force=false
 table:aitickets_payouts	rls=true force=false

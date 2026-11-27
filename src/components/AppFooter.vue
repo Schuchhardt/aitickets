@@ -70,6 +70,7 @@ const columns = [
     title: "Producto",
     links: [
       { href: "/eventos", label: "Eventos" },
+      { href: "/panoramas", label: "Panoramas" },
       { href: "/organizadores", label: "Para organizadores" },
       { href: "/organizadores/registro", label: "Crear cuenta de productor" },
       { href: "/precios", label: "Precios" },
