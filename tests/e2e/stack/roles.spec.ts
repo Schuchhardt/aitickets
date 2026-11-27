@@ -33,6 +33,7 @@ const PAGES: Record<string, Role[]> = {
   "/dashboard/promote/ads/create": OAR,
   "/dashboard/settings": [...OAR, "finance"],
   "/dashboard/sitio": OAR,
+  "/dashboard/sitio/editor": OAR,
   "/dashboard/team": OAR,
   "/dashboard/tickets": EMR,
   "/validador": CHECKIN,

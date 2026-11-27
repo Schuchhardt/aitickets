@@ -65,6 +65,11 @@ const cssVars = [
     )}
     <slot />
     <ToastContainer client:only="vue" />
+    <script>
+      // Pestañas, carruseles, ventanas, menú del celular y videos de los sitios con secciones (src/lib/siteInteractions.js)
+      import { initSiteInteractions } from "../lib/siteInteractions.js";
+      initSiteInteractions();
+    </script>
   </body>
 </html>
 

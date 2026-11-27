@@ -139,6 +139,7 @@ export type SiteDraft = {
     tagline: string;
     about: string;
     sections: unknown[];
+    layout?: { nav?: string; sticky?: boolean };
 };
 
 export type SiteEditResult = {
@@ -152,6 +153,10 @@ export type SiteEditResult = {
     sections: unknown[];
     /** Ids de todas las secciones en su orden final (vacío al editar una sola sección). */
     order: string[];
+    /** Tipo de menú y si queda fijo (solo los campos que cambian). */
+    layout?: { nav?: string; sticky?: boolean };
+    /** Plantilla completa a aplicar (src/lib/sitePresets.ts), si el productor la pidió. */
+    preset?: string;
 };
 
 // Salida estructurada: todos los campos obligatorios (la API limita los opcionales). "" o null = vacío / sin cambio.
@@ -161,12 +166,12 @@ const requiredStrings = (keys: string[]) => ({
     required: keys,
     properties: Object.fromEntries(keys.map((k) => [k, { type: "string" }])),
 });
-const SITE_ITEM_SCHEMA = requiredStrings(["title", "text", "question", "answer", "quote", "author", "image_url", "caption"]);
+const SITE_ITEM_SCHEMA = requiredStrings(["title", "text", "question", "answer", "quote", "author", "image_url", "caption", "name", "role", "link_url"]);
 
 /**
  * Edición del sitio web del productor con IA (src/components/dashboard/site/SiteAiPanel.vue): recibe el borrador actual
- * y una instrucción y devuelve los cambios. Quien llama sanea todo con sanitizeSections / sanitizeTheme y descarta las
- * imágenes que no estaban en el borrador.
+ * y una instrucción y devuelve los cambios. Quien llama sanea todo con sanitizeSections / sanitizeTheme, descarta las
+ * imágenes que no estaban en el borrador y conserva los videos (la IA no los ve ni los inventa).
  */
 export async function generateSiteEdit(input: {
     instruction: string;
@@ -176,50 +181,84 @@ export async function generateSiteEdit(input: {
     templates: { key: string; name: string; description: string }[];
     fonts: string[];
     sectionTypes: { type: string; name: string; description: string }[];
+    /** Variantes de diseño por tipo de sección. */
+    layouts?: Record<string, string[]>;
+    /** Plantillas completas (copy + diseño + tema) por tipo de página. */
+    presets?: { key: string; template: string; name: string; description: string }[];
+    navStyles?: { value: string; label: string }[];
+    /** Conversación anterior con el asistente (para seguir con "más corto", "deshaz eso del menú"...). */
+    history?: { instruction: string; summary: string }[];
+    /** Fotos y videos que el productor adjuntó en el chat (ya subidos y verificados). */
+    attachments?: { type: "image" | "video"; url: string; description?: string }[];
     /** Solo editar esta sección. */
     sectionId?: string | null;
 }): Promise<SiteEditResult> {
     const { draft, sectionId } = input;
+    const presets = input.presets || [];
+    const navStyles = input.navStyles || [];
+    const layoutValues = [...new Set(Object.values(input.layouts || {}).flat())];
     // Para que la respuesta sea corta (y rápida), la IA devuelve solo las secciones nuevas o cambiadas y el orden final
     const scope = sectionId
-        ? `Edita SOLO la sección con id "${sectionId}": devuelve en "sections" un arreglo con esa única sección (mismo id y tipo), "order" vacío y deja template, los campos de theme, title, tagline y about en "" o null.`
-        : 'Devuelve en "sections" SOLO las secciones nuevas o que cambias (completas, con todos sus campos; conserva el id de las que ya existen y a las nuevas ponles un id corto en minúsculas, p. ej. "faq-1"), y en "order" los ids de TODAS las secciones como deben quedar, en orden (una sección que no esté en order se elimina). Para template, los campos de theme, title, tagline y about: "" o null si no los cambias.';
+        ? `Edita SOLO la sección con id "${sectionId}": devuelve en "sections" un arreglo con esa única sección (mismo id y tipo), "order" vacío, preset "" y deja template, los campos de theme y layout, title, tagline y about en "" o null.`
+        : 'Devuelve en "sections" SOLO las secciones nuevas o que cambias (completas, con todos sus campos; conserva el id de las que ya existen y a las nuevas ponles un id corto en minúsculas, p. ej. "faq-1"), y en "order" los ids de TODAS las secciones como deben quedar, en orden (una sección que no esté en order se elimina). Para template, preset, los campos de theme y layout, title, tagline y about: "" o null si no los cambias.';
     const text = await ask(
         "Eres diseñador y redactor web de AI Tickets, una ticketera chilena. Editas el sitio web gratis de una productora de eventos " +
             "siguiendo la instrucción del productor, en español de Chile, con textos breves, concretos y cercanos.\n\n" +
             "Cómo es el sitio:\n" +
             "- Una plantilla (template) define el estilo visual según el tipo de evento:\n" +
             input.templates.map((t) => `  * ${t.key}: ${t.name}. ${t.description}`).join("\n") +
+            (presets.length
+                ? "\n- Plantillas completas (preset): combinan textos, secciones, menú y colores para un tipo de página. Si el productor pide " +
+                  "usar o cambiar a una de ellas (\"hazlo como un festival\", \"usa la plantilla de academia de baile\"), pon su key en preset y deja " +
+                  "sections y order vacíos (se aplican las secciones de la plantilla; no se pierden logo ni \"Sobre nosotros\"):\n" +
+                  presets.map((p) => `  * ${p.key} (${p.template}): ${p.name}. ${p.description}`).join("\n")
+                : "") +
             "\n- El tema (theme) tiene colores hex: primary (botones y acentos), accent (segundo color), background (fondo) y text (texto); " +
             `y font (tipografía de titulares), una de: ${input.fonts.join(", ")}. Si cambias colores, cuida el contraste entre background y text.\n` +
+            (navStyles.length ? `- layout.nav es el tipo de menú: ${navStyles.map((n) => `${n.value} (${n.label})`).join(", ")}; layout.sticky deja el menú fijo arriba.\n` : "") +
             "- title es el nombre a mostrar, tagline una frase corta (máx. 200 caracteres) y about el texto de \"Sobre nosotros\" en texto plano " +
             "(párrafos separados por una línea en blanco; se muestra en la sección de tipo about).\n" +
             "- La página de inicio es una lista de secciones. Tipos:\n" +
             input.sectionTypes.map((s) => `  * ${s.type}: ${s.name}. ${s.description}`).join("\n") +
-            "\n- Campos de data por tipo: todas aceptan eyebrow (antetítulo corto) y title. hero: subtitle, button_label, image_url. " +
-            "events: text, layout (cards | posters | list). video: url (YouTube o Vimeo), text. cta: text, button_label, button_url " +
-            '("#eventos", "contacto" o una URL https). contact: text. highlights: items [{title, text}]. faq: items [{question, answer}]. ' +
-            "testimonials: items [{quote, author}]. gallery: items [{image_url, caption}]. about: solo eyebrow y title. " +
-            "hidden: true oculta una sección sin borrarla. Los campos que no usa un tipo van como \"\" (y items como []).\n\n" +
+            "\n- Campos de data por tipo: todas aceptan eyebrow (antetítulo corto), title y nav_label (texto corto en el menú). " +
+            "hero: subtitle, button_label, button_url, image_url, video, layout. events: text, layout. feature: text, image_url, video, align (left | right), " +
+            "button_label, button_url, button_action, modal_title, modal_text. video: url (YouTube o Vimeo), video (subido), text. cta: text, button_label, button_url, " +
+            'button_action, modal_title, modal_text. button_url: "#eventos", "contacto", "#<id de otra sección>" o una URL https. ' +
+            'button_action "modal" hace que el botón abra una ventana con modal_title y modal_text (condiciones, reservas, cotizaciones); "" lo deja como enlace. ' +
+            "contact: text. highlights: items [{title, text}]. faq: items [{question, answer}]. testimonials: items [{quote, author}], layout. " +
+            "tabs: items [{title (nombre de la pestaña), text, image_url}]. people: items [{name, role, text (bio), image_url, link_url}], layout. " +
+            "gallery: items [{image_url, caption}], layout. about: solo eyebrow, title y nav_label. " +
+            (input.layouts ? `Valores de layout por tipo: ${Object.entries(input.layouts).map(([t, v]) => `${t}: ${v.join(" | ")}`).join("; ")}. ` : "") +
+            "hidden: true oculta una sección sin borrarla; nav: true la pone en el menú. Los campos que no usa un tipo van como \"\" (y items como []).\n\n" +
             "Reglas:\n" +
             "- La sección events muestra sola los eventos publicados: nunca escribas eventos, fechas ni precios a mano.\n" +
-            "- No inventes datos que no estén en la información entregada: artistas, precios, fechas, direcciones, políticas (edad, devoluciones, " +
-            "estacionamiento), premios, cifras ni opiniones o testimonios de personas reales. Si te piden opiniones y no hay, no crees la sección " +
-            "y explícalo en summary. En preguntas frecuentes, responde solo con lo que se sabe (por ejemplo, que la entrada llega por correo con un QR) " +
-            "o sugiere escribir por el formulario de contacto.\n" +
-            "- Usa solo URLs de imágenes que ya estén en el borrador; no inventes URLs.\n" +
+            "- No inventes datos que no estén en la información entregada: artistas, nombres de personas, precios, fechas, direcciones, horarios, políticas (edad, devoluciones, " +
+            "estacionamiento), premios, cifras ni opiniones o testimonios de personas reales. Si te piden opiniones o personas y no hay, no inventes: deja los ítems vacíos " +
+            "(\"\") para que el productor los complete y explícalo en summary. En preguntas frecuentes, responde solo con lo que se sabe (por ejemplo, que la entrada llega por correo con un QR) " +
+            "o deja la respuesta vacía para que el productor la escriba.\n" +
+            "- Imágenes: usa solo URLs que ya estén en el borrador, en las imágenes de los eventos o en los adjuntos; no inventes URLs. " +
+            "theme.logo_url y theme.hero_image_url (imagen de portada general): \"\" deja la actual, \"none\" la quita o una URL permitida.\n" +
+            "- Videos subidos: data.video de hero, feature y video. \"\" deja el que ya tiene la sección, \"none\" lo quita, o la URL de un video " +
+            "del borrador o de los adjuntos (así se mueve un video de una sección a otra). Nunca inventes URLs de video. Máximo 3 videos y 60 fotos en el sitio.\n" +
+            "- Si el productor adjuntó fotos o videos, úsalos donde lo pida (portada, galería, personas, pestañas, imagen y texto); si no dice dónde, elige el lugar más lógico y cuéntalo en summary.\n" +
             "- Texto plano en todos los campos: sin HTML, sin Markdown y con pocos emojis o ninguno.\n" +
             "- Respeta lo que no te pidieron cambiar.\n" +
             "- summary: una o dos frases para el productor sobre lo que cambiaste, en primera persona (p. ej. \"Agregué preguntas frecuentes y...\"), sin tecnicismos.",
         `Información de la productora y sus eventos:\n${input.context}\n\n` +
-            `Borrador actual del sitio (JSON):\n${JSON.stringify(draft).slice(0, 30000)}\n\n` +
+            (input.history?.length
+                ? `Conversación anterior (más antigua primero):\n${input.history.map((h) => `- Productor: ${h.instruction}\n  Tú: ${h.summary}`).join("\n").slice(0, 4000)}\n\n`
+                : "") +
+            (input.attachments?.length
+                ? `Adjuntos de este mensaje:\n${input.attachments.map((a, i) => `- ${a.type === "video" ? "video" : "imagen"} ${i + 1}: ${a.url}${a.description ? ` (${a.description})` : ""}`).join("\n")}\n\n`
+                : "") +
+            `Borrador actual del sitio (JSON):\n${JSON.stringify(draft).slice(0, 40000)}\n\n` +
             `Instrucción del productor: ${input.instruction.slice(0, 1500)}\n\n${scope}`,
         {
             type: "json_schema",
             schema: {
                 type: "object",
                 additionalProperties: false,
-                required: ["summary", "order", "sections", "template", "theme", "title", "tagline", "about"],
+                required: ["summary", "order", "sections", "template", "preset", "theme", "layout", "title", "tagline", "about"],
                 properties: {
                     summary: { type: "string" },
                     order: { type: "array", items: { type: "string" } },
@@ -228,18 +267,24 @@ export async function generateSiteEdit(input: {
                         items: {
                             type: "object",
                             additionalProperties: false,
-                            required: ["id", "type", "hidden", "data"],
+                            required: ["id", "type", "hidden", "nav", "data"],
                             properties: {
                                 id: { type: "string" },
                                 type: { type: "string", enum: input.sectionTypes.map((s) => s.type) },
                                 hidden: { type: "boolean" },
+                                nav: { type: "boolean" },
                                 data: {
                                     type: "object",
                                     additionalProperties: false,
-                                    required: ["eyebrow", "title", "subtitle", "text", "button_label", "button_url", "image_url", "url", "layout", "items"],
+                                    required: [
+                                        "eyebrow", "title", "nav_label", "subtitle", "text", "button_label", "button_url", "button_action",
+                                        "modal_title", "modal_text", "image_url", "url", "video", "layout", "align", "items",
+                                    ],
                                     properties: {
-                                        ...requiredStrings(["eyebrow", "title", "subtitle", "text", "button_label", "button_url", "image_url", "url"]).properties,
-                                        layout: { type: "string", enum: ["", "cards", "posters", "list"] },
+                                        ...requiredStrings(["eyebrow", "title", "nav_label", "subtitle", "text", "button_label", "button_url", "modal_title", "modal_text", "image_url", "url", "video"]).properties,
+                                        button_action: { type: "string", enum: ["", "modal"] },
+                                        layout: { type: "string", enum: ["", ...(layoutValues.length ? layoutValues : ["cards", "posters", "list"])] },
+                                        align: { type: "string", enum: ["", "left", "right"] },
                                         items: { type: "array", items: SITE_ITEM_SCHEMA },
                                     },
                                 },
@@ -247,13 +292,23 @@ export async function generateSiteEdit(input: {
                         },
                     },
                     template: { type: "string", enum: ["", ...input.templates.map((t) => t.key)] },
+                    preset: { type: "string", enum: ["", ...presets.map((p) => p.key)] },
                     theme: {
                         type: "object",
                         additionalProperties: false,
-                        required: ["primary", "accent", "background", "text", "font"],
+                        required: ["primary", "accent", "background", "text", "font", "logo_url", "hero_image_url"],
                         properties: {
-                            ...requiredStrings(["primary", "accent", "background", "text"]).properties,
+                            ...requiredStrings(["primary", "accent", "background", "text", "logo_url", "hero_image_url"]).properties,
                             font: { type: "string", enum: ["", ...input.fonts] },
+                        },
+                    },
+                    layout: {
+                        type: "object",
+                        additionalProperties: false,
+                        required: ["nav", "sticky"],
+                        properties: {
+                            nav: { type: "string", enum: ["", ...navStyles.map((n) => n.value)] },
+                            sticky: { type: ["boolean", "null"] },
                         },
                     },
                     title: { type: ["string", "null"] },
@@ -264,13 +319,20 @@ export async function generateSiteEdit(input: {
         },
     );
     const parsed = JSON.parse(text);
+    const layout: { nav?: string; sticky?: boolean } = {};
+    if (parsed.layout && typeof parsed.layout === "object") {
+        if (typeof parsed.layout.nav === "string" && parsed.layout.nav) layout.nav = parsed.layout.nav;
+        if (typeof parsed.layout.sticky === "boolean") layout.sticky = parsed.layout.sticky;
+    }
     return {
         summary: String(parsed.summary || "").trim().slice(0, 500),
         template: typeof parsed.template === "string" && parsed.template ? parsed.template : undefined,
+        preset: typeof parsed.preset === "string" && parsed.preset ? parsed.preset : undefined,
         // Solo los campos del tema que la IA cambió ("" = sin cambio)
         theme: parsed.theme && typeof parsed.theme === "object"
             ? (Object.fromEntries(Object.entries(parsed.theme).filter(([, v]) => typeof v === "string" && v.trim())) as Record<string, string>)
             : undefined,
+        layout: Object.keys(layout).length ? layout : undefined,
         title: typeof parsed.title === "string" ? parsed.title : undefined,
         tagline: typeof parsed.tagline === "string" ? parsed.tagline : undefined,
         about: typeof parsed.about === "string" ? parsed.about : undefined,

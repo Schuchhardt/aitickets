@@ -16,7 +16,10 @@ import {
   mainOrigin,
   type SiteTemplate,
 } from "../../../../lib/sites";
-import { NICHE_TEMPLATES, sanitizeSections } from "../../../../lib/siteTemplates";
+import { NICHE_TEMPLATES, sanitizeLayout, sanitizeSections, sectionVideoUrls, type SiteSection } from "../../../../lib/siteTemplates";
+import { PRESET_BY_KEY } from "../../../../lib/sitePresets";
+import { publicImageBaseUrl } from "../../../../lib/imageStorage";
+import { ownVideoLocationAt, removeVideoAt } from "../../../../lib/videoStorage";
 import { domainView, getDomainProvider } from "../../../../../netlify/lib/domains/index.mjs";
 
 /** Plantillas que ofrece el editor: las de cada nicho y las generales (el renderizador soporta más; ver src/lib/siteTemplates.ts). */
@@ -226,26 +229,74 @@ export function sanitizeTheme(input: any): Record<string, unknown> {
   return out;
 }
 
+/**
+ * Contenido del sitio. Solo cambia las claves que vienen en input (el editor visual manda textos, secciones y menú; la
+ * página de ajustes manda nombre, frase y redes) y conserva las demás, incluidas las que el editor no maneja.
+ */
 export function sanitizeContent(input: any, previous: any = {}): Record<string, unknown> {
   const c = input && typeof input === "object" ? input : {};
-  // Conserva claves que el editor no maneja
+  const has = (key: string) => Object.prototype.hasOwnProperty.call(c, key);
   const out: Record<string, unknown> = { ...(previous && typeof previous === "object" ? previous : {}) };
-  out.title = text(c.title, 80) || undefined;
-  out.tagline = text(c.tagline, 200) || undefined;
-  const about = sanitizeRichText(typeof c.about === "string" ? c.about.slice(0, 8000) : "");
-  out.about = about ? about.slice(0, 6000) : undefined;
-  const s = c.socials && typeof c.socials === "object" ? c.socials : {};
-  const socials: Record<string, string> = {};
-  for (const key of ["instagram", "facebook", "tiktok", "x", "youtube", "website"]) {
-    const url = socialUrl(s[key]);
-    if (url) socials[key] = url;
+  if (has("title")) out.title = text(c.title, 80) || undefined;
+  if (has("tagline")) out.tagline = text(c.tagline, 200) || undefined;
+  if (has("about")) {
+    const about = sanitizeRichText(typeof c.about === "string" ? c.about.slice(0, 8000) : "");
+    out.about = about ? about.slice(0, 6000) : undefined;
   }
-  const wa = String(s.whatsapp || "").replace(/[^\d]/g, "");
-  if (wa.length >= 8 && wa.length <= 15) socials.whatsapp = wa;
-  out.socials = socials;
-  // Secciones de la página de inicio (src/lib/siteTemplates.ts). Sin la clave, se conservan las guardadas.
-  if (Array.isArray(c.sections)) out.sections = sanitizeSections(c.sections);
+  if (has("socials")) {
+    const s = c.socials && typeof c.socials === "object" ? c.socials : {};
+    const socials: Record<string, string> = {};
+    for (const key of ["instagram", "facebook", "tiktok", "x", "youtube", "website"]) {
+      const url = socialUrl(s[key]);
+      if (url) socials[key] = url;
+    }
+    const wa = String(s.whatsapp || "").replace(/[^\d]/g, "");
+    if (wa.length >= 8 && wa.length <= 15) socials.whatsapp = wa;
+    out.socials = socials;
+  }
+  // Secciones de la página de inicio (src/lib/siteTemplates.ts). Se guardan también los ítems a medio llenar (el sitio
+  // público solo muestra los completos) para que el productor los termine después.
+  if (Array.isArray(c.sections)) out.sections = sanitizeSections(c.sections, { keepEmpty: true });
+  // Tipo de menú y plantilla completa de la que partió (src/lib/sitePresets.ts)
+  if (has("layout")) out.layout = sanitizeLayout(c.layout);
+  if (has("preset")) out.preset = typeof c.preset === "string" && PRESET_BY_KEY[c.preset] ? c.preset : undefined;
   return Object.fromEntries(Object.entries(out).filter(([, v]) => v !== undefined));
+}
+
+// ---------------------------------------------------------------------------
+// Videos del sitio (/api/sites/video): carpeta propia de la organización en el Storage de videos
+// ---------------------------------------------------------------------------
+export const siteVideoPrefix = (orgId: number) => `site-videos/${orgId}/video-`;
+
+/**
+ * Quita de las secciones los videos que no están en la carpeta de la organización y los pósters que no son de nuestro
+ * bucket de imágenes (el editor solo pone ahí lo que subió con /api/sites/video y /api/sites/upload).
+ */
+export function keepOwnSiteVideos(sections: SiteSection[], orgId: number): SiteSection[] {
+  const prefix = siteVideoPrefix(orgId);
+  let imageBase: string | null = null;
+  return sections.map((s) => {
+    const video = s.data?.video;
+    if (!video) return s;
+    if (!ownVideoLocationAt(video.url, prefix)) {
+      const { video: _drop, ...data } = s.data;
+      return { ...s, data };
+    }
+    imageBase = imageBase ?? publicImageBaseUrl();
+    if (video.poster_url && !video.poster_url.startsWith(imageBase)) {
+      const { poster_url: _poster, ...rest } = video;
+      return { ...s, data: { ...s.data, video: rest } };
+    }
+    return s;
+  });
+}
+
+/** Borra del Storage los videos que el sitio usaba y ya no usa ninguna sección. Nunca lanza. */
+export async function removeUnusedSiteVideos(previous: unknown, next: SiteSection[], orgId: number): Promise<void> {
+  const prefix = siteVideoPrefix(orgId);
+  const kept = new Set(sectionVideoUrls(next));
+  const before = sectionVideoUrls(sanitizeSections(Array.isArray(previous) ? previous : [], { keepEmpty: true }));
+  await Promise.all(before.filter((url) => !kept.has(url)).map((url) => removeVideoAt(ownVideoLocationAt(url, prefix))));
 }
 
 export function sanitizeSeo(input: any): Record<string, unknown> {

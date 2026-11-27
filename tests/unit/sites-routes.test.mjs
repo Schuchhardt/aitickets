@@ -91,12 +91,14 @@ const domain = await import('../../src/pages/api/sites/domain.ts')
 const sitesIndex = await import('../../src/pages/api/sites/index.ts')
 const slugCheck = await import('../../src/pages/api/sites/slug-check.ts')
 const upload = await import('../../src/pages/api/sites/upload.ts')
+const videoRoute = await import('../../src/pages/api/sites/video.ts')
 const { AiRefusalError } = await import('../../src/lib/aiText')
 
 const ALL_ROLES = ['producer', 'admin', 'finance', 'editor', 'validator', 'viewer']
 const OAR = ['admin', 'producer']
 const DENIED = ALL_ROLES.filter((r) => !OAR.includes(r))
 const CDN = 'https://proj.supabase.co/storage/v1/object/public/Events/sites'
+const VIDEOS = 'https://proj.supabase.co/storage/v1/object/public/aitickets-event-videos'
 const PNG = await sharp({ create: { width: 8, height: 8, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0.5 } } }).png().toBuffer()
 const OLD = '2026-11-01T00:00:00.000Z'
 
@@ -148,6 +150,9 @@ function seed() {
     },
   })
   db.uploads = []
+  db.removed = []
+  db.signed = []
+  db.fileInfo = {}
   db.storage = {
     from: (bucket) => ({
       upload: async (path, buf, opts) => {
@@ -155,6 +160,18 @@ function seed() {
         return { data: { path }, error: null }
       },
       getPublicUrl: (path) => ({ data: { publicUrl: `https://proj.supabase.co/storage/v1/object/public/${bucket}/${path}` } }),
+      createSignedUploadUrl: async (path) => {
+        db.signed.push({ bucket, path })
+        return { data: { signedUrl: `https://proj.supabase.co/upload/sign/${bucket}/${path}?token=t` }, error: null }
+      },
+      info: async (path) => {
+        const meta = db.fileInfo[`${bucket}/${path}`]
+        return meta ? { data: meta, error: null } : { data: null, error: { message: 'Object not found' } }
+      },
+      remove: async (paths) => {
+        db.removed.push(...paths.map((p) => `${bucket}/${p}`))
+        return { data: [], error: null }
+      },
     }),
   }
 }
@@ -203,6 +220,8 @@ describe('requireSiteAdmin: sesión y rol admin/producer en todas las rutas /api
     'PUT sites': () => sitesIndex.PUT(req('PUT', { body: { published: false } })),
     'GET slug-check': () => slugCheck.GET(req('GET', { path: '/api/sites/slug-check', query: '?slug=nuevo-nombre' })),
     'POST upload': () => upload.POST({ request: new Request('https://aitickets.cl/api/sites/upload', { method: 'POST', body: pngForm() }), cookies: {} }),
+    'GET video': () => videoRoute.GET(req('GET', { path: '/api/sites/video' })),
+    'POST video': () => videoRoute.POST(req('POST', { path: '/api/sites/video', body: { action: 'upload_url', contentType: 'video/mp4', size: 1000 } })),
   }
 
   it('sin sesión: 401 en todas, sin escribir, sin IA, sin proveedor de dominios ni Storage', async () => {
@@ -654,5 +673,234 @@ describe('POST /api/sites/upload', () => {
     expect((await call(new File(['<svg/>'], 'x.png', { type: 'image/png' }))).status).toBe(400)
     expect((await call(new File([Buffer.alloc(5 * 1024 * 1024 + 1)], 'big.png', { type: 'image/png' }))).status).toBe(400)
     expect(db.uploads).toEqual([])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Editor visual: guardado parcial, videos y límites de medios
+// ---------------------------------------------------------------------------
+describe('PUT /api/sites desde el editor visual', () => {
+  const put = (body) => sitesIndex.PUT(req('PUT', { body }))
+  const ownVideo = (n) => `${VIDEOS}/site-videos/7/video-${n}.mp4`
+
+  it('guardar solo redes no borra textos ni secciones; guardar secciones no borra las redes', async () => {
+    site(7).content = { title: 'Club Norte', sections: [{ id: 'hero', type: 'hero', data: { title: 'Hola' } }], socials: { instagram: 'https://instagram.com/norte' } }
+    expect((await put({ content: { socials: { tiktok: 'tiktok.com/@norte' } } })).status).toBe(200)
+    expect(site(7).content).toMatchObject({ title: 'Club Norte', sections: [{ id: 'hero', type: 'hero', data: { title: 'Hola' } }], socials: { tiktok: 'https://tiktok.com/@norte' } })
+    expect((await put({ content: { sections: [{ id: 'faq', type: 'faq', data: { items: [{ question: '¿Edad?', answer: '' }] } }], layout: { nav: 'sidebar' }, preset: 'clubs-colectivo' } })).status).toBe(200)
+    // Los ítems a medio llenar se guardan para terminarlos después; el menú y la plantilla de origen también
+    expect(site(7).content).toMatchObject({
+      socials: { tiktok: 'https://tiktok.com/@norte' },
+      sections: [{ id: 'faq', type: 'faq', data: { items: [{ question: '¿Edad?' }] } }],
+      layout: { nav: 'sidebar' },
+      preset: 'clubs-colectivo',
+    })
+    await put({ content: { preset: 'inventada' } })
+    expect(site(7).content.preset).toBeUndefined()
+  })
+
+  it('solo guarda videos de la carpeta de la productora (y pósters de nuestro bucket)', async () => {
+    const res = await put({
+      content: {
+        sections: [
+          { id: 'hero', type: 'hero', data: { video: { url: ownVideo(1), poster_url: 'https://evil.example/p.jpg', width: 1920, height: 1080 } } },
+          { id: 'v1', type: 'video', data: { video: { url: `${VIDEOS}/site-videos/8/video-9.mp4` } } },
+          { id: 'v2', type: 'video', data: { video: { url: 'https://evil.example/x.mp4' } } },
+        ],
+      },
+    })
+    expect(res.status).toBe(200)
+    const sections = site(7).content.sections
+    expect(sections[0].data.video).toEqual({ url: ownVideo(1), width: 1920, height: 1080 })
+    expect(sections[1].data.video).toBeUndefined()
+    expect(sections[2].data.video).toBeUndefined()
+  })
+
+  it('límites del sitio: más de 60 fotos o más de 3 videos responde 400 sin guardar', async () => {
+    const galleries = [0, 1, 2].map((g) => ({ id: `g${g}`, type: 'gallery', data: { items: Array.from({ length: 21 }, (_, i) => ({ image_url: `${CDN}/7/g${g}-${i}.jpg` })) } }))
+    const tooManyImages = await put({ content: { sections: galleries } })
+    expect(tooManyImages.status).toBe(400)
+    expect((await tooManyImages.json()).message).toMatch(/hasta 60 fotos/)
+    const videos = [1, 2, 3, 4].map((n) => ({ id: `v${n}`, type: 'video', data: { video: { url: ownVideo(n) } } }))
+    const tooManyVideos = await put({ content: { sections: videos } })
+    expect(tooManyVideos.status).toBe(400)
+    expect((await tooManyVideos.json()).message).toMatch(/hasta 3 videos/)
+    expect(writes()).toEqual([])
+  })
+
+  it('al quitar un video de las secciones se borra del Storage (solo los de la productora)', async () => {
+    site(7).content = { sections: [{ id: 'v1', type: 'video', data: { video: { url: ownVideo(1) } } }, { id: 'v2', type: 'video', data: { video: { url: ownVideo(2) } } }] }
+    expect((await put({ content: { sections: [{ id: 'v2', type: 'video', data: { video: { url: ownVideo(2) } } }] } })).status).toBe(200)
+    expect(db.removed).toEqual(['aitickets-event-videos/site-videos/7/video-1.mp4'])
+  })
+})
+
+describe('/api/sites/video', () => {
+  const call = (body) => videoRoute.POST(req('POST', { path: '/api/sites/video', body }))
+
+  it('GET informa los límites', async () => {
+    expect(await (await videoRoute.GET(req('GET', { path: '/api/sites/video' }))).json()).toEqual({ available: true, max_bytes: 50 * 1024 * 1024, max_seconds: 180, max_videos: 3 })
+  })
+
+  it('upload_url: URL firmada en site-videos/<org de la sesión>/; formato, peso y duración se validan antes', async () => {
+    expect((await call({ action: 'upload_url', contentType: 'image/png', size: 100 })).status).toBe(400)
+    expect((await call({ action: 'upload_url', contentType: 'video/mp4', size: 51 * 1024 * 1024 })).status).toBe(400)
+    expect((await call({ action: 'upload_url', contentType: 'video/mp4', size: 1000, duration: 600 })).status).toBe(400)
+    expect(db.signed).toEqual([])
+    const res = await call({ action: 'upload_url', contentType: 'video/quicktime', size: 1000, duration: 20 })
+    expect(res.status).toBe(200)
+    const { uploadUrl, publicUrl } = await res.json()
+    expect(db.signed[0].path).toMatch(/^site-videos\/7\/video-.+\.mov$/)
+    expect(uploadUrl).toContain('/upload/sign/')
+    expect(publicUrl).toBe(`${VIDEOS}/${db.signed[0].path}`)
+    expect(h.rateCalls.at(-1)).toEqual(['dash:sitevideo', 'org:7', expect.objectContaining({ max: 30 })])
+    h.rateAllowed = false
+    expect((await call({ action: 'upload_url', contentType: 'video/mp4', size: 1000 })).status).toBe(429)
+  })
+
+  it('confirm: verifica que el archivo propio exista, sea video y no supere el máximo; si no, lo borra', async () => {
+    const path = 'site-videos/7/video-1.mp4'
+    expect((await call({ action: 'confirm', url: `${VIDEOS}/site-videos/8/video-1.mp4` })).status).toBe(400)
+    expect((await call({ action: 'confirm', url: `${VIDEOS}/${path}` })).status).toBe(400)
+    db.fileInfo[`aitickets-event-videos/${path}`] = { contentType: 'video/mp4', size: 1234 }
+    const ok = await call({ action: 'confirm', url: `${VIDEOS}/${path}` })
+    expect(ok.status).toBe(200)
+    expect(await ok.json()).toEqual({ url: `${VIDEOS}/${path}`, mime: 'video/mp4', bytes: 1234 })
+    db.fileInfo[`aitickets-event-videos/${path}`] = { contentType: 'video/mp4', size: 60 * 1024 * 1024 }
+    expect((await call({ action: 'confirm', url: `${VIDEOS}/${path}` })).status).toBe(400)
+    expect(db.removed).toEqual([`aitickets-event-videos/${path}`])
+    expect((await call({ action: 'otra' })).status).toBe(400)
+  })
+})
+
+describe('POST /api/sites/ai con plantillas, menú y videos', () => {
+  const call = (body) => aiRoute.POST(req('POST', { path: '/api/sites/ai', body }))
+  const video = { url: `${VIDEOS}/site-videos/7/video-1.mp4`, poster_url: `${CDN}/7/poster.jpg` }
+  const draft = {
+    template: 'clasico',
+    theme: { primary: '#111111', logo_url: `${CDN}/7/logo.png` },
+    title: 'Club Norte',
+    tagline: '',
+    about: 'Somos',
+    layout: { nav: 'top' },
+    sections: [
+      { id: 'hero', type: 'hero', data: { title: 'Hola', video } },
+      { id: 'faq', type: 'faq', data: { items: [{ question: '¿Edad?', answer: '' }] } },
+    ],
+  }
+
+  it('la IA conoce las plantillas, los tipos de menú y las variantes de diseño', async () => {
+    await call({ instruction: 'Hazlo como un festival', draft })
+    const input = h.siteEditCalls[0]
+    expect(input.presets.map((p) => p.key)).toContain('musica-festival')
+    expect(input.navStyles.map((n) => n.value)).toEqual(['top', 'centered', 'sidebar'])
+    expect(input.layouts.gallery).toEqual(['grid', 'carousel', 'logos'])
+    expect(input.draft.layout).toEqual({ nav: 'top' })
+  })
+
+  it('preset: devuelve la plantilla completa (estilo, menú y secciones) y conserva el logo', async () => {
+    h.siteEdit = () => ({ summary: 'Usé la plantilla de festival.', preset: 'musica-festival', sections: [{ id: 'x', type: 'cta', data: { title: 'ignorado' } }], order: [], title: 'Festival Norte' })
+    const { changes, summary } = await (await call({ instruction: 'Usa la plantilla de festival', draft })).json()
+    expect(summary).toBe('Usé la plantilla de festival.')
+    expect(changes).toMatchObject({ template: 'musica', preset: 'musica-festival', layout: { nav: 'centered', sticky: true }, title: 'Festival Norte' })
+    expect(changes.theme.logo_url).toBe(`${CDN}/7/logo.png`)
+    expect(changes.sections.map((s) => s.id)).toContain('lineup')
+    expect(changes.sections.some((s) => s.id === 'x')).toBe(false)
+    expect(writes()).toEqual([])
+  })
+
+  it('cambiar el menú y editar secciones: la IA no ve los videos, pero se conservan; deja ítems vacíos para completar', async () => {
+    h.siteEdit = () => ({
+      summary: 'Puse el menú a la izquierda.',
+      layout: { nav: 'sidebar' },
+      order: ['hero', 'faq', 'equipo'],
+      sections: [
+        { id: 'hero', type: 'hero', data: { title: 'Bienvenidos', video: { url: 'https://evil.example/otro.mp4' } } },
+        { id: 'equipo', type: 'people', nav: true, data: { title: 'Equipo', items: [{ name: '', role: '' }] } },
+      ],
+    })
+    const { changes } = await (await call({ instruction: 'Menú a la izquierda y agrega el equipo', draft })).json()
+    expect(changes.layout).toEqual({ nav: 'sidebar' })
+    expect(changes.sections[0].data).toEqual({ title: 'Bienvenidos', video })
+    expect(changes.sections[2]).toEqual({ id: 'equipo', type: 'people', nav: true, data: { title: 'Equipo', items: [{}] } })
+  })
+})
+
+describe('POST /api/sites/ai: el asistente hace todo lo del editor (adjuntos, videos, logo y portada, conversación)', () => {
+  const call = (body) => aiRoute.POST(req('POST', { path: '/api/sites/ai', body }))
+  const IMAGES = 'https://proj.supabase.co/storage/v1/object/public/Events'
+  const own = (n) => `${VIDEOS}/site-videos/7/video-${n}.mp4`
+  const draft = {
+    template: 'clasico',
+    theme: { logo_url: `${CDN}/7/logo.png`, hero_image_url: `${CDN}/7/hero.jpg` },
+    title: 'Club Norte',
+    tagline: '',
+    about: '',
+    sections: [
+      { id: 'hero', type: 'hero', data: { title: 'Hola', video: { url: own(1), poster_url: `${CDN}/7/p1.jpg` } } },
+      { id: 'video', type: 'video', data: { title: 'Aftermovie' } },
+    ],
+  }
+
+  it('la IA ve los videos como URL, recibe la conversación y solo los adjuntos propios', async () => {
+    await call({
+      instruction: 'Pon mis fotos en una galería',
+      draft,
+      history: [{ instruction: 'Hazlo más oscuro', summary: 'Cambié los colores.' }, { instruction: '', summary: 'x' }, 'basura'],
+      attachments: [
+        { type: 'image', url: `${IMAGES}/sites/7/gallery-1.jpg` },
+        { type: 'image', url: `${IMAGES}/sites/8/gallery-ajena.jpg` },
+        { type: 'image', url: 'https://evil.example/x.jpg' },
+        { type: 'video', url: own(2), poster_url: `${IMAGES}/sites/7/poster-2.jpg`, width: 1080, height: 1920, duration: 20 },
+        { type: 'video', url: `${VIDEOS}/site-videos/8/video-9.mp4` },
+      ],
+    })
+    const input = h.siteEditCalls[0]
+    expect(input.draft.sections[0].data.video).toBe(own(1))
+    expect(input.history).toEqual([{ instruction: 'Hazlo más oscuro', summary: 'Cambié los colores.' }])
+    expect(input.attachments).toEqual([
+      { type: 'image', url: `${IMAGES}/sites/7/gallery-1.jpg` },
+      { type: 'video', url: own(2), description: 'vertical, 20 s' },
+    ])
+  })
+
+  it('videos: "" deja el que había, "none" lo quita, una URL conocida o adjunta lo pone o lo mueve; nunca uno inventado', async () => {
+    h.siteEdit = () => ({
+      summary: 'Moví el video.',
+      order: ['hero', 'video', 'feature-1'],
+      sections: [
+        { id: 'hero', type: 'hero', data: { title: 'Hola', video: 'none' } },
+        { id: 'video', type: 'video', data: { title: 'Aftermovie', video: own(1) } },
+        { id: 'feature-1', type: 'feature', data: { title: 'Nuevo', text: 'x', video: own(2) } },
+      ],
+    })
+    const attached = { type: 'video', url: own(2), poster_url: `${IMAGES}/sites/7/poster-2.jpg`, width: 1080, height: 1920 }
+    const { changes } = await (await call({ instruction: 'Mueve el video y usa el nuevo', draft, attachments: [attached] })).json()
+    expect(changes.sections[0].data.video).toBeUndefined()
+    expect(changes.sections[1].data.video).toEqual({ url: own(1), poster_url: `${CDN}/7/p1.jpg` })
+    expect(changes.sections[2].data.video).toEqual({ url: own(2), poster_url: `${IMAGES}/sites/7/poster-2.jpg`, width: 1080, height: 1920 })
+
+    h.siteEdit = () => ({ summary: 'ok', order: ['hero', 'video'], sections: [{ id: 'video', type: 'video', data: { title: 'A', video: `${VIDEOS}/site-videos/7/video-99.mp4` } }] })
+    const second = await (await call({ instruction: 'Pon otro video', draft })).json()
+    expect(second.changes.sections[1].data.video).toBeUndefined()
+    expect(second.changes.sections[0].data.video.url).toBe(own(1))
+  })
+
+  it('logo e imagen de portada: solo imágenes permitidas o "none" para quitarlas', async () => {
+    h.siteEdit = () => ({ summary: 'ok', order: [], sections: [], theme: { primary: '#123456', logo_url: 'none', hero_image_url: `${IMAGES}/sites/7/gallery-1.jpg` } })
+    const { changes } = await (await call({ instruction: 'Quita el logo y usa mi foto de portada', draft, attachments: [{ type: 'image', url: `${IMAGES}/sites/7/gallery-1.jpg` }] })).json()
+    expect(changes.theme).toEqual({ primary: '#123456', hero_image_url: `${IMAGES}/sites/7/gallery-1.jpg` })
+
+    h.siteEdit = () => ({ summary: 'ok', order: [], sections: [], theme: { logo_url: 'https://evil.example/l.png', hero_image_url: '' } })
+    const kept = await (await call({ instruction: 'Cambia el logo', draft })).json()
+    expect(kept.changes.theme).toBeUndefined()
+  })
+
+  it('avisa si los cambios dejan el sitio sobre el límite de fotos', async () => {
+    const many = Array.from({ length: 61 }, (_, i) => ({ image_url: `${IMAGES}/sites/7/g-${i}.jpg` }))
+    const big = { ...draft, sections: [...draft.sections, { id: 'g', type: 'gallery', data: { items: many.slice(0, 24) } }, { id: 'g2', type: 'gallery', data: { items: many.slice(24, 48) } }, { id: 'g3', type: 'gallery', data: { items: many.slice(48) } }] }
+    h.siteEdit = () => ({ summary: 'ok', order: [], sections: [] })
+    const res = await (await call({ instruction: 'Cambia el título', draft: big })).json()
+    expect(res.warning).toMatch(/60 fotos/)
   })
 })

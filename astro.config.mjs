@@ -17,6 +17,9 @@ const e2eFixtures = {
       injectRoute({ pattern: '/__e2e/eventos/[escenario]', entrypoint: './tests/e2e/fixtures/event-fixture-page.astro', prerender: false });
       // Bajo /validador para que lo controle el service worker del validador (scope /validador)
       injectRoute({ pattern: '/validador/__e2e/[escenario]', entrypoint: './tests/e2e/fixtures/validator-fixture-page.astro', prerender: false });
+      // Sitio de productor con una plantilla completa (src/lib/sitePresets.ts) y contenido de ejemplo
+      injectRoute({ pattern: '/__e2e/sitios/[plantilla]', entrypoint: './tests/e2e/fixtures/site-fixture-page.astro', prerender: false });
+      injectRoute({ pattern: '/__e2e/sitio-editor', entrypoint: './tests/e2e/fixtures/site-builder-fixture-page.astro', prerender: false });
     },
   },
 };

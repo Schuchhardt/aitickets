@@ -1,0 +1,51 @@
+---
+// /dashboard/sitio/editor — editor visual del sitio del productor en pantalla completa (SiteBuilder.vue): plantillas por
+// tipo de página (copy + layout + tema), secciones, estilo, IA y edición de textos dentro de la vista previa.
+// Solo admin/producer; todo se filtra por la organización de la sesión. Lo demás del sitio (dirección, SEO, redes,
+// banners, contacto y dominio) sigue en /dashboard/sitio.
+import DashboardLayout from "../../../layouts/DashboardLayout.astro";
+import { ORG_ADMIN_ROLES } from "../../../lib/supabaseServer";
+import { requireDashboardSession } from "../_lib/guard";
+import SiteBuilder from "../../../components/dashboard/site/SiteBuilder.vue";
+import IslandSkeleton from "../../../components/dashboard/IslandSkeleton.astro";
+import { EDITOR_FONTS, EDITOR_TEMPLATES, SitesUnavailableError, editorView, loadBanners, loadOrgSite, orgStatus } from "./_lib/site-admin";
+
+const guard = await requireDashboardSession(Astro, ORG_ADMIN_ROLES);
+if (!guard.ok) return guard.response;
+const orgId = Number(guard.session.dbUser.organization_id);
+
+let json = "";
+let unavailable = false;
+let loadError = false;
+try {
+  const site = await loadOrgSite(orgId);
+  const [banners, org] = await Promise.all([loadBanners(site.id), orgStatus(orgId)]);
+  json = JSON.stringify({ ...editorView(site, banners), org, templates: EDITOR_TEMPLATES, fonts: EDITOR_FONTS });
+} catch (err) {
+  if (err instanceof SitesUnavailableError) unavailable = true;
+  else {
+    loadError = true;
+    console.error("dashboard/sitio/editor: error cargando el sitio", err);
+  }
+}
+---
+
+<DashboardLayout title="Editor del sitio">
+  {unavailable && (
+    <div class="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-700">
+      El editor del sitio web estará disponible muy pronto. Vuelve a intentarlo en unos minutos.
+    </div>
+  )}
+  {loadError && (
+    <div class="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-800">
+      No pudimos cargar tu sitio. Recarga la página o escríbenos si el problema continúa.
+    </div>
+  )}
+  {json && (
+    <SiteBuilder client:only="vue" initialJson={json}>
+      <div slot="fallback" class="fixed inset-0 z-[70] flex items-center justify-center bg-gray-100">
+        <IslandSkeleton fields={4} />
+      </div>
+    </SiteBuilder>
+  )}
+</DashboardLayout>
