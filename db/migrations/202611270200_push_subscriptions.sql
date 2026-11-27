@@ -16,3 +16,5 @@ CREATE INDEX IF NOT EXISTS aitickets_push_subscriptions_user_idx ON public.aitic
 
 ALTER TABLE public.aitickets_push_subscriptions ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.aitickets_push_subscriptions FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON SEQUENCE public.aitickets_push_subscriptions_id_seq FROM PUBLIC, anon, authenticated;
+GRANT USAGE, SELECT ON SEQUENCE public.aitickets_push_subscriptions_id_seq TO service_role;
