@@ -70,6 +70,11 @@ async function sendPushWhere(column, value, notification) {
   }
 }
 
+/** true si las claves VAPID están configuradas (sin ellas los envíos son no-op). */
+export function isPushConfigured() {
+  return getVapid() !== null
+}
+
 /** Avisa a todos los navegadores suscritos de la organización. Nunca lanza. */
 export function sendPushToOrg(orgId, notification) {
   return sendPushWhere('organization_id', orgId, notification)
