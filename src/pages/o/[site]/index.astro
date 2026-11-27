@@ -12,15 +12,13 @@ import { sanitizeRichText } from "../../../lib/sanitize";
 import { defaultSections, isNicheTemplate, sanitizeSections } from "../../../lib/siteTemplates";
 import { htmlToPlainText } from "../../../lib/sitePlainText";
 import { stripHtml, truncate } from "../../../lib/eventPage";
-import { loadSiteForPage } from "../_site";
-
-import { notFound } from "../../../lib/notFound";
+import { loadSiteForPage, siteMissingResponse } from "../_site";
 
 export const prerender = false;
 
 const loaded = await loadSiteForPage(Astro);
 if (!loaded) {
-  return notFound();
+  return siteMissingResponse(Astro);
 }
 const { site, preview, base, template, owner } = loaded;
 

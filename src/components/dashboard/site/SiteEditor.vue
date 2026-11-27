@@ -7,6 +7,7 @@ import { Globe, ExternalLink, Copy, Check, Upload, X, Eye, EyeOff, AlertTriangle
 import { apiRequest, uploadSiteImage, copyText } from './siteApi.js'
 import { TEMPLATE_INFO } from '../../../lib/siteTemplates'
 import { PRESET_BY_KEY } from '../../../lib/sitePresets'
+import ConfirmDialog from '../ConfirmDialog.vue'
 
 const props = defineProps({
   initialJson: { type: String, required: true },
@@ -177,6 +178,11 @@ async function save() {
   }
 }
 
+// Publicar u ocultar cambia lo que ve el público en todas las direcciones del sitio (incluido el dominio propio):
+// siempre pasa por el modal de confirmación.
+const publishDialog = ref(false)
+const publicUrls = computed(() => [urls.value.free, urls.value.subdomain, urls.value.custom].filter(Boolean))
+
 async function togglePublished() {
   publishing.value = true
   try {
@@ -187,6 +193,7 @@ async function togglePublished() {
     flash(e.message, true)
   } finally {
     publishing.value = false
+    publishDialog.value = false
   }
 }
 
@@ -233,7 +240,8 @@ const visibleToPublic = computed(() => site.value.published && org.emailVerified
           class="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm rounded-lg border shrink-0"
           :class="site.published ? 'border-gray-300 text-gray-700 hover:bg-gray-50' : 'bg-black text-white border-black hover:bg-gray-800'"
           :disabled="publishing"
-          @click="togglePublished"
+          data-testid="site-publish-toggle"
+          @click="publishDialog = true"
         >
           <component :is="site.published ? EyeOff : Eye" size="16" />
           {{ publishing ? 'Guardando…' : site.published ? 'Ocultar sitio' : 'Publicar sitio' }}
@@ -365,5 +373,40 @@ const visibleToPublic = computed(() => site.value.published && org.emailVerified
       </div>
 
     </div>
+
+    <ConfirmDialog
+      :open="publishDialog"
+      :title="site.published ? '¿Ocultar tu sitio?' : '¿Publicar tu sitio?'"
+      :confirm-label="site.published ? 'Ocultar sitio' : 'Publicar sitio'"
+      :tone="site.published ? 'danger' : 'default'"
+      :busy="publishing"
+      test-id="site-publish-dialog"
+      @confirm="togglePublished"
+      @cancel="publishDialog = false"
+    >
+      <template v-if="site.published">
+        <p>Tu sitio dejará de verse en:</p>
+        <ul class="space-y-1">
+          <li v-for="url in publicUrls" :key="url" class="font-medium text-gray-900 break-all">{{ url }}</li>
+        </ul>
+        <p>
+          Quien entre verá un aviso de que el sitio no está publicado por ahora.
+          <template v-if="urls.custom">Tu dominio sigue conectado: no tienes que tocar el DNS.</template>
+        </p>
+        <p>Tus eventos siguen a la venta en AI Tickets y puedes volver a publicar el sitio cuando quieras.</p>
+      </template>
+      <template v-else>
+        <p>Tu sitio quedará visible para el público en:</p>
+        <ul class="space-y-1">
+          <li v-for="url in publicUrls" :key="url" class="font-medium text-gray-900 break-all">{{ url }}</li>
+        </ul>
+        <p v-if="dirty" class="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-amber-900">
+          Tienes cambios sin guardar: se publicará la última versión guardada. Guárdalos antes si quieres que se vean.
+        </p>
+        <p v-if="!org.emailVerified" class="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-amber-900">
+          Mientras no verifiques el correo de tu productora, solo tú podrás ver el sitio.
+        </p>
+      </template>
+    </ConfirmDialog>
   </div>
 </template>

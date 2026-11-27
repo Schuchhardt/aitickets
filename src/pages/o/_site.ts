@@ -1,6 +1,8 @@
 // Helper compartido por las páginas /o/[site]/* (el "_" lo excluye del enrutado de Astro).
 import type { AstroGlobal } from "astro";
 import { getSessionContext } from "../../lib/supabaseServer";
+import { notFound } from "../../lib/notFound";
+import { siteUnavailableResponse } from "../../lib/siteUnavailable";
 import {
   SITE_TEMPLATES,
   getSiteBySlug,
@@ -35,8 +37,19 @@ async function isOwner(Astro: AstroGlobal, site: SiteRecord): Promise<boolean> {
 }
 
 /**
- * Carga el sitio de la ruta /o/[site]. Devuelve null (=> 404) si no existe o no es público y quien lo
- * ve no es el dueño. En un host de tenant usa el sitio ya resuelto por el middleware.
+ * Respuesta cuando loadSiteForPage devolvió null: si el sitio existe pero no es público (oculto por el productor o
+ * aún sin publicar), el aviso "no publicado por ahora" (503); si no existe, 404. En un host de tenant el middleware
+ * ya respondió el aviso antes de llegar aquí, así que un null ahí es una ruta de otro sitio (404).
+ */
+export async function siteMissingResponse(Astro: AstroGlobal): Promise<Response> {
+  if (Astro.locals.site) return notFound();
+  const site = await getSiteBySlug(String(Astro.params.site || ""), { includeUnpublished: true });
+  return site && !isSitePublic(site) ? siteUnavailableResponse() : notFound();
+}
+
+/**
+ * Carga el sitio de la ruta /o/[site]. Devuelve null (=> siteMissingResponse) si no existe o no es público y
+ * quien lo ve no es el dueño. En un host de tenant usa el sitio ya resuelto por el middleware.
  */
 export async function loadSiteForPage(Astro: AstroGlobal): Promise<LoadedSite | null> {
   const slug = String(Astro.params.site || "").toLowerCase();

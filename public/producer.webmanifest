@@ -1,0 +1,25 @@
+{
+  "name": "AI Tickets – Panel de Productores",
+  "short_name": "AI Tickets",
+  "description": "Gestiona tus eventos, entradas y pagos desde tu teléfono.",
+  "lang": "es-CL",
+  "dir": "ltr",
+  "start_url": "/dashboard?utm_source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#a3e635",
+  "background_color": "#ffffff",
+  "categories": ["business", "entertainment"],
+  "icons": [
+    { "src": "/android-chrome-192x192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/android-chrome-512x512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/android-chrome-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    { "name": "Mis eventos", "url": "/dashboard/events", "icons": [{ "src": "/android-chrome-192x192.png", "sizes": "192x192" }] },
+    { "name": "Crear evento", "url": "/dashboard/events/create", "icons": [{ "src": "/android-chrome-192x192.png", "sizes": "192x192" }] },
+    { "name": "Finanzas", "url": "/dashboard/finance", "icons": [{ "src": "/android-chrome-192x192.png", "sizes": "192x192" }] }
+  ]
+}

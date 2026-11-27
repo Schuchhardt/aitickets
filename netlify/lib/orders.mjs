@@ -11,6 +11,7 @@
 //   barrido de expire-pending-orders (payments/reconcile.mjs).
 // - Sobreventa o monto/moneda que no coincide: 'review' + Slack, nunca se emite en silencio.
 // - Reintentos: si el correo falla se devuelve httpStatus 503 para que el proveedor reintente.
+import { notifyProducerSale } from './push.mjs'
 import { ensureOrderAttendees, getSoldCounts } from './tickets.mjs'
 import { loadOrderSeatSelection, holdOrderSeats } from './seats.mjs'
 import { sendOrderTicketsEmail } from './tickets-email.mjs'
@@ -384,6 +385,7 @@ export async function confirmPaidOrder(supabase, orderId, payment) {
 
   console.log(`✅ Orden ${order.id} pagada (${label} ${externalId}, ${amount} CLP)`)
   await notifyFirstSaleIfNeeded(supabase, order, amount)
+  await notifyProducerSale(supabase, claimedOrder, amount)
   const emailed = await fulfillPaidOrder(supabase, { ...claimedOrder, status: 'paid' })
   if (!emailed) return { status: 'retry', httpStatus: 503, message: 'Pago confirmado; correo pendiente' }
   return { status: 'paid', httpStatus: 200, message: 'Pago confirmado y entradas registradas' }

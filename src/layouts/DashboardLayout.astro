@@ -1,6 +1,7 @@
 ---
 import DashboardSidebar from "../components/dashboard/DashboardSidebar.vue";
 import DashboardSkeletons from "../components/dashboard/DashboardSkeletons.astro";
+import PushNotificationPrompt from "../components/pwa/PushNotificationPrompt.vue";
 import ChunkReload from "../components/ChunkReload.astro";
 import logoLight from "../images/logo.png";
 import "../styles/global.css";
@@ -64,7 +65,7 @@ const sidebarCollapsed = Astro.cookies.get("dashboard_sidebar_collapsed")?.value
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
-    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="manifest" href="/producer.webmanifest" />
     <meta name="generator" content={Astro.generator} />
     <title>{title} | Producer Dashboard</title>
     <!-- Las fuentes (Unbounded y Prompt) vienen de @fontsource en global.css: sin hoja externa que bloquee el render -->
@@ -142,6 +143,9 @@ const sidebarCollapsed = Astro.cookies.get("dashboard_sidebar_collapsed")?.value
       import { startDashboardNav } from "../lib/dashboardNav.js";
       startDashboardNav();
       startProducerActivity();
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("/producer-sw.js", { scope: "/" }).catch(() => {});
+      }
     </script>
     <div class="flex flex-col md:flex-row h-dvh overflow-hidden">
       <!-- Barra superior (mobile): abre el menú lateral como cajón -->
@@ -237,6 +241,7 @@ const sidebarCollapsed = Astro.cookies.get("dashboard_sidebar_collapsed")?.value
               </script>
             )
           }
+          <div class="mb-4"><PushNotificationPrompt client:idle /></div>
           <slot />
         </div>
       </main>

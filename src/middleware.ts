@@ -6,11 +6,13 @@ import {
     getSiteBySlug,
     getTrustedTenantProxy,
     isMainHost,
+    isSitePublic,
     mainOrigin,
     normalizeHost,
     resolveSiteByHost,
     type SiteRecord,
 } from "./lib/sites";
+import { siteUnavailableResponse } from "./lib/siteUnavailable";
 import { purgeEventPages } from "./lib/cdnCache";
 
 // Rutas que requieren sesión de productor
@@ -169,10 +171,15 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
     // ----- Resolución del tenant -----
     let tenantSite: SiteRecord | null = null;
+    // Sitio del host que existe pero no es público (oculto por el productor o aún sin publicar): no se sirve,
+    // pero se avisa "no publicado por ahora" en vez de un 404 que parece dominio roto.
+    let hiddenTenantSite: SiteRecord | null = null;
     let isTenantHost = false;
     if (!isMainHost(effectiveHost)) {
         isTenantHost = true;
-        tenantSite = await resolveSiteByHost(effectiveHost);
+        const resolved = await resolveSiteByHost(effectiveHost, { includeUnpublished: true });
+        if (isSitePublic(resolved)) tenantSite = resolved;
+        else hiddenTenantSite = resolved;
     } else if (import.meta.env.DEV) {
         // Solo en desarrollo: ?__site=<slug> simula un host de tenant
         const simulated = url.searchParams.get("__site");
@@ -195,7 +202,10 @@ export const onRequest = defineMiddleware(async (context, next) => {
             return context.redirect(`${mainOrigin()}${pathname}${qs ? `?${qs}` : ""}`, 302);
         }
 
-        if (!tenantSite) return notFoundResponse(pathname.startsWith("/api/"));
+        if (!tenantSite) {
+            const json = pathname.startsWith("/api/");
+            return hiddenTenantSite ? siteUnavailableResponse({ json, onTenantHost: true }) : notFoundResponse(json);
+        }
         context.locals.site = tenantSite;
 
         if (pathname.startsWith("/api/")) {
