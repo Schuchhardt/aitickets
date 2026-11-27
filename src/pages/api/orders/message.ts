@@ -10,6 +10,7 @@ import { rateLimit } from "../../../../netlify/lib/rate-limit.mjs";
 import { sendEmail, isValidEmail, formatRecipient, SITE_URL } from "../../../../netlify/lib/mailer.mjs";
 import { renderAttendeeMessageEmail } from "../../../../netlify/lib/emails/index.mjs";
 import { orderCopy } from "../../../../netlify/lib/order-kind.mjs";
+import { sendPushToOrg } from "../../../../netlify/lib/push.mjs";
 import {
   MESSAGES_TABLE,
   MESSAGE_MAX,
@@ -70,6 +71,12 @@ export const POST: APIRoute = async ({ request }) => {
           dashboardUrl: `${SITE_URL}/dashboard/events/${event.id}#mensajes`,
         });
         await sendEmail({ to: recipients, subject: mail.subject, html: mail.html, text: mail.text, replyTo: formatRecipient(name, email), tags: ["attendee-message"] });
+        sendPushToOrg(event.organization_id, {
+          title: `Mensaje de ${name}`,
+          body: String(text || "").slice(0, 100),
+          url: `/dashboard/events/${event.id}#mensajes`,
+          tag: "attendee-message",
+        }).catch(() => {});
       } catch (err: any) {
         console.error("orders/message: error al enviar el correo", err?.message || err);
         mailError = String(err?.message || err || "error").slice(0, 500);

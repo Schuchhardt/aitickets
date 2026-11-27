@@ -3,6 +3,7 @@ import Layout from "../../layouts/Layout.astro";
 import AppHeader from "../../components/AppHeader.vue";
 import AppFooter from "../../components/AppFooter.vue";
 import ProducerLoginForm from "../../components/auth/ProducerLoginForm.vue";
+import PwaInstallBanner from "../../components/pwa/PwaInstallBanner.vue";
 import GradientBackground from "../../components/Hero/GradientBackground.vue";
 import { isGoogleAuthEnabled } from "../../lib/google-auth";
 import { getSessionContext } from "../../lib/supabaseServer";
@@ -20,6 +21,11 @@ if (await getSessionContext(Astro)) return Astro.redirect(safeNextPath(Astro.url
   description="Ingresa a tu panel de AI Tickets para gestionar tus eventos, entradas, check-in y pagos."
   noindex={true}
 >
+  <Fragment slot="head-extra">
+    <link rel="manifest" href="/producer.webmanifest" />
+  </Fragment>
+
+  <PwaInstallBanner client:load />
   <AppHeader client:idle />
 
   <main
@@ -32,4 +38,10 @@ if (await getSessionContext(Astro)) return Astro.redirect(safeNextPath(Astro.url
   </main>
 
   <AppFooter client:idle />
+
+  <script is:inline>
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/producer-sw.js", { scope: "/" }).catch(function () {});
+    }
+  </script>
 </Layout>

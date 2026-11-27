@@ -6,6 +6,7 @@
 import { getSupabaseAdmin, json } from '../../lib/supabase.mjs'
 import { getFlowPaymentStatus, FLOW_STATUS } from '../../lib/payments/flow.mjs'
 import { confirmPaidOrder, markOrderFailed, loadOrder, recordPaymentEvent, UUID_RE } from '../../lib/orders.mjs'
+import { sendPushToOrg } from '../../lib/push.mjs'
 
 async function readToken(req) {
   const url = new URL(req.url)
@@ -77,6 +78,18 @@ export default async function handler(req) {
           orderId: order.id,
           payload: { commerceOrder, flowOrder, status, amount, currency },
         })
+      }
+      if (result.status === 'paid') {
+        const { data: ev } = await supabase.from('events').select('organization_id, name').eq('id', order.event_id).maybeSingle()
+        if (ev?.organization_id) {
+          const qty = (order.ticket_details || []).reduce((s, t) => s + (t.quantity || 0), 0)
+          sendPushToOrg(ev.organization_id, {
+            title: 'Nueva venta',
+            body: `${qty} entrada${qty !== 1 ? 's' : ''} · $${Number(amount).toLocaleString('es-CL')} CLP · ${ev.name || ''}`.slice(0, 120),
+            url: `/dashboard/events/${order.event_id}`,
+            tag: 'new-sale',
+          }).catch(() => {})
+        }
       }
       return json({ message: result.message }, result.httpStatus)
     }
