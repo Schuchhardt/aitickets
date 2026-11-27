@@ -192,7 +192,7 @@ export function guessCategory(text) {
   return null
 }
 
-const VENUE_RE = /\b(?:en\s+(?:el\s+|la\s+)?)?((?:Teatro|Sala|Centro Cultural|Centro Arte|Club|Bar|Anfiteatro|Espacio|Galp[oó]n|Casa|Auditorio|Aula Magna|Estadio|Parque|Taller|Cine|Microteatro)\s+[A-ZÁÉÍÓÚÑ0-9][\wÁÉÍÓÚÑáéíóúñ.'’&-]*(?:\s+(?:de\s+la\s+|del\s+|de\s+|la\s+|el\s+)?[A-ZÁÉÍÓÚÑ0-9][\wÁÉÍÓÚÑáéíóúñ.'’&-]*){0,4})/
+export const VENUE_RE = /\b(?:en\s+(?:el\s+|la\s+)?)?((?:Teatro|Sala|Centro Cultural|Centro Arte|Club|Bar|Anfiteatro|Espacio|Galp[oó]n|Casa|Auditorio|Aula Magna|Estadio|Parque|Taller|Cine|Microteatro)\s+[A-ZÁÉÍÓÚÑ0-9][\wÁÉÍÓÚÑáéíóúñ.'’&-]*(?:\s+(?:de\s+la\s+|del\s+|de\s+|la\s+|el\s+)?[A-ZÁÉÍÓÚÑ0-9][\wÁÉÍÓÚÑáéíóúñ.'’&-]*){0,4})/
 const PRODUCER_LABEL_RE = /\b(?:organiza|organizador|produce|productora|producci[oó]n|productor)\s*:\s*([^.|\n·•]{3,60})/i
 
 /** Limpia el título del resultado ("Entradas X | Passline" → "X"). */

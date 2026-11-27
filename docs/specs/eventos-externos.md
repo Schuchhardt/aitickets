@@ -153,8 +153,9 @@ eventos del tipo hay en la ciudad, cuántos registrados esa semana y cuánto fal
 ## 4. Próximos pasos
 
 1. **Carga sistemática**: un importador programado desde Passline/Puntoticket/Ticketplus (ya existe
-   `scripts/passline-watch-local.mjs` para leads) que llame a la misma normalización y deduplicación. La tarea
-   programada propuesta (con `description` e `image_url` para /panoramas) está en [`panoramas.md`](panoramas.md) §6.
+   `scripts/passline-watch-local.mjs` para leads) que llame a la misma normalización y deduplicación. Hecho: market-watch
+   (búsqueda en ticketeras + API de Ticketmaster + vigía de Passline, [`panoramas.md`](panoramas.md) §9) y las tareas
+   programadas de §6.
 2. **Observaciones en el tiempo**: guardar disponibilidad por tanda cada N días → velocidad de venta y fecha de
    agotado, el mejor indicador de demanda.
 3. **Calibrar** los priors con los datos acumulados (backtesting: ¿las fechas con nota alta se agotaron más?) y
