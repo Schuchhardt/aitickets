@@ -10,6 +10,7 @@ import { purgeEventPages } from "../../cdnCache";
 import { notifySlack } from "../../../pages/api/_lib/server-utils";
 import { sendEmail, formatRecipient, isValidEmail } from "../../../../netlify/lib/mailer.mjs";
 import { renderPayoutPaidEmail, renderPayoutFailedEmail } from "../../../../netlify/lib/emails/index.mjs";
+import { sendPushToOrg } from "../../../../netlify/lib/push.mjs";
 import { sendVerificationEmail, getOrgVerification } from "../../email-verification";
 import { sendMagicLinkEmail, reserveAuthLinkSend, isAiticketsIdentity } from "../../magic-link";
 import { recomputeHolderMatch } from "../../producerIdentity";
@@ -44,6 +45,12 @@ async function notifyProducer(supabase: any, orgId: number, render: (orgName: st
         if (!to.length) return { email_sent: false, email_note: "La organización no tiene un correo válido de dueño ni de contacto." };
         const { subject, html, text } = await render(orgName);
         await sendEmail({ to, subject, html, text, tags: ["payout", tag] });
+        await sendPushToOrg(orgId, {
+            title: subject,
+            body: text.slice(0, 120),
+            url: "/dashboard/finance",
+            tag,
+        });
         return { email_sent: true, email_recipients: to.length };
     } catch (err: any) {
         console.error(`admin ${tag} email:`, err?.message || err);

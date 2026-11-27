@@ -122,6 +122,12 @@ const jsonLd = [
   <ProducerTracking />
 </Layout>
 
+<script is:inline>
+  if (window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true) {
+    window.location.replace('/organizadores/login');
+  }
+</script>
+
 <style>
   .faq {
     padding-top: 0;

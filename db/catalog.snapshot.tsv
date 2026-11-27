@@ -809,6 +809,14 @@ column:aitickets_promoter_links.organization_id	bigint notnull=true default=-
 column:aitickets_promoter_links.ref	text notnull=true default=-
 column:aitickets_promoter_links.revoked_at	timestamp with time zone notnull=false default=-
 column:aitickets_promoter_links.token_hash	text notnull=true default=-
+column:aitickets_push_subscriptions.auth	text notnull=true default=-
+column:aitickets_push_subscriptions.created_at	timestamp with time zone notnull=true default=now()
+column:aitickets_push_subscriptions.endpoint	text notnull=true default=-
+column:aitickets_push_subscriptions.id	bigint notnull=true default=- identity=a
+column:aitickets_push_subscriptions.organization_id	bigint notnull=true default=-
+column:aitickets_push_subscriptions.p256dh	text notnull=true default=-
+column:aitickets_push_subscriptions.user_agent	text notnull=false default=-
+column:aitickets_push_subscriptions.user_id	uuid notnull=true default=-
 column:aitickets_rate_limits.bucket	text notnull=true default=-
 column:aitickets_rate_limits.count	integer notnull=true default=0
 column:aitickets_rate_limits.key_hash	text notnull=true default=-
@@ -1710,6 +1718,10 @@ constraint:aitickets_promoter_links.aitickets_promoter_links_pkey	PRIMARY KEY (i
 constraint:aitickets_promoter_links.aitickets_promoter_links_ref_check	CHECK ((ref ~ '^[a-z0-9_.-]{1,64}$'::text))
 constraint:aitickets_promoter_links.aitickets_promoter_links_token_hash_check	CHECK ((token_hash ~ '^[0-9a-f]{64}$'::text))
 constraint:aitickets_promoter_links.aitickets_promoter_links_token_key	UNIQUE (token_hash)
+constraint:aitickets_push_subscriptions.aitickets_push_subscriptions_endpoint_key	UNIQUE (endpoint)
+constraint:aitickets_push_subscriptions.aitickets_push_subscriptions_organization_id_fkey	FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+constraint:aitickets_push_subscriptions.aitickets_push_subscriptions_pkey	PRIMARY KEY (id)
+constraint:aitickets_push_subscriptions.aitickets_push_subscriptions_user_id_fkey	FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 constraint:aitickets_rate_limits.aitickets_rate_limits_pkey	PRIMARY KEY (bucket, key_hash, window_start)
 constraint:aitickets_refunds.aitickets_refunds_event_id_fkey	FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
 constraint:aitickets_refunds.aitickets_refunds_fee_amount_check	CHECK ((fee_amount >= 0))
@@ -1999,6 +2011,7 @@ grant:aitickets_payouts	-
 grant:aitickets_platform_settings	-
 grant:aitickets_producer_activity	-
 grant:aitickets_promoter_links	-
+grant:aitickets_push_subscriptions	-
 grant:aitickets_rate_limits	-
 grant:aitickets_refunds	-
 grant:aitickets_scheduled_messages	-
@@ -2135,6 +2148,8 @@ index:aitickets_producer_activity.aitickets_producer_activity_org_idx	CREATE IND
 index:aitickets_producer_activity.aitickets_producer_activity_user_idx	CREATE INDEX aitickets_producer_activity_user_idx ON aitickets_producer_activity USING btree (user_id, occurred_at DESC)
 index:aitickets_promoter_links.aitickets_promoter_links_event_idx	CREATE INDEX aitickets_promoter_links_event_idx ON aitickets_promoter_links USING btree (event_id) WHERE (event_id IS NOT NULL)
 index:aitickets_promoter_links.aitickets_promoter_links_org_idx	CREATE INDEX aitickets_promoter_links_org_idx ON aitickets_promoter_links USING btree (organization_id, created_at DESC)
+index:aitickets_push_subscriptions.aitickets_push_subscriptions_org_idx	CREATE INDEX aitickets_push_subscriptions_org_idx ON aitickets_push_subscriptions USING btree (organization_id)
+index:aitickets_push_subscriptions.aitickets_push_subscriptions_user_idx	CREATE INDEX aitickets_push_subscriptions_user_idx ON aitickets_push_subscriptions USING btree (user_id)
 index:aitickets_rate_limits.aitickets_rate_limits_window_idx	CREATE INDEX aitickets_rate_limits_window_idx ON aitickets_rate_limits USING btree (window_start)
 index:aitickets_refunds.aitickets_refunds_event_idx	CREATE INDEX aitickets_refunds_event_idx ON aitickets_refunds USING btree (event_id)
 index:aitickets_refunds.aitickets_refunds_order_idx	CREATE INDEX aitickets_refunds_order_idx ON aitickets_refunds USING btree (order_id)
@@ -2257,6 +2272,7 @@ table:aitickets_payouts	rls=true force=false
 table:aitickets_platform_settings	rls=true force=false
 table:aitickets_producer_activity	rls=true force=false
 table:aitickets_promoter_links	rls=true force=false
+table:aitickets_push_subscriptions	rls=true force=false
 table:aitickets_rate_limits	rls=true force=false
 table:aitickets_refunds	rls=true force=false
 table:aitickets_scheduled_messages	rls=true force=false
