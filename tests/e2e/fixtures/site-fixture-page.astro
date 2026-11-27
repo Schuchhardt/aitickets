@@ -1,0 +1,83 @@
+---
+// Sitio de productor armado con una plantilla completa (src/lib/sitePresets.ts) y contenido de ejemplo, para los e2e sin
+// BD y para revisar el diseño: /__e2e/sitios/<plantilla>. Con ?vacio=1 se ve tal como queda al aplicar la plantilla (lo
+// incompleto no se muestra). No vive en src/pages: astro.config.mjs la inyecta solo en `astro dev` con E2E_FIXTURES=1.
+import SiteLayout from "../../../src/layouts/SiteLayout.astro";
+import SitePage from "../../../src/components/sites/SitePage.vue";
+import { PRESET_BY_KEY } from "../../../src/lib/sitePresets";
+import { resolveThemeFor, sanitizeSections } from "../../../src/lib/siteTemplates";
+
+export const prerender = false;
+
+const preset = PRESET_BY_KEY[Astro.params.plantilla || ""];
+if (!preset) return new Response("Plantilla desconocida", { status: 404 });
+const empty = Astro.url.searchParams.get("vacio") === "1";
+// ?editor=1: vista previa en vivo, como /o/<slug>?editor=1 para el dueño (la usa el fixture del editor visual)
+const live = Astro.url.searchParams.get("editor") === "1";
+
+const IMAGES = [
+  "/landing/aitk-teatro-funcion.jpg",
+  "/landing/aitk-musica-sala.jpg",
+  "/landing/aitk-fiesta-pista.jpg",
+  "/landing/aitk-club-pista.jpg",
+  "/landing/aitk-seminario-sala.jpg",
+  "/landing/aitk-taller-clase.jpg",
+  "/landing/aitk-acad-recital.jpg",
+  "/landing/aitk-publico.jpg",
+];
+const PEOPLE = ["Antonia Rivas", "Matías Soto", "Javiera Muñoz", "Diego Fuentes", "Catalina Rojas", "Tomás Herrera", "Isidora Vega", "Benjamín Lagos"];
+const img = (i: number) => IMAGES[i % IMAGES.length];
+
+// Contenido de ejemplo: completa lo que la plantilla deja vacío (sin sanear: las imágenes son rutas locales del dev)
+const sections = JSON.parse(JSON.stringify(preset.sections)).map((s: any, n: number) => {
+  if (empty) return s;
+  const d = s.data;
+  if (s.type === "hero") d.image_url = img(n);
+  if (s.type === "feature") {
+    d.text ||= "Un texto de ejemplo para este bloque: cuenta aquí lo que hace especial a tu espacio, tu método o tu propuesta.";
+    d.image_url = img(n + 1);
+  }
+  if (s.type === "tabs") d.items = d.items.map((t: any, i: number) => ({ ...t, text: t.text || `Contenido de ejemplo de la pestaña ${i + 1}.\nHorarios, actividades y detalles.`, image_url: i === 0 ? img(n) : undefined }));
+  if (s.type === "people") d.items = d.items.map((p: any, i: number) => ({ name: PEOPLE[i % PEOPLE.length], role: "Rol de ejemplo", text: i % 2 ? "" : "Bio de ejemplo con su trayectoria.", image_url: i === 1 ? undefined : img(i) }));
+  if (s.type === "gallery") d.items = Array.from({ length: s.data.layout === "logos" ? 5 : 6 }, (_, i) => ({ image_url: img(i), caption: s.data.layout === "logos" ? `Marca ${i + 1}` : `Foto ${i + 1}` }));
+  if (s.type === "testimonials") d.items = d.items.map((_: any, i: number) => ({ quote: `Una opinión de ejemplo número ${i + 1}.`, author: PEOPLE[i] }));
+  if (s.type === "highlights") d.items = d.items.map((h: any, i: number) => ({ title: h.title || `Punto ${i + 1}`, text: h.text || "Texto de ejemplo." }));
+  if (s.type === "faq") d.items = d.items.map((f: any) => ({ ...f, answer: f.answer || "Respuesta de ejemplo." }));
+  if (s.type === "video") d.video = { url: "/videos/aitickets-demo.mp4", poster_url: "/videos/aitickets-demo-poster.jpg", width: 1920, height: 1080 };
+  if (s.type === "cta" && !d.modal_text && d.button_action === "modal") d.modal_text = "Texto de ejemplo de la ventana.";
+  return s;
+});
+
+const theme = resolveThemeFor(preset.template, preset.theme || {});
+const site = {
+  slug: "demo",
+  name: "Productora Demo",
+  template: preset.template,
+  theme,
+  content: { title: "Productora Demo", tagline: "Una frase de ejemplo para la productora." },
+  socials: { instagram: "https://www.instagram.com/aitickets.cl" },
+  contact_form_enabled: true,
+  is_demo: true,
+  layout: preset.layout,
+};
+const events = [1, 2, 3].map((i) => ({
+  id: i,
+  slug: `evento-${i}`,
+  name: `Evento de ejemplo ${i}`,
+  image_url: img(i + 2),
+  location: "Santiago",
+  start_date: null,
+  end_date: null,
+  dates: [{ date: `2026-12-${String(4 + i * 3).padStart(2, "0")}`, start_time: "21:00:00", end_time: null }],
+}));
+const shown = empty ? sanitizeSections(sections, { keepEmpty: live }) : sections;
+---
+<SiteLayout theme={theme}>
+  <title slot="head">{preset.name} · prueba</title>
+  <meta slot="head" name="robots" content="noindex" />
+  {live ? (
+    <SitePage client:load site={site} sections={shown} events={events} banners={[]} aboutHtml="<p>Texto de ejemplo sobre la productora.</p>" aboutText="Texto de ejemplo sobre la productora." base="/o/demo" fallbackName="Productora Demo" live />
+  ) : (
+    <SitePage site={site} sections={shown} events={events} banners={[]} aboutHtml="<p>Texto de ejemplo sobre la productora.</p>" aboutText="" base="/o/demo" fallbackName="" live={false} />
+  )}
+</SiteLayout>

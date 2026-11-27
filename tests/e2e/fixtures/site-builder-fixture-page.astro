@@ -1,0 +1,41 @@
+---
+// Editor visual del sitio (SiteBuilder.vue) con un sitio de ejemplo, para los e2e sin BD: /__e2e/sitio-editor. La vista
+// previa es la página de prueba del sitio en modo en vivo (site-fixture-page.astro con ?editor=1). Guardar llama a
+// PUT /api/sites, que los tests interceptan. Solo en `astro dev` con E2E_FIXTURES=1 (astro.config.mjs).
+import SiteBuilder from "../../../src/components/dashboard/site/SiteBuilder.vue";
+import { EDITOR_FONTS, EDITOR_TEMPLATES } from "../../../src/pages/dashboard/sitio/_lib/site-admin";
+import "../../../src/styles/global.css";
+
+export const prerender = false;
+
+const json = JSON.stringify({
+  site: {
+    id: 1,
+    slug: "demo",
+    template: "teatro",
+    theme: {},
+    content: { title: "Productora Demo", tagline: "Una frase de ejemplo para la productora.", about: "<p>Texto de ejemplo sobre la productora.</p>" },
+    seo: {},
+    contact_email: "",
+    contact_form_enabled: true,
+    published: true,
+  },
+  urls: { free: "/o/demo", subdomain: null, custom: null },
+  org: { publicName: "Productora Demo", emailVerified: true, publishedEvents: 3 },
+  templates: EDITOR_TEMPLATES,
+  fonts: EDITOR_FONTS,
+  previewPath: "/__e2e/sitios/general-productora?vacio=1",
+});
+---
+<!doctype html>
+<html lang="es-CL">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Editor del sitio · prueba</title>
+  </head>
+  <body class="font-[Prompt]">
+    <SiteBuilder client:only="vue" initialJson={json} />
+  </body>
+</html>

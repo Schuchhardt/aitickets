@@ -11,8 +11,15 @@
 //     los puede cambiar).
 //
 // Secciones (content.sections): lista ordenada que arma la página de inicio. Cada sección tiene un tipo, datos de texto
-// plano (nunca HTML: se renderizan como texto) y puede ocultarse. "Sobre nosotros" usa content.about (HTML saneado).
-// Un sitio sin content.sections se ve con la plantilla original (src/components/sites/templates/*).
+// plano (nunca HTML: se renderizan como texto), una variante de diseño (SECTION_LAYOUTS), puede ocultarse y aparecer en
+// el menú. Tipos: portada, eventos, sobre nosotros (content.about, HTML saneado), imagen y texto, destacados, pestañas,
+// personas (con bio en una ventana), galería (grilla, carrusel o logos), video (subido o YouTube/Vimeo), preguntas,
+// opiniones, llamado a la acción (enlace o ventana) y contacto. Un sitio sin content.sections se ve con la plantilla
+// original (src/components/sites/templates/*).
+//
+// content.layout: tipo de menú (barra superior, centrada o lateral). Plantillas completas por tipo de página (copy +
+// layout + tema): src/lib/sitePresets.ts. Límites de fotos y videos: MAX_SITE_IMAGES / MAX_SITE_VIDEOS.
+// Diseño y decisiones: docs/specs/sitios-plantillas-por-nicho.md.
 
 // ---------------------------------------------------------------------------
 // Plantillas
@@ -436,7 +443,21 @@ export function readableOn(hex: string | undefined): string {
 // ---------------------------------------------------------------------------
 // Secciones
 // ---------------------------------------------------------------------------
-export const SECTION_TYPES = ["hero", "events", "about", "highlights", "gallery", "video", "faq", "testimonials", "cta", "contact"] as const;
+export const SECTION_TYPES = [
+  "hero",
+  "events",
+  "about",
+  "feature",
+  "highlights",
+  "tabs",
+  "people",
+  "gallery",
+  "video",
+  "faq",
+  "testimonials",
+  "cta",
+  "contact",
+] as const;
 export type SectionType = (typeof SECTION_TYPES)[number];
 
 export interface SectionItem {
@@ -448,7 +469,23 @@ export interface SectionItem {
   author?: string;
   image_url?: string;
   caption?: string;
+  /** Personas (elenco, artistas, expositores, profes). */
+  name?: string;
+  role?: string;
+  /** Enlace de la persona (Instagram, sitio web). */
+  link_url?: string;
 }
+
+/** Video subido por el productor (Storage propio, mismas reglas que el video del evento). */
+export interface SiteVideo {
+  url: string;
+  poster_url?: string;
+  width?: number;
+  height?: number;
+  duration?: number;
+}
+
+export type ButtonAction = "link" | "modal";
 
 export interface SectionData {
   eyebrow?: string;
@@ -457,9 +494,21 @@ export interface SectionData {
   text?: string;
   button_label?: string;
   button_url?: string;
+  /** "modal": el botón abre una ventana con modal_title y modal_text en vez de ir a un enlace. */
+  button_action?: ButtonAction;
+  modal_title?: string;
+  modal_text?: string;
   image_url?: string;
+  /** Video de YouTube o Vimeo (sección video). */
   url?: string;
-  layout?: EventsLayout;
+  /** Video subido (portada de fondo, sección video, imagen y texto). */
+  video?: SiteVideo;
+  /** Variante de diseño de la sección (SECTION_LAYOUTS). */
+  layout?: string;
+  /** Imagen y texto: lado de la imagen. */
+  align?: "left" | "right";
+  /** Texto del enlace en el menú (si no, el título de la sección). */
+  nav_label?: string;
   items?: SectionItem[];
 }
 
@@ -467,24 +516,112 @@ export interface SiteSection {
   id: string;
   type: SectionType;
   hidden?: boolean;
+  /** Aparece en el menú de navegación del sitio. */
+  nav?: boolean;
   data: SectionData;
 }
 
 export const SECTION_INFO: Record<SectionType, { name: string; description: string; single?: boolean; maxItems?: number }> = {
-  hero: { name: "Portada", description: "Título grande, frase e imagen principal.", single: true },
+  hero: { name: "Portada", description: "Título grande, frase e imagen o video de fondo.", single: true },
   events: { name: "Próximos eventos", description: "Tus eventos publicados, siempre al día.", single: true },
-  about: { name: "Sobre nosotros", description: "Quiénes son y qué hacen." },
+  about: { name: "Sobre nosotros", description: "Quiénes son y qué hacen.", single: true },
+  feature: { name: "Imagen y texto", description: "Un bloque con foto o video al lado del texto (la sala, el método, cómo llegar)." },
   highlights: { name: "Destacados", description: "Tres a seis puntos cortos (cómo comprar, qué incluye...).", maxItems: 6 },
-  gallery: { name: "Galería", description: "Fotos de funciones, fiestas o clases anteriores.", maxItems: 12 },
-  video: { name: "Video", description: "Un video de YouTube o Vimeo." },
+  tabs: { name: "Pestañas", description: "Contenido en pestañas: programa por día, niveles, disciplinas, salas.", maxItems: 6 },
+  people: { name: "Personas", description: "Elenco, artistas, expositores o profes, con su bio en una ventana.", maxItems: 16 },
+  gallery: { name: "Galería", description: "Fotos en grilla o carrusel, o logos de auspiciadores y prensa.", maxItems: 24 },
+  video: { name: "Video", description: "Un video subido por ti o de YouTube / Vimeo." },
   faq: { name: "Preguntas frecuentes", description: "Preguntas y respuestas.", maxItems: 12 },
-  testimonials: { name: "Opiniones", description: "Lo que dice tu público o la prensa.", maxItems: 6 },
-  cta: { name: "Llamado a la acción", description: "Un mensaje con un botón." },
+  testimonials: { name: "Opiniones", description: "Lo que dice tu público o la prensa.", maxItems: 8 },
+  cta: { name: "Llamado a la acción", description: "Un mensaje con un botón (enlace o ventana con más información)." },
   contact: { name: "Contacto", description: "Invita a escribirte por el formulario.", single: true },
+};
+
+/** Variantes de diseño por tipo de sección (data.layout). La primera es la por defecto si la plantilla no dice otra. */
+export const SECTION_LAYOUTS: Partial<Record<SectionType, { value: string; label: string }[]>> = {
+  hero: [
+    { value: "split", label: "Texto al lado de la imagen" },
+    { value: "overlay", label: "Imagen o video de fondo" },
+    { value: "centered", label: "Centrada sobre la imagen" },
+  ],
+  events: [
+    { value: "cards", label: "Tarjetas" },
+    { value: "posters", label: "Afiches" },
+    { value: "list", label: "Lista de fechas" },
+  ],
+  gallery: [
+    { value: "grid", label: "Grilla (abre las fotos en grande)" },
+    { value: "carousel", label: "Carrusel" },
+    { value: "logos", label: "Logos (auspiciadores, prensa, sellos)" },
+  ],
+  people: [
+    { value: "grid", label: "Grilla" },
+    { value: "carousel", label: "Carrusel" },
+  ],
+  testimonials: [
+    { value: "grid", label: "Grilla" },
+    { value: "carousel", label: "Carrusel" },
+  ],
 };
 
 export const MAX_SECTIONS = 20;
 
+// ---------------------------------------------------------------------------
+// Límites de medios del sitio (fotos y videos). Las fotos se achican en el navegador (src/lib/clientImage.js) y el
+// servidor las optimiza (src/lib/imageOptimize.ts); los videos se suben directo a Storage con las reglas del video del
+// evento (src/lib/videoStorage.ts): MP4/WEBM/MOV, máx. SITE_VIDEO_MAX_BYTES, con póster.
+// ---------------------------------------------------------------------------
+export const MAX_SITE_IMAGES = 60;
+export const MAX_SITE_VIDEOS = 3;
+export const SITE_VIDEO_MAX_BYTES = 50 * 1024 * 1024;
+/** Duración máxima de un video del sitio (se revisa en el navegador al subirlo). */
+export const SITE_VIDEO_MAX_SECONDS = 180;
+export const SITE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+
+/** Fotos y videos subidos que usan las secciones (no cuenta logo ni imágenes de eventos). */
+export function countSectionMedia(sections: SiteSection[] | null | undefined): { images: number; videos: number } {
+  const images = new Set<string>();
+  const videos = new Set<string>();
+  for (const s of Array.isArray(sections) ? sections : []) {
+    if (s?.data?.image_url) images.add(s.data.image_url);
+    if (s?.data?.video?.url) videos.add(s.data.video.url);
+    for (const item of s?.data?.items || []) if (item?.image_url) images.add(item.image_url);
+  }
+  return { images: images.size, videos: videos.size };
+}
+
+/** Videos subidos (URL) que usan las secciones. */
+export function sectionVideoUrls(sections: SiteSection[] | null | undefined): string[] {
+  return [...new Set((Array.isArray(sections) ? sections : []).map((s) => s?.data?.video?.url).filter((u): u is string => !!u))];
+}
+
+// ---------------------------------------------------------------------------
+// Diseño general del sitio (content.layout): tipo de menú
+// ---------------------------------------------------------------------------
+export const SITE_NAV_STYLES = [
+  { value: "top", label: "Barra superior", description: "Logo a la izquierda y menú a la derecha." },
+  { value: "centered", label: "Centrada", description: "Logo al centro y menú debajo, estilo revista." },
+  { value: "sidebar", label: "Menú lateral", description: "Menú fijo a la izquierda en el computador." },
+] as const;
+export type SiteNavStyle = (typeof SITE_NAV_STYLES)[number]["value"];
+
+export interface SiteLayoutSettings {
+  nav?: SiteNavStyle;
+  /** El menú queda fijo arriba al hacer scroll (barra superior y centrada). */
+  sticky?: boolean;
+}
+
+export function sanitizeLayout(input: unknown): SiteLayoutSettings {
+  const l = input && typeof input === "object" ? (input as Record<string, unknown>) : {};
+  const out: SiteLayoutSettings = {};
+  if (SITE_NAV_STYLES.some((n) => n.value === l.nav)) out.nav = l.nav as SiteNavStyle;
+  if (l.sticky === true) out.sticky = true;
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Saneamiento
+// ---------------------------------------------------------------------------
 const clean = (v: unknown, max: number): string | undefined => {
   if (typeof v !== "string") return undefined;
   // Sin caracteres de control (salvo saltos de línea), sin espacios repetidos al borde
@@ -509,45 +646,124 @@ function cleanImage(v: unknown, allowedImages?: Set<string>): string | undefined
   return url;
 }
 
+const VIDEO_FILE_RE = /\.(mp4|webm|mov)$/i;
+const positiveInt = (v: unknown, max: number) => {
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) && n > 0 && n <= max ? n : undefined;
+};
+
+/**
+ * Video subido: URL https de un archivo MP4/WEBM/MOV y metadatos numéricos. Que el archivo sea nuestro (Storage de la
+ * productora) lo revisa el servidor al guardar (src/pages/dashboard/sitio/_lib/site-admin.ts); allowedVideos restringe
+ * a URLs conocidas (la IA no puede inventar videos).
+ */
+export function cleanVideo(v: unknown, opts: { allowedVideos?: Set<string>; allowedImages?: Set<string> } = {}): SiteVideo | undefined {
+  if (!v || typeof v !== "object") return undefined;
+  const raw = v as Record<string, unknown>;
+  const url = cleanUrl(raw.url);
+  if (!url || !url.startsWith("https://") || !VIDEO_FILE_RE.test(new URL(url).pathname)) return undefined;
+  if (opts.allowedVideos && !opts.allowedVideos.has(url)) return undefined;
+  const video: SiteVideo = { url };
+  const poster = cleanImage(raw.poster_url);
+  if (poster && (!opts.allowedImages || opts.allowedImages.has(poster))) video.poster_url = poster;
+  const width = positiveInt(raw.width, 20000);
+  const height = positiveInt(raw.height, 20000);
+  const duration = positiveInt(raw.duration, 24 * 3600);
+  if (width) video.width = width;
+  if (height) video.height = height;
+  if (duration) video.duration = duration;
+  return video;
+}
+
 /** Id de sección: corto y estable. */
 export function newSectionId(type: string): string {
   return `${type}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function cleanItems(type: SectionType, items: unknown, allowedImages?: Set<string>): SectionItem[] {
+/** Largo máximo de cada texto editable (editor, edición en la vista previa y saneamiento). */
+const TEXT_MAX: Record<string, number> = { eyebrow: 60, title: 120, nav_label: 24, subtitle: 300, button_label: 40, modal_title: 120, modal_text: 3000 };
+const SECTION_TEXT_MAX: Partial<Record<SectionType, number>> = { events: 300, video: 600, cta: 400, contact: 300, feature: 1500 };
+const ITEM_TEXT_MAX: Partial<Record<SectionType, Record<string, number>>> = {
+  highlights: { title: 80, text: 300 },
+  faq: { question: 200, answer: 1500 },
+  testimonials: { quote: 500, author: 100 },
+  gallery: { caption: 140 },
+  tabs: { title: 40, text: 2000 },
+  people: { name: 80, role: 80, text: 1000 },
+};
+/** Campos de texto de una línea (Enter termina la edición en la vista previa). */
+export const SINGLE_LINE_FIELDS = new Set(["eyebrow", "title", "nav_label", "button_label", "modal_title", "question", "author", "caption", "name", "role", "tagline"]);
+
+/** Largo máximo de un campo de la sección (o de sus ítems con item=true); 0 si el campo no se edita como texto. */
+export function textMax(type: SectionType, field: string, item = false): number {
+  if (item) return ITEM_TEXT_MAX[type]?.[field] || 0;
+  if (field === "text") return SECTION_TEXT_MAX[type] || 0;
+  if (field === "subtitle" && type !== "hero") return 0;
+  if (field === "button_label" && !BUTTON_TYPES.has(type)) return 0;
+  if ((field === "modal_title" || field === "modal_text") && !MODAL_TYPES.has(type)) return 0;
+  return TEXT_MAX[field] || 0;
+}
+
+/** El ítem tiene lo mínimo para mostrarse en el sitio público. */
+export function itemIsFilled(type: SectionType, item: SectionItem | null | undefined): boolean {
+  if (!item) return false;
+  if (type === "highlights") return !!(item.title || item.text);
+  if (type === "faq") return !!(item.question && item.answer);
+  if (type === "testimonials") return !!item.quote;
+  if (type === "gallery") return !!item.image_url;
+  if (type === "tabs") return !!(item.title && (item.text || item.image_url));
+  if (type === "people") return !!item.name;
+  return false;
+}
+
+function cleanItems(type: SectionType, items: unknown, opts: SanitizeOptions): SectionItem[] {
   if (!Array.isArray(items)) return [];
   const max = SECTION_INFO[type].maxItems || 0;
+  const limits = ITEM_TEXT_MAX[type] || {};
   const out: SectionItem[] = [];
   for (const raw of items) {
     if (out.length >= max) break;
     if (!raw || typeof raw !== "object") continue;
     const i = raw as Record<string, unknown>;
-    let item: SectionItem | null = null;
-    if (type === "highlights") {
-      const title = cleanLine(i.title, 80);
-      const text = clean(i.text, 300);
-      if (title || text) item = { title, text };
-    } else if (type === "faq") {
-      const question = cleanLine(i.question, 200);
-      const answer = clean(i.answer, 1500);
-      if (question && answer) item = { question, answer };
-    } else if (type === "testimonials") {
-      const quote = clean(i.quote, 500);
-      if (quote) item = { quote, author: cleanLine(i.author, 100) };
-    } else if (type === "gallery") {
-      const image_url = cleanImage(i.image_url, allowedImages);
-      if (image_url) item = { image_url, caption: cleanLine(i.caption, 140) };
+    const item: SectionItem = {};
+    for (const [field, limit] of Object.entries(limits)) {
+      const value = SINGLE_LINE_FIELDS.has(field) ? cleanLine(i[field], limit) : clean(i[field], limit);
+      if (value) (item as Record<string, string>)[field] = value;
     }
-    if (item) out.push(Object.fromEntries(Object.entries(item).filter(([, v]) => v !== undefined)) as SectionItem);
+    if (type === "gallery" || type === "tabs" || type === "people") {
+      const image_url = cleanImage(i.image_url, opts.allowedImages);
+      if (image_url) item.image_url = image_url;
+    }
+    if (type === "people") {
+      const link = cleanUrl(i.link_url);
+      if (link) item.link_url = link;
+    }
+    // En el editor se conservan los ítems a medio llenar (se muestran con textos de ayuda en la vista previa); el sitio
+    // público solo guarda y muestra los completos. Una foto de galería sin imagen (rechazada o inválida) nunca sirve.
+    if (type === "gallery" && !item.image_url) continue;
+    if (opts.keepEmpty || itemIsFilled(type, item)) out.push(item);
   }
   return out;
 }
 
+export interface SanitizeOptions {
+  /** Solo se aceptan estas URLs de imagen (la IA no puede inventar imágenes). */
+  allowedImages?: Set<string>;
+  /** Solo se aceptan estos videos subidos. */
+  allowedVideos?: Set<string>;
+  /** Conserva ítems incompletos (editor y vista previa en vivo). */
+  keepEmpty?: boolean;
+}
+
+const LAYOUT_TYPES = new Set<SectionType>(Object.keys(SECTION_LAYOUTS) as SectionType[]);
+const BUTTON_TYPES = new Set<SectionType>(["hero", "feature", "cta"]);
+const MODAL_TYPES = new Set<SectionType>(["feature", "cta"]);
+
 /**
- * Valida y limpia las secciones (del editor o de la IA). allowedImages: si se indica, solo se aceptan esas URLs de
- * imagen (la IA no puede inventar imágenes; las del productor vienen de /api/sites/upload).
+ * Valida y limpia las secciones (del editor o de la IA). Las imágenes de las productoras vienen de /api/sites/upload y los
+ * videos de /api/sites/video.
  */
-export function sanitizeSections(input: unknown, opts: { allowedImages?: Set<string> } = {}): SiteSection[] {
+export function sanitizeSections(input: unknown, opts: SanitizeOptions = {}): SiteSection[] {
   if (!Array.isArray(input)) return [];
   const out: SiteSection[] = [];
   const ids = new Set<string>();
@@ -563,37 +779,48 @@ export function sanitizeSections(input: unknown, opts: { allowedImages?: Set<str
       singles.add(type);
     }
     let id = typeof s.id === "string" && /^[a-z0-9-]{1,40}$/i.test(s.id) ? s.id : newSectionId(type);
+    // "eventos" es el ancla fija de la sección de eventos
+    if (id === "eventos" && type !== "events") id = newSectionId(type);
     while (ids.has(id)) id = newSectionId(type);
     ids.add(id);
 
     const d = s.data && typeof s.data === "object" ? s.data : {};
     const data: SectionData = {
-      eyebrow: cleanLine(d.eyebrow, 60),
-      title: cleanLine(d.title, 120),
+      eyebrow: cleanLine(d.eyebrow, TEXT_MAX.eyebrow),
+      title: cleanLine(d.title, TEXT_MAX.title),
+      nav_label: cleanLine(d.nav_label, TEXT_MAX.nav_label),
     };
-    if (type === "hero") {
-      data.subtitle = clean(d.subtitle, 300);
-      data.button_label = cleanLine(d.button_label, 40);
-      data.image_url = cleanImage(d.image_url, opts.allowedImages);
-    } else if (type === "events") {
-      data.text = clean(d.text, 300);
-      if (["cards", "posters", "list"].includes(d.layout)) data.layout = d.layout;
-    } else if (type === "video") {
-      data.text = clean(d.text, 600);
-      data.url = videoEmbedUrl(d.url) ? cleanUrl(d.url) : undefined;
-    } else if (type === "cta") {
-      data.text = clean(d.text, 400);
-      data.button_label = cleanLine(d.button_label, 40);
+    if (LAYOUT_TYPES.has(type) && SECTION_LAYOUTS[type]!.some((l) => l.value === d.layout)) data.layout = d.layout;
+    if (BUTTON_TYPES.has(type)) {
+      data.button_label = cleanLine(d.button_label, TEXT_MAX.button_label);
       data.button_url = cleanUrl(d.button_url, { allowAnchors: true });
-    } else if (type === "contact") {
-      data.text = clean(d.text, 300);
-    } else if (type === "highlights" || type === "faq" || type === "testimonials" || type === "gallery") {
-      data.items = cleanItems(type, d.items, opts.allowedImages);
+    }
+    if (MODAL_TYPES.has(type) && d.button_action === "modal") {
+      data.button_action = "modal";
+      data.modal_title = cleanLine(d.modal_title, TEXT_MAX.modal_title);
+      data.modal_text = clean(d.modal_text, TEXT_MAX.modal_text);
+    }
+    if (SECTION_TEXT_MAX[type]) data.text = clean(d.text, SECTION_TEXT_MAX[type]!);
+
+    if (type === "hero") {
+      data.subtitle = clean(d.subtitle, TEXT_MAX.subtitle);
+      data.image_url = cleanImage(d.image_url, opts.allowedImages);
+      data.video = cleanVideo(d.video, opts);
+    } else if (type === "feature") {
+      data.image_url = cleanImage(d.image_url, opts.allowedImages);
+      data.video = cleanVideo(d.video, opts);
+      if (d.align === "right") data.align = "right";
+    } else if (type === "video") {
+      data.url = videoEmbedUrl(d.url) ? cleanUrl(d.url) : undefined;
+      data.video = cleanVideo(d.video, opts);
+    } else if (SECTION_INFO[type].maxItems) {
+      data.items = cleanItems(type, d.items, opts);
     }
     out.push({
       id,
       type,
       ...(s.hidden === true ? { hidden: true } : {}),
+      ...(s.nav === true ? { nav: true } : {}),
       data: Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined)) as SectionData,
     });
   }
@@ -622,7 +849,7 @@ export function defaultSections(template: SiteTemplate): SiteSection[] {
   return sections.map((s) => ({ ...s, data: Object.fromEntries(Object.entries(s.data).filter(([, v]) => v !== undefined)) }));
 }
 
-/** Sección nueva y vacía (con textos de ejemplo de la plantilla) para "Agregar sección". */
+/** Sección nueva (con textos de ejemplo de la plantilla) para "Agregar sección". */
 export function blankSection(type: SectionType, template: SiteTemplate): SiteSection {
   const fromDefaults = defaultSections(template).find((s) => s.type === type);
   if (fromDefaults) return { ...fromDefaults, id: newSectionId(type) };
@@ -630,7 +857,10 @@ export function blankSection(type: SectionType, template: SiteTemplate): SiteSec
     hero: {},
     events: {},
     about: { title: "Sobre nosotros" },
+    feature: { title: "", text: "", button_label: "", button_url: "#eventos" },
     highlights: { title: "Destacados", items: [{ title: "", text: "" }] },
+    tabs: { title: "Programa", items: [{ title: "Día 1", text: "" }, { title: "Día 2", text: "" }] },
+    people: { title: "Quiénes participan", layout: "grid", items: [{ name: "", role: "" }, { name: "", role: "" }, { name: "", role: "" }] },
     gallery: { title: "Galería", items: [] },
     video: { title: "Mira cómo se vive", url: "" },
     faq: { title: "Preguntas frecuentes", items: [{ question: "", answer: "" }] },
@@ -639,6 +869,90 @@ export function blankSection(type: SectionType, template: SiteTemplate): SiteSec
     contact: { title: "Contacto", text: "Escríbenos y te responderemos a tu correo." },
   };
   return { id: newSectionId(type), type, data: data[type] };
+}
+
+/** Ítem vacío para "Agregar" en una sección con ítems. */
+export function blankItem(type: SectionType): SectionItem {
+  const fields = Object.keys(ITEM_TEXT_MAX[type] || {});
+  return Object.fromEntries(fields.map((f) => [f, ""]));
+}
+
+// ---------------------------------------------------------------------------
+// Menú de navegación
+// ---------------------------------------------------------------------------
+/** Ancla de la sección en la página de inicio ("#eventos" para la de eventos). */
+export const sectionAnchor = (s: Pick<SiteSection, "id" | "type">) => (s.type === "events" ? "eventos" : s.id);
+
+const NAV_DEFAULT_LABEL: Partial<Record<SectionType, string>> = {
+  events: "Eventos",
+  about: "Nosotros",
+  faq: "Preguntas",
+  people: "Equipo",
+  gallery: "Galería",
+  video: "Video",
+  testimonials: "Opiniones",
+  contact: "Contacto",
+  tabs: "Programa",
+};
+
+/** Etiqueta de la sección en el menú. */
+export function navLabel(s: SiteSection): string {
+  const label = s.data.nav_label || (s.type !== "hero" ? s.data.title : "") || NAV_DEFAULT_LABEL[s.type] || SECTION_INFO[s.type].name;
+  return label.length > 24 ? `${label.slice(0, 23).trimEnd()}…` : label;
+}
+
+// ---------------------------------------------------------------------------
+// Edición de textos en la vista previa (el editor recibe { target, value } desde el iframe)
+// ---------------------------------------------------------------------------
+export interface SiteDraft {
+  template: SiteTemplate;
+  theme: Record<string, unknown>;
+  title: string;
+  tagline: string;
+  about: string;
+  sections: SiteSection[];
+  layout?: SiteLayoutSettings;
+}
+
+const SITE_FIELD_MAX: Record<string, number> = { title: 80, tagline: 200, about: 5000 };
+
+/**
+ * Aplica un texto editado en la vista previa. target: "site.title" | "site.tagline" | "site.about" |
+ * "<sección>.<campo>" | "<sección>.items.<n>.<campo>". Devuelve false si el destino no existe o no es editable.
+ */
+export function applyTextEdit(draft: Pick<SiteDraft, "title" | "tagline" | "about" | "sections">, target: unknown, value: unknown): boolean {
+  if (typeof target !== "string" || typeof value !== "string" || target.length > 120) return false;
+  const parts = target.split(".");
+  const normalize = (v: string, max: number, singleLine: boolean) => {
+    let s = v.replace(/\r\n?/g, "\n").replace(/ /g, " ");
+    if (singleLine) s = s.replace(/\s*\n\s*/g, " ");
+    return s.replace(/\n{3,}/g, "\n\n").trim().slice(0, max);
+  };
+  if (parts[0] === "site" && parts.length === 2) {
+    const field = parts[1] as "title" | "tagline" | "about";
+    if (!SITE_FIELD_MAX[field]) return false;
+    draft[field] = normalize(value, SITE_FIELD_MAX[field], field !== "about");
+    return true;
+  }
+  const section = draft.sections.find((s) => s.id === parts[0]);
+  if (!section) return false;
+  if (parts.length === 2) {
+    const field = parts[1];
+    const max = textMax(section.type, field);
+    if (!max) return false;
+    (section.data as Record<string, unknown>)[field] = normalize(value, max, SINGLE_LINE_FIELDS.has(field));
+    return true;
+  }
+  if (parts.length === 4 && parts[1] === "items") {
+    const index = Number(parts[2]);
+    const field = parts[3];
+    const item = Number.isInteger(index) ? section.data.items?.[index] : undefined;
+    const max = textMax(section.type, field, true);
+    if (!item || !max) return false;
+    (item as Record<string, unknown>)[field] = normalize(value, max, SINGLE_LINE_FIELDS.has(field));
+    return true;
+  }
+  return false;
 }
 
 /** URL para incrustar un video de YouTube o Vimeo (null si no es de uno de ellos). */

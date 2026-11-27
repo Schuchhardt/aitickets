@@ -16,7 +16,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { getSupabaseAdmin } from "./auth-helpers";
 import { DEMO_EVENT_SLUGS, getDemoFunctionDate } from "./demoEvent.mjs";
 import { getZonedParts, zonedDateTimeToDate } from "../utils/dateHelpers.js";
-import { SITE_TEMPLATES, isSafeHttpUrl, resolveThemeFor, type SiteTemplate } from "./siteTemplates";
+import { SITE_TEMPLATES, isSafeHttpUrl, resolveThemeFor, sanitizeLayout, type SiteLayoutSettings, type SiteTemplate } from "./siteTemplates";
 
 export {
   SITE_FONTS,
@@ -125,6 +125,8 @@ export interface PublicSiteProps {
   socials: SiteSocials;
   contact_form_enabled: boolean;
   is_demo: boolean;
+  /** Tipo de menú (content.layout, src/lib/siteTemplates.ts). */
+  layout: SiteLayoutSettings;
 }
 
 // ---------------------------------------------------------------------------
@@ -627,6 +629,7 @@ export function publicSiteProps(site: SiteRecord, templateOverride?: SiteTemplat
     socials: cleanSocials(site),
     contact_form_enabled: site.contact_form_enabled !== false,
     is_demo: !!site.is_demo,
+    layout: sanitizeLayout(site.content?.layout),
   };
 }
 

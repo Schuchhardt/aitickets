@@ -1,5 +1,5 @@
 <script setup>
-// "Editar con IA" del sitio: el productor describe el cambio y /api/sites/ai devuelve los cambios, que SiteEditor aplica
+// "Editar con IA" del sitio: el productor describe el cambio y /api/sites/ai devuelve los cambios, que SiteBuilder aplica
 // al borrador (se ven al tiro en la vista previa y se pueden deshacer). Nada se guarda hasta "Guardar cambios".
 import { computed, nextTick, ref } from 'vue'
 import { Sparkles, Undo2, X } from 'lucide-vue-next'
@@ -23,9 +23,11 @@ const textarea = ref(null)
 
 const SITE_IDEAS = [
   'Escribe los textos del sitio a partir de mis próximos eventos',
+  'Usa la plantilla de festival y adapta los textos a mi productora',
+  'Agrega pestañas con el programa por día',
+  'Pon el menú a la izquierda y déjalo más sobrio',
   'Agrega preguntas frecuentes sobre cómo comprar y recibir la entrada',
-  'Hazlo más elegante y sobrio',
-  'Agrega un llamado a la acción para comprar antes de que se agote',
+  'Agrega un botón que abra una ventana para cotizar eventos privados',
   'Cambia los colores a tonos verdes',
 ]
 const SECTION_IDEAS = ['Hazlo más corto y directo', 'Escríbelo con más energía', 'Hazlo más formal']

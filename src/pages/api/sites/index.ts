@@ -8,6 +8,7 @@ import { getSupabaseAdmin } from "../../../lib/auth-helpers";
 import { isValidSlug, RESERVED_SLUGS, SLUG_RE } from "../../../lib/sites";
 import { isValidEmail } from "../../../../netlify/lib/mailer.mjs";
 import { sendContactEmailConfirmation } from "../../../lib/site-contact-email";
+import { MAX_SITE_IMAGES, MAX_SITE_VIDEOS, countSectionMedia, type SiteSection } from "../../../lib/siteTemplates";
 import {
   EDITOR_TEMPLATES,
   SITE_EDITOR_COLUMNS,
@@ -17,7 +18,9 @@ import {
   json,
   loadBanners,
   loadOrgSite,
+  keepOwnSiteVideos,
   orgStatus,
+  removeUnusedSiteVideos,
   requireSiteAdmin,
   sanitizeContent,
   sanitizeSeo,
@@ -93,7 +96,22 @@ export const PUT: APIRoute = async ({ request, cookies }) => {
     patch.template = input.template;
   }
   if (input.theme !== undefined) patch.theme = sanitizeTheme(input.theme);
-  if (input.content !== undefined) patch.content = sanitizeContent(input.content, site.content);
+  if (input.content !== undefined) {
+    const content = sanitizeContent(input.content, site.content);
+    if (Array.isArray(input.content.sections)) {
+      // Solo videos subidos a la carpeta de la productora y dentro de los límites de fotos y videos del sitio
+      const sections = keepOwnSiteVideos(content.sections as SiteSection[], auth.orgId);
+      const media = countSectionMedia(sections);
+      if (media.images > MAX_SITE_IMAGES) {
+        return json({ message: `Tu sitio puede tener hasta ${MAX_SITE_IMAGES} fotos y tiene ${media.images}. Quita algunas para guardar.`, field: "sections" }, 400);
+      }
+      if (media.videos > MAX_SITE_VIDEOS) {
+        return json({ message: `Tu sitio puede tener hasta ${MAX_SITE_VIDEOS} videos subidos y tiene ${media.videos}. Quita alguno para guardar.`, field: "sections" }, 400);
+      }
+      content.sections = sections;
+    }
+    patch.content = content;
+  }
   if (input.seo !== undefined) patch.seo = sanitizeSeo(input.seo);
   // contact_email: vacío o igual al correo VERIFICADO de la productora (email_verified_for, no
   // organizations.email, que se edita sin confirmar) se guarda directo; cualquier otro correo
@@ -162,6 +180,9 @@ export const PUT: APIRoute = async ({ request, cookies }) => {
   if (!updated) return json({ message: "Sitio no encontrado" }, 404);
 
   invalidateSite(updated, previousSlug);
+  if (Array.isArray((patch.content as any)?.sections)) {
+    await removeUnusedSiteVideos(site.content?.sections, (patch.content as any).sections, auth.orgId);
+  }
   const banners = await loadBanners(updated.id);
   return json({ ...editorView(updated, banners), pendingContactEmail, message: pendingMessage ? `Cambios guardados. ${pendingMessage}` : "Cambios guardados" });
 };

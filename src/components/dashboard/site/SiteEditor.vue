@@ -1,11 +1,12 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { Globe, ExternalLink, Copy, Check, RefreshCw, Upload, X, Eye, EyeOff, AlertTriangle, Monitor, Smartphone } from 'lucide-vue-next'
-import { apiRequest, uploadSiteImage, copyText, htmlToPlain, plainToHtml } from './siteApi.js'
-import { TEMPLATE_INFO, defaultSections, fontStack, sanitizeSections } from '../../../lib/siteTemplates'
-import SectionsEditor from './SectionsEditor.vue'
-import SiteAiPanel from './SiteAiPanel.vue'
-import '../../../styles/site-niches.css'
+// Ajustes del sitio web del productor (/dashboard/sitio): estado y enlaces, nombre, frase, redes, dirección y SEO.
+// El diseño (plantillas, secciones, estilo, IA y textos) se edita en el editor visual a pantalla completa
+// (/dashboard/sitio/editor, SiteBuilder.vue). Guardar aquí solo envía lo de esta página (PUT parcial de content).
+import { computed, reactive, ref, watch } from 'vue'
+import { Globe, ExternalLink, Copy, Check, Upload, X, Eye, EyeOff, AlertTriangle, LayoutTemplate, ArrowRight } from 'lucide-vue-next'
+import { apiRequest, uploadSiteImage, copyText } from './siteApi.js'
+import { TEMPLATE_INFO } from '../../../lib/siteTemplates'
+import { PRESET_BY_KEY } from '../../../lib/sitePresets'
 
 const props = defineProps({
   initialJson: { type: String, required: true },
@@ -15,18 +16,7 @@ const initial = JSON.parse(props.initialJson)
 const site = ref(initial.site)
 const urls = ref(initial.urls)
 const org = initial.org || {}
-const templates = initial.templates || ['clasico', 'nocturno']
-const fonts = initial.fonts || ['Unbounded', 'Prompt', 'Inter']
 
-// Plantillas por nicho primero (mismo estilo que cada landing de nicho) y luego las generales
-const nicheTemplates = templates.filter((t) => TEMPLATE_INFO[t]?.group === 'nicho')
-const generalTemplates = templates.filter((t) => TEMPLATE_INFO[t] && TEMPLATE_INFO[t].group !== 'nicho')
-const COLOR_FIELDS = [
-  { key: 'primary', label: 'Principal' },
-  { key: 'accent', label: 'Acento' },
-  { key: 'background', label: 'Fondo' },
-  { key: 'text', label: 'Texto' },
-]
 const SOCIAL_FIELDS = [
   { key: 'instagram', label: 'Instagram', placeholder: 'https://instagram.com/tuproductora' },
   { key: 'facebook', label: 'Facebook', placeholder: 'https://facebook.com/tuproductora' },
@@ -40,11 +30,8 @@ function formFromSite(s) {
   const content = s.content || {}
   const socials = content.socials || {}
   return {
-    template: templates.includes(s.template) ? s.template : 'clasico',
-    theme: { ...(s.theme || {}) },
     title: content.title || '',
     tagline: content.tagline || '',
-    about: htmlToPlain(content.about || ''),
     socials: {
       instagram: socials.instagram || '',
       facebook: socials.facebook || '',
@@ -55,8 +42,6 @@ function formFromSite(s) {
       whatsapp: socials.whatsapp || '',
     },
     seo: { title: s.seo?.title || '', description: s.seo?.description || '', og_image: s.seo?.og_image || '' },
-    // Sin secciones guardadas: las sugeridas de la plantilla (el sitio sigue con la plantilla original hasta guardar)
-    sections: Array.isArray(content.sections) ? sanitizeSections(content.sections) : defaultSections(templates.includes(s.template) ? s.template : 'clasico'),
   }
 }
 
@@ -69,80 +54,12 @@ const message = ref('')
 const isError = ref(false)
 const publishing = ref(false)
 
-const templateDefaults = computed(() => TEMPLATE_INFO[form.template]?.defaults || TEMPLATE_INFO.clasico.defaults)
-const templateName = computed(() => TEMPLATE_INFO[form.template]?.name || form.template)
-
-// --- Plantilla y secciones ---
-const withoutIds = (sections) => JSON.stringify(sections.map(({ id, ...rest }) => rest))
-const usingSuggested = computed(() => withoutIds(form.sections) === withoutIds(defaultSections(form.template)))
-function clearStyleOverrides() {
-  for (const f of COLOR_FIELDS) delete form.theme[f.key]
-  delete form.theme.font
-  delete form.theme.dark
-}
-function selectTemplate(key) {
-  if (key === form.template) return
-  pushHistory()
-  // Si las secciones siguen como las sugirió la plantilla anterior, se cambian por las de la nueva (sus textos son del nicho)
-  if (usingSuggested.value) form.sections = defaultSections(key)
-  clearStyleOverrides()
-  form.template = key
-}
-function useSuggestedSections() {
-  pushHistory()
-  form.sections = defaultSections(form.template)
-}
-
-// --- Deshacer (cambios de la IA y de plantilla) ---
-const history = ref([])
-function pushHistory() {
-  history.value.push(JSON.stringify(form))
-  if (history.value.length > 20) history.value.shift()
-}
-function undo() {
-  const previous = history.value.pop()
-  if (previous) Object.assign(form, JSON.parse(previous))
-}
-
-// --- IA ---
-const aiPanel = ref(null)
-const aiTarget = ref(null)
-const draft = () => ({
-  template: form.template,
-  theme: form.theme,
-  title: form.title,
-  tagline: form.tagline,
-  about: form.about,
-  sections: form.sections,
+const designName = computed(() => {
+  const preset = PRESET_BY_KEY[site.value.content?.preset]
+  if (preset) return preset.name
+  return TEMPLATE_INFO[site.value.template]?.name || site.value.template
 })
-function applyAi(changes) {
-  pushHistory()
-  if (changes.template && templates.includes(changes.template)) {
-    form.template = changes.template
-    if (!changes.theme) clearStyleOverrides()
-  }
-  if (changes.theme) form.theme = { ...changes.theme }
-  if (typeof changes.title === 'string') form.title = changes.title
-  if (typeof changes.tagline === 'string') form.tagline = changes.tagline
-  if (typeof changes.about === 'string') form.about = changes.about
-  if (Array.isArray(changes.sections)) {
-    form.sections = changes.sections
-    if (aiTarget.value) aiTarget.value = form.sections.find((s) => s.id === aiTarget.value.id) || null
-  }
-}
-function editSectionWithAi(section) {
-  aiTarget.value = section
-  aiPanel.value?.$el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  aiPanel.value?.focus()
-}
-const colorValue = (key) => form.theme[key] || templateDefaults.value[key]
-const setColor = (key, value) => {
-  form.theme[key] = value
-}
-const removeThemeImage = (key) => {
-  delete form.theme[key]
-}
-const resetColors = () => clearStyleOverrides()
+const hasSections = computed(() => Array.isArray(site.value.content?.sections))
 
 // --- Dirección (slug) ---
 const slugInput = ref(site.value.slug)
@@ -165,7 +82,7 @@ watch(slugInput, (value) => {
   const cleaned = String(value || '')
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9-]/g, '-')
     .replace(/-{2,}/g, '-')
     .slice(0, 40)
@@ -209,22 +126,19 @@ async function saveSlug() {
   }
 }
 
-// --- Imágenes ---
-const uploading = reactive({ logo: false, hero: false, og: false })
-async function onUpload(event, kind) {
+// --- Imagen para compartir ---
+const uploadingOg = ref(false)
+async function onUploadOg(event) {
   const file = event.target.files?.[0]
   event.target.value = ''
   if (!file) return
-  uploading[kind] = true
+  uploadingOg.value = true
   try {
-    const url = await uploadSiteImage(file, kind)
-    if (kind === 'logo') form.theme.logo_url = url
-    else if (kind === 'hero') form.theme.hero_image_url = url
-    else form.seo.og_image = url
+    form.seo.og_image = await uploadSiteImage(file, 'og')
   } catch (e) {
     flash(e.message, true)
   } finally {
-    uploading[kind] = false
+    uploadingOg.value = false
   }
 }
 
@@ -243,25 +157,18 @@ function applyServer(data, { keepForm = false } = {}) {
     savedSnapshot.value = JSON.stringify(form)
   }
   slugInput.value = site.value.slug
-  reloadPreview()
+  previewKey.value = Date.now()
 }
 
 async function save() {
   saving.value = true
   message.value = ''
   try {
-    const socials = { ...form.socials }
     const data = await apiRequest('/api/sites', {
       method: 'PUT',
-      body: {
-        template: form.template,
-        theme: form.theme,
-        content: { title: form.title, tagline: form.tagline, about: plainToHtml(form.about), socials, sections: form.sections },
-        seo: form.seo,
-      },
+      body: { content: { title: form.title, tagline: form.tagline, socials: { ...form.socials } }, seo: form.seo },
     })
     applyServer(data)
-    history.value = []
     flash('Cambios guardados. Ya se ven en tu sitio.')
   } catch (e) {
     flash(e.message, true)
@@ -283,41 +190,7 @@ async function togglePublished() {
   }
 }
 
-// --- Vista previa en vivo ---
-// /o/<slug>?editor=1 se hidrata solo para el dueño y redibuja con el borrador que le mandamos por postMessage
-// (src/components/sites/SitePage.vue): los cambios se ven antes de guardar.
 const previewKey = ref(Date.now())
-const previewFrame = ref(null)
-const previewMode = ref('desktop')
-const previewUrl = computed(() => `/o/${site.value.slug}?editor=1&v=${previewKey.value}`)
-function reloadPreview() {
-  previewKey.value = Date.now()
-}
-function postDraft() {
-  const win = previewFrame.value?.contentWindow
-  if (!win) return
-  win.postMessage({ type: 'aitickets:site-draft', draft: JSON.parse(JSON.stringify(draft())) }, window.location.origin)
-}
-let draftTimer = null
-watch(form, () => {
-  clearTimeout(draftTimer)
-  draftTimer = setTimeout(postDraft, 200)
-}, { deep: true })
-function onPreviewMessage(event) {
-  if (event.origin !== window.location.origin || event.source !== previewFrame.value?.contentWindow) return
-  if (event.data?.type === 'aitickets:site-preview-ready') postDraft()
-}
-const onSiteUpdated = () => reloadPreview()
-onMounted(() => {
-  window.addEventListener('aitickets:site-updated', onSiteUpdated)
-  window.addEventListener('message', onPreviewMessage)
-})
-onBeforeUnmount(() => {
-  window.removeEventListener('aitickets:site-updated', onSiteUpdated)
-  window.removeEventListener('message', onPreviewMessage)
-  clearTimeout(draftTimer)
-})
-
 const copied = ref('')
 async function copy(url) {
   if (await copyText(url)) {
@@ -376,101 +249,39 @@ const visibleToPublic = computed(() => site.value.published && org.emailVerified
       </div>
     </section>
 
-    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
-      <div class="space-y-6">
-        <SiteAiPanel ref="aiPanel" :get-draft="draft" :target="aiTarget" :can-undo="history.length > 0" @apply="applyAi" @undo="undo" @clear-target="aiTarget = null" />
-
-        <!-- Plantilla -->
-        <section class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6 space-y-4">
-          <div>
-            <h3 class="font-bold">Plantilla</h3>
-            <p class="text-sm text-gray-500">Cada plantilla tiene el estilo de su tipo de evento. Al cambiarla se usan sus colores; luego puedes ajustarlos.</p>
-          </div>
-          <div v-for="group in [{ label: 'Según lo que produces', keys: nicheTemplates }, { label: 'Generales', keys: generalTemplates }]" :key="group.label" class="space-y-2">
-            <p v-if="group.keys.length" class="text-xs font-bold text-gray-500 uppercase">{{ group.label }}</p>
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <button
-                v-for="key in group.keys"
-                :key="key"
-                type="button"
-                class="text-left rounded-xl border-2 overflow-hidden transition-colors"
-                :class="form.template === key ? 'border-black' : 'border-gray-200 hover:border-gray-400'"
-                :aria-pressed="form.template === key"
-                @click="selectTemplate(key)"
-              >
-                <div class="h-20 p-2.5 flex flex-col justify-between" :style="{ background: TEMPLATE_INFO[key].defaults.background, color: TEMPLATE_INFO[key].defaults.text }">
-                  <span class="text-xl leading-none truncate" :style="{ fontFamily: fontStack(TEMPLATE_INFO[key].defaults.font) }">Aa</span>
-                  <div class="flex gap-1.5">
-                    <span class="h-4 w-8 rounded-full" :style="{ background: TEMPLATE_INFO[key].defaults.primary }"></span>
-                    <span class="h-4 w-4 rounded-full" :style="{ background: TEMPLATE_INFO[key].defaults.accent }"></span>
-                  </div>
-                </div>
-                <div class="p-2.5">
-                  <p class="font-semibold text-sm leading-tight">{{ TEMPLATE_INFO[key].name }}</p>
-                  <p class="text-[11px] leading-snug text-gray-500 mt-0.5">{{ TEMPLATE_INFO[key].description }}</p>
-                </div>
-              </button>
-            </div>
-          </div>
-          <p v-if="!usingSuggested" class="text-xs text-gray-500">
-            Mantuvimos tus secciones.
-            <button type="button" class="underline" @click="useSuggestedSections">Usar las sugeridas para {{ templateName }}</button>
+    <!-- Diseño: editor visual -->
+    <section class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden" data-testid="site-design-card">
+      <div class="grid grid-cols-1 lg:grid-cols-[1fr_1.1fr]">
+        <div class="p-5 md:p-6 flex flex-col gap-3 justify-center">
+          <span class="inline-flex w-fit items-center gap-1.5 rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-800"><LayoutTemplate size="14" /> Editor visual</span>
+          <h3 class="font-bold text-lg leading-tight">Diseña tu sitio en grande</h3>
+          <p class="text-sm text-gray-600">
+            Elige una plantilla para tu tipo de productora (compañía, sala, festival, club, academia…), cambia los textos haciendo clic
+            sobre ellos, agrega pestañas, carruseles, videos, galerías y ventanas, o pídele los cambios a la IA.
           </p>
-        </section>
+          <p class="text-xs text-gray-500">Diseño actual: <strong class="text-gray-700">{{ designName }}</strong><template v-if="!hasSections"> · todavía sin personalizar</template></p>
+          <a href="/dashboard/sitio/editor" class="inline-flex w-fit items-center gap-2 rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700" data-testid="open-site-builder">
+            Abrir editor visual <ArrowRight size="16" />
+          </a>
+        </div>
+        <a href="/dashboard/sitio/editor" class="relative block h-56 lg:h-auto min-h-56 overflow-hidden bg-gray-100 border-t lg:border-t-0 lg:border-l border-gray-100" aria-label="Abrir editor visual">
+          <iframe
+            :key="previewKey"
+            :src="`/o/${site.slug}?v=${previewKey}`"
+            title="Vista previa del sitio"
+            tabindex="-1"
+            loading="lazy"
+            class="pointer-events-none absolute left-0 top-0 h-[250%] w-[250%] origin-top-left scale-40 bg-white"
+          ></iframe>
+        </a>
+      </div>
+    </section>
 
-        <SectionsEditor :form="form" :contact-form-enabled="site.contact_form_enabled" @ai="editSectionWithAi" @error="(m) => flash(m, true)" />
-
-        <!-- Colores, tipografía e imágenes -->
-        <section class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6 space-y-4">
-          <div class="flex flex-wrap items-center justify-between gap-2">
-            <h3 class="font-bold">Colores y tipografía</h3>
-            <button type="button" class="text-xs text-gray-500 underline" @click="resetColors">Usar los de la plantilla</button>
-          </div>
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <label v-for="field in COLOR_FIELDS" :key="field.key" class="block min-w-0">
-              <span class="block text-xs font-bold text-gray-500 uppercase mb-1">{{ field.label }}</span>
-              <span class="flex items-center gap-2 rounded-lg border border-gray-300 px-2 py-1.5 min-w-0">
-                <input
-                  type="color"
-                  class="h-7 w-9 shrink-0 cursor-pointer bg-transparent"
-                  :value="colorValue(field.key)"
-                  @input="setColor(field.key, $event.target.value)"
-                />
-                <span class="text-xs text-gray-600 font-mono truncate">{{ colorValue(field.key) }}</span>
-              </span>
-            </label>
-          </div>
-          <label class="block">
-            <span class="block text-xs font-bold text-gray-500 uppercase mb-1">Tipografía de títulos</span>
-            <select v-model="form.theme.font" class="w-full px-3 py-2 rounded-lg border border-gray-300 bg-white outline-none focus:ring-2 focus:ring-black">
-              <option :value="undefined">La de la plantilla ({{ templateDefaults.font }})</option>
-              <option v-for="f in fonts" :key="f" :value="f">{{ f }}</option>
-            </select>
-          </label>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div v-for="img in [{ kind: 'logo', key: 'logo_url', label: 'Logo' }, { kind: 'hero', key: 'hero_image_url', label: 'Imagen de portada' }]" :key="img.kind">
-              <span class="block text-xs font-bold text-gray-500 uppercase mb-1">{{ img.label }}</span>
-              <div class="flex items-center gap-3">
-                <div class="h-16 w-16 shrink-0 rounded-lg border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center">
-                  <img v-if="form.theme[img.key]" :src="form.theme[img.key]" alt="" class="h-full w-full object-cover" />
-                  <Upload v-else size="16" class="text-gray-400" />
-                </div>
-                <div class="flex flex-col gap-1">
-                  <label class="text-xs px-3 py-1.5 rounded-lg border border-gray-300 cursor-pointer hover:bg-gray-50">
-                    {{ uploading[img.kind] ? 'Subiendo…' : 'Subir imagen' }}
-                    <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" class="hidden" :disabled="uploading[img.kind]" @change="onUpload($event, img.kind)" />
-                  </label>
-                  <button v-if="form.theme[img.key]" type="button" class="text-xs text-gray-500 underline text-left" @click="removeThemeImage(img.key)">Quitar</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
+    <div class="space-y-6">
+      <div class="space-y-6">
         <!-- Contenido -->
         <section class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6 space-y-4">
-          <h3 class="font-bold">Contenido</h3>
+          <div><h3 class="font-bold">Nombre, frase y redes</h3><p class="text-sm text-gray-500">Se muestran en el encabezado, la portada y el pie de tu sitio.</p></div>
           <label class="block">
             <span class="block text-xs font-bold text-gray-500 uppercase mb-1">Nombre a mostrar</span>
             <input v-model="form.title" type="text" maxlength="80" :placeholder="org.publicName" class="w-full px-3 py-2 rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-black" />
@@ -531,8 +342,8 @@ const visibleToPublic = computed(() => site.value.published && org.emailVerified
               <Upload v-else size="16" class="text-gray-400" />
             </div>
             <label class="text-xs px-3 py-1.5 rounded-lg border border-gray-300 cursor-pointer hover:bg-gray-50">
-              {{ uploading.og ? 'Subiendo…' : 'Imagen para compartir (1200×630)' }}
-              <input type="file" accept="image/jpeg,image/png,image/webp" class="hidden" :disabled="uploading.og" @change="onUpload($event, 'og')" />
+              {{ uploadingOg ? 'Subiendo…' : 'Imagen para compartir (1200×630)' }}
+              <input type="file" accept="image/jpeg,image/png,image/webp" class="hidden" :disabled="uploadingOg" @change="onUploadOg" />
             </label>
             <button v-if="form.seo.og_image" type="button" class="p-1 text-gray-500 hover:text-black" title="Quitar" @click="form.seo.og_image = ''"><X size="14" /></button>
           </div>
@@ -553,29 +364,6 @@ const visibleToPublic = computed(() => site.value.published && org.emailVerified
         </div>
       </div>
 
-      <!-- Vista previa -->
-      <section class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden xl:sticky xl:top-4">
-        <div class="flex items-center justify-between gap-2 px-4 py-3 border-b border-gray-100">
-          <p class="text-sm font-semibold min-w-0">Vista previa <span class="font-normal text-gray-500">{{ dirty ? '(con cambios sin guardar)' : '(en vivo)' }}</span></p>
-          <div class="flex items-center gap-2">
-            <button type="button" class="p-1.5" :class="previewMode === 'desktop' ? 'text-black' : 'text-gray-400 hover:text-black'" title="Computador" :aria-pressed="previewMode === 'desktop'" @click="previewMode = 'desktop'"><Monitor size="16" /></button>
-            <button type="button" class="p-1.5" :class="previewMode === 'mobile' ? 'text-black' : 'text-gray-400 hover:text-black'" title="Celular" :aria-pressed="previewMode === 'mobile'" @click="previewMode = 'mobile'"><Smartphone size="16" /></button>
-            <button type="button" class="p-1.5 text-gray-500 hover:text-black" title="Recargar" @click="reloadPreview"><RefreshCw size="16" /></button>
-            <a :href="`/o/${site.slug}`" target="_blank" rel="noopener" class="p-1.5 text-gray-500 hover:text-black" title="Abrir en otra pestaña"><ExternalLink size="16" /></a>
-          </div>
-        </div>
-        <div class="bg-gray-100 flex justify-center">
-          <iframe
-            ref="previewFrame"
-            :key="previewKey"
-            :src="previewUrl"
-            title="Vista previa del sitio"
-            class="h-[560px] md:h-[760px] bg-white transition-[width] duration-200"
-            :class="previewMode === 'mobile' ? 'w-[390px] max-w-full border-x border-gray-200' : 'w-full'"
-            @load="postDraft"
-          ></iframe>
-        </div>
-      </section>
     </div>
   </div>
 </template>

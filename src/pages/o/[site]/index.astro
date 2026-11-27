@@ -10,6 +10,7 @@ import SitePage from "../../../components/sites/SitePage.vue";
 import { getSiteBanners, getSiteEvents, publicSiteProps, siteShareImageSource, siteUrl } from "../../../lib/sites";
 import { sanitizeRichText } from "../../../lib/sanitize";
 import { defaultSections, isNicheTemplate, sanitizeSections } from "../../../lib/siteTemplates";
+import { htmlToPlainText } from "../../../lib/sitePlainText";
 import { stripHtml, truncate } from "../../../lib/eventPage";
 import { loadSiteForPage } from "../_site";
 
@@ -34,7 +35,8 @@ const Template = (TEMPLATES as Record<string, any>)[template] || Clasico;
 // plantilla con ?plantilla=), las sugeridas. Sin secciones y en una plantilla general se usa la plantilla original.
 // ?editor=1 (solo el dueño): vista previa en vivo del editor, que redibuja con el borrador sin guardar.
 const live = owner && Astro.url.searchParams.get("editor") === "1";
-const savedSections = Array.isArray(site.content?.sections) ? sanitizeSections(site.content.sections) : null;
+// En la vista previa en vivo se conservan las secciones a medio llenar (se ven con textos de ayuda para completarlas)
+const savedSections = Array.isArray(site.content?.sections) ? sanitizeSections(site.content.sections, { keepEmpty: live }) : null;
 const sections = savedSections || (isNicheTemplate(template) || live ? defaultSections(template) : null);
 
 // SEO: canónico en el origen del sitio (dominio propio > /o/<slug>). noindex hasta tener eventos publicados.
@@ -72,9 +74,9 @@ const jsonLd = JSON.stringify({
   />
   {sections ? (
     live ? (
-      <SitePage client:load site={props} sections={sections} events={events} banners={banners} aboutHtml={aboutHtml} base={base} fallbackName={site.org?.public_name || ""} live />
+      <SitePage client:load site={props} sections={sections} events={events} banners={banners} aboutHtml={aboutHtml} aboutText={htmlToPlainText(aboutHtml)} base={base} fallbackName={site.org?.public_name || ""} live />
     ) : (
-      <SitePage site={props} sections={sections} events={events} banners={banners} aboutHtml={aboutHtml} base={base} fallbackName="" live={false} />
+      <SitePage site={props} sections={sections} events={events} banners={banners} aboutHtml={aboutHtml} aboutText="" base={base} fallbackName="" live={false} />
     )
   ) : (
     <Template site={props} events={events} banners={banners} aboutHtml={aboutHtml} base={base} />

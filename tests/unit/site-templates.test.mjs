@@ -3,19 +3,32 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 import {
+  MAX_SITE_IMAGES,
   NICHE_TEMPLATES,
+  SECTION_INFO,
+  SECTION_TYPES,
   SITE_FONTS,
   SITE_TEMPLATES,
   TEMPLATE_INFO,
+  applyTextEdit,
+  blankItem,
   blankSection,
+  cleanVideo,
+  countSectionMedia,
   defaultSections,
+  itemIsFilled,
   mergeSectionEdits,
+  navLabel,
   plainTextToHtml,
   readableOn,
   resolveThemeFor,
+  sanitizeLayout,
   sanitizeSections,
+  sectionAnchor,
+  sectionVideoUrls,
   videoEmbedUrl,
 } from '../../src/lib/siteTemplates.ts'
+import { htmlToPlainText } from '../../src/lib/sitePlainText.ts'
 
 describe('plantillas', () => {
   it('cada plantilla tiene colores hex y una tipografía disponible', () => {
@@ -117,5 +130,139 @@ describe('utilidades', () => {
 
   it('plainTextToHtml escapa y arma párrafos', () => {
     expect(plainTextToHtml('Hola <b>\nlínea\n\nOtro')).toBe('<p>Hola &lt;b&gt;<br>línea</p><p>Otro</p>')
+  })
+})
+
+describe('componentes nuevos: pestañas, personas, imagen y texto, carrusel, ventanas y menú', () => {
+  const VIDEO = 'https://proj.supabase.co/storage/v1/object/public/aitickets-event-videos/site-videos/7/video-1.mp4'
+
+  it('pestañas y personas: campos propios, imagen https y enlace saneado', () => {
+    const [tabs, people] = sanitizeSections([
+      { id: 'programa', type: 'tabs', data: { title: 'Programa', items: [{ title: 'Día 1', text: 'Charlas', image_url: 'https://cdn.test/a.jpg', name: 'x' }, { title: 'Día 2' }] } },
+      { id: 'elenco', type: 'people', data: { layout: 'carousel', items: [{ name: ' Ana\nPérez ', role: 'Actriz', text: 'Bio', link_url: 'javascript:alert(1)', image_url: 'http://inseguro/a.jpg' }] } },
+    ])
+    // Una pestaña sin contenido no se publica
+    expect(tabs.data.items).toEqual([{ title: 'Día 1', text: 'Charlas', image_url: 'https://cdn.test/a.jpg' }])
+    expect(people.data).toEqual({ layout: 'carousel', items: [{ name: 'Ana Pérez', role: 'Actriz', text: 'Bio' }] })
+  })
+
+  it('imagen y texto: lado de la foto, video y botón con ventana; la ventana solo con button_action "modal"', () => {
+    const [feature, cta, plain] = sanitizeSections([
+      { id: 'sala', type: 'feature', data: { title: 'La sala', text: 'Texto', align: 'right', video: { url: VIDEO, width: '1920', height: 1080, duration: 30, poster_url: 'https://cdn.test/p.jpg' }, button_label: 'Ver', button_action: 'modal', modal_title: 'Info', modal_text: 'Detalle' } },
+      { id: 'reserva', type: 'cta', data: { title: 'Reserva', button_action: 'modal', modal_text: 'Escríbenos', button_url: '#sala' } },
+      { id: 'otro', type: 'cta', data: { title: 'Ven', button_action: 'link', modal_text: 'no se guarda' } },
+    ])
+    expect(feature.data).toMatchObject({ align: 'right', button_action: 'modal', modal_title: 'Info', modal_text: 'Detalle' })
+    expect(feature.data.video).toEqual({ url: VIDEO, poster_url: 'https://cdn.test/p.jpg', width: 1920, height: 1080, duration: 30 })
+    expect(cta.data).toMatchObject({ button_action: 'modal', modal_text: 'Escríbenos', button_url: '#sala' })
+    expect(plain.data).toEqual({ title: 'Ven' })
+  })
+
+  it('el diseño de cada sección solo acepta sus variantes; nav y el ancla fija de eventos', () => {
+    const out = sanitizeSections([
+      { id: 'hero', type: 'hero', nav: true, data: { layout: 'overlay' } },
+      { id: 'eventos', type: 'gallery', nav: true, data: { layout: 'posters', nav_label: 'Fotos de la temporada pasada', items: [{ image_url: 'https://cdn.test/a.jpg' }] } },
+      { id: 'eventos', type: 'events', nav: 'sí', data: { layout: 'list' } },
+    ])
+    expect(out[0]).toMatchObject({ nav: true, data: { layout: 'overlay' } })
+    // "eventos" es el ancla de la sección de eventos: otra sección recibe un id nuevo
+    expect(out[1].id).not.toBe('eventos')
+    expect(out[1].data.layout).toBeUndefined()
+    expect(out[1].data.nav_label).toBe('Fotos de la temporada pa')
+    expect(out[2]).toEqual({ id: 'eventos', type: 'events', data: { layout: 'list' } })
+    expect(sectionAnchor(out[2])).toBe('eventos')
+    expect(navLabel({ type: 'faq', data: {} })).toBe('Preguntas')
+    expect(navLabel({ type: 'people', data: { title: 'Un título muy largo para el menú del sitio' } })).toHaveLength(24)
+  })
+
+  it('keepEmpty conserva los ítems a medio llenar (editor); sin él solo quedan los completos; galería sin foto nunca', () => {
+    const input = [
+      { id: 'faq', type: 'faq', data: { items: [{ question: '¿Edad?', answer: '' }, { question: '¿QR?', answer: 'Por correo' }] } },
+      { id: 'p', type: 'people', data: { items: [{ name: '', role: '' }] } },
+      { id: 'g', type: 'gallery', data: { items: [{ caption: 'sin foto' }] } },
+    ]
+    const editor = sanitizeSections(input, { keepEmpty: true })
+    expect(editor[0].data.items).toEqual([{ question: '¿Edad?' }, { question: '¿QR?', answer: 'Por correo' }])
+    expect(editor[1].data.items).toEqual([{}])
+    expect(editor[2].data.items).toEqual([])
+    const publicSite = sanitizeSections(input)
+    expect(publicSite[0].data.items).toEqual([{ question: '¿QR?', answer: 'Por correo' }])
+    expect(publicSite[1].data.items).toEqual([])
+    expect(itemIsFilled('tabs', { title: 'Día 1' })).toBe(false)
+    expect(itemIsFilled('people', { name: 'Ana' })).toBe(true)
+  })
+
+  it('cada tipo de sección se puede agregar y sus ítems vacíos tienen los campos del tipo', () => {
+    for (const type of SECTION_TYPES) {
+      const s = blankSection(type, 'teatro')
+      expect(s.type).toBe(type)
+      expect(sanitizeSections([s], { keepEmpty: true })).toHaveLength(1)
+      if (SECTION_INFO[type].maxItems && type !== 'gallery') expect(Object.keys(blankItem(type)).length).toBeGreaterThan(0)
+    }
+  })
+
+  it('cleanVideo: solo archivos de video https, metadatos numéricos y videos permitidos', () => {
+    expect(cleanVideo({ url: VIDEO, duration: -3 })).toEqual({ url: VIDEO })
+    expect(cleanVideo({ url: 'https://cdn.test/x.jpg' })).toBeUndefined()
+    expect(cleanVideo({ url: 'http://cdn.test/x.mp4' })).toBeUndefined()
+    expect(cleanVideo('javascript:alert(1)')).toBeUndefined()
+    expect(cleanVideo({ url: VIDEO }, { allowedVideos: new Set() })).toBeUndefined()
+  })
+
+  it('countSectionMedia cuenta fotos y videos subidos sin repetir', () => {
+    const sections = [
+      { id: 'a', type: 'hero', data: { image_url: 'https://cdn.test/1.jpg', video: { url: VIDEO } } },
+      { id: 'b', type: 'gallery', data: { items: [{ image_url: 'https://cdn.test/1.jpg' }, { image_url: 'https://cdn.test/2.jpg' }] } },
+      { id: 'c', type: 'video', data: { video: { url: VIDEO } } },
+    ]
+    expect(countSectionMedia(sections)).toEqual({ images: 2, videos: 1 })
+    expect(sectionVideoUrls(sections)).toEqual([VIDEO])
+    expect(MAX_SITE_IMAGES).toBeGreaterThan(SECTION_INFO.gallery.maxItems)
+  })
+
+  it('sanitizeLayout: tipo de menú conocido y menú fijo', () => {
+    expect(sanitizeLayout({ nav: 'sidebar', sticky: true, extra: 1 })).toEqual({ nav: 'sidebar', sticky: true })
+    expect(sanitizeLayout({ nav: 'flotante', sticky: 'sí' })).toEqual({})
+    expect(sanitizeLayout(null)).toEqual({})
+  })
+})
+
+describe('edición de textos en la vista previa (applyTextEdit)', () => {
+  const draft = () => ({
+    title: 'Club',
+    tagline: '',
+    about: '',
+    sections: [
+      { id: 'hero', type: 'hero', data: {} },
+      { id: 'faq', type: 'faq', data: { items: [{ question: '¿QR?', answer: '' }] } },
+      { id: 'eventos', type: 'events', data: {} },
+    ],
+  })
+
+  it('aplica textos del sitio, de una sección y de un ítem, normalizando saltos de línea', () => {
+    const d = draft()
+    expect(applyTextEdit(d, 'site.title', '  Club\nNorte ')).toBe(true)
+    expect(applyTextEdit(d, 'site.about', 'Uno\n\n\n\nDos')).toBe(true)
+    expect(applyTextEdit(d, 'hero.title', 'Temporada\n2027')).toBe(true)
+    expect(applyTextEdit(d, 'hero.subtitle', 'Línea 1\nLínea 2')).toBe(true)
+    expect(applyTextEdit(d, 'faq.items.0.answer', 'Llega por correo.')).toBe(true)
+    expect(d).toMatchObject({ title: 'Club Norte', about: 'Uno\n\nDos' })
+    expect(d.sections[0].data).toEqual({ title: 'Temporada 2027', subtitle: 'Línea 1\nLínea 2' })
+    expect(d.sections[1].data.items[0].answer).toBe('Llega por correo.')
+  })
+
+  it('respeta el largo máximo y rechaza destinos que no existen o no son texto', () => {
+    const d = draft()
+    expect(applyTextEdit(d, 'hero.eyebrow', 'x'.repeat(200))).toBe(true)
+    expect(d.sections[0].data.eyebrow).toHaveLength(60)
+    for (const target of ['site.slug', 'hero.image_url', 'hero.items.0.title', 'faq.items.5.answer', 'faq.items.0.image_url', 'otra.title', 'eventos.subtitle', '__proto__.x', 42]) {
+      expect(applyTextEdit(d, target, 'x'), String(target)).toBe(false)
+    }
+    expect(applyTextEdit(d, 'hero.title', { toString: () => 'x' })).toBe(false)
+  })
+
+  it('htmlToPlainText pasa "Sobre nosotros" a texto con párrafos', () => {
+    expect(htmlToPlainText('<p>Hola &amp; chao</p><p>Línea<br>dos</p>')).toBe('Hola & chao\n\nLínea\ndos')
+    expect(htmlToPlainText('')).toBe('')
   })
 })
