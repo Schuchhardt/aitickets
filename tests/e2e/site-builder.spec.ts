@@ -81,7 +81,9 @@ test.describe("editor visual del sitio", () => {
     await page.goto("/__e2e/sitio-editor");
     await expect(page.getByTestId("site-builder")).toBeVisible();
 
-    // Sin secciones guardadas abre en Plantillas
+    // Abre en el asistente; las plantillas están en su pestaña
+    await expect(page.getByTestId("site-ai-panel")).toBeVisible();
+    await page.getByTestId("builder-tab-presets").click();
     await page.locator('[data-preset="teatro-festival"]').click();
     const preview = page.frameLocator('[data-testid="site-builder-preview"]');
     await expect(preview.locator('.sn-page[data-nav="centered"]')).toBeVisible();
@@ -112,5 +114,45 @@ test.describe("editor visual del sitio", () => {
     expect(saved.content.layout).toEqual({ nav: "centered", sticky: true });
     expect(saved.content.sections[0].data.title).toBe("Festival del Sur");
     expect(Object.keys(saved.content)).not.toContain("socials");
+  });
+
+  test("el asistente es la primera pestaña: aplica cambios, recuerda la conversación y se puede enfocar en una sección", async ({ page }) => {
+    const calls: any[] = [];
+    await page.route("**/api/sites/ai", async (route) => {
+      const body = route.request().postDataJSON();
+      calls.push(body);
+      const sections = body.draft.sections.map((s: any) => (s.type === "hero" ? { ...s, data: { ...s.data, title: `Portada ${calls.length}` } } : s));
+      await route.fulfill({
+        json: { summary: `Listo (${calls.length}): puse el menú a la izquierda.`, changes: { layout: { nav: "sidebar" }, sections } },
+      });
+    });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/__e2e/sitio-editor");
+    await expect(page.getByTestId("builder-tab-ai")).toHaveAttribute("aria-pressed", "true");
+    const nav = page.getByRole("navigation", { name: "Paneles del editor" }).getByRole("button");
+    await expect(nav.first()).toHaveText(/Asistente/);
+
+    const panel = page.getByTestId("site-ai-panel");
+    const input = panel.getByRole("textbox", { name: "Pídele un cambio al asistente" });
+    await input.fill("Pon el menú a la izquierda");
+    await input.press("Enter");
+    await expect(panel).toContainText("Listo (1): puse el menú a la izquierda.");
+    const preview = page.frameLocator('[data-testid="site-builder-preview"]');
+    await expect(preview.locator('.sn-page[data-nav="sidebar"]')).toBeVisible();
+    await expect(preview.locator(".sn-hero h1")).toHaveText("Portada 1");
+
+    // Seleccionar una sección en la vista previa ofrece enfocar el pedido en ella
+    await preview.locator('[data-section-id="events"]').click({ position: { x: 6, y: 6 } });
+    await panel.getByRole("button", { name: /Enfocar en/ }).click();
+    await expect(panel.getByTestId("ai-target")).toBeVisible();
+    await input.fill("Hazlo más corto");
+    await panel.getByTestId("ai-send").click();
+    await expect(panel).toContainText("Listo (2)");
+    expect(calls[1].section_id).toBe("events");
+    expect(calls[1].history).toEqual([{ instruction: "Pon el menú a la izquierda", summary: "Listo (1): puse el menú a la izquierda." }]);
+
+    // Deshacer desde el chat
+    await panel.getByRole("button", { name: "Deshacer este cambio" }).click();
+    await expect(preview.locator(".sn-hero h1")).toHaveText("Portada 1");
   });
 });

@@ -825,3 +825,82 @@ describe('POST /api/sites/ai con plantillas, menú y videos', () => {
     expect(changes.sections[2]).toEqual({ id: 'equipo', type: 'people', nav: true, data: { title: 'Equipo', items: [{}] } })
   })
 })
+
+describe('POST /api/sites/ai: el asistente hace todo lo del editor (adjuntos, videos, logo y portada, conversación)', () => {
+  const call = (body) => aiRoute.POST(req('POST', { path: '/api/sites/ai', body }))
+  const IMAGES = 'https://proj.supabase.co/storage/v1/object/public/Events'
+  const own = (n) => `${VIDEOS}/site-videos/7/video-${n}.mp4`
+  const draft = {
+    template: 'clasico',
+    theme: { logo_url: `${CDN}/7/logo.png`, hero_image_url: `${CDN}/7/hero.jpg` },
+    title: 'Club Norte',
+    tagline: '',
+    about: '',
+    sections: [
+      { id: 'hero', type: 'hero', data: { title: 'Hola', video: { url: own(1), poster_url: `${CDN}/7/p1.jpg` } } },
+      { id: 'video', type: 'video', data: { title: 'Aftermovie' } },
+    ],
+  }
+
+  it('la IA ve los videos como URL, recibe la conversación y solo los adjuntos propios', async () => {
+    await call({
+      instruction: 'Pon mis fotos en una galería',
+      draft,
+      history: [{ instruction: 'Hazlo más oscuro', summary: 'Cambié los colores.' }, { instruction: '', summary: 'x' }, 'basura'],
+      attachments: [
+        { type: 'image', url: `${IMAGES}/sites/7/gallery-1.jpg` },
+        { type: 'image', url: `${IMAGES}/sites/8/gallery-ajena.jpg` },
+        { type: 'image', url: 'https://evil.example/x.jpg' },
+        { type: 'video', url: own(2), poster_url: `${IMAGES}/sites/7/poster-2.jpg`, width: 1080, height: 1920, duration: 20 },
+        { type: 'video', url: `${VIDEOS}/site-videos/8/video-9.mp4` },
+      ],
+    })
+    const input = h.siteEditCalls[0]
+    expect(input.draft.sections[0].data.video).toBe(own(1))
+    expect(input.history).toEqual([{ instruction: 'Hazlo más oscuro', summary: 'Cambié los colores.' }])
+    expect(input.attachments).toEqual([
+      { type: 'image', url: `${IMAGES}/sites/7/gallery-1.jpg` },
+      { type: 'video', url: own(2), description: 'vertical, 20 s' },
+    ])
+  })
+
+  it('videos: "" deja el que había, "none" lo quita, una URL conocida o adjunta lo pone o lo mueve; nunca uno inventado', async () => {
+    h.siteEdit = () => ({
+      summary: 'Moví el video.',
+      order: ['hero', 'video', 'feature-1'],
+      sections: [
+        { id: 'hero', type: 'hero', data: { title: 'Hola', video: 'none' } },
+        { id: 'video', type: 'video', data: { title: 'Aftermovie', video: own(1) } },
+        { id: 'feature-1', type: 'feature', data: { title: 'Nuevo', text: 'x', video: own(2) } },
+      ],
+    })
+    const attached = { type: 'video', url: own(2), poster_url: `${IMAGES}/sites/7/poster-2.jpg`, width: 1080, height: 1920 }
+    const { changes } = await (await call({ instruction: 'Mueve el video y usa el nuevo', draft, attachments: [attached] })).json()
+    expect(changes.sections[0].data.video).toBeUndefined()
+    expect(changes.sections[1].data.video).toEqual({ url: own(1), poster_url: `${CDN}/7/p1.jpg` })
+    expect(changes.sections[2].data.video).toEqual({ url: own(2), poster_url: `${IMAGES}/sites/7/poster-2.jpg`, width: 1080, height: 1920 })
+
+    h.siteEdit = () => ({ summary: 'ok', order: ['hero', 'video'], sections: [{ id: 'video', type: 'video', data: { title: 'A', video: `${VIDEOS}/site-videos/7/video-99.mp4` } }] })
+    const second = await (await call({ instruction: 'Pon otro video', draft })).json()
+    expect(second.changes.sections[1].data.video).toBeUndefined()
+    expect(second.changes.sections[0].data.video.url).toBe(own(1))
+  })
+
+  it('logo e imagen de portada: solo imágenes permitidas o "none" para quitarlas', async () => {
+    h.siteEdit = () => ({ summary: 'ok', order: [], sections: [], theme: { primary: '#123456', logo_url: 'none', hero_image_url: `${IMAGES}/sites/7/gallery-1.jpg` } })
+    const { changes } = await (await call({ instruction: 'Quita el logo y usa mi foto de portada', draft, attachments: [{ type: 'image', url: `${IMAGES}/sites/7/gallery-1.jpg` }] })).json()
+    expect(changes.theme).toEqual({ primary: '#123456', hero_image_url: `${IMAGES}/sites/7/gallery-1.jpg` })
+
+    h.siteEdit = () => ({ summary: 'ok', order: [], sections: [], theme: { logo_url: 'https://evil.example/l.png', hero_image_url: '' } })
+    const kept = await (await call({ instruction: 'Cambia el logo', draft })).json()
+    expect(kept.changes.theme).toBeUndefined()
+  })
+
+  it('avisa si los cambios dejan el sitio sobre el límite de fotos', async () => {
+    const many = Array.from({ length: 61 }, (_, i) => ({ image_url: `${IMAGES}/sites/7/g-${i}.jpg` }))
+    const big = { ...draft, sections: [...draft.sections, { id: 'g', type: 'gallery', data: { items: many.slice(0, 24) } }, { id: 'g2', type: 'gallery', data: { items: many.slice(24, 48) } }, { id: 'g3', type: 'gallery', data: { items: many.slice(48) } }] }
+    h.siteEdit = () => ({ summary: 'ok', order: [], sections: [] })
+    const res = await (await call({ instruction: 'Cambia el título', draft: big })).json()
+    expect(res.warning).toMatch(/60 fotos/)
+  })
+})

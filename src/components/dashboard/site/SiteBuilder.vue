@@ -133,13 +133,14 @@ function step(change) {
 }
 
 // --- Paneles ---
+// El asistente va primero y es la pestaña por defecto: puede hacer todo lo que hacen las demás
 const TABS = [
+  { key: 'ai', label: 'Asistente', icon: Sparkles },
   { key: 'sections', label: 'Secciones', icon: ListTree },
   { key: 'presets', label: 'Plantillas', icon: LayoutTemplate },
   { key: 'style', label: 'Estilo', icon: Palette },
-  { key: 'ai', label: 'IA', icon: Sparkles },
 ]
-const tab = ref(Array.isArray(site.value.content?.sections) ? 'sections' : 'presets')
+const tab = ref('ai')
 const selectedId = ref(null)
 const selected = computed(() => form.sections.find((s) => s.id === selectedId.value) || null)
 const mobileView = ref('preview') // celular: 'edit' | 'preview'
@@ -321,6 +322,7 @@ function onPreviewMessage(event) {
     else if (data.action === 'save' && dirty.value) setTimeout(save, 50)
   } else if (data.type === 'aitickets:site-select') {
     selectedId.value = data.sectionId || null
+    // En Plantillas o Estilo, seleccionar una sección lleva a sus ajustes; en el asistente se puede "enfocar" en ella
     if (data.sectionId && tab.value !== 'sections' && tab.value !== 'ai') tab.value = 'sections'
   }
 }
@@ -466,20 +468,26 @@ const visibleToPublic = computed(() => site.value.published && org.emailVerified
             @open-dialog="(id) => postToPreview({ type: 'aitickets:site-open-dialog', id })"
           />
         </div>
-        <div class="min-h-0 flex-1 overflow-y-auto p-4" :class="{ 'max-xl:hidden': selected && tab === 'sections' }">
-          <SectionList v-if="tab === 'sections'" :form="form" :selected-id="selectedId" @select="(id) => select(id)" @add="addSection" />
-          <PresetPicker v-else-if="tab === 'presets'" :templates="templates" :current="form.preset" :current-template="form.template" @apply="applyPresetKey" />
-          <StylePanel v-else-if="tab === 'style'" :form="form" :templates="templates" :fonts="fonts" :images-full="media.images >= media.maxImages" @select-template="selectTemplate" @error="(m) => flash(m, true)" />
+        <div v-if="tab === 'ai'" class="min-h-0 flex-1">
           <SiteAiPanel
-            v-else
             ref="aiPanel"
             :get-draft="draft"
             :target="aiTarget"
+            :selected="selected"
             :can-undo="history.length > 0"
+            :template="form.template"
+            :media="media"
             @apply="applyAi"
             @undo="undo"
             @clear-target="aiTarget = null"
+            @set-target="(s) => (aiTarget = s)"
+            @error="(m) => flash(m, true)"
           />
+        </div>
+        <div v-else class="min-h-0 flex-1 overflow-y-auto p-4" :class="{ 'max-xl:hidden': selected && tab === 'sections' }">
+          <SectionList v-if="tab === 'sections'" :form="form" :selected-id="selectedId" @select="(id) => select(id)" @add="addSection" />
+          <PresetPicker v-else-if="tab === 'presets'" :templates="templates" :current="form.preset" :current-template="form.template" @apply="applyPresetKey" />
+          <StylePanel v-else-if="tab === 'style'" :form="form" :templates="templates" :fonts="fonts" :images-full="media.images >= media.maxImages" @select-template="selectTemplate" @error="(m) => flash(m, true)" />
         </div>
       </aside>
 

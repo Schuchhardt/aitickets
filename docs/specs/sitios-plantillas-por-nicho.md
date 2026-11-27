@@ -20,8 +20,8 @@ Estado: implementado (nov 2026). Código: `src/lib/siteTemplates.ts`, `src/lib/s
    - **Botones** que abren una ventana con más información (reservas, condiciones, cotizaciones).
    - **Videos subidos** en la portada (de fondo), en la sección Video y en Imagen y texto.
    - Cualquier sección se puede poner en el menú.
-3. **Editor visual a pantalla completa** (`/dashboard/sitio/editor`). Tiene cuatro paneles: Secciones, Plantillas,
-   Estilo e IA. La vista previa se puede ver como computador, tablet o celular, y los textos se editan haciendo clic
+3. **Editor visual a pantalla completa** (`/dashboard/sitio/editor`). Tiene cuatro paneles: Asistente (el primero y
+   el que abre por defecto), Secciones, Plantillas y Estilo. La vista previa se puede ver como computador, tablet o celular, y los textos se editan haciendo clic
    sobre ellos en la vista previa. Al hacer clic en una sección se abren sus ajustes (fotos, videos, ítems, diseño,
    botón, menú). Deshacer y rehacer cubren todo y funcionan con atajos. La página `/dashboard/sitio` queda para los
    ajustes: estado, dirección, nombre y redes, SEO, banners, contacto y dominio.
@@ -141,20 +141,28 @@ El límite se revisa en dos momentos:
   carpeta de la productora (`site-videos/<org>/`) y pósters que no sean del bucket. Además borra del Storage los
   videos que ya no usa ninguna sección.
 
-## IA
+## Asistente (IA)
 
-`/api/sites/ai` le pasa a la IA estos elementos:
+El asistente es la primera pestaña del editor y la que abre por defecto. Funciona como un chat
+(`SiteAiPanel.vue` → `/api/sites/ai`) y puede hacer todo lo que hacen las otras pestañas:
 
-- las plantillas completas;
-- los tipos de menú;
-- las variantes de diseño;
-- los campos nuevos (pestañas, personas, botón con ventana, menú).
-
-Si el productor pide una plantilla, la IA devuelve su key en `preset` y el servidor la aplica con `applyPreset`. Esa
-plantilla reemplaza secciones, estilo y menú, y conserva el logo, la portada y "Sobre nosotros".
-
-La IA no ve ni puede inventar videos: cada sección conserva el suyo. Las imágenes siguen restringidas a las que ya
-estaban en el borrador.
+- **Plantillas:** si el productor pide una, la IA devuelve su key en `preset` y el servidor la aplica con
+  `applyPreset`. Esa plantilla reemplaza secciones, estilo y menú, y conserva el logo, la portada y "Sobre nosotros".
+- **Estilo:** cambia la plantilla de estilo, los colores, la tipografía y el tipo de menú (fijo o no). También cambia
+  el logo y la imagen de portada (`theme.logo_url` y `theme.hero_image_url`): con `""` deja la actual, con `"none"` la
+  quita, o pone una imagen permitida.
+- **Secciones:** agrega, quita, ordena, oculta y duplica secciones. Edita sus textos, ítems, diseño y botones (enlace
+  o ventana) y decide si aparecen en el menú.
+- **Fotos y videos:** solo usa los que ya están en el borrador, las imágenes de los eventos y los adjuntos del chat.
+  Los adjuntos se suben con las mismas reglas y optimización que en el resto del editor, y el servidor solo acepta
+  los que están en la carpeta de la organización. Los videos los recibe como URL. En `data.video`, `""` deja el que
+  ya tiene la sección, `"none"` lo quita, y la URL de otro video lo pone o lo mueve. No puede inventar URLs. Si los
+  cambios dejan el sitio sobre el límite de fotos o videos, la respuesta trae un aviso (`warning`).
+- **Conversación:** se mandan los últimos 6 intercambios (`history`), así se puede seguir con "más corto" o "deshaz lo
+  del menú". Al seleccionar una sección en la vista previa aparece la opción "Enfocar en…", que limita el pedido a esa
+  sección.
+- **Guardar:** el asistente no guarda. Lo hace el productor con el botón "Guardar", y cada cambio se puede deshacer
+  desde el chat.
 
 ## Pruebas
 

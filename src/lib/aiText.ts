@@ -186,6 +186,10 @@ export async function generateSiteEdit(input: {
     /** Plantillas completas (copy + diseño + tema) por tipo de página. */
     presets?: { key: string; template: string; name: string; description: string }[];
     navStyles?: { value: string; label: string }[];
+    /** Conversación anterior con el asistente (para seguir con "más corto", "deshaz eso del menú"...). */
+    history?: { instruction: string; summary: string }[];
+    /** Fotos y videos que el productor adjuntó en el chat (ya subidos y verificados). */
+    attachments?: { type: "image" | "video"; url: string; description?: string }[];
     /** Solo editar esta sección. */
     sectionId?: string | null;
 }): Promise<SiteEditResult> {
@@ -217,8 +221,8 @@ export async function generateSiteEdit(input: {
             "- La página de inicio es una lista de secciones. Tipos:\n" +
             input.sectionTypes.map((s) => `  * ${s.type}: ${s.name}. ${s.description}`).join("\n") +
             "\n- Campos de data por tipo: todas aceptan eyebrow (antetítulo corto), title y nav_label (texto corto en el menú). " +
-            "hero: subtitle, button_label, button_url, image_url, layout. events: text, layout. feature: text, image_url, align (left | right), " +
-            "button_label, button_url, button_action, modal_title, modal_text. video: url (YouTube o Vimeo), text. cta: text, button_label, button_url, " +
+            "hero: subtitle, button_label, button_url, image_url, video, layout. events: text, layout. feature: text, image_url, video, align (left | right), " +
+            "button_label, button_url, button_action, modal_title, modal_text. video: url (YouTube o Vimeo), video (subido), text. cta: text, button_label, button_url, " +
             'button_action, modal_title, modal_text. button_url: "#eventos", "contacto", "#<id de otra sección>" o una URL https. ' +
             'button_action "modal" hace que el botón abra una ventana con modal_title y modal_text (condiciones, reservas, cotizaciones); "" lo deja como enlace. ' +
             "contact: text. highlights: items [{title, text}]. faq: items [{question, answer}]. testimonials: items [{quote, author}], layout. " +
@@ -232,11 +236,21 @@ export async function generateSiteEdit(input: {
             "estacionamiento), premios, cifras ni opiniones o testimonios de personas reales. Si te piden opiniones o personas y no hay, no inventes: deja los ítems vacíos " +
             "(\"\") para que el productor los complete y explícalo en summary. En preguntas frecuentes, responde solo con lo que se sabe (por ejemplo, que la entrada llega por correo con un QR) " +
             "o deja la respuesta vacía para que el productor la escriba.\n" +
-            "- Usa solo URLs de imágenes que ya estén en el borrador; no inventes URLs. Los videos subidos (campo video del borrador) se conservan solos: no los incluyas.\n" +
+            "- Imágenes: usa solo URLs que ya estén en el borrador, en las imágenes de los eventos o en los adjuntos; no inventes URLs. " +
+            "theme.logo_url y theme.hero_image_url (imagen de portada general): \"\" deja la actual, \"none\" la quita o una URL permitida.\n" +
+            "- Videos subidos: data.video de hero, feature y video. \"\" deja el que ya tiene la sección, \"none\" lo quita, o la URL de un video " +
+            "del borrador o de los adjuntos (así se mueve un video de una sección a otra). Nunca inventes URLs de video. Máximo 3 videos y 60 fotos en el sitio.\n" +
+            "- Si el productor adjuntó fotos o videos, úsalos donde lo pida (portada, galería, personas, pestañas, imagen y texto); si no dice dónde, elige el lugar más lógico y cuéntalo en summary.\n" +
             "- Texto plano en todos los campos: sin HTML, sin Markdown y con pocos emojis o ninguno.\n" +
             "- Respeta lo que no te pidieron cambiar.\n" +
             "- summary: una o dos frases para el productor sobre lo que cambiaste, en primera persona (p. ej. \"Agregué preguntas frecuentes y...\"), sin tecnicismos.",
         `Información de la productora y sus eventos:\n${input.context}\n\n` +
+            (input.history?.length
+                ? `Conversación anterior (más antigua primero):\n${input.history.map((h) => `- Productor: ${h.instruction}\n  Tú: ${h.summary}`).join("\n").slice(0, 4000)}\n\n`
+                : "") +
+            (input.attachments?.length
+                ? `Adjuntos de este mensaje:\n${input.attachments.map((a, i) => `- ${a.type === "video" ? "video" : "imagen"} ${i + 1}: ${a.url}${a.description ? ` (${a.description})` : ""}`).join("\n")}\n\n`
+                : "") +
             `Borrador actual del sitio (JSON):\n${JSON.stringify(draft).slice(0, 40000)}\n\n` +
             `Instrucción del productor: ${input.instruction.slice(0, 1500)}\n\n${scope}`,
         {
@@ -264,10 +278,10 @@ export async function generateSiteEdit(input: {
                                     additionalProperties: false,
                                     required: [
                                         "eyebrow", "title", "nav_label", "subtitle", "text", "button_label", "button_url", "button_action",
-                                        "modal_title", "modal_text", "image_url", "url", "layout", "align", "items",
+                                        "modal_title", "modal_text", "image_url", "url", "video", "layout", "align", "items",
                                     ],
                                     properties: {
-                                        ...requiredStrings(["eyebrow", "title", "nav_label", "subtitle", "text", "button_label", "button_url", "modal_title", "modal_text", "image_url", "url"]).properties,
+                                        ...requiredStrings(["eyebrow", "title", "nav_label", "subtitle", "text", "button_label", "button_url", "modal_title", "modal_text", "image_url", "url", "video"]).properties,
                                         button_action: { type: "string", enum: ["", "modal"] },
                                         layout: { type: "string", enum: ["", ...(layoutValues.length ? layoutValues : ["cards", "posters", "list"])] },
                                         align: { type: "string", enum: ["", "left", "right"] },
@@ -282,9 +296,9 @@ export async function generateSiteEdit(input: {
                     theme: {
                         type: "object",
                         additionalProperties: false,
-                        required: ["primary", "accent", "background", "text", "font"],
+                        required: ["primary", "accent", "background", "text", "font", "logo_url", "hero_image_url"],
                         properties: {
-                            ...requiredStrings(["primary", "accent", "background", "text"]).properties,
+                            ...requiredStrings(["primary", "accent", "background", "text", "logo_url", "hero_image_url"]).properties,
                             font: { type: "string", enum: ["", ...input.fonts] },
                         },
                     },
