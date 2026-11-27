@@ -468,9 +468,14 @@ export async function getSiteBySlug(
 
 /**
  * Sitio por host del visitante: <slug>.<SITES_ROOT_DOMAIN> (si SITES_WILDCARD_ENABLED) o dominio propio
- * con domain_status='active'. Solo devuelve sitios públicos. null para hosts principales o desconocidos.
+ * con domain_status='active'. Por defecto solo devuelve sitios públicos; con includeUnpublished también los
+ * no publicados (el middleware los usa para avisar "no publicado por ahora" en vez de un 404; nunca para
+ * servirlos). null para hosts principales o desconocidos.
  */
-export async function resolveSiteByHost(host: string | null | undefined): Promise<SiteRecord | null> {
+export async function resolveSiteByHost(
+  host: string | null | undefined,
+  opts: { includeUnpublished?: boolean } = {}
+): Promise<SiteRecord | null> {
   const h = normalizeHost(host);
   if (!h || isMainHost(h)) return null;
 
@@ -479,7 +484,7 @@ export async function resolveSiteByHost(host: string | null | undefined): Promis
     if (!envWildcardEnabled()) return null;
     const sub = h.slice(0, -(root.length + 1));
     if (sub.includes(".")) return null;
-    return getSiteBySlug(sub);
+    return getSiteBySlug(sub, { includeUnpublished: opts.includeUnpublished });
   }
 
   let site = cacheGet(cacheByHost, h);
@@ -492,7 +497,8 @@ export async function resolveSiteByHost(host: string | null | undefined): Promis
     }
     cacheSet(cacheByHost, h, site);
   }
-  return isSitePublic(site) ? site : null;
+  if (!site) return null;
+  return opts.includeUnpublished || isSitePublic(site) ? site : null;
 }
 
 /** Banners activos y vigentes del sitio, ordenados. */
