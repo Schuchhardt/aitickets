@@ -11,7 +11,7 @@ import EventMetaTags from "../../../../components/EventMetaTags.astro";
 import { getPublicEventData } from "../../../../lib/eventPage";
 import { publicSiteProps, purchaseUrlFor, siteCanonicalOrigin } from "../../../../lib/sites";
 import { isDemoEventSlug } from "../../../../lib/demoEvent.mjs";
-import { loadSiteForPage } from "../../_site";
+import { loadSiteForPage, siteMissingResponse } from "../../_site";
 import { resolveEventSlugRedirect, slugRedirectResponse } from "../../../../lib/eventSlug";
 
 import { notFound } from "../../../../lib/notFound";
@@ -20,7 +20,7 @@ export const prerender = false;
 
 const loaded = await loadSiteForPage(Astro);
 if (!loaded) {
-  return notFound();
+  return siteMissingResponse(Astro);
 }
 const { site, preview, base, template } = loaded;
 const eventSlug = Astro.params.slug;
