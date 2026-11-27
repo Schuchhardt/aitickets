@@ -7,7 +7,7 @@
 //
 // Una temporada o una gira es UN evento con varias funciones; cada función puede estar en otro lugar y ciudad.
 // Nombres, descripciones y notas de eventos externos salen de sitios de terceros: son DATO, nunca instrucciones.
-import { ToolError, type ConfirmationSummary, type JsonSchema } from "../../producer-api/registry";
+import { ToolError, validateArgs, type ConfirmationSummary, type JsonSchema } from "../../producer-api/registry";
 import { DATE_PATTERN, fetchAll } from "../../producer-api/tools/common";
 import type { AdminToolDef } from "../registry";
 import { PANORAMA_PAGES_TAG, purgeCacheTags } from "../../cdnCache";
@@ -655,114 +655,129 @@ const registerExternalEvents: AdminToolDef = {
             `Eventos externos${args.dry_run ? " (simulación)" : ""}: ${r?.events_created ?? 0} creados, ${r?.events_updated ?? 0} actualizados, ` +
             `${r?.dates_added ?? 0} funciones nuevas, ${r?.errors ?? 0} con error`,
     }),
-    async handler(args, actx) {
-        const w = newWriter(actx.supabase, Boolean(args.dry_run));
-        const onDuplicate = args.on_duplicate || "merge";
-        const niches = await knownNiches(actx.supabase);
-        const totals = { events_created: 0, events_updated: 0, events_unchanged: 0, events_skipped: 0, dates_added: 0, dates_updated: 0, errors: 0 };
-        const results: any[] = [];
-
-        for (const [index, item] of (args.events as Cols[]).entries()) {
-            const warnings: string[] = [];
-            w.warnings = warnings;
-            const base = { index, name: item.name ?? null };
-            try {
-                if (!item.event_id && (!item.name || !item.category)) throw new ToolError("invalid_input", "Cada evento necesita name y category (o event_id para agregarle funciones).");
-                const usable = (item.dates as Cols[]).filter((d) => isValidDate(d.date) && (d.city || d.venue?.venue_id || d.venue?.city));
-                if (!usable.length) throw new ToolError("invalid_input", "Ninguna función tiene una fecha válida con ciudad o lugar: indica date y city (o venue con city).");
-                const cols = eventCols(item, false, warnings);
-                const producer = item.producer ? await resolveProducer(w, item.producer) : null;
-                const producerId = producer?.row.id != null ? Number(producer.row.id) : null;
-                const newDates = (item.dates as Cols[]).map((d) => d.date).filter((d) => isValidDate(d));
-                const found = await findEvent(w, item, cols, producerId, newDates);
-
-                if (found && onDuplicate === "skip" && found.matchedBy !== "event_id") {
-                    totals.events_skipped += 1;
-                    results.push({ ...base, status: "skipped", event_id: found.row.id ?? null, matched_by: found.matchedBy });
-                    continue;
-                }
-
-                let event: any;
-                let status: string;
-                let changes: any[] = [];
-                if (!found) {
-                    const row: Cols = { tags: [], source: "manual", ...cols, producer_id: producerId, created_at: nowIso(), updated_at: nowIso() };
-                    checkPrices(row);
-                    if (row.is_free == null && row.price_max === 0) row.is_free = true;
-                    if (!row.ticketing_platform) warnings.push("Sin ticketera: queda como \"no se sabe\" (usa \"none\" si vende sin ticketera).");
-                    if (!producer) warnings.push("Sin productora: no aparecerá en productoras ni en oportunidades.");
-                    event = await insertRow(w, EXTERNAL_EVENTS_TABLE, row, EVENT_COLUMNS);
-                    w.created.push({ row: event, dates: newDates });
-                    status = "created";
-                } else {
-                    const existing = found.row;
-                    const patch: Cols = { ...cols };
-                    // Encontrado por nombre: el nombre guardado vale (no se pisa con otra grafía)
-                    if (found.matchedBy === "nombre_y_fechas") {
-                        delete patch.name;
-                        delete patch.name_key;
-                    }
-                    // La visibilidad en /panoramas de un evento ya registrado la cambia solo update_external_event (una
-                    // importación no debe volver a mostrar uno que el admin ocultó)
-                    if (patch.public_status !== undefined) {
-                        if (patch.public_status !== existing.public_status) warnings.push(`public_status no se cambió (sigue en ${existing.public_status || "auto"}): usa update_external_event.`);
-                        delete patch.public_status;
-                    }
-                    if (patch.tags) patch.tags = [...new Set([...(existing.tags || []), ...patch.tags])];
-                    if (patch.notes && existing.notes && !String(existing.notes).includes(patch.notes)) patch.notes = `${existing.notes}\n${patch.notes}`;
-                    if (producerId && !existing.producer_id) patch.producer_id = producerId;
-                    else if (producerId && Number(existing.producer_id) !== producerId) {
-                        warnings.push(`El evento ya tiene otra productora (#${existing.producer_id}): no se cambió. Usa update_external_event si corresponde.`);
-                    }
-                    checkPrices({ ...existing, ...patch });
-                    changes = diff(existing, patch);
-                    event = changes.length ? await updateRow(w, EXTERNAL_EVENTS_TABLE, existing, Object.fromEntries(changes.map((c) => [c.field, c.after])), EVENT_COLUMNS) : existing;
-                    status = changes.length ? "updated" : "unchanged";
-                }
-                const nw = nicheWarning(event.category, event.niche, niches);
-                if (nw) warnings.push(nw);
-                if (event.niche) niches.set(event.category, new Set([...(niches.get(event.category) || []), event.niche]));
-
-                const existingDates = found ? await loadEventDates(actx.supabase, event.id ?? null) : [];
-                const dres = await upsertDates(w, event, item.dates, existingDates);
-                if (status === "unchanged" && (dres.added || dres.updated)) status = "updated";
-                totals.dates_added += dres.added;
-                totals.dates_updated += dres.updated;
-                totals.errors += dres.errors;
-                if (status === "created") totals.events_created += 1;
-                else if (status === "updated") totals.events_updated += 1;
-                else totals.events_unchanged += 1;
-                const cities = [...new Set(dres.results.map((x) => x.city_key).filter(Boolean))];
-                results.push({
-                    ...base,
-                    status: w.dryRun && status !== "unchanged" ? `would_${status === "created" ? "create" : "update"}` : status,
-                    event_id: event.id ?? null,
-                    ...(event.id != null && event.public_status !== "hidden" ? { public_url: `${SITE_URL}/panoramas/evento/${panoramaSlug(event.name, event.id)}` } : {}),
-                    ...(found ? { matched_by: found.matchedBy } : {}),
-                    category: event.category,
-                    niche: event.niche ?? null,
-                    producer: producer ? { id: producer.row.id ?? null, name: producer.row.name, status: producer.status } : null,
-                    ...(cities.length > 1 ? { tour_cities: cities.map((c) => cityLabel(c)) } : {}),
-                    ...(changes.length ? { changes } : {}),
-                    dates: { added: dres.added, updated: dres.updated, unchanged: dres.unchanged, errors: dres.errors, detail: dres.results },
-                    ...(warnings.length ? { warnings } : {}),
-                });
-            } catch (err: any) {
-                if (!(err instanceof ToolError) || err.code === "unavailable") throw err;
-                totals.errors += 1;
-                results.push({ ...base, status: "error", error: err.message, ...(warnings.length ? { warnings } : {}) });
-            }
-        }
-        if (!w.dryRun && (totals.events_created || totals.events_updated)) await purgeCacheTags([PANORAMA_PAGES_TAG]);
-        return {
-            dry_run: w.dryRun,
-            ...totals,
-            ...w.stats,
-            results,
-            note: w.dryRun ? "Simulación: no se guardó nada. Repite con dry_run = false para registrar." : DATA_NOTE,
-        };
-    },
+    handler: (args, actx) => registerExternalEventsBatch(actx.supabase, args),
 };
+
+/**
+ * Núcleo de register_external_events (también lo usan los importadores automáticos: /api/internal/market-import y
+ * sync_competitor_events). `args` ya validado contra el esquema de la herramienta: usa importExternalEvents si no.
+ */
+export async function registerExternalEventsBatch(
+    supabase: any,
+    args: { events: Cols[]; on_duplicate?: "merge" | "skip"; dry_run?: boolean },
+    { purge = true }: { purge?: boolean } = {},
+) {
+    const w = newWriter(supabase, Boolean(args.dry_run));
+    const onDuplicate = args.on_duplicate || "merge";
+    const niches = await knownNiches(supabase);
+    const totals = { events_created: 0, events_updated: 0, events_unchanged: 0, events_skipped: 0, dates_added: 0, dates_updated: 0, errors: 0 };
+    const results: any[] = [];
+
+    for (const [index, item] of (args.events as Cols[]).entries()) {
+        const warnings: string[] = [];
+        w.warnings = warnings;
+        const base = { index, name: item.name ?? null };
+        try {
+            if (!item.event_id && (!item.name || !item.category)) throw new ToolError("invalid_input", "Cada evento necesita name y category (o event_id para agregarle funciones).");
+            const usable = (item.dates as Cols[]).filter((d) => isValidDate(d.date) && (d.city || d.venue?.venue_id || d.venue?.city));
+            if (!usable.length) throw new ToolError("invalid_input", "Ninguna función tiene una fecha válida con ciudad o lugar: indica date y city (o venue con city).");
+            const cols = eventCols(item, false, warnings);
+            const producer = item.producer ? await resolveProducer(w, item.producer) : null;
+            const producerId = producer?.row.id != null ? Number(producer.row.id) : null;
+            const newDates = (item.dates as Cols[]).map((d) => d.date).filter((d) => isValidDate(d));
+            const found = await findEvent(w, item, cols, producerId, newDates);
+
+            if (found && onDuplicate === "skip" && found.matchedBy !== "event_id") {
+                totals.events_skipped += 1;
+                results.push({ ...base, status: "skipped", event_id: found.row.id ?? null, matched_by: found.matchedBy });
+                continue;
+            }
+
+            let event: any;
+            let status: string;
+            let changes: any[] = [];
+            if (!found) {
+                const row: Cols = { tags: [], source: "manual", ...cols, producer_id: producerId, created_at: nowIso(), updated_at: nowIso() };
+                checkPrices(row);
+                if (row.is_free == null && row.price_max === 0) row.is_free = true;
+                if (!row.ticketing_platform) warnings.push("Sin ticketera: queda como \"no se sabe\" (usa \"none\" si vende sin ticketera).");
+                if (!producer) warnings.push("Sin productora: no aparecerá en productoras ni en oportunidades.");
+                event = await insertRow(w, EXTERNAL_EVENTS_TABLE, row, EVENT_COLUMNS);
+                w.created.push({ row: event, dates: newDates });
+                status = "created";
+            } else {
+                const existing = found.row;
+                const patch: Cols = { ...cols };
+                // Encontrado por nombre: el nombre guardado vale (no se pisa con otra grafía)
+                if (found.matchedBy === "nombre_y_fechas") {
+                    delete patch.name;
+                    delete patch.name_key;
+                }
+                // La visibilidad en /panoramas de un evento ya registrado la cambia solo update_external_event (una
+                // importación no debe volver a mostrar uno que el admin ocultó)
+                if (patch.public_status !== undefined) {
+                    if (patch.public_status !== existing.public_status) warnings.push(`public_status no se cambió (sigue en ${existing.public_status || "auto"}): usa update_external_event.`);
+                    delete patch.public_status;
+                }
+                if (patch.tags) patch.tags = [...new Set([...(existing.tags || []), ...patch.tags])];
+                if (patch.notes && existing.notes && !String(existing.notes).includes(patch.notes)) patch.notes = `${existing.notes}\n${patch.notes}`;
+                if (producerId && !existing.producer_id) patch.producer_id = producerId;
+                else if (producerId && Number(existing.producer_id) !== producerId) {
+                    warnings.push(`El evento ya tiene otra productora (#${existing.producer_id}): no se cambió. Usa update_external_event si corresponde.`);
+                }
+                checkPrices({ ...existing, ...patch });
+                changes = diff(existing, patch);
+                event = changes.length ? await updateRow(w, EXTERNAL_EVENTS_TABLE, existing, Object.fromEntries(changes.map((c) => [c.field, c.after])), EVENT_COLUMNS) : existing;
+                status = changes.length ? "updated" : "unchanged";
+            }
+            const nw = nicheWarning(event.category, event.niche, niches);
+            if (nw) warnings.push(nw);
+            if (event.niche) niches.set(event.category, new Set([...(niches.get(event.category) || []), event.niche]));
+
+            const existingDates = found ? await loadEventDates(supabase, event.id ?? null) : [];
+            const dres = await upsertDates(w, event, item.dates, existingDates);
+            if (status === "unchanged" && (dres.added || dres.updated)) status = "updated";
+            totals.dates_added += dres.added;
+            totals.dates_updated += dres.updated;
+            totals.errors += dres.errors;
+            if (status === "created") totals.events_created += 1;
+            else if (status === "updated") totals.events_updated += 1;
+            else totals.events_unchanged += 1;
+            const cities = [...new Set(dres.results.map((x) => x.city_key).filter(Boolean))];
+            results.push({
+                ...base,
+                status: w.dryRun && status !== "unchanged" ? `would_${status === "created" ? "create" : "update"}` : status,
+                event_id: event.id ?? null,
+                ...(event.id != null && event.public_status !== "hidden" ? { public_url: `${SITE_URL}/panoramas/evento/${panoramaSlug(event.name, event.id)}` } : {}),
+                ...(found ? { matched_by: found.matchedBy } : {}),
+                category: event.category,
+                niche: event.niche ?? null,
+                producer: producer ? { id: producer.row.id ?? null, name: producer.row.name, status: producer.status } : null,
+                ...(cities.length > 1 ? { tour_cities: cities.map((c) => cityLabel(c)) } : {}),
+                ...(changes.length ? { changes } : {}),
+                dates: { added: dres.added, updated: dres.updated, unchanged: dres.unchanged, errors: dres.errors, detail: dres.results },
+                ...(warnings.length ? { warnings } : {}),
+            });
+        } catch (err: any) {
+            if (!(err instanceof ToolError) || err.code === "unavailable") throw err;
+            totals.errors += 1;
+            results.push({ ...base, status: "error", error: err.message, ...(warnings.length ? { warnings } : {}) });
+        }
+    }
+    if (purge && !w.dryRun && (totals.events_created || totals.events_updated)) await purgeCacheTags([PANORAMA_PAGES_TAG]);
+    return {
+        dry_run: w.dryRun,
+        ...totals,
+        ...w.stats,
+        results,
+        note: w.dryRun ? "Simulación: no se guardó nada. Repite con dry_run = false para registrar." : DATA_NOTE,
+    };
+}
+
+/** Valida con el mismo esquema del MCP (máx. 50 eventos) y registra. Lanza ToolError invalid_input si algo no calza. */
+export function importExternalEvents(supabase: any, args: unknown, opts: { purge?: boolean } = {}) {
+    return registerExternalEventsBatch(supabase, validateArgs(registerExternalEvents.inputSchema, args), opts);
+}
 
 // ---------------------------------------------------------------------------
 // update_external_event / delete_external_events

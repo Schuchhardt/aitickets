@@ -19,6 +19,7 @@ import { leadTools } from "./leads";
 import { errorIssueTools } from "./errors";
 import { marketTools } from "./market";
 import { panoramaTools } from "./panoramas";
+import { marketImportTools } from "./marketImport";
 import { pushTools } from "./push";
 import { mirrorTools } from "../mirror";
 
@@ -42,6 +43,7 @@ export const ADMIN_TOOLS: AdminToolDef[] = [
     ...pushTools,
     ...marketTools,
     ...panoramaTools,
+    ...marketImportTools,
     ...mirrorTools,
 ];
 

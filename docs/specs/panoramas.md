@@ -115,10 +115,13 @@ personales de terceros o groserías, aprobar con `public_comment` corregido o re
 
 ## 6. Tarea programada "Panoramas – Eventos externos"
 
-**No existía** (2026-11-26: revisadas las 60 tareas de la cuenta; ninguna llama a `register_external_events`). Se crea
-**después del deploy** de esta versión: antes, `register_external_events` rechaza `description` / `image_url` (el esquema
-no admite campos desconocidos) y la corrida fallaría. Propuesta: lunes y jueves 07:4x (hora de Chile), sesión nueva por
-corrida, conectores `AI_Tickets_Admin` + búsqueda web. Prompt:
+**No existía** (2026-11-26: revisadas las 60 tareas de la cuenta; ninguna llama a `register_external_events`). Desde el
+2026-11-27 hay dos tareas programadas (sus prompts viven en las rutinas de claude.ai, no en el repo; necesitan el
+conector "AI Tickets Admin"): **"Panoramas – Mapeo inicial de leads"** (cada 2 h el 27 y 28-11: revisa los 372 leads,
+registra sus eventos próximos enlazados al lead y deja una nota "Panoramas: …" en cada uno) y **"Panoramas – Eventos
+externos"** (lunes y jueves 07:47: salas, productores y agendas; las ticketeras grandes llegan solas por market-watch,
+§9). Ninguna evade bloqueos anti-bot: si una fuente bloquea, confirman por otra fuente pública o no registran. Prompt
+original de la segunda (versión inicial):
 
 ```text
 Eres el curador de Panoramas de AI Tickets (aitickets.cl/panoramas), la cartelera pública de eventos externos de la
@@ -200,3 +203,47 @@ Primera línea: "Panoramas <fecha>: N nuevos · M actualizados · P comentarios 
 3. Purga automática de comprobantes moderados (> 90 días) en una función programada.
 4. Copiar los afiches al bucket público optimizados (`storeOptimizedImage`) para no depender del hotlink.
 5. Aviso por correo a quien comentó cuando su comentario se publica (con link para compartir).
+
+## 9. Importación automática (market-watch)
+
+Implementado v1 (2026-11-27): `netlify/lib/market/ticketing-watch.mjs`, `netlify/functions/market-watch{,-background}`,
+`src/lib/market/importer.ts`, `POST /api/internal/market-import` y la herramienta `sync_competitor_events`.
+
+```
+market-watch (programada, 12:20 UTC) ──▶ market-watch-background (hasta 15 min)
+   1. Firecrawl SEARCH "site:<ticketera> <palabra> <ciudad>"  (Puntoticket, Ticketplus, Welcu, Eventbrite, Passline)
+      └─ solo título + snippet + URL del buscador; Claude Haiku (un lote) extrae fecha, hora, sala, ciudad, categoría,
+         nicho y precios SOLO de ese texto (lo que no aparece queda vacío)
+   2. Ticketmaster Discovery API oficial (countryCode=CL) con TICKETMASTER_API_KEY
+   3. POST /api/internal/market-import (x-internal-secret) en tandas de 6 ──▶ importExternalEvents = el MISMO registro de
+      register_external_events (validación, normalización, deduplicación) en lotes de 4 con plazo de 7 s
+   4. sync_competitor_events: los eventos del vigía de Passline (aitickets_competitor_events) → eventos externos,
+      enlazados a su lead (productora: producer.lead_id; sala: nota "Lead sala")
+```
+
+**Regla dura** (la misma de `passline-watch`): nunca se visita la página de una ticketera ni se evaden protecciones
+anti-bot (Passline y Ticketmaster responden con un desafío de Cloudflare). Solo resultados de búsqueda y APIs oficiales.
+Por eso los eventos llegan sin afiche ni descripción (la tarea programada "Panoramas – Eventos externos" los completa
+desde fuentes abiertas: salas, productores); los de Ticketmaster traen afiche, hora y precios de la API.
+
+| Variable | Por defecto | Qué hace |
+| --- | --- | --- |
+| `MARKET_WATCH_ENABLED` | apagado | `true` enciende la corrida diaria |
+| `FIRECRAWL_API_KEY` | (ya existe para passline-watch) | búsquedas en ticketeras |
+| `TICKETMASTER_API_KEY` | vacío | Discovery API (gratis en developer.ticketmaster.com); sin ella se omite |
+| `MARKET_WATCH_QUERIES_PER_RUN` | 24 | consultas por día; rotan sobre 360 combinaciones (5 ticketeras × 18 palabras × 4 ciudades, Santiago primero) |
+| `MARKET_WATCH_RESULTS_PER_QUERY` | 10 | resultados por consulta |
+| `MARKET_WATCH_CREDITS_PER_RUN` | 120 | tope de créditos de Firecrawl por corrida |
+| `MARKET_WATCH_TOKENS_PER_RUN` | 80000 | tope de tokens de Claude por corrida (`ANTHROPIC_MODEL_FAST`, Haiku) |
+| `MARKET_WATCH_MAX_ITEMS` | 150 | eventos enviados al registro por corrida (los más cercanos primero) |
+| `MARKET_WATCH_HORIZON_DAYS` | 240 | ventana de fechas |
+| `TICKETMASTER_MAX_PAGES` | 3 | páginas de 100 eventos de la API |
+| `MARKET_IMPORT_BUDGET_MS` | 7000 | plazo por request del endpoint interno (las funciones síncronas cortan a los 10 s) |
+
+**Encender**: `MARKET_WATCH_ENABLED=true` en Netlify (y `TICKETMASTER_API_KEY` si se quiere Ticketmaster; validar que
+`countryCode=CL` devuelva eventos: la documentación no lo garantiza). Probar sin registrar: `POST
+/.netlify/functions/market-watch-background` con `x-internal-secret` y `{"dry_run": true}` (el resumen va a Slack).
+**Monitoreo**: `get_system_health` (proceso market-watch) y el resumen de Slack de cada corrida. Sin
+`MARKET_WATCH_ENABLED`, el vigía de Passline (que crea leads) sigue igual; `sync_competitor_events` se puede correr a
+mano desde el MCP.
+

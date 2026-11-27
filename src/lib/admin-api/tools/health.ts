@@ -182,6 +182,7 @@ const SCHEDULED_JOBS: { job: string; label: string; everyHours: number; note: st
     { job: "social-series-dispatch", label: "social-series-dispatch (historias automáticas)", everyHours: 1 / 4, note: "Corre cada 15 min; publica lo que sale en las próximas 2 h. last_activity_at es la última pieza programada: quieta no es falla." },
     { job: "send-scheduled-messages", label: "send-scheduled-messages", everyHours: 1 / 6, note: "Corre cada 10 min; envía si hay mensajes programados." },
     { job: "check-custom-domains", label: "check-custom-domains", everyHours: 1 / 4, note: "Corre cada 15 min; revisa dominios pendientes y, cada ~6 h, los activos." },
+    { job: "market-watch", label: "market-watch (panoramas)", everyHours: 24, note: "Corre a diario (12:20 UTC): eventos de Puntoticket, Ticketplus, Welcu, Eventbrite y Passline por resultados de búsqueda y de Ticketmaster por su API, y los del vigía de Passline, hacia /panoramas. Solo con MARKET_WATCH_ENABLED=true y FIRECRAWL_API_KEY o TICKETMASTER_API_KEY: si no, last_note dice skipped." },
     { job: "passline-watch", label: "passline-watch (leads)", everyHours: 24, note: "Corre a diario (11:00 UTC). Solo busca si LEADS_PASSLINE_ENABLED=true y hay FIRECRAWL_API_KEY: si no, last_note dice skipped." },
     { job: "outreach-tick", label: "outreach", everyHours: 1 / 3, note: "Corre cada 20 min; solo envía con OUTREACH_ENABLED=true." },
     { job: "outreach-digest", label: "outreach-digest", everyHours: 24, note: "Corre a diario (23:00 UTC); solo con OUTREACH_ENABLED=true." },
