@@ -6,7 +6,7 @@ import { fetchAll, localDay } from "../producer-api/tools/common";
 import { loadPaidOrders, loadPlatformEvents, totalsByEvent } from "../admin-api/metrics";
 import { addDays, dayOfWeek, WEEKDAY_NAMES, type CalendarEntry } from "./calendar";
 import { nightDate, type MarketEvent } from "./dateModel";
-import { CATEGORY_INFO, categoryFromTag, cityInfo, cityLabel, isCategory, leadNicheFor, normalizeText, platformLabel, slugKey, usesTicketing } from "./taxonomy";
+import { CATEGORY_INFO, categoryFromTag, cityInfo, cityLabel, isCategory, leadNicheFor, normalizeText, panoramaSlug, platformLabel, slugKey, usesTicketing } from "./taxonomy";
 
 export const PRODUCERS_TABLE = "aitickets_external_producers";
 export const VENUES_TABLE = "aitickets_external_venues";
@@ -21,7 +21,7 @@ export const isMissingTable = (error: any) => ["42P01", "PGRST205"].includes(Str
 export const PRODUCER_COLUMNS = "id, name, producer_key, instagram, website, city, city_key, region, organization_id, lead_id, notes, created_at, updated_at";
 export const VENUE_COLUMNS = "id, name, venue_key, address, commune, city, city_key, region, capacity, notes, created_at, updated_at";
 export const EVENT_COLUMNS =
-    "id, name, name_key, category, niche, tags, producer_id, ticketing_platform, ticketing_url, price_min, price_max, is_free, announced_at, source, source_url, external_id, notes, created_at, updated_at";
+    "id, name, name_key, category, niche, tags, producer_id, ticketing_platform, ticketing_url, price_min, price_max, is_free, announced_at, source, source_url, external_id, notes, description, image_url, public_status, created_at, updated_at";
 export const DATE_COLUMNS =
     "id, event_id, event_date, start_time, end_date, venue_id, city, city_key, commune, region, capacity, status, sold_out, sold_out_at, sold_pct, attendance, ticketing_url, slot_key, notes, created_at, updated_at";
 
@@ -232,6 +232,20 @@ export function datesSummary(dates: any[], venues: Map<number, any>, today: stri
     };
 }
 
+const SITE_URL = (process.env.SITE_URL || "https://aitickets.cl").replace(/\/$/, "");
+
+/** Cómo se ve en /panoramas (docs/specs/panoramas.md): estado, link público y si hoy aparece en el listado. */
+function presentPublic(e: any, nextDate: string | null) {
+    const status = e.public_status || "auto";
+    return {
+        status,
+        listed: status !== "hidden" && Boolean(nextDate),
+        url: status === "hidden" ? null : `${SITE_URL}/panoramas/evento/${panoramaSlug(e.name, e.id)}`,
+        description: e.description || null,
+        image_url: e.image_url || null,
+    };
+}
+
 export function presentEvent(e: any, dates: any[], bundle: Pick<ExternalBundle, "venues" | "producers">, today: string, compact = false) {
     const producer = e.producer_id ? bundle.producers.get(Number(e.producer_id)) : null;
     const summary = datesSummary(dates, bundle.venues, today);
@@ -248,6 +262,7 @@ export function presentEvent(e: any, dates: any[], bundle: Pick<ExternalBundle, 
             last_date: summary.last_date,
             cities: summary.cities,
             is_tour: summary.is_tour,
+            public_status: e.public_status || "auto",
         };
     }
     return {
@@ -270,6 +285,7 @@ export function presentEvent(e: any, dates: any[], bundle: Pick<ExternalBundle, 
         announced_at: e.announced_at || null,
         source: { source: e.source, url: e.source_url || null, external_id: e.external_id || null },
         lead_niche: leadNicheFor(e.category),
+        public: presentPublic(e, summary.next_date),
         notes: e.notes || null,
         created_at: e.created_at,
         updated_at: e.updated_at,

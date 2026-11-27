@@ -59,6 +59,15 @@ const toggleMenu = () => {
             Eventos
           </a>
           <a
+            href="/panoramas"
+            :class="[
+              'text-sm font-medium font-[Unbounded] px-3 py-1.5 rounded-lg transition-colors text-black hover:text-gray-600',
+              currentPath.startsWith('/panoramas') ? 'border-b-2 border-lime-400' : ''
+            ]"
+          >
+            Panoramas
+          </a>
+          <a
             href="/organizadores"
             :class="[
               'text-sm font-medium font-[Unbounded] px-3 py-1.5 rounded-lg transition-colors text-black hover:text-gray-600',
@@ -113,6 +122,15 @@ const toggleMenu = () => {
             ]"
           >
             Eventos
+          </a>
+          <a
+            href="/panoramas"
+            :class="[
+              'text-sm font-medium font-[Unbounded] px-4 py-2 rounded-md transition-colors',
+              currentPath.startsWith('/panoramas') ? 'border-b-2 border-lime-400' : 'hover:bg-gray-100'
+            ]"
+          >
+            Panoramas
           </a>
           <a
             href="/organizadores"

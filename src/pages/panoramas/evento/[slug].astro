@@ -1,0 +1,293 @@
+---
+// /panoramas/evento/<nombre>-<id> — detalle público de un evento externo: afiche, funciones, precio, el link a su
+// ticketera y los comentarios de asistentes validados por el admin, con el formulario "¿Fuiste?". Sigue visible después
+// del evento (para los comentarios) salvo que el admin lo oculte (public_status = hidden). El slug canónico sale del
+// nombre actual: cualquier otro (o solo el id) redirige. Spec: docs/specs/panoramas.md.
+import AppHeader from "../../../components/AppHeader.vue";
+import AppFooter from "../../../components/AppFooter.vue";
+import PanoramaCard from "../../../components/panoramas/PanoramaCard.astro";
+import PanoramaFeedbackForm from "../../../components/panoramas/PanoramaFeedbackForm.vue";
+import StarRating from "../../../components/event/StarRating.vue";
+import { CATEGORY_STYLE } from "../../../components/panoramas/categoryStyle";
+import Layout from "../../../layouts/Layout.astro";
+import { getSupabaseAdmin } from "../../../lib/auth-helpers";
+import { cachePublicPage } from "../../../lib/cdnCache";
+import { jsonLdString } from "../../../lib/jsonLd";
+import { todayChile } from "../../../lib/market/calendar";
+import { notFound } from "../../../lib/notFound";
+import {
+    COMMENT_MAX,
+    COMMENT_MIN,
+    filterPanoramas,
+    loadPanoramaDetail,
+    loadPanoramaFeed,
+    PANORAMA_PAGES_TAG,
+    panoramaSlug,
+    parsePanoramaSlug,
+    priceLabel,
+    PROOF_MAX_BYTES,
+} from "../../../lib/panoramas";
+import { zonedDateTimeToISO } from "../../../utils/dateHelpers.js";
+import "../../../styles/global.css";
+
+export const prerender = false;
+
+const slug = String(Astro.params.slug || "");
+const id = parsePanoramaSlug(slug);
+if (!id) return notFound();
+const today = todayChile();
+const supabase = getSupabaseAdmin();
+const detail = await loadPanoramaDetail(supabase, id, today);
+if (!detail) return notFound();
+const { panorama: p, reviews, rating } = detail;
+if (slug !== panoramaSlug(p.name, p.id)) return Astro.redirect(p.path, 301);
+
+const feed = await loadPanoramaFeed(supabase, today);
+const related = feed ? filterPanoramas(feed.upcoming, { category: p.category }).filter((x) => x.id !== p.id).slice(0, 4) : [];
+cachePublicPage(Astro.response.headers, { sMaxAge: 300, staleWhileRevalidate: 86400, tag: PANORAMA_PAGES_TAG });
+
+const SITE_URL = (import.meta.env.SITE_URL || "https://aitickets.cl").replace(/\/$/, "");
+const style = CATEGORY_STYLE[p.category];
+const price = priceLabel(p.price);
+const upcoming = p.dates.filter((d) => !d.is_past);
+const shownDates = upcoming.length ? upcoming : p.dates.slice(-6);
+const reviewDates = p.dates.filter((d) => d.date <= today && d.status !== "cancelled").map((d) => ({ id: d.id, label: `${d.label}${d.venue ? ` · ${d.venue}` : ""}` }));
+const soldByUs = p.link?.platform === "aitickets";
+const ended = !p.next;
+const STATUS_LABEL: Record<string, string> = { postponed: "Postergada", cancelled: "Cancelada", completed: "Realizada" };
+const where = p.next?.city || p.cities[0] || "Chile";
+const when = p.next ? p.next.label.toLowerCase() : null;
+const description =
+    (p.description ? p.description.replace(/\s+/g, " ").slice(0, 150) : `${p.category_name}${p.niche_label ? ` de ${p.niche_label.toLowerCase()}` : ""} en ${where}.`) +
+    (when ? ` ${when.charAt(0).toUpperCase()}${when.slice(1)}.` : "") +
+    (price ? ` ${price}.` : "");
+const utm = `utm_source=panoramas&utm_medium=evento&utm_campaign=${p.id}`;
+
+// Datos estructurados: un Event por función próxima (máx. 10) y las migas de pan
+const EVENT_STATUS: Record<string, string> = {
+    scheduled: "https://schema.org/EventScheduled",
+    postponed: "https://schema.org/EventPostponed",
+    cancelled: "https://schema.org/EventCancelled",
+    completed: "https://schema.org/EventScheduled",
+};
+const jsonLd: Record<string, unknown>[] = upcoming.slice(0, 10).map((d) => ({
+    "@context": "https://schema.org",
+    "@type": "Event",
+    name: p.name,
+    startDate: zonedDateTimeToISO(d.date, d.start_time || "00:00") || d.date,
+    ...(d.end_date ? { endDate: d.end_date } : {}),
+    eventStatus: EVENT_STATUS[d.status],
+    eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
+    location: {
+        "@type": "Place",
+        name: d.venue || d.city || "Chile",
+        address: { "@type": "PostalAddress", ...(d.commune ? { addressLocality: d.commune } : d.city ? { addressLocality: d.city } : {}), addressCountry: "CL" },
+    },
+    ...(p.image_url ? { image: [p.image_url] } : {}),
+    ...(p.description ? { description: p.description } : {}),
+    ...(p.producer ? { organizer: { "@type": "Organization", name: p.producer } } : {}),
+    ...(p.link
+        ? {
+              offers: {
+                  "@type": "Offer",
+                  url: d.ticket_url || p.link.url,
+                  priceCurrency: "CLP",
+                  ...(p.price.is_free ? { price: 0 } : p.price.min != null ? { price: p.price.min } : {}),
+              },
+          }
+        : {}),
+}));
+jsonLd.push({
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Panoramas", item: `${SITE_URL}/panoramas` },
+        { "@type": "ListItem", position: 2, name: p.category_name, item: `${SITE_URL}${p.category_path}` },
+        ...(p.niche_path ? [{ "@type": "ListItem", position: 3, name: p.niche_label, item: `${SITE_URL}${p.niche_path}` }] : []),
+        { "@type": "ListItem", position: p.niche_path ? 4 : 3, name: p.name, item: `${SITE_URL}${p.path}` },
+    ],
+});
+---
+
+<Layout
+    title={`${p.name}${p.next ? ` · ${p.next.label.split(" · ")[0]}` : ""} | Panoramas AI Tickets`}
+    description={description}
+    canonical={p.path}
+    ogType="article"
+    image={p.image_url || undefined}
+    imageAlt={p.image_url ? `Afiche de ${p.name}` : undefined}
+>
+    <AppHeader client:idle />
+    <main class="font-['Prompt'] bg-white">
+        <script is:inline type="application/ld+json" set:html={jsonLdString(jsonLd)} />
+
+        <section class="px-4 pt-28 pb-10">
+            <div class="container mx-auto md:px-8 max-w-6xl">
+                <nav aria-label="Migas de pan" class="text-sm text-gray-500 mb-6">
+                    <a href="/panoramas" class="hover:text-black">Panoramas</a>
+                    <span class="mx-1">›</span>
+                    <a href={p.category_path} class="hover:text-black">{p.category_name}</a>
+                    {p.niche_path && (
+                        <>
+                            <span class="mx-1">›</span>
+                            <a href={p.niche_path} class="hover:text-black">{p.niche_label}</a>
+                        </>
+                    )}
+                </nav>
+
+                <div class="grid md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-8 md:gap-12 items-start">
+                    <div class={`relative aspect-[4/5] rounded-2xl overflow-hidden ${style.bg}`}>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center text-center p-6" aria-hidden="true">
+                            <span class="text-7xl">{style.emoji}</span>
+                            <span class="mt-3 text-lg font-semibold text-white/90 font-['Unbounded']">{p.category_name}</span>
+                        </div>
+                        {p.image_url && (
+                            <img
+                                src={p.image_url}
+                                alt={`Afiche de ${p.name}`}
+                                referrerpolicy="no-referrer"
+                                decoding="async"
+                                class="absolute inset-0 w-full h-full object-cover"
+                                onerror="this.remove()"
+                            />
+                        )}
+                    </div>
+
+                    <div>
+                        <p class="text-sm uppercase tracking-wide text-lime-700 font-semibold">
+                            <a href={p.category_path} class="hover:underline">{p.category_name}</a>
+                            {p.niche_path && (
+                                <>
+                                    {" · "}
+                                    <a href={p.niche_path} class="hover:underline">{p.niche_label}</a>
+                                </>
+                            )}
+                        </p>
+                        <h1 class="mt-2 text-3xl md:text-4xl font-bold font-['Unbounded'] leading-tight">{p.name}</h1>
+                        {p.producer && <p class="mt-2 text-gray-600">Organiza: {p.producer}</p>}
+                        {rating.count > 0 && (
+                            <a href="#comentarios" class="mt-3 inline-flex items-center gap-2 text-sm text-gray-700 hover:underline">
+                                <StarRating modelValue={rating.average || 0} size={18} label="Calificación promedio" readonly={true} showLabel={false} />
+                                <span>{rating.average?.toLocaleString("es-CL")} · {rating.count} {rating.count === 1 ? "comentario verificado" : "comentarios verificados"}</span>
+                            </a>
+                        )}
+
+                        <div class="mt-6 flex flex-wrap items-center gap-4">
+                            {price && <p class="text-xl font-bold">{price}</p>}
+                            {p.link && !ended && (
+                                <a
+                                    href={p.link.url}
+                                    target="_blank"
+                                    rel={soldByUs ? "noopener" : "nofollow noopener noreferrer"}
+                                    class="inline-flex items-center gap-2 bg-black text-white font-semibold px-6 py-3 rounded-lg hover:bg-gray-800 transition"
+                                >
+                                    {p.link.label} <span aria-hidden="true">↗</span>
+                                </a>
+                            )}
+                            {ended && <span class="rounded-full bg-gray-100 text-gray-700 text-sm font-semibold px-3 py-1.5">Este evento ya pasó</span>}
+                        </div>
+                        {p.link && !soldByUs && !ended && (
+                            <p class="mt-3 text-xs text-gray-500">
+                                AI Tickets no vende las entradas de este evento: el botón te lleva al sitio donde se venden. Precios, horarios y disponibilidad pueden cambiar; confírmalos ahí.
+                            </p>
+                        )}
+
+                        <h2 class="mt-8 text-lg font-bold font-['Unbounded']">{upcoming.length ? (upcoming.length === 1 ? "Fecha" : `Fechas (${upcoming.length})`) : "Funciones"}</h2>
+                        <ul class="mt-3 divide-y divide-gray-200 border-y border-gray-200">
+                            {shownDates.map((d) => (
+                                <li class="py-3 flex flex-wrap items-baseline justify-between gap-2">
+                                    <div>
+                                        <p class={`font-semibold ${d.status === "cancelled" ? "line-through text-gray-400" : ""}`}>{d.label}</p>
+                                        <p class="text-sm text-gray-600">{[d.venue, d.commune && d.commune !== d.city ? d.commune : null, d.city].filter(Boolean).join(" · ")}</p>
+                                    </div>
+                                    <div class="flex items-center gap-3">
+                                        {STATUS_LABEL[d.status] && <span class={`text-xs font-semibold rounded-full px-2 py-0.5 ${d.status === "completed" ? "bg-gray-100 text-gray-600" : "bg-amber-100 text-amber-800"}`}>{STATUS_LABEL[d.status]}</span>}
+                                        {d.ticket_url && !d.is_past && d.status !== "cancelled" && d.ticket_url !== p.link?.url && (
+                                            <a href={d.ticket_url} target="_blank" rel="nofollow noopener noreferrer" class="text-sm underline">Entradas ↗</a>
+                                        )}
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+
+                        {p.description && (
+                            <div class="mt-8">
+                                <h2 class="text-lg font-bold font-['Unbounded']">De qué se trata</h2>
+                                <p class="mt-3 text-gray-800 whitespace-pre-line leading-relaxed">{p.description}</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="comentarios" class="px-4 py-12 bg-slate-100">
+            <div class="container mx-auto md:px-8 max-w-4xl">
+                <h2 class="text-2xl font-bold font-['Unbounded']">Comentarios de asistentes</h2>
+                {reviews.length ? (
+                    <ul class="mt-6 space-y-4">
+                        {reviews.map((r) => (
+                            <li class="rounded-2xl bg-white border border-gray-200 p-5">
+                                <div class="flex flex-wrap items-center justify-between gap-2">
+                                    <div class="flex items-center gap-3">
+                                        <p class="font-semibold">{r.name}</p>
+                                        <span class="text-xs font-semibold rounded-full bg-lime-100 text-lime-800 px-2 py-0.5">✓ Asistencia verificada</span>
+                                    </div>
+                                    <StarRating modelValue={r.rating} size={16} label={`Calificación de ${r.name}`} readonly={true} showLabel={false} />
+                                </div>
+                                {r.function_label && <p class="mt-1 text-xs text-gray-500">Fue el {r.function_label.charAt(0).toLowerCase() + r.function_label.slice(1)}</p>}
+                                <p class="mt-3 text-gray-800 whitespace-pre-line">{r.comment}</p>
+                            </li>
+                        ))}
+                    </ul>
+                ) : (
+                    <p class="mt-4 text-gray-600">{p.has_started ? "Todavía no hay comentarios verificados. ¡Sé la primera persona en contar cómo estuvo!" : "Cuando el evento ocurra, aquí verás los comentarios de quienes fueron."}</p>
+                )}
+
+                <div id="fuiste" class="mt-10 scroll-mt-24">
+                    <h2 class="text-xl font-bold font-['Unbounded']">¿Fuiste? Cuéntanos cómo estuvo</h2>
+                    {p.has_started && reviewDates.length ? (
+                        <div class="mt-4">
+                            <PanoramaFeedbackForm
+                                client:visible
+                                eventId={p.id}
+                                eventName={p.name}
+                                dates={reviewDates}
+                                commentMin={COMMENT_MIN}
+                                commentMax={COMMENT_MAX}
+                                maxMb={PROOF_MAX_BYTES / 1024 / 1024}
+                            />
+                        </div>
+                    ) : (
+                        <p class="mt-3 text-gray-600">Podrás dejar tu comentario cuando el evento haya empezado. Guarda tu entrada: te la pediremos como comprobante.</p>
+                    )}
+                </div>
+            </div>
+        </section>
+
+        {related.length > 0 && (
+            <section class="px-4 py-12">
+                <div class="container mx-auto md:px-8 max-w-6xl">
+                    <div class="flex items-baseline justify-between gap-4 mb-5">
+                        <h2 class="text-2xl font-bold font-['Unbounded']">Más {p.category_name.toLowerCase()}</h2>
+                        <a href={p.category_path} class="text-sm underline shrink-0">Ver todos</a>
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+                        {related.map((x) => <PanoramaCard panorama={x} />)}
+                    </div>
+                </div>
+            </section>
+        )}
+
+        {!soldByUs && (
+            <section class="px-4 pb-14">
+                <div class="container mx-auto md:px-8 max-w-4xl rounded-2xl bg-black text-white p-8 md:p-10">
+                    <h2 class="text-xl md:text-2xl font-bold font-['Unbounded']">¿Organizas {p.name}?</h2>
+                    <p class="mt-3 text-white/80">Vende tus próximas fechas con AI Tickets: página del evento, pagos, entradas con QR y difusión con IA.</p>
+                    <a href={`/organizadores?${utm}`} class="inline-block mt-5 bg-lime-400 text-black font-semibold px-6 py-3 rounded-lg hover:bg-lime-300 transition">Conocer AI Tickets</a>
+                </div>
+            </section>
+        )}
+    </main>
+    <AppFooter client:idle />
+</Layout>

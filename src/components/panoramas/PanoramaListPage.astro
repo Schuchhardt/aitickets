@@ -1,0 +1,150 @@
+---
+// Cuerpo de los listados de /panoramas (portada, categoría y nicho): filtros por categoría, nicho y ciudad, destacados,
+// cartelera agrupada por la fecha de la próxima función y "¿Fuiste?" con los que terminaron hace poco.
+import PanoramaCard from "./PanoramaCard.astro";
+import {
+    CATEGORY_PUBLIC,
+    categoryPath,
+    facets,
+    shortCityLabel,
+    filterPanoramas,
+    groupByNextDate,
+    type PanoramaFeed,
+} from "../../lib/panoramas";
+import { cityInfo, type Category } from "../../lib/market/taxonomy";
+
+interface Props {
+    feed: PanoramaFeed | null;
+    today: string;
+    title: string;
+    intro: string;
+    category?: Category | null;
+    niche?: string | null;
+    city?: string | null;
+    breadcrumbs?: { name: string; href: string }[];
+}
+const { feed, today, title, intro, category = null, niche = null, city = null, breadcrumbs = [] } = Astro.props;
+const MAX_ITEMS = 120;
+
+const all = feed?.upcoming || [];
+const cityKey = city ? cityInfo(city).key : null;
+const list = filterPanoramas(all, { category, niche, city: cityKey });
+const featured = list.filter((p) => p.featured).slice(0, 4);
+const groups = groupByNextDate(list.slice(0, MAX_ITEMS), today);
+const recent = filterPanoramas(feed?.recent || [], { category, niche, city: cityKey }).slice(0, 8);
+const f = facets(filterPanoramas(all, { city: cityKey }), category);
+const cities = facets(filterPanoramas(all, { category, niche }), null).cities;
+const basePath = category ? categoryPath(category, niche) : "/panoramas";
+const chip = (active: boolean) =>
+    `px-3 py-1 rounded-full border text-sm transition ${active ? "bg-lime-400 border-lime-400 text-black font-semibold" : "border-white/30 hover:bg-white hover:text-black"}`;
+const cityQuery = cityKey ? `?ciudad=${encodeURIComponent(cityKey)}` : "";
+const utm = `utm_source=panoramas&utm_medium=listado&utm_campaign=${category ? CATEGORY_PUBLIC[category].slug : "todos"}`;
+---
+
+<section class="bg-black text-white px-4 pt-28 pb-12">
+    <div class="container mx-auto md:px-8 max-w-6xl">
+        {breadcrumbs.length > 0 && (
+            <nav aria-label="Migas de pan" class="text-sm text-white/60 mb-4">
+                {breadcrumbs.map((b, i) => (
+                    <>
+                        {i > 0 && <span class="mx-1">›</span>}
+                        <a href={b.href} class="hover:text-white">{b.name}</a>
+                    </>
+                ))}
+            </nav>
+        )}
+        <h1 class="text-3xl md:text-5xl font-bold font-['Unbounded']">{title}</h1>
+        <p class="mt-4 text-lg text-white/80 max-w-2xl">{intro}</p>
+
+        <div class="mt-8 flex flex-wrap gap-2" aria-label="Categorías">
+            <a href={`/panoramas${cityQuery}`} class={chip(!category)}>Todos</a>
+            {f.categories.map((c) => (
+                <a href={`${c.path}${cityQuery}`} class={chip(category === c.key)}>
+                    {c.name} <span class="opacity-60">{c.count}</span>
+                </a>
+            ))}
+        </div>
+        {category && f.niches.length > 1 && (
+            <div class="mt-3 flex flex-wrap gap-2" aria-label="Nichos">
+                <a href={`${categoryPath(category)}${cityQuery}`} class={chip(!niche)}>Todos los nichos</a>
+                {f.niches.map((n) => (
+                    <a href={`${n.path}${cityQuery}`} class={chip(niche === n.key)}>
+                        {n.label} <span class="opacity-60">{n.count}</span>
+                    </a>
+                ))}
+            </div>
+        )}
+        {cities.length > 1 && (
+            <div class="mt-3 flex flex-wrap gap-2 items-center" aria-label="Ciudades">
+                <span class="text-sm text-white/60 mr-1">Ciudad:</span>
+                <a href={basePath} class={chip(!cityKey)}>Todas</a>
+                {cities.slice(0, 10).map((c) => (
+                    <a href={`${basePath}?ciudad=${encodeURIComponent(c.key)}`} class={chip(cityKey === c.key)} rel="nofollow">
+                        {c.label}
+                    </a>
+                ))}
+            </div>
+        )}
+    </div>
+</section>
+
+<section class="px-4 py-12 bg-white">
+    <div class="container mx-auto md:px-8 max-w-6xl">
+        {!feed ? (
+            <p class="text-gray-600">Estamos preparando la cartelera. Vuelve pronto.</p>
+        ) : list.length === 0 ? (
+            <div class="py-8">
+                <p class="text-lg text-gray-700">No hay panoramas próximos{cityKey ? ` en ${shortCityLabel(cityKey)}` : ""} con estos filtros.</p>
+                <a href="/panoramas" class="inline-block mt-4 underline font-semibold">Ver todos los panoramas</a>
+            </div>
+        ) : (
+            <>
+                {featured.length > 0 && (
+                    <div class="mb-12">
+                        <h2 class="text-xl md:text-2xl font-bold font-['Unbounded'] mb-5">Destacados</h2>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+                            {featured.map((p) => <PanoramaCard panorama={p} />)}
+                        </div>
+                    </div>
+                )}
+                {groups.map((g) => (
+                    <div class="mb-10">
+                        <h2 class="text-lg md:text-xl font-bold font-['Unbounded'] mb-4 sticky top-16 bg-white/95 backdrop-blur py-2 z-10">{g.label}</h2>
+                        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+                            {g.items.map((p) => <PanoramaCard panorama={p} />)}
+                        </div>
+                    </div>
+                ))}
+                {list.length > MAX_ITEMS && (
+                    <p class="text-gray-600">Hay {list.length - MAX_ITEMS} panoramas más: filtra por categoría o ciudad para verlos.</p>
+                )}
+            </>
+        )}
+    </div>
+</section>
+
+{recent.length > 0 && (
+    <section class="px-4 py-12 bg-slate-100">
+        <div class="container mx-auto md:px-8 max-w-6xl">
+            <h2 class="text-2xl font-bold font-['Unbounded']">¿Fuiste a alguno? Cuéntanos cómo estuvo</h2>
+            <p class="mt-2 text-gray-600 max-w-2xl">
+                Sube tu entrada, el PDF o el correo de compra y deja tu comentario. Lo publicamos con el sello de asistencia verificada después de revisarlo.
+            </p>
+            <div class="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+                {recent.map((p) => <PanoramaCard panorama={p} mode="past" />)}
+            </div>
+        </div>
+    </section>
+)}
+
+<section class="px-4 py-14 bg-black text-white">
+    <div class="container mx-auto md:px-8 max-w-4xl text-center">
+        <h2 class="text-2xl md:text-3xl font-bold font-['Unbounded']">¿Organizas eventos?</h2>
+        <p class="mt-3 text-white/80">
+            Vende tus entradas con AI Tickets: página del evento, pagos, entradas con QR y difusión con IA.
+        </p>
+        <a href={`/organizadores?${utm}`} class="inline-block mt-6 bg-lime-400 text-black font-semibold px-6 py-3 rounded-lg hover:bg-lime-300 transition">
+            Publicar mi evento
+        </a>
+    </div>
+</section>
