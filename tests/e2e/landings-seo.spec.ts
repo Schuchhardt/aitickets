@@ -52,7 +52,7 @@ for (const { path, schemas, ogImage } of LANDINGS) {
     const blocks = await page.locator('script[type="application/ld+json"]').allTextContents();
     const types = blocks.flatMap((text) => {
       const data = JSON.parse(text);
-      return (data["@graph"] ?? [data]).map((d) => d["@type"]);
+      return (data["@graph"] ?? [data]).map((d: { "@type"?: string }) => d["@type"]);
     });
     for (const schema of schemas) expect(types).toContain(schema);
   });

@@ -97,7 +97,7 @@ export default async function handler(req) {
       return respond({ message: `Entrada no válida (estado: ${current?.status || 'desconocido'})`, code: 'invalid_status', status: current?.status || null }, 409)
     }
 
-    const fnCheck = await getFunctionCheck(supabase, eventId, ticket.event_tickets?.event_date_id ?? null)
+    const fnCheck = await getFunctionCheck(supabase, eventId, ticket.event_tickets?.event_date_id ?? null, validatedAt)
     return respond({ message: 'Entrada validada exitosamente', validated_at: validatedAt, ...fnCheck, ...lateFields }, 200)
   } catch (err) {
     console.error('Error en confirm-ticket:', err?.message)

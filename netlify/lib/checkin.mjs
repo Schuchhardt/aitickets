@@ -1,14 +1,20 @@
 // Utilidades de check-in: advertencia cuando la entrada es de otra función (contrato R1), ingreso por función de
 // las entradas multifunción y hora límite de ingreso (la lista "hasta las 01:00").
-import { EVENT_DATE_COLUMNS, todayInTimeZone, formatFunctionLabel } from './dates.mjs'
-import { isMultiSession, pickSession, santiagoDay, sessionView } from '../../src/lib/sessionCheckin.mjs'
+import { EVENT_DATE_COLUMNS, formatFunctionLabel } from './dates.mjs'
+import { isMultiSession, isOtherFunction, pickSession, santiagoDay, sessionView } from '../../src/lib/sessionCheckin.mjs'
 import { entryDeadlineCheck, lateEntryMessage, normalizeEntryUntil } from '../../src/lib/entryDeadline.mjs'
 
 /**
  * Si la entrada es de una función específica (event_tickets.event_date_id) que no es hoy (America/Santiago),
  * devuelve { function_mismatch: true, function_label }. Si no, { function_mismatch: false, function_label }.
+ * En la madrugada, mientras sigue la función de anoche que cruza la medianoche, la función actual es esa
+ * (isOtherFunction, src/lib/sessionCheckin.mjs). `at` = hora de la validación (por defecto, ahora).
+ * @param {any} supabase
+ * @param {number} eventId
+ * @param {number|null} eventDateId
+ * @param {Date|string} [at]
  */
-export async function getFunctionCheck(supabase, eventId, eventDateId) {
+export async function getFunctionCheck(supabase, eventId, eventDateId, at = new Date()) {
   if (eventDateId == null) return { function_mismatch: false, function_label: null }
   const { data: fn } = await supabase
     .from('event_dates')
@@ -18,7 +24,19 @@ export async function getFunctionCheck(supabase, eventId, eventDateId) {
     .maybeSingle()
   if (!fn) return { function_mismatch: false, function_label: null }
   const label = formatFunctionLabel(fn)
-  return { function_mismatch: String(fn.date).slice(0, 10) !== todayInTimeZone(), function_label: label }
+  const day = String(fn.date).slice(0, 10)
+  const today = santiagoDay(at)
+  const yesterday = santiagoDay(new Date(new Date(`${today}T12:00:00Z`).getTime() - 86_400_000))
+  // Solo hoy y ayer pueden cambiar por una función que cruza la medianoche: el resto se decide por el día
+  if (day !== today && day !== yesterday) return { function_mismatch: true, function_label: label }
+  let dates = null
+  try {
+    dates = await loadEventSessions(supabase, eventId)
+  } catch {
+    dates = null
+  }
+  const mismatch = dates?.length ? isOtherFunction(fn, dates, at) : day !== today
+  return { function_mismatch: mismatch, function_label: label }
 }
 
 // ==== Ingreso por función de las entradas multifunción (aitickets_attendee_checkins) ====

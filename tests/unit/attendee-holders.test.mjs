@@ -61,7 +61,7 @@ describe('ensureOrderAttendees', () => {
 
   it('emite la mesa con sus asistentes guardados en la orden', async () => {
     const db = setup()
-    const r = await ensureOrderAttendees(db, { id: ORDER, event_id: 1, attendee_id: 9, ticket_details: [{ id: 7, quantity: 1 }, { id: 5, quantity: 1 }] })
+    const r = await ensureOrderAttendees(db, { id: ORDER, event_id: 1, attendee_id: 9, ticket_details: [{ id: 7, quantity: 1, people: 4 }, { id: 5, quantity: 1 }] })
     expect(r).toEqual({ created: 5, existing: 0 })
     const rows = db.tables.event_attendees
     expect(rows.filter((a) => a.event_ticket_id === 7)).toHaveLength(4)
@@ -74,12 +74,25 @@ describe('ensureOrderAttendees', () => {
   it('base sin las columnas nuevas: emite igual, sin asistentes ni mesa', async () => {
     const db = setup()
     db.failOn('event_attendees', 'insert', { code: '42703', message: 'column "holder_name" does not exist' })
-    const r = await ensureOrderAttendees(db, { id: ORDER, event_id: 1, attendee_id: 9, ticket_details: [{ id: 5, quantity: 1 }, { id: 7, quantity: 1 }] })
+    const r = await ensureOrderAttendees(db, { id: ORDER, event_id: 1, attendee_id: 9, ticket_details: [{ id: 5, quantity: 1 }, { id: 7, quantity: 1, people: 4 }] })
     expect(r.created).toBe(5)
     for (const a of db.tables.event_attendees) {
       expect(a).not.toHaveProperty('holder_name')
       expect(a).not.toHaveProperty('unit_id')
     }
+  })
+
+  it('usa las personas por mesa que se compraron, no el valor actual del tipo de entrada', async () => {
+    const db = setup()
+    // Se compró como entrada normal (sin `people`) y el tipo 7 ahora es mesa para 4: 2 QR, no 8
+    const a = await ensureOrderAttendees(db, { id: ORDER, event_id: 1, attendee_id: 9, ticket_details: [{ id: 7, quantity: 2 }] })
+    expect(a.created).toBe(2)
+    expect(db.tables.event_attendees.every((x) => x.unit_id === undefined)).toBe(true)
+    // Se compró una mesa para 6 y el tipo 5 ahora es para 1: igual son 6 QR de la misma mesa
+    const db2 = setup()
+    const b = await ensureOrderAttendees(db2, { id: ORDER, event_id: 1, attendee_id: 9, ticket_details: [{ id: 5, quantity: 1, people: 6 }] })
+    expect(b.created).toBe(6)
+    expect(new Set(db2.tables.event_attendees.map((x) => x.unit_id)).size).toBe(1)
   })
 
   it('sin la columna people_per_ticket, todas son entradas normales', async () => {

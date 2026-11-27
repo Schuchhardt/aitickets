@@ -135,6 +135,20 @@ describe('autenticación', () => {
     expect(auth).toMatchObject({ ok: true, keyKind: 'full' })
   })
 
+  it('token OAuth (aitk_) de un email autorizado pero sin scope write: solo lectura', async () => {
+    const apiKey = generateApiKey()
+    db.tables.aitickets_api_keys.push({
+      id: 502, organization_id: 7, user_id: 1, name: 'Solo lectura', key_prefix: apiKey.prefix,
+      key_hash: apiKey.hash, scopes: ['read'], last_used_at: null, expires_at: null, revoked_at: null, created_at: new Date().toISOString(),
+    })
+    process.env.ADMIN_MCP_EMAILS = 'ana@prod.cl,admin@aitickets.cl'
+    const auth = await authenticateAdminRequest(
+      new Request('https://aitickets.cl/api/admin/mcp', { method: 'POST', headers: { host: 'aitickets.cl', Authorization: `Bearer ${apiKey.key}` }, body: '{}' }),
+      db,
+    )
+    expect(auth).toMatchObject({ ok: true, keyKind: 'readonly' })
+  })
+
   it('token OAuth (aitk_) con email no autorizado: 401', async () => {
     const apiKey = generateApiKey()
     db.tables.aitickets_api_keys.push({

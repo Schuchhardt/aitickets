@@ -76,6 +76,21 @@ export function pickSession(dates, at = new Date()) {
 }
 
 /**
+ * ¿Una entrada de la función `fn` es "de otra función" en el momento `at`? Por día de Chile, salvo en la madrugada
+ * mientras sigue la función de anoche que cruza la medianoche (y no empezó una de hoy): ahí la función actual es esa,
+ * así que su entrada NO es de otra función y la de hoy sí.
+ */
+export function isOtherFunction(fn, dates, at = new Date()) {
+  const today = santiagoDay(at)
+  const current = pickSession(dates, at)
+  const now = minutesOf(timeFmt.format(toDate(at)))
+  if (current && dayNumber(current.date) === dayNumber(today) - 1 && now < overnightUntil(current)) {
+    return String(current.id) !== String(fn?.id)
+  }
+  return String(fn?.date).slice(0, 10) !== today
+}
+
+/**
  * La entrada como la ve el escáner en la función actual: una multifunción está 'validated' solo si ya entró a ESA
  * función. `session_checkins` ([{ event_date_id, checked_in_at }]) lo agrega el servidor; si falta (tabla aún sin
  * migrar), la entrada se deja tal cual (regla de un solo ingreso).
