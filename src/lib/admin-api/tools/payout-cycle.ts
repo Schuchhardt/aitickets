@@ -49,12 +49,12 @@ async function notifyProducer(supabase: any, orgId: number, render: (orgName: st
         if (!to.length) return { email_sent: false, email_note: "La organización no tiene un correo válido de dueño ni de contacto." };
         const { subject, html, text } = await render(orgName);
         await sendEmail({ to, subject, html, text, tags: ["payout", tag] });
-        sendPushToOrg(orgId, {
+        await sendPushToOrg(orgId, {
             title: subject,
             body: text.slice(0, 120),
             url: "/dashboard/finance",
             tag,
-        }).catch(() => {});
+        });
         return { email_sent: true, email_recipients: to.length };
     } catch (err: any) {
         console.error(`admin ${tag} email:`, err?.message || err);

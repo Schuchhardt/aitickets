@@ -1,3 +1,5 @@
+// Service worker del panel de productores (PWA): avisos push y caché mínima. Solo guarda assets con hash
+// (/_astro/, inmutables) e íconos; el resto del sitio (páginas, imágenes de eventos, API) va siempre a la red.
 const CACHE_NAME = 'ait-producer-v1'
 const PRECACHE_URLS = [
   '/android-chrome-192x192.png',
@@ -17,7 +19,8 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+      // Solo cachés propias: las del validador (validador-*) son del mismo origen y deben sobrevivir
+      Promise.all(keys.filter((k) => k.startsWith('ait-producer-') && k !== CACHE_NAME).map((k) => caches.delete(k)))
     )
   )
   self.clients.claim()
@@ -30,10 +33,9 @@ self.addEventListener('fetch', (event) => {
   if (url.protocol !== 'https:' && url.protocol !== 'http:') return
 
   const isAstroAsset = url.pathname.startsWith('/_astro/')
-  const isFont = url.pathname.match(/\.(woff2?|ttf|otf)$/)
   const isIcon = PRECACHE_URLS.includes(url.pathname)
 
-  if (isAstroAsset || isFont || isIcon) {
+  if (url.origin === self.location.origin && (isAstroAsset || isIcon)) {
     event.respondWith(
       caches.match(event.request).then((cached) => {
         if (cached) return cached
@@ -49,20 +51,6 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  if (url.pathname.endsWith('.js') || url.pathname.endsWith('.css') || url.pathname.match(/\.(png|jpg|jpeg|webp|avif|svg|gif|ico)$/)) {
-    event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          if (response.ok) {
-            const clone = response.clone()
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone))
-          }
-          return response
-        })
-        .catch(() => caches.match(event.request))
-    )
-    return
-  }
 })
 
 self.addEventListener('push', (event) => {

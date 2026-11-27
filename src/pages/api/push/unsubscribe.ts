@@ -20,7 +20,7 @@ export const POST: APIRoute = async (context) => {
 
     const supabase = getSupabaseAdmin();
     await supabase
-        .from("push_subscriptions")
+        .from("aitickets_push_subscriptions")
         .delete()
         .eq("endpoint", endpoint)
         .eq("user_id", session.authUser.id);

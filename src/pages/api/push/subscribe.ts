@@ -27,7 +27,7 @@ export const POST: APIRoute = async (context) => {
     const userAgent = context.request.headers.get("user-agent") || null;
 
     const { error } = await supabase
-        .from("push_subscriptions")
+        .from("aitickets_push_subscriptions")
         .upsert(
             {
                 user_id: session.authUser.id,

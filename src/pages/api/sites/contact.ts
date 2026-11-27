@@ -205,12 +205,12 @@ export const POST: APIRoute = async ({ request, locals }) => {
         replyTo: formatRecipient(oneLine(data.name), data.email),
         tags: ["site-contact"],
       });
-      sendPushToOrg(site.organization_id, {
+      await sendPushToOrg(site.organization_id, {
         title: "Nuevo mensaje de contacto",
         body: `${oneLine(data.name)}: ${String(data.message || "").slice(0, 100)}`,
         url: "/dashboard/events",
         tag: "site-contact",
-      }).catch(() => {});
+      });
     } catch (err: any) {
       console.error("sites/contact: error al enviar el correo", err);
       mailError = String(err?.message || err || "error").slice(0, 500);

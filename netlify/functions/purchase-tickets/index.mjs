@@ -648,12 +648,12 @@ export default async function handler(req) {
 
       const emailResult = await sendOrderTicketsEmail(order.id)
       if (!emailResult.ok) console.error(`Orden gratis ${order.id}: no se pudo enviar el correo (${emailResult.status})`)
-      sendPushToOrg(event.organization_id, {
+      await sendPushToOrg(event.organization_id, {
         title: 'Nuevo registro',
         body: `${ticketQty} entrada${ticketQty !== 1 ? 's' : ''} gratis · ${event.name || ''}`.slice(0, 120),
         url: `/dashboard/events/${eventId}`,
         tag: 'new-sale',
-      }).catch(() => {})
+      })
 
       console.log(`🎟️ Orden gratis ${order.id} evento ${eventId}: ${ticketQty} entrada(s)`)
       return json({ orderId: order.id, redirectUrl: `/order/${order.id}`, provider: 'free', message: 'Registro completado' }, 200)
